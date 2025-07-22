@@ -17,12 +17,14 @@ interface OrdersTableProps {
 }
 
 const statusConfig: Record<OrderStatus, { label: string; className: string }> = {
+  pending: { label: 'Pending', className: 'bg-yellow-100 text-yellow-800' },
   confirmed: { label: 'Confirmed', className: 'bg-blue-100 text-blue-800' },
   preparing: { label: 'Preparing', className: 'bg-yellow-100 text-yellow-800' },
   ready: { label: 'Ready', className: 'bg-indigo-100 text-indigo-800' },
   out_for_delivery: { label: 'Out for Delivery', className: 'bg-purple-100 text-purple-800' },
   delivered: { label: 'Delivered', className: 'bg-green-100 text-green-800' },
   cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
+  refunded: { label: 'Refunded', className: 'bg-gray-100 text-gray-800' },
 };
 
 const getStatusBadge = (status: OrderStatus) => {
@@ -67,12 +69,12 @@ const OrdersTable = ({ orders, onViewOrder }: OrdersTableProps) => {
                 <td className="py-4 px-6 font-medium text-gray-800">{formatCurrency(order.total_amount)}</td>
                 <td className="py-4 px-6">
                   <div className="flex items-center space-x-2">
-                    {order.delivery_method === 'delivery' ? (
+                    {order.order_type === 'delivery' ? (
                       <Truck className="h-4 w-4 text-gray-500" />
                     ) : (
                       <Package className="h-4 w-4 text-gray-500" />
                     )}
-                    <span className="text-gray-600 capitalize">{order.delivery_method}</span>
+                    <span className="text-gray-600 capitalize">{order.order_type}</span>
                   </div>
                 </td>
                 <td className="py-4 px-6">

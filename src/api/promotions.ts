@@ -58,14 +58,10 @@ function castPromotionInput(input: any): Omit<Promotion, "id" | "created_at" | "
 }
 
 // Create new promotion
-export async function createPromotion(
-  promo: Omit<Promotion, "id" | "created_at" | "updated_at" | "status">
-) {
-  const insertPromo = castPromotionInput(promo);
-
+export async function createPromotion(promo: NewPromotion) {
   const { data, error } = await supabase
     .from("promotions")
-    .insert(insertPromo)
+    .insert(promo)
     .select()
     .single();
   if (error) throw error;

@@ -40,13 +40,13 @@ export const getCustomerDeliveryHistory = async (
     order_number: string;
     order_time: string;
     delivery_address: string;
-    delivery_method: string;
+    order_type: string;
     status: string;
     total_amount: number;
     order_items: {
       id: string;
       quantity: number;
-      price: number;
+      unit_price: number;
       product: {
         name: string;
       } | null;
@@ -60,13 +60,13 @@ export const getCustomerDeliveryHistory = async (
       order_number,
       order_time,
       delivery_address,
-      delivery_method,
+      order_type,
       status,
       total_amount,
       order_items(
         id,
         quantity,
-        price,
+        unit_price,
         product:products(name)
       )
     `)

@@ -12,13 +12,10 @@ export type ProductWithCategory = Product & {
   categories: Pick<Category, 'id' | 'name'> | null;
 };
 
-export type SiteContent = Database['public']['Tables']['site_content']['Row'];
-export type NewSiteContent = Database['public']['Tables']['site_content']['Insert'];
-export type UpdatedSiteContent = Database['public']['Tables']['site_content']['Update'];
-
-export type ContentVersion = Database['public']['Tables']['content_versions']['Row'];
-export type NewContentVersion = Database['public']['Tables']['content_versions']['Insert'];
-export type UpdatedContentVersion = Database['public']['Tables']['content_versions']['Update'];
+// Content management types using existing tables
+export type SiteContent = Database['public']['Tables']['content_management']['Row'];
+export type NewSiteContent = Database['public']['Tables']['content_management']['Insert'];
+export type UpdatedSiteContent = Database['public']['Tables']['content_management']['Update'];
 
 export type MenuSection = Database['public']['Enums']['menu_section'];
 export type PermissionLevel = Database['public']['Enums']['permission_level'];

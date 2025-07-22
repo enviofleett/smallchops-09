@@ -20,10 +20,9 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
     phone: "",
     working_hours: "",
     logo_url: "",
-    registration_number: "",
-    tax_id: "",
-    licenses: "",
-    social_links: "",
+    facebook_url: "",
+    instagram_url: "",
+    tiktok_url: "",
   });
 
   // Load existing settings from the edge function
@@ -88,17 +87,11 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
       return;
     }
     
-    if (business.social_links && !isValidJson(business.social_links)) {
-      handleError(new Error("Social Links must be valid JSON (e.g. {\"facebook\": \"...\"})"), "form validation");
-      return;
-    }
-
     console.log("Submitting business settings:", business);
     setLoading(true);
 
     try {
-      const social_links_value = parseSocialLinksValue(business.social_links);
-      const updatedSettings = await saveBusinessSettings(business, social_links_value);
+      const updatedSettings = await saveBusinessSettings(business, null);
       console.log("Business settings saved successfully:", updatedSettings);
       handleSuccess("Business information updated successfully");
       setBusiness(updatedSettings);

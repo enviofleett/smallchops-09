@@ -82,41 +82,6 @@ const BusinessForm = ({
           />
         </div>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">Business Registration Number</label>
-          <Input 
-            type="text" 
-            name="registration_number" 
-            placeholder="Reg. Number" 
-            value={business.registration_number} 
-            onChange={onChange} 
-            disabled={loading} 
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">Tax ID</label>
-          <Input 
-            type="text" 
-            name="tax_id" 
-            placeholder="Tax ID" 
-            value={business.tax_id} 
-            onChange={onChange} 
-            disabled={loading} 
-          />
-        </div>
-      </div>
-      <div>
-        <label className="block text-sm font-medium mb-1 text-gray-700">Licenses</label>
-        <Input 
-          type="text" 
-          name="licenses" 
-          placeholder="Licenses" 
-          value={business.licenses} 
-          onChange={onChange} 
-          disabled={loading} 
-        />
-      </div>
       <div>
         <label className="block text-sm font-medium mb-2 text-gray-700">Business Logo</label>
         <ImageUpload 
@@ -129,15 +94,50 @@ const BusinessForm = ({
         )}
       </div>
       <div>
-        <label className="block text-sm font-medium mb-1 text-gray-700">Social Links (JSON)</label>
-        <Input 
-          type="text" 
-          name="social_links" 
-          placeholder='{"facebook":"..."}' 
-          value={business.social_links} 
-          onChange={onChange} 
-          disabled={loading} 
-        />
+        <label className="block text-sm font-medium mb-2 text-gray-700">
+          Social Media Links
+        </label>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              Facebook URL
+            </label>
+            <Input 
+              type="url" 
+              name="facebook_url" 
+              placeholder="https://facebook.com/your-page" 
+              value={business.facebook_url} 
+              onChange={onChange} 
+              disabled={loading}
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              Instagram URL
+            </label>
+            <Input 
+              type="url" 
+              name="instagram_url" 
+              placeholder="https://instagram.com/your-page" 
+              value={business.instagram_url} 
+              onChange={onChange} 
+              disabled={loading}
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              TikTok URL
+            </label>
+            <Input 
+              type="url" 
+              name="tiktok_url" 
+              placeholder="https://tiktok.com/@your-page" 
+              value={business.tiktok_url} 
+              onChange={onChange} 
+              disabled={loading}
+            />
+          </div>
+        </div>
       </div>
       <div className="pt-2">
         <Button type="submit" className="px-7 rounded-lg text-base font-medium" disabled={loading || uploadingLogo}>

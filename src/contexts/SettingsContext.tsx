@@ -47,14 +47,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           phone: item.phone || "",
           working_hours: item.working_hours || "",
           logo_url: item.logo_url || "",
-          registration_number: item.registration_number || "",
-          tax_id: item.tax_id || "",
-          licenses: item.licenses || "",
-          social_links: item.social_links
-            ? typeof item.social_links === "string"
-              ? item.social_links
-              : JSON.stringify(item.social_links)
-            : "",
+          facebook_url: item.facebook_url || "",
+          instagram_url: item.instagram_url || "",
+          tiktok_url: item.tiktok_url || "",
         } as BusinessSettings;
       }
       
@@ -65,10 +60,9 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         phone: "",
         working_hours: "",
         logo_url: "",
-        registration_number: "",
-        tax_id: "",
-        licenses: "",
-        social_links: "",
+        facebook_url: "",
+        instagram_url: "",
+        tiktok_url: "",
       } as BusinessSettings;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

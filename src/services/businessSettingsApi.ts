@@ -52,14 +52,9 @@ export const loadBusinessSettings = async (): Promise<BusinessSettings | null> =
         phone: item.phone || "",
         working_hours: item.working_hours || "",
         logo_url: item.logo_url || "",
-        registration_number: item.registration_number || "",
-        tax_id: item.tax_id || "",
-        licenses: item.licenses || "",
-        social_links: item.social_links
-          ? typeof item.social_links === "string"
-            ? item.social_links
-            : JSON.stringify(item.social_links)
-          : "",
+        facebook_url: item.facebook_url || "",
+        instagram_url: item.instagram_url || "",
+        tiktok_url: item.tiktok_url || "",
       };
     }
 
@@ -76,10 +71,7 @@ export const saveBusinessSettings = async (
   
   return retryOperation(async () => {
     const { data, error } = await supabase.functions.invoke("business-settings", {
-      body: {
-        ...business,
-        social_links: social_links_value,
-      },
+      body: business,
     });
 
     if (error) {
@@ -103,14 +95,9 @@ export const saveBusinessSettings = async (
         phone: item.phone || "",
         working_hours: item.working_hours || "",
         logo_url: item.logo_url || "",
-        registration_number: item.registration_number || "",
-        tax_id: item.tax_id || "",
-        licenses: item.licenses || "",
-        social_links: item.social_links
-          ? typeof item.social_links === "string"
-            ? item.social_links
-            : JSON.stringify(item.social_links)
-          : "",
+        facebook_url: item.facebook_url || "",
+        instagram_url: item.instagram_url || "",
+        tiktok_url: item.tiktok_url || "",
       };
     }
 

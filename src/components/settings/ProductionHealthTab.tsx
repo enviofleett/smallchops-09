@@ -13,7 +13,7 @@ interface HealthCheck {
   lastChecked?: Date;
 }
 
-export const ProductionHealthTab = () => {
+const ProductionHealthTab = () => {
   const [healthChecks, setHealthChecks] = useState<HealthCheck[]>([
     { name: "Database Connection", status: 'loading', message: "Checking..." },
     { name: "Business Settings", status: 'loading', message: "Checking..." },
@@ -275,3 +275,5 @@ export const ProductionHealthTab = () => {
     </div>
   );
 };
+
+export default ProductionHealthTab;

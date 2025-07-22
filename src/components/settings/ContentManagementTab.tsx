@@ -17,7 +17,7 @@ const CONTENT_TYPE_LABELS = {
   help_center: 'Help Center',
 };
 
-export const ContentManagementTab = () => {
+const ContentManagementTab = () => {
   const { useContentList, useDeleteContent } = useContentManagement();
   const { data: contentList = [], isLoading } = useContentList();
   const deleteContentMutation = useDeleteContent();
@@ -166,3 +166,5 @@ export const ContentManagementTab = () => {
     </div>
   );
 };
+
+export default ContentManagementTab;

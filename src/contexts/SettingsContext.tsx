@@ -72,7 +72,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       } as BusinessSettings;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes
-    cacheTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
   });
 
   const refetchBusinessSettings = async () => {

@@ -1,29 +1,12 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Tables } from "@/integrations/supabase/types";
+import { Database } from "@/integrations/supabase/types";
 
-export type Vehicle = {
-  id: string;
-  license_plate: string;
-  type: "bike" | "van" | "truck" | "sedan" | "motorcycle" | "other";
-  brand: string | null;
-  model: string | null;
-  status: "available" | "assigned" | "maintenance" | "inactive";
-  notes: string | null;
-  created_at: string;
-  updated_at: string;
-};
-export type NewVehicle = Omit<Vehicle, "id" | "created_at" | "updated_at" | "status"> & { status?: Vehicle["status"] };
+// Use Supabase generated types
+export type Vehicle = Database['public']['Tables']['vehicles']['Row'];
+export type NewVehicle = Database['public']['Tables']['vehicles']['Insert'];
 
-export type Assignment = {
-  id: string;
-  vehicle_id: string;
-  dispatch_rider_id: string;
-  assigned_at: string;
-  assigned_by: string | null;
-  status: "active" | "inactive";
-  notes: string | null;
-};
+export type Assignment = Database['public']['Tables']['vehicle_assignments']['Row'];
 
 export async function getVehicles(): Promise<Vehicle[]> {
   const { data, error } = await supabase.from("vehicles").select("*").order("created_at", { ascending: false });
@@ -32,7 +15,7 @@ export async function getVehicles(): Promise<Vehicle[]> {
 }
 
 export async function createVehicle(vehicle: NewVehicle): Promise<Vehicle> {
-  const { data, error } = await supabase.from("vehicles").insert([vehicle]).select().single();
+  const { data, error } = await supabase.from("vehicles").insert(vehicle).select().single();
   if (error) throw error;
   return data;
 }

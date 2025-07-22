@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import CategoriesManager from '@/components/categories/CategoriesManager';
 import { PromotionsSidebarIcon } from "./PromotionsSidebarIcon";
+import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 
 
 interface SidebarProps {
@@ -30,6 +31,7 @@ interface SidebarProps {
 
 const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
   const [isCategoriesOpen, setCategoriesOpen] = useState(false);
+  const { data: settings } = useBusinessSettings();
   
 
   const menuItems = [
@@ -64,11 +66,21 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
       {/* Logo */}
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">D</span>
+          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center overflow-hidden">
+            {settings?.logo_url ? (
+              <img 
+                src={settings.logo_url} 
+                alt={settings.name} 
+                className="w-full h-full object-contain"
+              />
+            ) : (
+              <span className="text-white font-bold text-sm">
+                {settings?.name?.charAt(0) || 'D'}
+              </span>
+            )}
           </div>
           {!isCollapsed && (
-            <span className="font-semibold text-xl text-gray-800">DotCrafts</span>
+            <span className="font-semibold text-xl text-gray-800">{settings?.name || 'DotCrafts'}</span>
           )}
         </div>
       </div>

@@ -6,10 +6,9 @@ export interface BusinessSettings {
   phone: string;
   working_hours: string;
   logo_url: string;
-  registration_number: string;
-  tax_id: string;
-  licenses: string;
-  social_links: string; // JSON string in the form
+  facebook_url: string;
+  instagram_url: string;
+  tiktok_url: string;
 }
 
 export interface BusinessSettingsHookReturn {

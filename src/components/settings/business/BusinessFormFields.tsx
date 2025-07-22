@@ -94,47 +94,51 @@ const BusinessFormFields: React.FC<BusinessFormFieldsProps> = ({
         </div>
       </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">
-            Registration Number
-          </label>
-          <Input 
-            type="text" 
-            name="registration_number" 
-            placeholder="Reg. Number" 
-            value={formData.registration_number} 
-            onChange={onChange} 
-            disabled={disabled}
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1 text-gray-700">
-            Tax ID
-          </label>
-          <Input 
-            type="text" 
-            name="tax_id" 
-            placeholder="Tax ID" 
-            value={formData.tax_id} 
-            onChange={onChange} 
-            disabled={disabled}
-          />
-        </div>
-      </div>
-      
       <div>
-        <label className="block text-sm font-medium mb-1 text-gray-700">
-          Licenses
+        <label className="block text-sm font-medium mb-2 text-gray-700">
+          Social Media Links
         </label>
-        <Input 
-          type="text" 
-          name="licenses" 
-          placeholder="Licenses" 
-          value={formData.licenses} 
-          onChange={onChange} 
-          disabled={disabled}
-        />
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              Facebook URL
+            </label>
+            <Input 
+              type="url" 
+              name="facebook_url" 
+              placeholder="https://facebook.com/your-page" 
+              value={formData.facebook_url} 
+              onChange={onChange} 
+              disabled={disabled}
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              Instagram URL
+            </label>
+            <Input 
+              type="url" 
+              name="instagram_url" 
+              placeholder="https://instagram.com/your-page" 
+              value={formData.instagram_url} 
+              onChange={onChange} 
+              disabled={disabled}
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-600 mb-1">
+              TikTok URL
+            </label>
+            <Input 
+              type="url" 
+              name="tiktok_url" 
+              placeholder="https://tiktok.com/@your-page" 
+              value={formData.tiktok_url} 
+              onChange={onChange} 
+              disabled={disabled}
+            />
+          </div>
+        </div>
       </div>
       
       <div>
@@ -151,19 +155,6 @@ const BusinessFormFields: React.FC<BusinessFormFieldsProps> = ({
         )}
       </div>
       
-      <div>
-        <label className="block text-sm font-medium mb-1 text-gray-700">
-          Social Links (JSON)
-        </label>
-        <Input 
-          type="text" 
-          name="social_links" 
-          placeholder='{"facebook":"..."}' 
-          value={formData.social_links} 
-          onChange={onChange} 
-          disabled={disabled}
-        />
-      </div>
     </>
   );
 };

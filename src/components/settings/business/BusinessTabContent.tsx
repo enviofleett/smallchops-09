@@ -24,10 +24,9 @@ const BusinessTabContent: React.FC = () => {
     phone: "",
     working_hours: "",
     logo_url: "",
-    registration_number: "",
-    tax_id: "",
-    licenses: "",
-    social_links: "",
+    facebook_url: "",
+    instagram_url: "",
+    tiktok_url: "",
   }));
   
   const [saving, setSaving] = useState(false);
@@ -46,9 +45,6 @@ const BusinessTabContent: React.FC = () => {
   const validationError = useMemo(() => {
     if (!debouncedFormData.name.trim()) {
       return "Business name is required";
-    }
-    if (debouncedFormData.social_links && !isValidJson(debouncedFormData.social_links)) {
-      return "Social Links must be valid JSON";
     }
     return null;
   }, [debouncedFormData]);
@@ -86,8 +82,7 @@ const BusinessTabContent: React.FC = () => {
 
     setSaving(true);
     try {
-      const social_links_value = parseSocialLinksValue(formData.social_links);
-      await saveBusinessSettings(formData, social_links_value);
+      await saveBusinessSettings(formData, null);
       handleSuccess("Business information updated successfully");
       await refetchBusinessSettings();
     } catch (err: any) {

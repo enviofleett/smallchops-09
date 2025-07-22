@@ -37,6 +37,16 @@ export const sanitizeInput = (input: string): string => {
   return input.trim().replace(/[<>]/g, '');
 };
 
+export const validateUrl = (url: string): boolean => {
+  if (!url.trim()) return true; // Empty URL is valid
+  try {
+    new URL(url);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
 export const validateBusinessSettings = (business: any): string[] => {
   const errors: string[] = [];
   
@@ -52,8 +62,16 @@ export const validateBusinessSettings = (business: any): string[] => {
     errors.push("Please enter a valid phone number");
   }
   
-  if (business.social_links && !isValidJson(business.social_links)) {
-    errors.push("Social links must be valid JSON format");
+  if (business.facebook_url && !validateUrl(business.facebook_url)) {
+    errors.push("Please enter a valid Facebook URL");
+  }
+  
+  if (business.instagram_url && !validateUrl(business.instagram_url)) {
+    errors.push("Please enter a valid Instagram URL");
+  }
+  
+  if (business.tiktok_url && !validateUrl(business.tiktok_url)) {
+    errors.push("Please enter a valid TikTok URL");
   }
   
   return errors;

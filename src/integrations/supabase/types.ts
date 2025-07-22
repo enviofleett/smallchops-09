@@ -1189,6 +1189,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_user_permission: {
+        Args: {
+          user_id_param: string
+          menu_key_param: string
+          required_level_param?: string
+        }
+        Returns: boolean
+      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -1196,6 +1204,10 @@ export type Database = {
       get_user_role: {
         Args: { user_id_to_check: string }
         Returns: string
+      }
+      health_check: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       is_admin: {
         Args: Record<PropertyKey, never>

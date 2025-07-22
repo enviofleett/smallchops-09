@@ -5,9 +5,11 @@ import { loadBusinessSettings, saveBusinessSettings } from "@/services/businessS
 import { uploadLogo } from "@/services/logoUploadService";
 import { isValidJson, parseSocialLinksValue } from "@/utils/businessValidation";
 import type { BusinessSettings, BusinessSettingsHookReturn } from "@/types/businessSettings";
+import { useGlobalBusinessSettings } from "./useGlobalBusinessSettings";
 
 export const useBusinessSettings = (): BusinessSettingsHookReturn => {
   const { handleError, handleSuccess } = useErrorHandler();
+  const { refetch: refetchGlobal } = useGlobalBusinessSettings();
   const [loading, setLoading] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -100,6 +102,9 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
       console.log("Business settings saved successfully:", updatedSettings);
       handleSuccess("Business information updated successfully");
       setBusiness(updatedSettings);
+      
+      // Refresh global business settings to update header/sidebar
+      await refetchGlobal();
     } catch (err: any) {
       console.error("Error saving business settings:", err);
       // Show user-friendly error message

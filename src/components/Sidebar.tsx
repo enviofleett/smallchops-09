@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { 
@@ -20,6 +21,7 @@ import {
 } from "@/components/ui/dialog";
 import CategoriesManager from '@/components/categories/CategoriesManager';
 import { PromotionsSidebarIcon } from "./PromotionsSidebarIcon";
+import { useGlobalBusinessSettings } from '@/hooks/useGlobalBusinessSettings';
 
 interface SidebarProps {
   isCollapsed: boolean;
@@ -28,6 +30,7 @@ interface SidebarProps {
 
 const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
   const [isCategoriesOpen, setCategoriesOpen] = useState(false);
+  const { settings } = useGlobalBusinessSettings();
 
   const menuItems = [
     { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
@@ -61,11 +64,23 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
       {/* Logo */}
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-            <span className="text-white font-bold text-sm">D</span>
-          </div>
+          {settings?.logo_url ? (
+            <img 
+              src={settings.logo_url} 
+              alt={settings.name || "Business Logo"}
+              className="w-8 h-8 rounded-lg object-cover"
+            />
+          ) : (
+            <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+              <span className="text-white font-bold text-sm">
+                {settings?.name?.charAt(0) || 'D'}
+              </span>
+            </div>
+          )}
           {!isCollapsed && (
-            <span className="font-semibold text-xl text-gray-800">DotCrafts</span>
+            <span className="font-semibold text-xl text-gray-800">
+              {settings?.name || 'DotCrafts'}
+            </span>
           )}
         </div>
       </div>

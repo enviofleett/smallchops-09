@@ -2,9 +2,11 @@
 import React, { useState } from 'react';
 import { Search, Bell, User, LogOut, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useGlobalBusinessSettings } from '@/hooks/useGlobalBusinessSettings';
 
 const TopNav = () => {
   const { user, logout } = useAuth();
+  const { settings } = useGlobalBusinessSettings();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleLogout = async () => {
@@ -15,15 +17,30 @@ const TopNav = () => {
   return (
     <header className="bg-white border-b border-gray-200 px-6 py-4">
       <div className="flex items-center justify-between">
-        {/* Search */}
-        <div className="flex-1 max-w-md">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-            <input
-              type="text"
-              placeholder="Search orders, customers, products..."
-              className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
-            />
+        {/* Business branding and search */}
+        <div className="flex items-center space-x-6 flex-1">
+          <div className="flex items-center space-x-3">
+            {settings?.logo_url && (
+              <img 
+                src={settings.logo_url} 
+                alt={settings.name || "Business Logo"}
+                className="w-8 h-8 rounded-lg object-cover"
+              />
+            )}
+            <h1 className="text-lg font-semibold text-gray-800">
+              {settings?.name || 'DotCrafts'}
+            </h1>
+          </div>
+          
+          <div className="flex-1 max-w-md">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                placeholder="Search orders, customers, products..."
+                className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent"
+              />
+            </div>
           </div>
         </div>
 

@@ -14,6 +14,7 @@ import CommunicationLogsTab from "@/components/settings/communication/Communicat
 import CustomerPreferencesTab from "@/components/settings/CustomerPreferencesTab";
 import MapApiTab from "@/components/settings/MapApiTab";
 import DevelopersCornerTab from "@/components/settings/DevelopersCornerTab";
+import { ProductionHealthTab } from "@/components/settings/ProductionHealthTab";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const TABS = [
@@ -28,6 +29,7 @@ const TABS = [
   { value: "envioapi", label: "Envio API", icon: Code, component: () => <EnvioApiTab /> },
   { value: "mapapi", label: "Map API", icon: Map, component: () => <MapApiTab /> },
   { value: "content", label: "Content", icon: FileText, component: () => <ContentManagementTab /> },
+  { value: "health", label: "Production Health", icon: ListChecks, component: () => <ProductionHealthTab /> },
   { value: "developers-corner", label: "Developers Corner", icon: Code, component: () => <DevelopersCornerTab /> },
 ];
 

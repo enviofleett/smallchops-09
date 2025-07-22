@@ -193,15 +193,12 @@ export default function PromotionsPage() {
                       <td className="p-3">{promo.name}</td>
                       <td className="p-3">{promo.type}</td>
                       <td className="p-3">
-                        {promo.discount_percent
-                          ? `${promo.discount_percent}%`
-                          : (promo.discount_amount ? `₦${promo.discount_amount}` : "-")
-                        }
+                        {promo.value ? `₦${promo.value}` : "-"}
                       </td>
-                      <td className="p-3">{promo.loyalty_points_reward || "-"}</td>
-                      <td className="p-3">{promo.min_purchase || "-"}</td>
-                      <td className="p-3">{promo.starts_at ? promo.starts_at.substring(0,10) : "-"}</td>
-                      <td className="p-3">{promo.expires_at ? promo.expires_at.substring(0,10) : "-"}</td>
+                      <td className="p-3">{promo.value || "-"}</td>
+                      <td className="p-3">{promo.min_order_amount || "-"}</td>
+                      <td className="p-3">{promo.valid_from ? promo.valid_from.substring(0,10) : "-"}</td>
+                      <td className="p-3">{promo.valid_until ? promo.valid_until.substring(0,10) : "-"}</td>
                       <td className="p-3">
                         <StatusBadge status={promo.status ?? "active"} />
                       </td>
@@ -226,11 +223,11 @@ export default function PromotionsPage() {
                               onClick={() => handleStatusChange(promo, "active")}
                             >Activate</Button>
                           }
-                          {promo.status !== "paused" &&
+                          {promo.status !== "inactive" &&
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => handleStatusChange(promo, "paused")}
+                              onClick={() => handleStatusChange(promo, "inactive")}
                             >Pause</Button>
                           }
                           {promo.status !== "expired" &&

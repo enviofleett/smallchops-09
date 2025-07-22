@@ -1,10 +1,9 @@
-
 import React from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { Edit } from "lucide-react";
+import { Edit, CalendarIcon } from "lucide-react";
 import { useUpdatePromotion } from "@/hooks/usePromotions";
 import { Button } from "@/components/ui/button";
 import {
@@ -39,7 +38,6 @@ import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import type { Promotion } from "@/api/promotions";
 
-// Define a zod schema similar to create form
 const EditPromotionSchema = z.object({
   name: z.string().min(2, "Name is required"),
   description: z.string().max(256).optional(),
@@ -50,24 +48,16 @@ const EditPromotionSchema = z.object({
     "bundle",
     "flash_sale",
   ]),
-  discount_percent: z
-    .union([z.number().min(1).max(100), z.nan()])
-    .optional()
-    .transform(val => isNaN(val as any) ? undefined : val),
-  discount_amount: z
+  value: z
     .union([z.number().min(1), z.nan()])
     .optional()
     .transform(val => isNaN(val as any) ? undefined : val),
-  loyalty_points_reward: z
-    .union([z.number().min(1), z.nan()])
-    .optional()
-    .transform(val => isNaN(val as any) ? undefined : val),
-  min_purchase: z
+  min_order_amount: z
     .union([z.number().min(0), z.nan()])
     .optional()
     .transform(val => isNaN(val as any) ? undefined : val),
-  starts_at: z.date().optional(),
-  expires_at: z.date().optional(),
+  valid_from: z.date().optional(),
+  valid_until: z.date().optional(),
 });
 
 type EditPromotionFormData = z.infer<typeof EditPromotionSchema>;
@@ -98,29 +88,14 @@ export default function EditPromotionDialog({
   const form = useForm<EditPromotionFormData>({
     resolver: zodResolver(EditPromotionSchema),
     defaultValues: {
-      name: promotion?.name || "",
-      description: promotion?.description || "",
-      type: (promotion?.type as any) || "discount",
-      discount_percent: promotion?.discount_percent || undefined,
-      discount_amount: promotion?.discount_amount || undefined,
-      loyalty_points_reward: promotion?.loyalty_points_reward || undefined,
-      min_purchase: promotion?.min_purchase || undefined,
-      starts_at: promotion?.starts_at ? new Date(promotion.starts_at) : undefined,
-      expires_at: promotion?.expires_at ? new Date(promotion.expires_at) : undefined,
+      name: "",
+      description: "",
+      type: "discount",
+      value: undefined,
+      min_order_amount: undefined,
+      valid_from: undefined,
+      valid_until: undefined,
     },
-    values: promotion
-      ? {
-          name: promotion.name || "",
-          description: promotion.description || "",
-          type: promotion.type as any,
-          discount_percent: promotion.discount_percent || undefined,
-          discount_amount: promotion.discount_amount || undefined,
-          loyalty_points_reward: promotion.loyalty_points_reward || undefined,
-          min_purchase: promotion.min_purchase || undefined,
-          starts_at: promotion.starts_at ? new Date(promotion.starts_at) : undefined,
-          expires_at: promotion.expires_at ? new Date(promotion.expires_at) : undefined,
-        }
-      : undefined,
   });
 
   React.useEffect(() => {
@@ -129,12 +104,10 @@ export default function EditPromotionDialog({
         name: promotion.name || "",
         description: promotion.description || "",
         type: promotion.type as any,
-        discount_percent: promotion.discount_percent || undefined,
-        discount_amount: promotion.discount_amount || undefined,
-        loyalty_points_reward: promotion.loyalty_points_reward || undefined,
-        min_purchase: promotion.min_purchase || undefined,
-        starts_at: promotion.starts_at ? new Date(promotion.starts_at) : undefined,
-        expires_at: promotion.expires_at ? new Date(promotion.expires_at) : undefined,
+        value: promotion.value || undefined,
+        min_order_amount: promotion.min_order_amount || undefined,
+        valid_from: promotion.valid_from ? new Date(promotion.valid_from) : undefined,
+        valid_until: promotion.valid_until ? new Date(promotion.valid_until) : undefined,
       });
     }
   }, [promotion, form]);
@@ -151,13 +124,15 @@ export default function EditPromotionDialog({
   function handleSubmit(values: EditPromotionFormData) {
     if (!promotion) return;
     const cleaned: Partial<Promotion> = { ...values } as any;
-    // Safely convert dates to ISO if valid
-    if (isDate(cleaned.starts_at)) {
-      cleaned.starts_at = cleaned.starts_at.toISOString();
+    
+    // Safely convert dates to ISO string if they are valid Date objects
+    if (isDate(cleaned.valid_from)) {
+      cleaned.valid_from = cleaned.valid_from.toISOString();
     }
-    if (isDate(cleaned.expires_at)) {
-      cleaned.expires_at = cleaned.expires_at.toISOString();
+    if (isDate(cleaned.valid_until)) {
+      cleaned.valid_until = cleaned.valid_until.toISOString();
     }
+    
     Object.keys(cleaned).forEach(
       key =>
         (cleaned[key] === "" ||
@@ -165,6 +140,7 @@ export default function EditPromotionDialog({
           (typeof cleaned[key] === "number" && isNaN(cleaned[key])))
           && delete cleaned[key]
     );
+    
     mutation.mutate(
       { id: promotion.id, fields: cleaned },
       {
@@ -258,80 +234,33 @@ export default function EditPromotionDialog({
 
               {/* Conditional fields */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Discount fields */}
-                {(watchType === "discount" ||
-                  watchType === "flash_sale" ||
-                  watchType === "bundle") && (
-                  <>
-                    <FormField
-                      control={form.control}
-                      name="discount_percent"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Discount %</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="%"
-                              type="number"
-                              min={1}
-                              max={100}
-                              {...field}
-                              value={field.value ?? ""}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="discount_amount"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Discount ₦</FormLabel>
-                          <FormControl>
-                            <Input
-                              placeholder="₦"
-                              type="number"
-                              min={1}
-                              {...field}
-                              value={field.value ?? ""}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </>
-                )}
-
-                {/* Loyalty fields */}
-                {watchType === "loyalty" && (
-                  <FormField
-                    control={form.control}
-                    name="loyalty_points_reward"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Loyalty Points Reward</FormLabel>
-                        <FormControl>
-                          <Input
-                            placeholder="Points"
-                            type="number"
-                            min={1}
-                            {...field}
-                            value={field.value ?? ""}
-                          />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                )}
+                {/* Value field for all types */}
+                <FormField
+                  control={form.control}
+                  name="value"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>
+                        {watchType === "loyalty" ? "Loyalty Points" : "Value (% or ₦)"}
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder={watchType === "loyalty" ? "Points" : "Enter value"}
+                          type="number"
+                          min={1}
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
                 {/* Min Purchase */}
                 <FormField
                   control={form.control}
-                  name="min_purchase"
+                  name="min_order_amount"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Min. Purchase (₦)</FormLabel>
@@ -355,7 +284,7 @@ export default function EditPromotionDialog({
                 {/* Start Date */}
                 <FormField
                   control={form.control}
-                  name="starts_at"
+                  name="valid_from"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Start Date</FormLabel>
@@ -370,7 +299,7 @@ export default function EditPromotionDialog({
                                 !field.value && "text-muted-foreground"
                               )}
                             >
-                              {/* small edit: allow clearing date */}
+                              <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
                               {field.value
                                 ? format(field.value, "PPP")
                                 : <span>Pick a date</span>}
@@ -391,10 +320,11 @@ export default function EditPromotionDialog({
                     </FormItem>
                   )}
                 />
+                
                 {/* End Date */}
                 <FormField
                   control={form.control}
-                  name="expires_at"
+                  name="valid_until"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>End Date</FormLabel>
@@ -409,6 +339,7 @@ export default function EditPromotionDialog({
                                 !field.value && "text-muted-foreground"
                               )}
                             >
+                              <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
                               {field.value
                                 ? format(field.value, "PPP")
                                 : <span>Pick a date</span>}

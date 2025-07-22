@@ -40,24 +40,16 @@ const PromotionFormSchema = z.object({
     "bundle",
     "flash_sale",
   ]),
-  discount_percent: z
-    .union([z.number().min(1).max(100), z.nan()])
-    .optional()
-    .transform(val => isNaN(val as any) ? undefined : val),
-  discount_amount: z
+  value: z
     .union([z.number().min(1), z.nan()])
     .optional()
     .transform(val => isNaN(val as any) ? undefined : val),
-  loyalty_points_reward: z
-    .union([z.number().min(1), z.nan()])
-    .optional()
-    .transform(val => isNaN(val as any) ? undefined : val),
-  min_purchase: z
+  min_order_amount: z
     .union([z.number().min(0), z.nan()])
     .optional()
     .transform(val => isNaN(val as any) ? undefined : val),
-  starts_at: z.date().optional(),
-  expires_at: z.date().optional(),
+  valid_from: z.date().optional(),
+  valid_until: z.date().optional(),
 });
 
 type PromotionFormData = z.infer<typeof PromotionFormSchema>;
@@ -76,12 +68,10 @@ export default function CreatePromotionForm({
       name: "",
       description: "",
       type: "discount",
-      discount_percent: undefined,
-      discount_amount: undefined,
-      loyalty_points_reward: undefined,
-      min_purchase: undefined,
-      starts_at: undefined,
-      expires_at: undefined,
+      value: undefined,
+      min_order_amount: undefined,
+      valid_from: undefined,
+      valid_until: undefined,
     },
   });
 
@@ -103,11 +93,11 @@ export default function CreatePromotionForm({
     > = { ...values } as any;
 
     // Safely convert dates to ISO string if they are valid Date objects
-    if (isDate(cleaned.starts_at)) {
-      cleaned.starts_at = cleaned.starts_at.toISOString();
+    if (isDate(cleaned.valid_from)) {
+      cleaned.valid_from = cleaned.valid_from.toISOString();
     }
-    if (isDate(cleaned.expires_at)) {
-      cleaned.expires_at = cleaned.expires_at.toISOString();
+    if (isDate(cleaned.valid_until)) {
+      cleaned.valid_until = cleaned.valid_until.toISOString();
     }
     Object.keys(cleaned).forEach(
       key =>
@@ -220,34 +210,13 @@ export default function CreatePromotionForm({
             <>
               <FormField
                 control={form.control}
-                name="discount_percent"
+                name="value"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Discount %</FormLabel>
+                    <FormLabel>Value (% or ₦)</FormLabel>
                     <FormControl>
                       <Input
-                        placeholder="%"
-                        type="number"
-                        min={1}
-                        max={100}
-                        {...field}
-                        value={field.value ?? ""}
-                        disabled={disabled}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="discount_amount"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Discount ₦</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="₦"
+                        placeholder="Enter discount value"
                         type="number"
                         min={1}
                         {...field}
@@ -266,7 +235,7 @@ export default function CreatePromotionForm({
           {watchType === "loyalty" && (
             <FormField
               control={form.control}
-              name="loyalty_points_reward"
+              name="value"
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Loyalty Points Reward</FormLabel>
@@ -289,7 +258,7 @@ export default function CreatePromotionForm({
           {/* Min Purchase */}
           <FormField
             control={form.control}
-            name="min_purchase"
+            name="min_order_amount"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Min. Purchase (₦)</FormLabel>
@@ -314,7 +283,7 @@ export default function CreatePromotionForm({
           {/* Start Date */}
           <FormField
             control={form.control}
-            name="starts_at"
+            name="valid_from"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>Start Date</FormLabel>
@@ -353,7 +322,7 @@ export default function CreatePromotionForm({
           {/* End Date */}
           <FormField
             control={form.control}
-            name="expires_at"
+            name="valid_until"
             render={({ field }) => (
               <FormItem>
                 <FormLabel>End Date</FormLabel>

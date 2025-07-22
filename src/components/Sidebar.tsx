@@ -9,7 +9,8 @@ import {
   ChevronRight,
   Package,
   Tag,
-  Truck
+  Truck,
+  Settings
 } from 'lucide-react';
 import {
   Dialog,
@@ -40,8 +41,8 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
     { icon: Truck, label: 'Delivery & Pickup', path: '/delivery-pickup' },
     { icon: PromotionsSidebarIcon, label: 'Promotions & Loyalty', path: '/promotions' },
     { icon: FileText, label: 'Reports', path: '/reports' },
-    
     { icon: FileText, label: 'Audit Logs', path: '/audit-logs' },
+    { icon: Settings, label: 'Settings', path: '/settings' },
   ];
 
   return (

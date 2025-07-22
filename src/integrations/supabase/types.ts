@@ -101,6 +101,136 @@ export type Database = {
         }
         Relationships: []
       }
+      communication_events: {
+        Row: {
+          created_at: string
+          event_type: string
+          id: string
+          last_error: string | null
+          order_id: string
+          payload: Json | null
+          processed_at: string | null
+          retry_count: number
+          status: Database["public"]["Enums"]["communication_event_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          event_type: string
+          id?: string
+          last_error?: string | null
+          order_id: string
+          payload?: Json | null
+          processed_at?: string | null
+          retry_count?: number
+          status?: Database["public"]["Enums"]["communication_event_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          event_type?: string
+          id?: string
+          last_error?: string | null
+          order_id?: string
+          payload?: Json | null
+          processed_at?: string | null
+          retry_count?: number
+          status?: Database["public"]["Enums"]["communication_event_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      communication_logs: {
+        Row: {
+          channel: string
+          created_at: string
+          error_message: string | null
+          event_id: string | null
+          id: string
+          order_id: string
+          provider_response: Json | null
+          recipient: string
+          status: Database["public"]["Enums"]["communication_log_status"]
+          subject: string | null
+          template_name: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          error_message?: string | null
+          event_id?: string | null
+          id?: string
+          order_id: string
+          provider_response?: Json | null
+          recipient: string
+          status: Database["public"]["Enums"]["communication_log_status"]
+          subject?: string | null
+          template_name?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          error_message?: string | null
+          event_id?: string | null
+          id?: string
+          order_id?: string
+          provider_response?: Json | null
+          recipient?: string
+          status?: Database["public"]["Enums"]["communication_log_status"]
+          subject?: string | null
+          template_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "communication_logs_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "communication_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_communication_preferences: {
+        Row: {
+          allow_order_updates: boolean
+          allow_promotions: boolean
+          created_at: string
+          customer_email: string
+          id: string
+          language: string
+          preferred_channel: string
+          updated_at: string
+        }
+        Insert: {
+          allow_order_updates?: boolean
+          allow_promotions?: boolean
+          created_at?: string
+          customer_email: string
+          id?: string
+          language?: string
+          preferred_channel?: string
+          updated_at?: string
+        }
+        Update: {
+          allow_order_updates?: boolean
+          allow_promotions?: boolean
+          created_at?: string
+          customer_email?: string
+          id?: string
+          language?: string
+          preferred_channel?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -127,6 +257,71 @@ export type Database = {
           id?: string
           name?: string
           phone?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      delivery_fees: {
+        Row: {
+          base_fee: number
+          created_at: string
+          fee_per_km: number | null
+          id: string
+          min_order_for_free_delivery: number | null
+          updated_at: string
+          zone_id: string
+        }
+        Insert: {
+          base_fee?: number
+          created_at?: string
+          fee_per_km?: number | null
+          id?: string
+          min_order_for_free_delivery?: number | null
+          updated_at?: string
+          zone_id: string
+        }
+        Update: {
+          base_fee?: number
+          created_at?: string
+          fee_per_km?: number | null
+          id?: string
+          min_order_for_free_delivery?: number | null
+          updated_at?: string
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_fees_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_zones: {
+        Row: {
+          area: Json
+          created_at: string
+          description: string | null
+          id: string
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          area: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          area?: Json
+          created_at?: string
+          description?: string | null
+          id?: string
+          name?: string
           updated_at?: string
         }
         Relationships: []
@@ -194,6 +389,7 @@ export type Database = {
           delivery_address: string | null
           delivery_fee: number | null
           delivery_time: string | null
+          delivery_zone_id: string | null
           discount_amount: number | null
           id: string
           order_number: string
@@ -222,6 +418,7 @@ export type Database = {
           delivery_address?: string | null
           delivery_fee?: number | null
           delivery_time?: string | null
+          delivery_zone_id?: string | null
           discount_amount?: number | null
           id?: string
           order_number: string
@@ -250,6 +447,7 @@ export type Database = {
           delivery_address?: string | null
           delivery_fee?: number | null
           delivery_time?: string | null
+          delivery_zone_id?: string | null
           discount_amount?: number | null
           id?: string
           order_number?: string
@@ -280,6 +478,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_zone_id_fkey"
+            columns: ["delivery_zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
             referencedColumns: ["id"]
           },
         ]
@@ -379,6 +584,199 @@ export type Database = {
         }
         Relationships: []
       }
+      promotion_usage: {
+        Row: {
+          customer_email: string
+          discount_amount: number
+          id: string
+          order_id: string
+          promotion_id: string
+          used_at: string
+        }
+        Insert: {
+          customer_email: string
+          discount_amount: number
+          id?: string
+          order_id: string
+          promotion_id: string
+          used_at?: string
+        }
+        Update: {
+          customer_email?: string
+          discount_amount?: number
+          id?: string
+          order_id?: string
+          promotion_id?: string
+          used_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotion_usage_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "promotion_usage_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "promotions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promotions: {
+        Row: {
+          applicable_categories: string[] | null
+          applicable_products: string[] | null
+          code: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          max_discount_amount: number | null
+          min_order_amount: number | null
+          name: string
+          status: Database["public"]["Enums"]["promotion_status"]
+          type: Database["public"]["Enums"]["promotion_type"]
+          updated_at: string
+          usage_count: number | null
+          usage_limit: number | null
+          valid_from: string
+          valid_until: string | null
+          value: number
+        }
+        Insert: {
+          applicable_categories?: string[] | null
+          applicable_products?: string[] | null
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          max_discount_amount?: number | null
+          min_order_amount?: number | null
+          name: string
+          status?: Database["public"]["Enums"]["promotion_status"]
+          type: Database["public"]["Enums"]["promotion_type"]
+          updated_at?: string
+          usage_count?: number | null
+          usage_limit?: number | null
+          valid_from?: string
+          valid_until?: string | null
+          value: number
+        }
+        Update: {
+          applicable_categories?: string[] | null
+          applicable_products?: string[] | null
+          code?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          max_discount_amount?: number | null
+          min_order_amount?: number | null
+          name?: string
+          status?: Database["public"]["Enums"]["promotion_status"]
+          type?: Database["public"]["Enums"]["promotion_type"]
+          updated_at?: string
+          usage_count?: number | null
+          usage_limit?: number | null
+          valid_from?: string
+          valid_until?: string | null
+          value?: number
+        }
+        Relationships: []
+      }
+      vehicle_assignments: {
+        Row: {
+          assigned_at: string
+          assigned_by: string | null
+          dispatch_rider_id: string
+          id: string
+          notes: string | null
+          status: Database["public"]["Enums"]["assignment_status"]
+          vehicle_id: string
+        }
+        Insert: {
+          assigned_at?: string
+          assigned_by?: string | null
+          dispatch_rider_id: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["assignment_status"]
+          vehicle_id: string
+        }
+        Update: {
+          assigned_at?: string
+          assigned_by?: string | null
+          dispatch_rider_id?: string
+          id?: string
+          notes?: string | null
+          status?: Database["public"]["Enums"]["assignment_status"]
+          vehicle_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "vehicle_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_assignments_dispatch_rider_id_fkey"
+            columns: ["dispatch_rider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_assignments_vehicle_id_fkey"
+            columns: ["vehicle_id"]
+            isOneToOne: false
+            referencedRelation: "vehicles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      vehicles: {
+        Row: {
+          brand: string | null
+          created_at: string
+          id: string
+          license_plate: string
+          model: string | null
+          notes: string | null
+          status: Database["public"]["Enums"]["vehicle_status"]
+          type: Database["public"]["Enums"]["vehicle_type"]
+          updated_at: string
+        }
+        Insert: {
+          brand?: string | null
+          created_at?: string
+          id?: string
+          license_plate: string
+          model?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["vehicle_status"]
+          type: Database["public"]["Enums"]["vehicle_type"]
+          updated_at?: string
+        }
+        Update: {
+          brand?: string | null
+          created_at?: string
+          id?: string
+          license_plate?: string
+          model?: string | null
+          notes?: string | null
+          status?: Database["public"]["Enums"]["vehicle_status"]
+          type?: Database["public"]["Enums"]["vehicle_type"]
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -398,6 +796,14 @@ export type Database = {
       }
     }
     Enums: {
+      assignment_status: "active" | "inactive"
+      communication_event_status: "queued" | "processing" | "sent" | "failed"
+      communication_log_status:
+        | "sent"
+        | "delivered"
+        | "bounced"
+        | "failed"
+        | "skipped"
       order_status:
         | "pending"
         | "confirmed"
@@ -415,8 +821,16 @@ export type Database = {
         | "refunded"
         | "partially_refunded"
       product_status: "active" | "archived" | "draft"
+      promotion_status: "active" | "inactive" | "expired" | "scheduled"
+      promotion_type:
+        | "percentage"
+        | "fixed_amount"
+        | "buy_one_get_one"
+        | "free_delivery"
       user_role: "admin" | "manager" | "staff" | "dispatch_rider"
       user_status: "active" | "inactive" | "pending"
+      vehicle_status: "available" | "assigned" | "maintenance" | "inactive"
+      vehicle_type: "bike" | "van" | "truck"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -544,6 +958,15 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      assignment_status: ["active", "inactive"],
+      communication_event_status: ["queued", "processing", "sent", "failed"],
+      communication_log_status: [
+        "sent",
+        "delivered",
+        "bounced",
+        "failed",
+        "skipped",
+      ],
       order_status: [
         "pending",
         "confirmed",
@@ -563,8 +986,17 @@ export const Constants = {
         "partially_refunded",
       ],
       product_status: ["active", "archived", "draft"],
+      promotion_status: ["active", "inactive", "expired", "scheduled"],
+      promotion_type: [
+        "percentage",
+        "fixed_amount",
+        "buy_one_get_one",
+        "free_delivery",
+      ],
       user_role: ["admin", "manager", "staff", "dispatch_rider"],
       user_status: ["active", "inactive", "pending"],
+      vehicle_status: ["available", "assigned", "maintenance", "inactive"],
+      vehicle_type: ["bike", "van", "truck"],
     },
   },
 } as const

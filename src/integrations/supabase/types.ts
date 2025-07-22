@@ -14,6 +14,53 @@ export type Database = {
   }
   public: {
     Tables: {
+      admin_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_at: string
+          invited_by: string | null
+          role: Database["public"]["Enums"]["user_role"]
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_at?: string
+          invited_by?: string | null
+          role?: Database["public"]["Enums"]["user_role"]
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action: string
@@ -71,12 +118,20 @@ export type Database = {
           facebook_url: string | null
           id: string
           instagram_url: string | null
+          linkedin_url: string | null
           logo_url: string | null
           name: string
           phone: string | null
+          seo_description: string | null
+          seo_keywords: string | null
+          seo_title: string | null
+          tagline: string | null
           tiktok_url: string | null
+          twitter_url: string | null
           updated_at: string
+          website_url: string | null
           working_hours: string | null
+          youtube_url: string | null
         }
         Insert: {
           address?: string | null
@@ -86,12 +141,20 @@ export type Database = {
           facebook_url?: string | null
           id?: string
           instagram_url?: string | null
+          linkedin_url?: string | null
           logo_url?: string | null
           name: string
           phone?: string | null
+          seo_description?: string | null
+          seo_keywords?: string | null
+          seo_title?: string | null
+          tagline?: string | null
           tiktok_url?: string | null
+          twitter_url?: string | null
           updated_at?: string
+          website_url?: string | null
           working_hours?: string | null
+          youtube_url?: string | null
         }
         Update: {
           address?: string | null
@@ -101,12 +164,20 @@ export type Database = {
           facebook_url?: string | null
           id?: string
           instagram_url?: string | null
+          linkedin_url?: string | null
           logo_url?: string | null
           name?: string
           phone?: string | null
+          seo_description?: string | null
+          seo_keywords?: string | null
+          seo_title?: string | null
+          tagline?: string | null
           tiktok_url?: string | null
+          twitter_url?: string | null
           updated_at?: string
+          website_url?: string | null
           working_hours?: string | null
+          youtube_url?: string | null
         }
         Relationships: []
       }

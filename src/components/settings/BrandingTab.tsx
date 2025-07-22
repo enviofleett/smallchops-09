@@ -94,9 +94,8 @@ export const BrandingTab = () => {
     try {
       setIsSubmitting(true);
       
-      // Use Supabase's functions.invoke method instead of raw fetch
+      // Use Supabase's functions.invoke method
       const { data: result, error } = await supabase.functions.invoke('business-settings', {
-        method: 'POST',
         body: data,
       });
 

@@ -2,10 +2,33 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BrandingTab } from "@/components/settings/BrandingTab";
+import { AdminUserControl } from "@/components/settings/AdminUserControl";
 import { Settings as SettingsIcon } from "lucide-react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("branding");
+
+  // Check if current user is admin to show admin controls
+  const { data: userProfile } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return null;
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    }
+  });
+
+  const isAdmin = userProfile?.role === 'admin';
 
   return (
     <div className="container mx-auto py-6 space-y-6">
@@ -20,8 +43,9 @@ const Settings = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-1 lg:w-auto lg:grid-cols-none lg:flex">
+        <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:grid-cols-none lg:flex">
           <TabsTrigger value="branding">Branding</TabsTrigger>
+          {isAdmin && <TabsTrigger value="admin">Admin User Control</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="branding" className="space-y-6">
@@ -37,6 +61,12 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="admin" className="space-y-6">
+            <AdminUserControl />
+          </TabsContent>
+        )}
       </Tabs>
     </div>
   );

@@ -12,39 +12,8 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   const { isAuthenticated, user, isLoading } = useAuth();
-  const [adminExists, setAdminExists] = useState<boolean | null>(null);
-  const [isCheckingAdmin, setIsCheckingAdmin] = useState(true);
 
-  useEffect(() => {
-    const checkAdminExists = async () => {
-      setIsCheckingAdmin(true);
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('role', 'admin')
-          .limit(1);
-
-        if (error) {
-          console.error("Error checking for admin user:", error);
-          // Fail safe: assume an admin exists to prevent the app from getting stuck.
-          setAdminExists(true);
-        } else {
-          setAdminExists(data && data.length > 0);
-        }
-      } catch (error) {
-        console.error("Error checking for admin user:", error);
-        // Fail safe: assume an admin exists to prevent the app from getting stuck.
-        setAdminExists(true);
-      } finally {
-        setIsCheckingAdmin(false);
-      }
-    };
-
-    checkAdminExists();
-  }, [isAuthenticated]); // Re-check when auth state changes.
-
-  if (isLoading || isCheckingAdmin) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-orange-600"></div>
@@ -53,9 +22,6 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   }
 
   if (!isAuthenticated) {
-    if (adminExists === false) {
-      return <CreateFirstAdmin />;
-    }
     return <LoginPage />;
   }
 

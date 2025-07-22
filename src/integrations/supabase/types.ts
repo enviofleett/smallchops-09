@@ -68,11 +68,13 @@ export type Database = {
           business_hours: Json | null
           created_at: string
           email: string | null
+          facebook_url: string | null
           id: string
+          instagram_url: string | null
           logo_url: string | null
           name: string
           phone: string | null
-          social_links: Json | null
+          tiktok_url: string | null
           updated_at: string
           working_hours: string | null
         }
@@ -81,11 +83,13 @@ export type Database = {
           business_hours?: Json | null
           created_at?: string
           email?: string | null
+          facebook_url?: string | null
           id?: string
+          instagram_url?: string | null
           logo_url?: string | null
           name: string
           phone?: string | null
-          social_links?: Json | null
+          tiktok_url?: string | null
           updated_at?: string
           working_hours?: string | null
         }
@@ -94,11 +98,13 @@ export type Database = {
           business_hours?: Json | null
           created_at?: string
           email?: string | null
+          facebook_url?: string | null
           id?: string
+          instagram_url?: string | null
           logo_url?: string | null
           name?: string
           phone?: string | null
-          social_links?: Json | null
+          tiktok_url?: string | null
           updated_at?: string
           working_hours?: string | null
         }

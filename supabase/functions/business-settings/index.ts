@@ -78,8 +78,22 @@ serve(async (req) => {
       console.log("Fetching business settings");
       const { data, error } = await adminClient
         .from("business_settings")
-        .select("*")
-        .order("created_at", { ascending: false })
+        .select(`
+          id,
+          name,
+          email,
+          address,
+          phone,
+          working_hours,
+          logo_url,
+          facebook_url,
+          instagram_url,
+          tiktok_url,
+          created_at,
+          updated_at
+        `)
+        .order("updated_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
       
       if (error) {

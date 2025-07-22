@@ -178,29 +178,18 @@ export const UserPermissionsMatrix = ({ selectedUser }: UserPermissionsMatrixPro
     
     setIsSubmitting(true);
     try {
-      // Delete existing permissions for this user
-      await supabase
-        .from('user_permissions')
-        .delete()
-        .eq('user_id', currentUser.id);
+      // Use admin management edge function for better security and audit logging
+      const { data, error } = await supabase.functions.invoke('admin-management', {
+        body: {
+          action: 'update_permissions',
+          userId: currentUser.id,
+          permissions: Object.fromEntries(
+            Object.entries(permissions).filter(([_, level]) => level !== 'none')
+          )
+        }
+      });
 
-      // Insert new permissions (only non-'none' permissions)
-      const permissionsToInsert = Object.entries(permissions)
-        .filter(([_, level]) => level !== 'none')
-        .map(([menuKey, level]) => ({
-          user_id: currentUser.id,
-          menu_key: menuKey,
-          menu_section: 'dashboard' as any, // Default value since this is legacy field
-          permission_level: level as any,
-        }));
-
-      if (permissionsToInsert.length > 0) {
-        const { error } = await supabase
-          .from('user_permissions')
-          .insert(permissionsToInsert);
-
-        if (error) throw error;
-      }
+      if (error) throw error;
 
       toast({
         title: "Permissions updated",

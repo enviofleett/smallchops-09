@@ -98,22 +98,53 @@ serve(async (req) => {
           .delete()
           .eq('user_id', userId)
 
-        // Insert new permissions
+        // Get admin profile for audit logging
+        const { data: adminProfile } = await supabaseClient
+          .from('profiles')
+          .select('name')
+          .eq('id', user.id)
+          .single();
+
+        // Get menu structure to determine parent menu sections
+        const { data: menuStructure } = await supabaseClient
+          .from('menu_structure')
+          .select('key, parent_key')
+          .eq('is_active', true);
+
+        const menuMap = new Map(menuStructure?.map(m => [m.key, m.parent_key]) || []);
+
+        // Insert new permissions using menu_key
         const permissionsToInsert = Object.entries(permissions)
           .filter(([_, level]) => level !== 'none')
-          .map(([menuSection, permissionLevel]) => ({
-            user_id: userId,
-            menu_section: menuSection,
-            permission_level: permissionLevel
-          }))
+          .map(([menuKey, permissionLevel]) => {
+            const parentKey = menuMap.get(menuKey);
+            return {
+              user_id: userId,
+              menu_key: menuKey,
+              permission_level: permissionLevel,
+              // Keep menu_section for backward compatibility
+              menu_section: parentKey || menuKey.split('_')[0] || 'dashboard',
+            };
+          });
 
         if (permissionsToInsert.length > 0) {
           const { error } = await supabaseClient
             .from('user_permissions')
-            .insert(permissionsToInsert)
+            .insert(permissionsToInsert);
 
-          if (error) throw error
+          if (error) throw error;
         }
+
+        // Log the permission change
+        await supabaseClient.from('audit_logs').insert({
+          user_id: user.id,
+          action: 'UPDATE',
+          category: 'User Management',
+          entity_type: 'user_permissions',
+          entity_id: userId,
+          message: `${adminProfile?.name || 'Admin'} updated permissions for user ${userId}`,
+          new_values: permissions
+        });
 
         return new Response(
           JSON.stringify({ 
@@ -164,7 +195,7 @@ serve(async (req) => {
         const userId = url.searchParams.get('userId')
         const { data: permissions, error } = await supabaseClient
           .from('user_permissions')
-          .select('*')
+          .select('menu_key, permission_level, menu_section, sub_menu_section')
           .eq('user_id', userId)
 
         if (error) throw error

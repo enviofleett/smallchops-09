@@ -1,17 +1,25 @@
 
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
+import { useHasPermission } from '@/hooks/usePermissions';
 import LoginPage from './auth/LoginPage';
-import { supabase } from '@/integrations/supabase/client';
-import CreateFirstAdmin from './auth/CreateFirstAdmin';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
   requiredRole?: 'admin' | 'manager' | 'staff' | 'dispatch_rider';
+  menuKey?: string;
+  requiredPermission?: 'view' | 'edit';
 }
 
-const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ 
+  children, 
+  requiredRole,
+  menuKey,
+  requiredPermission = 'view'
+}: ProtectedRouteProps) => {
   const { isAuthenticated, user, isLoading } = useAuth();
+  const hasPermission = useHasPermission(menuKey || '', requiredPermission);
 
   if (isLoading) {
     return (
@@ -25,15 +33,14 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     return <LoginPage />;
   }
 
+  // Check role-based access (legacy)
   if (requiredRole && user?.role !== requiredRole && user?.role !== 'admin') {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold text-gray-800">Access Denied</h1>
-          <p className="text-gray-600 mt-2">You don't have permission to view this page</p>
-        </div>
-      </div>
-    );
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // Check permission-based access (new system)
+  if (menuKey && !hasPermission) {
+    return <Navigate to="/dashboard" replace />;
   }
 
   return <>{children}</>;

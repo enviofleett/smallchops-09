@@ -62,6 +62,57 @@ export type Database = {
         }
         Relationships: []
       }
+      business_settings: {
+        Row: {
+          address: string | null
+          business_hours: Json | null
+          created_at: string
+          email: string | null
+          id: string
+          licenses: string | null
+          logo_url: string | null
+          name: string
+          phone: string | null
+          registration_number: string | null
+          social_links: Json | null
+          tax_id: string | null
+          updated_at: string
+          working_hours: string | null
+        }
+        Insert: {
+          address?: string | null
+          business_hours?: Json | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          licenses?: string | null
+          logo_url?: string | null
+          name: string
+          phone?: string | null
+          registration_number?: string | null
+          social_links?: Json | null
+          tax_id?: string | null
+          updated_at?: string
+          working_hours?: string | null
+        }
+        Update: {
+          address?: string | null
+          business_hours?: Json | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          licenses?: string | null
+          logo_url?: string | null
+          name?: string
+          phone?: string | null
+          registration_number?: string | null
+          social_links?: Json | null
+          tax_id?: string | null
+          updated_at?: string
+          working_hours?: string | null
+        }
+        Relationships: []
+      }
       categories: {
         Row: {
           banner_url: string | null
@@ -198,6 +249,108 @@ export type Database = {
           },
         ]
       }
+      communication_settings: {
+        Row: {
+          connected_by: string | null
+          created_at: string
+          email_templates: Json | null
+          enable_email: boolean | null
+          enable_sms: boolean | null
+          id: string
+          sender_email: string | null
+          sms_api_key: string | null
+          sms_provider: string | null
+          sms_sender_id: string | null
+          sms_templates: Json | null
+          smtp_host: string | null
+          smtp_pass: string | null
+          smtp_port: number | null
+          smtp_user: string | null
+          triggers: Json | null
+          updated_at: string
+        }
+        Insert: {
+          connected_by?: string | null
+          created_at?: string
+          email_templates?: Json | null
+          enable_email?: boolean | null
+          enable_sms?: boolean | null
+          id?: string
+          sender_email?: string | null
+          sms_api_key?: string | null
+          sms_provider?: string | null
+          sms_sender_id?: string | null
+          sms_templates?: Json | null
+          smtp_host?: string | null
+          smtp_pass?: string | null
+          smtp_port?: number | null
+          smtp_user?: string | null
+          triggers?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          connected_by?: string | null
+          created_at?: string
+          email_templates?: Json | null
+          enable_email?: boolean | null
+          enable_sms?: boolean | null
+          id?: string
+          sender_email?: string | null
+          sms_api_key?: string | null
+          sms_provider?: string | null
+          sms_sender_id?: string | null
+          sms_templates?: Json | null
+          smtp_host?: string | null
+          smtp_pass?: string | null
+          smtp_port?: number | null
+          smtp_user?: string | null
+          triggers?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      content_management: {
+        Row: {
+          content: string | null
+          content_type: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          is_published: boolean | null
+          key: string
+          title: string | null
+          updated_at: string
+          updated_by: string | null
+          version: number | null
+        }
+        Insert: {
+          content?: string | null
+          content_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_published?: boolean | null
+          key: string
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          version?: number | null
+        }
+        Update: {
+          content?: string | null
+          content_type?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_published?: boolean | null
+          key?: string
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          version?: number | null
+        }
+        Relationships: []
+      }
       customer_communication_preferences: {
         Row: {
           allow_order_updates: boolean
@@ -323,6 +476,65 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      map_api_usage: {
+        Row: {
+          count: number
+          feature_used: string
+          id: string
+          log_time: string
+          user_id: string | null
+        }
+        Insert: {
+          count?: number
+          feature_used: string
+          id?: string
+          log_time?: string
+          user_id?: string | null
+        }
+        Update: {
+          count?: number
+          feature_used?: string
+          id?: string
+          log_time?: string
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "map_api_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      map_settings: {
+        Row: {
+          created_at: string
+          id: number
+          monthly_usage_limit: number | null
+          updated_at: string
+          usage_alert_email: string | null
+          usage_alert_threshold: number | null
+        }
+        Insert: {
+          created_at?: string
+          id?: number
+          monthly_usage_limit?: number | null
+          updated_at?: string
+          usage_alert_email?: string | null
+          usage_alert_threshold?: number | null
+        }
+        Update: {
+          created_at?: string
+          id?: number
+          monthly_usage_limit?: number | null
+          updated_at?: string
+          usage_alert_email?: string | null
+          usage_alert_threshold?: number | null
         }
         Relationships: []
       }
@@ -488,6 +700,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_integrations: {
+        Row: {
+          connected_by: string | null
+          connection_status: string | null
+          created_at: string
+          currency: string | null
+          id: string
+          mode: string | null
+          payment_methods: Json | null
+          provider: string
+          public_key: string | null
+          secret_key: string | null
+          transaction_fee: number | null
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          connected_by?: string | null
+          connection_status?: string | null
+          created_at?: string
+          currency?: string | null
+          id?: string
+          mode?: string | null
+          payment_methods?: Json | null
+          provider: string
+          public_key?: string | null
+          secret_key?: string | null
+          transaction_fee?: number | null
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          connected_by?: string | null
+          connection_status?: string | null
+          created_at?: string
+          currency?: string | null
+          id?: string
+          mode?: string | null
+          payment_methods?: Json | null
+          provider?: string
+          public_key?: string | null
+          secret_key?: string | null
+          transaction_fee?: number | null
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Relationships: []
       }
       products: {
         Row: {
@@ -689,6 +949,35 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permissions: {
+        Row: {
+          id: string
+          menu_section: Database["public"]["Enums"]["menu_section"]
+          permission_level: Database["public"]["Enums"]["permission_level"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          menu_section: Database["public"]["Enums"]["menu_section"]
+          permission_level?: Database["public"]["Enums"]["permission_level"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          menu_section?: Database["public"]["Enums"]["menu_section"]
+          permission_level?: Database["public"]["Enums"]["permission_level"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       vehicle_assignments: {
         Row: {
           assigned_at: string
@@ -804,6 +1093,17 @@ export type Database = {
         | "bounced"
         | "failed"
         | "skipped"
+      menu_section:
+        | "dashboard"
+        | "orders"
+        | "categories"
+        | "products"
+        | "customers"
+        | "delivery_pickup"
+        | "promotions"
+        | "reports"
+        | "settings"
+        | "audit_logs"
       order_status:
         | "pending"
         | "confirmed"
@@ -820,6 +1120,7 @@ export type Database = {
         | "failed"
         | "refunded"
         | "partially_refunded"
+      permission_level: "none" | "view" | "edit"
       product_status: "active" | "archived" | "draft"
       promotion_status: "active" | "inactive" | "expired" | "scheduled"
       promotion_type:
@@ -967,6 +1268,18 @@ export const Constants = {
         "failed",
         "skipped",
       ],
+      menu_section: [
+        "dashboard",
+        "orders",
+        "categories",
+        "products",
+        "customers",
+        "delivery_pickup",
+        "promotions",
+        "reports",
+        "settings",
+        "audit_logs",
+      ],
       order_status: [
         "pending",
         "confirmed",
@@ -985,6 +1298,7 @@ export const Constants = {
         "refunded",
         "partially_refunded",
       ],
+      permission_level: ["none", "view", "edit"],
       product_status: ["active", "archived", "draft"],
       promotion_status: ["active", "inactive", "expired", "scheduled"],
       promotion_type: [

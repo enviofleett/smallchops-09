@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+
+import React, { useState, useEffect } from "react";
 import BusinessTab from "@/components/settings/BusinessTab";
 import UsersTab from "@/components/settings/UsersTab";
 import PaymentTab from "@/components/settings/PaymentTab";
@@ -8,11 +9,12 @@ import { ContentManagementTab } from "@/components/settings/ContentManagementTab
 import DeliveryManagementTab from "@/components/settings/DeliveryManagementTab";
 import DeliveryVehiclesTab from "@/components/settings/DeliveryVehiclesTab";
 import { Badge } from "@/components/ui/badge";
-import { Building, Users, CreditCard, MessageSquare, Code, FileText, Truck, ListChecks, Contact, Map } from "lucide-react";
+import { Building, Users, CreditCard, MessageSquare, Code, FileText, Truck, ListChecks, Contact, Map, Wifi, WifiOff, AlertTriangle } from "lucide-react";
 import CommunicationLogsTab from "@/components/settings/communication/CommunicationLogsTab";
 import CustomerPreferencesTab from "@/components/settings/CustomerPreferencesTab";
 import MapApiTab from "@/components/settings/MapApiTab";
 import DevelopersCornerTab from "@/components/settings/DevelopersCornerTab";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 const TABS = [
   { value: "business", label: "Business", icon: Building, component: () => <BusinessTab /> },
@@ -31,20 +33,84 @@ const TABS = [
 
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("business");
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [hasError, setHasError] = useState(false);
+
+  useEffect(() => {
+    const handleOnline = () => {
+      setIsOnline(true);
+      setHasError(false);
+    };
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Test connection to Supabase
+    const testConnection = async () => {
+      try {
+        await fetch('https://oknnklksdiqaifhxaccs.supabase.co/rest/v1/', {
+          method: 'HEAD',
+          mode: 'no-cors'
+        });
+        setHasError(false);
+      } catch {
+        setHasError(true);
+      }
+    };
+    
+    testConnection();
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
 
   const ActiveComponent = TABS.find((tab) => tab.value === activeTab)?.component;
+
+  const getSystemStatus = () => {
+    if (!isOnline) return { status: "Offline", color: "bg-red-500", icon: WifiOff };
+    if (hasError) return { status: "Connection Issues", color: "bg-yellow-500", icon: AlertTriangle };
+    return { status: "System Ready", color: "bg-green-500", icon: Wifi };
+  };
+
+  const systemStatus = getSystemStatus();
+  const StatusIcon = systemStatus.icon;
 
   return (
     <div className="flex flex-col h-full">
       <div>
         <h1 className="text-3xl font-bold text-gray-800">Settings &amp; Configurations</h1>
         <div className="flex items-center gap-2 mt-2">
-          <Badge variant="outline" className="text-green-600 border-green-600">
-            System Ready
+          <Badge variant="outline" className={`text-white border-transparent ${systemStatus.color}`}>
+            <StatusIcon className="h-3 w-3 mr-1" />
+            {systemStatus.status}
           </Badge>
-          <span className="text-sm text-gray-500">All services are operational</span>
+          <span className="text-sm text-gray-500">
+            {isOnline ? "All services are operational" : "You are currently offline"}
+          </span>
         </div>
+        
+        {!isOnline && (
+          <Alert className="mt-4 max-w-3xl">
+            <WifiOff className="h-4 w-4" />
+            <AlertDescription>
+              You are currently offline. Some features may not work properly until your connection is restored.
+            </AlertDescription>
+          </Alert>
+        )}
+        
+        {hasError && isOnline && (
+          <Alert className="mt-4 max-w-3xl">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              There may be connectivity issues with our servers. If problems persist, please try refreshing the page.
+            </AlertDescription>
+          </Alert>
+        )}
       </div>
+      
       <div className="flex flex-1 gap-8 mt-6">
         <nav className="w-60 flex-shrink-0">
            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 h-fit">

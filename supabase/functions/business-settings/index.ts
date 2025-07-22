@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Service role client
+// Service role client for database operations
 const adminClient = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -22,23 +22,24 @@ serve(async (req) => {
   }
 
   try {
-    // Auth
+    // Auth validation
     const authHeader = req.headers.get("Authorization") || req.headers.get("authorization");
     if (!authHeader) {
+      console.log("No authorization header found");
       return new Response(
         JSON.stringify({ error: "No authorization header" }),
         { status: 401, headers: corsHeaders }
       );
     }
 
-    // Use anon client for the user context
+    // Use anon client for user context
     const userClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_ANON_KEY') ?? '',
       { global: { headers: { Authorization: authHeader } } }
     );
 
-    // Auth user
+    // Verify user authentication
     const { data: { user }, error: userError } = await userClient.auth.getUser();
 
     if (userError || !user) {
@@ -49,7 +50,7 @@ serve(async (req) => {
       );
     }
 
-    // Verify admin
+    // Verify admin role
     const { data: profile, error: profileError } = await userClient
       .from("profiles")
       .select("role")
@@ -65,19 +66,22 @@ serve(async (req) => {
     }
 
     if (!profile || profile.role !== "admin") {
+      console.log("Access denied - user is not admin:", profile?.role);
       return new Response(
         JSON.stringify({ error: "Access denied. Admin role required." }), 
         { status: 403, headers: corsHeaders }
       );
     }
 
-    // GET: get latest business_settings
+    // GET: Retrieve business settings
     if (req.method === "GET") {
+      console.log("Fetching business settings");
       const { data, error } = await adminClient
         .from("business_settings")
         .select("*")
         .order("created_at", { ascending: false })
         .maybeSingle();
+      
       if (error) {
         console.log("Database error on GET:", error);
         return new Response(
@@ -85,17 +89,21 @@ serve(async (req) => {
           { status: 400, headers: corsHeaders }
         );
       }
+      
+      console.log("Business settings retrieved successfully");
       return new Response(JSON.stringify({ data }), { headers: corsHeaders });
     }
 
-    // POST: upsert
+    // POST: Create or update business settings
     if (req.method === "POST") {
-      if (!req.headers.get("content-type")?.includes("application/json")) {
+      const contentType = req.headers.get("content-type");
+      if (!contentType?.includes("application/json")) {
         return new Response(
           JSON.stringify({ error: "Request must have 'Content-Type: application/json'" }),
           { status: 415, headers: corsHeaders }
         );
       }
+      
       let body;
       try {
         body = await req.json();
@@ -106,12 +114,14 @@ serve(async (req) => {
           { status: 400, headers: corsHeaders }
         );
       }
+      
       if (!body || Object.keys(body).length === 0) {
         return new Response(
           JSON.stringify({ error: "Request body cannot be empty" }),
           { status: 400, headers: corsHeaders }
         );
       }
+      
       if (!body.name) {
         return new Response(
           JSON.stringify({ error: "Business name is required" }), 
@@ -119,6 +129,8 @@ serve(async (req) => {
         );
       }
 
+      console.log("Creating/updating business settings:", body);
+      
       const updateData = {
         ...body,
         updated_at: new Date().toISOString(),
@@ -138,6 +150,7 @@ serve(async (req) => {
         );
       }
 
+      console.log("Business settings saved successfully");
       return new Response(JSON.stringify({ data }), { headers: corsHeaders });
     }
 

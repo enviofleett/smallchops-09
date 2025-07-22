@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { useErrorHandler } from "./useErrorHandler";
 import { loadBusinessSettings, saveBusinessSettings } from "@/services/businessSettingsApi";
@@ -9,6 +10,7 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
   const { handleError, handleSuccess } = useErrorHandler();
   const [loading, setLoading] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [business, setBusiness] = useState<BusinessSettings>({
     name: "",
     email: "",
@@ -25,7 +27,7 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
   // Load existing settings from the edge function
   useEffect(() => {
     const load = async () => {
-      setLoading(true);
+      setInitialLoading(true);
       try {
         console.log("Loading business settings...");
         const settings = await loadBusinessSettings();
@@ -38,9 +40,14 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
         }
       } catch (e: any) {
         console.error("Error loading business settings:", e);
-        handleError(e, "loading business settings");
+        // Show user-friendly error message
+        if (e.message.includes("Network error") || e.message.includes("Failed to fetch")) {
+          handleError(new Error("Unable to connect to server. Please check your internet connection and try again."), "loading business settings");
+        } else {
+          handleError(e, "loading business settings");
+        }
       } finally {
-        setLoading(false);
+        setInitialLoading(false);
       }
     };
     load();
@@ -74,7 +81,7 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
     e.preventDefault();
 
     // Basic validation
-    if (!business.name) {
+    if (!business.name.trim()) {
       handleError(new Error("Business name is required"), "form validation");
       return;
     }
@@ -95,7 +102,12 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
       setBusiness(updatedSettings);
     } catch (err: any) {
       console.error("Error saving business settings:", err);
-      handleError(err, "saving business settings");
+      // Show user-friendly error message
+      if (err.message.includes("Network error") || err.message.includes("Failed to fetch")) {
+        handleError(new Error("Unable to save changes. Please check your internet connection and try again."), "saving business settings");
+      } else {
+        handleError(err, "saving business settings");
+      }
     } finally {
       setLoading(false);
     }
@@ -108,7 +120,7 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
 
   return {
     business,
-    loading,
+    loading: loading || initialLoading,
     uploadingLogo,
     handleSubmit,
     handleChange,

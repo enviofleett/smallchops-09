@@ -21,9 +21,6 @@ const TopNav = () => {
         {/* Business branding and search */}
         <div className="flex items-center space-x-6 flex-1">
           <div className="flex items-center space-x-3">
-            {settings?.logo_url ? (
-              <img src={settings.logo_url} alt={settings.name} className="w-8 h-8 object-contain" />
-            ) : null}
             <h1 className="text-lg font-semibold text-gray-800">{settings?.name || 'DotCrafts'}</h1>
           </div>
           

@@ -606,6 +606,50 @@ export type Database = {
         }
         Relationships: []
       }
+      menu_structure: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean | null
+          key: string
+          label: string
+          parent_key: string | null
+          permission_levels: Json | null
+          sort_order: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          key: string
+          label: string
+          parent_key?: string | null
+          permission_levels?: Json | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          key?: string
+          label?: string
+          parent_key?: string | null
+          permission_levels?: Json | null
+          sort_order?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "menu_structure_parent_key_fkey"
+            columns: ["parent_key"]
+            isOneToOne: false
+            referencedRelation: "menu_structure"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           customizations: Json | null
@@ -1020,20 +1064,26 @@ export type Database = {
       user_permissions: {
         Row: {
           id: string
+          menu_key: string | null
           menu_section: Database["public"]["Enums"]["menu_section"]
           permission_level: Database["public"]["Enums"]["permission_level"]
+          sub_menu_section: string | null
           user_id: string
         }
         Insert: {
           id?: string
+          menu_key?: string | null
           menu_section: Database["public"]["Enums"]["menu_section"]
           permission_level?: Database["public"]["Enums"]["permission_level"]
+          sub_menu_section?: string | null
           user_id: string
         }
         Update: {
           id?: string
+          menu_key?: string | null
           menu_section?: Database["public"]["Enums"]["menu_section"]
           permission_level?: Database["public"]["Enums"]["permission_level"]
+          sub_menu_section?: string | null
           user_id?: string
         }
         Relationships: [

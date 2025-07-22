@@ -145,15 +145,39 @@ serve(async (req) => {
 
       console.log("Creating/updating business settings:", body);
       
+      // Prepare the data for upsert - only include fields that exist in the new schema
       const updateData = {
-        ...body,
+        name: body.name,
+        email: body.email || '',
+        address: body.address || '',
+        phone: body.phone || '',
+        working_hours: body.working_hours || '',
+        logo_url: body.logo_url || '',
+        facebook_url: body.facebook_url || '',
+        instagram_url: body.instagram_url || '',
+        tiktok_url: body.tiktok_url || '',
         updated_at: new Date().toISOString(),
       };
+
+      console.log("Prepared data for upsert:", updateData);
 
       const { data, error } = await adminClient
         .from("business_settings")
         .upsert([updateData])
-        .select()
+        .select(`
+          id,
+          name,
+          email,
+          address,
+          phone,
+          working_hours,
+          logo_url,
+          facebook_url,
+          instagram_url,
+          tiktok_url,
+          created_at,
+          updated_at
+        `)
         .maybeSingle();
 
       if (error) {
@@ -164,7 +188,7 @@ serve(async (req) => {
         );
       }
 
-      console.log("Business settings saved successfully");
+      console.log("Business settings saved successfully:", data);
       return new Response(JSON.stringify({ data }), { headers: corsHeaders });
     }
 

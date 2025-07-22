@@ -3,7 +3,6 @@ import { useEffect, useState } from "react";
 import { useErrorHandler } from "./useErrorHandler";
 import { loadBusinessSettings, saveBusinessSettings } from "@/services/businessSettingsApi";
 import { uploadLogo } from "@/services/logoUploadService";
-import { isValidJson, parseSocialLinksValue } from "@/utils/businessValidation";
 import type { BusinessSettings, BusinessSettingsHookReturn } from "@/types/businessSettings";
 import { useGlobalBusinessSettings } from "./useGlobalBusinessSettings";
 
@@ -30,18 +29,16 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
     const load = async () => {
       setInitialLoading(true);
       try {
-        console.log("Loading business settings...");
+        console.log("useBusinessSettings: Loading business settings...");
         const settings = await loadBusinessSettings();
         if (settings) {
-          console.log("Business settings loaded:", settings);
+          console.log("useBusinessSettings: Business settings loaded:", settings);
           setBusiness(settings);
         } else {
-          console.log("No existing business settings found, using defaults");
-          // Keep the default empty settings - this is not an error
+          console.log("useBusinessSettings: No existing business settings found, using defaults");
         }
       } catch (e: any) {
-        console.error("Error loading business settings:", e);
-        // Show user-friendly error message
+        console.error("useBusinessSettings: Error loading business settings:", e);
         if (e.message.includes("Network error") || e.message.includes("Failed to fetch")) {
           handleError(new Error("Unable to connect to server. Please check your internet connection and try again."), "loading business settings");
         } else {
@@ -57,20 +54,20 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
   // Handle logo file upload
   const handleLogoUpload = async (file: File | null) => {
     if (!file) {
-      console.log("Removing logo...");
+      console.log("useBusinessSettings: Removing logo...");
       setBusiness((prev) => ({ ...prev, logo_url: "" }));
       return;
     }
 
-    console.log("Starting logo upload for file:", file.name, file.type, file.size);
+    console.log("useBusinessSettings: Starting logo upload for file:", file.name, file.type, file.size);
     setUploadingLogo(true);
     try {
       const logoUrl = await uploadLogo(file);
-      console.log("Logo upload successful:", logoUrl);
+      console.log("useBusinessSettings: Logo upload successful:", logoUrl);
       setBusiness((prev) => ({ ...prev, logo_url: logoUrl }));
       handleSuccess("Logo uploaded successfully");
     } catch (error: any) {
-      console.error("Logo upload failed:", error);
+      console.error("useBusinessSettings: Logo upload failed:", error);
       handleError(error, "uploading logo");
     } finally {
       setUploadingLogo(false);
@@ -87,20 +84,20 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
       return;
     }
     
-    console.log("Submitting business settings:", business);
+    console.log("useBusinessSettings: Submitting business settings:", business);
     setLoading(true);
 
     try {
       const updatedSettings = await saveBusinessSettings(business, null);
-      console.log("Business settings saved successfully:", updatedSettings);
+      console.log("useBusinessSettings: Business settings saved successfully:", updatedSettings);
       handleSuccess("Business information updated successfully");
       setBusiness(updatedSettings);
       
       // Refresh global business settings to update header/sidebar
+      console.log("useBusinessSettings: Refreshing global business settings...");
       await refetchGlobal();
     } catch (err: any) {
-      console.error("Error saving business settings:", err);
-      // Show user-friendly error message
+      console.error("useBusinessSettings: Error saving business settings:", err);
       if (err.message.includes("Network error") || err.message.includes("Failed to fetch")) {
         handleError(new Error("Unable to save changes. Please check your internet connection and try again."), "saving business settings");
       } else {
@@ -113,7 +110,9 @@ export const useBusinessSettings = (): BusinessSettingsHookReturn => {
 
   // Handle input change
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setBusiness((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+    const { name, value } = e.target;
+    console.log("useBusinessSettings: Field changed:", name, "=", value);
+    setBusiness((prev) => ({ ...prev, [name]: value }));
   };
 
   return {

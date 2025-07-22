@@ -20,12 +20,13 @@ export const useGlobalBusinessSettings = (): GlobalBusinessSettings => {
       setLoading(true);
       setError(null);
       
+      console.log("useGlobalBusinessSettings: Fetching business settings...");
       const { data, error } = await supabase.functions.invoke("business-settings", {
         method: "GET",
       });
       
       if (error) {
-        console.error("Error fetching business settings:", error);
+        console.error("useGlobalBusinessSettings: Error fetching business settings:", error);
         setError("Failed to load business settings");
         return;
       }
@@ -43,9 +44,11 @@ export const useGlobalBusinessSettings = (): GlobalBusinessSettings => {
           instagram_url: item.instagram_url || "",
           tiktok_url: item.tiktok_url || "",
         };
+        console.log("useGlobalBusinessSettings: Settings fetched successfully:", businessSettings);
         setSettings(businessSettings);
       } else {
         // No settings found, use defaults
+        console.log("useGlobalBusinessSettings: No settings found, using defaults");
         setSettings({
           name: "Business Dashboard",
           email: "",
@@ -59,7 +62,7 @@ export const useGlobalBusinessSettings = (): GlobalBusinessSettings => {
         });
       }
     } catch (err) {
-      console.error("Failed to fetch business settings:", err);
+      console.error("useGlobalBusinessSettings: Failed to fetch business settings:", err);
       setError("Failed to load business settings");
       // Set fallback defaults
       setSettings({

@@ -21,17 +21,18 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
 
   // Sync preview with external value changes
   useEffect(() => {
+    console.log("ImageUpload: External value changed to:", value);
     setPreview(value || null);
   }, [value]);
 
   const handleFileChange = useCallback((file: File | null) => {
     setError(null);
-    console.log("ImageUpload: handleFileChange called with file:", file?.name);
+    console.log("ImageUpload: handleFileChange called with file:", file?.name, file?.size);
     
     if (file) {
       // Validate file type
       if (!file.type.startsWith('image/')) {
-        setError('Please select a valid image file');
+        setError('Please select a valid image file (PNG, JPG, WebP)');
         return;
       }
 
@@ -44,8 +45,9 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
       console.log("ImageUpload: Creating preview for file:", file.name);
       const reader = new FileReader();
       reader.onload = () => {
-        setPreview(reader.result as string);
-        console.log("ImageUpload: Preview created successfully");
+        const result = reader.result as string;
+        console.log("ImageUpload: Preview created successfully, length:", result.length);
+        setPreview(result);
       };
       reader.readAsDataURL(file);
     } else {
@@ -84,7 +86,7 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    console.log("ImageUpload: File input changed:", file?.name);
+    console.log("ImageUpload: File input changed:", file?.name, file?.size);
     handleFileChange(file);
   }, [handleFileChange]);
 
@@ -101,6 +103,10 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
             src={preview}
             alt="Preview"
             className="w-full h-48 object-cover rounded-lg border"
+            onError={(e) => {
+              console.error("ImageUpload: Failed to load preview image:", preview);
+              setError("Failed to load image preview");
+            }}
           />
           {!disabled && (
             <Button

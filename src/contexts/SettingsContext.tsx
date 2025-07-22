@@ -32,14 +32,19 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   } = useQuery({
     queryKey: ['business-settings'],
     queryFn: async () => {
+      console.log("SettingsContext: Fetching business settings via edge function...");
       const { data, error } = await supabase.functions.invoke("business-settings", {
         method: "GET",
       });
       
-      if (error) throw error;
+      if (error) {
+        console.error("SettingsContext: Error fetching business settings:", error);
+        throw error;
+      }
       
       if (data?.data) {
         const item = data.data;
+        console.log("SettingsContext: Business settings fetched successfully:", item);
         return {
           name: item.name || "",
           email: item.email || "",
@@ -53,6 +58,7 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         } as BusinessSettings;
       }
       
+      console.log("SettingsContext: No business settings found, returning defaults");
       return {
         name: "",
         email: "",
@@ -70,9 +76,11 @@ export const SettingsProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   });
 
   const refetchBusinessSettings = async () => {
+    console.log("SettingsContext: Refetching business settings...");
     await refetch();
     // Also invalidate global business settings
     queryClient.invalidateQueries({ queryKey: ['global-business-settings'] });
+    console.log("SettingsContext: Business settings refetch complete");
   };
 
   return (

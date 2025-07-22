@@ -2,11 +2,12 @@
 import React, { useState } from 'react';
 import { Search, Bell, User, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { useBusinessSettings } from '../hooks/useBusinessSettings';
 
 
 const TopNav = () => {
   const { user, logout } = useAuth();
-  
+  const { data: settings } = useBusinessSettings();
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleLogout = async () => {
@@ -20,7 +21,10 @@ const TopNav = () => {
         {/* Business branding and search */}
         <div className="flex items-center space-x-6 flex-1">
           <div className="flex items-center space-x-3">
-            <h1 className="text-lg font-semibold text-gray-800">DotCrafts</h1>
+            {settings?.logo_url ? (
+              <img src={settings.logo_url} alt={settings.name} className="w-8 h-8 object-contain" />
+            ) : null}
+            <h1 className="text-lg font-semibold text-gray-800">{settings?.name || 'DotCrafts'}</h1>
           </div>
           
           <div className="flex-1 max-w-md">

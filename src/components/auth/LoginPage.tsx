@@ -1,12 +1,14 @@
 
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
+import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { Eye, EyeOff, UserPlus } from 'lucide-react';
 
 type AuthView = 'sign_in' | 'sign_up' | 'forgot_password';
 
 const LoginPage = () => {
   const { login, signUp, resetPassword, isLoading } = useAuth();
+  const { data: settings } = useBusinessSettings();
   const [view, setView] = useState<AuthView>('sign_in');
   const [formData, setFormData] = useState({
     name: '',
@@ -98,12 +100,16 @@ const LoginPage = () => {
     return (
       <>
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-orange-100 rounded-full mx-auto mb-4 flex items-center justify-center">
-            <span className="text-2xl">🍽️</span>
+          <div className="w-16 h-16 bg-orange-100 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden">
+            {settings?.logo_url ? (
+              <img src={settings.logo_url} alt={settings.name} className="w-full h-full object-contain" />
+            ) : (
+              <span className="text-2xl">🍽️</span>
+            )}
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">Business Dashboard</h1>
+          <h1 className="text-2xl font-bold text-gray-800">{settings?.name || 'Business Dashboard'}</h1>
           <p className="text-gray-600 mt-2">
-            {view === 'sign_in' ? 'Admin Dashboard' : 'Create an Account'}
+            {settings?.tagline || (view === 'sign_in' ? 'Admin Dashboard' : 'Create an Account')}
           </p>
         </div>
 

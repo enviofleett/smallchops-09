@@ -117,54 +117,50 @@ const Settings = () => {
           )}
         </div>
         
-        <div className="flex flex-1 gap-8 mt-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical" className="flex flex-1 gap-8 mt-6">
           <nav className="w-60 flex-shrink-0">
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4 h-fit">
-              <Tabs value={activeTab} onValueChange={setActiveTab} orientation="vertical">
-                <div className="space-y-6">
-                  {TAB_CATEGORIES.map(category => (
-                    <div key={category.id}>
-                      <h3 className="text-sm font-semibold text-gray-900 mb-2">
-                        {category.label}
-                      </h3>
-                      <div className="space-y-1">
-                        {category.tabs
-                          .filter(tab => availableTabs.includes(tab))
-                          .map(tab => (
-                            <TabsTrigger
-                              key={tab.value}
-                              value={tab.value}
-                              className="w-full justify-start space-x-3 px-3 py-3 rounded-xl text-left text-sm font-medium transition-all duration-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-50 data-[state=active]:to-purple-50 data-[state=active]:text-blue-600 data-[state=active]:shadow-sm text-gray-600 hover:bg-gray-50 hover:text-gray-800"
-                            >
-                              <tab.icon className="h-5 w-5" />
-                              <span>{tab.label}</span>
-                            </TabsTrigger>
-                          ))}
-                      </div>
+              <TabsList className="flex flex-col h-auto w-full space-y-6 bg-transparent p-0">
+                {TAB_CATEGORIES.map(category => (
+                  <div key={category.id} className="w-full">
+                    <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                      {category.label}
+                    </h3>
+                    <div className="space-y-1 w-full">
+                      {category.tabs
+                        .filter(tab => availableTabs.includes(tab))
+                        .map(tab => (
+                          <TabsTrigger
+                            key={tab.value}
+                            value={tab.value}
+                            className="w-full justify-start space-x-3 px-3 py-3 rounded-xl text-left text-sm font-medium transition-all duration-200 data-[state=active]:bg-gradient-to-r data-[state=active]:from-blue-50 data-[state=active]:to-purple-50 data-[state=active]:text-blue-600 data-[state=active]:shadow-sm text-gray-600 hover:bg-gray-50 hover:text-gray-800"
+                          >
+                            <tab.icon className="h-5 w-5" />
+                            <span>{tab.label}</span>
+                          </TabsTrigger>
+                        ))}
                     </div>
-                  ))}
-                </div>
-              </Tabs>
+                  </div>
+                ))}
+              </TabsList>
             </div>
           </nav>
 
           <main className="flex-1">
-            <Tabs value={activeTab} onValueChange={setActiveTab}>
-              {availableTabs.map(tab => {
-                const TabComponent = tab.component;
-                return (
-                  <TabsContent key={tab.value} value={tab.value} className="mt-0">
-                    <ErrorBoundary>
-                      <Suspense fallback={<TabContentSkeleton />}>
-                        <TabComponent />
-                      </Suspense>
-                    </ErrorBoundary>
-                  </TabsContent>
-                );
-              })}
-            </Tabs>
+            {availableTabs.map(tab => {
+              const TabComponent = tab.component;
+              return (
+                <TabsContent key={tab.value} value={tab.value} className="mt-0">
+                  <ErrorBoundary>
+                    <Suspense fallback={<TabContentSkeleton />}>
+                      <TabComponent />
+                    </Suspense>
+                  </ErrorBoundary>
+                </TabsContent>
+              );
+            })}
           </main>
-        </div>
+        </Tabs>
       </div>
     </SettingsProvider>
   );

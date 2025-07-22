@@ -1,12 +1,12 @@
 
 import React, { useState } from 'react';
-import { Search, Bell, User, LogOut, Settings } from 'lucide-react';
+import { Search, Bell, User, LogOut } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { useGlobalBusinessSettings } from '@/hooks/useGlobalBusinessSettings';
+
 
 const TopNav = () => {
   const { user, logout } = useAuth();
-  const { settings } = useGlobalBusinessSettings();
+  
   const [showUserMenu, setShowUserMenu] = useState(false);
 
   const handleLogout = async () => {
@@ -20,16 +20,7 @@ const TopNav = () => {
         {/* Business branding and search */}
         <div className="flex items-center space-x-6 flex-1">
           <div className="flex items-center space-x-3">
-            {settings?.logo_url && (
-              <img 
-                src={settings.logo_url} 
-                alt={settings.name || "Business Logo"}
-                className="w-8 h-8 rounded-lg object-cover"
-              />
-            )}
-            <h1 className="text-lg font-semibold text-gray-800">
-              {settings?.name || 'DotCrafts'}
-            </h1>
+            <h1 className="text-lg font-semibold text-gray-800">DotCrafts</h1>
           </div>
           
           <div className="flex-1 max-w-md">
@@ -74,10 +65,6 @@ const TopNav = () => {
                 <button className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
                   <User className="h-4 w-4" />
                   <span>Profile</span>
-                </button>
-                <button className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
-                  <Settings className="h-4 w-4" />
-                  <span>Settings</span>
                 </button>
                 <hr className="my-2" />
                 <button

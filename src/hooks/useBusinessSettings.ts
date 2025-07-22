@@ -1,3 +1,4 @@
+
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -44,8 +45,8 @@ export const useBusinessSettings = () => {
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  const invalidateSettings = () => {
-    queryClient.invalidateQueries({ queryKey: ['business-settings'] });
+  const invalidateSettings = async () => {
+    await queryClient.invalidateQueries({ queryKey: ['business-settings'] });
   };
 
   return {

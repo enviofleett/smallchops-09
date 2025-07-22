@@ -10,7 +10,8 @@ import {
   Package,
   Tag,
   Truck,
-  Settings
+  Settings,
+  Store
 } from 'lucide-react';
 import {
   Dialog,
@@ -70,17 +71,17 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
             {settings?.logo_url ? (
               <img 
                 src={settings.logo_url} 
-                alt={settings.name} 
+                alt={settings?.name || 'Business'} 
                 className="w-full h-full object-contain"
               />
             ) : (
               <span className="text-white font-bold text-sm">
-                {settings?.name?.charAt(0) || 'D'}
+                <Store className="h-4 w-4" />
               </span>
             )}
           </div>
           {!isCollapsed && (
-            <span className="font-semibold text-xl text-gray-800">{settings?.name || 'DotCrafts'}</span>
+            <span className="font-semibold text-xl text-gray-800">{settings?.name || 'Business'}</span>
           )}
         </div>
       </div>

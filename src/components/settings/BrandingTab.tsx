@@ -1,4 +1,5 @@
-import { useState } from "react";
+
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -14,6 +15,8 @@ import { SEOSettings } from "./SEOSettings";
 import { useBusinessSettings } from "@/hooks/useBusinessSettings";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useErrorHandler } from "@/hooks/useErrorHandler";
 
 const brandingSchema = z.object({
   name: z.string().min(1, "Business name is required"),
@@ -38,53 +41,75 @@ type BrandingFormData = z.infer<typeof brandingSchema>;
 
 export const BrandingTab = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { data: settings, refetch } = useBusinessSettings();
+  const { data: settings, invalidateSettings } = useBusinessSettings();
+  const { handleError } = useErrorHandler();
 
   const form = useForm<BrandingFormData>({
     resolver: zodResolver(brandingSchema),
     defaultValues: {
-      name: settings?.name || "",
-      tagline: settings?.tagline || "",
-      email: settings?.email || "",
-      phone: settings?.phone || "",
-      address: settings?.address || "",
-      website_url: settings?.website_url || "",
-      logo_url: settings?.logo_url || "",
-      facebook_url: settings?.facebook_url || "",
-      instagram_url: settings?.instagram_url || "",
-      tiktok_url: settings?.tiktok_url || "",
-      twitter_url: settings?.twitter_url || "",
-      linkedin_url: settings?.linkedin_url || "",
-      youtube_url: settings?.youtube_url || "",
-      seo_title: settings?.seo_title || "",
-      seo_description: settings?.seo_description || "",
-      seo_keywords: settings?.seo_keywords || "",
+      name: "",
+      tagline: "",
+      email: "",
+      phone: "",
+      address: "",
+      website_url: "",
+      logo_url: "",
+      facebook_url: "",
+      instagram_url: "",
+      tiktok_url: "",
+      twitter_url: "",
+      linkedin_url: "",
+      youtube_url: "",
+      seo_title: "",
+      seo_description: "",
+      seo_keywords: "",
     },
   });
+
+  // Update form when settings load or change
+  useEffect(() => {
+    if (settings) {
+      form.reset({
+        name: settings.name || "",
+        tagline: settings.tagline || "",
+        email: settings.email || "",
+        phone: settings.phone || "",
+        address: settings.address || "",
+        website_url: settings.website_url || "",
+        logo_url: settings.logo_url || "",
+        facebook_url: settings.facebook_url || "",
+        instagram_url: settings.instagram_url || "",
+        tiktok_url: settings.tiktok_url || "",
+        twitter_url: settings.twitter_url || "",
+        linkedin_url: settings.linkedin_url || "",
+        youtube_url: settings.youtube_url || "",
+        seo_title: settings.seo_title || "",
+        seo_description: settings.seo_description || "",
+        seo_keywords: settings.seo_keywords || "",
+      });
+    }
+  }, [settings, form]);
 
   const onSubmit = async (data: BrandingFormData) => {
     try {
       setIsSubmitting(true);
       
-      const response = await fetch('https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/business-settings', {
+      // Use Supabase's functions.invoke method instead of raw fetch
+      const { data: result, error } = await supabase.functions.invoke('business-settings', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('supabase.auth.token')}`,
-        },
-        body: JSON.stringify(data),
+        body: data,
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to update settings');
+      if (error) {
+        throw error;
       }
 
-      await refetch();
+      // Refresh the settings data
+      await invalidateSettings();
       toast.success("Branding settings updated successfully!");
     } catch (error) {
       console.error('Error updating branding settings:', error);
-      toast.error(error instanceof Error ? error.message : "Failed to update settings");
+      handleError(error, "Updating branding settings");
     } finally {
       setIsSubmitting(false);
     }

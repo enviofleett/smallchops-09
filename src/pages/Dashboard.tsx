@@ -4,7 +4,7 @@ import { Package, ShoppingCart, Users, TrendingUp } from 'lucide-react';
 import DashboardCard from '@/components/DashboardCard';
 import RevenueChart from '@/components/charts/RevenueChart';
 import OrdersChart from '@/components/charts/OrdersChart';
-import TopCustomersChart from '@/components/customers/TopCustomersChart';
+import { TopCustomersChart } from '@/components/customers/TopCustomersChart';
 import DashboardHeader from '@/components/DashboardHeader';
 
 const Dashboard = () => {
@@ -18,28 +18,28 @@ const Dashboard = () => {
           title="Total Products"
           value="156"
           change="+12%"
-          icon={Package}
+          icon={<Package className="w-6 h-6 text-blue-600" />}
           trend="up"
         />
         <DashboardCard
           title="Total Orders"
           value="2,847"
           change="+8%"
-          icon={ShoppingCart}
+          icon={<ShoppingCart className="w-6 h-6 text-green-600" />}
           trend="up"
         />
         <DashboardCard
           title="Total Customers"
           value="1,249"
           change="+15%"
-          icon={Users}
+          icon={<Users className="w-6 h-6 text-purple-600" />}
           trend="up"
         />
         <DashboardCard
           title="Revenue"
           value="₦45,897"
           change="+23%"
-          icon={TrendingUp}
+          icon={<TrendingUp className="w-6 h-6 text-orange-600" />}
           trend="up"
         />
       </div>

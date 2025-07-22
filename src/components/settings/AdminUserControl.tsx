@@ -7,9 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateAdminDialog } from "./CreateAdminDialog";
 import { UserPermissionsMatrix } from "./UserPermissionsMatrix";
 import { AdminActionsLog } from "./AdminActionsLog";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useAdminManagement } from '@/hooks/useAdminManagement';
+import ErrorBoundary from '@/components/ErrorBoundary';
 import { UserPlus, Shield, Activity, Trash2 } from "lucide-react";
 import {
   AlertDialog,
@@ -44,84 +43,21 @@ interface AdminInvitation {
 export const AdminUserControl = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null);
-  const { toast } = useToast();
-
-  const { data: adminUsers, isLoading: loadingUsers, refetch: refetchUsers } = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, name, role, status, created_at')
-        .eq('role', 'admin');
-      
-      if (error) throw error;
-      return data as AdminUser[];
-    }
-  });
-
-  const { data: invitations, isLoading: loadingInvitations, refetch: refetchInvitations } = useQuery({
-    queryKey: ['admin-invitations'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('admin_invitations')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
-      return data as AdminInvitation[];
-    }
-  });
-
-  const handleDeleteUser = async (userId: string) => {
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ status: 'inactive' })
-        .eq('id', userId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Admin deactivated",
-        description: "The admin user has been deactivated successfully.",
-      });
-      
-      refetchUsers();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handleDeleteInvitation = async (invitationId: string) => {
-    try {
-      const { error } = await supabase
-        .from('admin_invitations')
-        .delete()
-        .eq('id', invitationId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Invitation deleted",
-        description: "The admin invitation has been deleted successfully.",
-      });
-      
-      refetchInvitations();
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive"
-      });
-    }
-  };
+  
+  const {
+    admins: adminUsers,
+    invitations,
+    isLoadingAdmins: loadingUsers,
+    isLoadingInvitations: loadingInvitations,
+    deleteUser,
+    deleteInvitation,
+    isDeletingUser,
+    isDeletingInvitation,
+  } = useAdminManagement();
 
   return (
-    <div className="space-y-6">
+    <ErrorBoundary>
+      <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Admin User Control</h2>
@@ -209,8 +145,8 @@ export const AdminUserControl = () => {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => handleDeleteUser(user.id)}>
-                                    Deactivate
+                                  <AlertDialogAction onClick={() => deleteUser(user.id)} disabled={isDeletingUser}>
+                                    {isDeletingUser ? 'Deactivating...' : 'Deactivate'}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -280,8 +216,8 @@ export const AdminUserControl = () => {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => handleDeleteInvitation(invitation.id)}>
-                                  Delete
+                                <AlertDialogAction onClick={() => deleteInvitation(invitation.id)} disabled={isDeletingInvitation}>
+                                  {isDeletingInvitation ? 'Deleting...' : 'Delete'}
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>
@@ -308,11 +244,8 @@ export const AdminUserControl = () => {
       <CreateAdminDialog 
         open={showCreateDialog} 
         onOpenChange={setShowCreateDialog}
-        onSuccess={() => {
-          refetchUsers();
-          refetchInvitations();
-        }}
       />
     </div>
+    </ErrorBoundary>
   );
 };

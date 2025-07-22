@@ -1,12 +1,58 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Enhanced CORS headers for production
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+  'Access-Control-Max-Age': '86400',
+}
+
+// Rate limiting helper
+async function checkRateLimit(supabase: any, identifier: string, action: string, limit: number = 10): Promise<boolean> {
+  try {
+    const windowStart = new Date(Date.now() - 60000) // 1 minute window
+    
+    const { data, error } = await supabase
+      .from('rate_limits')
+      .select('count')
+      .eq('identifier', identifier)
+      .eq('action', action)
+      .gte('window_start', windowStart.toISOString())
+      .single()
+
+    if (error && error.code !== 'PGRST116') {
+      console.error('Rate limit check error:', error)
+      return true // Allow on error
+    }
+
+    if (data && data.count >= limit) {
+      return false
+    }
+
+    // Update or insert rate limit record
+    await supabase
+      .from('rate_limits')
+      .upsert(
+        { 
+          identifier, 
+          action, 
+          count: (data?.count || 0) + 1,
+          window_start: windowStart.toISOString()
+        },
+        { onConflict: 'identifier,action,window_start' }
+      )
+
+    return true
+  } catch (err) {
+    console.error('Rate limiting error:', err)
+    return true // Allow on error
+  }
 }
 
 serve(async (req) => {
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -17,23 +63,74 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const authHeader = req.headers.get('Authorization')!
-    const token = authHeader.replace('Bearer ', '')
-    const { data: user } = await supabaseClient.auth.getUser(token)
+    // Enhanced authentication validation
+    const authHeader = req.headers.get('Authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.error('Missing or invalid authorization header')
+      return new Response(
+        JSON.stringify({ error: 'Missing or invalid authorization header' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    if (!user.user) {
-      throw new Error('Unauthorized')
+    const token = authHeader.replace('Bearer ', '')
+    if (!token || token.length < 10) {
+      console.error('Invalid token format')
+      return new Response(
+        JSON.stringify({ error: 'Invalid token format' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const { data: user, error: userError } = await supabaseClient.auth.getUser(token)
+    if (userError || !user.user) {
+      console.error('Authentication failed:', userError?.message)
+      return new Response(
+        JSON.stringify({ error: 'Authentication failed' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // Rate limiting check
+    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || 'unknown'
+    const rateLimitPassed = await checkRateLimit(supabaseClient, `${user.user.id}:${clientIP}`, 'admin_action', 30)
+    if (!rateLimitPassed) {
+      console.error('Rate limit exceeded for user:', user.user.id)
+      return new Response(
+        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     // Check if user is admin
-    const { data: profile } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
-      .select('role')
+      .select('role, status')
       .eq('id', user.user.id)
       .single()
 
-    if (profile?.role !== 'admin') {
-      throw new Error('Admin access required')
+    if (profileError || !profile) {
+      console.error('Profile fetch failed:', profileError?.message)
+      return new Response(
+        JSON.stringify({ error: 'User profile not found' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (profile.role !== 'admin') {
+      console.error('Non-admin user attempted admin action:', user.user.id)
+      return new Response(
+        JSON.stringify({ error: 'Admin access required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (profile.status !== 'active') {
+      console.error('Inactive admin user attempted action:', user.user.id)
+      return new Response(
+        JSON.stringify({ error: 'Account is not active' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
     if (req.method === 'POST') {

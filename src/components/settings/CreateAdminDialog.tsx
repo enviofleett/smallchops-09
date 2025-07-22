@@ -21,7 +21,7 @@ type CreateAdminFormData = z.infer<typeof createAdminSchema>;
 interface CreateAdminDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onSuccess: () => void;
+  onSuccess?: () => void;
 }
 
 export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdminDialogProps) => {
@@ -56,7 +56,7 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
 
       form.reset();
       onOpenChange(false);
-      onSuccess();
+      onSuccess?.();
     } catch (error: any) {
       toast({
         title: "Error",

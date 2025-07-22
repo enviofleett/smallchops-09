@@ -1061,10 +1061,37 @@ export type Database = {
         }
         Relationships: []
       }
+      rate_limits: {
+        Row: {
+          action: string
+          count: number | null
+          created_at: string | null
+          id: string
+          identifier: string
+          window_start: string | null
+        }
+        Insert: {
+          action: string
+          count?: number | null
+          created_at?: string | null
+          id?: string
+          identifier: string
+          window_start?: string | null
+        }
+        Update: {
+          action?: string
+          count?: number | null
+          created_at?: string | null
+          id?: string
+          identifier?: string
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           id: string
-          menu_key: string | null
+          menu_key: string
           menu_section: Database["public"]["Enums"]["menu_section"]
           permission_level: Database["public"]["Enums"]["permission_level"]
           sub_menu_section: string | null
@@ -1072,7 +1099,7 @@ export type Database = {
         }
         Insert: {
           id?: string
-          menu_key?: string | null
+          menu_key: string
           menu_section: Database["public"]["Enums"]["menu_section"]
           permission_level?: Database["public"]["Enums"]["permission_level"]
           sub_menu_section?: string | null
@@ -1080,7 +1107,7 @@ export type Database = {
         }
         Update: {
           id?: string
-          menu_key?: string | null
+          menu_key?: string
           menu_section?: Database["public"]["Enums"]["menu_section"]
           permission_level?: Database["public"]["Enums"]["permission_level"]
           sub_menu_section?: string | null
@@ -1212,6 +1239,17 @@ export type Database = {
       is_admin: {
         Args: Record<PropertyKey, never>
         Returns: boolean
+      }
+      log_admin_action: {
+        Args: {
+          action_type: string
+          entity_type: string
+          entity_id: string
+          old_values?: Json
+          new_values?: Json
+          message?: string
+        }
+        Returns: undefined
       }
     }
     Enums: {

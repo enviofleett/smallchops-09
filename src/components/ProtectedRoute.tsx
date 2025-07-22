@@ -19,16 +19,19 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     const checkAdminExists = async () => {
       setIsCheckingAdmin(true);
       try {
-        const { count, error } = await supabase
+        const { data, error } = await supabase
           .from('profiles')
-          .select('id', { count: 'exact', head: true })
-          .eq('role', 'admin');
+          .select('id')
+          .eq('role', 'admin')
+          .limit(1);
 
         if (error) {
-          throw error;
+          console.error("Error checking for admin user:", error);
+          // Fail safe: assume an admin exists to prevent the app from getting stuck.
+          setAdminExists(true);
+        } else {
+          setAdminExists(data && data.length > 0);
         }
-        
-        setAdminExists(count !== null && count > 0);
       } catch (error) {
         console.error("Error checking for admin user:", error);
         // Fail safe: assume an admin exists to prevent the app from getting stuck.

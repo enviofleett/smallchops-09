@@ -19,28 +19,28 @@ const Dashboard = () => {
           value="156"
           change="+12%"
           icon={<Package className="w-6 h-6 text-blue-600" />}
-          trend="up"
+          changeType="positive"
         />
         <DashboardCard
           title="Total Orders"
           value="2,847"
           change="+8%"
           icon={<ShoppingCart className="w-6 h-6 text-green-600" />}
-          trend="up"
+          changeType="positive"
         />
         <DashboardCard
           title="Total Customers"
           value="1,249"
           change="+15%"
           icon={<Users className="w-6 h-6 text-purple-600" />}
-          trend="up"
+          changeType="positive"
         />
         <DashboardCard
           title="Revenue"
           value="₦45,897"
           change="+23%"
           icon={<TrendingUp className="w-6 h-6 text-orange-600" />}
-          trend="up"
+          changeType="positive"
         />
       </div>
 
@@ -60,7 +60,11 @@ const Dashboard = () => {
       {/* Additional Charts */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
         <h3 className="text-lg font-semibold text-gray-800 mb-4">Top Customers</h3>
-        <TopCustomersChart />
+        <TopCustomersChart 
+          customers={[]} 
+          type="orders" 
+          title="Top Customers by Orders" 
+        />
       </div>
     </div>
   );

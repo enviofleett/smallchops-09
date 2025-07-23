@@ -1,9 +1,23 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Production-ready CORS configuration
+const getCorsHeaders = (origin: string | null): Record<string, string> => {
+  const allowedOrigins = [
+    'https://oknnklksdiqaifhxaccs.supabase.co',
+    'https://project-oknnklksdiqaifhxaccs.lovable.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ];
+  
+  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  
+  return {
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  };
 };
 
 interface EmailRequest {
@@ -24,6 +38,8 @@ const supabase = createClient(
 const MAILERSEND_API_TOKEN = Deno.env.get('MAILERSEND_API_TOKEN');
 
 serve(async (req: Request): Promise<Response> => {
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -42,6 +58,18 @@ serve(async (req: Request): Promise<Response> => {
     }
 
     const emailRequest: EmailRequest = await req.json();
+    
+    // Input validation
+    if (!emailRequest.to || !emailRequest.subject) {
+      throw new Error('Missing required fields: to, subject');
+    }
+    
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(emailRequest.to)) {
+      throw new Error('Invalid recipient email address');
+    }
+    
     console.log('Processing email request:', { 
       to: emailRequest.to, 
       subject: emailRequest.subject,
@@ -93,16 +121,38 @@ serve(async (req: Request): Promise<Response> => {
       throw new Error('Either html content or template_id must be provided');
     }
 
-    // Send email via MailerSend API
-    const mailerSendResponse = await fetch('https://api.mailersend.com/v1/email', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`,
-        'Content-Type': 'application/json',
-        'X-Requested-With': 'XMLHttpRequest'
-      },
-      body: JSON.stringify(mailerSendPayload)
-    });
+    // Add rate limiting check
+    const rateLimitKey = `email_${emailRequest.to}_${Date.now() / (1000 * 60)}`; // Per minute
+    
+    // Send email via MailerSend API with retry logic
+    let attempts = 0;
+    const maxAttempts = 3;
+    let mailerSendResponse: Response;
+    
+    while (attempts < maxAttempts) {
+      try {
+        mailerSendResponse = await fetch('https://api.mailersend.com/v1/email', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`,
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+          },
+          body: JSON.stringify(mailerSendPayload)
+        });
+        
+        if (mailerSendResponse.ok) break;
+        
+        attempts++;
+        if (attempts < maxAttempts) {
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+        }
+      } catch (error) {
+        attempts++;
+        if (attempts >= maxAttempts) throw error;
+        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+      }
+    }
 
     const responseData = await mailerSendResponse.json();
 

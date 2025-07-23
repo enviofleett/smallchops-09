@@ -325,6 +325,9 @@ export type Database = {
           enable_email: boolean | null
           enable_sms: boolean | null
           id: string
+          mailersend_api_token: string | null
+          mailersend_domain: string | null
+          mailersend_domain_verified: boolean | null
           sender_email: string | null
           sms_api_key: string | null
           sms_provider: string | null
@@ -344,6 +347,9 @@ export type Database = {
           enable_email?: boolean | null
           enable_sms?: boolean | null
           id?: string
+          mailersend_api_token?: string | null
+          mailersend_domain?: string | null
+          mailersend_domain_verified?: boolean | null
           sender_email?: string | null
           sms_api_key?: string | null
           sms_provider?: string | null
@@ -363,6 +369,9 @@ export type Database = {
           enable_email?: boolean | null
           enable_sms?: boolean | null
           id?: string
+          mailersend_api_token?: string | null
+          mailersend_domain?: string | null
+          mailersend_domain_verified?: boolean | null
           sender_email?: string | null
           sms_api_key?: string | null
           sms_provider?: string | null

@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle2, Mail, Send, Settings, TestTube } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Mail, Send, Settings, TestTube, ExternalLink, Shield } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -22,6 +22,9 @@ const communicationSchema = z.object({
   enable_sms: z.boolean().default(false),
   sender_email: z.string().email('Invalid email address').optional().or(z.literal('')),
   smtp_user: z.string().min(1, 'Sender name is required').optional().or(z.literal('')),
+  mailersend_api_token: z.string().optional(),
+  mailersend_domain: z.string().optional(),
+  mailersend_domain_verified: z.boolean().default(false),
   smtp_host: z.string().optional(),
   smtp_port: z.number().optional(),
   smtp_pass: z.string().optional(),
@@ -143,6 +146,9 @@ export const CommunicationsTab = () => {
       enable_sms: false,
       sender_email: '',
       smtp_user: '',
+      mailersend_api_token: '',
+      mailersend_domain: '',
+      mailersend_domain_verified: false,
       smtp_host: '',
       smtp_port: 587,
       smtp_pass: '',
@@ -173,6 +179,9 @@ export const CommunicationsTab = () => {
           enable_sms: data.enable_sms || false,
           sender_email: data.sender_email || '',
           smtp_user: data.smtp_user || '',
+          mailersend_api_token: data.mailersend_api_token || '',
+          mailersend_domain: data.mailersend_domain || '',
+          mailersend_domain_verified: data.mailersend_domain_verified || false,
           smtp_host: data.smtp_host || '',
           smtp_port: data.smtp_port || 587,
           smtp_pass: data.smtp_pass || '',
@@ -203,6 +212,9 @@ export const CommunicationsTab = () => {
             // Convert empty strings to null for database
             sender_email: data.sender_email || null,
             smtp_user: data.smtp_user || null,
+            mailersend_api_token: data.mailersend_api_token || null,
+            mailersend_domain: data.mailersend_domain || null,
+            mailersend_domain_verified: data.mailersend_domain_verified || false,
             smtp_host: data.smtp_host || null,
             smtp_port: data.smtp_port || null,
             smtp_pass: data.smtp_pass || null,
@@ -447,6 +459,71 @@ export const CommunicationsTab = () => {
                         </FormItem>
                       )}
                     />
+                  </div>
+
+                  <div className="space-y-4 border rounded-lg p-4">
+                    <div className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      <h4 className="font-medium">MailerSend Configuration</h4>
+                      <a
+                        href="https://app.mailersend.com/api-tokens"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="ml-auto flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
+                      >
+                        Get API Token <ExternalLink className="h-3 w-3" />
+                      </a>
+                    </div>
+
+                    <FormField
+                      control={form.control}
+                      name="mailersend_api_token"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>MailerSend API Token</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="password"
+                              placeholder="mlsn.xxxxxxxxxxxxxxxxxxxxx"
+                              {...field}
+                              value={field.value || ''}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            Your MailerSend API token for sending emails
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="mailersend_domain"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Domain</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="yourdomain.com"
+                              {...field}
+                              value={field.value || ''}
+                            />
+                          </FormControl>
+                          <FormDescription>
+                            The domain you've verified with MailerSend
+                          </FormDescription>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {form.watch('mailersend_domain_verified') && (
+                      <div className="flex items-center gap-2 text-sm text-green-600">
+                        <CheckCircle2 className="h-4 w-4" />
+                        Domain verified
+                      </div>
+                    )}
                   </div>
 
                   {connectionStatus !== 'idle' && (

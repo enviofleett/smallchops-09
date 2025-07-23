@@ -1,9 +1,23 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Production-ready CORS configuration
+const getCorsHeaders = (origin: string | null): Record<string, string> => {
+  const allowedOrigins = [
+    'https://oknnklksdiqaifhxaccs.supabase.co',
+    'https://project-oknnklksdiqaifhxaccs.lovable.app',
+    'http://localhost:5173',
+    'http://localhost:3000'
+  ];
+  
+  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  
+  return {
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  };
 };
 
 const supabase = createClient(
@@ -102,6 +116,8 @@ const ORDER_STATUS_TEMPLATES = {
 };
 
 serve(async (req: Request): Promise<Response> => {
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });

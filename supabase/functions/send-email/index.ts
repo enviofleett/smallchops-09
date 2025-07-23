@@ -5,9 +5,11 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
 const getCorsHeaders = (origin: string | null): Record<string, string> => {
   const allowedOrigins = [
     'https://oknnklksdiqaifhxaccs.supabase.co',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev',
     'https://project-oknnklksdiqaifhxaccs.lovable.app',
     'http://localhost:5173',
-    'http://localhost:3000'
+    'http://localhost:3000',
+    'http://localhost:8000'
   ];
   
   const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
@@ -53,27 +55,40 @@ serve(async (req: Request): Promise<Response> => {
   }
 
   try {
+    console.log('Send-email function called from:', req.headers.get('origin'));
+    
     if (!MAILERSEND_API_TOKEN) {
-      throw new Error('MailerSend API token not configured');
+      console.error('MailerSend API token not configured in environment variables');
+      throw new Error('MailerSend API token not configured. Please add MAILERSEND_API_TOKEN to Supabase Edge Function secrets.');
     }
 
-    const emailRequest: EmailRequest = await req.json();
+    let emailRequest: EmailRequest;
+    try {
+      emailRequest = await req.json();
+    } catch (parseError) {
+      console.error('Failed to parse request body:', parseError);
+      throw new Error('Invalid JSON in request body');
+    }
     
     // Input validation
     if (!emailRequest.to || !emailRequest.subject) {
+      console.error('Missing required fields:', { to: !!emailRequest.to, subject: !!emailRequest.subject });
       throw new Error('Missing required fields: to, subject');
     }
     
     // Email validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(emailRequest.to)) {
+      console.error('Invalid email format:', emailRequest.to);
       throw new Error('Invalid recipient email address');
     }
     
     console.log('Processing email request:', { 
       to: emailRequest.to, 
       subject: emailRequest.subject,
-      order_id: emailRequest.order_id 
+      order_id: emailRequest.order_id,
+      has_html: !!emailRequest.html,
+      has_template_id: !!emailRequest.template_id
     });
 
     // Get sender configuration from database
@@ -124,13 +139,18 @@ serve(async (req: Request): Promise<Response> => {
     // Add rate limiting check
     const rateLimitKey = `email_${emailRequest.to}_${Date.now() / (1000 * 60)}`; // Per minute
     
-    // Send email via MailerSend API with retry logic
+    // Send email via MailerSend API with retry logic and timeout
     let attempts = 0;
     const maxAttempts = 3;
     let mailerSendResponse: Response;
     
+    console.log('Sending email to MailerSend API...');
+    
     while (attempts < maxAttempts) {
       try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+        
         mailerSendResponse = await fetch('https://api.mailersend.com/v1/email', {
           method: 'POST',
           headers: {
@@ -138,19 +158,32 @@ serve(async (req: Request): Promise<Response> => {
             'Content-Type': 'application/json',
             'X-Requested-With': 'XMLHttpRequest'
           },
-          body: JSON.stringify(mailerSendPayload)
+          body: JSON.stringify(mailerSendPayload),
+          signal: controller.signal
         });
         
-        if (mailerSendResponse.ok) break;
+        clearTimeout(timeoutId);
+        
+        if (mailerSendResponse.ok) {
+          console.log('MailerSend API responded successfully');
+          break;
+        }
+        
+        console.log(`MailerSend API error (attempt ${attempts + 1}):`, mailerSendResponse.status, mailerSendResponse.statusText);
         
         attempts++;
         if (attempts < maxAttempts) {
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+          const delay = Math.pow(2, attempts) * 1000;
+          console.log(`Retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
         }
       } catch (error) {
         attempts++;
+        console.error(`MailerSend API call failed (attempt ${attempts}):`, error.message);
         if (attempts >= maxAttempts) throw error;
-        await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempts) * 1000));
+        const delay = Math.pow(2, attempts) * 1000;
+        console.log(`Retrying in ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 

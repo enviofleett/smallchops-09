@@ -1,25 +1,26 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Environment-aware CORS headers for production security
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  // Allow any Lovable project domain for development/preview
+// Production-ready CORS configuration
+const getCorsHeaders = (origin: string | null): Record<string, string> => {
   const allowedOrigins = [
-    'https://oknnklksdiqaifhxaccs.lovableproject.com', // Production
-    /^https:\/\/[\w-]+\.lovableproject\.com$/ // Dev/Preview domains
+    'https://oknnklksdiqaifhxaccs.supabase.co',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev',
+    'https://project-oknnklksdiqaifhxaccs.lovable.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:8000'
   ];
   
-  const isAllowed = origin && allowedOrigins.some(allowed => 
-    typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
-  );
+  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
   
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://oknnklksdiqaifhxaccs.lovableproject.com',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
   };
-}
+};
 
 serve(async (req) => {
   const origin = req.headers.get('origin');
@@ -203,10 +204,20 @@ serve(async (req) => {
           });
         }
 
-        // Call the send-email function to test the connection
+        // Call the send-email function using direct HTTP request
         try {
-          const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('send-email', {
-            body: {
+          console.log('Calling send-email function...');
+          
+          const sendEmailUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-email`;
+          
+          const emailResponse = await fetch(sendEmailUrl, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+              'Content-Type': 'application/json',
+              'apikey': Deno.env.get('SUPABASE_ANON_KEY') || ''
+            },
+            body: JSON.stringify({
               to: settings.sender_email, // Send test email to sender
               subject: 'MailerSend Test Email - Connection Successful',
               html: `
@@ -217,24 +228,38 @@ serve(async (req) => {
                 <p>Time: ${new Date().toISOString()}</p>
               `,
               order_id: null // Optional field for test emails
-            }
+            })
           });
+          
+          const emailResult = await emailResponse.json();
 
-          if (emailError) {
-            console.error('Email test failed:', emailError);
+          if (!emailResponse.ok) {
+            console.error('Send-email function failed:', emailResponse.status, emailResponse.statusText, emailResult);
             return new Response(JSON.stringify({
               success: false,
-              error: `Email test failed: ${emailError.message}`
+              error: `Email test failed: ${emailResult.error || 'Unknown error from send-email function'}`
             }), {
               status: 400,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
           }
 
-          console.log('Email test successful');
+          if (!emailResult.success) {
+            console.error('Email test failed (internal):', emailResult.error);
+            return new Response(JSON.stringify({
+              success: false,
+              error: `Email test failed: ${emailResult.error}`
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          console.log('Email test successful:', emailResult);
           return new Response(JSON.stringify({
             success: true,
-            message: 'Test email sent successfully! Check your inbox.'
+            message: 'Test email sent successfully! Check your inbox.',
+            details: emailResult.message
           }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -244,7 +269,7 @@ serve(async (req) => {
           console.error('Email test error:', error);
           return new Response(JSON.stringify({
             success: false,
-            error: `Failed to send test email: ${error.message}`
+            error: `Failed to communicate with send-email function: ${error.message}. Please check that your MailerSend API token is configured in Supabase Edge Function secrets.`
           }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }

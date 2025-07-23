@@ -94,15 +94,23 @@ export const BrandingTab = () => {
     try {
       setIsSubmitting(true);
       
-      // Use Supabase's functions.invoke method
+      console.log('Submitting branding data:', data);
+      
+      // Use Supabase's functions.invoke method with explicit method
       const { data: result, error } = await supabase.functions.invoke('business-settings', {
         body: data,
+        headers: {
+          'Content-Type': 'application/json',
+        }
       });
 
       if (error) {
-        throw error;
+        console.error('Supabase function error:', error);
+        throw new Error(error.message || 'Failed to update business settings');
       }
 
+      console.log('Business settings updated successfully:', result);
+      
       // Refresh the settings data
       await invalidateSettings();
       toast.success("Branding settings updated successfully!");

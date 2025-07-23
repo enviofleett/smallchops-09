@@ -25,6 +25,8 @@ serve(async (req) => {
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
   
+  console.log(`Business settings request: ${req.method} from ${origin}`);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -35,23 +37,44 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const authHeader = req.headers.get('Authorization')!
-    const token = authHeader.replace('Bearer ', '')
-    const { data: user } = await supabaseClient.auth.getUser(token)
+    // Enhanced auth header validation
+    const authHeader = req.headers.get('Authorization');
+    console.log('Auth header present:', !!authHeader);
+    
+    if (!authHeader) {
+      throw new Error('Authorization header missing');
+    }
+    
+    const token = authHeader.replace('Bearer ', '');
+    const { data: user, error: authError } = await supabaseClient.auth.getUser(token);
 
-    if (!user.user) {
-      throw new Error('Unauthorized')
+    if (authError) {
+      console.error('Auth error:', authError);
+      throw new Error(`Authentication failed: ${authError.message}`);
     }
 
+    if (!user.user) {
+      throw new Error('User not found');
+    }
+
+    console.log('User authenticated:', user.user.id);
+
     // Check if user is admin
-    const { data: profile } = await supabaseClient
+    const { data: profile, error: profileError } = await supabaseClient
       .from('profiles')
       .select('role')
       .eq('id', user.user.id)
-      .single()
+      .single();
+
+    if (profileError) {
+      console.error('Profile error:', profileError);
+      throw new Error(`Failed to get user profile: ${profileError.message}`);
+    }
+
+    console.log('User role:', profile?.role);
 
     if (profile?.role !== 'admin') {
-      throw new Error('Admin access required')
+      throw new Error('Admin access required');
     }
 
     if (req.method === 'GET') {
@@ -70,65 +93,103 @@ serve(async (req) => {
       )
     }
 
-    if (req.method === 'POST' || req.method === 'PUT') {
-      const body = await req.json()
+    // Handle POST (functions.invoke defaults to POST)
+    if (req.method === 'POST') {
+      console.log('Processing POST request for business settings');
+      
+      let body;
+      try {
+        body = await req.json();
+        console.log('Request body received:', Object.keys(body));
+      } catch (error) {
+        console.error('Failed to parse JSON body:', error);
+        throw new Error('Invalid JSON in request body');
+      }
       
       // Validate required fields
       if (!body.name || body.name.trim().length === 0) {
-        throw new Error('Business name is required')
+        throw new Error('Business name is required');
       }
 
       // Validate email format if provided
-      if (body.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
-        throw new Error('Invalid email format')
+      if (body.email && body.email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(body.email)) {
+        throw new Error('Invalid email format');
       }
 
       // Validate URLs if provided
-      const urlFields = ['website_url', 'facebook_url', 'instagram_url', 'tiktok_url', 'twitter_url', 'linkedin_url', 'youtube_url']
+      const urlFields = ['website_url', 'facebook_url', 'instagram_url', 'tiktok_url', 'twitter_url', 'linkedin_url', 'youtube_url'];
       for (const field of urlFields) {
         if (body[field] && body[field].trim() !== '') {
           try {
-            new URL(body[field])
+            new URL(body[field]);
           } catch {
-            throw new Error(`Invalid URL format for ${field}`)
+            throw new Error(`Invalid URL format for ${field}`);
           }
         }
       }
 
+      // Clean up empty strings to null for database
+      const cleanedBody = { ...body };
+      Object.keys(cleanedBody).forEach(key => {
+        if (cleanedBody[key] === '') {
+          cleanedBody[key] = null;
+        }
+      });
+
+      console.log('Checking for existing settings...');
+      
       // Check if settings exist
-      const { data: existing } = await supabaseClient
+      const { data: existing, error: existingError } = await supabaseClient
         .from('business_settings')
         .select('id')
-        .single()
+        .single();
 
-      let result
+      if (existingError && existingError.code !== 'PGRST116') {
+        console.error('Error checking existing settings:', existingError);
+        throw new Error(`Database error: ${existingError.message}`);
+      }
+
+      let result;
       if (existing) {
+        console.log('Updating existing settings with ID:', existing.id);
         // Update existing settings
         const { data, error } = await supabaseClient
           .from('business_settings')
-          .update(body)
+          .update(cleanedBody)
           .eq('id', existing.id)
           .select()
-          .single()
+          .single();
         
-        if (error) throw error
-        result = data
+        if (error) {
+          console.error('Update error:', error);
+          throw new Error(`Failed to update settings: ${error.message}`);
+        }
+        result = data;
       } else {
+        console.log('Creating new settings...');
         // Insert new settings
         const { data, error } = await supabaseClient
           .from('business_settings')
-          .insert(body)
+          .insert(cleanedBody)
           .select()
-          .single()
+          .single();
         
-        if (error) throw error
-        result = data
+        if (error) {
+          console.error('Insert error:', error);
+          throw new Error(`Failed to create settings: ${error.message}`);
+        }
+        result = data;
       }
+
+      console.log('Settings operation successful');
 
       return new Response(
         JSON.stringify({ data: result }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      );
     }
 
     return new Response(
@@ -137,10 +198,25 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('Business settings error:', error)
+    console.error('Business settings error:', error);
+    
+    // Determine appropriate status code
+    let status = 400;
+    if (error.message.includes('Unauthorized') || error.message.includes('Admin access required')) {
+      status = 403;
+    } else if (error.message.includes('Authentication failed') || error.message.includes('Authorization header missing')) {
+      status = 401;
+    }
+    
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack || 'No additional details'
+      }),
+      { 
+        status, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
   }
 })

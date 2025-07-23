@@ -2,16 +2,15 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
-import { Eye, EyeOff, UserPlus } from 'lucide-react';
+import { Eye, EyeOff } from 'lucide-react';
 
-type AuthView = 'sign_in' | 'sign_up' | 'forgot_password';
+type AuthView = 'sign_in' | 'forgot_password';
 
 const LoginPage = () => {
-  const { login, signUp, resetPassword, isLoading } = useAuth();
+  const { login, resetPassword, isLoading } = useAuth();
   const { data: settings } = useBusinessSettings();
   const [view, setView] = useState<AuthView>('sign_in');
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
     password: '',
   });
@@ -19,19 +18,13 @@ const LoginPage = () => {
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
 
-  const handleAuthAction = async (e: React.FormEvent) => {
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
     setMessage('');
     
     try {
-      if (view === 'sign_in') {
-        await login({ email: formData.email, password: formData.password });
-      } else if (view === 'sign_up') {
-        await signUp({ name: formData.name, email: formData.email, password: formData.password });
-        setMessage('Account created! Please check your email for verification link.');
-        setView('sign_in');
-      }
+      await login({ email: formData.email, password: formData.password });
     } catch (err: any) {
       console.error('Auth error:', err);
       setError(err.message || 'An unexpected error occurred.');
@@ -51,11 +44,6 @@ const LoginPage = () => {
     }
   };
 
-  const createFirstAdmin = () => {
-    setView('sign_up');
-    setFormData(prev => ({ ...prev, name: 'System Admin' }));
-    setMessage('Creating your first admin account. You will have admin privileges.');
-  };
 
   const renderForm = () => {
     if (view === 'forgot_password') {
@@ -109,39 +97,11 @@ const LoginPage = () => {
           </div>
           <h1 className="text-2xl font-bold text-gray-800">{settings?.name || 'Business Dashboard'}</h1>
           <p className="text-gray-600 mt-2">
-            {settings?.tagline || (view === 'sign_in' ? 'Admin Dashboard' : 'Create an Account')}
+            {settings?.tagline || 'Admin Dashboard'}
           </p>
         </div>
 
-        {view === 'sign_in' && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-xl">
-            <p className="text-sm text-blue-800 mb-3">
-              Need to set up your first admin account?
-            </p>
-            <button
-              onClick={createFirstAdmin}
-              className="flex items-center space-x-2 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors text-sm"
-            >
-              <UserPlus className="h-4 w-4" />
-              <span>Create First Admin Account</span>
-            </button>
-          </div>
-        )}
-
-        <form onSubmit={handleAuthAction} className="space-y-4">
-          {view === 'sign_up' && (
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-              <input
-                type="text"
-                value={formData.name}
-                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500"
-                placeholder="Your Name"
-                required
-              />
-            </div>
-          )}
+        <form onSubmit={handleSignIn} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
             <input
@@ -182,7 +142,7 @@ const LoginPage = () => {
               disabled={isLoading}
               className="w-full bg-orange-600 text-white py-3 rounded-xl hover:bg-orange-700 transition-colors disabled:opacity-50"
             >
-              {isLoading ? 'Processing...' : (view === 'sign_in' ? 'Sign In' : 'Create Admin Account')}
+              {isLoading ? 'Signing In...' : 'Sign In'}
             </button>
             
             {view === 'sign_in' && (
@@ -192,29 +152,6 @@ const LoginPage = () => {
                 className="w-full text-orange-600 hover:text-orange-700 transition-colors"
               >
                 Forgot Password?
-              </button>
-            )}
-
-            {view !== 'sign_up' && (
-              <p className="text-center text-sm text-gray-600">
-                Don't have an account?
-                <button
-                  type="button"
-                  onClick={() => setView('sign_up')}
-                  className="font-medium text-orange-600 hover:text-orange-700 ml-1"
-                >
-                  Sign Up
-                </button>
-              </p>
-            )}
-
-            {view === 'sign_up' && (
-              <button
-                type="button"
-                onClick={() => setView('sign_in')}
-                className="w-full text-gray-600 hover:text-gray-800 transition-colors"
-              >
-                Back to Sign In
               </button>
             )}
           </div>

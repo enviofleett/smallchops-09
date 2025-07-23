@@ -96,9 +96,16 @@ export const BrandingTab = () => {
       
       console.log('Submitting branding data:', data);
       
+      // Clean the data to ensure no undefined values
+      const cleanData = Object.fromEntries(
+        Object.entries(data).filter(([_, value]) => value !== undefined)
+      );
+      
+      console.log('Cleaned data being sent:', cleanData);
+      
       // Use Supabase's functions.invoke method with explicit method
       const { data: result, error } = await supabase.functions.invoke('business-settings', {
-        body: data,
+        body: cleanData,
         headers: {
           'Content-Type': 'application/json',
         }

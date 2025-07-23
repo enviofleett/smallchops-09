@@ -100,12 +100,25 @@ serve(async (req) => {
       console.log('Processing POST request for business settings');
       
       let reqBody;
+      const contentType = req.headers.get('content-type');
+      console.log('Content-Type:', contentType);
+      
       try {
-        reqBody = await req.json();
-        console.log('Request body received:', Object.keys(reqBody));
+        const bodyText = await req.text();
+        console.log('Raw body length:', bodyText.length);
+        console.log('Raw body preview:', bodyText.substring(0, 200));
+        
+        if (!bodyText || bodyText.trim() === '') {
+          console.log('Empty request body received');
+          throw new Error('Request body is empty');
+        }
+        
+        reqBody = JSON.parse(bodyText);
+        console.log('Request body received successfully:', Object.keys(reqBody || {}));
       } catch (error) {
         console.error('Failed to parse JSON body:', error);
-        throw new Error('Invalid JSON in request body');
+        console.error('Error details:', error.message);
+        throw new Error(`Invalid JSON in request body: ${error.message}`);
       }
 
       // Handle communication settings updates

@@ -21,32 +21,32 @@ const DashboardCard = ({
   className = '' 
 }: DashboardCardProps) => {
   return (
-    <div className={`bg-card rounded-xl sm:rounded-2xl shadow-sm border border-border p-4 sm:p-6 hover:shadow-md transition-shadow ${className}`}>
-      <div className="flex items-start justify-between mb-3 sm:mb-4">
+    <div className={`bg-card rounded-xl shadow-sm border border-border p-5 hover:shadow-md transition-all duration-200 w-full ${className}`}>
+      <div className="flex items-start justify-between mb-4">
         <div className="flex-1 min-w-0">
-          <p className="text-muted-foreground text-xs sm:text-sm font-medium">{title}</p>
-          <p className="text-xl sm:text-2xl font-bold text-foreground mt-1 break-words">{value}</p>
+          <p className="text-muted-foreground text-sm font-medium mb-1">{title}</p>
+          <p className="text-2xl sm:text-3xl font-bold text-foreground leading-tight">{value}</p>
         </div>
         {icon && (
-          <div className="p-2 sm:p-3 bg-primary/10 rounded-lg sm:rounded-xl ml-3 flex-shrink-0">
+          <div className="p-3 bg-primary/10 rounded-lg ml-4 flex-shrink-0">
             {icon}
           </div>
         )}
       </div>
       
       {change && (
-        <div className="flex items-center space-x-2">
-          <span className={`text-xs sm:text-sm font-medium ${
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-semibold ${
             changeType === 'positive' ? 'text-green-600' : 'text-destructive'
           }`}>
             {changeType === 'positive' ? '++' : ''}{change}
           </span>
-          <span className="text-muted-foreground text-xs sm:text-sm">vs last month</span>
+          <span className="text-muted-foreground text-sm">vs last month</span>
         </div>
       )}
       
       {children && (
-        <div className="mt-3 sm:mt-4">
+        <div className="mt-4">
           {children}
         </div>
       )}

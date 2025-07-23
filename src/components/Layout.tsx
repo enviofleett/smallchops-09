@@ -35,8 +35,10 @@ const Layout = () => {
           onMenuClick={() => setMobileSidebarOpen(true)}
           isMobile={isMobile}
         />
-        <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-hidden">
-          <Outlet />
+        <main className="flex-1 p-4 sm:p-6 overflow-auto">
+          <div className="max-w-full">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>

@@ -20,7 +20,7 @@ const Layout = () => {
         />
       )}
       
-      {/* Sidebar - hidden on mobile by default */}
+      {/* Sidebar */}
       <Sidebar 
         isCollapsed={sidebarCollapsed} 
         onToggle={() => setSidebarCollapsed(!sidebarCollapsed)}
@@ -29,16 +29,14 @@ const Layout = () => {
         setMobileSidebarOpen={setMobileSidebarOpen}
       />
       
-      {/* Main content - full width on mobile */}
-      <div className="flex-1 flex flex-col w-full min-w-0">
+      {/* Main content */}
+      <div className="flex-1 flex flex-col min-w-0">
         <TopNav 
           onMenuClick={() => setMobileSidebarOpen(true)}
           isMobile={isMobile}
         />
-        <main className="flex-1 px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-8 w-full overflow-x-hidden">
-          <div className="w-full max-w-none">
-            <Outlet />
-          </div>
+        <main className="flex-1 p-3 sm:p-4 lg:p-6 overflow-hidden">
+          <Outlet />
         </main>
       </div>
     </div>

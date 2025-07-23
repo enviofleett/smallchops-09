@@ -10,7 +10,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { MobileTable, MobileRow, MobileField, MobileHeader, MobileHeaderCell, MobileBody } from '@/components/ui/mobile-table';
 
 interface OrdersTableProps {
   orders: OrderWithItems[];
@@ -38,107 +37,95 @@ const OrdersTable = ({ orders, onViewOrder }: OrdersTableProps) => {
   };
 
   return (
-    <MobileTable>
-      <table className="w-full">
-        <MobileHeader>
-          <MobileHeaderCell>Order ID</MobileHeaderCell>
-          <MobileHeaderCell>Customer</MobileHeaderCell>
-          <MobileHeaderCell>Order Time</MobileHeaderCell>
-          <MobileHeaderCell>Amount</MobileHeaderCell>
-          <MobileHeaderCell>Method</MobileHeaderCell>
-          <MobileHeaderCell>Status</MobileHeaderCell>
-          <MobileHeaderCell>Actions</MobileHeaderCell>
-        </MobileHeader>
-        <MobileBody>
-          {orders.map((order) => (
-            <MobileRow key={order.id} onClick={() => onViewOrder(order)}>
-              <MobileField label="Order ID">
-                <span className="font-medium text-primary">{order.order_number}</span>
-              </MobileField>
-              
-              <MobileField label="Customer">
-                <div>
-                  <p className="font-medium text-foreground">{order.customer_name}</p>
-                  <p className="text-sm text-muted-foreground">{order.customer_phone}</p>
-                </div>
-              </MobileField>
-              
-              <MobileField label="Order Time">
-                <span className="text-muted-foreground">
-                  {format(new Date(order.order_time), 'MMM d, yyyy h:mm a')}
-                </span>
-              </MobileField>
-              
-              <MobileField label="Amount">
-                <span className="font-medium text-foreground">{formatCurrency(order.total_amount)}</span>
-              </MobileField>
-              
-              <MobileField label="Method">
-                <div className="flex items-center space-x-2">
-                  {order.order_type === 'delivery' ? (
-                    <Truck className="h-4 w-4 text-muted-foreground" />
-                  ) : (
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                  )}
-                  <span className="text-muted-foreground capitalize">{order.order_type}</span>
-                </div>
-              </MobileField>
-              
-              <MobileField label="Status">
-                <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
-                  {getStatusBadge(order.status).label}
-                </span>
-              </MobileField>
-              
-              <MobileField label="Actions">
-                <TooltipProvider>
-                  <div className="flex items-center space-x-1">
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onViewOrder(order);
-                          }}
-                        >
-                          <Eye className="h-4 w-4" />
-                          <span className="sr-only">View Order</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>View Details</p>
-                      </TooltipContent>
-                    </Tooltip>
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            console.log('Print order:', order.id);
-                          }}
-                        >
-                          <Printer className="h-4 w-4" />
-                          <span className="sr-only">Print Order</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>
-                        <p>Print Order</p>
-                      </TooltipContent>
-                    </Tooltip>
+    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <div className="overflow-x-auto">
+        <table className="w-full">
+          <thead className="bg-gray-50 border-b border-gray-100">
+            <tr>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Order ID</th>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Customer</th>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Order Time</th>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Amount</th>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Method</th>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {orders.map((order) => (
+              <tr key={order.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <td className="py-4 px-6">
+                  <span className="font-medium text-blue-600">{order.order_number}</span>
+                </td>
+                <td className="py-4 px-6">
+                  <div>
+                    <p className="font-medium text-gray-800">{order.customer_name}</p>
+                    <p className="text-sm text-gray-600">{order.customer_phone}</p>
                   </div>
-                </TooltipProvider>
-              </MobileField>
-            </MobileRow>
-          ))}
-        </MobileBody>
-      </table>
-    </MobileTable>
+                </td>
+                <td className="py-4 px-6 text-gray-600">
+                  {format(new Date(order.order_time), 'MMM d, yyyy h:mm a')}
+                </td>
+                <td className="py-4 px-6 font-medium text-gray-800">{formatCurrency(order.total_amount)}</td>
+                <td className="py-4 px-6">
+                  <div className="flex items-center space-x-2">
+                    {order.order_type === 'delivery' ? (
+                      <Truck className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <Package className="h-4 w-4 text-gray-500" />
+                    )}
+                    <span className="text-gray-600 capitalize">{order.order_type}</span>
+                  </div>
+                </td>
+                <td className="py-4 px-6">
+                  <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
+                    {getStatusBadge(order.status).label}
+                  </span>
+                </td>
+                <td className="py-4 px-6">
+                  <TooltipProvider>
+                    <div className="flex items-center space-x-1">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => onViewOrder(order)}
+                          >
+                            <Eye className="h-4 w-4" />
+                            <span className="sr-only">View Order</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>View Details</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => console.log('Print order:', order.id)}
+                          >
+                            <Printer className="h-4 w-4" />
+                            <span className="sr-only">Print Order</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Print Order</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </TooltipProvider>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
   );
 };
 

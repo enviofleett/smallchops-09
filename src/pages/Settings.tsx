@@ -31,21 +31,21 @@ const Settings = () => {
   const isAdmin = userProfile?.role === 'admin';
 
   return (
-    <div className="container mx-auto py-3 sm:py-6 space-y-4 sm:space-y-6 px-0">
-      <div className="flex flex-col sm:flex-row sm:items-center space-y-3 sm:space-y-0 sm:space-x-4 px-3 sm:px-0">
+    <div className="container mx-auto py-6 space-y-6">
+      <div className="flex items-center space-x-4">
         <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
           <SettingsIcon className="w-6 h-6 text-primary-foreground" />
         </div>
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Settings</h1>
+          <h1 className="text-3xl font-bold">Settings</h1>
           <p className="text-muted-foreground">Manage your business settings and preferences</p>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 sm:space-y-6">
-        <TabsList className="grid w-full grid-cols-2 mx-3 sm:mx-0 lg:w-auto lg:grid-cols-none lg:flex">
-          <TabsTrigger value="branding" className="text-sm">Branding</TabsTrigger>
-          {isAdmin && <TabsTrigger value="admin" className="text-sm">Admin Control</TabsTrigger>}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+        <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:grid-cols-none lg:flex">
+          <TabsTrigger value="branding">Branding</TabsTrigger>
+          {isAdmin && <TabsTrigger value="admin">Admin User Control</TabsTrigger>}
         </TabsList>
 
         <TabsContent value="branding" className="space-y-6">

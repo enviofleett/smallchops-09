@@ -37,28 +37,42 @@ export const LogoUpload = ({ value, onChange, disabled }: LogoUploadProps) => {
 
     try {
       setIsUploading(true);
-      setIsProcessing(true);
-
-      // Load the image for background removal
-      const imageElement = await loadImage(file);
-      
-      // Remove background
-      toast.info('Removing background from logo...');
-      const processedBlob = await removeBackground(imageElement);
-      
-      setIsProcessing(false);
-      toast.info('Uploading processed logo...');
 
       // Create file path
-      const fileName = `logo_${Date.now()}.png`;
+      const fileExt = file.name.split('.').pop();
+      const fileName = `logo_${Date.now()}.${fileExt}`;
 
-      // Upload processed image to Supabase Storage
+      // First try background removal if it's supported
+      let uploadBlob: File | Blob = file;
+      let uploadContentType = file.type;
+
+      if (file.type.startsWith('image/')) {
+        try {
+          setIsProcessing(true);
+          toast.info('Removing background from logo...');
+          
+          const imageElement = await loadImage(file);
+          const processedBlob = await removeBackground(imageElement);
+          
+          uploadBlob = processedBlob;
+          uploadContentType = 'image/png';
+          setIsProcessing(false);
+          toast.info('Background removed! Uploading logo...');
+        } catch (bgRemovalError) {
+          console.warn('Background removal failed, uploading original:', bgRemovalError);
+          setIsProcessing(false);
+          toast.info('Uploading original logo...');
+          // Continue with original file
+        }
+      }
+
+      // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('business-logos')
-        .upload(fileName, processedBlob, {
+        .upload(fileName, uploadBlob, {
           cacheControl: '3600',
           upsert: false,
-          contentType: 'image/png'
+          contentType: uploadContentType
         });
 
       if (error) {
@@ -72,38 +86,10 @@ export const LogoUpload = ({ value, onChange, disabled }: LogoUploadProps) => {
 
       setPreview(publicUrl);
       onChange(publicUrl);
-      toast.success('Logo uploaded with background removed!');
+      toast.success('Logo uploaded successfully!');
     } catch (error) {
       console.error('Upload error:', error);
-      if (error instanceof Error && error.message.includes('segmentation')) {
-        toast.error('Background removal failed. Uploading original image...');
-        // Fallback to original upload
-        try {
-          const fileExt = file.name.split('.').pop();
-          const fileName = `logo_${Date.now()}.${fileExt}`;
-          
-          const { data, error } = await supabase.storage
-            .from('business-logos')
-            .upload(fileName, file, {
-              cacheControl: '3600',
-              upsert: false
-            });
-
-          if (error) throw error;
-
-          const { data: { publicUrl } } = supabase.storage
-            .from('business-logos')
-            .getPublicUrl(data.path);
-
-          setPreview(publicUrl);
-          onChange(publicUrl);
-          toast.success('Logo uploaded successfully!');
-        } catch (fallbackError) {
-          toast.error('Failed to upload logo');
-        }
-      } else {
-        toast.error('Failed to process logo');
-      }
+      toast.error('Failed to upload logo. Please try again.');
     } finally {
       setIsUploading(false);
       setIsProcessing(false);

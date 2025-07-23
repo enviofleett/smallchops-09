@@ -6,6 +6,7 @@ const getCorsHeaders = (origin: string | null): Record<string, string> => {
   const allowedOrigins = [
     'https://oknnklksdiqaifhxaccs.supabase.co',
     'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com',
     'https://project-oknnklksdiqaifhxaccs.lovable.app',
     'http://localhost:5173',
     'http://localhost:3000',

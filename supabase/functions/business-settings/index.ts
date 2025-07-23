@@ -97,14 +97,121 @@ serve(async (req) => {
     if (req.method === 'POST') {
       console.log('Processing POST request for business settings');
       
-      let body;
+      let reqBody;
       try {
-        body = await req.json();
-        console.log('Request body received:', Object.keys(body));
+        reqBody = await req.json();
+        console.log('Request body received:', Object.keys(reqBody));
       } catch (error) {
         console.error('Failed to parse JSON body:', error);
         throw new Error('Invalid JSON in request body');
       }
+
+      // Handle communication settings updates
+      if (reqBody?.action === 'update_communication_settings') {
+        const { settings } = reqBody;
+        console.log('Updating communication settings:', settings);
+
+        // Check if record exists
+        const { data: existingSettings } = await supabaseClient
+          .from('communication_settings')
+          .select('id')
+          .single();
+
+        let result;
+        if (existingSettings) {
+          // Update existing record
+          result = await supabaseClient
+            .from('communication_settings')
+            .update({
+              ...settings,
+              updated_at: new Date().toISOString(),
+              connected_by: user.user.id
+            })
+            .eq('id', existingSettings.id)
+            .select()
+            .single();
+        } else {
+          // Insert new record
+          result = await supabaseClient
+            .from('communication_settings')
+            .insert({
+              ...settings,
+              connected_by: user.user.id
+            })
+            .select()
+            .single();
+        }
+
+        if (result.error) {
+          console.error('Error updating communication settings:', result.error);
+          throw new Error(`Failed to update communication settings: ${result.error.message}`);
+        }
+
+        console.log('Communication settings updated successfully');
+        return new Response(JSON.stringify({
+          success: true,
+          data: result.data,
+          message: 'Communication settings updated successfully'
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Handle email template updates
+      if (reqBody?.action === 'update_email_templates') {
+        const { templates } = reqBody;
+        console.log('Updating email templates:', Object.keys(templates));
+
+        // Check if record exists
+        const { data: existingSettings } = await supabaseClient
+          .from('communication_settings')
+          .select('id')
+          .single();
+
+        let result;
+        if (existingSettings) {
+          // Update existing record
+          result = await supabaseClient
+            .from('communication_settings')
+            .update({
+              email_templates: templates,
+              updated_at: new Date().toISOString(),
+              connected_by: user.user.id
+            })
+            .eq('id', existingSettings.id)
+            .select()
+            .single();
+        } else {
+          // Insert new record
+          result = await supabaseClient
+            .from('communication_settings')
+            .insert({
+              email_templates: templates,
+              connected_by: user.user.id
+            })
+            .select()
+            .single();
+        }
+
+        if (result.error) {
+          console.error('Error updating email templates:', result.error);
+          throw new Error(`Failed to update email templates: ${result.error.message}`);
+        }
+
+        console.log('Email templates updated successfully');
+        return new Response(JSON.stringify({
+          success: true,
+          data: result.data,
+          message: 'Email templates updated successfully'
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+
+      // Handle regular business settings update
+      const body = reqBody;
       
       // Validate required fields
       if (!body.name || body.name.trim().length === 0) {

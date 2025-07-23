@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BrandingTab } from "@/components/settings/BrandingTab";
 import { AdminUserControl } from "@/components/settings/AdminUserControl";
+import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
 import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -43,8 +44,9 @@ const Settings = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-2 lg:w-auto lg:grid-cols-none lg:flex">
+        <TabsList className="grid w-full grid-cols-3 lg:w-auto lg:grid-cols-none lg:flex">
           <TabsTrigger value="branding">Branding</TabsTrigger>
+          <TabsTrigger value="communications">Communications</TabsTrigger>
           {isAdmin && <TabsTrigger value="admin">Admin User Control</TabsTrigger>}
         </TabsList>
 
@@ -58,6 +60,20 @@ const Settings = () => {
             </CardHeader>
             <CardContent>
               <BrandingTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="communications" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Communication Settings</CardTitle>
+              <CardDescription>
+                Configure email and SMS notifications for your customers
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <CommunicationsTab />
             </CardContent>
           </Card>
         </TabsContent>

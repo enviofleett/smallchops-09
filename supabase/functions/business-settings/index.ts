@@ -158,6 +158,100 @@ serve(async (req) => {
         });
       }
 
+      // Handle test email connection
+      if (reqBody?.action === 'test_email_connection') {
+        console.log('Testing email connection...');
+
+        // Get MailerSend API token from environment
+        const mailersendToken = Deno.env.get('MAILERSEND_API_TOKEN');
+        
+        if (!mailersendToken) {
+          console.error('MailerSend API token not configured');
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'MailerSend API token not configured in Supabase secrets. Please add MAILERSEND_API_TOKEN to your edge function secrets.'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Get current communication settings
+        const { data: settings, error: settingsError } = await supabaseClient
+          .from('communication_settings')
+          .select('*')
+          .single();
+
+        if (settingsError) {
+          console.error('Error fetching communication settings:', settingsError);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'No communication settings found. Please configure your email settings first.'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        if (!settings.sender_email) {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Sender email not configured. Please set a sender email address.'
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Call the send-email function to test the connection
+        try {
+          const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('send-email', {
+            body: {
+              to: settings.sender_email, // Send test email to sender
+              subject: 'MailerSend Test Email - Connection Successful',
+              html: `
+                <h2>Test Email Successful!</h2>
+                <p>Your MailerSend configuration is working correctly.</p>
+                <p>Sender: ${settings.smtp_user || settings.sender_email}</p>
+                <p>Domain: ${settings.mailersend_domain || 'Default domain'}</p>
+                <p>Time: ${new Date().toISOString()}</p>
+              `,
+              order_id: null // Optional field for test emails
+            }
+          });
+
+          if (emailError) {
+            console.error('Email test failed:', emailError);
+            return new Response(JSON.stringify({
+              success: false,
+              error: `Email test failed: ${emailError.message}`
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          console.log('Email test successful');
+          return new Response(JSON.stringify({
+            success: true,
+            message: 'Test email sent successfully! Check your inbox.'
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+
+        } catch (error) {
+          console.error('Email test error:', error);
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Failed to send test email: ${error.message}`
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+
       // Handle email template updates
       if (reqBody?.action === 'update_email_templates') {
         const { templates } = reqBody;

@@ -67,21 +67,19 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
       {/* Logo */}
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-center space-x-3">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center overflow-hidden">
+          <div className="w-10 h-10 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center overflow-hidden">
             {settings?.logo_url ? (
               <img 
                 src={settings.logo_url} 
-                alt={settings?.name || 'Business'} 
+                alt={settings?.name || 'Logo'} 
                 className="w-full h-full object-contain"
               />
             ) : (
-              <span className="text-white font-bold text-sm">
-                <Store className="h-4 w-4" />
-              </span>
+              <Store className="h-5 w-5 text-primary-foreground" />
             )}
           </div>
-          {!isCollapsed && (
-            <span className="font-semibold text-xl text-gray-800">{settings?.name || 'Business'}</span>
+          {!isCollapsed && settings?.name && (
+            <span className="font-semibold text-xl text-foreground">{settings.name}</span>
           )}
         </div>
       </div>

@@ -21,7 +21,9 @@ const TopNav = () => {
         {/* Business branding and search */}
         <div className="flex items-center space-x-6 flex-1">
           <div className="flex items-center space-x-3">
-            <h1 className="text-lg font-semibold text-gray-800">{settings?.name || 'DotCrafts'}</h1>
+            {settings?.name && (
+              <h1 className="text-lg font-semibold text-foreground">{settings.name}</h1>
+            )}
           </div>
           
           <div className="flex-1 max-w-md">

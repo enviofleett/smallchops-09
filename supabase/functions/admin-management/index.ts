@@ -1,12 +1,24 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Production-ready CORS headers with specific origin
-const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://oknnklksdiqaifhxaccs.lovableproject.com',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
-  'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-  'Access-Control-Max-Age': '86400',
+// Environment-aware CORS headers for production security
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  // Allow any Lovable project domain for development/preview
+  const allowedOrigins = [
+    'https://oknnklksdiqaifhxaccs.lovableproject.com', // Production
+    /^https:\/\/[\w-]+\.lovableproject\.com$/ // Dev/Preview domains
+  ];
+  
+  const isAllowed = origin && allowedOrigins.some(allowed => 
+    typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
+  );
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://oknnklksdiqaifhxaccs.lovableproject.com',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
+    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  };
 }
 
 // Rate limiting helper
@@ -52,6 +64,9 @@ async function checkRateLimit(supabase: any, identifier: string, action: string,
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })

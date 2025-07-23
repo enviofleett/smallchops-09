@@ -17,6 +17,7 @@ import Promotions from "./pages/Promotions";
 import DeliveryPickup from "./pages/DeliveryPickup";
 import AuditLogs from "./pages/AuditLogs";
 import Settings from "./pages/Settings";
+import CustomerPortal from "./pages/CustomerPortal";
 
 const queryClient = new QueryClient();
 
@@ -41,6 +42,8 @@ const App = () => (
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<NotFound />} />
             </Route>
+            {/* Public Customer Portal */}
+            <Route path="/customer-portal" element={<CustomerPortal />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

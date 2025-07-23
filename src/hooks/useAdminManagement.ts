@@ -44,7 +44,7 @@ async function callAdminFunction(
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.data.session.access_token}`,
         },
-        body: method === 'POST' ? { action, ...data } : undefined,
+        body: method === 'POST' ? { action, ...data } : data,
       });
 
       if (error) {
@@ -101,7 +101,7 @@ export const useAdminManagement = () => {
     queryKey: ['admin-users'],
     queryFn: async () => {
       try {
-        const result = await callAdminFunction('get_admins', undefined, 'GET');
+        const result = await callAdminFunction('get_admins', { action: 'get_admins' }, 'GET');
         return result.data as AdminUser[];
       } catch (error: any) {
         handleError(error, 'Fetching admin users');
@@ -121,7 +121,7 @@ export const useAdminManagement = () => {
     queryKey: ['admin-invitations'],
     queryFn: async () => {
       try {
-        const result = await callAdminFunction('get_invitations', undefined, 'GET');
+        const result = await callAdminFunction('get_invitations', { action: 'get_invitations' }, 'GET');
         return result.data as AdminInvitation[];
       } catch (error: any) {
         handleError(error, 'Fetching admin invitations');

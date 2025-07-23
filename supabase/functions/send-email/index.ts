@@ -1,285 +1,213 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// Production-ready CORS configuration
-const getCorsHeaders = (origin: string | null): Record<string, string> => {
-  const allowedOrigins = [
-    'https://oknnklksdiqaifhxaccs.supabase.co',
-    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev',
-    'https://project-oknnklksdiqaifhxaccs.lovable.app',
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:8000'
-  ];
-  
-  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
-  
-  return {
-    'Access-Control-Allow-Origin': corsOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Max-Age': '86400',
-  };
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface EmailRequest {
   to: string;
+  toName?: string;
   subject: string;
-  html?: string;
-  template_id?: string;
+  template?: 'order_confirmation' | 'delivery_notification' | 'welcome' | 'order_status_update';
   variables?: Record<string, any>;
-  order_id?: string;
-  event_id?: string;
+  html?: string;
+  text?: string;
 }
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-);
+const logStep = (step: string, details?: any) => {
+  const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
+  console.log(`[SEND-EMAIL] ${step}${detailsStr}`);
+};
 
-const MAILERSEND_API_TOKEN = Deno.env.get('MAILERSEND_API_TOKEN');
-
-serve(async (req: Request): Promise<Response> => {
-  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
-  
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+serve(async (req) => {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { 
-      status: 405, 
-      headers: corsHeaders 
-    });
-  }
-
   try {
-    console.log('Send-email function called from:', req.headers.get('origin'));
+    logStep("Email function started");
+
+    const apiToken = Deno.env.get("MAILERSEND_API_TOKEN");
+    if (!apiToken) {
+      throw new Error("MailerSend API token not configured");
+    }
+
+    const supabaseClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    const { to, toName, subject, template, variables, html, text }: EmailRequest = await req.json();
     
-    if (!MAILERSEND_API_TOKEN) {
-      console.error('MailerSend API token not configured in environment variables');
-      throw new Error('MailerSend API token not configured. Please add MAILERSEND_API_TOKEN to Supabase Edge Function secrets.');
+    if (!to || !subject) {
+      throw new Error("Missing required fields: 'to' and 'subject'");
     }
 
-    let emailRequest: EmailRequest;
-    try {
-      emailRequest = await req.json();
-    } catch (parseError) {
-      console.error('Failed to parse request body:', parseError);
-      throw new Error('Invalid JSON in request body');
-    }
-    
-    // Input validation
-    if (!emailRequest.to || !emailRequest.subject) {
-      console.error('Missing required fields:', { to: !!emailRequest.to, subject: !!emailRequest.subject });
-      throw new Error('Missing required fields: to, subject');
-    }
-    
-    // Email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(emailRequest.to)) {
-      console.error('Invalid email format:', emailRequest.to);
-      throw new Error('Invalid recipient email address');
-    }
-    
-    console.log('Processing email request:', { 
-      to: emailRequest.to, 
-      subject: emailRequest.subject,
-      order_id: emailRequest.order_id,
-      has_html: !!emailRequest.html,
-      has_template_id: !!emailRequest.template_id
-    });
+    logStep("Processing email request", { to, subject, template });
 
-    // Get sender configuration from database
-    const { data: commSettings, error: settingsError } = await supabase
-      .from('communication_settings')
-      .select('*')
-      .single();
+    let emailHtml = html;
+    let emailText = text;
 
-    if (settingsError && settingsError.code !== 'PGRST116') {
-      console.error('Error fetching communication settings:', settingsError);
-      throw new Error('Failed to fetch email configuration');
+    // Generate content based on template
+    if (template && variables) {
+      const templates = {
+        order_confirmation: {
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #2563eb;">Order Confirmation</h2>
+              <p>Dear ${variables.customerName || 'Customer'},</p>
+              <p>Thank you for your order! Your order <strong>#${variables.orderNumber}</strong> has been confirmed.</p>
+              <div style="background: #f8fafc; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3>Order Details:</h3>
+                <p><strong>Order Number:</strong> ${variables.orderNumber}</p>
+                <p><strong>Total Amount:</strong> $${variables.totalAmount}</p>
+                <p><strong>Order Type:</strong> ${variables.orderType}</p>
+                ${variables.deliveryAddress ? `<p><strong>Delivery Address:</strong> ${variables.deliveryAddress}</p>` : ''}
+              </div>
+              <p>We'll send you updates as your order is prepared.</p>
+              <p>Best regards,<br>Your Restaurant Team</p>
+            </div>
+          `,
+          text: `Order Confirmation - Dear ${variables.customerName || 'Customer'}, Thank you for your order! Order #${variables.orderNumber} confirmed. Total: $${variables.totalAmount}. Order Type: ${variables.orderType}.`
+        },
+        delivery_notification: {
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #059669;">Order Update</h2>
+              <p>Dear ${variables.customerName || 'Customer'},</p>
+              <p>Your order <strong>#${variables.orderNumber}</strong> status has been updated to: <strong>${variables.status}</strong></p>
+              ${variables.status === 'out_for_delivery' ? '<p>🚗 Your order is on its way! Expected delivery time: 20-30 minutes.</p>' : ''}
+              ${variables.status === 'ready' ? '<p>📦 Your order is ready for pickup!</p>' : ''}
+              ${variables.status === 'delivered' ? '<p>✅ Your order has been delivered. Enjoy your meal!</p>' : ''}
+              <p>Order Details:</p>
+              <ul>
+                <li>Order Number: ${variables.orderNumber}</li>
+                <li>Total Amount: $${variables.totalAmount}</li>
+                ${variables.estimatedTime ? `<li>Estimated Time: ${variables.estimatedTime}</li>` : ''}
+              </ul>
+              <p>Thank you for choosing us!</p>
+            </div>
+          `,
+          text: `Order Update - Order #${variables.orderNumber} status: ${variables.status}. ${variables.status === 'out_for_delivery' ? 'Your order is on its way!' : variables.status === 'ready' ? 'Your order is ready for pickup!' : 'Thank you for your order!'}`
+        },
+        welcome: {
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #7c3aed;">Welcome to Our Restaurant!</h2>
+              <p>Dear ${variables.customerName || 'Customer'},</p>
+              <p>Welcome to our restaurant family! We're excited to serve you delicious meals.</p>
+              <div style="background: #fef3c7; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <h3>🎉 Welcome Offer</h3>
+                <p>Use code <strong>WELCOME10</strong> to get 10% off your first order!</p>
+              </div>
+              <p>Browse our menu and place your first order today. We offer both delivery and pickup options.</p>
+              <p>Looking forward to serving you!</p>
+              <p>Best regards,<br>Your Restaurant Team</p>
+            </div>
+          `,
+          text: `Welcome! Dear ${variables.customerName || 'Customer'}, Welcome to our restaurant! Use code WELCOME10 for 10% off your first order. We look forward to serving you!`
+        },
+        order_status_update: {
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2 style="color: #dc2626;">Order Status Update</h2>
+              <p>Dear ${variables.customerName || 'Customer'},</p>
+              <p>Your order <strong>#${variables.orderNumber}</strong> status has changed from <em>${variables.oldStatus}</em> to <strong>${variables.newStatus}</strong>.</p>
+              ${variables.newStatus === 'cancelled' ? '<p style="color: #dc2626;">We apologize for any inconvenience. If you have questions, please contact us.</p>' : ''}
+              ${variables.newStatus === 'preparing' ? '<p>👨‍🍳 Your order is being prepared with care!</p>' : ''}
+              ${variables.newStatus === 'confirmed' ? '<p>✅ Your order has been confirmed and will be prepared soon.</p>' : ''}
+              <p>Thank you for your patience!</p>
+            </div>
+          `,
+          text: `Order Status Update - Order #${variables.orderNumber} status changed from ${variables.oldStatus} to ${variables.newStatus}.`
+        }
+      };
+
+      if (templates[template]) {
+        emailHtml = templates[template].html;
+        emailText = templates[template].text;
+      }
     }
 
-    const senderEmail = commSettings?.sender_email || 'noreply@example.com';
-    const senderName = commSettings?.smtp_user || 'Your Business';
-
-    // Prepare MailerSend payload
-    const mailerSendPayload: any = {
+    // MailerSend API request
+    const emailPayload = {
       from: {
-        email: senderEmail,
-        name: senderName
+        email: "orders@yourdomain.com", // Replace with your verified domain
+        name: "Restaurant Orders"
       },
       to: [
         {
-          email: emailRequest.to
+          email: to,
+          name: toName || to
         }
       ],
-      subject: emailRequest.subject
+      subject,
+      html: emailHtml,
+      text: emailText
     };
 
-    // Add HTML content or template
-    if (emailRequest.html) {
-      mailerSendPayload.html = emailRequest.html;
-    } else if (emailRequest.template_id) {
-      mailerSendPayload.template_id = emailRequest.template_id;
-      if (emailRequest.variables) {
-        mailerSendPayload.variables = [
-          {
-            email: emailRequest.to,
-            substitutions: emailRequest.variables
-          }
-        ];
-      }
-    } else {
-      throw new Error('Either html content or template_id must be provided');
-    }
+    logStep("Sending email via MailerSend", { to, subject });
 
-    // Add rate limiting check
-    const rateLimitKey = `email_${emailRequest.to}_${Date.now() / (1000 * 60)}`; // Per minute
-    
-    // Send email via MailerSend API with retry logic and timeout
-    let attempts = 0;
-    const maxAttempts = 3;
-    let mailerSendResponse: Response;
-    
-    console.log('Sending email to MailerSend API...');
-    
-    while (attempts < maxAttempts) {
-      try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
-        
-        mailerSendResponse = await fetch('https://api.mailersend.com/v1/email', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${MAILERSEND_API_TOKEN}`,
-            'Content-Type': 'application/json',
-            'X-Requested-With': 'XMLHttpRequest'
-          },
-          body: JSON.stringify(mailerSendPayload),
-          signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        
-        if (mailerSendResponse.ok) {
-          console.log('MailerSend API responded successfully');
-          break;
-        }
-        
-        console.log(`MailerSend API error (attempt ${attempts + 1}):`, mailerSendResponse.status, mailerSendResponse.statusText);
-        
-        attempts++;
-        if (attempts < maxAttempts) {
-          const delay = Math.pow(2, attempts) * 1000;
-          console.log(`Retrying in ${delay}ms...`);
-          await new Promise(resolve => setTimeout(resolve, delay));
-        }
-      } catch (error) {
-        attempts++;
-        console.error(`MailerSend API call failed (attempt ${attempts}):`, error.message);
-        if (attempts >= maxAttempts) throw error;
-        const delay = Math.pow(2, attempts) * 1000;
-        console.log(`Retrying in ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-    }
-
-    const responseData = await mailerSendResponse.json();
-
-    if (!mailerSendResponse.ok) {
-      console.error('MailerSend API error:', responseData);
-      throw new Error(`MailerSend API error: ${responseData.message || 'Unknown error'}`);
-    }
-
-    console.log('Email sent successfully:', responseData);
-
-    // Log the email in communication_logs
-    const logData = {
-      order_id: emailRequest.order_id,
-      event_id: emailRequest.event_id,
-      recipient: emailRequest.to,
-      subject: emailRequest.subject,
-      channel: 'email',
-      status: 'sent',
-      provider_response: responseData,
-      template_name: emailRequest.template_id || 'custom'
-    };
-
-    const { error: logError } = await supabase
-      .from('communication_logs')
-      .insert(logData);
-
-    if (logError) {
-      console.error('Error logging email:', logError);
-      // Don't fail the request if logging fails
-    }
-
-    // Update communication event status if event_id provided
-    if (emailRequest.event_id) {
-      const { error: updateError } = await supabase
-        .from('communication_events')
-        .update({
-          status: 'sent',
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', emailRequest.event_id);
-
-      if (updateError) {
-        console.error('Error updating communication event:', updateError);
-      }
-    }
-
-    return new Response(JSON.stringify({
-      success: true,
-      message_id: responseData.message_id || responseData.id,
-      message: 'Email sent successfully'
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    const response = await fetch("https://api.mailersend.com/v1/email", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiToken}`,
+        "X-Requested-With": "XMLHttpRequest"
+      },
+      body: JSON.stringify(emailPayload)
     });
 
-  } catch (error: any) {
-    console.error('Error in send-email function:', error);
+    const responseData = await response.text();
+    logStep("MailerSend response", { status: response.status, data: responseData });
 
-    // Log failed email attempt
+    if (!response.ok) {
+      throw new Error(`MailerSend API error: ${response.status} - ${responseData}`);
+    }
+
+    // Log email activity to database
     try {
-      const emailRequest: EmailRequest = await req.clone().json();
-      const logData = {
-        order_id: emailRequest.order_id,
-        event_id: emailRequest.event_id,
-        recipient: emailRequest.to,
-        subject: emailRequest.subject,
-        channel: 'email',
-        status: 'failed',
-        error_message: error.message
-      };
-
-      await supabase.from('communication_logs').insert(logData);
-
-      // Update communication event status if event_id provided
-      if (emailRequest.event_id) {
-        await supabase
-          .from('communication_events')
-          .update({
-            status: 'failed',
-            last_error: error.message,
-            retry_count: supabase.raw('retry_count + 1')
-          })
-          .eq('id', emailRequest.event_id);
-      }
+      await supabaseClient.from('audit_logs').insert({
+        user_id: null,
+        action: 'EMAIL_SENT',
+        category: 'Communication',
+        entity_type: 'email',
+        message: `Email sent to ${to} with subject: ${subject}`,
+        new_values: { to, subject, template, success: true }
+      });
+      logStep("Email activity logged to database");
     } catch (logError) {
-      console.error('Error logging failed email:', logError);
+      console.error("Failed to log email activity:", logError);
     }
 
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: "Email sent successfully",
+        messageId: response.headers.get('X-Message-Id')
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 200,
+      }
+    );
+
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logStep("ERROR in send-email", { message: errorMessage });
+    
+    return new Response(
+      JSON.stringify({ 
+        success: false, 
+        error: errorMessage 
+      }),
+      {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500,
+      }
+    );
   }
 });

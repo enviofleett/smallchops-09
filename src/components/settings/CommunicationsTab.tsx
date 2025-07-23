@@ -256,21 +256,8 @@ export const CommunicationsTab = () => {
         throw new Error('Please enter a sender email address');
       }
 
-      // Get current auth session
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Authentication required');
-      }
-
-      // Direct HTTP call to send-email function
-      const response = await fetch('https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/send-email', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-          'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA',
-        },
-        body: JSON.stringify({
+      const { data, error } = await supabase.functions.invoke('send-email', {
+        body: {
           to: formData.sender_email,
           subject: 'MailerSend Connection Test',
           html: `
@@ -279,18 +266,11 @@ export const CommunicationsTab = () => {
             <p>If you received this email, your email settings are working correctly.</p>
             <p>Sent at: ${new Date().toLocaleString()}</p>
           `
-        }),
+        }
       });
 
-      if (!response.ok) {
-        const errorData = await response.text();
-        throw new Error(`HTTP ${response.status}: ${errorData}`);
-      }
-
-      const result = await response.json();
-      
-      if (result.error) {
-        throw new Error(result.error);
+      if (error) {
+        throw new Error(error.message);
       }
 
       setConnectionStatus('success');

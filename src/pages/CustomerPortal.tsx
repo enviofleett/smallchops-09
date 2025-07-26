@@ -12,9 +12,13 @@ import { ProductCatalog } from '@/components/products/ProductCatalog';
 import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
+import { getCustomerOrderHistory } from '@/api/purchaseHistory';
+import { OrderWithItems } from '@/api/orders';
 
 export default function CustomerPortal() {
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [recentOrders, setRecentOrders] = useState<OrderWithItems[]>([]);
+  const [loadingOrders, setLoadingOrders] = useState(false);
   const { user, customerAccount, isLoading, isAuthenticated, logout } = useCustomerAuth();
   const { toast } = useToast();
 
@@ -38,32 +42,27 @@ export default function CustomerPortal() {
     }
   };
 
-  const mockOrderHistory = [
-    {
-      id: 'ord-1',
-      orderNumber: 'ORD000001',
-      date: '2024-01-20',
-      status: 'delivered',
-      total: 45.99,
-      items: ['Chicken Burger', 'French Fries', 'Coke']
-    },
-    {
-      id: 'ord-2',
-      orderNumber: 'ORD000002',
-      date: '2024-01-18',
-      status: 'delivered',
-      total: 32.50,
-      items: ['Pizza Margherita', 'Garlic Bread']
-    },
-    {
-      id: 'ord-3',
-      orderNumber: 'ORD000003',
-      date: '2024-01-15',
-      status: 'cancelled',
-      total: 28.99,
-      items: ['Pasta Carbonara', 'Caesar Salad']
+  // Load recent orders when user is authenticated
+  useEffect(() => {
+    if (isAuthenticated && user?.email) {
+      const fetchRecentOrders = async () => {
+        try {
+          setLoadingOrders(true);
+          const { orders } = await getCustomerOrderHistory(user.email, { 
+            pageSize: 3,
+            status: 'all'
+          });
+          setRecentOrders(orders);
+        } catch (error) {
+          console.error('Error fetching recent orders:', error);
+        } finally {
+          setLoadingOrders(false);
+        }
+      };
+
+      fetchRecentOrders();
     }
-  ];
+  }, [isAuthenticated, user?.email]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -157,9 +156,9 @@ export default function CustomerPortal() {
                   <Package className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-2xl font-bold">{mockOrderHistory.length}</div>
+                  <div className="text-2xl font-bold">{recentOrders.length}</div>
                   <p className="text-xs text-muted-foreground">
-                    {mockOrderHistory.filter(o => o.status === 'delivered').length} completed
+                    {recentOrders.filter(o => o.status === 'delivered').length} completed
                   </p>
                 </CardContent>
               </Card>
@@ -171,12 +170,12 @@ export default function CustomerPortal() {
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    ${mockOrderHistory.reduce((sum, order) => 
-                      order.status === 'delivered' ? sum + order.total : sum, 0
+                    ${recentOrders.reduce((sum, order) => 
+                      order.status === 'delivered' ? sum + Number(order.total_amount) : sum, 0
                     ).toFixed(2)}
                   </div>
                   <p className="text-xs text-muted-foreground">
-                    Lifetime spending
+                    Recent orders total
                   </p>
                 </CardContent>
               </Card>
@@ -201,25 +200,50 @@ export default function CustomerPortal() {
                 <CardDescription>Your latest order activity</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockOrderHistory.slice(0, 3).map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 rounded-lg border">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <p className="font-medium">#{order.orderNumber}</p>
-                          <p className="text-sm text-muted-foreground">{order.date}</p>
+                {loadingOrders ? (
+                  <div className="text-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                    <p className="text-sm text-muted-foreground mt-2">Loading orders...</p>
+                  </div>
+                ) : recentOrders.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No orders yet</p>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentOrders.slice(0, 3).map((order) => (
+                      <div key={order.id} className="flex items-center justify-between p-4 rounded-lg border">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <p className="font-medium">#{order.order_number}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(order.order_time).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm">
+                              {order.order_items.map(item => item.product_name).join(', ')}
+                            </p>
+                            <p className="text-sm font-medium">${order.total_amount}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm">{order.items.join(', ')}</p>
-                          <p className="text-sm font-medium">${order.total}</p>
-                        </div>
+                        <Badge className={getStatusColor(order.status)}>
+                          {order.status.toUpperCase()}
+                        </Badge>
                       </div>
-                      <Badge className={getStatusColor(order.status)}>
-                        {order.status.toUpperCase()}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                    {user?.email && (
+                      <div className="text-center pt-4">
+                        <Button asChild variant="outline">
+                          <Link to={`/purchase-history/${encodeURIComponent(user.email)}`}>
+                            View Full Purchase History
+                          </Link>
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -231,30 +255,55 @@ export default function CustomerPortal() {
                 <CardDescription>All your past orders</CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
-                  {mockOrderHistory.map((order) => (
-                    <div key={order.id} className="flex items-center justify-between p-4 rounded-lg border">
-                      <div className="flex items-center gap-4">
-                        <div>
-                          <p className="font-medium">#{order.orderNumber}</p>
-                          <p className="text-sm text-muted-foreground">{order.date}</p>
+                {loadingOrders ? (
+                  <div className="text-center py-4">
+                    <Loader2 className="h-6 w-6 animate-spin mx-auto" />
+                    <p className="text-sm text-muted-foreground mt-2">Loading orders...</p>
+                  </div>
+                ) : recentOrders.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No orders yet</p>
+                    <Button asChild className="mt-4">
+                      <Link to="#menu">Browse Menu</Link>
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {recentOrders.map((order) => (
+                      <div key={order.id} className="flex items-center justify-between p-4 rounded-lg border">
+                        <div className="flex items-center gap-4">
+                          <div>
+                            <p className="font-medium">#{order.order_number}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {new Date(order.order_time).toLocaleDateString()}
+                            </p>
+                          </div>
+                          <div>
+                            <p className="text-sm">
+                              {order.order_items.map(item => item.product_name).join(', ')}
+                            </p>
+                            <p className="text-sm font-medium">${order.total_amount}</p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm">{order.items.join(', ')}</p>
-                          <p className="text-sm font-medium">${order.total}</p>
+                        <div className="flex items-center gap-3">
+                          <Badge className={getStatusColor(order.status)}>
+                            {order.status.toUpperCase()}
+                          </Badge>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <Badge className={getStatusColor(order.status)}>
-                          {order.status.toUpperCase()}
-                        </Badge>
-                        <Button variant="outline" size="sm">
-                          View Details
+                    ))}
+                    {user?.email && (
+                      <div className="text-center pt-4">
+                        <Button asChild variant="outline">
+                          <Link to={`/purchase-history/${encodeURIComponent(user.email)}`}>
+                            View Full Purchase History
+                          </Link>
                         </Button>
                       </div>
-                    </div>
-                  ))}
-                </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>

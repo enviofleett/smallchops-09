@@ -19,6 +19,7 @@ import AuditLogs from "./pages/AuditLogs";
 import Settings from "./pages/Settings";
 import CustomerPortal from "./pages/CustomerPortal";
 import CustomerFavorites from "./pages/CustomerFavorites";
+import PurchaseHistory from "./pages/PurchaseHistory";
 
 const queryClient = new QueryClient();
 
@@ -46,6 +47,7 @@ const App = () => (
             {/* Public Customer Portal */}
             <Route path="/customer-portal" element={<CustomerPortal />} />
             <Route path="/favorites" element={<CustomerFavorites />} />
+            <Route path="/purchase-history/:customerEmail" element={<PurchaseHistory />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

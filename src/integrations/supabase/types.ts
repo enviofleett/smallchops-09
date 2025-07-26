@@ -595,6 +595,53 @@ export type Database = {
           },
         ]
       }
+      customer_purchase_analytics: {
+        Row: {
+          average_order_value: number | null
+          created_at: string | null
+          customer_email: string
+          customer_id: string | null
+          favorite_category_id: string | null
+          id: string
+          last_purchase_date: string | null
+          total_orders: number | null
+          total_spent: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          average_order_value?: number | null
+          created_at?: string | null
+          customer_email: string
+          customer_id?: string | null
+          favorite_category_id?: string | null
+          id?: string
+          last_purchase_date?: string | null
+          total_orders?: number | null
+          total_spent?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          average_order_value?: number | null
+          created_at?: string | null
+          customer_email?: string
+          customer_id?: string | null
+          favorite_category_id?: string | null
+          id?: string
+          last_purchase_date?: string | null
+          total_orders?: number | null
+          total_spent?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_purchase_analytics_favorite_category_id_fkey"
+            columns: ["favorite_category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           created_at: string
@@ -1054,6 +1101,59 @@ export type Database = {
           webhook_url?: string | null
         }
         Relationships: []
+      }
+      payment_transactions: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string | null
+          id: string
+          order_id: string | null
+          payment_method: string | null
+          processed_at: string | null
+          provider_response: Json | null
+          provider_transaction_id: string | null
+          status: string
+          transaction_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          order_id?: string | null
+          payment_method?: string | null
+          processed_at?: string | null
+          provider_response?: Json | null
+          provider_transaction_id?: string | null
+          status: string
+          transaction_type: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string | null
+          id?: string
+          order_id?: string | null
+          payment_method?: string | null
+          processed_at?: string | null
+          provider_response?: Json | null
+          provider_transaction_id?: string | null
+          status?: string
+          transaction_type?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       product_price_history: {
         Row: {

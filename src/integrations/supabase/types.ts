@@ -1190,6 +1190,111 @@ export type Database = {
           },
         ]
       }
+      product_ratings_summary: {
+        Row: {
+          average_rating: number
+          last_updated: string
+          product_id: string
+          rating_distribution: Json
+          total_reviews: number
+        }
+        Insert: {
+          average_rating?: number
+          last_updated?: string
+          product_id: string
+          rating_distribution?: Json
+          total_reviews?: number
+        }
+        Update: {
+          average_rating?: number
+          last_updated?: string
+          product_id?: string
+          rating_distribution?: Json
+          total_reviews?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_ratings_summary_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      product_reviews: {
+        Row: {
+          content: string | null
+          created_at: string
+          customer_email: string
+          customer_id: string
+          helpful_votes: number
+          id: string
+          is_verified_purchase: boolean
+          order_id: string | null
+          product_id: string
+          rating: number
+          status: string
+          title: string | null
+          total_votes: number
+          updated_at: string
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          customer_email: string
+          customer_id: string
+          helpful_votes?: number
+          id?: string
+          is_verified_purchase?: boolean
+          order_id?: string | null
+          product_id: string
+          rating: number
+          status?: string
+          title?: string | null
+          total_votes?: number
+          updated_at?: string
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          customer_email?: string
+          customer_id?: string
+          helpful_votes?: number
+          id?: string
+          is_verified_purchase?: boolean
+          order_id?: string | null
+          product_id?: string
+          rating?: number
+          status?: string
+          title?: string | null
+          total_votes?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_reviews_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       products: {
         Row: {
           category_id: string | null
@@ -1417,6 +1522,115 @@ export type Database = {
         }
         Relationships: []
       }
+      review_media: {
+        Row: {
+          alt_text: string | null
+          created_at: string
+          id: string
+          media_type: string
+          media_url: string
+          review_id: string
+        }
+        Insert: {
+          alt_text?: string | null
+          created_at?: string
+          id?: string
+          media_type: string
+          media_url: string
+          review_id: string
+        }
+        Update: {
+          alt_text?: string | null
+          created_at?: string
+          id?: string
+          media_type?: string
+          media_url?: string
+          review_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_media_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "product_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_responses: {
+        Row: {
+          business_user_id: string
+          created_at: string
+          id: string
+          response_content: string
+          review_id: string
+          updated_at: string
+        }
+        Insert: {
+          business_user_id: string
+          created_at?: string
+          id?: string
+          response_content: string
+          review_id: string
+          updated_at?: string
+        }
+        Update: {
+          business_user_id?: string
+          created_at?: string
+          id?: string
+          response_content?: string
+          review_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_responses_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "product_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_votes: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          review_id: string
+          vote_type: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          review_id: string
+          vote_type: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          review_id?: string
+          vote_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_votes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_votes_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "product_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_permissions: {
         Row: {
           id: string
@@ -1551,6 +1765,10 @@ export type Database = {
           menu_key_param: string
           required_level_param?: string
         }
+        Returns: boolean
+      }
+      customer_purchased_product: {
+        Args: { customer_uuid: string; product_uuid: string }
         Returns: boolean
       }
       generate_order_number: {

@@ -28,3 +28,4 @@ const AuditLogs = () => {
 };
 
 export default AuditLogs;
+export { AuditLogs };

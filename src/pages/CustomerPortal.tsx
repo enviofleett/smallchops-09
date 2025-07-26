@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Package, Star, Gift, TrendingUp, User } from 'lucide-react';
+import { MapPin, Package, Star, Gift, TrendingUp, User, Heart } from 'lucide-react';
 import { DeliveryTracker } from '@/components/delivery/DeliveryTracker';
 import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
 import { useOrderManagement } from '@/hooks/useOrderManagement';
@@ -113,9 +113,10 @@ export default function CustomerPortal() {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="orders">Order History</TabsTrigger>
+            <TabsTrigger value="favorites">My Favorites</TabsTrigger>
             <TabsTrigger value="tracking">Track Order</TabsTrigger>
             <TabsTrigger value="loyalty">Loyalty & Rewards</TabsTrigger>
           </TabsList>
@@ -225,6 +226,28 @@ export default function CustomerPortal() {
                       </div>
                     </div>
                   ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="favorites" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Heart className="h-5 w-5" />
+                  My Favorite Products
+                </CardTitle>
+                <CardDescription>Products you've saved for later</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="text-center py-12">
+                  <Heart className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+                  <h4 className="text-lg font-semibold mb-2">No favorites yet</h4>
+                  <p className="text-muted-foreground mb-4">
+                    Start adding products to your favorites to see them here
+                  </p>
+                  <Button>Browse Products</Button>
                 </div>
               </CardContent>
             </Card>

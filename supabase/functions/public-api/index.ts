@@ -31,6 +31,120 @@ serve(async (req) => {
     );
 
     // Route handling
+    // GET /customers/:id/favorites
+    if (method === "GET" && path.startsWith("/customers/") && path.includes("/favorites")) {
+      const pathParts = path.split('/');
+      if (pathParts.length === 4 && pathParts[3] === "favorites") {
+        const customerId = pathParts[2];
+        
+        const { data: favorites, error } = await supabaseClient
+          .from('customer_favorites')
+          .select(`
+            id,
+            created_at,
+            products!inner (
+              *,
+              categories (
+                id,
+                name
+              )
+            )
+          `)
+          .eq('customer_id', customerId)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('Error fetching customer favorites:', error);
+          return new Response(JSON.stringify({ success: false, error: 'Failed to fetch favorites' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const favoriteProducts = favorites?.map(favorite => ({
+          ...favorite.products,
+          favorite_id: favorite.id,
+          favorited_at: favorite.created_at,
+        })) || [];
+
+        return new Response(JSON.stringify({ success: true, data: favoriteProducts }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // POST /customers/:id/favorites
+    if (method === "POST" && path.startsWith("/customers/") && path.includes("/favorites")) {
+      const pathParts = path.split('/');
+      if (pathParts.length === 4 && pathParts[3] === "favorites") {
+        const customerId = pathParts[2];
+        const { product_id } = await req.json();
+
+        if (!product_id) {
+          return new Response(JSON.stringify({ success: false, error: 'product_id is required' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        const { data, error } = await supabaseClient
+          .from('customer_favorites')
+          .insert({
+            customer_id: customerId,
+            product_id: product_id,
+          })
+          .select()
+          .single();
+
+        if (error) {
+          if (error.code === '23505') { // Unique constraint violation
+            return new Response(JSON.stringify({ success: false, error: 'Product is already in favorites' }), {
+              status: 409,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+          console.error('Error adding to favorites:', error);
+          return new Response(JSON.stringify({ success: false, error: 'Failed to add to favorites' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true, data }), {
+          status: 201,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
+      }
+    }
+
+    // DELETE /customers/:id/favorites/:product_id
+    if (method === "DELETE" && path.startsWith("/customers/") && path.includes("/favorites/")) {
+      const pathParts = path.split('/');
+      if (pathParts.length === 5 && pathParts[3] === "favorites") {
+        const customerId = pathParts[2];
+        const productId = pathParts[4];
+
+        const { error } = await supabaseClient
+          .from('customer_favorites')
+          .delete()
+          .eq('customer_id', customerId)
+          .eq('product_id', productId);
+
+        if (error) {
+          console.error('Error removing from favorites:', error);
+          return new Response(JSON.stringify({ success: false, error: 'Failed to remove from favorites' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        return new Response(null, {
+          status: 204,
+          headers: corsHeaders
+        });
+      }
+    }
+
     if (method === "GET" && path === "/categories") {
       // Get all active categories
       const { data: categories, error } = await supabaseClient

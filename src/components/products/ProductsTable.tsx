@@ -4,6 +4,7 @@ import { ProductWithCategory } from '@/types/database';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { FavoriteButton } from '@/components/ui/favorite-button';
 
 interface ProductsTableProps {
   products: ProductWithCategory[] | undefined;

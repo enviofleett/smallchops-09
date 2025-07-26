@@ -461,6 +461,42 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_favorites: {
+        Row: {
+          created_at: string
+          customer_id: string
+          id: string
+          product_id: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          id?: string
+          product_id: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          id?: string
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_favorites_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_favorites_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           created_at: string

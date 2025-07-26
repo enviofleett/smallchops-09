@@ -13,6 +13,8 @@ import { createClient } from '@supabase/supabase-js';
 import { PaymentAnalyticsDashboard } from '@/components/payments/PaymentAnalyticsDashboard';
 import { TransactionMonitor } from '@/components/admin/TransactionMonitor';
 import { PaymentHealthCheck } from '@/components/admin/PaymentHealthCheck';
+import { EnvironmentSwitcher } from '@/components/environment/EnvironmentSwitcher';
+import { PaymentErrorTracker } from '@/components/admin/PaymentErrorTracker';
 import { AlertCircle, CheckCircle, Copy, ExternalLink } from 'lucide-react';
 
 // Use direct client to avoid type issues
@@ -195,8 +197,9 @@ export const PaymentSettings: React.FC = () => {
         {getConnectionStatusBadge()}
       </div>
 
-      <Tabs defaultValue="configuration" className="space-y-6">
-        <TabsList>
+      <Tabs defaultValue="environment" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-6">
+          <TabsTrigger value="environment">Environment</TabsTrigger>
           <TabsTrigger value="configuration">Configuration</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
@@ -204,7 +207,11 @@ export const PaymentSettings: React.FC = () => {
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
         </TabsList>
 
-        <TabsContent value="configuration" className="space-y-6">
+        <TabsContent value="environment" className="space-y-6">
+          <EnvironmentSwitcher />
+        </TabsContent>
+
+          <TabsContent value="configuration" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Paystack Configuration</CardTitle>
@@ -341,8 +348,9 @@ export const PaymentSettings: React.FC = () => {
           <TransactionMonitor />
         </TabsContent>
 
-        <TabsContent value="health">
+        <TabsContent value="health" className="space-y-6">
           <PaymentHealthCheck />
+          <PaymentErrorTracker />
         </TabsContent>
 
         <TabsContent value="webhooks" className="space-y-6">

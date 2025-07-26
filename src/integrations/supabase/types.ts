@@ -1425,6 +1425,47 @@ export type Database = {
           },
         ]
       }
+      payment_status_tracking: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          metadata: Json | null
+          previous_status: string | null
+          status: string
+          status_reason: string | null
+          transaction_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          metadata?: Json | null
+          previous_status?: string | null
+          status: string
+          status_reason?: string | null
+          transaction_id: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          metadata?: Json | null
+          previous_status?: string | null
+          status?: string
+          status_reason?: string | null
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_status_tracking_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_transactions: {
         Row: {
           account_name: string | null
@@ -2259,6 +2300,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_enhanced_rate_limit: {
+        Args: {
+          p_user_id?: string
+          p_ip_address?: string
+          p_operation_type?: string
+          p_limit_per_minute?: number
+          p_limit_per_hour?: number
+        }
+        Returns: boolean
+      }
       check_user_permission: {
         Args: {
           user_id_param: string
@@ -2274,6 +2325,24 @@ export type Database = {
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_active_paystack_config: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          public_key: string
+          secret_key: string
+          webhook_secret: string
+          test_mode: boolean
+          environment: string
+        }[]
+      }
+      get_environment_config: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          environment: string
+          is_live_mode: boolean
+          webhook_url: string
+        }[]
       }
       get_user_role: {
         Args: { user_id_to_check: string }
@@ -2334,6 +2403,18 @@ export type Database = {
           p_metadata?: Json
         }
         Returns: undefined
+      }
+      sync_payment_to_order_status: {
+        Args: {
+          p_transaction_id: string
+          p_payment_status: string
+          p_order_status?: string
+        }
+        Returns: undefined
+      }
+      verify_webhook_signature: {
+        Args: { p_payload: string; p_signature: string; p_secret: string }
+        Returns: boolean
       }
     }
     Enums: {

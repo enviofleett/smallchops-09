@@ -41,21 +41,28 @@ class PaystackService {
   private baseURL = 'https://api.paystack.co';
 
   async getConfig(): Promise<PaystackConfig | null> {
-    const { data } = await supabase
-      .from('payment_integrations')
-      .select('*')
-      .eq('provider', 'paystack')
-      .eq('connection_status', 'connected')
-      .maybeSingle();
+    try {
+      // Use the environment-aware configuration function
+      const { data, error } = await supabase.rpc('get_active_paystack_config');
 
-    if (!data) return null;
+      if (error || !data) {
+        console.error('Failed to get Paystack config:', error);
+        return null;
+      }
 
-    return {
-      public_key: data.public_key,
-      secret_key: data.secret_key,
-      webhook_secret: data.webhook_secret,
-      test_mode: data.test_mode || false,
-    };
+      // RPC returns a single row, not an array
+      const configData = Array.isArray(data) ? data[0] : data;
+      
+      return {
+        public_key: configData.public_key,
+        secret_key: configData.secret_key,
+        webhook_secret: configData.webhook_secret,
+        test_mode: configData.test_mode,
+      };
+    } catch (error) {
+      console.error('Error getting Paystack config:', error);
+      return null;
+    }
   }
 
   async initializeTransaction(transactionData: PaystackTransaction) {

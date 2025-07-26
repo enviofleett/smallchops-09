@@ -271,20 +271,31 @@ serve(async (req) => {
     }
 
     if (req.method === 'GET') {
-      // Try to get action from query params first, then from body
+      // Extract action from query params for GET requests
       const url = new URL(req.url)
-      let action = url.searchParams.get('action')
+      const action = url.searchParams.get('action')
+      const userId = url.searchParams.get('userId')
+      
+      console.log(`[ADMIN-GET] Action: ${action}, UserId: ${userId}, URL: ${url.pathname}${url.search}`)
       
       if (!action) {
-        try {
-          const body = await req.json()
-          action = body.action
-        } catch {
-          // No body or invalid JSON, continue with null action
-        }
+        console.error('No action specified in GET request')
+        return new Response(
+          JSON.stringify({ error: 'Action parameter is required for GET requests' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
       }
 
       if (action === 'get_admins') {
+        console.log('Fetching admin users...')
+        
+        // Log the admin action
+        await supabaseClient.rpc('log_admin_management_action', {
+          action_type: 'get_admins',
+          target_user_id: null,
+          target_email: null,
+          action_data: { requested_by: user.user.id }
+        })
         const { data: admins, error } = await supabaseClient
           .from('profiles')
           .select('id, name, role, status, created_at')
@@ -300,13 +311,27 @@ serve(async (req) => {
       }
 
       if (action === 'get_invitations') {
+        console.log('Fetching admin invitations...')
+        
+        // Log the admin action
+        await supabaseClient.rpc('log_admin_management_action', {
+          action_type: 'get_invitations',
+          target_user_id: null,
+          target_email: null,
+          action_data: { requested_by: user.user.id }
+        })
+
         const { data: invitations, error } = await supabaseClient
           .from('admin_invitations')
           .select('*')
           .order('created_at', { ascending: false })
 
-        if (error) throw error
+        if (error) {
+          console.error('Failed to fetch invitations:', error)
+          throw error
+        }
 
+        console.log(`Successfully fetched ${invitations?.length || 0} invitations`)
         return new Response(
           JSON.stringify({ data: invitations }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

@@ -2383,6 +2383,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      log_admin_management_action: {
+        Args: {
+          action_type: string
+          target_user_id?: string
+          target_email?: string
+          action_data?: Json
+          action_result?: string
+        }
+        Returns: undefined
+      }
       log_payment_error: {
         Args: {
           p_error_code: string
@@ -2412,6 +2422,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      validate_admin_permission: {
+        Args: { required_permission?: string }
+        Returns: boolean
+      }
       verify_webhook_signature: {
         Args: { p_payload: string; p_signature: string; p_secret: string }
         Returns: boolean
@@ -2437,6 +2451,8 @@ export type Database = {
         | "reports"
         | "settings"
         | "audit_logs"
+        | "delivery"
+        | "payment"
       order_status:
         | "pending"
         | "confirmed"
@@ -2612,6 +2628,8 @@ export const Constants = {
         "reports",
         "settings",
         "audit_logs",
+        "delivery",
+        "payment",
       ],
       order_status: [
         "pending",

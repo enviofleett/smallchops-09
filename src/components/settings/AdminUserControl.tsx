@@ -5,8 +5,9 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CreateAdminDialog } from "./CreateAdminDialog";
-import { UserPermissionsMatrix } from "./UserPermissionsMatrix";
+import { EnhancedUserPermissionsMatrix } from "./EnhancedUserPermissionsMatrix";
 import { AdminActionsLog } from "./AdminActionsLog";
+import { AdminHealthMonitor } from "../admin/AdminHealthMonitor";
 import { useAdminManagement } from '@/hooks/useAdminManagement';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { UserPlus, Shield, Activity, Trash2 } from "lucide-react";
@@ -72,11 +73,12 @@ export const AdminUserControl = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="users">Admin Users</TabsTrigger>
           <TabsTrigger value="invitations">Invitations</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
+          <TabsTrigger value="health">System Health</TabsTrigger>
         </TabsList>
 
         <TabsContent value="users">
@@ -233,11 +235,15 @@ export const AdminUserControl = () => {
         </TabsContent>
 
         <TabsContent value="permissions">
-          <UserPermissionsMatrix selectedUser={selectedUser} />
+          <EnhancedUserPermissionsMatrix selectedUser={selectedUser} />
         </TabsContent>
 
         <TabsContent value="audit">
           <AdminActionsLog />
+        </TabsContent>
+
+        <TabsContent value="health">
+          <AdminHealthMonitor />
         </TabsContent>
       </Tabs>
 

@@ -305,30 +305,40 @@ serve(async (req) => {
           });
 
         if (permissionsToInsert.length > 0) {
-          console.log(`Inserting ${permissionsToInsert.length} permissions for user ${userId}`);
+          console.log(`Upserting ${permissionsToInsert.length} permissions for user ${userId}`);
           
+          // Use upsert to handle any conflicts gracefully with the new (user_id, menu_key) constraint
           const { error } = await supabaseClient
             .from('user_permissions')
-            .insert(permissionsToInsert);
+            .upsert(permissionsToInsert, { 
+              onConflict: 'user_id,menu_key',
+              ignoreDuplicates: false 
+            });
 
           if (error) {
-            console.error('Permission insert error:', error);
+            console.error('Permission upsert error:', error);
             
-            // Handle specific constraint violations
+            // Handle specific constraint violations with improved messages
             if (error.code === '23505') {
-              throw new Error(`Duplicate permission entry detected. Please refresh and try again.`);
+              const detail = error.details || '';
+              if (detail.includes('menu_key')) {
+                console.log('Duplicate menu_key constraint - this should not happen with upsert');
+                throw new Error('Permission conflict detected. The permissions have been updated.');
+              } else {
+                throw new Error('Permission conflict detected. Please refresh and try again.');
+              }
             } else if (error.code === '23502') {
-              throw new Error(`Required permission field is missing. Please contact support.`);
+              throw new Error('Required permission field is missing. Please contact support.');
             } else if (error.code === '23503') {
-              throw new Error(`Invalid user or permission reference. Please refresh and try again.`);
+              throw new Error('Invalid user or permission reference. Please refresh and try again.');
             } else if (error.message.includes('violates check constraint')) {
-              throw new Error(`Invalid permission level provided. Please use 'view' or 'edit'.`);
+              throw new Error('Invalid permission level provided. Please use "view" or "edit".');
             } else {
               throw new Error(`Permission update failed: ${error.message}`);
             }
           }
           
-          console.log(`Successfully inserted permissions for user ${userId}`);
+          console.log(`Successfully upserted permissions for user ${userId}`);
         } else {
           console.log(`No permissions to insert for user ${userId} (all set to 'none')`);
         }

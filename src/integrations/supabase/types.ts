@@ -2136,6 +2136,45 @@ export type Database = {
         }
         Relationships: []
       }
+      user_permission_audit: {
+        Row: {
+          action: string
+          changed_at: string | null
+          changed_by: string | null
+          id: string
+          menu_key: string
+          menu_section: string | null
+          new_values: Json | null
+          old_values: Json | null
+          permission_level: Database["public"]["Enums"]["permission_level"]
+          user_id: string
+        }
+        Insert: {
+          action: string
+          changed_at?: string | null
+          changed_by?: string | null
+          id?: string
+          menu_key: string
+          menu_section?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          permission_level: Database["public"]["Enums"]["permission_level"]
+          user_id: string
+        }
+        Update: {
+          action?: string
+          changed_at?: string | null
+          changed_by?: string | null
+          id?: string
+          menu_key?: string
+          menu_section?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          permission_level?: Database["public"]["Enums"]["permission_level"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           id: string

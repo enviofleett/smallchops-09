@@ -299,3 +299,4 @@ async function checkRateLimit(supabaseClient: any, userId: string, ipAddress: st
       attempts: 1,
       window_start: now.toISOString()
     });
+}

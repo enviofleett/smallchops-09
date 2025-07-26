@@ -9,6 +9,7 @@ import { DeliveryTracker } from '@/components/delivery/DeliveryTracker';
 import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
 import { FavoritesSection } from '@/components/customers/FavoritesSection';
 import { ProductCatalog } from '@/components/products/ProductCatalog';
+import { CustomerReviewsTab } from '@/components/customer/CustomerReviewsTab';
 import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -139,11 +140,12 @@ export default function CustomerPortal() {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-6">
+          <TabsList className="grid w-full grid-cols-7">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="menu">Browse Menu</TabsTrigger>
             <TabsTrigger value="orders">Order History</TabsTrigger>
             <TabsTrigger value="favorites">My Favorites</TabsTrigger>
+            <TabsTrigger value="reviews">My Reviews</TabsTrigger>
             <TabsTrigger value="tracking">Track Order</TabsTrigger>
             <TabsTrigger value="loyalty">Loyalty & Rewards</TabsTrigger>
           </TabsList>
@@ -326,6 +328,10 @@ export default function CustomerPortal() {
               </Button>
             </div>
             <FavoritesSection customerId={customerAccount?.id || null} />
+          </TabsContent>
+
+          <TabsContent value="reviews" className="space-y-6">
+            <CustomerReviewsTab />
           </TabsContent>
 
           <TabsContent value="tracking">

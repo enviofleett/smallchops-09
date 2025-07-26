@@ -3,7 +3,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { Package, Star, TrendingUp, User, LogOut, Loader2 } from 'lucide-react';
+import { Package, Star, TrendingUp, User, LogOut, Loader2, Heart } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { DeliveryTracker } from '@/components/delivery/DeliveryTracker';
 import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
 import { FavoritesSection } from '@/components/customers/FavoritesSection';
@@ -263,6 +264,18 @@ export default function CustomerPortal() {
           </TabsContent>
 
           <TabsContent value="favorites" className="space-y-6">
+            <div className="flex items-center justify-between mb-6">
+              <div>
+                <h2 className="text-2xl font-bold">My Favorites</h2>
+                <p className="text-muted-foreground">Your saved products</p>
+              </div>
+              <Button asChild>
+                <Link to="/favorites" className="flex items-center gap-2">
+                  <Heart className="h-4 w-4" />
+                  View Full Favorites Page
+                </Link>
+              </Button>
+            </div>
             <FavoritesSection customerId={customerAccount?.id || null} />
           </TabsContent>
 

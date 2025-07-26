@@ -18,6 +18,7 @@ import DeliveryPickup from "./pages/DeliveryPickup";
 import AuditLogs from "./pages/AuditLogs";
 import Settings from "./pages/Settings";
 import CustomerPortal from "./pages/CustomerPortal";
+import CustomerFavorites from "./pages/CustomerFavorites";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +45,7 @@ const App = () => (
             </Route>
             {/* Public Customer Portal */}
             <Route path="/customer-portal" element={<CustomerPortal />} />
+            <Route path="/favorites" element={<CustomerFavorites />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

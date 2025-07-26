@@ -174,38 +174,7 @@ serve(async (req) => {
   }
 });
 
-async function handleChargeSuccess(supabaseClient: any, data: any) {
-  const updateData = {
-    status: 'success',
-    paid_at: new Date(data.paid_at),
-    gateway_response: data.gateway_response,
-    fees: data.fees / 100,
-    channel: data.channel
-  };
-
-  await supabaseClient
-    .from('payment_transactions')
-    .update(updateData)
-    .eq('provider_reference', data.reference);
-
-  // Update order status
-  const { data: transaction } = await supabaseClient
-    .from('payment_transactions')
-    .select('order_id')
-    .eq('provider_reference', data.reference)
-    .single();
-
-  if (transaction?.order_id) {
-    await supabaseClient
-      .from('orders')
-      .update({ 
-        payment_status: 'paid',
-        status: 'confirmed',
-        updated_at: new Date()
-      })
-      .eq('id', transaction.order_id);
-  }
-}
+// Remove duplicate function - use the improved one below
 
 async function handleChargeSuccess(supabaseClient: any, data: any) {
   try {

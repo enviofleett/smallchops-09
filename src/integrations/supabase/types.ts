@@ -1054,6 +1054,48 @@ export type Database = {
           },
         ]
       }
+      payment_disputes: {
+        Row: {
+          amount: number
+          created_at: string | null
+          currency: string | null
+          dispute_id: string
+          id: string
+          reason: string | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          status: string
+          transaction_reference: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          currency?: string | null
+          dispute_id: string
+          id?: string
+          reason?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          status?: string
+          transaction_reference: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          currency?: string | null
+          dispute_id?: string
+          id?: string
+          reason?: string | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          status?: string
+          transaction_reference?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       payment_error_logs: {
         Row: {
           created_at: string | null
@@ -1144,6 +1186,36 @@ export type Database = {
           webhook_endpoints?: Json | null
           webhook_secret?: string | null
           webhook_url?: string | null
+        }
+        Relationships: []
+      }
+      payment_rate_limits: {
+        Row: {
+          attempts: number | null
+          created_at: string | null
+          id: string
+          ip_address: string | null
+          operation_type: string
+          user_id: string | null
+          window_start: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          operation_type: string
+          user_id?: string | null
+          window_start?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string | null
+          id?: string
+          ip_address?: string | null
+          operation_type?: string
+          user_id?: string | null
+          window_start?: string | null
         }
         Relationships: []
       }
@@ -1901,6 +1973,22 @@ export type Database = {
       get_user_role: {
         Args: { user_id_to_check: string }
         Returns: string
+      }
+      handle_successful_payment: {
+        Args: {
+          p_reference: string
+          p_paid_at: string
+          p_gateway_response: string
+          p_fees: number
+          p_channel: string
+          p_authorization_code?: string
+          p_card_type?: string
+          p_last4?: string
+          p_exp_month?: string
+          p_exp_year?: string
+          p_bank?: string
+        }
+        Returns: undefined
       }
       health_check: {
         Args: Record<PropertyKey, never>

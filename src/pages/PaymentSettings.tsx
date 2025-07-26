@@ -11,6 +11,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
 import { createClient } from '@supabase/supabase-js';
 import { PaymentAnalyticsDashboard } from '@/components/payments/PaymentAnalyticsDashboard';
+import { TransactionMonitor } from '@/components/admin/TransactionMonitor';
+import { PaymentHealthCheck } from '@/components/admin/PaymentHealthCheck';
 import { AlertCircle, CheckCircle, Copy, ExternalLink } from 'lucide-react';
 
 // Use direct client to avoid type issues
@@ -197,6 +199,8 @@ export const PaymentSettings: React.FC = () => {
         <TabsList>
           <TabsTrigger value="configuration">Configuration</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="transactions">Transactions</TabsTrigger>
+          <TabsTrigger value="health">Health Check</TabsTrigger>
           <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
         </TabsList>
 
@@ -331,6 +335,14 @@ export const PaymentSettings: React.FC = () => {
 
         <TabsContent value="analytics">
           <PaymentAnalyticsDashboard />
+        </TabsContent>
+
+        <TabsContent value="transactions">
+          <TransactionMonitor />
+        </TabsContent>
+
+        <TabsContent value="health">
+          <PaymentHealthCheck />
         </TabsContent>
 
         <TabsContent value="webhooks" className="space-y-6">

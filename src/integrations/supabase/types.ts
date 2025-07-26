@@ -1255,6 +1255,53 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_refunds: {
+        Row: {
+          amount: number
+          created_at: string | null
+          created_by: string | null
+          id: string
+          provider_refund_id: string | null
+          reason: string
+          status: string | null
+          transaction_id: string | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          amount: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          provider_refund_id?: string | null
+          reason: string
+          status?: string | null
+          transaction_id?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          provider_refund_id?: string | null
+          reason?: string
+          status?: string | null
+          transaction_id?: string | null
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_refunds_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "payment_transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_transactions: {
         Row: {
           account_name: string | null
@@ -1265,6 +1312,7 @@ export type Database = {
           channel: string | null
           created_at: string | null
           currency: string | null
+          customer_email: string | null
           customer_phone: string | null
           exp_month: string | null
           exp_year: string | null
@@ -1292,6 +1340,7 @@ export type Database = {
           channel?: string | null
           created_at?: string | null
           currency?: string | null
+          customer_email?: string | null
           customer_phone?: string | null
           exp_month?: string | null
           exp_year?: string | null
@@ -1319,6 +1368,7 @@ export type Database = {
           channel?: string | null
           created_at?: string | null
           currency?: string | null
+          customer_email?: string | null
           customer_phone?: string | null
           exp_month?: string | null
           exp_year?: string | null

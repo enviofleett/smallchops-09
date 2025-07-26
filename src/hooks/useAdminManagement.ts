@@ -37,14 +37,30 @@ async function callAdminFunction(
 
   for (let attempt = 1; attempt <= retries; attempt++) {
     try {
+      let functionUrl = '';
+      let requestBody: any = undefined;
+
+      if (method === 'GET') {
+        // For GET requests, pass action as query parameter
+        const params = new URLSearchParams({ action });
+        if (data?.userId) {
+          params.append('userId', data.userId);
+        }
+        functionUrl = `admin-management?${params.toString()}`;
+      } else {
+        // For POST requests, pass action in body
+        functionUrl = 'admin-management';
+        requestBody = { action, ...data };
+      }
+
       // Use Supabase client's invoke method for better reliability
-      const { data: result, error } = await supabase.functions.invoke('admin-management', {
+      const { data: result, error } = await supabase.functions.invoke(functionUrl, {
         method,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.data.session.access_token}`,
         },
-        body: method === 'POST' ? { action, ...data } : data,
+        body: requestBody,
       });
 
       if (error) {
@@ -101,7 +117,7 @@ export const useAdminManagement = () => {
     queryKey: ['admin-users'],
     queryFn: async () => {
       try {
-        const result = await callAdminFunction('get_admins', { action: 'get_admins' }, 'GET');
+        const result = await callAdminFunction('get_admins', undefined, 'GET');
         return result.data as AdminUser[];
       } catch (error: any) {
         handleError(error, 'Fetching admin users');
@@ -121,7 +137,7 @@ export const useAdminManagement = () => {
     queryKey: ['admin-invitations'],
     queryFn: async () => {
       try {
-        const result = await callAdminFunction('get_invitations', { action: 'get_invitations' }, 'GET');
+        const result = await callAdminFunction('get_invitations', undefined, 'GET');
         return result.data as AdminInvitation[];
       } catch (error: any) {
         handleError(error, 'Fetching admin invitations');
@@ -164,21 +180,7 @@ export const useAdminManagement = () => {
   // Get user permissions
   const getUserPermissions = async (userId: string) => {
     try {
-      const session = await supabase.auth.getSession();
-      if (!session.data.session?.access_token) {
-        throw new Error('No authentication token available');
-      }
-
-      const { data: result, error } = await supabase.functions.invoke('admin-management', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${session.data.session.access_token}`,
-        },
-        // Pass userId as query parameter
-        body: undefined,
-      });
-
-      if (error) throw error;
+      const result = await callAdminFunction('get_permissions', { userId }, 'GET');
       return result.data;
     } catch (error: any) {
       handleError(error, 'Fetching user permissions');

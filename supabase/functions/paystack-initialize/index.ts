@@ -11,19 +11,71 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  let supabaseClient;
+  let user;
+
   try {
-    const supabaseClient = createClient(
+    supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { persistSession: false } }
     );
 
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader.replace('Bearer ', '');
-    const { data: userData } = await supabaseClient.auth.getUser(token);
-    const user = userData.user;
+    // Authenticate user with proper error handling
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({
+        status: false,
+        error: 'Authentication required'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
 
+    const token = authHeader.replace('Bearer ', '');
+    const { data: userData, error: authError } = await supabaseClient.auth.getUser(token);
+    
+    if (authError || !userData.user) {
+      return new Response(JSON.stringify({
+        status: false,
+        error: 'Invalid authentication token'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
+    }
+
+    user = userData.user;
+
+    // Parse and validate request body
     const body = await req.json();
+    
+    // Input validation
+    const errors = [];
+    if (!body.email || typeof body.email !== 'string' || !body.email.includes('@')) {
+      errors.push('Valid email is required');
+    }
+    if (!body.amount || typeof body.amount !== 'number' || body.amount <= 0) {
+      errors.push('Valid amount is required');
+    }
+    if (body.amount < 50) {
+      errors.push('Minimum amount is 50 NGN');
+    }
+    if (body.amount > 10000000) {
+      errors.push('Maximum amount is 10,000,000 NGN');
+    }
+    
+    if (errors.length > 0) {
+      return new Response(JSON.stringify({
+        status: false,
+        error: 'Validation failed',
+        details: errors
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
     const { email, amount, currency = 'NGN', reference, callback_url, metadata = {}, orderId } = body;
 
     // Get Paystack configuration
@@ -39,17 +91,20 @@ serve(async (req) => {
     }
 
     // Create transaction record
+    const transactionRef = reference || `init_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
     const { data: transaction, error: dbError } = await supabaseClient
       .from('payment_transactions')
       .insert({
-        transaction_reference: reference,
+        transaction_reference: transactionRef,
         provider: 'paystack',
         order_id: orderId,
-        amount: parseFloat(amount),
-        currency,
+        amount: parseFloat(amount.toString()),
+        currency: currency || 'NGN',
         customer_email: email,
-        metadata,
-        status: 'pending'
+        metadata: { ...metadata, user_id: user.id },
+        status: 'pending',
+        transaction_type: 'initialize'
       })
       .select()
       .single();
@@ -69,7 +124,7 @@ serve(async (req) => {
         email,
         amount: Math.round(amount * 100), // Convert to kobo
         currency,
-        reference,
+        reference: transactionRef,
         callback_url: callback_url || `${req.headers.get('origin')}/payment/callback`,
         metadata: { ...metadata, orderId },
         channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer']

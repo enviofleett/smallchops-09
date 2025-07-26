@@ -1,37 +1,38 @@
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Package, Star, Gift, TrendingUp, User, Heart } from 'lucide-react';
+import { Package, Star, TrendingUp, User, LogOut, Loader2 } from 'lucide-react';
 import { DeliveryTracker } from '@/components/delivery/DeliveryTracker';
 import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
 import { FavoritesSection } from '@/components/customers/FavoritesSection';
-import { useOrderManagement } from '@/hooks/useOrderManagement';
+import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
+import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { useToast } from '@/hooks/use-toast';
 
 export default function CustomerPortal() {
-  const [customerEmail, setCustomerEmail] = useState('demo@example.com');
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [customerId, setCustomerId] = useState<string | null>(null);
-  const { trackOrder } = useOrderManagement();
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const { user, customerAccount, isLoading, isAuthenticated, logout } = useCustomerAuth();
+  const { toast } = useToast();
 
-  // Initialize customer ID when logged in
-  useEffect(() => {
-    if (isLoggedIn && customerEmail) {
-      // For demo purposes, create a consistent customer ID from email
-      // In production, this would come from your customer registration system
-      const id = btoa(customerEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
-      const formattedId = `${id.substring(0, 8)}-${id.substring(8, 12)}-${id.substring(12, 16)}-${id.substring(16, 20)}-${id.substring(20, 32)}`.padEnd(36, '0');
-      setCustomerId(formattedId);
-    } else {
-      setCustomerId(null);
-    }
-  }, [isLoggedIn, customerEmail]);
+  const handleAuthenticated = (customerId: string) => {
+    setShowAuthModal(false);
+  };
 
-  const handleLogin = () => {
-    if (customerEmail) {
-      setIsLoggedIn(true);
+  const handleLogout = async () => {
+    try {
+      await logout();
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Logout failed",
+        description: error.message || "An error occurred during logout.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -75,7 +76,18 @@ export default function CustomerPortal() {
     }
   };
 
-  if (!isLoggedIn) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex items-center gap-2">
+          <Loader2 className="h-6 w-6 animate-spin" />
+          <span>Loading...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
@@ -85,27 +97,24 @@ export default function CustomerPortal() {
               Customer Portal
             </CardTitle>
             <CardDescription>
-              Enter your email to access your account
+              Sign in to access your account
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                type="email"
-                placeholder="your.email@example.com"
-                value={customerEmail}
-                onChange={(e) => setCustomerEmail(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-              />
-            </div>
-            <Button onClick={handleLogin} className="w-full">
-              Access Portal
+            <Button onClick={() => setShowAuthModal(true)} className="w-full">
+              Sign In / Sign Up
             </Button>
             <div className="text-center text-sm text-muted-foreground">
-              Demo email: demo@example.com
+              Create an account or sign in to manage your orders and favorites
             </div>
           </CardContent>
         </Card>
+
+        <CustomerAuthModal
+          isOpen={showAuthModal}
+          onClose={() => setShowAuthModal(false)}
+          onAuthenticated={handleAuthenticated}
+        />
       </div>
     );
   }
@@ -117,10 +126,11 @@ export default function CustomerPortal() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-2xl font-bold">Welcome Back!</h1>
-              <p className="text-muted-foreground">{customerEmail}</p>
+              <p className="text-muted-foreground">{customerAccount?.name || user?.email}</p>
             </div>
-            <Button variant="outline" onClick={() => setIsLoggedIn(false)}>
-              Switch Account
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
             </Button>
           </div>
         </div>
@@ -247,7 +257,7 @@ export default function CustomerPortal() {
           </TabsContent>
 
           <TabsContent value="favorites" className="space-y-6">
-            <FavoritesSection customerId={customerId} />
+            <FavoritesSection customerId={customerAccount?.id || null} />
           </TabsContent>
 
           <TabsContent value="tracking">
@@ -255,7 +265,7 @@ export default function CustomerPortal() {
           </TabsContent>
 
           <TabsContent value="loyalty">
-            <LoyaltyDashboard customerEmail={customerEmail} />
+            <LoyaltyDashboard customerEmail={user?.email || ''} />
           </TabsContent>
         </Tabs>
       </div>

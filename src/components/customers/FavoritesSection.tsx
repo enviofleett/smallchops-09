@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Heart, Plus, AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { FavoriteProduct } from '@/api/favorites';
-import { publicAPI } from '@/api/public';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface FavoritesSectionProps {
@@ -25,7 +25,17 @@ export const FavoritesSection = ({ customerId }: FavoritesSectionProps) => {
       setError(null);
       
       try {
-        const response = await fetch(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/public-api/customers/${customerId}/favorites`);
+        const { data: session } = await supabase.auth.getSession();
+        if (!session?.session?.access_token) {
+          throw new Error('Not authenticated');
+        }
+
+        const response = await fetch(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/public-api/customers/${customerId}/favorites`, {
+          headers: {
+            'Authorization': `Bearer ${session.session.access_token}`,
+            'Content-Type': 'application/json',
+          }
+        });
         
         if (!response.ok) {
           throw new Error(`Failed to load favorites: ${response.statusText}`);
@@ -48,9 +58,20 @@ export const FavoritesSection = ({ customerId }: FavoritesSectionProps) => {
     if (!customerId) return;
     
     try {
+      const { data: session } = await supabase.auth.getSession();
+      if (!session?.session?.access_token) {
+        throw new Error('Not authenticated');
+      }
+
       const response = await fetch(
         `https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/public-api/customers/${customerId}/favorites/${productId}`,
-        { method: 'DELETE' }
+        { 
+          method: 'DELETE',
+          headers: {
+            'Authorization': `Bearer ${session.session.access_token}`,
+            'Content-Type': 'application/json',
+          }
+        }
       );
       
       if (!response.ok) {

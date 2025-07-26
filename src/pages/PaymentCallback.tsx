@@ -26,7 +26,7 @@ interface PaymentData {
   };
 }
 
-export const PaymentCallback: React.FC = () => {
+const PaymentCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<PaymentStatus>('verifying');
@@ -269,3 +269,6 @@ export const PaymentCallback: React.FC = () => {
     </div>
   );
 };
+
+export default PaymentCallback;
+export { PaymentCallback };

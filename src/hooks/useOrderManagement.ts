@@ -38,7 +38,7 @@ export const useOrderManagement = () => {
         phone: checkoutData.customer_phone
       });
 
-      // Create order
+      // Create order with pending payment status
       const orderResponse = await publicAPI.createOrder({
         ...checkoutData,
         items,
@@ -49,7 +49,17 @@ export const useOrderManagement = () => {
         throw new Error(orderResponse.error || 'Failed to create order');
       }
 
-      toast.success('Order placed successfully!');
+      // Create pending payment transaction
+      const { supabase } = await import('@/integrations/supabase/client');
+      await supabase.from('payment_transactions').insert({
+        order_id: orderResponse.data.id,
+        amount: summary.total_amount,
+        currency: 'NGN',
+        status: 'pending',
+        transaction_type: 'payment',
+        provider_reference: `order_${orderResponse.data.id}_${Date.now()}`
+      });
+
       return orderResponse.data;
 
     } catch (error) {
@@ -59,6 +69,28 @@ export const useOrderManagement = () => {
       throw error;
     } finally {
       setLoading(false);
+    }
+  };
+
+  const updateOrderPaymentStatus = async (orderId: string, paymentStatus: 'paid' | 'failed') => {
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      
+      const { error } = await supabase
+        .from('orders')
+        .update({ 
+          payment_status: paymentStatus,
+          status: paymentStatus === 'paid' ? 'confirmed' : 'cancelled',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      toast.success(`Order ${paymentStatus === 'paid' ? 'confirmed' : 'cancelled'} successfully`);
+    } catch (error) {
+      console.error('Error updating order payment status:', error);
+      throw error;
     }
   };
 
@@ -127,7 +159,8 @@ export const useOrderManagement = () => {
     placeOrder,
     trackOrder,
     getOrderHistory,
-    cancelOrder
+    cancelOrder,
+    updateOrderPaymentStatus
   };
 };
 

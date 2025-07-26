@@ -10,7 +10,7 @@ import Orders from "./pages/Orders";
 import Products from "./pages/Products";
 import Customers from "./pages/Customers";
 import Reports from "./pages/Reports";
-
+import { PaymentSettings } from "./pages/PaymentSettings";
 import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
 import Promotions from "./pages/Promotions";
@@ -20,6 +20,7 @@ import Settings from "./pages/Settings";
 import CustomerPortal from "./pages/CustomerPortal";
 import CustomerFavorites from "./pages/CustomerFavorites";
 import PurchaseHistory from "./pages/PurchaseHistory";
+import { PaymentCallback } from "./pages/PaymentCallback";
 
 const queryClient = new QueryClient();
 
@@ -31,6 +32,15 @@ const App = () => (
       <AuthProvider>
         <BrowserRouter>
           <Routes>
+            {/* Public routes */}
+            <Route path="/customer-portal" element={<CustomerPortal />} />
+            <Route path="/customer-favorites" element={<CustomerFavorites />} />
+            <Route path="/purchase-history" element={<PurchaseHistory />} />
+            <Route path="/payment/callback" element={<PaymentCallback />} />
+            <Route path="/payment/success" element={<PaymentCallback />} />
+            <Route path="/payment/failed" element={<PaymentCallback />} />
+            
+            {/* Protected routes */}
             <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
               <Route path="/" element={<Index />} />
               <Route path="/orders" element={<Orders />} />
@@ -38,16 +48,12 @@ const App = () => (
               <Route path="/customers" element={<Customers />} />
               <Route path="/delivery-pickup" element={<DeliveryPickup />} />
               <Route path="/reports" element={<Reports />} />
-              
               <Route path="/promotions" element={<Promotions />} />
               <Route path="/audit-logs" element={<AuditLogs />} />
               <Route path="/settings" element={<Settings />} />
-              <Route path="*" element={<NotFound />} />
+              <Route path="/payment-settings" element={<PaymentSettings />} />
             </Route>
-            {/* Public Customer Portal */}
-            <Route path="/customer-portal" element={<CustomerPortal />} />
-            <Route path="/favorites" element={<CustomerFavorites />} />
-            <Route path="/purchase-history/:customerEmail" element={<PurchaseHistory />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>
       </AuthProvider>

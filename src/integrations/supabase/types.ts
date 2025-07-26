@@ -773,6 +773,45 @@ export type Database = {
         }
         Relationships: []
       }
+      environment_config: {
+        Row: {
+          created_at: string | null
+          environment: string
+          id: string
+          is_live_mode: boolean
+          paystack_live_public_key: string | null
+          paystack_live_secret_key: string | null
+          paystack_test_public_key: string | null
+          paystack_test_secret_key: string | null
+          updated_at: string | null
+          webhook_url: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          environment?: string
+          id?: string
+          is_live_mode?: boolean
+          paystack_live_public_key?: string | null
+          paystack_live_secret_key?: string | null
+          paystack_test_public_key?: string | null
+          paystack_test_secret_key?: string | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          environment?: string
+          id?: string
+          is_live_mode?: boolean
+          paystack_live_public_key?: string | null
+          paystack_live_secret_key?: string | null
+          paystack_test_public_key?: string | null
+          paystack_test_secret_key?: string | null
+          updated_at?: string | null
+          webhook_url?: string | null
+        }
+        Relationships: []
+      }
       map_api_usage: {
         Row: {
           count: number
@@ -1162,14 +1201,90 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_error_tracking: {
+        Row: {
+          created_at: string | null
+          error_code: string
+          error_context: Json | null
+          error_message: string
+          id: string
+          order_id: string | null
+          resolution_notes: string | null
+          resolved: boolean | null
+          resolved_at: string | null
+          severity: string
+          transaction_reference: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_code: string
+          error_context?: Json | null
+          error_message: string
+          id?: string
+          order_id?: string | null
+          resolution_notes?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          severity?: string
+          transaction_reference?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_code?: string
+          error_context?: Json | null
+          error_message?: string
+          id?: string
+          order_id?: string | null
+          resolution_notes?: string | null
+          resolved?: boolean | null
+          resolved_at?: string | null
+          severity?: string
+          transaction_reference?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
+      payment_health_metrics: {
+        Row: {
+          id: string
+          metadata: Json | null
+          metric_name: string
+          metric_unit: string | null
+          metric_value: number
+          recorded_at: string | null
+        }
+        Insert: {
+          id?: string
+          metadata?: Json | null
+          metric_name: string
+          metric_unit?: string | null
+          metric_value: number
+          recorded_at?: string | null
+        }
+        Update: {
+          id?: string
+          metadata?: Json | null
+          metric_name?: string
+          metric_unit?: string | null
+          metric_value?: number
+          recorded_at?: string | null
+        }
+        Relationships: []
+      }
       payment_integrations: {
         Row: {
           connected_by: string | null
           connection_status: string | null
           created_at: string
           currency: string | null
+          environment: string | null
           id: string
           integration_data: Json | null
+          live_public_key: string | null
+          live_secret_key: string | null
+          live_webhook_secret: string | null
           mode: string | null
           payment_methods: Json | null
           provider: string
@@ -1188,8 +1303,12 @@ export type Database = {
           connection_status?: string | null
           created_at?: string
           currency?: string | null
+          environment?: string | null
           id?: string
           integration_data?: Json | null
+          live_public_key?: string | null
+          live_secret_key?: string | null
+          live_webhook_secret?: string | null
           mode?: string | null
           payment_methods?: Json | null
           provider: string
@@ -1208,8 +1327,12 @@ export type Database = {
           connection_status?: string | null
           created_at?: string
           currency?: string | null
+          environment?: string | null
           id?: string
           integration_data?: Json | null
+          live_public_key?: string | null
+          live_secret_key?: string | null
+          live_webhook_secret?: string | null
           mode?: string | null
           payment_methods?: Json | null
           provider?: string
@@ -2188,6 +2311,27 @@ export type Database = {
           old_values?: Json
           new_values?: Json
           message?: string
+        }
+        Returns: undefined
+      }
+      log_payment_error: {
+        Args: {
+          p_error_code: string
+          p_error_message: string
+          p_error_context?: Json
+          p_user_id?: string
+          p_order_id?: string
+          p_transaction_reference?: string
+          p_severity?: string
+        }
+        Returns: string
+      }
+      record_payment_metric: {
+        Args: {
+          p_metric_name: string
+          p_metric_value: number
+          p_metric_unit?: string
+          p_metadata?: Json
         }
         Returns: undefined
       }

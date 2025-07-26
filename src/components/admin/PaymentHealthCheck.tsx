@@ -128,6 +128,90 @@ export const PaymentHealthCheck: React.FC = () => {
         lastChecked: now
       });
 
+      // Check Permission System Integrity - NEW
+      const { data: permissions, error: permError } = await supabase
+        .from('user_permissions')
+        .select('menu_key, menu_section, permission_level');
+
+      if (permError) {
+        checks.push({
+          name: 'Permission System',
+          status: 'fail',
+          message: 'Failed to validate permission system',
+          lastChecked: now
+        });
+      } else {
+        const validEnumValues = [
+          'dashboard', 'orders', 'categories', 'products', 'customers', 
+          'delivery_pickup', 'promotions', 'reports', 'settings', 
+          'audit_logs', 'delivery', 'payment'
+        ];
+
+        const invalidPermissions = permissions?.filter(p => 
+          !validEnumValues.includes(p.menu_section)
+        ) || [];
+
+        checks.push({
+          name: 'Permission System',
+          status: invalidPermissions.length > 0 ? 'fail' : 'pass',
+          message: invalidPermissions.length > 0 
+            ? `Found ${invalidPermissions.length} permissions with invalid menu_section values`
+            : 'All permissions have valid menu_section values',
+          lastChecked: now
+        });
+      }
+
+      // Check Menu Structure Consistency - NEW
+      const { data: menuItems, error: menuError } = await supabase
+        .from('menu_structure')
+        .select('key, parent_key, is_active')
+        .eq('is_active', true);
+
+      if (menuError) {
+        checks.push({
+          name: 'Menu Structure',
+          status: 'fail',
+          message: 'Failed to validate menu structure',
+          lastChecked: now
+        });
+      } else {
+        const orphanedItems = menuItems?.filter(item => 
+          item.parent_key && !menuItems.find(parent => parent.key === item.parent_key)
+        ) || [];
+
+        checks.push({
+          name: 'Menu Structure',
+          status: orphanedItems.length > 0 ? 'warning' : 'pass',
+          message: orphanedItems.length > 0 
+            ? `Found ${orphanedItems.length} orphaned menu items`
+            : 'All menu items properly linked',
+          lastChecked: now
+        });
+      }
+
+      // Check Admin Management Function - NEW
+      try {
+        const { data, error } = await supabase.functions.invoke('admin-management', {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+          body: new URLSearchParams({ action: 'get_admins' })
+        });
+
+        checks.push({
+          name: 'Admin Management Function',
+          status: error ? 'fail' : 'pass',
+          message: error ? 'Admin management function failed' : 'Admin management function responding',
+          lastChecked: now
+        });
+      } catch (err) {
+        checks.push({
+          name: 'Admin Management Function',
+          status: 'fail',
+          message: 'Failed to reach admin management function',
+          lastChecked: now
+        });
+      }
+
       // Check recent transaction processing
       const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
       const { data: recentTransactions, error: transactionError } = await supabase
@@ -143,23 +227,6 @@ export const PaymentHealthCheck: React.FC = () => {
         name: 'Transaction Processing',
         status: recentFailureRate > 10 ? 'warning' : recentFailureRate > 25 ? 'fail' : 'pass',
         message: `${recentFailureRate.toFixed(1)}% failure rate in the last hour`,
-        lastChecked: now
-      });
-
-      // Check webhook logs
-      const { data: webhookLogs, error: webhookError } = await supabase
-        .from('webhook_logs')
-        .select('created_at, processed')
-        .gte('created_at', oneHourAgo)
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      const unprocessedWebhooks = webhookLogs?.filter(w => !w.processed).length || 0;
-      
-      checks.push({
-        name: 'Webhook Processing',
-        status: unprocessedWebhooks > 5 ? 'warning' : unprocessedWebhooks > 10 ? 'fail' : 'pass',
-        message: `${unprocessedWebhooks} unprocessed webhooks in the last hour`,
         lastChecked: now
       });
 

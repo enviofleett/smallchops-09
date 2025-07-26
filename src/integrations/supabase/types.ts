@@ -554,6 +554,47 @@ export type Database = {
           },
         ]
       }
+      customer_notification_preferences: {
+        Row: {
+          created_at: string
+          customer_id: string
+          digest_frequency: string
+          id: string
+          minimum_discount_percentage: number
+          price_alerts: boolean
+          promotion_alerts: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          digest_frequency?: string
+          id?: string
+          minimum_discount_percentage?: number
+          price_alerts?: boolean
+          promotion_alerts?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          digest_frequency?: string
+          id?: string
+          minimum_discount_percentage?: number
+          price_alerts?: boolean
+          promotion_alerts?: boolean
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_notification_preferences_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: true
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           created_at: string
@@ -749,6 +790,57 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "menu_structure"
             referencedColumns: ["key"]
+          },
+        ]
+      }
+      notification_queue: {
+        Row: {
+          created_at: string
+          customer_id: string
+          data: Json | null
+          id: string
+          notification_type: string
+          processed_at: string | null
+          product_id: string | null
+          scheduled_for: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          data?: Json | null
+          id?: string
+          notification_type: string
+          processed_at?: string | null
+          product_id?: string | null
+          scheduled_for?: string
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          data?: Json | null
+          id?: string
+          notification_type?: string
+          processed_at?: string | null
+          product_id?: string | null
+          scheduled_for?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_queue_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_queue_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -962,6 +1054,41 @@ export type Database = {
           webhook_url?: string | null
         }
         Relationships: []
+      }
+      product_price_history: {
+        Row: {
+          changed_at: string
+          changed_by: string | null
+          id: string
+          new_price: number
+          old_price: number
+          product_id: string
+        }
+        Insert: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_price: number
+          old_price: number
+          product_id: string
+        }
+        Update: {
+          changed_at?: string
+          changed_by?: string | null
+          id?: string
+          new_price?: number
+          old_price?: number
+          product_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "product_price_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       products: {
         Row: {

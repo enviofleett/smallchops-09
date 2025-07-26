@@ -20,7 +20,7 @@ import Settings from "./pages/Settings";
 import CustomerPortal from "./pages/CustomerPortal";
 import CustomerFavorites from "./pages/CustomerFavorites";
 import PurchaseHistory from "./pages/PurchaseHistory";
-import { PaymentCallback } from "./pages/PaymentCallback";
+import PaymentCallback from "./pages/PaymentCallback";
 
 const queryClient = new QueryClient();
 

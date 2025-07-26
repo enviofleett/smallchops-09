@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { publicAPI } from '@/api/public';
 import { paystackService } from '@/lib/paystack';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
 export interface PaymentResult {
@@ -107,32 +108,24 @@ export const usePayment = () => {
   };
 
   const verifyPayment = async (
-    sessionId: string,
-    orderId?: string,
-    provider: PaymentProvider = 'stripe'
-  ): Promise<PaymentVerification | null> => {
+    reference: string,
+    provider: PaymentProvider = 'paystack'
+  ): Promise<any> => {
     try {
       if (provider === 'paystack') {
-        const response = await paystackService.verifyTransaction(sessionId);
+        // Call the enhanced paystack verify function
+        const { data, error } = await supabase.functions.invoke('paystack-verify', {
+          body: { reference }
+        });
+
+        if (error) throw new Error(error.message);
         
-        return {
-          success: response.status === 'success',
-          paymentStatus: response.status,
-          orderStatus: response.status === 'success' ? 'confirmed' : 'pending',
-          orderNumber: response.reference,
-          amount: response.amount / 100
-        };
+        return data.data;
       } else {
-        const response = await publicAPI.verifyPayment(sessionId, orderId);
+        const response = await publicAPI.verifyPayment(reference);
         
         if (response.success) {
-          return {
-            success: true,
-            paymentStatus: response.paymentStatus,
-            orderStatus: response.orderStatus,
-            orderNumber: response.orderNumber,
-            amount: response.amount
-          };
+          return response.data;
         } else {
           throw new Error(response.error || 'Payment verification failed');
         }
@@ -140,13 +133,13 @@ export const usePayment = () => {
     } catch (error) {
       console.error('Payment verification error:', error);
       toast.error('Failed to verify payment');
-      return null;
+      throw error;
     }
   };
 
-  const handlePaymentSuccess = async (sessionId: string, orderId?: string, provider: PaymentProvider = 'stripe') => {
+  const handlePaymentSuccess = async (sessionId: string, provider: PaymentProvider = 'stripe') => {
     try {
-      const verification = await verifyPayment(sessionId, orderId, provider);
+      const verification = await verifyPayment(sessionId, provider);
       
       if (verification && verification.success) {
         if (verification.paymentStatus === 'paid') {

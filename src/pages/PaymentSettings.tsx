@@ -1,0 +1,369 @@
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useToast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { PaymentAnalyticsDashboard } from '@/components/payments/PaymentAnalyticsDashboard';
+import { AlertCircle, CheckCircle, Copy, ExternalLink } from 'lucide-react';
+
+interface PaymentIntegration {
+  id?: string;
+  provider: string;
+  public_key: string;
+  secret_key: string;
+  webhook_secret: string;
+  test_mode: boolean;
+  is_active: boolean;
+  currency: string;
+  payment_methods: string[];
+  connection_status?: string;
+}
+
+export const PaymentSettings: React.FC = () => {
+  const [config, setConfig] = useState<PaymentIntegration>({
+    provider: 'paystack',
+    public_key: '',
+    secret_key: '',
+    webhook_secret: '',
+    test_mode: true,
+    is_active: true,
+    currency: 'NGN',
+    payment_methods: ['card', 'bank_transfer', 'ussd']
+  });
+  const [loading, setLoading] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testing, setTesting] = useState(false);
+  const [connectionStatus, setConnectionStatus] = useState<string>('');
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadConfiguration();
+  }, []);
+
+  const loadConfiguration = async () => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('payment_integrations')
+        .select('*')
+        .eq('provider', 'paystack')
+        .eq('is_active', true)
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        throw error;
+      }
+
+      if (data) {
+        setConfig({
+          ...data,
+          payment_methods: data.payment_methods || ['card']
+        });
+        setConnectionStatus(data.connection_status || '');
+      }
+    } catch (error) {
+      console.error('Error loading configuration:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load payment configuration",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveConfiguration = async () => {
+    setSaving(true);
+    try {
+      // Validate required fields
+      if (!config.public_key || !config.secret_key || !config.webhook_secret) {
+        throw new Error('All fields are required');
+      }
+
+      const { error } = await supabase
+        .from('payment_integrations')
+        .upsert({
+          ...config,
+          connected_by: (await supabase.auth.getUser()).data.user?.id,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'provider' });
+
+      if (error) throw error;
+
+      toast({
+        title: "Success",
+        description: "Payment configuration saved successfully",
+      });
+
+      setConnectionStatus('connected');
+    } catch (error: any) {
+      console.error('Error saving configuration:', error);
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const testConnection = async () => {
+    setTesting(true);
+    try {
+      // Test connection by fetching banks
+      const { data, error } = await supabase.functions.invoke('paystack-banks');
+
+      if (error) throw error;
+
+      if (data.status) {
+        toast({
+          title: "Success",
+          description: "Paystack connection test successful",
+        });
+        setConnectionStatus('connected');
+      } else {
+        throw new Error('Connection test failed');
+      }
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: "Connection test failed: " + error.message,
+        variant: "destructive"
+      });
+      setConnectionStatus('error');
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const copyWebhookUrl = () => {
+    const webhookUrl = `${window.location.origin}/api/webhooks/paystack`;
+    navigator.clipboard.writeText(webhookUrl);
+    toast({
+      title: "Copied",
+      description: "Webhook URL copied to clipboard",
+    });
+  };
+
+  const getConnectionStatusBadge = () => {
+    switch (connectionStatus) {
+      case 'connected':
+        return <Badge className="bg-green-500"><CheckCircle className="w-3 h-3 mr-1" />Connected</Badge>;
+      case 'error':
+        return <Badge variant="destructive"><AlertCircle className="w-3 h-3 mr-1" />Error</Badge>;
+      default:
+        return <Badge variant="secondary">Not Connected</Badge>;
+    }
+  };
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold">Payment Settings</h1>
+          <p className="text-muted-foreground">Configure payment providers and manage transactions</p>
+        </div>
+        {getConnectionStatusBadge()}
+      </div>
+
+      <Tabs defaultValue="configuration" className="space-y-6">
+        <TabsList>
+          <TabsTrigger value="configuration">Configuration</TabsTrigger>
+          <TabsTrigger value="analytics">Analytics</TabsTrigger>
+          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="configuration" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Paystack Configuration</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="environment">Environment</Label>
+                  <Select
+                    value={config.test_mode ? 'test' : 'live'}
+                    onValueChange={(value) => setConfig({ ...config, test_mode: value === 'test' })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select environment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="test">Test Mode</SelectItem>
+                      <SelectItem value="live">Live Mode</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="currency">Currency</Label>
+                  <Select
+                    value={config.currency}
+                    onValueChange={(value) => setConfig({ ...config, currency: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="NGN">Nigerian Naira (NGN)</SelectItem>
+                      <SelectItem value="USD">US Dollar (USD)</SelectItem>
+                      <SelectItem value="GHS">Ghanaian Cedi (GHS)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="public_key">Public Key</Label>
+                <Input
+                  id="public_key"
+                  type="text"
+                  value={config.public_key}
+                  onChange={(e) => setConfig({ ...config, public_key: e.target.value })}
+                  placeholder="pk_test_..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="secret_key">Secret Key</Label>
+                <Input
+                  id="secret_key"
+                  type="password"
+                  value={config.secret_key}
+                  onChange={(e) => setConfig({ ...config, secret_key: e.target.value })}
+                  placeholder="sk_test_..."
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="webhook_secret">Webhook Secret</Label>
+                <Input
+                  id="webhook_secret"
+                  type="password"
+                  value={config.webhook_secret}
+                  onChange={(e) => setConfig({ ...config, webhook_secret: e.target.value })}
+                  placeholder="Webhook secret from Paystack dashboard"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Payment Methods</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['card', 'bank_transfer', 'ussd', 'qr'].map((method) => (
+                    <div key={method} className="flex items-center space-x-2">
+                      <Switch
+                        checked={config.payment_methods.includes(method)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setConfig({
+                              ...config,
+                              payment_methods: [...config.payment_methods, method]
+                            });
+                          } else {
+                            setConfig({
+                              ...config,
+                              payment_methods: config.payment_methods.filter(m => m !== method)
+                            });
+                          }
+                        }}
+                      />
+                      <Label className="capitalize">{method.replace('_', ' ')}</Label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="flex items-center space-x-2">
+                <Switch
+                  checked={config.is_active}
+                  onCheckedChange={(checked) => setConfig({ ...config, is_active: checked })}
+                />
+                <Label>Enable Paystack Integration</Label>
+              </div>
+
+              <div className="flex space-x-2 pt-4">
+                <Button
+                  onClick={saveConfiguration}
+                  disabled={saving || loading}
+                  className="flex-1"
+                >
+                  {saving ? 'Saving...' : 'Save Configuration'}
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={testConnection}
+                  disabled={!config.secret_key || testing}
+                >
+                  {testing ? 'Testing...' : 'Test Connection'}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics">
+          <PaymentAnalyticsDashboard />
+        </TabsContent>
+
+        <TabsContent value="webhooks" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Webhook Configuration</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Configure this webhook URL in your Paystack dashboard to receive real-time payment notifications.
+                </AlertDescription>
+              </Alert>
+
+              <div className="space-y-2">
+                <Label>Webhook URL</Label>
+                <div className="flex items-center space-x-2">
+                  <Input
+                    value={`${window.location.origin}/api/webhooks/paystack`}
+                    readOnly
+                    className="bg-muted"
+                  />
+                  <Button variant="outline" size="sm" onClick={copyWebhookUrl}>
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => window.open('https://dashboard.paystack.com/#/settings/developers', '_blank')}
+                  >
+                    <ExternalLink className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Required Events</Label>
+                <div className="grid grid-cols-2 gap-2">
+                  {['charge.success', 'charge.failed', 'charge.dispute.create', 'transfer.success', 'transfer.failed'].map((event) => (
+                    <div key={event} className="flex items-center space-x-2 p-2 bg-muted rounded">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span className="text-sm font-mono">{event}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
+    </div>
+  );
+};

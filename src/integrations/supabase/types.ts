@@ -595,6 +595,42 @@ export type Database = {
           },
         ]
       }
+      customer_payment_preferences: {
+        Row: {
+          created_at: string | null
+          email_notifications: boolean | null
+          id: string
+          preferred_currency: string | null
+          preferred_payment_method: string | null
+          save_payment_methods: boolean | null
+          sms_notifications: boolean | null
+          updated_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          preferred_currency?: string | null
+          preferred_payment_method?: string | null
+          save_payment_methods?: boolean | null
+          sms_notifications?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          preferred_currency?: string | null
+          preferred_payment_method?: string | null
+          save_payment_methods?: boolean | null
+          sms_notifications?: boolean | null
+          updated_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       customer_purchase_analytics: {
         Row: {
           average_order_value: number | null
@@ -1221,13 +1257,26 @@ export type Database = {
       }
       payment_transactions: {
         Row: {
+          account_name: string | null
           amount: number
+          authorization_code: string | null
+          bank: string | null
+          card_type: string | null
+          channel: string | null
           created_at: string | null
           currency: string | null
+          customer_phone: string | null
+          exp_month: string | null
+          exp_year: string | null
+          fees: number | null
+          gateway_response: string | null
           id: string
+          last4: string | null
           order_id: string | null
+          paid_at: string | null
           payment_method: string | null
           processed_at: string | null
+          provider_reference: string | null
           provider_response: Json | null
           provider_transaction_id: string | null
           status: string
@@ -1235,13 +1284,26 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          account_name?: string | null
           amount: number
+          authorization_code?: string | null
+          bank?: string | null
+          card_type?: string | null
+          channel?: string | null
           created_at?: string | null
           currency?: string | null
+          customer_phone?: string | null
+          exp_month?: string | null
+          exp_year?: string | null
+          fees?: number | null
+          gateway_response?: string | null
           id?: string
+          last4?: string | null
           order_id?: string | null
+          paid_at?: string | null
           payment_method?: string | null
           processed_at?: string | null
+          provider_reference?: string | null
           provider_response?: Json | null
           provider_transaction_id?: string | null
           status: string
@@ -1249,13 +1311,26 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          account_name?: string | null
           amount?: number
+          authorization_code?: string | null
+          bank?: string | null
+          card_type?: string | null
+          channel?: string | null
           created_at?: string | null
           currency?: string | null
+          customer_phone?: string | null
+          exp_month?: string | null
+          exp_year?: string | null
+          fees?: number | null
+          gateway_response?: string | null
           id?: string
+          last4?: string | null
           order_id?: string | null
+          paid_at?: string | null
           payment_method?: string | null
           processed_at?: string | null
+          provider_reference?: string | null
           provider_response?: Json | null
           provider_transaction_id?: string | null
           status?: string
@@ -1758,8 +1833,12 @@ export type Database = {
           exp_year: string | null
           id: string
           is_active: boolean | null
+          is_default: boolean | null
+          last_used_at: string | null
           last4: string | null
+          nickname: string | null
           provider: string
+          usage_count: number | null
           user_id: string | null
         }
         Insert: {
@@ -1771,8 +1850,12 @@ export type Database = {
           exp_year?: string | null
           id?: string
           is_active?: boolean | null
+          is_default?: boolean | null
+          last_used_at?: string | null
           last4?: string | null
+          nickname?: string | null
           provider: string
+          usage_count?: number | null
           user_id?: string | null
         }
         Update: {
@@ -1784,9 +1867,58 @@ export type Database = {
           exp_year?: string | null
           id?: string
           is_active?: boolean | null
+          is_default?: boolean | null
+          last_used_at?: string | null
           last4?: string | null
+          nickname?: string | null
           provider?: string
+          usage_count?: number | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      transaction_analytics: {
+        Row: {
+          average_transaction_value: number | null
+          channels_used: Json | null
+          created_at: string | null
+          date: string
+          failed_transactions: number | null
+          id: string
+          success_rate: number | null
+          successful_transactions: number | null
+          total_amount: number | null
+          total_fees: number | null
+          total_transactions: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          average_transaction_value?: number | null
+          channels_used?: Json | null
+          created_at?: string | null
+          date: string
+          failed_transactions?: number | null
+          id?: string
+          success_rate?: number | null
+          successful_transactions?: number | null
+          total_amount?: number | null
+          total_fees?: number | null
+          total_transactions?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          average_transaction_value?: number | null
+          channels_used?: Json | null
+          created_at?: string | null
+          date?: string
+          failed_transactions?: number | null
+          id?: string
+          success_rate?: number | null
+          successful_transactions?: number | null
+          total_amount?: number | null
+          total_fees?: number | null
+          total_transactions?: number | null
+          updated_at?: string | null
         }
         Relationships: []
       }

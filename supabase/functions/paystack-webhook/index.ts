@@ -66,27 +66,98 @@ serve(async (req) => {
 
     const event = JSON.parse(payload);
 
-    // Log webhook event
-    await supabaseClient
+    // Check for replay attacks (events older than 5 minutes)
+    const eventTime = new Date(event.created_at || event.data?.created_at);
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    
+    if (eventTime < fiveMinutesAgo) {
+      console.error('Webhook replay attack detected:', { eventTime, received: new Date() });
+      return new Response(JSON.stringify({ error: 'Event too old' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
+
+    // Check for duplicate events
+    const { data: existingEvent } = await supabaseClient
+      .from('webhook_logs')
+      .select('id')
+      .eq('provider_event_id', event.id)
+      .eq('provider', 'paystack')
+      .single();
+
+    if (existingEvent) {
+      console.log('Duplicate webhook event received:', event.id);
+      return new Response(JSON.stringify({ status: 'duplicate_processed' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      });
+    }
+
+    // Log webhook event before processing
+    const { data: webhookLog, error: logError } = await supabaseClient
       .from('webhook_logs')
       .insert({
         provider: 'paystack',
         event_type: event.event,
         provider_event_id: event.id,
         transaction_reference: event.data?.reference,
-        payload: event
-      });
+        payload: event,
+        processed_at: new Date()
+      })
+      .select()
+      .single();
 
-    // Process different event types
-    switch (event.event) {
-      case 'charge.success':
-        await handleChargeSuccess(supabaseClient, event.data);
-        break;
-      case 'charge.failed':
-        await handleChargeFailed(supabaseClient, event.data);
-        break;
-      default:
-        console.log(`Unhandled event type: ${event.event}`);
+    if (logError) {
+      console.error('Failed to log webhook event:', logError);
+      // Continue processing even if logging fails
+    }
+
+    // Process different event types with error handling
+    try {
+      switch (event.event) {
+        case 'charge.success':
+          await handleChargeSuccess(supabaseClient, event.data);
+          break;
+        case 'charge.failed':
+          await handleChargeFailed(supabaseClient, event.data);
+          break;
+        case 'charge.dispute.create':
+          await handleChargeDispute(supabaseClient, event.data);
+          break;
+        default:
+          console.log(`Unhandled event type: ${event.event}`);
+      }
+
+      // Update webhook log as processed successfully
+      if (webhookLog) {
+        await supabaseClient
+          .from('webhook_logs')
+          .update({ processed_at: new Date() })
+          .eq('id', webhookLog.id);
+      }
+
+    } catch (processingError) {
+      console.error('Webhook processing error:', processingError);
+      
+      // Update webhook log with error
+      if (webhookLog) {
+        await supabaseClient
+          .from('webhook_logs')
+          .update({ 
+            processed_at: new Date(),
+            payload: { ...event, processing_error: processingError.message }
+          })
+          .eq('id', webhookLog.id);
+      }
+
+      return new Response(JSON.stringify({ 
+        error: 'Event processing failed',
+        event_id: event.id 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      });
     }
 
     return new Response(JSON.stringify({ status: 'success' }), {
@@ -136,12 +207,78 @@ async function handleChargeSuccess(supabaseClient: any, data: any) {
   }
 }
 
+async function handleChargeSuccess(supabaseClient: any, data: any) {
+  try {
+    // Use transaction for data consistency
+    const { error: transactionError } = await supabaseClient.rpc('handle_successful_payment', {
+      p_reference: data.reference,
+      p_paid_at: new Date(data.paid_at),
+      p_gateway_response: data.gateway_response,
+      p_fees: data.fees / 100,
+      p_channel: data.channel,
+      p_authorization_code: data.authorization?.authorization_code,
+      p_card_type: data.authorization?.card_type,
+      p_last4: data.authorization?.last4,
+      p_exp_month: data.authorization?.exp_month,
+      p_exp_year: data.authorization?.exp_year,
+      p_bank: data.authorization?.bank
+    });
+
+    if (transactionError) {
+      throw new Error(`Database transaction failed: ${transactionError.message}`);
+    }
+
+    console.log(`Successfully processed charge success for reference: ${data.reference}`);
+  } catch (error) {
+    console.error('Error handling charge success:', error);
+    throw error;
+  }
+}
+
 async function handleChargeFailed(supabaseClient: any, data: any) {
-  await supabaseClient
-    .from('payment_transactions')
-    .update({
-      status: 'failed',
-      gateway_response: data.gateway_response
-    })
-    .eq('provider_reference', data.reference);
+  try {
+    const { error } = await supabaseClient
+      .from('payment_transactions')
+      .update({
+        status: 'failed',
+        gateway_response: data.gateway_response,
+        processed_at: new Date()
+      })
+      .eq('provider_reference', data.reference);
+
+    if (error) {
+      throw new Error(`Failed to update failed transaction: ${error.message}`);
+    }
+
+    console.log(`Successfully processed charge failure for reference: ${data.reference}`);
+  } catch (error) {
+    console.error('Error handling charge failure:', error);
+    throw error;
+  }
+}
+
+async function handleChargeDispute(supabaseClient: any, data: any) {
+  try {
+    // Log dispute for manual review
+    const { error } = await supabaseClient
+      .from('payment_disputes')
+      .insert({
+        transaction_reference: data.reference,
+        dispute_id: data.id,
+        reason: data.reason,
+        amount: data.amount / 100,
+        currency: data.currency,
+        status: 'pending_review',
+        created_at: new Date(data.created_at)
+      });
+
+    if (error) {
+      throw new Error(`Failed to log payment dispute: ${error.message}`);
+    }
+
+    console.log(`Successfully logged dispute for reference: ${data.reference}`);
+  } catch (error) {
+    console.error('Error handling charge dispute:', error);
+    throw error;
+  }
 }

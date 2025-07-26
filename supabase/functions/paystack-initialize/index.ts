@@ -48,6 +48,10 @@ serve(async (req) => {
 
     user = userData.user;
 
+    // Rate limiting check
+    const userIp = req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || 'unknown';
+    await checkRateLimit(supabaseClient, user.id, userIp, 'payment_initialize');
+
     // Parse and validate request body
     const body = await req.json();
     
@@ -157,6 +161,24 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Paystack initialization error:', error);
+    
+    // Log error for monitoring
+    if (supabaseClient && user) {
+      try {
+        await supabaseClient
+          .from('payment_error_logs')
+          .insert({
+            user_id: user.id,
+            error_type: 'initialization_failed',
+            error_message: error.message,
+            error_stack: error.stack,
+            occurred_at: new Date()
+          });
+      } catch (logError) {
+        console.error('Failed to log error:', logError);
+      }
+    }
+
     return new Response(JSON.stringify({
       status: false,
       error: error.message
@@ -166,3 +188,47 @@ serve(async (req) => {
     });
   }
 });
+
+// Rate limiting function
+async function checkRateLimit(supabaseClient: any, userId: string, ipAddress: string, operationType: string) {
+  const now = new Date();
+  const oneMinuteAgo = new Date(now.getTime() - 60000);
+  
+  // Check user-based rate limit (10 requests per minute)
+  const { data: userLimits } = await supabaseClient
+    .from('payment_rate_limits')
+    .select('attempts')
+    .eq('user_id', userId)
+    .eq('operation_type', operationType)
+    .gte('window_start', oneMinuteAgo.toISOString());
+  
+  const userAttempts = userLimits?.reduce((sum, limit) => sum + limit.attempts, 0) || 0;
+  
+  if (userAttempts >= 10) {
+    throw new Error('Rate limit exceeded. Please wait before trying again.');
+  }
+  
+  // Check IP-based rate limit (20 requests per minute)
+  const { data: ipLimits } = await supabaseClient
+    .from('payment_rate_limits')
+    .select('attempts')
+    .eq('ip_address', ipAddress)
+    .eq('operation_type', operationType)
+    .gte('window_start', oneMinuteAgo.toISOString());
+  
+  const ipAttempts = ipLimits?.reduce((sum, limit) => sum + limit.attempts, 0) || 0;
+  
+  if (ipAttempts >= 20) {
+    throw new Error('Rate limit exceeded for this IP. Please wait before trying again.');
+  }
+  
+  // Record this attempt
+  await supabaseClient
+    .from('payment_rate_limits')
+    .insert({
+      user_id: userId,
+      ip_address: ipAddress,
+      operation_type: operationType,
+      attempts: 1,
+      window_start: now.toISOString()
+    });

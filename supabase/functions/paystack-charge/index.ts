@@ -90,6 +90,10 @@ serve(async (req) => {
 
     user = userData.user;
 
+    // Rate limiting check
+    const userIp = req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || 'unknown';
+    await checkRateLimit(supabaseClient, user.id, userIp, 'payment_charge');
+
     // Parse and validate request body
     const body = await req.json();
     const validationErrors = validateChargeInput(body);
@@ -265,3 +269,33 @@ serve(async (req) => {
     });
   }
 });
+
+// Rate limiting function
+async function checkRateLimit(supabaseClient: any, userId: string, ipAddress: string, operationType: string) {
+  const now = new Date();
+  const oneMinuteAgo = new Date(now.getTime() - 60000);
+  
+  // Check user-based rate limit (5 charge attempts per minute)
+  const { data: userLimits } = await supabaseClient
+    .from('payment_rate_limits')
+    .select('attempts')
+    .eq('user_id', userId)
+    .eq('operation_type', operationType)
+    .gte('window_start', oneMinuteAgo.toISOString());
+  
+  const userAttempts = userLimits?.reduce((sum, limit) => sum + limit.attempts, 0) || 0;
+  
+  if (userAttempts >= 5) {
+    throw new Error('Too many payment attempts. Please wait before trying again.');
+  }
+  
+  // Record this attempt
+  await supabaseClient
+    .from('payment_rate_limits')
+    .insert({
+      user_id: userId,
+      ip_address: ipAddress,
+      operation_type: operationType,
+      attempts: 1,
+      window_start: now.toISOString()
+    });

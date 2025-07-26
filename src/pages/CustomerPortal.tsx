@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,12 +7,27 @@ import { Badge } from '@/components/ui/badge';
 import { MapPin, Package, Star, Gift, TrendingUp, User, Heart } from 'lucide-react';
 import { DeliveryTracker } from '@/components/delivery/DeliveryTracker';
 import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
+import { FavoritesSection } from '@/components/customers/FavoritesSection';
 import { useOrderManagement } from '@/hooks/useOrderManagement';
 
 export default function CustomerPortal() {
   const [customerEmail, setCustomerEmail] = useState('demo@example.com');
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [customerId, setCustomerId] = useState<string | null>(null);
   const { trackOrder } = useOrderManagement();
+
+  // Initialize customer ID when logged in
+  useEffect(() => {
+    if (isLoggedIn && customerEmail) {
+      // For demo purposes, create a consistent customer ID from email
+      // In production, this would come from your customer registration system
+      const id = btoa(customerEmail).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+      const formattedId = `${id.substring(0, 8)}-${id.substring(8, 12)}-${id.substring(12, 16)}-${id.substring(16, 20)}-${id.substring(20, 32)}`.padEnd(36, '0');
+      setCustomerId(formattedId);
+    } else {
+      setCustomerId(null);
+    }
+  }, [isLoggedIn, customerEmail]);
 
   const handleLogin = () => {
     if (customerEmail) {
@@ -232,25 +247,7 @@ export default function CustomerPortal() {
           </TabsContent>
 
           <TabsContent value="favorites" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Heart className="h-5 w-5" />
-                  My Favorite Products
-                </CardTitle>
-                <CardDescription>Products you've saved for later</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-12">
-                  <Heart className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-                  <h4 className="text-lg font-semibold mb-2">No favorites yet</h4>
-                  <p className="text-muted-foreground mb-4">
-                    Start adding products to your favorites to see them here
-                  </p>
-                  <Button>Browse Products</Button>
-                </div>
-              </CardContent>
-            </Card>
+            <FavoritesSection customerId={customerId} />
           </TabsContent>
 
           <TabsContent value="tracking">

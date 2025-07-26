@@ -44,6 +44,7 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
               <th className="text-left py-4 px-6 font-medium text-gray-600">Stock</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Price</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Favorites</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
@@ -56,13 +57,14 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
                   <td className="py-4 px-6"><Skeleton className="h-4 w-[100px]" /></td>
                   <td className="py-4 px-6"><Skeleton className="h-4 w-[50px]" /></td>
                   <td className="py-4 px-6"><Skeleton className="h-4 w-[80px]" /></td>
-                  <td className="py-4 px-6"><Skeleton className="h-8 w-24 rounded-full" /></td>
-                  <td className="py-4 px-6"><div className="flex items-center space-x-2"><Skeleton className="h-8 w-16" /><span className="text-gray-300">|</span><Skeleton className="h-8 w-20" /></div></td>
+                   <td className="py-4 px-6"><Skeleton className="h-8 w-24 rounded-full" /></td>
+                   <td className="py-4 px-6"><Skeleton className="h-4 w-16" /></td>
+                   <td className="py-4 px-6"><div className="flex items-center space-x-2"><Skeleton className="h-8 w-16" /><span className="text-gray-300">|</span><Skeleton className="h-8 w-20" /></div></td>
                 </tr>
               ))
             ) : isError ? (
               <tr>
-                <td colSpan={7} className="text-center py-10">
+                <td colSpan={8} className="text-center py-10">
                   <Alert variant="destructive" className="max-w-lg mx-auto">
                     <Terminal className="h-4 w-4" />
                     <AlertTitle>Error Fetching Products</AlertTitle>
@@ -85,8 +87,11 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
                   <td className="py-4 px-6 text-gray-600">{product.categories?.name || 'N/A'}</td>
                   <td className="py-4 px-6"><span className={`font-medium ${product.stock_quantity === 0 ? 'text-red-600' : product.stock_quantity <= 10 ? 'text-yellow-600' : 'text-green-600'}`}>{product.stock_quantity}</span></td>
                   <td className="py-4 px-6 font-medium text-gray-800">{formatCurrency(product.price)}</td>
-                  <td className="py-4 px-6"><span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(product.stock_quantity)}`}>{getStatusText(product.stock_quantity)}</span></td>
-                  <td className="py-4 px-6">
+                   <td className="py-4 px-6"><span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(product.stock_quantity)}`}>{getStatusText(product.stock_quantity)}</span></td>
+                   <td className="py-4 px-6 text-center text-gray-500">
+                     <span className="text-sm">Admin view</span>
+                   </td>
+                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-2">
                       <Button
                         variant="ghost"

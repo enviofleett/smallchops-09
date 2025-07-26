@@ -15,7 +15,9 @@ import { TransactionMonitor } from '@/components/admin/TransactionMonitor';
 import { PaymentHealthCheck } from '@/components/admin/PaymentHealthCheck';
 import { EnvironmentSwitcher } from '@/components/environment/EnvironmentSwitcher';
 import { PaymentErrorTracker } from '@/components/admin/PaymentErrorTracker';
-import { AlertCircle, CheckCircle, Copy, ExternalLink } from 'lucide-react';
+import { AlertCircle, CheckCircle, Copy, ExternalLink, Lock, UserX } from 'lucide-react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useHasPermission } from '@/hooks/usePermissions';
 
 // Use direct client to avoid type issues
 const supabaseUrl = "https://oknnklksdiqaifhxaccs.supabase.co";
@@ -36,6 +38,9 @@ interface PaymentIntegration {
 }
 
 export const PaymentSettings: React.FC = () => {
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
+  const isAdmin = useHasPermission('payment_settings', 'edit');
+  
   const [config, setConfig] = useState<PaymentIntegration>({
     provider: 'paystack',
     public_key: '',
@@ -103,6 +108,25 @@ export const PaymentSettings: React.FC = () => {
   };
 
   const saveConfiguration = async () => {
+    // Check authentication and authorization first
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to save payment settings",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!isAdmin) {
+      toast({
+        title: "Access Denied", 
+        description: "You need admin permissions to save payment settings",
+        variant: "destructive"
+      });
+      return;
+    }
+
     setSaving(true);
     try {
       // Validate required fields
@@ -114,11 +138,20 @@ export const PaymentSettings: React.FC = () => {
         .from('payment_integrations')
         .upsert({
           ...config,
-          connected_by: (await supabase.auth.getUser()).data.user?.id,
+          connected_by: user?.id,
           updated_at: new Date().toISOString()
         }, { onConflict: 'provider' });
 
-      if (error) throw error;
+      if (error) {
+        // Provide specific error messages for common issues
+        if (error.message.includes('row-level security')) {
+          throw new Error('Access denied. You need admin permissions to modify payment settings.');
+        } else if (error.message.includes('violates')) {
+          throw new Error('Invalid data provided. Please check your input fields.');
+        } else {
+          throw error;
+        }
+      }
 
       toast({
         title: "Success",
@@ -126,11 +159,14 @@ export const PaymentSettings: React.FC = () => {
       });
 
       setConnectionStatus('connected');
+      
+      // Reload configuration to sync with database
+      await loadConfiguration();
     } catch (error: any) {
       console.error('Error saving configuration:', error);
       toast({
         title: "Error",
-        description: error.message,
+        description: error.message || "Failed to save configuration",
         variant: "destructive"
       });
     } finally {
@@ -187,6 +223,78 @@ export const PaymentSettings: React.FC = () => {
     }
   };
 
+  // Show loading state while checking authentication
+  if (authLoading) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="flex items-center justify-center min-h-[200px]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // Show authentication required state
+  if (!isAuthenticated) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Payment Settings</h1>
+            <p className="text-muted-foreground">Configure payment providers and manage transactions</p>
+          </div>
+        </div>
+        
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center space-y-4">
+              <UserX className="h-12 w-12 mx-auto text-muted-foreground" />
+              <div>
+                <h3 className="text-lg font-semibold">Authentication Required</h3>
+                <p className="text-muted-foreground">Please log in to access payment settings</p>
+              </div>
+              <Button onClick={() => window.location.href = '/auth'}>
+                Go to Login
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  // Show access denied state for non-admin users
+  if (!isAdmin) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-3xl font-bold">Payment Settings</h1>
+            <p className="text-muted-foreground">Configure payment providers and manage transactions</p>
+          </div>
+        </div>
+        
+        <Card>
+          <CardContent className="py-12">
+            <div className="text-center space-y-4">
+              <Lock className="h-12 w-12 mx-auto text-muted-foreground" />
+              <div>
+                <h3 className="text-lg font-semibold">Admin Access Required</h3>
+                <p className="text-muted-foreground">
+                  You need administrator permissions to configure payment settings. 
+                  Please contact your system administrator.
+                </p>
+              </div>
+              <div className="text-sm text-muted-foreground">
+                Logged in as: <span className="font-medium">{user?.email}</span> ({user?.role})
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -194,7 +302,12 @@ export const PaymentSettings: React.FC = () => {
           <h1 className="text-3xl font-bold">Payment Settings</h1>
           <p className="text-muted-foreground">Configure payment providers and manage transactions</p>
         </div>
-        {getConnectionStatusBadge()}
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-xs">
+            {user?.email} ({user?.role})
+          </Badge>
+          {getConnectionStatusBadge()}
+        </div>
       </div>
 
       <Tabs defaultValue="environment" className="space-y-6">
@@ -323,7 +436,7 @@ export const PaymentSettings: React.FC = () => {
               <div className="flex space-x-2 pt-4">
                 <Button
                   onClick={saveConfiguration}
-                  disabled={saving || loading}
+                  disabled={saving || loading || !isAuthenticated || !isAdmin}
                   className="flex-1"
                 >
                   {saving ? 'Saving...' : 'Save Configuration'}
@@ -331,11 +444,23 @@ export const PaymentSettings: React.FC = () => {
                 <Button
                   variant="outline"
                   onClick={testConnection}
-                  disabled={!config.secret_key || testing}
+                  disabled={!config.secret_key || testing || !isAuthenticated}
                 >
                   {testing ? 'Testing...' : 'Test Connection'}
                 </Button>
               </div>
+              
+              {(!isAuthenticated || !isAdmin) && (
+                <Alert>
+                  <AlertCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    {!isAuthenticated 
+                      ? "You must be logged in to save payment settings"
+                      : "Administrator permissions required to modify payment settings"
+                    }
+                  </AlertDescription>
+                </Alert>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

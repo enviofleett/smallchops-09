@@ -381,6 +381,346 @@ if (!paymentSuccess) {
                     </div>
                   </div>
 
+                  {/* Customer Favorites */}
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-semibold">❤️ Customer Favorites</h3>
+                    
+                    {/* Database Schema */}
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-3">📊 Database Schema</h4>
+                      <div className="bg-muted/50 p-3 rounded text-sm">
+                        <pre>{`-- customer_favorites table
+CREATE TABLE customer_favorites (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  customer_id UUID NOT NULL,
+  product_id UUID NOT NULL REFERENCES products(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(customer_id, product_id)
+);
+
+-- RLS Policies enabled for secure customer access
+-- Customers can only manage their own favorites`}</pre>
+                      </div>
+                    </div>
+
+                    {/* API Endpoints */}
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-3">🔗 API Endpoints</h4>
+                      <div className="space-y-3">
+                        <div className="border-l-4 border-green-500 pl-3">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-mono">GET</span>
+                            <code className="text-sm">/customers/:id/favorites</code>
+                          </div>
+                          <p className="text-sm text-muted-foreground">Get customer's favorite products with full product details</p>
+                          <div className="bg-muted/50 p-2 rounded text-xs mt-2">
+                            <pre>{`// Response
+{
+  "success": true,
+  "data": [
+    {
+      "id": "product-uuid",
+      "name": "Pizza Margherita",
+      "price": 18.99,
+      "image_url": "...",
+      "category": { "id": "...", "name": "Pizza" },
+      "favorite_id": "favorite-uuid",
+      "favorited_at": "2024-01-15T10:30:00Z"
+    }
+  ]
+}`}</pre>
+                          </div>
+                        </div>
+                        
+                        <div className="border-l-4 border-blue-500 pl-3">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-mono">POST</span>
+                            <code className="text-sm">/customers/:id/favorites</code>
+                          </div>
+                          <p className="text-sm text-muted-foreground">Add product to customer's favorites</p>
+                          <div className="bg-muted/50 p-2 rounded text-xs mt-2">
+                            <pre>{`// Request Body
+{
+  "product_id": "product-uuid"
+}
+
+// Response
+{
+  "success": true,
+  "data": {
+    "id": "favorite-uuid",
+    "customer_id": "customer-uuid", 
+    "product_id": "product-uuid",
+    "created_at": "2024-01-15T10:30:00Z"
+  },
+  "message": "Product added to favorites"
+}`}</pre>
+                          </div>
+                        </div>
+                        
+                        <div className="border-l-4 border-red-500 pl-3">
+                          <div className="flex items-center space-x-2 mb-1">
+                            <span className="bg-red-100 text-red-800 px-2 py-1 rounded text-xs font-mono">DELETE</span>
+                            <code className="text-sm">/customers/:id/favorites/:product_id</code>
+                          </div>
+                          <p className="text-sm text-muted-foreground">Remove product from customer's favorites</p>
+                          <div className="bg-muted/50 p-2 rounded text-xs mt-2">
+                            <pre>{`// Response
+{
+  "success": true,
+  "message": "Product removed from favorites"
+}`}</pre>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Frontend Integration */}
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-3">⚛️ Frontend Integration</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <h5 className="font-medium text-sm mb-2">React Hooks</h5>
+                          <div className="bg-muted/50 p-3 rounded text-sm">
+                            <pre>{`import { useCustomerFavorites, useIsFavorite } from './hooks/useCustomerFavorites';
+
+// Manage customer favorites
+const { 
+  favorites, 
+  isLoading, 
+  addFavorite, 
+  removeFavorite 
+} = useCustomerFavorites(customerId);
+
+// Check if single product is favorite
+const { data: isFavorite } = useIsFavorite(customerId, productId);
+
+// Bulk check for multiple products
+const { data: favoritesMap } = useFavoritesByProducts(customerId, productIds);`}</pre>
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <h5 className="font-medium text-sm mb-2">Favorite Button Component</h5>
+                          <div className="bg-muted/50 p-3 rounded text-sm">
+                            <pre>{`import { FavoriteButton } from '@/components/ui/favorite-button';
+
+<FavoriteButton
+  isFavorite={isFavorite}
+  isLoading={isLoading}
+  onToggle={() => {
+    if (isFavorite) {
+      removeFavorite.mutate(productId);
+    } else {
+      addFavorite.mutate(productId);
+    }
+  }}
+  size="md" // sm, md, lg
+  className="absolute top-2 right-2"
+/>`}</pre>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Implementation Examples */}
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-3">💡 Implementation Examples</h4>
+                      
+                      <div className="space-y-4">
+                        <div>
+                          <h5 className="font-medium text-sm mb-2">Product Card with Favorites</h5>
+                          <div className="bg-muted/50 p-3 rounded text-xs">
+                            <pre>{`function ProductCard({ product, customerId }) {
+  const { data: isFavorite } = useIsFavorite(customerId, product.id);
+  const { addFavorite, removeFavorite } = useCustomerFavorites(customerId);
+
+  const handleToggleFavorite = () => {
+    if (isFavorite) {
+      removeFavorite.mutate(product.id);
+    } else {
+      addFavorite.mutate(product.id);
+    }
+  };
+
+  return (
+    <div className="relative product-card">
+      <img src={product.image_url} alt={product.name} />
+      
+      <FavoriteButton
+        isFavorite={isFavorite}
+        isLoading={addFavorite.isPending || removeFavorite.isPending}
+        onToggle={handleToggleFavorite}
+        className="absolute top-2 right-2"
+      />
+      
+      <div className="p-4">
+        <h3>{product.name}</h3>
+        <p>\${product.price}</p>
+        <button onClick={() => addToCart(product)}>
+          Add to Cart
+        </button>
+      </div>
+    </div>
+  );
+}`}</pre>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h5 className="font-medium text-sm mb-2">Customer Favorites Page</h5>
+                          <div className="bg-muted/50 p-3 rounded text-xs">
+                            <pre>{`function CustomerFavorites({ customerId }) {
+  const { favorites, isLoading, removeFavorite } = useCustomerFavorites(customerId);
+  const { addItem } = useCart();
+
+  if (isLoading) return <div>Loading favorites...</div>;
+  
+  if (favorites?.length === 0) {
+    return (
+      <div className="text-center py-8">
+        <h3>No favorites yet</h3>
+        <p>Start adding products to your favorites!</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="favorites-grid">
+      {favorites?.map((product) => (
+        <FavoriteProductCard
+          key={product.id}
+          product={product}
+          onRemoveFromFavorites={(productId) => removeFavorite.mutate(productId)}
+          onAddToCart={(product) => addItem(product, 1)}
+          isRemoving={removeFavorite.isPending}
+        />
+      ))}
+    </div>
+  );
+}`}</pre>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h5 className="font-medium text-sm mb-2">Bulk Favorites Check</h5>
+                          <div className="bg-muted/50 p-3 rounded text-xs">
+                            <pre>{`function ProductList({ products, customerId }) {
+  const productIds = products.map(p => p.id);
+  const { data: favoritesMap } = useFavoritesByProducts(customerId, productIds);
+
+  return (
+    <div className="product-list">
+      {products.map((product) => (
+        <ProductCard
+          key={product.id}
+          product={product}
+          isFavorite={favoritesMap?.[product.id] || false}
+          customerId={customerId}
+        />
+      ))}
+    </div>
+  );
+}`}</pre>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Advanced Features */}
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-3">🚀 Advanced Features</h4>
+                      <div className="space-y-3">
+                        <div>
+                          <h5 className="font-medium text-sm mb-2">Error Handling</h5>
+                          <div className="bg-muted/50 p-3 rounded text-xs">
+                            <pre>{`// Hooks automatically handle errors and show toast notifications
+const { addFavorite, removeFavorite } = useCustomerFavorites(customerId);
+
+// Add favorite with error handling
+addFavorite.mutate(productId, {
+  onError: (error) => {
+    if (error.message.includes('already in favorites')) {
+      toast.info('Product is already in your favorites');
+    } else {
+      toast.error('Failed to add to favorites');
+    }
+  }
+});`}</pre>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h5 className="font-medium text-sm mb-2">Performance Optimization</h5>
+                          <div className="bg-muted/50 p-3 rounded text-xs">
+                            <pre>{`// React Query automatically handles:
+// - Caching favorites data
+// - Background refetching
+// - Optimistic updates
+// - Query invalidation after mutations
+
+// Manual cache invalidation if needed
+import { useQueryClient } from '@tanstack/react-query';
+
+const queryClient = useQueryClient();
+queryClient.invalidateQueries({ queryKey: ['customer-favorites', customerId] });`}</pre>
+                          </div>
+                        </div>
+
+                        <div>
+                          <h5 className="font-medium text-sm mb-2">Analytics Integration</h5>
+                          <div className="bg-muted/50 p-3 rounded text-xs">
+                            <pre>{`// Track favorite events for analytics
+const handleAddFavorite = (productId) => {
+  addFavorite.mutate(productId, {
+    onSuccess: () => {
+      // Track analytics event
+      analytics.track('product_favorited', {
+        product_id: productId,
+        customer_id: customerId,
+        timestamp: new Date().toISOString()
+      });
+    }
+  });
+};`}</pre>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Testing */}
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-3">🧪 Testing Guide</h4>
+                      <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded">
+                        <h5 className="font-medium text-sm mb-2">Test Scenarios</h5>
+                        <ul className="text-sm space-y-1">
+                          <li>• Add product to favorites (success case)</li>
+                          <li>• Try to add duplicate favorite (error handling)</li>
+                          <li>• Remove product from favorites</li>
+                          <li>• Load customer favorites list</li>
+                          <li>• Check favorite status for multiple products</li>
+                          <li>• Handle network errors gracefully</li>
+                        </ul>
+                      </div>
+                      
+                      <div className="bg-muted/50 p-3 rounded text-xs mt-3">
+                        <pre>{`// Sample test data
+const testCustomerId = "customer-uuid";
+const testProductId = "product-uuid";
+
+// Test adding favorite
+POST /customers/customer-uuid/favorites
+Body: { "product_id": "product-uuid" }
+
+// Test getting favorites
+GET /customers/customer-uuid/favorites
+
+// Test removing favorite  
+DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Support */}
                   <div className="space-y-4">
                     <h3 className="text-lg font-semibold">🆘 Support & Documentation</h3>

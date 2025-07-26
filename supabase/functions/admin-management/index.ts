@@ -204,11 +204,28 @@ serve(async (req) => {
       }
 
       if (action === 'update_permissions' && userId && permissions) {
+        // Validate inputs
+        if (!userId || typeof userId !== 'string') {
+          throw new Error('Valid user ID is required');
+        }
+        
+        if (!permissions || typeof permissions !== 'object') {
+          throw new Error('Valid permissions object is required');
+        }
+        
+        console.log(`Starting permission update for user ${userId}`);
+        console.log('Permissions data:', permissions);
+        
         // Delete existing permissions
-        await supabaseClient
+        const { error: deleteError } = await supabaseClient
           .from('user_permissions')
           .delete()
           .eq('user_id', userId)
+        
+        if (deleteError) {
+          console.error('Failed to delete existing permissions:', deleteError);
+          throw new Error(`Failed to clear existing permissions: ${deleteError.message}`);
+        }
 
         // Get admin profile for audit logging
         const { data: adminProfile } = await supabaseClient
@@ -216,6 +233,16 @@ serve(async (req) => {
           .select('name')
           .eq('id', user.id)
           .single();
+
+        // Get valid enum values for menu_section
+        const { data: enumValues } = await supabaseClient
+          .rpc('health_check') // Just to test connection
+        
+        const validEnumValues = [
+          'dashboard', 'orders', 'categories', 'products', 'customers', 
+          'delivery_pickup', 'promotions', 'reports', 'settings', 
+          'audit_logs', 'delivery', 'payment'
+        ];
 
         // Get menu structure to determine parent menu sections
         const { data: menuStructure } = await supabaseClient
@@ -225,26 +252,85 @@ serve(async (req) => {
 
         const menuMap = new Map(menuStructure?.map(m => [m.key, m.parent_key]) || []);
 
+        // Function to map menu key to valid enum value
+        function getValidMenuSection(menuKey: string): string {
+          const parentKey = menuMap.get(menuKey);
+          
+          // If parent exists and is a valid enum value, use it
+          if (parentKey && validEnumValues.includes(parentKey)) {
+            return parentKey;
+          }
+          
+          // If menuKey itself is a valid enum value, use it
+          if (validEnumValues.includes(menuKey)) {
+            return menuKey;
+          }
+          
+          // Try to extract section from key (split on -)
+          const section = menuKey.split('-')[0];
+          if (validEnumValues.includes(section)) {
+            return section;
+          }
+          
+          // Map common patterns
+          if (menuKey.includes('payment')) return 'payment';
+          if (menuKey.includes('setting')) return 'settings';
+          if (menuKey.includes('delivery')) return 'delivery';
+          if (menuKey.includes('order')) return 'orders';
+          if (menuKey.includes('product')) return 'products';
+          if (menuKey.includes('customer')) return 'customers';
+          if (menuKey.includes('report')) return 'reports';
+          if (menuKey.includes('audit')) return 'audit_logs';
+          if (menuKey.includes('promotion')) return 'promotions';
+          if (menuKey.includes('categor')) return 'categories';
+          
+          // Default fallback
+          return 'dashboard';
+        }
+
         // Insert new permissions using menu_key
         const permissionsToInsert = Object.entries(permissions)
           .filter(([_, level]) => level !== 'none')
           .map(([menuKey, permissionLevel]) => {
-            const parentKey = menuMap.get(menuKey);
+            const menuSection = getValidMenuSection(menuKey);
+            
+            console.log(`Mapping permission: ${menuKey} -> section: ${menuSection}, level: ${permissionLevel}`);
+            
             return {
               user_id: userId,
               menu_key: menuKey,
               permission_level: permissionLevel,
-              // Keep menu_section for backward compatibility
-              menu_section: parentKey || menuKey.split('_')[0] || 'dashboard',
+              menu_section: menuSection,
             };
           });
 
         if (permissionsToInsert.length > 0) {
+          console.log(`Inserting ${permissionsToInsert.length} permissions for user ${userId}`);
+          
           const { error } = await supabaseClient
             .from('user_permissions')
             .insert(permissionsToInsert);
 
-          if (error) throw error;
+          if (error) {
+            console.error('Permission insert error:', error);
+            
+            // Handle specific constraint violations
+            if (error.code === '23505') {
+              throw new Error(`Duplicate permission entry detected. Please refresh and try again.`);
+            } else if (error.code === '23502') {
+              throw new Error(`Required permission field is missing. Please contact support.`);
+            } else if (error.code === '23503') {
+              throw new Error(`Invalid user or permission reference. Please refresh and try again.`);
+            } else if (error.message.includes('violates check constraint')) {
+              throw new Error(`Invalid permission level provided. Please use 'view' or 'edit'.`);
+            } else {
+              throw new Error(`Permission update failed: ${error.message}`);
+            }
+          }
+          
+          console.log(`Successfully inserted permissions for user ${userId}`);
+        } else {
+          console.log(`No permissions to insert for user ${userId} (all set to 'none')`);
         }
 
         // Log the permission change

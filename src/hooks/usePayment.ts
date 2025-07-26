@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { publicAPI } from '@/api/public';
+import { paystackService } from '@/lib/paystack';
 import { toast } from 'sonner';
 
 export interface PaymentResult {
@@ -17,6 +18,8 @@ export interface PaymentVerification {
   amount: number;
 }
 
+export type PaymentProvider = 'stripe' | 'paystack';
+
 export const usePayment = () => {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -24,20 +27,37 @@ export const usePayment = () => {
   const initiatePayment = async (
     orderId: string,
     amount: number,
-    customerEmail?: string
+    customerEmail?: string,
+    provider: PaymentProvider = 'stripe'
   ): Promise<PaymentResult> => {
     setLoading(true);
     try {
-      const response = await publicAPI.createPayment(orderId, amount, customerEmail);
-      
-      if (response.success && response.url) {
+      if (provider === 'paystack') {
+        const reference = paystackService.generateReference();
+        const response = await paystackService.initializeTransaction({
+          email: customerEmail || '',
+          amount,
+          reference,
+          metadata: { orderId }
+        });
+        
         return {
           success: true,
-          sessionId: response.sessionId,
-          url: response.url
+          url: response.authorization_url,
+          sessionId: response.reference
         };
       } else {
-        throw new Error(response.error || 'Failed to create payment session');
+        const response = await publicAPI.createPayment(orderId, amount, customerEmail);
+        
+        if (response.success && response.url) {
+          return {
+            success: true,
+            sessionId: response.sessionId,
+            url: response.url
+          };
+        } else {
+          throw new Error(response.error || 'Failed to create payment session');
+        }
       }
     } catch (error) {
       console.error('Payment initiation error:', error);
@@ -57,11 +77,12 @@ export const usePayment = () => {
     orderId: string,
     amount: number,
     customerEmail?: string,
-    openInNewTab = true
+    openInNewTab = true,
+    provider: PaymentProvider = 'stripe'
   ): Promise<boolean> => {
     setProcessing(true);
     try {
-      const result = await initiatePayment(orderId, amount, customerEmail);
+      const result = await initiatePayment(orderId, amount, customerEmail, provider);
       
       if (result.success && result.url) {
         if (openInNewTab) {
@@ -87,21 +108,34 @@ export const usePayment = () => {
 
   const verifyPayment = async (
     sessionId: string,
-    orderId?: string
+    orderId?: string,
+    provider: PaymentProvider = 'stripe'
   ): Promise<PaymentVerification | null> => {
     try {
-      const response = await publicAPI.verifyPayment(sessionId, orderId);
-      
-      if (response.success) {
+      if (provider === 'paystack') {
+        const response = await paystackService.verifyTransaction(sessionId);
+        
         return {
-          success: true,
-          paymentStatus: response.paymentStatus,
-          orderStatus: response.orderStatus,
-          orderNumber: response.orderNumber,
-          amount: response.amount
+          success: response.status === 'success',
+          paymentStatus: response.status,
+          orderStatus: response.status === 'success' ? 'confirmed' : 'pending',
+          orderNumber: response.reference,
+          amount: response.amount / 100
         };
       } else {
-        throw new Error(response.error || 'Payment verification failed');
+        const response = await publicAPI.verifyPayment(sessionId, orderId);
+        
+        if (response.success) {
+          return {
+            success: true,
+            paymentStatus: response.paymentStatus,
+            orderStatus: response.orderStatus,
+            orderNumber: response.orderNumber,
+            amount: response.amount
+          };
+        } else {
+          throw new Error(response.error || 'Payment verification failed');
+        }
       }
     } catch (error) {
       console.error('Payment verification error:', error);
@@ -110,9 +144,9 @@ export const usePayment = () => {
     }
   };
 
-  const handlePaymentSuccess = async (sessionId: string, orderId?: string) => {
+  const handlePaymentSuccess = async (sessionId: string, orderId?: string, provider: PaymentProvider = 'stripe') => {
     try {
-      const verification = await verifyPayment(sessionId, orderId);
+      const verification = await verifyPayment(sessionId, orderId, provider);
       
       if (verification && verification.success) {
         if (verification.paymentStatus === 'paid') {

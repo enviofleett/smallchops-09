@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { BrandingTab } from "@/components/settings/BrandingTab";
 import { AdminUserControl } from "@/components/settings/AdminUserControl";
 import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
+import { PaymentSettingsTab } from "@/components/payments/PaymentSettingsTab";
 import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,9 +45,10 @@ const Settings = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:w-auto lg:grid-cols-none lg:flex">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-5">
           <TabsTrigger value="branding">Branding</TabsTrigger>
           <TabsTrigger value="communications">Communications</TabsTrigger>
+          <TabsTrigger value="payments">Payments</TabsTrigger>
           {isAdmin && <TabsTrigger value="admin">Admin User Control</TabsTrigger>}
           {isAdmin && <TabsTrigger value="developer">Developer</TabsTrigger>}
         </TabsList>
@@ -75,6 +77,20 @@ const Settings = () => {
             </CardHeader>
             <CardContent>
               <CommunicationsTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="payments" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Payment Settings</CardTitle>
+              <CardDescription>
+                Configure payment providers and processing options
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <PaymentSettingsTab />
             </CardContent>
           </Card>
         </TabsContent>

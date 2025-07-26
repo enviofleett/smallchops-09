@@ -5,6 +5,8 @@ export interface CartItem {
   product_id: string;
   product_name: string;
   price: number;
+  original_price?: number;
+  discount_amount?: number;
   quantity: number;
   customizations?: Record<string, any>;
   special_instructions?: string;
@@ -85,6 +87,8 @@ export const useCart = () => {
     id: string;
     name: string;
     price: number;
+    original_price?: number;
+    discount_amount?: number;
     customizations?: Record<string, any>;
     special_instructions?: string;
   }, quantity = 1) => {
@@ -93,6 +97,8 @@ export const useCart = () => {
       product_id: product.id,
       product_name: product.name,
       price: product.price,
+      original_price: product.original_price,
+      discount_amount: product.discount_amount,
       quantity,
       customizations: product.customizations,
       special_instructions: product.special_instructions

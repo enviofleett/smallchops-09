@@ -7,6 +7,7 @@ import { Package, Star, TrendingUp, User, LogOut, Loader2 } from 'lucide-react';
 import { DeliveryTracker } from '@/components/delivery/DeliveryTracker';
 import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
 import { FavoritesSection } from '@/components/customers/FavoritesSection';
+import { ProductCatalog } from '@/components/products/ProductCatalog';
 import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -138,8 +139,9 @@ export default function CustomerPortal() {
 
       <div className="container mx-auto px-4 py-8">
         <Tabs defaultValue="dashboard" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+            <TabsTrigger value="menu">Browse Menu</TabsTrigger>
             <TabsTrigger value="orders">Order History</TabsTrigger>
             <TabsTrigger value="favorites">My Favorites</TabsTrigger>
             <TabsTrigger value="tracking">Track Order</TabsTrigger>
@@ -254,6 +256,10 @@ export default function CustomerPortal() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="menu" className="space-y-6">
+            <ProductCatalog />
           </TabsContent>
 
           <TabsContent value="favorites" className="space-y-6">

@@ -9,9 +9,14 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { createClient } from '@supabase/supabase-js';
 import { PaymentAnalyticsDashboard } from '@/components/payments/PaymentAnalyticsDashboard';
 import { AlertCircle, CheckCircle, Copy, ExternalLink } from 'lucide-react';
+
+// Use direct client to avoid type issues
+const supabaseUrl = "https://oknnklksdiqaifhxaccs.supabase.co";
+const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA";
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 interface PaymentIntegration {
   id?: string;
@@ -62,9 +67,22 @@ export const PaymentSettings: React.FC = () => {
       }
 
       if (data) {
+        const paymentMethods = data.payment_methods;
         setConfig({
-          ...data,
-          payment_methods: data.payment_methods || ['card']
+          id: data.id,
+          provider: data.provider,
+          public_key: data.public_key || '',
+          secret_key: data.secret_key || '',
+          webhook_secret: data.webhook_secret || '',
+          test_mode: data.test_mode || true,
+          is_active: !!data.is_active,
+          currency: data.currency || 'NGN',
+          connection_status: data.connection_status || '',
+          payment_methods: Array.isArray(paymentMethods) 
+            ? paymentMethods as string[]
+            : typeof paymentMethods === 'string' 
+              ? [paymentMethods]
+              : ['card']
         });
         setConnectionStatus(data.connection_status || '');
       }

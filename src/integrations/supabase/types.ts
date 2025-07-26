@@ -1061,13 +1061,18 @@ export type Database = {
           created_at: string
           currency: string | null
           id: string
+          integration_data: Json | null
           mode: string | null
           payment_methods: Json | null
           provider: string
           public_key: string | null
           secret_key: string | null
+          supported_methods: Json | null
+          test_mode: boolean | null
           transaction_fee: number | null
           updated_at: string
+          webhook_endpoints: Json | null
+          webhook_secret: string | null
           webhook_url: string | null
         }
         Insert: {
@@ -1076,13 +1081,18 @@ export type Database = {
           created_at?: string
           currency?: string | null
           id?: string
+          integration_data?: Json | null
           mode?: string | null
           payment_methods?: Json | null
           provider: string
           public_key?: string | null
           secret_key?: string | null
+          supported_methods?: Json | null
+          test_mode?: boolean | null
           transaction_fee?: number | null
           updated_at?: string
+          webhook_endpoints?: Json | null
+          webhook_secret?: string | null
           webhook_url?: string | null
         }
         Update: {
@@ -1091,13 +1101,18 @@ export type Database = {
           created_at?: string
           currency?: string | null
           id?: string
+          integration_data?: Json | null
           mode?: string | null
           payment_methods?: Json | null
           provider?: string
           public_key?: string | null
           secret_key?: string | null
+          supported_methods?: Json | null
+          test_mode?: boolean | null
           transaction_fee?: number | null
           updated_at?: string
+          webhook_endpoints?: Json | null
+          webhook_secret?: string | null
           webhook_url?: string | null
         }
         Relationships: []
@@ -1631,6 +1646,48 @@ export type Database = {
           },
         ]
       }
+      saved_payment_methods: {
+        Row: {
+          authorization_code: string
+          bank: string | null
+          card_type: string | null
+          created_at: string | null
+          exp_month: string | null
+          exp_year: string | null
+          id: string
+          is_active: boolean | null
+          last4: string | null
+          provider: string
+          user_id: string | null
+        }
+        Insert: {
+          authorization_code: string
+          bank?: string | null
+          card_type?: string | null
+          created_at?: string | null
+          exp_month?: string | null
+          exp_year?: string | null
+          id?: string
+          is_active?: boolean | null
+          last4?: string | null
+          provider: string
+          user_id?: string | null
+        }
+        Update: {
+          authorization_code?: string
+          bank?: string | null
+          card_type?: string | null
+          created_at?: string | null
+          exp_month?: string | null
+          exp_year?: string | null
+          id?: string
+          is_active?: boolean | null
+          last4?: string | null
+          provider?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       user_permissions: {
         Row: {
           id: string
@@ -1751,6 +1808,42 @@ export type Database = {
           status?: Database["public"]["Enums"]["vehicle_status"]
           type?: Database["public"]["Enums"]["vehicle_type"]
           updated_at?: string
+        }
+        Relationships: []
+      }
+      webhook_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          event_type: string
+          id: string
+          payload: Json
+          processed: boolean | null
+          provider: string
+          provider_event_id: string | null
+          transaction_reference: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          event_type: string
+          id?: string
+          payload: Json
+          processed?: boolean | null
+          provider: string
+          provider_event_id?: string | null
+          transaction_reference?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          event_type?: string
+          id?: string
+          payload?: Json
+          processed?: boolean | null
+          provider?: string
+          provider_event_id?: string | null
+          transaction_reference?: string | null
         }
         Relationships: []
       }

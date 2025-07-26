@@ -38,7 +38,7 @@ serve(async (req) => {
       throw new Error('Webhook secret not configured');
     }
 
-    // Verify webhook signature
+    // Verify webhook signature using crypto.subtle
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",
@@ -53,8 +53,15 @@ serve(async (req) => {
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
 
-    if (expectedSignature !== signature) {
-      throw new Error('Invalid webhook signature');
+    // Remove 'sha512=' prefix if present in signature
+    const cleanSignature = signature.startsWith('sha512=') ? signature.slice(7) : signature;
+    
+    if (expectedSignature !== cleanSignature) {
+      console.error('Signature mismatch:', { expected: expectedSignature, received: cleanSignature });
+      return new Response(JSON.stringify({ error: 'Invalid signature' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 401,
+      });
     }
 
     const event = JSON.parse(payload);

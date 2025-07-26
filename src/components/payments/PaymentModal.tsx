@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { CreditCard, Building2, Smartphone, QrCode, Globe } from 'lucide-react';
 import { usePayment, type PaymentProvider } from '@/hooks/usePayment';
+import { paystackService } from '@/lib/paystack';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -48,6 +49,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
   const [selectedProvider, setSelectedProvider] = useState<PaymentProvider>('stripe');
   const [paymentMethod, setPaymentMethod] = useState('new_card');
+  const [selectedSavedMethod, setSelectedSavedMethod] = useState<SavedPaymentMethod | null>(null);
   const [savedMethods, setSavedMethods] = useState<SavedPaymentMethod[]>([]);
   const [availableProviders, setAvailableProviders] = useState<PaymentConfig[]>([]);
   const { processPayment, loading } = usePayment();
@@ -104,30 +106,42 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const handlePayment = async () => {
-    if (paymentMethod !== 'new_card') {
-      // Handle saved card payment
-      const savedMethod = savedMethods.find(m => m.id === paymentMethod);
-      if (savedMethod) {
-        // TODO: Implement saved card payment
-        toast.info('Saved card payment coming soon!');
-        return;
-      }
-    }
-
     try {
-      const success = await processPayment(
-        orderData.id,
-        orderData.total,
-        orderData.customer_email,
-        false, // Don't open in new tab
-        selectedProvider
-      );
+      if (paymentMethod !== 'new_card' && selectedSavedMethod) {
+        // Handle saved card payment
+        if (selectedProvider === 'paystack') {
+          const result = await paystackService.chargeAuthorization({
+            authorization_code: selectedSavedMethod.authorization_code,
+            email: orderData.customer_email,
+            amount: orderData.total,
+            metadata: { orderId: orderData.id }
+          });
+          
+          if (result.status === 'success') {
+            toast.success('Payment successful!');
+            onSuccess(result);
+            onClose();
+          } else {
+            toast.error('Payment failed. Please try again.');
+          }
+        }
+      } else {
+        // Use regular payment flow
+        const success = await processPayment(
+          orderData.id,
+          orderData.total,
+          orderData.customer_email,
+          false, // Don't open in new tab
+          selectedProvider
+        );
 
-      if (success) {
-        onClose();
+        if (success) {
+          onClose();
+        }
       }
     } catch (error) {
       console.error('Payment error:', error);
+      toast.error('Payment failed. Please try again.');
     }
   };
 
@@ -198,7 +212,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
                 <Label className="text-sm font-medium">Saved Payment Methods</Label>
                 <RadioGroup
                   value={paymentMethod}
-                  onValueChange={setPaymentMethod}
+                  onValueChange={(value) => {
+                    setPaymentMethod(value);
+                    if (value !== 'new_card') {
+                      const method = savedMethods.find(m => m.id === value);
+                      setSelectedSavedMethod(method || null);
+                    } else {
+                      setSelectedSavedMethod(null);
+                    }
+                  }}
                   className="space-y-2"
                 >
                   {savedMethods

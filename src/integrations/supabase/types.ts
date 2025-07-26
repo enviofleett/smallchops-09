@@ -1054,6 +1054,36 @@ export type Database = {
           },
         ]
       }
+      payment_error_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string
+          error_stack: string | null
+          error_type: string
+          id: string
+          occurred_at: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message: string
+          error_stack?: string | null
+          error_type: string
+          id?: string
+          occurred_at?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string
+          error_stack?: string | null
+          error_type?: string
+          id?: string
+          occurred_at?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       payment_integrations: {
         Row: {
           connected_by: string | null

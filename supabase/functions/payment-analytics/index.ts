@@ -1,9 +1,10 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE',
 };
 
 interface AnalyticsRequest {
@@ -13,6 +14,7 @@ interface AnalyticsRequest {
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -23,22 +25,22 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Verify admin access
+    // Verify authentication
     const authHeader = req.headers.get('Authorization');
     if (!authHeader) {
-      return new Response(JSON.stringify({ error: 'No authorization header' }), {
+      return new Response(JSON.stringify({ error: 'Authorization required' }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
     const token = authHeader.replace('Bearer ', '');
     const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-
+    
     if (authError || !user) {
       return new Response(JSON.stringify({ error: 'Invalid token' }), {
         status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
@@ -52,131 +54,115 @@ serve(async (req) => {
     if (profile?.role !== 'admin') {
       return new Response(JSON.stringify({ error: 'Admin access required' }), {
         status: 403,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const body: AnalyticsRequest = req.method === 'POST' ? await req.json() : {};
-    const { startDate, endDate, groupBy = 'day' } = body;
+    const { startDate, endDate, groupBy }: AnalyticsRequest = await req.json().catch(() => ({}));
 
-    // Get analytics data
-    const analyticsQuery = supabaseClient
+    // Get analytics data from transaction_analytics table
+    const { data: analyticsData, error: analyticsError } = await supabaseClient
       .from('transaction_analytics')
-      .select('*');
-
-    if (startDate) {
-      analyticsQuery.gte('date', startDate);
-    }
-    if (endDate) {
-      analyticsQuery.lte('date', endDate);
-    }
-
-    const { data: analytics, error: analyticsError } = await analyticsQuery
-      .order('date', { ascending: true });
+      .select('*')
+      .order('date', { ascending: false })
+      .limit(100);
 
     if (analyticsError) {
-      throw new Error(analyticsError.message);
+      console.error('Analytics error:', analyticsError);
     }
 
-    // Get overall statistics
-    const { data: overallStats, error: statsError } = await supabaseClient
+    // Get overall statistics from payment_transactions
+    const { data: transactionStats, error: statsError } = await supabaseClient
       .from('payment_transactions')
-      .select(`
-        status,
-        amount,
-        fees,
-        channel,
-        created_at,
-        currency
-      `);
+      .select('status, amount, fees, channel, currency, created_at');
 
     if (statsError) {
-      throw new Error(statsError.message);
+      console.error('Stats error:', statsError);
     }
 
     // Calculate summary statistics
-    const summary = {
-      totalTransactions: overallStats.length,
-      successfulTransactions: overallStats.filter(t => t.status === 'success').length,
-      failedTransactions: overallStats.filter(t => t.status === 'failed').length,
-      totalRevenue: overallStats
-        .filter(t => t.status === 'success')
-        .reduce((sum, t) => sum + parseFloat(t.amount || '0'), 0),
-      totalFees: overallStats
-        .filter(t => t.status === 'success')
-        .reduce((sum, t) => sum + parseFloat(t.fees || '0'), 0),
-      successRate: overallStats.length > 0 
-        ? (overallStats.filter(t => t.status === 'success').length / overallStats.length) * 100
-        : 0,
-      channelBreakdown: overallStats.reduce((acc, t) => {
-        const channel = t.channel || 'unknown';
-        acc[channel] = (acc[channel] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>),
-      currencyBreakdown: overallStats.reduce((acc, t) => {
-        const currency = t.currency || 'NGN';
-        acc[currency] = (acc[currency] || 0) + parseFloat(t.amount || '0');
-        return acc;
-      }, {} as Record<string, number>)
-    };
+    const totalTransactions = transactionStats?.length || 0;
+    const successfulTransactions = transactionStats?.filter(t => t.status === 'success').length || 0;
+    const failedTransactions = transactionStats?.filter(t => t.status === 'failed').length || 0;
+    const totalRevenue = transactionStats?.filter(t => t.status === 'success')
+      .reduce((sum, t) => sum + (parseFloat(t.amount?.toString() || '0')), 0) || 0;
+    const totalFees = transactionStats?.filter(t => t.status === 'success')
+      .reduce((sum, t) => sum + (parseFloat(t.fees?.toString() || '0')), 0) || 0;
+    const successRate = totalTransactions > 0 ? (successfulTransactions / totalTransactions) * 100 : 0;
+
+    // Channel breakdown
+    const channelBreakdown = transactionStats?.reduce((acc: any, t) => {
+      if (t.status === 'success' && t.channel) {
+        acc[t.channel] = (acc[t.channel] || 0) + 1;
+      }
+      return acc;
+    }, {}) || {};
+
+    // Currency breakdown
+    const currencyBreakdown = transactionStats?.reduce((acc: any, t) => {
+      if (t.status === 'success' && t.currency) {
+        acc[t.currency] = (acc[t.currency] || 0) + parseFloat(t.amount?.toString() || '0');
+      }
+      return acc;
+    }, {}) || {};
 
     // Get recent transactions
     const { data: recentTransactions, error: recentError } = await supabaseClient
       .from('payment_transactions')
-      .select(`
-        id,
-        amount,
-        status,
-        channel,
-        customer_email,
-        created_at,
-        provider_reference
-      `)
+      .select('*')
       .order('created_at', { ascending: false })
       .limit(10);
 
     if (recentError) {
-      throw new Error(recentError.message);
+      console.error('Recent transactions error:', recentError);
     }
 
-    // Get top customers by transaction volume
-    const topCustomersQuery = `
-      SELECT 
-        customer_email,
-        COUNT(*) as transaction_count,
-        SUM(amount) as total_spent,
-        MAX(created_at) as last_transaction
-      FROM payment_transactions 
-      WHERE status = 'success' AND customer_email IS NOT NULL
-      GROUP BY customer_email 
-      ORDER BY total_spent DESC 
-      LIMIT 10
-    `;
+    // Get top customers by total spent
+    const { data: topCustomersData, error: customersError } = await supabaseClient
+      .from('payment_transactions')
+      .select('customer_email, amount')
+      .eq('status', 'success');
 
-    const { data: topCustomers, error: customersError } = await supabaseClient
-      .rpc('exec_sql', { query: topCustomersQuery });
+    let topCustomers: any[] = [];
+    if (topCustomersData && !customersError) {
+      const customerTotals = topCustomersData.reduce((acc: any, t) => {
+        if (t.customer_email) {
+          acc[t.customer_email] = (acc[t.customer_email] || 0) + parseFloat(t.amount?.toString() || '0');
+        }
+        return acc;
+      }, {});
 
-    return new Response(JSON.stringify({
-      status: true,
-      data: {
-        summary,
-        analytics: analytics || [],
-        recentTransactions: recentTransactions || [],
-        topCustomers: topCustomers || []
-      }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      topCustomers = Object.entries(customerTotals)
+        .map(([email, total]) => ({ customer_email: email, total_spent: total }))
+        .sort((a, b) => (b.total_spent as number) - (a.total_spent as number))
+        .slice(0, 10);
+    }
+
+    const response = {
+      summary: {
+        totalTransactions,
+        successfulTransactions,
+        failedTransactions,
+        totalRevenue,
+        totalFees,
+        successRate,
+        channelBreakdown,
+        currencyBreakdown
+      },
+      analytics: analyticsData || [],
+      recentTransactions: recentTransactions || [],
+      topCustomers: topCustomers || []
+    };
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
-    console.error('Analytics error:', error);
-    return new Response(JSON.stringify({
-      status: false,
-      error: error.message || 'Failed to fetch analytics'
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    console.error('Payment analytics error:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });

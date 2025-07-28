@@ -49,14 +49,25 @@ Deno.serve(async (req) => {
       })
     }
 
-    // 2. Check rate limiting
-    const rateLimitCheck = await checkRateLimit(supabase, recipient.email, emailType)
-    if (!rateLimitCheck.allowed) {
+    // 2. Check enhanced rate limiting
+    const rateLimitResponse = await supabase.functions.invoke('enhanced-email-rate-limiter', {
+      body: { 
+        identifier: recipient.email, 
+        emailType,
+        checkOnly: false
+      }
+    })
+
+    if (rateLimitResponse.error) {
+      throw new Error('Failed to check rate limits')
+    }
+
+    if (rateLimitResponse.data?.rateLimited) {
       console.log(`Rate limit exceeded for ${recipient.email}`)
       return new Response(JSON.stringify({
         success: false,
         error: 'Rate limit exceeded',
-        retryAfter: rateLimitCheck.retryAfter
+        retryAfter: rateLimitResponse.data.retryAfter
       }), { 
         status: 429, 
         headers: { 'Content-Type': 'application/json', ...corsHeaders }
@@ -238,25 +249,26 @@ function standardizeVariables(variables: Record<string, any>): Record<string, an
   return standardized
 }
 
-async function checkRateLimit(supabase: any, email: string, emailType: string) {
-  const windowMinutes = emailType === 'marketing' ? 60 : 5 // 1 hour for marketing, 5 min for transactional
-  const maxEmails = emailType === 'marketing' ? 5 : 20 // 5 marketing emails per hour, 20 transactional per 5 min
-  
-  const windowStart = new Date(Date.now() - windowMinutes * 60000).toISOString()
-  
-  const { data: recentEmails, count } = await supabase
-    .from('communication_events')
-    .select('*', { count: 'exact', head: true })
-    .eq('recipient_email', email)
-    .eq('email_type', emailType)
-    .gte('sent_at', windowStart)
-  
-  const emailCount = count || 0
-  
+// Enhanced validation for template variables
+function validateTemplateVariables(templateId: string, variables: Record<string, any>): { valid: boolean, missing: string[] } {
+  const requiredFields: Record<string, string[]> = {
+    'order_confirmation': ['customerName', 'orderNumber', 'orderTotal'],
+    'order_status_update': ['customerName', 'orderNumber', 'orderStatus'],
+    'price_change_alert': ['customerName', 'productName', 'oldPrice', 'newPrice'],
+    'promotion_alert': ['customerName', 'promotionTitle'],
+    'welcome': ['customerName'],
+    'delivery_notification': ['customerName', 'orderNumber'],
+    'order_ready': ['customerName', 'orderNumber'],
+    'order_preparing': ['customerName', 'orderNumber'],
+    'order_completed': ['customerName', 'orderNumber'],
+    'order_cancelled': ['customerName', 'orderNumber']
+  }
+
+  const required = requiredFields[templateId] || []
+  const missing = required.filter(field => !variables[field])
+
   return {
-    allowed: emailCount < maxEmails,
-    retryAfter: windowMinutes * 60, // seconds
-    currentCount: emailCount,
-    maxAllowed: maxEmails
+    valid: missing.length === 0,
+    missing
   }
 }

@@ -9,6 +9,12 @@ verify_jwt = false
 [functions.send-email-standardized]
 verify_jwt = false
 
+[functions.enhanced-email-rate-limiter]
+verify_jwt = false
+
+[functions.email-delivery-monitor]
+verify_jwt = false
+
 [api]
 enabled = true
 port = 54321

@@ -214,7 +214,7 @@ async function processOrderStatusUpdate(supabase: any, event: any): Promise<bool
       orderNumber: payload.order_number || 'N/A',
       orderStatus: payload.new_status,
       orderTotal: payload.total_amount || '0',
-      trackingUrl: `${Deno.env.get('SITE_URL') || 'https://yourdomain.com'}/orders/${order_id}`
+      trackingUrl: `${await getSiteUrl(supabase)}/orders/${order_id}`
     },
     emailType: 'transactional'
   }
@@ -246,7 +246,7 @@ async function processPriceChangeNotification(supabase: any, event: any): Promis
       oldPrice: payload.old_price || '0',
       newPrice: payload.new_price || '0',
       percentageChange: payload.percentage_change || '0',
-      productUrl: `${Deno.env.get('SITE_URL') || 'https://yourdomain.com'}/products/${payload.product_id}`
+      productUrl: `${await getSiteUrl(supabase)}/products/${payload.product_id}`
     },
     emailType: 'marketing'
   }
@@ -278,7 +278,7 @@ async function processPromotionAlert(supabase: any, event: any): Promise<boolean
       promotionDescription: payload.promotion_description || '',
       discountPercentage: payload.discount_percentage || '0',
       validUntil: payload.valid_until || '',
-      shopUrl: `${Deno.env.get('SITE_URL') || 'https://yourdomain.com'}/products`
+      shopUrl: `${await getSiteUrl(supabase)}/products`
     },
     emailType: 'marketing'
   }
@@ -307,8 +307,8 @@ async function processWelcomeEmail(supabase: any, event: any): Promise<boolean> 
     variables: {
       customerName: payload.customer_name || 'Valued Customer',
       welcomeMessage: 'Welcome to our platform!',
-      shopUrl: `${Deno.env.get('SITE_URL') || 'https://yourdomain.com'}/products`,
-      supportEmail: 'support@yourdomain.com'
+      shopUrl: `${await getSiteUrl(supabase)}/products`,
+      supportEmail: await getSupportEmail(supabase)
     },
     emailType: 'transactional'
   }
@@ -318,4 +318,26 @@ async function processWelcomeEmail(supabase: any, event: any): Promise<boolean> 
   })
 
   return !error
+}
+
+// Helper function to get site URL dynamically
+async function getSiteUrl(supabase: any): Promise<string> {
+  const { data } = await supabase
+    .from('business_settings')
+    .select('website_url')
+    .limit(1)
+    .maybeSingle()
+  
+  return Deno.env.get('SITE_URL') || data?.website_url || 'https://yourdomain.com'
+}
+
+// Helper function to get support email dynamically
+async function getSupportEmail(supabase: any): Promise<string> {
+  const { data } = await supabase
+    .from('business_settings')
+    .select('email')
+    .limit(1)
+    .maybeSingle()
+  
+  return data?.email || 'support@yourdomain.com'
 }

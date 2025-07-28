@@ -123,12 +123,22 @@ Deno.serve(async (req) => {
     // 5. Standardize variables (convert snake_case to camelCase for consistency)
     const standardizedVariables = standardizeVariables(variables)
 
-    // 6. Add required compliance variables
+    // 6. Get business settings for compliance
+    const { data: businessSettings } = await supabase
+      .from('business_settings')
+      .select('name, address, website_url')
+      .limit(1)
+      .maybeSingle()
+
+    const siteUrl = Deno.env.get('SITE_URL') || businessSettings?.website_url || 'https://yourdomain.com'
+    
+    // 7. Add required compliance variables
     const complianceVariables = {
-      unsubscribeUrl: `${Deno.env.get('SITE_URL') || 'https://yourdomain.com'}/unsubscribe?email=${encodeURIComponent(recipient.email)}`,
-      companyName: senderName,
-      companyAddress: '123 Business Street, Business City, BC 12345', // TODO: Get from business settings
-      privacyPolicyUrl: `${Deno.env.get('SITE_URL') || 'https://yourdomain.com'}/privacy-policy`
+      unsubscribeUrl: `${siteUrl}/unsubscribe?email=${encodeURIComponent(recipient.email)}`,
+      companyName: businessSettings?.name || senderName,
+      companyAddress: businessSettings?.address || '123 Business Street, Business City, BC 12345',
+      privacyPolicyUrl: `${siteUrl}/privacy-policy`,
+      siteUrl: siteUrl
     }
 
     const finalVariables = {
@@ -171,7 +181,26 @@ Deno.serve(async (req) => {
 
     if (!mailersendResponse.ok) {
       console.error('MailerSend API error:', result)
-      throw new Error(`MailerSend API error: ${result.message || 'Unknown error'}`)
+      
+      // Categorize errors for better handling
+      let errorCategory = 'unknown'
+      let retryable = false
+      
+      if (mailersendResponse.status === 429) {
+        errorCategory = 'rate_limit'
+        retryable = true
+      } else if (mailersendResponse.status >= 500) {
+        errorCategory = 'server_error'
+        retryable = true
+      } else if (mailersendResponse.status === 401 || mailersendResponse.status === 403) {
+        errorCategory = 'authentication'
+        retryable = false
+      } else if (mailersendResponse.status === 400) {
+        errorCategory = 'validation'
+        retryable = false
+      }
+      
+      throw new Error(`MailerSend ${errorCategory} error (${mailersendResponse.status}): ${result.message || 'Unknown error'}`)
     }
 
     console.log(`Email sent successfully - Message ID: ${result.message_id}`)

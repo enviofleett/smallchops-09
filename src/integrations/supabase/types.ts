@@ -250,39 +250,63 @@ export type Database = {
       communication_events: {
         Row: {
           created_at: string
+          delivery_status: string | null
+          email_type: string | null
+          error_message: string | null
           event_type: string
+          external_id: string | null
           id: string
           last_error: string | null
           order_id: string
           payload: Json | null
           processed_at: string | null
+          recipient_email: string | null
           retry_count: number
+          sent_at: string | null
           status: Database["public"]["Enums"]["communication_event_status"]
+          template_id: string | null
           updated_at: string
+          variables: Json | null
         }
         Insert: {
           created_at?: string
+          delivery_status?: string | null
+          email_type?: string | null
+          error_message?: string | null
           event_type: string
+          external_id?: string | null
           id?: string
           last_error?: string | null
           order_id: string
           payload?: Json | null
           processed_at?: string | null
+          recipient_email?: string | null
           retry_count?: number
+          sent_at?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
+          template_id?: string | null
           updated_at?: string
+          variables?: Json | null
         }
         Update: {
           created_at?: string
+          delivery_status?: string | null
+          email_type?: string | null
+          error_message?: string | null
           event_type?: string
+          external_id?: string | null
           id?: string
           last_error?: string | null
           order_id?: string
           payload?: Json | null
           processed_at?: string | null
+          recipient_email?: string | null
           retry_count?: number
+          sent_at?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
+          template_id?: string | null
           updated_at?: string
+          variables?: Json | null
         }
         Relationships: [
           {
@@ -770,6 +794,102 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      email_consents: {
+        Row: {
+          consent_source: string | null
+          consent_type: string
+          created_at: string | null
+          email_address: string
+          id: string
+          ip_address: unknown | null
+          is_active: boolean | null
+          unsubscribed_at: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          consent_source?: string | null
+          consent_type?: string
+          created_at?: string | null
+          email_address: string
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean | null
+          unsubscribed_at?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          consent_source?: string | null
+          consent_type?: string
+          created_at?: string | null
+          email_address?: string
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean | null
+          unsubscribed_at?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      email_delivery_logs: {
+        Row: {
+          created_at: string | null
+          email_id: string | null
+          event_type: string
+          id: string
+          recipient_email: string
+          status: string
+          subject: string | null
+          timestamp: string | null
+          webhook_data: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          email_id?: string | null
+          event_type: string
+          id?: string
+          recipient_email: string
+          status: string
+          subject?: string | null
+          timestamp?: string | null
+          webhook_data?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          email_id?: string | null
+          event_type?: string
+          id?: string
+          recipient_email?: string
+          status?: string
+          subject?: string | null
+          timestamp?: string | null
+          webhook_data?: Json | null
+        }
+        Relationships: []
+      }
+      email_suppression_list: {
+        Row: {
+          created_at: string | null
+          email_address: string
+          event_data: Json | null
+          id: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string | null
+          email_address: string
+          event_data?: Json | null
+          id?: string
+          reason: string
+        }
+        Update: {
+          created_at?: string | null
+          email_address?: string
+          event_data?: Json | null
+          id?: string
+          reason?: string
         }
         Relationships: []
       }
@@ -2403,12 +2523,20 @@ export type Database = {
         }
         Returns: undefined
       }
+      has_email_consent: {
+        Args: { email_address: string; consent_type?: string }
+        Returns: boolean
+      }
       health_check: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
       is_admin: {
         Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
+      is_email_suppressed: {
+        Args: { email_address: string }
         Returns: boolean
       }
       log_admin_action: {

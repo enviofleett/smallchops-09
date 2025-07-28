@@ -1,5 +1,14 @@
 project_id = "oknnklksdiqaifhxaccs"
 
+[functions.mailersend-webhook-handler]
+verify_jwt = false
+
+[functions.email-compliance-manager]
+verify_jwt = false
+
+[functions.send-email-standardized]
+verify_jwt = false
+
 [api]
 enabled = true
 port = 54321

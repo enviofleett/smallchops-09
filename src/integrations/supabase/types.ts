@@ -2628,6 +2628,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      cleanup_old_communication_events: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       confirm_payment_atomic: {
         Args: {
           p_reference: string
@@ -2661,6 +2665,17 @@ export type Database = {
           environment: string
           is_live_mode: boolean
           webhook_url: string
+        }[]
+      }
+      get_hourly_email_stats: {
+        Args: { start_time: string; end_time: string }
+        Returns: {
+          hour_bucket: string
+          total_sent: number
+          successful_delivered: number
+          failed_attempts: number
+          bounce_rate: number
+          delivery_rate: number
         }[]
       }
       get_user_role: {

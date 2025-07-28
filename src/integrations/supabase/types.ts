@@ -893,6 +893,27 @@ export type Database = {
         }
         Relationships: []
       }
+      enhanced_rate_limits: {
+        Row: {
+          key: string
+          request_count: number | null
+          window_end: string
+          window_start: string
+        }
+        Insert: {
+          key: string
+          request_count?: number | null
+          window_end?: string
+          window_start?: string
+        }
+        Update: {
+          key?: string
+          request_count?: number | null
+          window_end?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       environment_config: {
         Row: {
           created_at: string | null
@@ -1248,6 +1269,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_audit_log: {
+        Row: {
+          action: string
+          changed_by: string | null
+          created_at: string | null
+          id: string
+          ip_address: unknown | null
+          metadata: Json | null
+          new_status: string | null
+          payment_reference: string
+          previous_status: string | null
+        }
+        Insert: {
+          action: string
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          new_status?: string | null
+          payment_reference: string
+          previous_status?: string | null
+        }
+        Update: {
+          action?: string
+          changed_by?: string | null
+          created_at?: string | null
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          new_status?: string | null
+          payment_reference?: string
+          previous_status?: string | null
+        }
+        Relationships: []
       }
       payment_disputes: {
         Row: {
@@ -2211,6 +2268,60 @@ export type Database = {
         }
         Relationships: []
       }
+      security_incidents: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          error_message: string | null
+          expected_amount: number | null
+          expected_signature: string | null
+          id: string
+          ip_address: unknown | null
+          received_amount: number | null
+          received_signature: string | null
+          reference: string | null
+          request_data: Json | null
+          severity: string | null
+          type: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          error_message?: string | null
+          expected_amount?: number | null
+          expected_signature?: string | null
+          id?: string
+          ip_address?: unknown | null
+          received_amount?: number | null
+          received_signature?: string | null
+          reference?: string | null
+          request_data?: Json | null
+          severity?: string | null
+          type: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          error_message?: string | null
+          expected_amount?: number | null
+          expected_signature?: string | null
+          id?: string
+          ip_address?: unknown | null
+          received_amount?: number | null
+          received_signature?: string | null
+          reference?: string | null
+          request_data?: Json | null
+          severity?: string | null
+          type?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       transaction_analytics: {
         Row: {
           average_transaction_value: number | null
@@ -2418,6 +2529,42 @@ export type Database = {
         }
         Relationships: []
       }
+      webhook_events: {
+        Row: {
+          created_at: string | null
+          event_data: Json
+          event_type: string
+          id: string
+          paystack_event_id: string
+          processed: boolean | null
+          processed_at: string | null
+          processing_result: Json | null
+          signature: string
+        }
+        Insert: {
+          created_at?: string | null
+          event_data: Json
+          event_type: string
+          id?: string
+          paystack_event_id: string
+          processed?: boolean | null
+          processed_at?: string | null
+          processing_result?: Json | null
+          signature: string
+        }
+        Update: {
+          created_at?: string | null
+          event_data?: Json
+          event_type?: string
+          id?: string
+          paystack_event_id?: string
+          processed?: boolean | null
+          processed_at?: string | null
+          processing_result?: Json | null
+          signature?: string
+        }
+        Relationships: []
+      }
       webhook_logs: {
         Row: {
           created_at: string | null
@@ -2476,6 +2623,19 @@ export type Database = {
           required_level_param?: string
         }
         Returns: boolean
+      }
+      cleanup_expired_rate_limits: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      confirm_payment_atomic: {
+        Args: {
+          p_reference: string
+          p_amount: number
+          p_paystack_data: Json
+          p_confirmed_at: string
+        }
+        Returns: Json
       }
       customer_purchased_product: {
         Args: { customer_uuid: string; product_uuid: string }
@@ -2592,6 +2752,14 @@ export type Database = {
       validate_admin_permission: {
         Args: { required_permission?: string }
         Returns: boolean
+      }
+      verify_payment_atomic: {
+        Args: {
+          p_reference: string
+          p_paystack_data: Json
+          p_verified_at: string
+        }
+        Returns: Json
       }
       verify_webhook_signature: {
         Args: { p_payload: string; p_signature: string; p_secret: string }

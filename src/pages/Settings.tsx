@@ -5,6 +5,7 @@ import { BrandingTab } from "@/components/settings/BrandingTab";
 import { AdminUserControl } from "@/components/settings/AdminUserControl";
 import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
 import { PaymentSettingsTab } from "@/components/payments/PaymentSettingsTab";
+import { EmailTestingSimulation } from "@/components/admin/EmailTestingSimulation";
 import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,11 +46,12 @@ const Settings = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-5">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
           <TabsTrigger value="branding">Branding</TabsTrigger>
           <TabsTrigger value="communications">Communications</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           {isAdmin && <TabsTrigger value="admin">Admin User Control</TabsTrigger>}
+          {isAdmin && <TabsTrigger value="testing">Email Testing</TabsTrigger>}
           {isAdmin && <TabsTrigger value="developer">Developer</TabsTrigger>}
         </TabsList>
 
@@ -102,7 +104,12 @@ const Settings = () => {
         )}
 
         {isAdmin && (
-          <TabsContent value="developer" className="space-y-6">
+          <TabsContent value="testing" className="space-y-6">
+            <EmailTestingSimulation />
+          </TabsContent>
+        )}
+
+        {isAdmin && (
             <Card>
               <CardHeader>
                 <CardTitle>Frontend API Integration Guide</CardTitle>

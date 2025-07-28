@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { PaymentValidator } from "../_shared/payment-validators.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -94,8 +95,21 @@ serve(async (req) => {
       throw new Error('Paystack not configured');
     }
 
-    // Create transaction record
-    const transactionRef = reference || `init_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Validate amount using PaymentValidator
+    const amountValidation = PaymentValidator.validateAmount(parseFloat(amount.toString()), currency || 'NGN');
+    if (!amountValidation.isValid) {
+      return new Response(JSON.stringify({
+        status: false,
+        error: 'Amount validation failed',
+        details: amountValidation.errors
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
+
+    // Generate secure transaction reference
+    const transactionRef = reference || PaymentValidator.generateSecureReference('INIT');
     
     const { data: transaction, error: dbError } = await supabaseClient
       .from('payment_transactions')
@@ -103,7 +117,7 @@ serve(async (req) => {
         transaction_reference: transactionRef,
         provider: 'paystack',
         order_id: orderId,
-        amount: parseFloat(amount.toString()),
+        amount: amountValidation.sanitizedAmount,
         currency: currency || 'NGN',
         customer_email: email,
         metadata: { ...metadata, user_id: user.id },
@@ -126,7 +140,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         email,
-        amount: Math.round(amount * 100), // Convert to kobo
+        amount: amountValidation.subunitAmount, // Use validated amount in kobo
         currency,
         reference: transactionRef,
         callback_url: callback_url || `${req.headers.get('origin')}/payment/callback`,

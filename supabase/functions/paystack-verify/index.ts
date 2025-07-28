@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { PaymentValidator } from "../_shared/payment-validators.ts";
+import { DistributedRateLimiter } from "../_shared/rate-limiter.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,7 +20,46 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
+    // Enhanced rate limiting for verification
+    const clientIP = req.headers.get('cf-connecting-ip') || 
+                    req.headers.get('x-forwarded-for') || 
+                    req.headers.get('x-real-ip') || 
+                    'unknown';
+    
+    const rateLimitCheck = await DistributedRateLimiter.checkPaymentRateLimit(
+      `verify:${clientIP}`, 
+      'verify'
+    );
+    
+    if (!rateLimitCheck.allowed) {
+      return new Response(JSON.stringify({
+        status: false,
+        error: 'Too many verification attempts. Please wait before trying again.',
+        retryAfter: rateLimitCheck.retryAfter
+      }), {
+        status: 429,
+        headers: { 
+          ...corsHeaders, 
+          'Content-Type': 'application/json',
+          'Retry-After': rateLimitCheck.retryAfter?.toString() || '60'
+        },
+      });
+    }
+
     const { reference } = await req.json();
+    
+    // Enhanced reference validation
+    const refValidation = PaymentValidator.validatePaymentReference(reference);
+    if (!refValidation.isValid) {
+      return new Response(JSON.stringify({
+        status: false,
+        error: 'Invalid payment reference format',
+        details: refValidation.errors
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      });
+    }
 
     // Get Paystack configuration
     const { data: config } = await supabaseClient
@@ -116,6 +157,16 @@ serve(async (req) => {
           .eq('id', transaction.order_id);
       }
     }
+
+    // Log successful verification with sanitized data
+    const sanitizedLog = PaymentValidator.sanitizeForLogging({
+      reference,
+      amount: verification.data.amount,
+      status: verification.data.status,
+      timestamp: new Date().toISOString()
+    });
+    
+    console.log('Payment verified successfully:', sanitizedLog);
 
     return new Response(JSON.stringify({
       status: true,

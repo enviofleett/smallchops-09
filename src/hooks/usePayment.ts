@@ -3,6 +3,7 @@ import { publicAPI } from '@/api/public';
 import { paystackService } from '@/lib/paystack';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PaymentErrorHandler } from '@/lib/payment-error-handler';
 
 export interface PaymentResult {
   success: boolean;
@@ -62,12 +63,16 @@ export const usePayment = () => {
       }
     } catch (error) {
       console.error('Payment initiation error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Payment failed';
-      toast.error(errorMessage);
+      const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
+      
+      toast.error(errorInfo.title, {
+        description: errorInfo.message,
+        duration: 5000,
+      });
       
       return {
         success: false,
-        error: errorMessage
+        error: errorInfo.message
       };
     } finally {
       setLoading(false);
@@ -95,12 +100,21 @@ export const usePayment = () => {
         }
         return true;
       } else {
-        toast.error(result.error || 'Failed to process payment');
+        const errorInfo = PaymentErrorHandler.formatErrorForUser(new Error(result.error || 'Failed to process payment'));
+        toast.error(errorInfo.title, {
+          description: errorInfo.message,
+          duration: 5000,
+        });
         return false;
       }
     } catch (error) {
       console.error('Payment processing error:', error);
-      toast.error('Payment processing failed');
+      const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
+      
+      toast.error(errorInfo.title, {
+        description: errorInfo.message,
+        duration: 5000,
+      });
       return false;
     } finally {
       setProcessing(false);
@@ -132,7 +146,12 @@ export const usePayment = () => {
       }
     } catch (error) {
       console.error('Payment verification error:', error);
-      toast.error('Failed to verify payment');
+      const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
+      
+      toast.error(errorInfo.title, {
+        description: errorInfo.message,
+        duration: 5000,
+      });
       throw error;
     }
   };
@@ -152,14 +171,24 @@ export const usePayment = () => {
       }
     } catch (error) {
       console.error('Error handling payment success:', error);
-      toast.error('Error confirming payment');
+      const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
+      
+      toast.error(errorInfo.title, {
+        description: errorInfo.message,
+        duration: 5000,
+      });
       return null;
     }
   };
 
   const handlePaymentError = (error?: string) => {
     console.error('Payment error:', error);
-    toast.error(error || 'Payment was cancelled or failed');
+    const errorInfo = PaymentErrorHandler.formatErrorForUser(new Error(error || 'Payment was cancelled or failed'));
+    
+    toast.error(errorInfo.title, {
+      description: errorInfo.message,
+      duration: 5000,
+    });
   };
 
   return {

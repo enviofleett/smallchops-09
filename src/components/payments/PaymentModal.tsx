@@ -9,13 +9,8 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { CreditCard, Building2, Smartphone, QrCode, Trash2, Star, Globe } from 'lucide-react';
 import { usePayment, type PaymentProvider } from '@/hooks/usePayment';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-// Use direct client instead of the supabase import to avoid type issues
-const supabaseUrl = "https://oknnklksdiqaifhxaccs.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA";
-const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -83,10 +78,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const loadAvailableProviders = async () => {
     try {
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from('payment_integrations')
         .select('provider, currency, test_mode, payment_methods')
-        .eq('is_active', true);
+        .eq('connection_status', 'connected');
 
       if (error) throw error;
       
@@ -113,10 +108,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const loadSavedPaymentMethods = async () => {
     try {
-      const { data: { user } } = await supabaseClient.auth.getUser();
+      const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
 
-      const { data, error } = await supabaseClient
+      const { data, error } = await supabase
         .from('saved_payment_methods')
         .select('*')
         .eq('user_id', user.id)

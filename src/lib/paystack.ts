@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { PaymentValidator } from './payment-validators';
 
 export interface PaystackConfig {
   public_key: string;
@@ -157,12 +158,21 @@ class PaystackService {
   }
 
   generateReference(): string {
-    return `PAY_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    // Use secure reference generation
+    const timestamp = Date.now();
+    const randomBytes = crypto.getRandomValues(new Uint8Array(8));
+    const randomHex = Array.from(randomBytes, byte => byte.toString(16).padStart(2, '0')).join('');
+    
+    return `PAY_${timestamp}_${randomHex}`;
   }
 
   formatAmount(amount: number): number {
-    // Convert to kobo (multiply by 100)
-    return Math.round(amount * 100);
+    // Use secure amount validation and conversion
+    const validation = PaymentValidator.validateAmount(amount, 'NGN');
+    if (!validation.isValid) {
+      throw new Error(`Invalid amount: ${validation.errors.join(', ')}`);
+    }
+    return validation.subunitAmount;
   }
 
   formatCurrency(amount: number, currency = 'NGN'): string {

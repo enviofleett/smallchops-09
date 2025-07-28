@@ -110,6 +110,7 @@ const Settings = () => {
         )}
 
         {isAdmin && (
+          <TabsContent value="developer" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Frontend API Integration Guide</CardTitle>

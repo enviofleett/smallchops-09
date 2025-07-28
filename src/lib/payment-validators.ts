@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from 'crypto';
+// Browser-compatible crypto utilities
 
 export interface ValidationResult {
   isValid: boolean;
@@ -81,16 +81,21 @@ export class PaymentValidator {
    */
   static generateSecureReference(prefix: string = 'PAY'): string {
     const timestamp = Date.now();
-    const randomHex = randomBytes(8).toString('hex');
     
-    // Create checksum using secret key if available
-    const secretKey = process.env.PAYSTACK_SECRET_KEY || 'default-key';
-    const checksum = createHash('sha256')
-      .update(`${timestamp}_${randomHex}_${secretKey}`)
-      .digest('hex')
-      .substring(0, 8);
+    // Generate cryptographically secure random bytes using Web Crypto API
+    const randomBytes = new Uint8Array(8);
+    crypto.getRandomValues(randomBytes);
+    const randomHex = Array.from(randomBytes, byte => byte.toString(16).padStart(2, '0')).join('');
     
-    return `${prefix}_${timestamp}_${randomHex}_${checksum}`;
+    // Simple checksum using timestamp and random for uniqueness
+    const checksumInput = `${timestamp}_${randomHex}`;
+    let checksum = 0;
+    for (let i = 0; i < checksumInput.length; i++) {
+      checksum = ((checksum << 5) - checksum + checksumInput.charCodeAt(i)) & 0xffffffff;
+    }
+    const checksumHex = Math.abs(checksum).toString(16).substring(0, 8);
+    
+    return `${prefix}_${timestamp}_${randomHex}_${checksumHex}`;
   }
 
   /**

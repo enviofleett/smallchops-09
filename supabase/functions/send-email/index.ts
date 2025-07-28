@@ -132,11 +132,30 @@ serve(async (req) => {
       }
     }
 
+    // Get dynamic sender domain from database
+    const { data: commSettings } = await supabaseClient
+      .from('communication_settings')
+      .select('sender_email, smtp_user, mailersend_domain, mailersend_domain_verified')
+      .single();
+
+    let senderEmail = "orders@example.com";
+    let senderName = "Restaurant Orders";
+
+    if (commSettings?.sender_email && commSettings?.mailersend_domain_verified) {
+      senderEmail = commSettings.sender_email;
+      senderName = commSettings.smtp_user || "Restaurant Orders";
+    } else if (commSettings?.mailersend_domain && commSettings?.mailersend_domain_verified) {
+      senderEmail = `orders@${commSettings.mailersend_domain}`;
+      senderName = commSettings.smtp_user || "Restaurant Orders";
+    }
+
+    logStep("Using sender configuration", { senderEmail, senderName, domainVerified: commSettings?.mailersend_domain_verified });
+
     // MailerSend API request
     const emailPayload = {
       from: {
-        email: "orders@yourdomain.com", // Replace with your verified domain
-        name: "Restaurant Orders"
+        email: senderEmail,
+        name: senderName
       },
       to: [
         {
@@ -168,19 +187,44 @@ serve(async (req) => {
       throw new Error(`MailerSend API error: ${response.status} - ${responseData}`);
     }
 
-    // Log email activity to database
+    // Enhanced logging with delivery tracking
     try {
+      // Log to audit_logs
       await supabaseClient.from('audit_logs').insert({
         user_id: null,
         action: 'EMAIL_SENT',
         category: 'Communication',
         entity_type: 'email',
         message: `Email sent to ${to} with subject: ${subject}`,
-        new_values: { to, subject, template, success: true }
+        new_values: { 
+          to, 
+          subject, 
+          template, 
+          success: true, 
+          messageId: response.headers.get('X-Message-Id'),
+          senderEmail,
+          timestamp: new Date().toISOString()
+        }
       });
+
+      // Log to communication_logs for detailed tracking
+      await supabaseClient.from('communication_logs').insert({
+        channel: 'email',
+        recipient: to,
+        subject: subject,
+        template_name: template || 'custom',
+        status: 'sent',
+        provider_response: {
+          status: response.status,
+          messageId: response.headers.get('X-Message-Id'),
+          provider: 'mailersend'
+        }
+      });
+      
       logStep("Email activity logged to database");
     } catch (logError) {
       console.error("Failed to log email activity:", logError);
+      // Don't fail the email send if logging fails
     }
 
     return new Response(
@@ -199,10 +243,41 @@ serve(async (req) => {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logStep("ERROR in send-email", { message: errorMessage });
     
+    // Enhanced error logging
+    try {
+      const { to, subject, template } = await req.json().catch(() => ({ to: 'unknown', subject: 'unknown', template: null }));
+      
+      await supabaseClient.from('communication_logs').insert({
+        channel: 'email',
+        recipient: to,
+        subject: subject,
+        template_name: template || 'unknown',
+        status: 'failed',
+        error_message: errorMessage,
+        provider_response: {
+          error: errorMessage,
+          provider: 'mailersend',
+          timestamp: new Date().toISOString()
+        }
+      });
+
+      await supabaseClient.from('audit_logs').insert({
+        user_id: null,
+        action: 'EMAIL_FAILED',
+        category: 'Communication',
+        entity_type: 'email',
+        message: `Failed to send email to ${to}: ${errorMessage}`,
+        new_values: { to, subject, template, success: false, error: errorMessage }
+      });
+    } catch (logError) {
+      console.error("Failed to log email error:", logError);
+    }
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: errorMessage 
+        error: errorMessage,
+        timestamp: new Date().toISOString()
       }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },

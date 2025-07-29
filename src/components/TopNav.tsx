@@ -21,6 +21,13 @@ const TopNav = () => {
         {/* Business branding and search */}
         <div className="flex items-center space-x-6 flex-1">
           <div className="flex items-center space-x-3">
+            <div className="w-8 h-8 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center overflow-hidden">
+              <img 
+                src="/lovable-uploads/4b7e8feb-69d6-41e6-bf51-31bc57291f4a.png" 
+                alt="Starters Logo" 
+                className="w-full h-full object-contain"
+              />
+            </div>
             {settings?.name && (
               <h1 className="text-lg font-semibold text-foreground">{settings.name}</h1>
             )}

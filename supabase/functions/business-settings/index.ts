@@ -1,19 +1,43 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// PRODUCTION CORS - No wildcards
+// ENHANCED CORS - Fixed for Lovable domains
 const getCorsHeaders = (origin: string | null): Record<string, string> => {
   const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
   const isDev = Deno.env.get('DENO_ENV') === 'development';
   
+  console.log(`CORS Debug - Origin: ${origin}, DENO_ENV: ${isDev ? 'development' : 'production'}, ALLOWED_ORIGINS: ${allowedOrigins.join(', ')}`);
+  
+  // Always allow localhost in development
   if (isDev) {
     allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
   }
   
-  const isAllowed = origin && allowedOrigins.includes(origin);
+  // Check if origin is allowed via exact match
+  let isAllowed = origin && allowedOrigins.includes(origin);
+  
+  // Enhanced pattern matching for Lovable domains
+  if (!isAllowed && origin) {
+    const lovablePatterns = [
+      /^https:\/\/.*\.lovable\.app$/,
+      /^https:\/\/.*\.lovableproject\.com$/,
+      /^https:\/\/.*--.*\.lovable\.app$/, // Preview domains like id-preview--xxx.lovable.app
+    ];
+    
+    isAllowed = lovablePatterns.some(pattern => pattern.test(origin));
+    
+    if (isAllowed) {
+      console.log(`CORS: Lovable domain matched for origin: ${origin}`);
+    }
+  }
+  
+  // Fallback: allow all in development, reject in production
+  const allowOrigin = isAllowed ? origin : (isDev ? '*' : 'null');
+  
+  console.log(`CORS Result - Access-Control-Allow-Origin: ${allowOrigin}`);
   
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : 'null'),
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Max-Age': '86400',

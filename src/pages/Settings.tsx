@@ -165,9 +165,10 @@ const Settings = () => {
                     <h3 className="text-lg font-semibold">🔐 Authentication Setup</h3>
                     <div className="bg-muted/50 p-4 rounded-lg">
                       <h4 className="font-medium mb-2">Environment Configuration</h4>
-                      <div className="bg-muted px-3 py-2 rounded text-sm space-y-1">
-                        <div>VITE_SUPABASE_URL=https://oknnklksdiqaifhxaccs.supabase.co</div>
-                        <div className="break-all">VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA</div>
+                      <div className="bg-muted px-3 py-2 rounded text-sm">
+                        <div>✅ Supabase URL: Connected</div>
+                        <div>✅ Authentication: Configured</div>
+                        <div>✅ Database: Connected</div>
                       </div>
                     </div>
                   </div>

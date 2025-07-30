@@ -1,7 +1,9 @@
 import React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { EmailManagementDashboard } from './EmailManagementDashboard';
 import { EmailDeliveryDashboard } from '@/components/settings/EmailDeliveryDashboard';
+import { EmailTemplateManager } from './EmailTemplateManager';
 
 export const EmailSettingsPage = () => {
   return (
@@ -13,19 +15,35 @@ export const EmailSettingsPage = () => {
         </p>
       </div>
 
-      <EmailManagementDashboard />
+      <Tabs defaultValue="dashboard" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="templates">Templates</TabsTrigger>
+          <TabsTrigger value="delivery">Delivery Logs</TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Recent Email Deliveries</CardTitle>
-          <CardDescription>
-            Monitor the latest email delivery attempts and their status
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <EmailDeliveryDashboard />
-        </CardContent>
-      </Card>
+        <TabsContent value="dashboard">
+          <EmailManagementDashboard />
+        </TabsContent>
+
+        <TabsContent value="templates">
+          <EmailTemplateManager />
+        </TabsContent>
+
+        <TabsContent value="delivery">
+          <Card>
+            <CardHeader>
+              <CardTitle>Email Delivery Monitoring</CardTitle>
+              <CardDescription>
+                Monitor the latest email delivery attempts and their status
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmailDeliveryDashboard />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

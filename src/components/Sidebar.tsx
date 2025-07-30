@@ -11,7 +11,8 @@ import {
   Tag,
   Truck,
   Settings,
-  Store
+  Store,
+  Mail
 } from 'lucide-react';
 import {
   Dialog,
@@ -43,6 +44,7 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
     { icon: User, label: 'Customers', path: '/customers' },
     { icon: Truck, label: 'Delivery & Pickup', path: '/delivery-pickup' },
     { icon: PromotionsSidebarIcon, label: 'Promotions & Loyalty', path: '/promotions' },
+    { icon: Mail, label: 'Email Management', path: '/admin/email-settings' },
     { icon: FileText, label: 'Reports', path: '/reports' },
     { icon: FileText, label: 'Audit Logs', path: '/audit-logs' },
     { icon: Settings, label: 'Settings', path: '/settings' },

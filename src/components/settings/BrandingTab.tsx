@@ -103,9 +103,9 @@ export const BrandingTab = () => {
       
       console.log('Cleaned data being sent:', cleanData);
       
-      // Use Supabase's functions.invoke method with explicit method
+      // Use Supabase's functions.invoke method with proper body formatting
       const { data: result, error } = await supabase.functions.invoke('business-settings', {
-        body: cleanData,
+        body: JSON.stringify(cleanData),
         headers: {
           'Content-Type': 'application/json',
         }

@@ -20,6 +20,15 @@ export interface BusinessSettings {
   seo_title?: string;
   seo_description?: string;
   seo_keywords?: string;
+  primary_color?: string;
+  secondary_color?: string;
+  accent_color?: string;
+  logo_alt_text?: string;
+  logo_dark_url?: string;
+  favicon_url?: string;
+  social_card_url?: string;
+  brand_guidelines?: string;
+  logo_usage_rules?: string;
   created_at: string;
   updated_at: string;
 }

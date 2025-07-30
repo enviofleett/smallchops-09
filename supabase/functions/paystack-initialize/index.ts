@@ -2,12 +2,30 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { PaymentValidator } from "../_shared/payment-validators.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// PRODUCTION CORS - No wildcards
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
+  const isDev = Deno.env.get('DENO_ENV') === 'development';
+  
+  if (isDev) {
+    allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
+  }
+  
+  const isAllowed = origin && allowedOrigins.includes(origin);
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : 'null'),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
+  };
+}
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -22,9 +40,9 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Authenticate user with proper error handling
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    // FIXED AUTH - Consistent validation
+    const authHeader = req.headers.get('authorization'); // lowercase only
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(JSON.stringify({
         status: false,
         error: 'Authentication required'
@@ -34,7 +52,7 @@ serve(async (req) => {
       });
     }
 
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.substring(7); // More secure than replace
     const { data: userData, error: authError } = await supabaseClient.auth.getUser(token);
     
     if (authError || !userData.user) {

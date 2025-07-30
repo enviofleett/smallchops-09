@@ -11,11 +11,12 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle2, Mail, Send, Settings, TestTube, ExternalLink, Shield } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Mail, Send, Settings, TestTube, ExternalLink, Shield, Server } from 'lucide-react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { SMTPSettingsTab } from './SMTPSettingsTab';
 
 const communicationSchema = z.object({
   enable_email: z.boolean().default(false),
@@ -368,7 +369,11 @@ export const CommunicationsTab = () => {
         <TabsList>
           <TabsTrigger value="email" className="flex items-center gap-2">
             <Mail className="h-4 w-4" />
-            Email Settings
+            MailerSend
+          </TabsTrigger>
+          <TabsTrigger value="smtp" className="flex items-center gap-2">
+            <Server className="h-4 w-4" />
+            SMTP Server
           </TabsTrigger>
           <TabsTrigger value="templates" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
@@ -561,6 +566,10 @@ export const CommunicationsTab = () => {
               </Form>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="smtp">
+          <SMTPSettingsTab />
         </TabsContent>
 
         <TabsContent value="templates">

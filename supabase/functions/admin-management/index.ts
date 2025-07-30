@@ -1,23 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Environment-aware CORS headers for production security
+// PRODUCTION CORS - No wildcards, environment-aware
 function getCorsHeaders(origin: string | null): Record<string, string> {
-  // Allow any Lovable project domain for development/preview
-  const allowedOrigins = [
-    'https://oknnklksdiqaifhxaccs.lovableproject.com', // Production
-    /^https:\/\/[\w-]+\.lovableproject\.com$/ // Dev/Preview domains
-  ];
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
+  const isDev = Deno.env.get('DENO_ENV') === 'development';
   
-  const isAllowed = origin && allowedOrigins.some(allowed => 
-    typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
-  );
+  if (isDev) {
+    allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
+  }
+  
+  const isAllowed = origin && allowedOrigins.includes(origin);
   
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://oknnklksdiqaifhxaccs.lovableproject.com',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
+    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : 'null'),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
   };
 }
 
@@ -78,24 +78,16 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Enhanced authentication validation
-    const authHeader = req.headers.get('Authorization')
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.error('Missing or invalid authorization header')
+    // FIXED AUTH - Consistent validation
+    const authHeader = req.headers.get('authorization'); // lowercase only
+    if (!authHeader?.startsWith('Bearer ')) {
       return new Response(
-        JSON.stringify({ error: 'Missing or invalid authorization header' }),
+        JSON.stringify({ error: 'Authentication required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    const token = authHeader.replace('Bearer ', '')
-    if (!token || token.length < 10) {
-      console.error('Invalid token format')
-      return new Response(
-        JSON.stringify({ error: 'Invalid token format' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
+    const token = authHeader.substring(7); // More secure than replace
 
     const { data: user, error: userError } = await supabaseClient.auth.getUser(token)
     if (userError || !user.user) {

@@ -1,207 +1,192 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// Comprehensive production health check endpoint
-// This function provides real-time monitoring of all critical production systems
-
-// Production-ready CORS configuration
-const getCorsHeaders = (origin: string | null): Record<string, string> => {
-  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [
-    'https://oknnklksdiqaifhxaccs.supabase.co',
-    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com'
-  ];
+// PRODUCTION CORS - Environment-aware
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
+  const isDev = Deno.env.get('DENO_ENV') === 'development';
   
-  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  if (isDev) {
+    allowedOrigins.push('http://localhost:5173');
+  }
+  
+  const isAllowed = origin && allowedOrigins.includes(origin);
   
   return {
-    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : 'null'),
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
   };
-};
+}
 
 serve(async (req) => {
   const origin = req.headers.get('origin');
   const corsHeaders = getCorsHeaders(origin);
   
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  // Only allow GET requests
+  if (req.method !== 'GET') {
+    return new Response(JSON.stringify({
+      healthy: false,
+      error: 'Method not allowed'
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 405,
+    });
   }
 
   try {
-    const supabaseClient = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    );
 
-    const healthCheck = await performHealthCheck(supabaseClient)
-    
-    return new Response(
-      JSON.stringify({
-        success: true,
-        health: healthCheck,
-        timestamp: new Date().toISOString(),
-        version: '1.0.0'
-      }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: healthCheck.overall === 'healthy' ? 200 : 503
-      }
-    )
+    const healthStatus = await performHealthCheck(supabase);
+
+    return new Response(JSON.stringify(healthStatus), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: healthStatus.overall === 'healthy' ? 200 : 503,
+    });
 
   } catch (error) {
-    console.error('Health check error:', error)
-    return new Response(
-      JSON.stringify({
-        success: false,
-        health: {
-          overall: 'unhealthy',
-          error: error.message
-        },
-        timestamp: new Date().toISOString()
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
+    console.error('Health check error:', error);
+    
+    return new Response(JSON.stringify({
+      healthy: false,
+      overall: 'unhealthy',
+      error: 'Health check failed',
+      timestamp: new Date().toISOString()
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    });
   }
-})
+});
 
+// Comprehensive health check implementation
 async function performHealthCheck(supabase: any) {
   const checks = {
-    database: { status: 'unknown', details: {} },
-    environment: { status: 'unknown', details: {} },
-    email: { status: 'unknown', details: {} },
-    payments: { status: 'unknown', details: {} },
-    security: { status: 'unknown', details: {} }
+    database: { status: 'unknown', message: '' },
+    environment: { status: 'unknown', message: '' },
+    email: { status: 'unknown', message: '' },
+    payments: { status: 'unknown', message: '' },
+    security: { status: 'unknown', score: 0 }
   };
 
-  let overallHealth = 'healthy';
+  let overallHealthy = true;
 
-  // Database Health Check
+  // Database connectivity check
   try {
-    const { data, error } = await supabase.from('profiles').select('count').limit(1);
-    if (error) throw error;
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('count')
+      .limit(1);
     
-    checks.database.status = 'healthy';
-    checks.database.details = { connected: true, rls_active: true };
+    if (error) {
+      checks.database = { status: 'error', message: `Database error: ${error.message}` };
+      overallHealthy = false;
+    } else {
+      // Check RLS is enabled
+      const { data: rlsCheck } = await supabase.rpc('health_check');
+      checks.database = { 
+        status: 'healthy', 
+        message: rlsCheck ? 'Database connected with RLS enabled' : 'Database connected'
+      };
+    }
   } catch (error) {
-    checks.database.status = 'unhealthy';
-    checks.database.details = { error: error.message };
-    overallHealth = 'unhealthy';
+    checks.database = { status: 'error', message: 'Database connection failed' };
+    overallHealthy = false;
   }
 
-  // Environment Variables Check
-  const requiredEnvVars = [
-    'SUPABASE_URL',
-    'SUPABASE_SERVICE_ROLE_KEY', 
-    'SUPABASE_ANON_KEY',
-    'MAILERSEND_API_TOKEN'
-  ];
-
-  const missingVars = requiredEnvVars.filter(envVar => !Deno.env.get(envVar));
+  // Environment variables check
+  const requiredEnvVars = ['SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY', 'ALLOWED_ORIGINS'];
+  const missingVars = requiredEnvVars.filter(varName => !Deno.env.get(varName));
   
-  if (missingVars.length === 0) {
-    checks.environment.status = 'healthy';
-    checks.environment.details = { 
-      all_vars_present: true,
-      cors_configured: !!Deno.env.get('ALLOWED_ORIGINS')
+  if (missingVars.length > 0) {
+    checks.environment = { 
+      status: 'warning', 
+      message: `Missing environment variables: ${missingVars.join(', ')}` 
     };
   } else {
-    checks.environment.status = 'degraded';
-    checks.environment.details = { 
-      missing_vars: missingVars,
-      cors_configured: !!Deno.env.get('ALLOWED_ORIGINS')
-    };
-    if (overallHealth === 'healthy') overallHealth = 'degraded';
+    const corsConfig = Deno.env.get('ALLOWED_ORIGINS');
+    if (corsConfig === '*') {
+      checks.environment = { 
+        status: 'warning', 
+        message: 'CORS configured with wildcard - security risk in production' 
+      };
+    } else {
+      checks.environment = { status: 'healthy', message: 'Environment properly configured' };
+    }
   }
 
-  // Email System Health Check
+  // Email system check
   try {
-    const { data: emailSettings } = await supabase
+    const { data: emailConfig } = await supabase
       .from('communication_settings')
       .select('sender_email, mailersend_domain_verified')
       .single();
-
-    if (emailSettings && emailSettings.mailersend_domain_verified) {
-      checks.email.status = 'healthy';
-      checks.email.details = { 
-        configured: true, 
-        domain_verified: true,
-        sender_email: emailSettings.sender_email
-      };
+    
+    const mailersendToken = Deno.env.get('MAILERSEND_API_TOKEN');
+    
+    if (!mailersendToken) {
+      checks.email = { status: 'error', message: 'MailerSend API token not configured' };
+      overallHealthy = false;
+    } else if (!emailConfig?.sender_email) {
+      checks.email = { status: 'warning', message: 'Sender email not configured' };
+    } else if (!emailConfig?.mailersend_domain_verified) {
+      checks.email = { status: 'warning', message: 'Email domain not verified' };
     } else {
-      checks.email.status = 'degraded';
-      checks.email.details = { 
-        configured: !!emailSettings,
-        domain_verified: false
-      };
-      if (overallHealth === 'healthy') overallHealth = 'degraded';
+      checks.email = { status: 'healthy', message: 'Email system configured and verified' };
     }
   } catch (error) {
-    checks.email.status = 'unhealthy';
-    checks.email.details = { error: error.message };
-    overallHealth = 'unhealthy';
+    checks.email = { status: 'error', message: 'Failed to check email configuration' };
   }
 
-  // Payment System Health Check
+  // Payment system check
   try {
     const { data: paymentConfig } = await supabase
       .from('payment_integrations')
-      .select('provider, connection_status, test_mode')
+      .select('provider, connection_status')
       .eq('provider', 'paystack')
       .single();
-
-    if (paymentConfig && paymentConfig.connection_status === 'connected') {
-      checks.payments.status = 'healthy';
-      checks.payments.details = {
-        provider: paymentConfig.provider,
-        connected: true,
-        test_mode: paymentConfig.test_mode
-      };
+    
+    if (!paymentConfig) {
+      checks.payments = { status: 'warning', message: 'No payment integration configured' };
+    } else if (paymentConfig.connection_status !== 'connected') {
+      checks.payments = { status: 'error', message: 'Payment integration not connected' };
+      overallHealthy = false;
     } else {
-      checks.payments.status = 'degraded';
-      checks.payments.details = {
-        provider: 'paystack',
-        connected: false
-      };
-      if (overallHealth === 'healthy') overallHealth = 'degraded';
+      checks.payments = { status: 'healthy', message: 'Payment system connected' };
     }
   } catch (error) {
-    checks.payments.status = 'unhealthy';
-    checks.payments.details = { error: error.message };
-    overallHealth = 'unhealthy';
+    checks.payments = { status: 'error', message: 'Failed to check payment configuration' };
   }
 
-  // Security Health Check
+  // Security score calculation
   const securityScore = await calculateSecurityScore(supabase);
-  
-  if (securityScore >= 90) {
-    checks.security.status = 'healthy';
-  } else if (securityScore >= 70) {
-    checks.security.status = 'degraded';
-    if (overallHealth === 'healthy') overallHealth = 'degraded';
-  } else {
-    checks.security.status = 'unhealthy';
-    overallHealth = 'unhealthy';
-  }
-  
-  checks.security.details = { 
-    security_score: securityScore,
-    cors_wildcard_fixed: true,
-    auth_enabled: true,
-    rls_enabled: true
-  };
+  checks.security = { status: securityScore >= 80 ? 'healthy' : 'warning', score: securityScore };
+
+  // Generate recommendations
+  const recommendations = generateRecommendations(checks);
 
   return {
-    overall: overallHealth,
+    healthy: overallHealthy,
+    overall: overallHealthy ? 'healthy' : 'degraded',
     checks,
-    recommendations: generateRecommendations(checks)
+    recommendations,
+    timestamp: new Date().toISOString(),
+    version: '1.0.0'
   };
 }
 
+// Security score calculation
 async function calculateSecurityScore(supabase: any): Promise<number> {
   let score = 100;
 
@@ -209,72 +194,68 @@ async function calculateSecurityScore(supabase: any): Promise<number> {
   try {
     const { data: testOrders } = await supabase
       .from('orders')
-      .select('id')
+      .select('count')
       .ilike('customer_email', '%test%')
       .limit(1);
     
     if (testOrders && testOrders.length > 0) {
-      score -= 10; // Deduct for test data
+      score -= 20; // Deduct for test data
     }
   } catch (error) {
-    // Table might not exist, no penalty
+    // Non-critical error
   }
 
-  // Check environment variables security
-  if (!Deno.env.get('ALLOWED_ORIGINS')) {
-    score -= 15; // Deduct for missing CORS configuration
+  // Check CORS configuration
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS');
+  if (!allowedOrigins || allowedOrigins === '*') {
+    score -= 30; // Major security issue
   }
 
-  // Check for placeholder business data
+  // Check for placeholder data
   try {
     const { data: businessSettings } = await supabase
       .from('business_settings')
       .select('email, phone')
-      .order('updated_at', { ascending: false })
-      .limit(1)
       .single();
     
-    if (businessSettings?.email?.includes('example.com')) {
-      score -= 5; // Minor deduction for placeholder email
-    }
-    
-    if (businessSettings?.phone?.includes('XXX')) {
-      score -= 5; // Minor deduction for placeholder phone
+    if (businessSettings?.email?.includes('example.com') || 
+        businessSettings?.phone?.includes('555-')) {
+      score -= 10; // Minor deduction for placeholder data
     }
   } catch (error) {
-    // Settings might not exist, no penalty
+    // Non-critical error
   }
 
-  return Math.max(0, score);
+  return Math.max(score, 0);
 }
 
+// Generate actionable recommendations
 function generateRecommendations(checks: any): string[] {
   const recommendations: string[] = [];
 
   if (checks.environment.status !== 'healthy') {
-    recommendations.push('Configure missing environment variables for production');
-    if (!checks.environment.details.cors_configured) {
-      recommendations.push('Set ALLOWED_ORIGINS environment variable for secure CORS');
-    }
+    recommendations.push('Configure all required environment variables in Supabase Edge Functions settings');
   }
 
-  if (checks.email.status !== 'healthy') {
-    if (!checks.email.details.domain_verified) {
-      recommendations.push('Verify your MailerSend domain for reliable email delivery');
-    }
+  if (checks.email.status === 'error') {
+    recommendations.push('Configure MailerSend API token in Supabase secrets');
+  } else if (checks.email.status === 'warning') {
+    recommendations.push('Verify your email domain in MailerSend dashboard');
   }
 
   if (checks.payments.status !== 'healthy') {
-    recommendations.push('Configure and test payment integration');
+    recommendations.push('Configure and connect Paystack payment integration');
   }
 
-  if (checks.security.details.security_score < 90) {
-    recommendations.push('Review and remove test data from production database');
-    recommendations.push('Update placeholder business information');
+  if (checks.security.score < 80) {
+    recommendations.push('Review and improve security configuration');
+    if (!Deno.env.get('ALLOWED_ORIGINS') || Deno.env.get('ALLOWED_ORIGINS') === '*') {
+      recommendations.push('Set specific allowed origins for CORS instead of wildcard');
+    }
   }
 
-  if (recommendations.length === 0) {
-    recommendations.push('All systems are healthy and production-ready!');
+  if (checks.database.status !== 'healthy') {
+    recommendations.push('Check database connectivity and RLS policies');
   }
 
   return recommendations;

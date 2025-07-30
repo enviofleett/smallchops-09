@@ -1,26 +1,23 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// Production-ready CORS configuration
+// PRODUCTION CORS - No wildcards
 const getCorsHeaders = (origin: string | null): Record<string, string> => {
-  const allowedOrigins = [
-    'https://oknnklksdiqaifhxaccs.supabase.co',
-    'https://lovable.dev',
-    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com',
-    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev',
-    'https://project-oknnklksdiqaifhxaccs.lovable.app',
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:8000'
-  ];
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
+  const isDev = Deno.env.get('DENO_ENV') === 'development';
   
-  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : '*';
+  if (isDev) {
+    allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
+  }
+  
+  const isAllowed = origin && allowedOrigins.includes(origin);
   
   return {
-    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : 'null'),
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
   };
 };
 
@@ -40,15 +37,15 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // Enhanced auth header validation
-    const authHeader = req.headers.get('Authorization');
+    // FIXED AUTH - Consistent validation  
+    const authHeader = req.headers.get('authorization'); // lowercase only
     console.log('Auth header present:', !!authHeader);
     
-    if (!authHeader) {
-      throw new Error('Authorization header missing');
+    if (!authHeader?.startsWith('Bearer ')) {
+      throw new Error('Authentication required');
     }
     
-    const token = authHeader.replace('Bearer ', '');
+    const token = authHeader.substring(7); // More secure than replace
     const { data: user, error: authError } = await supabaseClient.auth.getUser(token);
 
     if (authError) {

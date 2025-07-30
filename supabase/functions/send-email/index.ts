@@ -1,20 +1,23 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// Production-ready CORS configuration
+// PRODUCTION CORS - Environment-aware
 const getCorsHeaders = (origin: string | null): Record<string, string> => {
-  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [
-    'https://oknnklksdiqaifhxaccs.supabase.co',
-    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com'
-  ];
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
+  const isDev = Deno.env.get('DENO_ENV') === 'development';
   
-  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  if (isDev) {
+    allowedOrigins.push('http://localhost:5173');
+  }
+  
+  const isAllowed = origin && allowedOrigins.includes(origin);
   
   return {
-    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : 'null'),
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
   };
 };
 
@@ -44,9 +47,16 @@ serve(async (req) => {
   try {
     logStep("Email function started");
 
+    // SECURITY: Validate MailerSend token exists
     const apiToken = Deno.env.get("MAILERSEND_API_TOKEN");
     if (!apiToken) {
-      throw new Error("MailerSend API token not configured");
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Email service not configured'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 503,
+      });
     }
 
     const supabaseClient = createClient(
@@ -57,8 +67,27 @@ serve(async (req) => {
 
     const { to, toName, subject, template, variables, html, text }: EmailRequest = await req.json();
     
+    // FIXED input validation
     if (!to || !subject) {
-      throw new Error("Missing required fields: 'to' and 'subject'");
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Missing required fields: to and subject'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
+    }
+
+    // SECURITY: Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(to)) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid email address'
+      }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 400,
+      });
     }
 
     logStep("Processing email request", { to, subject, template });

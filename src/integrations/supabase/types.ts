@@ -2478,6 +2478,51 @@ export type Database = {
         }
         Relationships: []
       }
+      smtp_delivery_logs: {
+        Row: {
+          created_at: string
+          delivery_status: string
+          delivery_timestamp: string | null
+          error_message: string | null
+          id: string
+          message_id: string | null
+          metadata: Json | null
+          provider: string
+          recipient_email: string
+          sender_email: string | null
+          smtp_response: string | null
+          subject: string | null
+        }
+        Insert: {
+          created_at?: string
+          delivery_status?: string
+          delivery_timestamp?: string | null
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          metadata?: Json | null
+          provider?: string
+          recipient_email: string
+          sender_email?: string | null
+          smtp_response?: string | null
+          subject?: string | null
+        }
+        Update: {
+          created_at?: string
+          delivery_status?: string
+          delivery_timestamp?: string | null
+          error_message?: string | null
+          id?: string
+          message_id?: string | null
+          metadata?: Json | null
+          provider?: string
+          recipient_email?: string
+          sender_email?: string | null
+          smtp_response?: string | null
+          subject?: string | null
+        }
+        Relationships: []
+      }
       transaction_analytics: {
         Row: {
           average_transaction_value: number | null

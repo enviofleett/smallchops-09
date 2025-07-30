@@ -136,22 +136,115 @@ export type Database = {
         }
         Relationships: []
       }
+      brand_assets: {
+        Row: {
+          asset_name: string | null
+          asset_type: string
+          asset_url: string
+          created_at: string | null
+          dimensions: Json | null
+          file_size: number | null
+          file_type: string | null
+          id: string
+          is_active: boolean | null
+          updated_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          asset_name?: string | null
+          asset_type: string
+          asset_url: string
+          created_at?: string | null
+          dimensions?: Json | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          asset_name?: string | null
+          asset_type?: string
+          asset_url?: string
+          created_at?: string | null
+          dimensions?: Json | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          is_active?: boolean | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: []
+      }
+      branding_audit_log: {
+        Row: {
+          action: string
+          changed_at: string | null
+          created_at: string | null
+          field_name: string
+          id: string
+          ip_address: unknown | null
+          metadata: Json | null
+          new_value: string | null
+          old_value: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          changed_at?: string | null
+          created_at?: string | null
+          field_name: string
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          new_value?: string | null
+          old_value?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          changed_at?: string | null
+          created_at?: string | null
+          field_name?: string
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          new_value?: string | null
+          old_value?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       business_settings: {
         Row: {
+          accent_color: string | null
           address: string | null
+          brand_guidelines: string | null
           business_hours: Json | null
           created_at: string
           email: string | null
           facebook_url: string | null
+          favicon_url: string | null
           id: string
           instagram_url: string | null
           linkedin_url: string | null
+          logo_alt_text: string | null
+          logo_dark_url: string | null
           logo_url: string | null
+          logo_usage_rules: string | null
           name: string
           phone: string | null
+          primary_color: string | null
+          secondary_color: string | null
           seo_description: string | null
           seo_keywords: string | null
           seo_title: string | null
+          social_card_url: string | null
           tagline: string | null
           tiktok_url: string | null
           twitter_url: string | null
@@ -161,20 +254,29 @@ export type Database = {
           youtube_url: string | null
         }
         Insert: {
+          accent_color?: string | null
           address?: string | null
+          brand_guidelines?: string | null
           business_hours?: Json | null
           created_at?: string
           email?: string | null
           facebook_url?: string | null
+          favicon_url?: string | null
           id?: string
           instagram_url?: string | null
           linkedin_url?: string | null
+          logo_alt_text?: string | null
+          logo_dark_url?: string | null
           logo_url?: string | null
+          logo_usage_rules?: string | null
           name: string
           phone?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
+          social_card_url?: string | null
           tagline?: string | null
           tiktok_url?: string | null
           twitter_url?: string | null
@@ -184,20 +286,29 @@ export type Database = {
           youtube_url?: string | null
         }
         Update: {
+          accent_color?: string | null
           address?: string | null
+          brand_guidelines?: string | null
           business_hours?: Json | null
           created_at?: string
           email?: string | null
           facebook_url?: string | null
+          favicon_url?: string | null
           id?: string
           instagram_url?: string | null
           linkedin_url?: string | null
+          logo_alt_text?: string | null
+          logo_dark_url?: string | null
           logo_url?: string | null
+          logo_usage_rules?: string | null
           name?: string
           phone?: string | null
+          primary_color?: string | null
+          secondary_color?: string | null
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
+          social_card_url?: string | null
           tagline?: string | null
           tiktok_url?: string | null
           twitter_url?: string | null
@@ -950,6 +1061,51 @@ export type Database = {
           paystack_test_secret_key?: string | null
           updated_at?: string | null
           webhook_url?: string | null
+        }
+        Relationships: []
+      }
+      logo_versions: {
+        Row: {
+          created_at: string | null
+          dimensions: Json | null
+          file_size: number | null
+          file_type: string | null
+          id: string
+          is_current: boolean | null
+          logo_url: string
+          replaced_at: string | null
+          replaced_by: string | null
+          upload_date: string | null
+          uploaded_by: string | null
+          version_number: number
+        }
+        Insert: {
+          created_at?: string | null
+          dimensions?: Json | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          is_current?: boolean | null
+          logo_url: string
+          replaced_at?: string | null
+          replaced_by?: string | null
+          upload_date?: string | null
+          uploaded_by?: string | null
+          version_number: number
+        }
+        Update: {
+          created_at?: string | null
+          dimensions?: Json | null
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          is_current?: boolean | null
+          logo_url?: string
+          replaced_at?: string | null
+          replaced_by?: string | null
+          upload_date?: string | null
+          uploaded_by?: string | null
+          version_number?: number
         }
         Relationships: []
       }
@@ -2367,6 +2523,27 @@ export type Database = {
         }
         Relationships: []
       }
+      upload_rate_limits: {
+        Row: {
+          id: string
+          upload_count: number | null
+          user_id: string | null
+          window_hour: string | null
+        }
+        Insert: {
+          id?: string
+          upload_count?: number | null
+          user_id?: string | null
+          window_hour?: string | null
+        }
+        Update: {
+          id?: string
+          upload_count?: number | null
+          user_id?: string | null
+          window_hour?: string | null
+        }
+        Relationships: []
+      }
       user_permission_audit: {
         Row: {
           action: string
@@ -2606,6 +2783,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_brand_consistency_score: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       check_enhanced_rate_limit: {
         Args: {
           p_user_id?: string
@@ -2614,6 +2795,10 @@ export type Database = {
           p_limit_per_minute?: number
           p_limit_per_hour?: number
         }
+        Returns: boolean
+      }
+      check_upload_rate_limit: {
+        Args: { p_user_id: string }
         Returns: boolean
       }
       check_user_permission: {
@@ -2640,6 +2825,16 @@ export type Database = {
           p_confirmed_at: string
         }
         Returns: Json
+      }
+      create_logo_version: {
+        Args: {
+          p_logo_url: string
+          p_file_size: number
+          p_file_type: string
+          p_dimensions: Json
+          p_uploaded_by: string
+        }
+        Returns: string
       }
       customer_purchased_product: {
         Args: { customer_uuid: string; product_uuid: string }
@@ -2734,6 +2929,18 @@ export type Database = {
           action_result?: string
         }
         Returns: undefined
+      }
+      log_branding_change: {
+        Args: {
+          p_action: string
+          p_field_name: string
+          p_old_value: string
+          p_new_value: string
+          p_metadata?: Json
+          p_ip_address?: unknown
+          p_user_agent?: string
+        }
+        Returns: string
       }
       log_payment_error: {
         Args: {

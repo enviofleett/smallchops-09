@@ -1,4 +1,5 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -138,38 +139,94 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6. Send email via SMTP using Web APIs
-    const emailPayload = {
-      from: {
-        email: smtpConfig.sender_email,
-        name: smtpConfig.sender_name || 'Your Business'
-      },
-      to: [{
-        email: to,
-        name: toName || ''
-      }],
-      subject: subject,
-      html: emailContent.html,
-      text: emailContent.text
-    }
-
+    // 6. Send email via real SMTP
     console.log(`Sending email via SMTP to ${smtpConfig.smtp_host}:${smtpConfig.smtp_port}`)
 
-    // For now, we'll simulate SMTP sending and log the configuration
-    // In a production environment, you would use an SMTP library
-    const messageId = `smtp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    
-    console.log('SMTP Email Configuration:', {
-      host: smtpConfig.smtp_host,
-      port: smtpConfig.smtp_port,
-      secure: smtpConfig.smtp_secure,
-      user: smtpConfig.smtp_user,
-      // Don't log password
+    // Create SMTP client with database configuration
+    const client = new SMTPClient({
+      connection: {
+        hostname: smtpConfig.smtp_host,
+        port: smtpConfig.smtp_port,
+        tls: smtpConfig.smtp_secure,
+        auth: {
+          username: smtpConfig.smtp_user,
+          password: smtpConfig.smtp_pass,
+        },
+      },
     })
 
-    console.log('Email Payload:', JSON.stringify(emailPayload, null, 2))
+    let messageId: string
+    let smtpResponse: string
 
-    // 7. Log the email event to SMTP delivery logs
+    try {
+      // Send email using the SMTP client
+      const result = await client.send({
+        from: smtpConfig.sender_name 
+          ? `${smtpConfig.sender_name} <${smtpConfig.sender_email}>`
+          : smtpConfig.sender_email,
+        to: toName ? `${toName} <${to}>` : to,
+        subject: subject,
+        content: emailContent.text || "Email content",
+        html: emailContent.html || undefined,
+      })
+
+      await client.close()
+
+      // Extract message ID from SMTP response or generate one
+      messageId = result?.messageId || `smtp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      smtpResponse = `Email sent successfully via SMTP. Message ID: ${messageId}`
+      
+      console.log('SMTP send result:', result)
+
+    } catch (smtpError) {
+      await client.close().catch(() => {}) // Ensure client is closed even on error
+      
+      // Log the SMTP error but still create a delivery log entry
+      messageId = `smtp-failed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      smtpResponse = `SMTP Error: ${smtpError.message}`
+      
+      console.error('SMTP sending failed:', smtpError)
+      
+      // Log failed attempt to database
+      await supabase
+        .from('smtp_delivery_logs')
+        .insert({
+          message_id: messageId,
+          recipient_email: to,
+          sender_email: smtpConfig.sender_email,
+          subject: subject,
+          delivery_status: 'failed',
+          provider: 'smtp',
+          smtp_response: smtpResponse,
+          delivery_timestamp: new Date().toISOString(),
+          metadata: {
+            emailType,
+            priority,
+            templateKey: templateKey || null,
+            variables: variables,
+            error: smtpError.message
+          }
+        })
+
+      // Also log failure to communication_events
+      await supabase
+        .from('communication_events')
+        .insert({
+          recipient_email: to,
+          template_id: templateKey || 'custom',
+          email_type: emailType,
+          status: 'failed',
+          external_id: messageId,
+          variables: variables,
+          sent_at: new Date().toISOString(),
+          delivery_status: 'failed',
+          error_message: smtpError.message
+        })
+
+      throw smtpError // Re-throw to be handled by outer catch block
+    }
+
+    // 7. Log the successful email event to SMTP delivery logs
     await supabase
       .from('smtp_delivery_logs')
       .insert({
@@ -179,7 +236,7 @@ Deno.serve(async (req) => {
         subject: subject,
         delivery_status: 'sent',
         provider: 'smtp',
-        smtp_response: 'Email sent via SMTP (simulated)',
+        smtp_response: smtpResponse,
         delivery_timestamp: new Date().toISOString(),
         metadata: {
           emailType,

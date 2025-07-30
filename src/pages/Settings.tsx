@@ -6,6 +6,7 @@ import { AdminUserControl } from "@/components/settings/AdminUserControl";
 import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
 import { PaymentSettingsTab } from "@/components/payments/PaymentSettingsTab";
 import { EmailTestingSimulation } from "@/components/admin/EmailTestingSimulation";
+import { EmailManagementDashboard } from "@/components/admin/EmailManagementDashboard";
 import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -46,10 +47,11 @@ const Settings = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7">
           <TabsTrigger value="branding">Branding</TabsTrigger>
           <TabsTrigger value="communications">Communications</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
+          {isAdmin && <TabsTrigger value="email">Email</TabsTrigger>}
           {isAdmin && <TabsTrigger value="admin">Admin User Control</TabsTrigger>}
           {isAdmin && <TabsTrigger value="testing">Email Testing</TabsTrigger>}
           {isAdmin && <TabsTrigger value="developer">Developer</TabsTrigger>}
@@ -96,6 +98,22 @@ const Settings = () => {
             </CardContent>
           </Card>
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="email" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Email Management</CardTitle>
+                <CardDescription>
+                  Configure SMTP settings, manage templates, and monitor email delivery
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <EmailManagementDashboard />
+              </CardContent>
+            </Card>
+          </TabsContent>
+        )}
 
         {isAdmin && (
           <TabsContent value="admin" className="space-y-6">

@@ -491,6 +491,7 @@ export type Database = {
           mailersend_domain: string | null
           mailersend_domain_verified: boolean | null
           sender_email: string | null
+          sender_name: string | null
           sms_api_key: string | null
           sms_provider: string | null
           sms_sender_id: string | null
@@ -513,6 +514,7 @@ export type Database = {
           mailersend_domain?: string | null
           mailersend_domain_verified?: boolean | null
           sender_email?: string | null
+          sender_name?: string | null
           sms_api_key?: string | null
           sms_provider?: string | null
           sms_sender_id?: string | null
@@ -535,6 +537,7 @@ export type Database = {
           mailersend_domain?: string | null
           mailersend_domain_verified?: boolean | null
           sender_email?: string | null
+          sender_name?: string | null
           sms_api_key?: string | null
           sms_provider?: string | null
           sms_sender_id?: string | null

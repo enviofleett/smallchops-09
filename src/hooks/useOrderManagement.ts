@@ -60,6 +60,9 @@ export const useOrderManagement = () => {
         provider_reference: `order_${orderResponse.data.id}_${Date.now()}`
       });
 
+      // Note: Order confirmation email will be automatically triggered by database trigger
+      console.log('Order placed successfully, confirmation email will be sent automatically');
+
       return orderResponse.data;
 
     } catch (error) {
@@ -86,6 +89,9 @@ export const useOrderManagement = () => {
         .eq('id', orderId);
 
       if (error) throw error;
+
+      // Note: Payment confirmation email will be automatically triggered by database trigger
+      console.log('Order payment status updated, notification email will be sent automatically');
 
       toast.success(`Order ${paymentStatus === 'paid' ? 'confirmed' : 'cancelled'} successfully`);
     } catch (error) {

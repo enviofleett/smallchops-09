@@ -3,6 +3,9 @@ project_id = "oknnklksdiqaifhxaccs"
 [functions.mailersend-webhook-handler]
 verify_jwt = false
 
+[functions.mailersend-webhook-secure]
+verify_jwt = false
+
 [functions.paystack-webhook-secure]
 verify_jwt = false
 
@@ -20,3 +23,15 @@ verify_jwt = false
 
 [functions.get-products-by-category]
 verify_jwt = false
+
+[functions.production-health-check]
+verify_jwt = false
+
+[functions.security-monitor]
+verify_jwt = true
+
+[functions.production-audit-fix]
+verify_jwt = true
+
+[functions.production-deployment-check]
+verify_jwt = true

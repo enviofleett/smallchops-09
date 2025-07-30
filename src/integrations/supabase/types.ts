@@ -1004,6 +1004,36 @@ export type Database = {
         }
         Relationships: []
       }
+      email_unsubscribes: {
+        Row: {
+          email_address: string
+          id: string
+          ip_address: unknown | null
+          reason: string | null
+          unsubscribe_type: string
+          unsubscribed_at: string
+          user_agent: string | null
+        }
+        Insert: {
+          email_address: string
+          id?: string
+          ip_address?: unknown | null
+          reason?: string | null
+          unsubscribe_type?: string
+          unsubscribed_at?: string
+          user_agent?: string | null
+        }
+        Update: {
+          email_address?: string
+          id?: string
+          ip_address?: unknown | null
+          reason?: string | null
+          unsubscribe_type?: string
+          unsubscribed_at?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       enhanced_email_templates: {
         Row: {
           created_at: string
@@ -2879,6 +2909,10 @@ export type Database = {
       calculate_brand_consistency_score: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      can_send_email_to: {
+        Args: { email_address: string; email_type?: string }
+        Returns: boolean
       }
       check_enhanced_rate_limit: {
         Args: {

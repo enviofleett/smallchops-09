@@ -44,6 +44,24 @@ export const useErrorHandler = () => {
           description: "There was a problem with the data format. Please refresh and try again.",
           variant: "destructive",
         };
+      } else if (error.message.includes("CORS") || error.message.includes("Failed to fetch")) {
+        errorDetails = {
+          title: "Connection Error",
+          description: "Unable to connect to the server. Please check your internet connection and try again.",
+          variant: "destructive",
+        };
+      } else if (error.message.includes("FunctionsFetchError")) {
+        errorDetails = {
+          title: "Service Error",
+          description: "The requested service is temporarily unavailable. Please try again in a moment.",
+          variant: "destructive",
+        };
+      } else if (error.message.includes("timeout") || error.message.includes("Timeout")) {
+        errorDetails = {
+          title: "Request Timeout",
+          description: "The request took too long to complete. Please try again.",
+          variant: "destructive",
+        };
       } else {
         errorDetails = {
           title: "Error",

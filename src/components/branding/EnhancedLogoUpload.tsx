@@ -6,8 +6,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { supabase } from '@/integrations/supabase/client';
+import { useApiWithRetry } from '@/hooks/useApiWithRetry';
 import { toast } from 'sonner';
+import EnhancedErrorBoundary from '@/components/ui/enhanced-error-boundary';
 
 interface ValidationResult {
   isValid: boolean;
@@ -30,6 +31,7 @@ export const EnhancedLogoUpload = ({
   disabled = false,
   onValidation 
 }: EnhancedLogoUploadProps) => {
+  const { invokeWithRetry } = useApiWithRetry();
   const [uploading, setUploading] = useState(false);
   const [validating, setValidating] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -50,7 +52,7 @@ export const EnhancedLogoUpload = ({
         reader.readAsDataURL(file);
       });
 
-      const { data, error } = await supabase.functions.invoke('validate-logo', {
+      const { data, error } = await invokeWithRetry('validate-logo', {
         body: {
           file: {
             name: file.name,
@@ -89,7 +91,7 @@ export const EnhancedLogoUpload = ({
         setUploadProgress(prev => Math.min(prev + 10, 90));
       }, 200);
 
-      const { data, error } = await supabase.functions.invoke('upload-logo', {
+      const { data, error } = await invokeWithRetry('upload-logo', {
         body: {
           file: {
             name: file.name,
@@ -99,6 +101,8 @@ export const EnhancedLogoUpload = ({
           },
           alt_text: altText
         }
+      }, {
+        maxRetries: 2, // Fewer retries for uploads to avoid duplicates
       });
 
       clearInterval(progressInterval);
@@ -261,15 +265,16 @@ export const EnhancedLogoUpload = ({
   }
 
   return (
-    <div className="space-y-4">
-      <Card
-        {...getRootProps()}
-        className={`
-          cursor-pointer transition-all duration-200 hover:shadow-md
-          ${isDragActive ? 'border-primary bg-primary/5' : 'border-dashed border-muted-foreground/25'}
-          ${(uploading || validating) ? 'pointer-events-none opacity-60' : ''}
-        `}
-      >
+    <EnhancedErrorBoundary context="Logo Upload Component">
+      <div className="space-y-4">
+        <Card
+          {...getRootProps()}
+          className={`
+            cursor-pointer transition-all duration-200 hover:shadow-md
+            ${isDragActive ? 'border-primary bg-primary/5' : 'border-dashed border-muted-foreground/25'}
+            ${(uploading || validating) ? 'pointer-events-none opacity-60' : ''}
+          `}
+        >
         <input {...getInputProps()} />
         <CardContent className="p-8">
           <div className="flex flex-col items-center justify-center text-center space-y-4">
@@ -315,7 +320,8 @@ export const EnhancedLogoUpload = ({
         <p>• Recommended: PNG or SVG format for best quality</p>
         <p>• Optimal size: 200x60px to 400x120px</p>
         <p>• Will be automatically validated for security and quality</p>
+        </div>
       </div>
-    </div>
+    </EnhancedErrorBoundary>
   );
 };

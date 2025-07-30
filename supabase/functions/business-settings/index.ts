@@ -5,15 +5,16 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const getCorsHeaders = (origin: string | null): Record<string, string> => {
   const allowedOrigins = [
     'https://oknnklksdiqaifhxaccs.supabase.co',
-    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev',
+    'https://lovable.dev',
     'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev',
     'https://project-oknnklksdiqaifhxaccs.lovable.app',
     'http://localhost:5173',
     'http://localhost:3000',
     'http://localhost:8000'
   ];
   
-  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : '*';
   
   return {
     'Access-Control-Allow-Origin': corsOrigin,
@@ -226,20 +227,12 @@ serve(async (req) => {
           });
         }
 
-        // Call the send-email function using direct HTTP request
+        // Call the send-email function using Supabase client
         try {
           console.log('Calling send-email function...');
           
-          const sendEmailUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/send-email`;
-          
-          const emailResponse = await fetch(sendEmailUrl, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
-              'Content-Type': 'application/json',
-              'apikey': Deno.env.get('SUPABASE_ANON_KEY') || ''
-            },
-            body: JSON.stringify({
+          const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('send-email', {
+            body: {
               to: settings.sender_email, // Send test email to sender
               subject: 'MailerSend Test Email - Connection Successful',
               html: `
@@ -250,23 +243,21 @@ serve(async (req) => {
                 <p>Time: ${new Date().toISOString()}</p>
               `,
               order_id: null // Optional field for test emails
-            })
+            }
           });
           
-          const emailResult = await emailResponse.json();
-
-          if (!emailResponse.ok) {
-            console.error('Send-email function failed:', emailResponse.status, emailResponse.statusText, emailResult);
+          if (emailError) {
+            console.error('Send-email function failed:', emailError);
             return new Response(JSON.stringify({
               success: false,
-              error: `Email test failed: ${emailResult.error || 'Unknown error from send-email function'}`
+              error: `Email test failed: ${emailError.message || 'Unknown error from send-email function'}`
             }), {
               status: 400,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
             });
           }
 
-          if (!emailResult.success) {
+          if (!emailResult?.success) {
             console.error('Email test failed (internal):', emailResult.error);
             return new Response(JSON.stringify({
               success: false,

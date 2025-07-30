@@ -1,6 +1,7 @@
 
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useApiWithRetry } from "./useApiWithRetry";
 
 export interface BusinessSettings {
   id: string;
@@ -35,13 +36,22 @@ export interface BusinessSettings {
 
 export const useBusinessSettings = () => {
   const queryClient = useQueryClient();
+  const { invokeWithRetry } = useApiWithRetry();
 
   const query = useQuery({
     queryKey: ['business-settings'],
     queryFn: async (): Promise<BusinessSettings | null> => {
-      // Use edge function to get business settings
-      const { data: result, error } = await supabase.functions.invoke('business-settings', {
+      // Use edge function to get business settings with retry logic
+      const { data: result, error } = await invokeWithRetry('business-settings', {
         method: 'GET'
+      }, {
+        maxRetries: 3,
+        retryCondition: (error) => {
+          // Retry on network errors and 5xx errors
+          return error?.message?.includes('Failed to send a request') ||
+                 error?.message?.includes('Network') ||
+                 error?.status >= 500;
+        }
       });
 
       if (error) {
@@ -53,6 +63,10 @@ export const useBusinessSettings = () => {
     },
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
+    retry: (failureCount, error: any) => {
+      // Let our custom retry logic handle retries instead of react-query
+      return false;
+    },
   });
 
   const invalidateSettings = async () => {

@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
+import EnhancedErrorBoundary from "./components/ui/enhanced-error-boundary";
 import Orders from "./pages/Orders";
 import Products from "./pages/Products";
 import Customers from "./pages/Customers";
@@ -26,41 +27,43 @@ import Unsubscribe from "./pages/Unsubscribe";
 const queryClient = new QueryClient();
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <AuthProvider>
-        <BrowserRouter>
-          <Routes>
-            {/* Public routes */}
-            <Route path="/customer-portal" element={<CustomerPortal />} />
-            <Route path="/customer-favorites" element={<CustomerFavorites />} />
-            <Route path="/purchase-history" element={<PurchaseHistory />} />
-            <Route path="/payment/callback" element={<PaymentCallback />} />
-            <Route path="/payment/success" element={<PaymentCallback />} />
-            <Route path="/payment/failed" element={<PaymentCallback />} />
-            <Route path="/unsubscribe" element={<Unsubscribe />} />
-            
-            {/* Protected routes */}
-            <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-              <Route path="/" element={<Index />} />
-              <Route path="/orders" element={<Orders />} />
-              <Route path="/products" element={<Products />} />
-              <Route path="/customers" element={<Customers />} />
-              <Route path="/delivery-pickup" element={<DeliveryPickup />} />
-              <Route path="/reports" element={<Reports />} />
-              <Route path="/promotions" element={<Promotions />} />
-              <Route path="/audit-logs" element={<AuditLogs />} />
-              <Route path="/settings" element={<Settings />} />
-              <Route path="/payment-settings" element={<PaymentSettings />} />
-            </Route>
-            <Route path="*" element={<NotFound />} />
-          </Routes>
-        </BrowserRouter>
-      </AuthProvider>
-    </TooltipProvider>
-  </QueryClientProvider>
+  <EnhancedErrorBoundary context="Main Application" showErrorDetails={true}>
+    <QueryClientProvider client={queryClient}>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <AuthProvider>
+          <BrowserRouter>
+            <Routes>
+              {/* Public routes */}
+              <Route path="/customer-portal" element={<CustomerPortal />} />
+              <Route path="/customer-favorites" element={<CustomerFavorites />} />
+              <Route path="/purchase-history" element={<PurchaseHistory />} />
+              <Route path="/payment/callback" element={<PaymentCallback />} />
+              <Route path="/payment/success" element={<PaymentCallback />} />
+              <Route path="/payment/failed" element={<PaymentCallback />} />
+              <Route path="/unsubscribe" element={<Unsubscribe />} />
+              
+              {/* Protected routes */}
+              <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+                <Route path="/" element={<EnhancedErrorBoundary context="Dashboard"><Index /></EnhancedErrorBoundary>} />
+                <Route path="/orders" element={<EnhancedErrorBoundary context="Orders"><Orders /></EnhancedErrorBoundary>} />
+                <Route path="/products" element={<EnhancedErrorBoundary context="Products"><Products /></EnhancedErrorBoundary>} />
+                <Route path="/customers" element={<EnhancedErrorBoundary context="Customers"><Customers /></EnhancedErrorBoundary>} />
+                <Route path="/delivery-pickup" element={<EnhancedErrorBoundary context="Delivery"><DeliveryPickup /></EnhancedErrorBoundary>} />
+                <Route path="/reports" element={<EnhancedErrorBoundary context="Reports"><Reports /></EnhancedErrorBoundary>} />
+                <Route path="/promotions" element={<EnhancedErrorBoundary context="Promotions"><Promotions /></EnhancedErrorBoundary>} />
+                <Route path="/audit-logs" element={<EnhancedErrorBoundary context="Audit Logs"><AuditLogs /></EnhancedErrorBoundary>} />
+                <Route path="/settings" element={<EnhancedErrorBoundary context="Settings"><Settings /></EnhancedErrorBoundary>} />
+                <Route path="/payment-settings" element={<EnhancedErrorBoundary context="Payment Settings"><PaymentSettings /></EnhancedErrorBoundary>} />
+              </Route>
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </BrowserRouter>
+        </AuthProvider>
+      </TooltipProvider>
+    </QueryClientProvider>
+  </EnhancedErrorBoundary>
 );
 
 export default App;

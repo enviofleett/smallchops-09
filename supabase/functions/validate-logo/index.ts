@@ -1,9 +1,27 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// Production-ready CORS configuration
+const getCorsHeaders = (origin: string | null): Record<string, string> => {
+  const allowedOrigins = [
+    'https://oknnklksdiqaifhxaccs.supabase.co',
+    'https://lovable.dev',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev',
+    'https://project-oknnklksdiqaifhxaccs.lovable.app',
+    'http://localhost:5173',
+    'http://localhost:3000',
+    'http://localhost:8000'
+  ];
+  
+  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : '*';
+  
+  return {
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  };
+};
 
 interface LogoValidationRequest {
   file: {
@@ -23,7 +41,10 @@ interface ValidationResult {
 }
 
 Deno.serve(async (req) => {
-  console.log('Logo validation request:', req.method, req.url);
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
+  console.log('Logo validation request:', req.method, req.url, 'from origin:', origin);
 
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {

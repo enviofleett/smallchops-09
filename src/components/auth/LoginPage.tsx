@@ -88,11 +88,18 @@ const LoginPage = () => {
     return (
       <>
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-orange-100 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden">
+          <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden bg-white shadow-lg">
             {settings?.logo_url ? (
-              <img src={settings.logo_url} alt={settings.name} className="w-full h-full object-contain" />
+              <img 
+                src={settings.logo_url} 
+                alt={settings?.name || 'Logo'} 
+                className="w-full h-full object-contain p-2"
+                loading="lazy"
+              />
             ) : (
-              <span className="text-2xl">🍽️</span>
+              <div className="w-full h-full bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
+                <span className="text-3xl text-white">🍽️</span>
+              </div>
             )}
           </div>
           <h1 className="text-2xl font-bold text-gray-800">{settings?.name || 'Business Dashboard'}</h1>

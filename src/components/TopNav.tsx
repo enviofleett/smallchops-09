@@ -21,12 +21,13 @@ const TopNav = () => {
         {/* Business branding and search */}
         <div className="flex items-center space-x-6 flex-1">
           <div className="flex items-center space-x-3">
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden">
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-white shadow-sm">
               {settings?.logo_url ? (
                 <img 
                   src={settings.logo_url} 
                   alt={settings?.name || 'Logo'} 
-                  className="w-full h-full object-contain"
+                  className="w-full h-full object-contain p-1"
+                  loading="lazy"
                 />
               ) : (
                 <div className="w-full h-full bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">

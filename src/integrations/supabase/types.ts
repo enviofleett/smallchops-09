@@ -499,6 +499,7 @@ export type Database = {
           smtp_host: string | null
           smtp_pass: string | null
           smtp_port: number | null
+          smtp_secure: boolean | null
           smtp_user: string | null
           triggers: Json | null
           updated_at: string
@@ -522,6 +523,7 @@ export type Database = {
           smtp_host?: string | null
           smtp_pass?: string | null
           smtp_port?: number | null
+          smtp_secure?: boolean | null
           smtp_user?: string | null
           triggers?: Json | null
           updated_at?: string
@@ -545,6 +547,7 @@ export type Database = {
           smtp_host?: string | null
           smtp_pass?: string | null
           smtp_port?: number | null
+          smtp_secure?: boolean | null
           smtp_user?: string | null
           triggers?: Json | null
           updated_at?: string

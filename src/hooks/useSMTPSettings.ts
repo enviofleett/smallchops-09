@@ -8,6 +8,7 @@ export interface SMTPSettings {
   smtp_port: number;
   smtp_user: string;
   smtp_pass: string;
+  smtp_secure: boolean;
   sender_email: string;
   sender_name?: string;
   enable_email: boolean;
@@ -24,22 +25,24 @@ export const useSMTPSettings = () => {
       const { data, error } = await supabase
         .from('communication_settings')
         .select('*')
-        .single();
+        .maybeSingle();
 
       if (error) {
-        if (error.code === 'PGRST116') {
-          // No settings found, return default
-          return {
-            smtp_host: '',
-            smtp_port: 587,
-            smtp_user: '',
-            smtp_pass: '',
-            sender_email: '',
-            sender_name: 'Starters',
-            enable_email: false
-          };
-        }
         throw error;
+      }
+
+      if (!data) {
+        // No settings found, return default
+        return {
+          smtp_host: '',
+          smtp_port: 587,
+          smtp_user: '',
+          smtp_pass: '',
+          smtp_secure: true,
+          sender_email: '',
+          sender_name: 'Starters',
+          enable_email: false
+        };
       }
 
       return {
@@ -48,6 +51,7 @@ export const useSMTPSettings = () => {
         smtp_port: data.smtp_port || 587,
         smtp_user: data.smtp_user || '',
         smtp_pass: data.smtp_pass || '',
+        smtp_secure: data.smtp_secure !== false,
         sender_email: data.sender_email || '',
         sender_name: data.sender_name || 'Starters',
         enable_email: data.enable_email || false
@@ -67,6 +71,7 @@ export const useSMTPSettings = () => {
           smtp_port: settings.smtp_port,
           smtp_user: settings.smtp_user,
           smtp_pass: settings.smtp_pass,
+          smtp_secure: settings.smtp_secure,
           sender_email: settings.sender_email,
           sender_name: settings.sender_name,
           enable_email: settings.enable_email

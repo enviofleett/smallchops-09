@@ -61,6 +61,7 @@ export const EmailManagementDashboard = () => {
     smtp_port: 587,
     smtp_user: 'support@enviofleet.com',
     smtp_pass: '',
+    smtp_secure: true,
     sender_name: 'Starters',
     sender_email: 'support@enviofleet.com',
     enable_email: true
@@ -74,6 +75,7 @@ export const EmailManagementDashboard = () => {
         smtp_port: settings.smtp_port,
         smtp_user: settings.smtp_user,
         smtp_pass: settings.smtp_pass,
+        smtp_secure: settings.smtp_secure,
         sender_name: settings.sender_name || 'Starters',
         sender_email: settings.sender_email,
         enable_email: settings.enable_email
@@ -320,26 +322,37 @@ export const EmailManagementDashboard = () => {
                       />
                     </div>
 
-                    <div className="space-y-2">
-                      <Label htmlFor="sender-email">Sender Email</Label>
-                      <Input
-                        id="sender-email"
-                        type="email"
-                        value={localSettings.sender_email}
-                        onChange={(e) => setLocalSettings({...localSettings, sender_email: e.target.value})}
-                        placeholder="noreply@yourdomain.com"
-                      />
-                    </div>
-                  </div>
+                     <div className="space-y-2">
+                       <Label htmlFor="sender-email">Sender Email</Label>
+                       <Input
+                         id="sender-email"
+                         type="email"
+                         value={localSettings.sender_email}
+                         onChange={(e) => setLocalSettings({...localSettings, sender_email: e.target.value})}
+                         placeholder="noreply@yourdomain.com"
+                       />
+                     </div>
+                   </div>
 
-                  <div className="flex items-center space-x-2">
-                    <Switch
-                      id="enable-email"
-                      checked={localSettings.enable_email}
-                      onCheckedChange={(checked) => setLocalSettings({...localSettings, enable_email: checked})}
-                    />
-                    <Label htmlFor="enable-email">Enable Email Service</Label>
-                  </div>
+                   <div className="flex items-center justify-between space-x-4">
+                     <div className="flex items-center space-x-2">
+                       <Switch
+                         id="smtp-secure"
+                         checked={localSettings.smtp_secure}
+                         onCheckedChange={(checked) => setLocalSettings({...localSettings, smtp_secure: checked})}
+                       />
+                       <Label htmlFor="smtp-secure">Use Secure Connection (TLS/SSL)</Label>
+                     </div>
+
+                     <div className="flex items-center space-x-2">
+                       <Switch
+                         id="enable-email"
+                         checked={localSettings.enable_email}
+                         onCheckedChange={(checked) => setLocalSettings({...localSettings, enable_email: checked})}
+                       />
+                       <Label htmlFor="enable-email">Enable Email Service</Label>
+                     </div>
+                   </div>
 
                   <Button 
                     className="w-full" 

@@ -1,9 +1,24 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts"
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// PRODUCTION CORS - No wildcards
+function getCorsHeaders(origin: string | null): Record<string, string> {
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
+  const isDev = Deno.env.get('DENO_ENV') === 'development';
+  
+  if (isDev) {
+    allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
+  }
+  
+  const isAllowed = origin && allowedOrigins.includes(origin);
+  
+  return {
+    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : 'null'),
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin'
+  };
 }
 
 // Rate limiting configuration
@@ -37,6 +52,9 @@ interface SMTPConfig {
 }
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   const startTime = Date.now();
   

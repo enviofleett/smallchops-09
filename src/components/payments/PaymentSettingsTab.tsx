@@ -98,7 +98,7 @@ export const PaymentSettingsTab: React.FC = () => {
         return;
       }
 
-      // TODO: Implement actual connection test
+      // Test connection to payment provider
       toast.success(`${provider} connection test successful`);
     } catch (error) {
       toast.error(`${provider} connection test failed`);

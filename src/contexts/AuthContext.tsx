@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session } from '@supabase/supabase-js';
 import { supabase } from '../integrations/supabase/client';
 import { User, AuthState, LoginCredentials } from '../types/auth';
+import logger from '../lib/logger';
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
@@ -34,7 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         // Set up auth state listener FIRST
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
           async (event, session) => {
-            console.log('Auth state change:', event, session?.user?.id);
+            logger.debug('Auth state change:', event, session?.user?.id);
             
             if (!mounted) return;
             
@@ -79,8 +80,8 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           mounted = false;
           subscription?.unsubscribe();
         };
-      } catch (error) {
-        console.error('Auth initialization error:', error);
+      } catch (error: any) {
+        logger.error('Auth initialization error:', error, 'AuthContext');
         if (mounted) {
           setIsLoading(false);
         }

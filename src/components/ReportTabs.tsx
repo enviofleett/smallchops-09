@@ -30,15 +30,15 @@ export default function ReportTabs({ reportsData, isLoading }: {
         </div>
       </TabsContent>
       <TabsContent value="orders" className="p-0">
-        {/* TODO: Wire up real order trends data */}
-        <div className="text-gray-500 text-sm py-8 text-center">
-          Order Trends coming soon.
+        <div className="text-center py-8">
+          <h3 className="text-lg font-semibold mb-2">Order Trends</h3>
+          <p className="text-muted-foreground">Order analytics will be available in a future update.</p>
         </div>
       </TabsContent>
       <TabsContent value="popular" className="p-0">
-        {/* TODO: Display popular items (pass data to subcomponent) */}
-        <div className="text-gray-500 text-sm py-8 text-center">
-          Popular Items coming soon.
+        <div className="text-center py-8">
+          <h3 className="text-lg font-semibold mb-2">Popular Items</h3>
+          <p className="text-muted-foreground">Popular items analytics will be available in a future update.</p>
         </div>
       </TabsContent>
     </Tabs>

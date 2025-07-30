@@ -30,16 +30,17 @@ export const useBusinessSettings = () => {
   const query = useQuery({
     queryKey: ['business-settings'],
     queryFn: async (): Promise<BusinessSettings | null> => {
-      const { data, error } = await supabase
-        .from('business_settings')
-        .select('*')
-        .single();
+      // Use edge function to get business settings
+      const { data: result, error } = await supabase.functions.invoke('business-settings', {
+        method: 'GET'
+      });
 
-      if (error && error.code !== 'PGRST116') {
-        throw error;
+      if (error) {
+        console.error('Error fetching business settings:', error);
+        throw new Error(error.message || 'Failed to fetch business settings');
       }
 
-      return data;
+      return result?.data || null;
     },
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000, // 5 minutes

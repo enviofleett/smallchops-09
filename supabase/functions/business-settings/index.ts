@@ -80,17 +80,25 @@ serve(async (req) => {
     }
 
     if (req.method === 'GET') {
+      console.log('Fetching business settings...');
+      
+      // Get all business settings and take the most recent one
       const { data: settings, error } = await supabaseClient
         .from('business_settings')
         .select('*')
-        .single()
+        .order('updated_at', { ascending: false })
+        .limit(1);
 
-      if (error && error.code !== 'PGRST116') {
-        throw error
+      if (error) {
+        console.error('Error fetching settings:', error);
+        throw new Error(`Failed to fetch settings: ${error.message}`);
       }
 
+      const settingsData = settings && settings.length > 0 ? settings[0] : null;
+      console.log('Settings fetched:', settingsData ? 'Found' : 'Not found');
+
       return new Response(
-        JSON.stringify({ data: settings }),
+        JSON.stringify({ data: settingsData }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -378,25 +386,28 @@ serve(async (req) => {
 
       console.log('Checking for existing settings...');
       
-      // Check if settings exist
+      // Check if settings exist (get the most recent one)
       const { data: existing, error: existingError } = await supabaseClient
         .from('business_settings')
         .select('id')
-        .single();
+        .order('updated_at', { ascending: false })
+        .limit(1);
 
-      if (existingError && existingError.code !== 'PGRST116') {
+      if (existingError) {
         console.error('Error checking existing settings:', existingError);
         throw new Error(`Database error: ${existingError.message}`);
       }
 
       let result;
-      if (existing) {
-        console.log('Updating existing settings with ID:', existing.id);
+      const existingRecord = existing && existing.length > 0 ? existing[0] : null;
+      
+      if (existingRecord) {
+        console.log('Updating existing settings with ID:', existingRecord.id);
         // Update existing settings
         const { data, error } = await supabaseClient
           .from('business_settings')
           .update(cleanedBody)
-          .eq('id', existing.id)
+          .eq('id', existingRecord.id)
           .select()
           .single();
         

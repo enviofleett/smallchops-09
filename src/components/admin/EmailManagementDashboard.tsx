@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -12,6 +12,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { useEmailService } from '@/hooks/useEmailService';
 import { useEmailMonitoring } from '@/hooks/useEmailMonitoring';
+import { useSMTPSettings } from '@/hooks/useSMTPSettings';
 import { toast } from 'sonner';
 import { 
   Mail, 
@@ -30,14 +31,6 @@ import {
 export const EmailManagementDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [testEmail, setTestEmail] = useState('');
-  const [smtpSettings, setSMTPSettings] = useState({
-    host: 'mail.enviofleet.com',
-    port: 587,
-    username: 'support@enviofleet.com',
-    password: '',
-    senderName: 'Starters',
-    senderEmail: 'support@enviofleet.com'
-  });
 
   const { 
     sendEmailAsync, 
@@ -54,6 +47,40 @@ export const EmailManagementDashboard = () => {
     refreshMetrics 
   } = useEmailMonitoring();
 
+  const {
+    settings,
+    isLoading: settingsLoading,
+    saveSettings,
+    isSaving,
+    testConnection,
+    isTesting
+  } = useSMTPSettings();
+
+  const [localSettings, setLocalSettings] = useState({
+    smtp_host: 'mail.enviofleet.com',
+    smtp_port: 587,
+    smtp_user: 'support@enviofleet.com',
+    smtp_pass: '',
+    sender_name: 'Starters',
+    sender_email: 'support@enviofleet.com',
+    enable_email: true
+  });
+
+  // Update local settings when remote settings load
+  useEffect(() => {
+    if (settings) {
+      setLocalSettings({
+        smtp_host: settings.smtp_host,
+        smtp_port: settings.smtp_port,
+        smtp_user: settings.smtp_user,
+        smtp_pass: settings.smtp_pass,
+        sender_name: settings.sender_name || 'Starters',
+        sender_email: settings.sender_email,
+        enable_email: settings.enable_email
+      });
+    }
+  }, [settings]);
+
   const handleTestEmail = async () => {
     if (!testEmail) {
       toast.error('Please enter a test email address');
@@ -61,22 +88,18 @@ export const EmailManagementDashboard = () => {
     }
 
     try {
-      await sendEmailAsync({
-        to: testEmail,
-        toName: 'Test User',
-        subject: 'SMTP Test Email',
-        html: '<h1>SMTP Test</h1><p>This is a test email to verify your SMTP configuration is working correctly.</p>',
-        text: 'SMTP Test - This is a test email to verify your SMTP configuration.',
-        emailType: 'transactional',
-        priority: 'normal',
-        provider: 'smtp'
-      });
-      
-      toast.success('Test email sent successfully!');
+      await testConnection(testEmail);
       setTestEmail('');
     } catch (error) {
-      toast.error('Failed to send test email');
       console.error('Test email error:', error);
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      await saveSettings(localSettings);
+    } catch (error) {
+      console.error('Save settings error:', error);
     }
   };
 
@@ -215,10 +238,10 @@ export const EmailManagementDashboard = () => {
                 />
                 <Button 
                   onClick={handleTestEmail} 
-                  disabled={isSending || !testEmail}
+                  disabled={isTesting || !testEmail}
                 >
                   <Send className="mr-2 h-4 w-4" />
-                  {isSending ? 'Sending...' : 'Send Test'}
+                  {isTesting ? 'Sending...' : 'Send Test'}
                 </Button>
               </div>
             </CardContent>
@@ -234,81 +257,100 @@ export const EmailManagementDashboard = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-host">SMTP Host</Label>
-                  <Input
-                    id="smtp-host"
-                    value={smtpSettings.host}
-                    onChange={(e) => setSMTPSettings({...smtpSettings, host: e.target.value})}
-                    placeholder="mail.yourdomain.com"
-                  />
-                </div>
-                
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-port">SMTP Port</Label>
-                  <Select 
-                    value={smtpSettings.port.toString()} 
-                    onValueChange={(value) => setSMTPSettings({...smtpSettings, port: parseInt(value)})}
+              {settingsLoading ? (
+                <div className="text-center py-8">Loading settings...</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="smtp-host">SMTP Host</Label>
+                      <Input
+                        id="smtp-host"
+                        value={localSettings.smtp_host}
+                        onChange={(e) => setLocalSettings({...localSettings, smtp_host: e.target.value})}
+                        placeholder="mail.yourdomain.com"
+                      />
+                    </div>
+                    
+                    <div className="space-y-2">
+                      <Label htmlFor="smtp-port">SMTP Port</Label>
+                      <Select 
+                        value={localSettings.smtp_port.toString()} 
+                        onValueChange={(value) => setLocalSettings({...localSettings, smtp_port: parseInt(value)})}
+                      >
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="25">25 (Plain)</SelectItem>
+                          <SelectItem value="587">587 (TLS)</SelectItem>
+                          <SelectItem value="465">465 (SSL)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="smtp-username">Username</Label>
+                      <Input
+                        id="smtp-username"
+                        value={localSettings.smtp_user}
+                        onChange={(e) => setLocalSettings({...localSettings, smtp_user: e.target.value})}
+                        placeholder="your-username"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="smtp-password">Password</Label>
+                      <Input
+                        id="smtp-password"
+                        type="password"
+                        value={localSettings.smtp_pass}
+                        onChange={(e) => setLocalSettings({...localSettings, smtp_pass: e.target.value})}
+                        placeholder="your-password"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="sender-name">Sender Name</Label>
+                      <Input
+                        id="sender-name"
+                        value={localSettings.sender_name}
+                        onChange={(e) => setLocalSettings({...localSettings, sender_name: e.target.value})}
+                        placeholder="Your Business Name"
+                      />
+                    </div>
+
+                    <div className="space-y-2">
+                      <Label htmlFor="sender-email">Sender Email</Label>
+                      <Input
+                        id="sender-email"
+                        type="email"
+                        value={localSettings.sender_email}
+                        onChange={(e) => setLocalSettings({...localSettings, sender_email: e.target.value})}
+                        placeholder="noreply@yourdomain.com"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Switch
+                      id="enable-email"
+                      checked={localSettings.enable_email}
+                      onCheckedChange={(checked) => setLocalSettings({...localSettings, enable_email: checked})}
+                    />
+                    <Label htmlFor="enable-email">Enable Email Service</Label>
+                  </div>
+
+                  <Button 
+                    className="w-full" 
+                    onClick={handleSaveSettings}
+                    disabled={isSaving}
                   >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="25">25 (Plain)</SelectItem>
-                      <SelectItem value="587">587 (TLS)</SelectItem>
-                      <SelectItem value="465">465 (SSL)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-username">Username</Label>
-                  <Input
-                    id="smtp-username"
-                    value={smtpSettings.username}
-                    onChange={(e) => setSMTPSettings({...smtpSettings, username: e.target.value})}
-                    placeholder="your-username"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="smtp-password">Password</Label>
-                  <Input
-                    id="smtp-password"
-                    type="password"
-                    value={smtpSettings.password}
-                    onChange={(e) => setSMTPSettings({...smtpSettings, password: e.target.value})}
-                    placeholder="your-password"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sender-name">Sender Name</Label>
-                  <Input
-                    id="sender-name"
-                    value={smtpSettings.senderName}
-                    onChange={(e) => setSMTPSettings({...smtpSettings, senderName: e.target.value})}
-                    placeholder="Your Business Name"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="sender-email">Sender Email</Label>
-                  <Input
-                    id="sender-email"
-                    type="email"
-                    value={smtpSettings.senderEmail}
-                    onChange={(e) => setSMTPSettings({...smtpSettings, senderEmail: e.target.value})}
-                    placeholder="noreply@yourdomain.com"
-                  />
-                </div>
-              </div>
-
-              <Button className="w-full">
-                <Settings className="mr-2 h-4 w-4" />
-                Save SMTP Settings
-              </Button>
+                    <Settings className="mr-2 h-4 w-4" />
+                    {isSaving ? 'Saving...' : 'Save SMTP Settings'}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

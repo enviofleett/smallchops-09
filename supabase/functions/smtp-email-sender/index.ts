@@ -6,6 +6,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Rate limiting configuration
+const RATE_LIMIT_WINDOW = 60 * 1000; // 1 minute
+const RATE_LIMIT_MAX_EMAILS = 60; // 60 emails per minute per recipient
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+
+// Email validation regex
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 interface SMTPEmailRequest {
   to: string
   toName?: string
@@ -29,6 +37,11 @@ interface SMTPConfig {
 }
 
 Deno.serve(async (req) => {
+  const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  const startTime = Date.now();
+  
+  console.log(`[${requestId}] Starting SMTP email request processing`);
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
@@ -56,6 +69,7 @@ Deno.serve(async (req) => {
 
     // 1. Validate input
     if (!to || !subject) {
+      console.log(`[${requestId}] Validation failed: missing required fields`);
       return new Response(JSON.stringify({
         success: false,
         error: 'Recipient email and subject are required'
@@ -65,18 +79,92 @@ Deno.serve(async (req) => {
       })
     }
 
-    // 2. Get SMTP configuration
-    const { data: smtpConfig, error: configError } = await supabase
-      .from('communication_settings')
-      .select('smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, sender_email, sender_name')
-      .single()
+    // Validate email format
+    if (!EMAIL_REGEX.test(to)) {
+      console.log(`[${requestId}] Invalid email format: ${to}`);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid email address format'
+      }), { 
+        status: 400, 
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      })
+    }
 
-    if (configError || !smtpConfig) {
-      throw new Error('SMTP configuration not found')
+    // Rate limiting check
+    const now = Date.now();
+    const rateLimitKey = to.toLowerCase();
+    const currentLimit = rateLimitMap.get(rateLimitKey);
+    
+    if (currentLimit) {
+      if (now < currentLimit.resetTime) {
+        if (currentLimit.count >= RATE_LIMIT_MAX_EMAILS) {
+          console.log(`[${requestId}] Rate limit exceeded for ${to}`);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Rate limit exceeded. Please try again later.'
+          }), { 
+            status: 429, 
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
+          })
+        }
+        currentLimit.count++;
+      } else {
+        // Reset the rate limit window
+        rateLimitMap.set(rateLimitKey, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+      }
+    } else {
+      // First request for this email
+      rateLimitMap.set(rateLimitKey, { count: 1, resetTime: now + RATE_LIMIT_WINDOW });
+    }
+
+    // Sanitize inputs to prevent XSS
+    const sanitizedVariables = Object.fromEntries(
+      Object.entries(variables).map(([key, value]) => [
+        key,
+        typeof value === 'string' ? value.replace(/<script[^>]*>.*?<\/script>/gi, '') : value
+      ])
+    );
+
+    // 2. Get SMTP configuration with environment fallback
+    let smtpConfig;
+    try {
+      const { data, error: configError } = await supabase
+        .from('communication_settings')
+        .select('smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, sender_email, sender_name')
+        .single();
+
+      if (configError || !data) {
+        console.log(`[${requestId}] Database config not found, using environment variables`);
+        // Fallback to environment variables
+        smtpConfig = {
+          smtp_host: Deno.env.get('SMTP_HOST'),
+          smtp_port: parseInt(Deno.env.get('SMTP_PORT') || '587'),
+          smtp_user: Deno.env.get('SMTP_USER'),
+          smtp_pass: Deno.env.get('SMTP_PASS'),
+          smtp_secure: Deno.env.get('SMTP_SECURE') === 'true',
+          sender_email: Deno.env.get('SENDER_EMAIL'),
+          sender_name: Deno.env.get('SENDER_NAME') || 'Starters'
+        };
+      } else {
+        smtpConfig = data;
+      }
+    } catch (dbError) {
+      console.log(`[${requestId}] Database error, using environment fallback:`, dbError);
+      smtpConfig = {
+        smtp_host: Deno.env.get('SMTP_HOST'),
+        smtp_port: parseInt(Deno.env.get('SMTP_PORT') || '587'),
+        smtp_user: Deno.env.get('SMTP_USER'),
+        smtp_pass: Deno.env.get('SMTP_PASS'),
+        smtp_secure: Deno.env.get('SMTP_SECURE') === 'true',
+        sender_email: Deno.env.get('SENDER_EMAIL'),
+        sender_name: Deno.env.get('SENDER_NAME') || 'Starters'
+      };
     }
 
     if (!smtpConfig.smtp_host || !smtpConfig.smtp_user || !smtpConfig.smtp_pass) {
-      throw new Error('SMTP configuration incomplete')
+      console.log(`[${requestId}] SMTP configuration incomplete`);
+      throw new Error('SMTP configuration incomplete - missing host, username, or password')
     }
 
     // 3. Check compliance (reuse existing function)
@@ -127,7 +215,7 @@ Deno.serve(async (req) => {
           recipientName: toName || variables.customerName || 'Valued Customer'
         }
 
-        const finalVariables = { ...variables, ...complianceVariables }
+        const finalVariables = { ...sanitizedVariables, ...complianceVariables }
 
         // Simple template replacement
         emailContent.html = replaceTemplateVariables(template.html_template, finalVariables)
@@ -139,55 +227,125 @@ Deno.serve(async (req) => {
       }
     }
 
-    // 6. Send email via real SMTP
-    console.log(`Sending email via SMTP to ${smtpConfig.smtp_host}:${smtpConfig.smtp_port}`)
+    // 6. Send email via SMTP with retry logic
+    console.log(`[${requestId}] Sending email via SMTP to ${smtpConfig.smtp_host}:${smtpConfig.smtp_port}`)
 
-    // Create SMTP client with database configuration
-    const client = new SMTPClient({
-      connection: {
-        hostname: smtpConfig.smtp_host,
-        port: smtpConfig.smtp_port,
-        tls: smtpConfig.smtp_secure,
-        auth: {
-          username: smtpConfig.smtp_user,
-          password: smtpConfig.smtp_pass,
-        },
-      },
-    })
+    let messageId: string;
+    let smtpResponse: string;
+    let client: SMTPClient | null = null;
 
-    let messageId: string
-    let smtpResponse: string
+    // Retry configuration
+    const maxRetries = 3;
+    const retryDelays = [1000, 2000, 4000]; // Exponential backoff: 1s, 2s, 4s
 
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        console.log(`[${requestId}] SMTP attempt ${attempt + 1}/${maxRetries}`);
+        
+        // Create SMTP client with timeout
+        client = new SMTPClient({
+          connection: {
+            hostname: smtpConfig.smtp_host,
+            port: smtpConfig.smtp_port,
+            tls: smtpConfig.smtp_secure,
+            auth: {
+              username: smtpConfig.smtp_user,
+              password: smtpConfig.smtp_pass,
+            },
+          },
+        });
+
+        // Send email using the SMTP client
+        const result = await Promise.race([
+          client.send({
+            from: smtpConfig.sender_name 
+              ? `${smtpConfig.sender_name} <${smtpConfig.sender_email}>`
+              : smtpConfig.sender_email,
+            to: toName ? `${toName} <${to}>` : to,
+            subject: subject,
+            content: emailContent.text || "Email content",
+            html: emailContent.html || undefined,
+          }),
+          new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('SMTP timeout after 30 seconds')), 30000)
+          )
+        ]);
+
+        // Extract message ID from SMTP response or generate one
+        messageId = result?.messageId || `smtp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        smtpResponse = `Email sent successfully via SMTP. Message ID: ${messageId}`;
+        
+        console.log(`[${requestId}] SMTP send result:`, result);
+        break; // Success, exit retry loop
+
+      } catch (smtpError) {
+        console.error(`[${requestId}] SMTP attempt ${attempt + 1} failed:`, smtpError);
+        
+        // Always try to close the client
+        if (client) {
+          try {
+            await client.close();
+          } catch (closeError) {
+            console.error(`[${requestId}] Error closing SMTP client:`, closeError);
+          }
+          client = null;
+        }
+
+        // If this was the last attempt, handle the failure
+        if (attempt === maxRetries - 1) {
+          messageId = `smtp-failed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+          smtpResponse = `SMTP Error after ${maxRetries} attempts: ${smtpError.message}`;
+          
+          // Log failed attempt to database (non-blocking)
+          try {
+            await supabase
+              .from('smtp_delivery_logs')
+              .insert({
+                message_id: messageId,
+                recipient_email: to,
+                sender_email: smtpConfig.sender_email,
+                subject: subject,
+                delivery_status: 'failed',
+                provider: 'smtp',
+                smtp_response: smtpResponse,
+                delivery_timestamp: new Date().toISOString(),
+                metadata: {
+                  requestId,
+                  emailType,
+                  priority,
+                  templateKey: templateKey || null,
+                  variables: sanitizedVariables,
+                  error: smtpError.message,
+                  attempts: maxRetries
+                }
+              });
+          } catch (logError) {
+            console.error(`[${requestId}] Failed to log error to database:`, logError);
+          }
+
+          throw smtpError; // Re-throw to be handled by outer catch block
+        }
+
+        // Wait before retrying (unless it's the last attempt)
+        if (attempt < maxRetries - 1) {
+          console.log(`[${requestId}] Waiting ${retryDelays[attempt]}ms before retry`);
+          await new Promise(resolve => setTimeout(resolve, retryDelays[attempt]));
+        }
+      } finally {
+        // Ensure client is always closed
+        if (client) {
+          try {
+            await client.close();
+          } catch (closeError) {
+            console.error(`[${requestId}] Error closing SMTP client in finally:`, closeError);
+          }
+          client = null;
+        }
+      }
+    }
+
+    // 7. Log the successful email event to SMTP delivery logs (non-blocking)
     try {
-      // Send email using the SMTP client
-      const result = await client.send({
-        from: smtpConfig.sender_name 
-          ? `${smtpConfig.sender_name} <${smtpConfig.sender_email}>`
-          : smtpConfig.sender_email,
-        to: toName ? `${toName} <${to}>` : to,
-        subject: subject,
-        content: emailContent.text || "Email content",
-        html: emailContent.html || undefined,
-      })
-
-      await client.close()
-
-      // Extract message ID from SMTP response or generate one
-      messageId = result?.messageId || `smtp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      smtpResponse = `Email sent successfully via SMTP. Message ID: ${messageId}`
-      
-      console.log('SMTP send result:', result)
-
-    } catch (smtpError) {
-      await client.close().catch(() => {}) // Ensure client is closed even on error
-      
-      // Log the SMTP error but still create a delivery log entry
-      messageId = `smtp-failed-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-      smtpResponse = `SMTP Error: ${smtpError.message}`
-      
-      console.error('SMTP sending failed:', smtpError)
-      
-      // Log failed attempt to database
       await supabase
         .from('smtp_delivery_logs')
         .insert({
@@ -195,86 +353,66 @@ Deno.serve(async (req) => {
           recipient_email: to,
           sender_email: smtpConfig.sender_email,
           subject: subject,
-          delivery_status: 'failed',
+          delivery_status: 'sent',
           provider: 'smtp',
           smtp_response: smtpResponse,
           delivery_timestamp: new Date().toISOString(),
           metadata: {
+            requestId,
             emailType,
             priority,
             templateKey: templateKey || null,
-            variables: variables,
-            error: smtpError.message
+            variables: sanitizedVariables,
+            processingTime: Date.now() - startTime
           }
-        })
+        });
+    } catch (logError) {
+      console.error(`[${requestId}] Failed to log success to smtp_delivery_logs:`, logError);
+      // Don't fail the request if logging fails
+    }
 
-      // Also log failure to communication_events
+    // 8. Also log to communication_events for consistency (non-blocking)
+    try {
       await supabase
         .from('communication_events')
         .insert({
           recipient_email: to,
           template_id: templateKey || 'custom',
           email_type: emailType,
-          status: 'failed',
+          status: 'sent',
           external_id: messageId,
-          variables: variables,
+          variables: sanitizedVariables,
           sent_at: new Date().toISOString(),
-          delivery_status: 'failed',
-          error_message: smtpError.message
-        })
-
-      throw smtpError // Re-throw to be handled by outer catch block
+          delivery_status: 'sent'
+        });
+    } catch (logError) {
+      console.error(`[${requestId}] Failed to log to communication_events:`, logError);
+      // Don't fail the request if logging fails
     }
 
-    // 7. Log the successful email event to SMTP delivery logs
-    await supabase
-      .from('smtp_delivery_logs')
-      .insert({
-        message_id: messageId,
-        recipient_email: to,
-        sender_email: smtpConfig.sender_email,
-        subject: subject,
-        delivery_status: 'sent',
-        provider: 'smtp',
-        smtp_response: smtpResponse,
-        delivery_timestamp: new Date().toISOString(),
-        metadata: {
-          emailType,
-          priority,
-          templateKey: templateKey || null,
-          variables: variables
-        }
-      })
-
-    // 8. Also log to communication_events for consistency
-    await supabase
-      .from('communication_events')
-      .insert({
-        recipient_email: to,
-        template_id: templateKey || 'custom',
-        email_type: emailType,
-        status: 'sent',
-        external_id: messageId,
-        variables: variables,
-        sent_at: new Date().toISOString(),
-        delivery_status: 'sent'
-      })
+    const processingTime = Date.now() - startTime;
+    console.log(`[${requestId}] Email sent successfully in ${processingTime}ms`);
 
     return new Response(JSON.stringify({
       success: true,
       messageId: messageId,
       status: 'sent',
-      provider: 'smtp'
+      provider: 'smtp',
+      requestId: requestId,
+      processingTime: processingTime
     }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     })
 
   } catch (error) {
-    console.error('SMTP email sending error:', error)
+    const processingTime = Date.now() - startTime;
+    console.error(`[${requestId}] SMTP email sending error after ${processingTime}ms:`, error);
     
     return new Response(JSON.stringify({
       success: false,
-      error: error.message
+      error: error.message,
+      requestId: requestId,
+      processingTime: processingTime
     }), { 
       status: 500, 
       headers: { 'Content-Type': 'application/json', ...corsHeaders }

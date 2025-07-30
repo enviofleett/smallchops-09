@@ -50,10 +50,10 @@ export const useEmailService = () => {
     mutationFn: async (emailRequest: EmailRequest) => {
       const provider = emailRequest.provider || 'auto';
       
-      // Determine which service to use
+      // Determine which service to use - default to SMTP for better reliability
       const functionName = provider === 'smtp' ? 'smtp-email-sender' : 
-                          provider === 'mailersend' ? 'send-email-standardized' :
-                          'send-email-standardized'; // Default to MailerSend for 'auto'
+                           provider === 'mailersend' ? 'send-email-standardized' :
+                           'smtp-email-sender'; // Default to SMTP for 'auto'
 
       const { data, error } = await supabase.functions.invoke(functionName, {
         body: {
@@ -90,42 +90,94 @@ export const useEmailService = () => {
     },
   });
 
-  // Get email templates (fallback to existing communication_events for now)
+  // Get email templates from enhanced_email_templates
   const templatesQuery = useQuery({
     queryKey: ['email-templates'],
     queryFn: async (): Promise<EmailTemplate[]> => {
-      // Return empty array for now until tables are created
-      return [];
+      const { data, error } = await supabase
+        .from('enhanced_email_templates')
+        .select('*')
+        .order('template_name');
+
+      if (error) {
+        console.error('Error fetching email templates:', error);
+        return [];
+      }
+
+      return (data || []).map((template: any) => ({
+        id: template.id,
+        template_key: template.template_key,
+        template_name: template.template_name,
+        subject_template: template.subject_template,
+        html_template: template.html_template,
+        text_template: template.text_template,
+        variables: template.variables || [],
+        template_type: template.template_type,
+        is_active: template.is_active
+      }));
     },
     refetchOnWindowFocus: false,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 
-  // Get delivery logs (use existing communication_events for now)
+  // Get delivery logs from smtp_delivery_logs and communication_events
   const deliveryLogsQuery = useQuery({
     queryKey: ['email-delivery-logs'],
     queryFn: async (): Promise<EmailDeliveryLog[]> => {
-      const { data, error } = await supabase
+      // Try to get from SMTP delivery logs first
+      const { data: smtpLogs, error: smtpError } = await supabase
+        .from('smtp_delivery_logs')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      // Also get from communication events
+      const { data: commEvents, error: commError } = await supabase
         .from('communication_events')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(50);
 
-      if (error) {
-        return [];
+      const logs: EmailDeliveryLog[] = [];
+
+      // Add SMTP logs
+      if (!smtpError && smtpLogs) {
+        logs.push(...smtpLogs.map((log: any) => ({
+          id: log.id,
+          message_id: log.message_id,
+          recipient_email: log.recipient_email,
+          sender_email: log.sender_email,
+          subject: log.subject,
+          delivery_status: log.delivery_status,
+          provider: 'smtp' as const,
+          error_message: log.error_message,
+          smtp_response: log.smtp_response,
+          delivery_timestamp: log.delivery_timestamp,
+          created_at: log.created_at,
+          metadata: log.metadata || {}
+        })));
       }
 
-      // Map existing data to delivery log format
-      return (data || []).map((event: any) => ({
-        id: event.id,
-        message_id: event.external_id,
-        recipient_email: event.recipient_email,
-        subject: event.template_id,
-        delivery_status: event.status,
-        provider: 'mailersend' as const,
-        created_at: event.created_at,
-        metadata: event.variables || {}
-      }));
+      // Add communication events
+      if (!commError && commEvents) {
+        logs.push(...commEvents.map((event: any) => ({
+          id: event.id,
+          message_id: event.external_id,
+          recipient_email: event.recipient_email,
+          subject: event.template_id,
+          delivery_status: event.status,
+          provider: 'mailersend' as const,
+          error_message: event.error_message,
+          delivery_timestamp: event.sent_at,
+          created_at: event.created_at,
+          metadata: event.variables || {}
+        })));
+      }
+
+      // Sort by created_at descending and limit to 100
+      return logs
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 100);
     },
     refetchOnWindowFocus: false,
     staleTime: 30 * 1000, // 30 seconds

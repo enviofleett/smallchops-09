@@ -1004,6 +1004,54 @@ export type Database = {
         }
         Relationships: []
       }
+      enhanced_email_templates: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          html_template: string
+          id: string
+          is_active: boolean | null
+          subject_template: string
+          template_key: string
+          template_name: string
+          template_type: string
+          text_template: string | null
+          updated_at: string
+          updated_by: string | null
+          variables: string[] | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          html_template: string
+          id?: string
+          is_active?: boolean | null
+          subject_template: string
+          template_key: string
+          template_name: string
+          template_type?: string
+          text_template?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          variables?: string[] | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          html_template?: string
+          id?: string
+          is_active?: boolean | null
+          subject_template?: string
+          template_key?: string
+          template_name?: string
+          template_type?: string
+          text_template?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          variables?: string[] | null
+        }
+        Relationships: []
+      }
       enhanced_rate_limits: {
         Row: {
           key: string

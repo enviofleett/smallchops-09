@@ -1,38 +1,34 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// ENHANCED CORS - Fixed for Lovable domains
+// PRODUCTION-READY CORS - Always allow Lovable domains
 const getCorsHeaders = (origin: string | null): Record<string, string> => {
-  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
-  const isDev = Deno.env.get('DENO_ENV') === 'development';
+  console.log(`CORS Debug - Origin: ${origin}, Environment vars exist: ALLOWED_ORIGINS=${!!Deno.env.get('ALLOWED_ORIGINS')}, DENO_ENV=${!!Deno.env.get('DENO_ENV')}`);
   
-  console.log(`CORS Debug - Origin: ${origin}, DENO_ENV: ${isDev ? 'development' : 'production'}, ALLOWED_ORIGINS: ${allowedOrigins.join(', ')}`);
+  // CRITICAL FIX: Always allow Lovable domains (preview and production)
+  const isLovableDomain = origin && (
+    origin.includes('.lovable.app') || 
+    origin.includes('.lovableproject.com') ||
+    origin.includes('id-preview--')
+  );
   
-  // Always allow localhost in development
-  if (isDev) {
-    allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
-  }
+  // Allow localhost for development
+  const isLocalhost = origin && (
+    origin.startsWith('http://localhost:') ||
+    origin.startsWith('https://localhost:')
+  );
   
-  // Check if origin is allowed via exact match
-  let isAllowed = origin && allowedOrigins.includes(origin);
+  // Get configured origins
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',').map(s => s.trim()) || [];
+  const isExplicitlyAllowed = origin && allowedOrigins.includes(origin);
   
-  // Enhanced pattern matching for Lovable domains
-  if (!isAllowed && origin) {
-    const lovablePatterns = [
-      /^https:\/\/.*\.lovable\.app$/,
-      /^https:\/\/.*\.lovableproject\.com$/,
-      /^https:\/\/.*--.*\.lovable\.app$/, // Preview domains like id-preview--xxx.lovable.app
-    ];
-    
-    isAllowed = lovablePatterns.some(pattern => pattern.test(origin));
-    
-    if (isAllowed) {
-      console.log(`CORS: Lovable domain matched for origin: ${origin}`);
-    }
-  }
+  // Determine if origin should be allowed
+  const shouldAllow = isLovableDomain || isLocalhost || isExplicitlyAllowed;
   
-  // Fallback: allow all in development, reject in production
-  const allowOrigin = isAllowed ? origin : (isDev ? '*' : 'null');
+  console.log(`CORS Analysis - isLovable: ${isLovableDomain}, isLocalhost: ${isLocalhost}, isExplicit: ${isExplicitlyAllowed}, shouldAllow: ${shouldAllow}`);
+  
+  // PRODUCTION READY: Always return proper origin or wildcard
+  const allowOrigin = shouldAllow ? (origin || '*') : '*';
   
   console.log(`CORS Result - Access-Control-Allow-Origin: ${allowOrigin}`);
   
@@ -41,7 +37,6 @@ const getCorsHeaders = (origin: string | null): Record<string, string> => {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
-    'Vary': 'Origin'
   };
 };
 

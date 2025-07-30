@@ -4,9 +4,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
+// PRODUCTION CORS - Restrict to Paystack IPs only
+const PAYSTACK_IPS = [
+  '52.31.139.75',
+  '52.49.173.169', 
+  '52.214.14.220'
+];
+
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Origin': 'https://paystack.co',
+  'Access-Control-Allow-Headers': 'content-type, x-paystack-signature',
+  'Access-Control-Allow-Methods': 'POST',
+  'Content-Security-Policy': "default-src 'none'",
+  'X-Content-Type-Options': 'nosniff',
+  'X-Frame-Options': 'DENY'
 };
 
 interface PaystackWebhookPayload {
@@ -210,6 +221,27 @@ serve(async (req) => {
   try {
     console.log('[WEBHOOK] Processing Paystack webhook...');
     
+    // Enhanced IP validation
+    const clientIP = req.headers.get('cf-connecting-ip') || 
+                    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+                    req.headers.get('x-real-ip') || 
+                    'unknown';
+
+    // Verify request comes from Paystack (production security)
+    if (Deno.env.get('DENO_ENV') === 'production' && !PAYSTACK_IPS.includes(clientIP)) {
+      await logSecurityIncident(
+        'unauthorized_webhook_ip',
+        `Webhook request from unauthorized IP: ${clientIP}`,
+        'high',
+        { ip: clientIP, user_agent: req.headers.get('user-agent') }
+      );
+
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 403,
+      });
+    }
+    
     // CRITICAL SECURITY 1: Verify webhook signature
     const signature = req.headers.get('x-paystack-signature');
     if (!signature) {
@@ -225,15 +257,25 @@ serve(async (req) => {
     const body = await req.text();
     console.log('[WEBHOOK] Received payload, verifying signature...');
 
-    // Get webhook secret from environment
-    const webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
-    if (!webhookSecret) {
-      console.error('[WEBHOOK] No webhook secret configured');
-      return new Response('Server configuration error', { status: 500, headers: corsHeaders });
+    // Get active webhook secret from database
+    const { data: config } = await supabase.rpc('get_active_paystack_config');
+    
+    if (!config?.webhook_secret) {
+      await logSecurityIncident(
+        'webhook_secret_not_configured',
+        'Webhook secret not configured',
+        'critical',
+        { ip: clientIP }
+      );
+
+      return new Response(JSON.stringify({ error: 'Webhook not configured' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 503,
+      });
     }
 
     // Verify signature
-    const isValidSignature = await verifyWebhookSignature(body, signature, webhookSecret);
+    const isValidSignature = await verifyWebhookSignature(body, signature, config.webhook_secret);
     if (!isValidSignature) {
       await logSecurityIncident(
         'webhook_signature_mismatch',

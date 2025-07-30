@@ -68,8 +68,12 @@ class PaystackService {
 
   async initializeTransaction(transactionData: PaystackTransaction) {
     try {
-      const response = await supabase.functions.invoke('paystack-initialize', {
-        body: transactionData,
+      // Use the new secure endpoint
+      const response = await supabase.functions.invoke('paystack-secure', {
+        body: {
+          action: 'initialize',
+          ...transactionData,
+        },
       });
 
       if (response.error) {
@@ -89,8 +93,12 @@ class PaystackService {
 
   async verifyTransaction(reference: string) {
     try {
-      const response = await supabase.functions.invoke('paystack-verify', {
-        body: { reference },
+      // Use the new secure endpoint
+      const response = await supabase.functions.invoke('paystack-secure', {
+        body: {
+          action: 'verify',
+          reference,
+        },
       });
 
       if (response.error) {
@@ -116,8 +124,10 @@ class PaystackService {
     metadata?: Record<string, any>;
   }) {
     try {
-      const response = await supabase.functions.invoke('paystack-charge', {
+      // Use the new secure endpoint
+      const response = await supabase.functions.invoke('paystack-secure', {
         body: {
+          action: 'charge',
           ...chargeData,
           reference: chargeData.reference || this.generateReference()
         },

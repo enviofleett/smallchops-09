@@ -1,9 +1,21 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Production-ready CORS configuration
+const getCorsHeaders = (origin: string | null): Record<string, string> => {
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [
+    'https://oknnklksdiqaifhxaccs.supabase.co',
+    'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com'
+  ];
+  
+  const corsOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  
+  return {
+    'Access-Control-Allow-Origin': corsOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  };
 };
 
 interface EmailRequest {
@@ -22,6 +34,9 @@ const logStep = (step: string, details?: any) => {
 };
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }

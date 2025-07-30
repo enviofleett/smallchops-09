@@ -1,1 +1,22 @@
 project_id = "oknnklksdiqaifhxaccs"
+
+[functions.mailersend-webhook-handler]
+verify_jwt = false
+
+[functions.paystack-webhook-secure]
+verify_jwt = false
+
+[functions.enhanced-paystack-webhook]
+verify_jwt = false
+
+[functions.paystack-webhook]
+verify_jwt = false
+
+[functions.get-public-categories]
+verify_jwt = false
+
+[functions.get-public-products]
+verify_jwt = false
+
+[functions.get-products-by-category]
+verify_jwt = false

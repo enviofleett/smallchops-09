@@ -157,10 +157,7 @@ export const deleteCustomer = async (customerId: string) => {
 export const getCustomerAnalytics = async (dateRange: DateRange): Promise<CustomerAnalytics> => {
   const { from, to } = dateRange;
 
-  // Fetch registered customers with their auth user emails
-  const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
-  if (authError) throw new Error(authError.message);
-
+  // Fetch registered customers with their auth user emails using JOIN
   const { data: registeredCustomers, error: registeredError } = await supabase
     .from('customer_accounts')
     .select(`
@@ -168,8 +165,11 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
       user_id,
       name,
       phone,
-      created_at
-    `);
+      created_at,
+      users:user_id (
+        email
+      )
+    `)
 
   if (registeredError) throw new Error(registeredError.message);
 
@@ -203,20 +203,11 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
     isGuest: boolean;
   }> = {};
 
-  // Create lookup map for auth users with proper typing
-  const authUserMap = new Map<string, any>();
-  if (authUsers?.users && Array.isArray(authUsers.users)) {
-    authUsers.users.forEach((user: any) => {
-      if (user && user.id) {
-        authUserMap.set(user.id, user);
-      }
-    });
-  }
-
   // Add registered customers to bucket
   registeredCustomers?.forEach(customer => {
     const customerKey = `reg:${customer.id}`;
-    const authUser = authUserMap.get(customer.user_id);
+    // Access the joined user data
+    const authUser = (customer as any).users;
     
     // Fix name vs email issue - if name looks like email, extract name from email
     let displayName = customer.name;

@@ -3282,6 +3282,10 @@ export type Database = {
         Args: { email_address: string }
         Returns: boolean
       }
+      link_guest_to_authenticated_customer: {
+        Args: { p_email: string; p_user_id: string }
+        Returns: undefined
+      }
       log_admin_action: {
         Args: {
           action_type: string

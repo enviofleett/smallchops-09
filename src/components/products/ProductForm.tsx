@@ -168,23 +168,26 @@ export const ProductForm = ({
         </div>
 
         {/* Features Section */}
-        <FormField control={form.control} name="features" render={({
-        field
-      }) => <FormItem>
+        <FormField
+          control={form.control}
+          name="features"
+          render={({ field }) => (
+            <FormItem>
               <FormLabel>Product Features</FormLabel>
               <FormDescription>
                 Add key features and highlights for this product
               </FormDescription>
               <FormControl>
-                <FeaturesList features={field.value} onChange={field.onChange} placeholder="Add a product feature..." />
+                <FeaturesList
+                  features={field.value || []}
+                  onChange={field.onChange}
+                  placeholder="List your features"
+                />
               </FormControl>
               <FormMessage />
-            </FormItem>} />
-
-        {/* Allergen Information */}
-        <FormField control={form.control} name="allergen_info" render={({
-        field
-      }) => {}} />
+            </FormItem>
+          )}
+        />
 
         <FormField control={form.control} name="description" render={({
         field

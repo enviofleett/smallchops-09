@@ -1,5 +1,5 @@
-import React from 'react';
-import { Image as ImageIcon, Terminal, Edit, Trash2, Clock, Tag } from 'lucide-react';
+import React, { useState } from 'react';
+import { Image as ImageIcon, Terminal, Edit, Trash2, Clock, Tag, CheckSquare, Square } from 'lucide-react';
 import { ProductWithCategory } from '@/types/database';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { PromotionalBadge } from '@/components/ui/promotional-badge';
 import { FavoriteButton } from '@/components/ui/favorite-button';
+import { BulkDeleteDialog } from './BulkDeleteDialog';
 
 interface ProductsTableProps {
   products: ProductWithCategory[] | undefined;
@@ -34,12 +35,81 @@ const formatCurrency = (amount: number) => {
 };
 
 const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onDeleteProduct }: ProductsTableProps) => {
+  const [selectedProducts, setSelectedProducts] = useState<ProductWithCategory[]>([]);
+  const [showBulkDelete, setShowBulkDelete] = useState(false);
+
+  const handleSelectAll = () => {
+    if (selectedProducts.length === products?.length) {
+      setSelectedProducts([]);
+    } else {
+      setSelectedProducts(products || []);
+    }
+  };
+
+  const handleSelectProduct = (product: ProductWithCategory) => {
+    setSelectedProducts(prev => {
+      const isSelected = prev.some(p => p.id === product.id);
+      if (isSelected) {
+        return prev.filter(p => p.id !== product.id);
+      } else {
+        return [...prev, product];
+      }
+    });
+  };
+
+  const isProductSelected = (product: ProductWithCategory) => {
+    return selectedProducts.some(p => p.id === product.id);
+  };
+
+  const clearSelection = () => {
+    setSelectedProducts([]);
+  };
   return (
     <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      {selectedProducts.length > 0 && (
+        <div className="bg-blue-50 border-b border-blue-200 px-6 py-3">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-800">
+              {selectedProducts.length} product{selectedProducts.length > 1 ? 's' : ''} selected
+            </span>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowBulkDelete(true)}
+                className="text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4 mr-1" />
+                Delete Selected
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearSelection}
+                className="text-gray-600"
+              >
+                Clear Selection
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
+              <th className="text-left py-4 px-6 font-medium text-gray-600 w-12">
+                <button
+                  onClick={handleSelectAll}
+                  className="flex items-center justify-center"
+                >
+                  {selectedProducts.length === products?.length && products?.length > 0 ? (
+                    <CheckSquare className="h-4 w-4 text-blue-600" />
+                  ) : (
+                    <Square className="h-4 w-4 text-gray-400" />
+                  )}
+                </button>
+              </th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Product</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">SKU</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Category</th>
@@ -54,6 +124,7 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
             {isLoading ? (
               [...Array(5)].map((_, i) => (
                 <tr key={i} className="border-b border-gray-50">
+                  <td className="py-4 px-6"><Skeleton className="w-4 h-4" /></td>
                   <td className="py-4 px-6"><div className="flex items-center space-x-4"><Skeleton className="w-12 h-12 rounded-lg" /><div className="space-y-2"><Skeleton className="h-4 w-[250px]" /></div></div></td>
                   <td className="py-4 px-6"><Skeleton className="h-4 w-[150px]" /></td>
                   <td className="py-4 px-6"><Skeleton className="h-4 w-[100px]" /></td>
@@ -66,7 +137,7 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
               ))
             ) : isError ? (
               <tr>
-                <td colSpan={8} className="text-center py-10">
+                <td colSpan={9} className="text-center py-10">
                   <Alert variant="destructive" className="max-w-lg mx-auto">
                     <Terminal className="h-4 w-4" />
                     <AlertTitle>Error Fetching Products</AlertTitle>
@@ -77,6 +148,18 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
             ) : (
               products?.map((product) => (
                 <tr key={product.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                  <td className="py-4 px-6">
+                    <button
+                      onClick={() => handleSelectProduct(product)}
+                      className="flex items-center justify-center"
+                    >
+                      {isProductSelected(product) ? (
+                        <CheckSquare className="h-4 w-4 text-blue-600" />
+                      ) : (
+                        <Square className="h-4 w-4 text-gray-400 hover:text-gray-600" />
+                      )}
+                    </button>
+                  </td>
                    <td className="py-4 px-6">
                      <div className="flex items-center space-x-4">
                        <div className="relative w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
@@ -160,6 +243,14 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
           </tbody>
         </table>
       </div>
+      
+      <BulkDeleteDialog
+        open={showBulkDelete}
+        onOpenChange={setShowBulkDelete}
+        selectedProducts={selectedProducts}
+        onClearSelection={clearSelection}
+      />
+      
       <div className="flex items-center justify-between px-6 py-4 bg-gray-50 border-t border-gray-100">
         <p className="text-sm text-gray-600">Showing 1 to {products?.length || 0} of {products?.length || 0} results</p>
         <div className="flex items-center space-x-2">

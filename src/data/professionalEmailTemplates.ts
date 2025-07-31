@@ -1,1763 +1,1284 @@
-// Professional Email Templates with 4 Visual Styles
-// Clean, Modern, Bold, Elegant designs for comprehensive e-commerce communication
-
 export interface EmailTemplate {
   template_key: string;
   template_name: string;
   subject_template: string;
   html_template: string;
   text_template: string;
-  template_type: 'transactional' | 'marketing';
-  variables: string[];
-  category: 'order_confirmation' | 'shipping' | 'abandoned_cart' | 'welcome' | 'promotional';
+  template_type: 'transactional' | 'marketing' | 'notification';
+  category: 'order' | 'shipping' | 'cart' | 'welcome' | 'promotional';
   style: 'clean' | 'modern' | 'bold' | 'elegant';
+  variables: string[];
+  is_active: boolean;
 }
 
 export const professionalEmailTemplates: EmailTemplate[] = [
-  // ORDER CONFIRMATION TEMPLATES (4 styles)
+  // ===== ORDER CONFIRMATION TEMPLATES =====
   {
     template_key: 'order_confirmation_clean',
     template_name: 'Order Confirmation - Clean Style',
-    subject_template: 'Order Confirmation #{{orderNumber}} - Thank You!',
-    category: 'order_confirmation',
+    subject_template: 'Order Confirmation #{{orderId}} - Thank You!',
+    category: 'order',
     style: 'clean',
     template_type: 'transactional',
-    variables: ['customerName', 'orderNumber', 'orderTotal', 'orderDate', 'deliveryAddress', 'companyName', 'supportEmail'],
-    html_template: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Confirmation</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 20px 40px; text-align: center; border-bottom: 1px solid #e2e8f0;">
-              <h1 style="margin: 0; color: #1e293b; font-size: 28px; font-weight: 600;">Order Confirmed</h1>
-              <p style="margin: 8px 0 0 0; color: #64748b; font-size: 16px;">Thank you for your order, {{customerName}}!</p>
-            </td>
-          </tr>
-          
-          <!-- Order Details -->
-          <tr>
-            <td style="padding: 30px 40px;">
-              <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                <tr>
-                  <td style="padding: 20px; background-color: #f1f5f9; border-radius: 6px;">
-                    <h2 style="margin: 0 0 16px 0; color: #1e293b; font-size: 18px; font-weight: 600;">Order Details</h2>
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size: 14px;">
-                      <tr>
-                        <td style="padding: 4px 0; color: #64748b;">Order Number:</td>
-                        <td style="padding: 4px 0; color: #1e293b; font-weight: 500; text-align: right;">#{{orderNumber}}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 4px 0; color: #64748b;">Order Date:</td>
-                        <td style="padding: 4px 0; color: #1e293b; font-weight: 500; text-align: right;">{{orderDate}}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 4px 0; color: #64748b;">Total Amount:</td>
-                        <td style="padding: 4px 0; color: #1e293b; font-weight: 600; font-size: 16px; text-align: right;">${{orderTotal}}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 4px 0; color: #64748b;">Delivery Address:</td>
-                        <td style="padding: 4px 0; color: #1e293b; font-weight: 500; text-align: right;">{{deliveryAddress}}</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-              
-              <p style="margin: 30px 0 0 0; color: #64748b; font-size: 14px;">
-                We'll send you a shipping confirmation email with tracking information once your order has been dispatched.
-              </p>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; border-top: 1px solid #e2e8f0; text-align: center;">
-              <p style="margin: 0; color: #64748b; font-size: 14px;">
-                Need help? Contact us at <a href="mailto:{{supportEmail}}" style="color: #3b82f6; text-decoration: none;">{{supportEmail}}</a>
-              </p>
-              <p style="margin: 16px 0 0 0; color: #94a3b8; font-size: 12px;">© {{companyName}}. All rights reserved.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`,
-    text_template: `Order Confirmation #{{orderNumber}}
+    variables: ['orderId', 'customerName', 'orderDate', 'orderItems', 'orderTotal', 'deliveryAddress', 'companyName', 'supportEmail'],
+    is_active: true,
+    text_template: `Dear {{customerName}},
 
-Hi {{customerName}},
+Thank you for your order! Your order #{{orderId}} has been confirmed.
 
-Thank you for your order! Here are the details:
-
-Order Number: #{{orderNumber}}
 Order Date: {{orderDate}}
-Total: ${{orderTotal}}
-Delivery Address: {{deliveryAddress}}
+Order Total: {{orderTotal}}
 
-We'll send you tracking information once your order ships.
+Your order will be delivered to:
+{{deliveryAddress}}
 
-Need help? Contact us at {{supportEmail}}
+We'll keep you updated on your delivery status.
+
+Thank you for choosing {{companyName}}!
+
+If you have any questions, please contact us at {{supportEmail}}.
 
 Best regards,
-{{companyName}}`
+The {{companyName}} Team`,
+    html_template: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #333333; background-color: #f8f9fa; }
+        .container { max-width: 600px; margin: 0 auto; background-color: #ffffff; }
+        .header { background-color: #ffffff; padding: 32px 24px; border-bottom: 1px solid #e5e7eb; text-align: center; }
+        .logo { font-size: 24px; font-weight: 700; color: #1f2937; }
+        .content { padding: 32px 24px; }
+        .order-header { background-color: #f3f4f6; padding: 20px; border-radius: 8px; margin-bottom: 24px; }
+        .order-number { font-size: 20px; font-weight: 600; color: #1f2937; margin-bottom: 8px; }
+        .order-date { color: #6b7280; }
+        .section { margin-bottom: 24px; }
+        .section-title { font-size: 16px; font-weight: 600; color: #1f2937; margin-bottom: 12px; }
+        .order-item { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid #f3f4f6; }
+        .order-item:last-child { border-bottom: none; }
+        .item-name { font-weight: 500; color: #1f2937; }
+        .item-price { font-weight: 600; color: #1f2937; }
+        .total-row { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-top: 2px solid #e5e7eb; margin-top: 16px; }
+        .total-label { font-size: 18px; font-weight: 700; color: #1f2937; }
+        .total-amount { font-size: 18px; font-weight: 700; color: #059669; }
+        .address-box { background-color: #f9fafb; padding: 16px; border-radius: 6px; border-left: 4px solid #10b981; }
+        .footer { background-color: #f9fafb; padding: 24px; text-align: center; color: #6b7280; font-size: 14px; }
+        .support-link { color: #059669; text-decoration: none; }
+        @media (max-width: 600px) {
+            .container { margin: 0; }
+            .content { padding: 24px 16px; }
+            .header { padding: 24px 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">{{companyName}}</div>
+        </div>
+        
+        <div class="content">
+            <div class="order-header">
+                <div class="order-number">Order #{{orderId}}</div>
+                <div class="order-date">Placed on {{orderDate}}</div>
+            </div>
+            
+            <p style="margin-bottom: 24px; color: #374151;">Hi {{customerName}},</p>
+            <p style="margin-bottom: 24px; color: #374151;">Thank you for your order! We've received your order and it's being processed.</p>
+            
+            <div class="section">
+                <div class="section-title">Order Summary</div>
+                <div>{{orderItems}}</div>
+                <div class="total-row">
+                    <span class="total-label">Total</span>
+                    <span class="total-amount">{{orderTotal}}</span>
+                </div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">Delivery Address</div>
+                <div class="address-box">{{deliveryAddress}}</div>
+            </div>
+            
+            <p style="color: #374151;">We'll send you tracking information once your order ships.</p>
+        </div>
+        
+        <div class="footer">
+            <p>Need help? Contact us at <a href="mailto:{{supportEmail}}" class="support-link">{{supportEmail}}</a></p>
+            <p style="margin-top: 8px;">© {{companyName}}. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>`
   },
 
   {
     template_key: 'order_confirmation_modern',
     template_name: 'Order Confirmation - Modern Style',
-    subject_template: '✨ Your Order #{{orderNumber}} is Confirmed!',
-    category: 'order_confirmation',
+    subject_template: '✅ Your order is confirmed! #{{orderId}}',
+    category: 'order',
     style: 'modern',
     template_type: 'transactional',
-    variables: ['customerName', 'orderNumber', 'orderTotal', 'orderDate', 'deliveryAddress', 'companyName', 'supportEmail'],
+    variables: [
+      'orderId',
+      'customerName',
+      'orderDate',
+      'orderItems',
+      'orderTotal',
+      'companyName',
+      'supportEmail'
+    ],
+    is_active: true,
+    text_template: `Hi {{customerName}}! 🎉
+
+Your order #{{orderId}} is confirmed and we're getting it ready for you!
+
+Order Details:
+- Order Date: {{orderDate}}
+- Total: {{orderTotal}}
+
+{{orderItems}}
+
+We'll notify you as soon as it ships!
+
+Questions? Reply to this email or contact {{supportEmail}}
+
+Thanks for choosing {{companyName}}!`,
     html_template: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Confirmation</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1a202c; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 24px; text-align: center; color: white; }
+        .logo { font-size: 28px; font-weight: 800; margin-bottom: 8px; }
+        .header-subtitle { opacity: 0.9; font-size: 16px; }
+        .content { padding: 40px 24px; }
+        .success-icon { width: 64px; height: 64px; background: linear-gradient(135deg, #10b981, #059669); border-radius: 50%; margin: 0 auto 24px; display: flex; align-items: center; justify-content: center; color: white; font-size: 24px; }
+        .order-card { background: linear-gradient(135deg, #f8fafc, #e2e8f0); border-radius: 12px; padding: 24px; margin: 24px 0; border: 1px solid #e2e8f0; }
+        .order-number { font-size: 24px; font-weight: 700; color: #2d3748; margin-bottom: 8px; }
+        .order-date { color: #718096; font-size: 14px; }
+        .section { margin: 32px 0; }
+        .section-title { font-size: 18px; font-weight: 700; color: #2d3748; margin-bottom: 16px; display: flex; align-items: center; }
+        .section-icon { margin-right: 8px; }
+        .items-container { background-color: #f7fafc; border-radius: 12px; padding: 20px; }
+        .total-card { background: linear-gradient(135deg, #2d3748, #4a5568); color: white; border-radius: 12px; padding: 20px; text-align: center; }
+        .total-amount { font-size: 28px; font-weight: 800; }
+        .footer { background-color: #f8fafc; padding: 32px 24px; text-align: center; color: #718096; }
+        .support-button { display: inline-block; background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 12px 24px; border-radius: 25px; text-decoration: none; font-weight: 600; margin-top: 16px; }
+        @media (max-width: 600px) {
+            .container { margin: 20px; border-radius: 12px; }
+            .content { padding: 24px 16px; }
+            .header { padding: 32px 16px; }
+        }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);">
-          <!-- Header with Gradient -->
-          <tr>
-            <td style="padding: 40px 40px 30px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center; color: white;">
-              <div style="width: 60px; height: 60px; margin: 0 auto 20px auto; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center;">
-                <div style="width: 24px; height: 24px; background: white; border-radius: 50%;"></div>
-              </div>
-              <h1 style="margin: 0; font-size: 32px; font-weight: 700;">Order Confirmed!</h1>
-              <p style="margin: 12px 0 0 0; font-size: 18px; opacity: 0.9;">Hey {{customerName}}, your order is on its way!</p>
-            </td>
-          </tr>
-          
-          <!-- Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 30px; border-radius: 12px; margin-bottom: 30px;">
-                <h2 style="margin: 0 0 20px 0; color: white; font-size: 20px; font-weight: 600;">Order Summary</h2>
-                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="color: white;">
-                  <tr>
-                    <td style="padding: 8px 0; font-size: 16px; opacity: 0.9;">Order #{{orderNumber}}</td>
-                    <td style="padding: 8px 0; font-size: 16px; text-align: right; font-weight: 600;">{{orderDate}}</td>
-                  </tr>
-                  <tr>
-                    <td colspan="2" style="padding: 16px 0 8px 0; border-top: 1px solid rgba(255,255,255,0.3);">
-                      <div style="font-size: 14px; opacity: 0.9;">Delivery Address</div>
-                      <div style="font-size: 16px; font-weight: 500; margin-top: 4px;">{{deliveryAddress}}</div>
-                    </td>
-                  </tr>
-                  <tr>
-                    <td style="padding: 16px 0 0 0; font-size: 18px; font-weight: 600;">Total</td>
-                    <td style="padding: 16px 0 0 0; font-size: 24px; font-weight: 700; text-align: right;">${{orderTotal}}</td>
-                  </tr>
-                </table>
-              </div>
-              
-              <div style="text-align: center; padding: 20px; background: #f8fafc; border-radius: 12px;">
-                <p style="margin: 0; color: #64748b; font-size: 16px;">
-                  🚀 We're preparing your order with care. You'll receive tracking details soon!
-                </p>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; background: #f8fafc; text-align: center;">
-              <p style="margin: 0; color: #64748b; font-size: 14px;">
-                Questions? We're here to help at <a href="mailto:{{supportEmail}}" style="color: #667eea; text-decoration: none; font-weight: 500;">{{supportEmail}}</a>
-              </p>
-              <p style="margin: 16px 0 0 0; color: #94a3b8; font-size: 12px;">© {{companyName}}. Made with ❤️</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">{{companyName}}</div>
+            <div class="header-subtitle">Your order is confirmed!</div>
+        </div>
+        
+        <div class="content">
+            <div class="success-icon">✅</div>
+            
+            <div style="text-align: center; margin-bottom: 32px;">
+                <h1 style="color: #2d3748; margin-bottom: 8px;">Thanks {{customerName}}!</h1>
+                <p style="color: #718096;">We've received your order and it's being processed with care.</p>
+            </div>
+            
+            <div class="order-card">
+                <div class="order-number">Order #{{orderId}}</div>
+                <div class="order-date">{{orderDate}}</div>
+            </div>
+            
+            <div class="section">
+                <div class="section-title">
+                    <span class="section-icon">📦</span>
+                    Your Items
+                </div>
+                <div class="items-container">
+                    {{orderItems}}
+                </div>
+            </div>
+            
+            <div class="total-card">
+                <div style="margin-bottom: 8px; opacity: 0.8;">Order Total</div>
+                <div class="total-amount">{{orderTotal}}</div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 32px;">
+                <p style="color: #4a5568; margin-bottom: 16px;">We'll send you updates as your order progresses!</p>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <p>Questions about your order?</p>
+            <a href="mailto:{{supportEmail}}" class="support-button">Contact Support</a>
+            <p style="margin-top: 24px; font-size: 12px;">© {{companyName}}. All rights reserved.</p>
+        </div>
+    </div>
 </body>
-</html>`,
-    text_template: `✨ Order Confirmed! #{{orderNumber}}
-
-Hey {{customerName}},
-
-Your order is on its way! 🚀
-
-📦 Order Details:
-- Order: #{{orderNumber}}
-- Date: {{orderDate}}
-- Total: ${{orderTotal}}
-- Delivery: {{deliveryAddress}}
-
-We're preparing your order with care. You'll receive tracking details soon!
-
-Questions? Contact us at {{supportEmail}}
-
-{{companyName}} Team ❤️`
+</html>`
   },
 
   {
     template_key: 'order_confirmation_bold',
     template_name: 'Order Confirmation - Bold Style',
-    subject_template: '🔥 ORDER CONFIRMED #{{orderNumber}} - GET READY!',
-    category: 'order_confirmation',
+    subject_template: '🔥 ORDER CONFIRMED: #{{orderId}} - {{companyName}}',
+    category: 'order',
     style: 'bold',
     template_type: 'transactional',
-    variables: ['customerName', 'orderNumber', 'orderTotal', 'orderDate', 'deliveryAddress', 'companyName', 'supportEmail'],
+    variables: ['orderId', 'customerName', 'orderDate', 'orderTotal', 'companyName', 'supportEmail'],
+    is_active: true,
+    text_template: `🔥 ORDER CONFIRMED! 🔥
+
+{{customerName}}, YOUR ORDER IS LOCKED IN!
+
+Order #{{orderId}}
+Date: {{orderDate}}
+Total: {{orderTotal}}
+
+WE'RE PREPARING YOUR ORDER RIGHT NOW!
+
+Get ready for an amazing delivery experience with {{companyName}}!
+
+Questions? Hit us up: {{supportEmail}}
+
+LET'S GO! 🚀`,
     html_template: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Confirmation</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmed!</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Arial Black', Arial, sans-serif; line-height: 1.4; background: linear-gradient(45deg, #ff6b6b, #ee5a52, #ff8a80); color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #1a1a1a, #2d2d2d); }
+        .header { background: linear-gradient(135deg, #ff6b6b, #ee5a52); padding: 40px 20px; text-align: center; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><circle cx="20" cy="20" r="2" fill="rgba(255,255,255,0.1)"/><circle cx="80" cy="80" r="2" fill="rgba(255,255,255,0.1)"/><circle cx="40" cy="60" r="1" fill="rgba(255,255,255,0.1)"/></svg>'); }
+        .logo { font-size: 32px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; position: relative; z-index: 1; }
+        .fire-emoji { font-size: 48px; margin: 16px 0; }
+        .content { padding: 40px 24px; color: #ffffff; }
+        .big-title { font-size: 36px; font-weight: 900; text-transform: uppercase; text-align: center; margin-bottom: 24px; color: #ff6b6b; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); letter-spacing: 1px; }
+        .order-box { background: linear-gradient(135deg, #ff6b6b, #ee5a52); padding: 24px; border-radius: 12px; margin: 24px 0; text-align: center; border: 3px solid #ffffff; box-shadow: 0 8px 16px rgba(0,0,0,0.3); }
+        .order-number { font-size: 28px; font-weight: 900; margin-bottom: 8px; }
+        .order-details { font-size: 18px; font-weight: 700; }
+        .status-banner { background: #00ff88; color: #000000; padding: 16px; text-align: center; font-weight: 900; font-size: 20px; margin: 24px 0; border-radius: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .cta-button { display: inline-block; background: linear-gradient(135deg, #00ff88, #00cc6a); color: #000000; padding: 16px 32px; border-radius: 50px; text-decoration: none; font-weight: 900; font-size: 18px; margin: 16px 0; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .footer { background: #000000; padding: 24px; text-align: center; }
+        .footer-text { color: #cccccc; font-size: 14px; }
+        @media (max-width: 600px) {
+            .big-title { font-size: 28px; }
+            .content { padding: 24px 16px; }
+        }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #000000; line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 0; box-shadow: 0 0 40px rgba(255,0,100,0.3);">
-          <!-- Bold Header -->
-          <tr>
-            <td style="padding: 0; background: linear-gradient(45deg, #ff0066, #ff3366); text-align: center; color: white; position: relative;">
-              <div style="padding: 50px 40px; transform: skew(-2deg); margin: -10px 0;">
-                <h1 style="margin: 0; font-size: 36px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">ORDER LOCKED IN!</h1>
-                <div style="width: 80px; height: 4px; background: white; margin: 20px auto; border-radius: 2px;"></div>
-                <p style="margin: 0; font-size: 20px; font-weight: 600; text-transform: uppercase;">{{customerName}} - YOU'RE ALL SET!</p>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- High Impact Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="border: 4px solid #ff0066; padding: 30px; margin-bottom: 30px; background: #000000; color: white; text-align: center;">
-                <h2 style="margin: 0 0 20px 0; color: #ff0066; font-size: 24px; font-weight: 800; text-transform: uppercase;">ORDER #{{orderNumber}}</h2>
-                <div style="font-size: 48px; font-weight: 900; color: #ffffff; margin: 20px 0;">${{orderTotal}}</div>
-                <div style="background: #ff0066; padding: 15px; margin: 20px 0; transform: skew(-1deg);">
-                  <div style="transform: skew(1deg); font-size: 16px; font-weight: 600;">{{orderDate}}</div>
-                </div>
-              </div>
-              
-              <div style="background: #f5f5f5; padding: 30px; border-left: 8px solid #ff0066;">
-                <h3 style="margin: 0 0 15px 0; color: #000000; font-size: 18px; font-weight: 700; text-transform: uppercase;">DELIVERY ZONE</h3>
-                <p style="margin: 0; color: #333333; font-size: 16px; font-weight: 500;">{{deliveryAddress}}</p>
-              </div>
-              
-              <div style="text-align: center; margin: 40px 0 0 0; padding: 30px; background: linear-gradient(45deg, #ff0066, #ff3366); color: white; transform: skew(-1deg);">
-                <div style="transform: skew(1deg);">
-                  <p style="margin: 0; font-size: 18px; font-weight: 700; text-transform: uppercase;">
-                    🚀 PREPARING YOUR ORDER NOW!
-                  </p>
-                  <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.9;">TRACKING DETAILS COMING SOON</p>
-                </div>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Bold Footer -->
-          <tr>
-            <td style="padding: 30px 40px; background: #000000; color: white; text-align: center;">
-              <p style="margin: 0; font-size: 16px; font-weight: 600; text-transform: uppercase;">
-                NEED BACKUP? <a href="mailto:{{supportEmail}}" style="color: #ff0066; text-decoration: none; font-weight: 700;">{{supportEmail}}</a>
-              </p>
-              <p style="margin: 16px 0 0 0; color: #666666; font-size: 12px; text-transform: uppercase;">© {{companyName}} - ALWAYS DELIVERING</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="fire-emoji">🔥</div>
+            <div class="logo">{{companyName}}</div>
+            <div class="fire-emoji">🔥</div>
+        </div>
+        
+        <div class="content">
+            <div class="big-title">ORDER CONFIRMED!</div>
+            
+            <div style="text-align: center; margin-bottom: 32px;">
+                <div style="font-size: 24px; font-weight: 700; margin-bottom: 8px;">{{customerName}}, YOU'RE ALL SET!</div>
+                <div style="font-size: 18px; opacity: 0.9;">Your order is locked in and we're getting it ready!</div>
+            </div>
+            
+            <div class="order-box">
+                <div class="order-number">ORDER #{{orderId}}</div>
+                <div class="order-details">{{orderDate}}</div>
+                <div class="order-details" style="font-size: 24px; margin-top: 12px;">{{orderTotal}}</div>
+            </div>
+            
+            <div class="status-banner">
+                🚀 PREPARING YOUR ORDER NOW! 🚀
+            </div>
+            
+            <div style="text-align: center;">
+                <p style="font-size: 18px; font-weight: 600; margin-bottom: 16px;">Get ready for an AMAZING delivery experience!</p>
+                <a href="mailto:{{supportEmail}}" class="cta-button">NEED HELP? CONTACT US!</a>
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="footer-text">© {{companyName}} - Delivering Excellence</div>
+        </div>
+    </div>
 </body>
-</html>`,
-    text_template: `🔥 ORDER CONFIRMED #{{orderNumber}} - GET READY!
-
-{{customerName}} - YOU'RE ALL SET!
-
-💥 ORDER DETAILS:
-━━━━━━━━━━━━━━━
-Order: #{{orderNumber}}
-Date: {{orderDate}}
-Total: ${{orderTotal}}
-Delivery: {{deliveryAddress}}
-━━━━━━━━━━━━━━━
-
-🚀 PREPARING YOUR ORDER NOW!
-TRACKING DETAILS COMING SOON
-
-NEED BACKUP? {{supportEmail}}
-
-{{companyName}} - ALWAYS DELIVERING`
+</html>`
   },
 
   {
     template_key: 'order_confirmation_elegant',
     template_name: 'Order Confirmation - Elegant Style',
-    subject_template: 'Your Exquisite Order #{{orderNumber}} - Confirmed with Gratitude',
-    category: 'order_confirmation',
+    subject_template: 'Your Order Confirmation — {{companyName}}',
+    category: 'order',
     style: 'elegant',
     template_type: 'transactional',
-    variables: ['customerName', 'orderNumber', 'orderTotal', 'orderDate', 'deliveryAddress', 'companyName', 'supportEmail'],
+    variables: ['orderId', 'customerName', 'orderDate', 'orderItems', 'orderTotal', 'deliveryAddress', 'companyName', 'supportEmail'],
+    is_active: true,
+    text_template: `Dear {{customerName}},
+
+We are delighted to confirm that your order has been received and is currently being prepared with the utmost care.
+
+Order Details:
+Order Number: {{orderId}}
+Order Date: {{orderDate}}
+Order Total: {{orderTotal}}
+
+Delivery Address:
+{{deliveryAddress}}
+
+Your order contains:
+{{orderItems}}
+
+We will keep you informed of your order's progress and notify you once it has been dispatched.
+
+Should you require any assistance, please do not hesitate to contact our customer service team at {{supportEmail}}.
+
+With warm regards,
+The {{companyName}} Team`,
     html_template: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Confirmation</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Confirmation</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Georgia', 'Times New Roman', serif; line-height: 1.8; color: #2c3e50; background-color: #f8f9fa; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; box-shadow: 0 10px 30px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #2c3e50, #34495e); padding: 48px 32px; text-align: center; color: #ffffff; position: relative; }
+        .header::after { content: ''; position: absolute; bottom: 0; left: 0; right: 0; height: 1px; background: linear-gradient(90deg, transparent, #ecf0f1, transparent); }
+        .logo { font-size: 32px; font-weight: 300; letter-spacing: 3px; margin-bottom: 8px; }
+        .tagline { font-size: 14px; opacity: 0.8; font-style: italic; letter-spacing: 1px; }
+        .content { padding: 48px 32px; }
+        .greeting { font-size: 18px; color: #2c3e50; margin-bottom: 32px; }
+        .order-details { background-color: #f8f9fa; border: 1px solid #e9ecef; border-radius: 0; padding: 32px; margin: 32px 0; position: relative; }
+        .order-details::before { content: ''; position: absolute; top: 0; left: 0; width: 4px; height: 100%; background: linear-gradient(180deg, #3498db, #2980b9); }
+        .order-number { font-size: 24px; font-weight: 400; color: #2c3e50; margin-bottom: 16px; letter-spacing: 1px; }
+        .order-meta { color: #7f8c8d; font-size: 16px; margin-bottom: 24px; }
+        .section-divider { height: 1px; background: linear-gradient(90deg, transparent, #bdc3c7, transparent); margin: 32px 0; }
+        .items-section { margin: 32px 0; }
+        .section-title { font-size: 18px; font-weight: 400; color: #2c3e50; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 2px; }
+        .total-section { background: linear-gradient(135deg, #ecf0f1, #d5dbdb); padding: 24px; margin: 32px 0; text-align: center; }
+        .total-label { font-size: 16px; color: #7f8c8d; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 1px; }
+        .total-amount { font-size: 28px; font-weight: 400; color: #2c3e50; }
+        .address-section { background-color: #f8f9fa; padding: 24px; border-left: 4px solid #3498db; margin: 24px 0; }
+        .footer { background-color: #2c3e50; color: #ecf0f1; padding: 32px; text-align: center; }
+        .footer-text { font-size: 14px; line-height: 1.6; }
+        .support-link { color: #3498db; text-decoration: none; }
+        .signature { font-style: italic; margin-top: 32px; color: #7f8c8d; }
+        @media (max-width: 600px) {
+            .container { margin: 20px; }
+            .content { padding: 32px 20px; }
+            .header { padding: 32px 20px; }
+            .order-details { padding: 24px 20px; }
+        }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: Georgia, 'Times New Roman', serif; background-color: #fafafa; line-height: 1.8;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 60px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e8e8e8;">
-          <!-- Elegant Header -->
-          <tr>
-            <td style="padding: 60px 50px 40px 50px; text-align: center; border-bottom: 3px double #d4af37;">
-              <div style="width: 120px; height: 1px; background: linear-gradient(to right, transparent, #d4af37, transparent); margin: 0 auto 30px auto;"></div>
-              <h1 style="margin: 0; color: #2c2c2c; font-size: 32px; font-weight: 300; letter-spacing: 3px; text-transform: uppercase;">Order Confirmed</h1>
-              <div style="width: 60px; height: 1px; background: #d4af37; margin: 20px auto; opacity: 0.7;"></div>
-              <p style="margin: 0; color: #666666; font-size: 18px; font-style: italic;">Dear {{customerName}}, thank you for choosing excellence</p>
-            </td>
-          </tr>
-          
-          <!-- Elegant Content -->
-          <tr>
-            <td style="padding: 50px;">
-              <p style="margin: 0 0 30px 0; color: #444444; font-size: 16px; line-height: 1.8;">
-                We are delighted to confirm that your order has been received and is being prepared with the utmost care and attention to detail.
-              </p>
-              
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 40px 0;">
-                <tr>
-                  <td style="padding: 30px; background: #fbfbfb; border: 1px solid #e8e8e8; border-left: 4px solid #d4af37;">
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                      <tr>
-                        <td colspan="2" style="padding-bottom: 20px; border-bottom: 1px solid #e8e8e8;">
-                          <h2 style="margin: 0; color: #2c2c2c; font-size: 20px; font-weight: 400; letter-spacing: 1px;">Order Details</h2>
-                        </td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 15px 0; color: #666666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Order Number</td>
-                        <td style="padding: 15px 0; color: #2c2c2c; font-size: 16px; text-align: right; font-weight: 500;">#{{orderNumber}}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 15px 0; color: #666666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Order Date</td>
-                        <td style="padding: 15px 0; color: #2c2c2c; font-size: 16px; text-align: right;">{{orderDate}}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 15px 0; color: #666666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Total Investment</td>
-                        <td style="padding: 15px 0; color: #d4af37; font-size: 20px; text-align: right; font-weight: 600;">${{orderTotal}}</td>
-                      </tr>
-                      <tr>
-                        <td colspan="2" style="padding: 20px 0 15px 0; border-top: 1px solid #e8e8e8;">
-                          <div style="color: #666666; font-size: 14px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px;">Delivery Address</div>
-                          <div style="color: #2c2c2c; font-size: 16px; line-height: 1.6;">{{deliveryAddress}}</div>
-                        </td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-              
-              <p style="margin: 40px 0 0 0; color: #666666; font-size: 15px; line-height: 1.8; font-style: italic; text-align: center;">
-                "Excellence is never an accident. It is always the result of high intention, sincere effort, and intelligent execution."
-              </p>
-            </td>
-          </tr>
-          
-          <!-- Elegant Footer -->
-          <tr>
-            <td style="padding: 40px 50px 60px 50px; border-top: 3px double #d4af37; text-align: center;">
-              <div style="width: 120px; height: 1px; background: linear-gradient(to right, transparent, #d4af37, transparent); margin: 0 auto 30px auto;"></div>
-              <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.6;">
-                Should you require any assistance, our dedicated team is at your service.<br>
-                <a href="mailto:{{supportEmail}}" style="color: #d4af37; text-decoration: none; font-weight: 500;">{{supportEmail}}</a>
-              </p>
-              <p style="margin: 30px 0 0 0; color: #999999; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;">
-                With sincere regards, {{companyName}}
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="logo">{{companyName}}</div>
+            <div class="tagline">Excellence in Every Detail</div>
+        </div>
+        
+        <div class="content">
+            <div class="greeting">Dear {{customerName}},</div>
+            
+            <p style="margin-bottom: 24px; color: #34495e;">We are delighted to confirm that your order has been received and is currently being prepared with the utmost care and attention to detail.</p>
+            
+            <div class="order-details">
+                <div class="order-number">Order №{{orderId}}</div>
+                <div class="order-meta">Placed on {{orderDate}}</div>
+                
+                <div class="section-divider"></div>
+                
+                <div class="items-section">
+                    <div class="section-title">Order Summary</div>
+                    {{orderItems}}
+                </div>
+                
+                <div class="total-section">
+                    <div class="total-label">Order Total</div>
+                    <div class="total-amount">{{orderTotal}}</div>
+                </div>
+            </div>
+            
+            <div class="section-title">Delivery Information</div>
+            <div class="address-section">
+                {{deliveryAddress}}
+            </div>
+            
+            <p style="color: #34495e; margin: 32px 0;">We will keep you informed of your order's progress and will notify you promptly once your items have been carefully packaged and dispatched.</p>
+            
+            <div class="signature">
+                With warm regards,<br>
+                The {{companyName}} Team
+            </div>
+        </div>
+        
+        <div class="footer">
+            <div class="footer-text">
+                Should you require any assistance, please do not hesitate to contact our dedicated customer service team at <a href="mailto:{{supportEmail}}" class="support-link">{{supportEmail}}</a>
+            </div>
+            <div style="margin-top: 20px; font-size: 12px; opacity: 0.7;">
+                © {{companyName}} — Crafted with Excellence
+            </div>
+        </div>
+    </div>
 </body>
-</html>`,
-    text_template: `Order Confirmed - #{{orderNumber}}
-
-Dear {{customerName}},
-
-Thank you for choosing excellence. We are delighted to confirm that your order has been received and is being prepared with the utmost care.
-
-ORDER DETAILS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Order Number: #{{orderNumber}}
-Order Date: {{orderDate}}
-Total Investment: ${{orderTotal}}
-Delivery Address: {{deliveryAddress}}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-"Excellence is never an accident. It is always the result of high intention, sincere effort, and intelligent execution."
-
-Should you require any assistance, our dedicated team is at your service at {{supportEmail}}.
-
-With sincere regards,
-{{companyName}}`
+</html>`
   },
 
-  // SHIPPING UPDATE TEMPLATES (3 templates)
+  // ===== SHIPPING TEMPLATES =====
   {
-    template_key: 'order_shipped_tracking',
-    template_name: 'Order Shipped with Tracking',
-    subject_template: '📦 Your Order #{{orderNumber}} Has Shipped!',
+    template_key: 'order_shipped',
+    template_name: 'Order Shipped Notification',
+    subject_template: '📦 Your order #{{orderId}} is on its way!',
     category: 'shipping',
     style: 'modern',
-    template_type: 'transactional',
-    variables: ['customerName', 'orderNumber', 'trackingNumber', 'trackingUrl', 'estimatedDelivery', 'companyName', 'supportEmail'],
+    template_type: 'notification',
+    variables: ['orderId', 'customerName', 'trackingNumber', 'carrierName', 'estimatedDelivery', 'trackingUrl', 'companyName'],
+    is_active: true,
+    text_template: `Hi {{customerName}}!
+
+Great news! Your order #{{orderId}} has shipped and is on its way to you.
+
+Tracking Information:
+- Tracking Number: {{trackingNumber}}
+- Carrier: {{carrierName}}
+- Estimated Delivery: {{estimatedDelivery}}
+
+Track your package: {{trackingUrl}}
+
+Thanks for choosing {{companyName}}!`,
     html_template: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Order Shipped</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Shipped</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1a202c; background-color: #f7fafc; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #4299e1, #3182ce); padding: 32px 24px; text-align: center; color: white; }
+        .truck-icon { font-size: 48px; margin-bottom: 16px; }
+        .content { padding: 32px 24px; }
+        .tracking-card { background: linear-gradient(135deg, #ebf8ff, #bee3f8); border-radius: 12px; padding: 24px; margin: 24px 0; border-left: 4px solid #4299e1; }
+        .track-button { display: inline-block; background: linear-gradient(135deg, #4299e1, #3182ce); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px; }
+        .delivery-info { background-color: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0; }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.15);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 30px 40px; background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); text-align: center; color: white;">
-              <div style="width: 80px; height: 80px; margin: 0 auto 20px auto; background: rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 32px;">📦</div>
-              <h1 style="margin: 0; font-size: 28px; font-weight: 700;">Your Order Has Shipped!</h1>
-              <p style="margin: 12px 0 0 0; font-size: 16px; opacity: 0.9;">Hi {{customerName}}, your package is on its way to you!</p>
-            </td>
-          </tr>
-          
-          <!-- Tracking Info -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 30px; border-radius: 12px; margin-bottom: 30px; text-align: center; color: white;">
-                <h2 style="margin: 0 0 20px 0; font-size: 20px; font-weight: 600;">Tracking Information</h2>
-                <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 8px; margin: 20px 0;">
-                  <div style="font-size: 14px; opacity: 0.9; margin-bottom: 8px;">Tracking Number</div>
-                  <div style="font-size: 24px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 2px;">{{trackingNumber}}</div>
-                </div>
-                <a href="{{trackingUrl}}" style="display: inline-block; background: white; color: #667eea; padding: 14px 28px; border-radius: 25px; text-decoration: none; font-weight: 600; margin-top: 15px;">Track Your Package</a>
-              </div>
-              
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background: #f8fafc; padding: 20px; border-radius: 8px;">
-                <tr>
-                  <td style="padding: 10px 0; color: #64748b; font-size: 14px;">Order Number:</td>
-                  <td style="padding: 10px 0; color: #1e293b; font-weight: 600; text-align: right;">#{{orderNumber}}</td>
-                </tr>
-                <tr>
-                  <td style="padding: 10px 0; color: #64748b; font-size: 14px;">Estimated Delivery:</td>
-                  <td style="padding: 10px 0; color: #059669; font-weight: 600; text-align: right;">{{estimatedDelivery}}</td>
-                </tr>
-              </table>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; background: #f8fafc; text-align: center;">
-              <p style="margin: 0; color: #64748b; font-size: 14px;">
-                Questions about your shipment? Contact us at <a href="mailto:{{supportEmail}}" style="color: #4facfe; text-decoration: none; font-weight: 500;">{{supportEmail}}</a>
-              </p>
-              <p style="margin: 16px 0 0 0; color: #94a3b8; font-size: 12px;">© {{companyName}}. Delivered with care.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="truck-icon">🚚</div>
+            <h1 style="font-size: 24px; margin-bottom: 8px;">Your Order is On Its Way!</h1>
+            <p style="opacity: 0.9;">{{companyName}}</p>
+        </div>
+        
+        <div class="content">
+            <p style="font-size: 18px; margin-bottom: 24px;">Hi {{customerName}},</p>
+            <p style="margin-bottom: 24px;">Great news! Your order #{{orderId}} has been shipped and is heading your way.</p>
+            
+            <div class="tracking-card">
+                <h3 style="color: #2d3748; margin-bottom: 16px;">Tracking Information</h3>
+                <p><strong>Tracking Number:</strong> {{trackingNumber}}</p>
+                <p><strong>Carrier:</strong> {{carrierName}}</p>
+                <p><strong>Estimated Delivery:</strong> {{estimatedDelivery}}</p>
+                <a href="{{trackingUrl}}" class="track-button">Track Your Package</a>
+            </div>
+            
+            <div class="delivery-info">
+                <p style="color: #4a5568;">We'll send you another update when your package is out for delivery!</p>
+            </div>
+        </div>
+    </div>
 </body>
-</html>`,
-    text_template: `📦 Your Order #{{orderNumber}} Has Shipped!
-
-Hi {{customerName}},
-
-Great news! Your package is on its way to you.
-
-🚚 TRACKING DETAILS:
-Tracking Number: {{trackingNumber}}
-Track your package: {{trackingUrl}}
-Estimated Delivery: {{estimatedDelivery}}
-
-Questions? Contact us at {{supportEmail}}
-
-{{companyName}} - Delivered with care.`
+</html>`
   },
 
   {
     template_key: 'out_for_delivery',
-    template_name: 'Out for Delivery Alert',
-    subject_template: '🚚 Your Order #{{orderNumber}} is Out for Delivery!',
+    template_name: 'Out for Delivery',
+    subject_template: '🚚 Your order #{{orderId}} is out for delivery!',
     category: 'shipping',
-    style: 'clean',
-    template_type: 'transactional',
-    variables: ['customerName', 'orderNumber', 'deliveryTimeWindow', 'driverName', 'driverPhone', 'companyName'],
+    style: 'modern',
+    template_type: 'notification',
+    variables: ['orderId', 'customerName', 'deliveryTimeframe', 'deliveryAddress', 'companyName'],
+    is_active: true,
+    text_template: `{{customerName}}, your package is almost there!
+
+Your order #{{orderId}} is out for delivery and should arrive within {{deliveryTimeframe}}.
+
+Delivery Address:
+{{deliveryAddress}}
+
+Please ensure someone is available to receive the package.
+
+Thank you for choosing {{companyName}}!`,
     html_template: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Out for Delivery</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Out for Delivery</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1a202c; background-color: #f7fafc; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #ed8936, #dd6b20); padding: 32px 24px; text-align: center; color: white; }
+        .content { padding: 32px 24px; }
+        .delivery-alert { background: linear-gradient(135deg, #fef5e7, #fed7aa); border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center; border-left: 4px solid #ed8936; }
+        .address-box { background-color: #f7fafc; padding: 20px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #4299e1; }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 30px 40px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 8px 8px 0 0;">
-              <div style="font-size: 48px; margin-bottom: 15px;">🚚</div>
-              <h1 style="margin: 0; font-size: 28px; font-weight: 700;">Out for Delivery!</h1>
-              <p style="margin: 12px 0 0 0; font-size: 16px; opacity: 0.9;">Hi {{customerName}}, your order is almost there!</p>
-            </td>
-          </tr>
-          
-          <!-- Delivery Info -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="background: #ecfdf5; border: 2px solid #10b981; padding: 25px; border-radius: 8px; margin-bottom: 25px; text-align: center;">
-                <h2 style="margin: 0 0 15px 0; color: #059669; font-size: 20px; font-weight: 600;">Delivery Window</h2>
-                <p style="margin: 0; color: #065f46; font-size: 18px; font-weight: 600;">{{deliveryTimeWindow}}</p>
-              </div>
-              
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 25px 0;">
-                <tr>
-                  <td style="padding: 15px; background: #f1f5f9; border-radius: 6px;">
-                    <table width="100%" cellpadding="0" cellspacing="0" border="0">
-                      <tr>
-                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Order Number:</td>
-                        <td style="padding: 8px 0; color: #1e293b; font-weight: 600; text-align: right;">#{{orderNumber}}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Driver:</td>
-                        <td style="padding: 8px 0; color: #1e293b; font-weight: 600; text-align: right;">{{driverName}}</td>
-                      </tr>
-                      <tr>
-                        <td style="padding: 8px 0; color: #64748b; font-size: 14px;">Driver Contact:</td>
-                        <td style="padding: 8px 0; color: #1e293b; font-weight: 600; text-align: right;">{{driverPhone}}</td>
-                      </tr>
-                    </table>
-                  </td>
-                </tr>
-              </table>
-              
-              <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 25px 0;">
-                <p style="margin: 0; color: #92400e; font-size: 14px; font-weight: 500;">
-                  💡 <strong>Delivery Tip:</strong> Please ensure someone is available to receive your package during the delivery window.
-                </p>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; border-top: 1px solid #e2e8f0; text-align: center;">
-              <p style="margin: 0; color: #64748b; font-size: 14px;">
-                Thank you for choosing {{companyName}}!
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="font-size: 48px; margin-bottom: 16px;">🚚</div>
+            <h1>Almost There!</h1>
+            <p>Your package is out for delivery</p>
+        </div>
+        
+        <div class="content">
+            <p style="font-size: 18px; margin-bottom: 24px;">Hi {{customerName}},</p>
+            
+            <div class="delivery-alert">
+                <h2 style="color: #744210; margin-bottom: 12px;">Your Order #{{orderId}} is Out for Delivery!</h2>
+                <p style="color: #744210; font-size: 18px;">Expected within {{deliveryTimeframe}}</p>
+            </div>
+            
+            <div style="margin: 24px 0;">
+                <h3 style="color: #2d3748; margin-bottom: 12px;">Delivery Address:</h3>
+                <div class="address-box">{{deliveryAddress}}</div>
+            </div>
+            
+            <p style="color: #4a5568;">Please ensure someone is available to receive your package. If you're not available, the driver may leave it in a safe location or attempt delivery another time.</p>
+        </div>
+    </div>
 </body>
-</html>`,
-    text_template: `🚚 Your Order #{{orderNumber}} is Out for Delivery!
-
-Hi {{customerName}},
-
-Your order is almost there!
-
-🕐 DELIVERY WINDOW: {{deliveryTimeWindow}}
-
-📦 Order: #{{orderNumber}}
-👤 Driver: {{driverName}}
-📞 Driver Contact: {{driverPhone}}
-
-💡 Please ensure someone is available to receive your package.
-
-Thank you,
-{{companyName}}`
+</html>`
   },
 
   {
     template_key: 'package_delivered',
-    template_name: 'Package Delivered Confirmation',
-    subject_template: '✅ Your Order #{{orderNumber}} Has Been Delivered!',
+    template_name: 'Package Delivered',
+    subject_template: '✅ Your order #{{orderId}} has been delivered!',
     category: 'shipping',
     style: 'clean',
-    template_type: 'transactional',
-    variables: ['customerName', 'orderNumber', 'deliveryTime', 'companyName', 'supportEmail', 'reviewUrl'],
+    template_type: 'notification',
+    variables: ['orderId', 'customerName', 'deliveryTime', 'deliveryLocation', 'companyName', 'reviewUrl'],
+    is_active: true,
+    text_template: `Hi {{customerName}}!
+
+Your order #{{orderId}} has been successfully delivered!
+
+Delivery Details:
+- Time: {{deliveryTime}}
+- Location: {{deliveryLocation}}
+
+We hope you love your purchase! If you have a moment, we'd appreciate your feedback: {{reviewUrl}}
+
+Thank you for choosing {{companyName}}!`,
     html_template: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Package Delivered</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Package Delivered</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1a202c; background-color: #f7fafc; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 12px; overflow: hidden; }
+        .header { background: linear-gradient(135deg, #48bb78, #38a169); padding: 40px 24px; text-align: center; color: white; }
+        .content { padding: 32px 24px; }
+        .success-card { background: linear-gradient(135deg, #f0fff4, #c6f6d5); border-radius: 12px; padding: 24px; margin: 24px 0; text-align: center; border-left: 4px solid #48bb78; }
+        .review-button { display: inline-block; background: linear-gradient(135deg, #48bb78, #38a169); color: white; padding: 14px 28px; border-radius: 8px; text-decoration: none; font-weight: 600; margin-top: 16px; }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-          <!-- Success Header -->
-          <tr>
-            <td style="padding: 40px; text-align: center; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-radius: 8px 8px 0 0;">
-              <div style="font-size: 64px; margin-bottom: 20px;">✅</div>
-              <h1 style="margin: 0; font-size: 32px; font-weight: 700;">Delivered Successfully!</h1>
-              <p style="margin: 15px 0 0 0; font-size: 18px; opacity: 0.9;">Your order has arrived, {{customerName}}!</p>
-            </td>
-          </tr>
-          
-          <!-- Delivery Confirmation -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="background: #ecfdf5; border: 2px solid #10b981; padding: 30px; border-radius: 8px; text-align: center; margin-bottom: 30px;">
-                <h2 style="margin: 0 0 15px 0; color: #059669; font-size: 22px; font-weight: 600;">Order #{{orderNumber}}</h2>
-                <p style="margin: 0; color: #065f46; font-size: 16px;">Delivered on {{deliveryTime}}</p>
-              </div>
-              
-              <p style="margin: 0 0 30px 0; color: #374151; font-size: 16px; text-align: center;">
-                We hope you love your order! Your satisfaction is our top priority.
-              </p>
-              
-              <!-- Review CTA -->
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="{{reviewUrl}}" style="display: inline-block; background: #3b82f6; color: white; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px;">
-                  Share Your Experience
-                </a>
-                <p style="margin: 15px 0 0 0; color: #6b7280; font-size: 14px;">
-                  Your feedback helps us serve you better
-                </p>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; border-top: 1px solid #e2e8f0; text-align: center;">
-              <p style="margin: 0; color: #64748b; font-size: 14px;">
-                Questions about your order? Contact us at <a href="mailto:{{supportEmail}}" style="color: #3b82f6; text-decoration: none;">{{supportEmail}}</a>
-              </p>
-              <p style="margin: 16px 0 0 0; color: #94a3b8; font-size: 12px;">© {{companyName}}. Thank you for your business!</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<body>
+    <div class="container">
+        <div class="header">
+            <div style="font-size: 64px; margin-bottom: 16px;">📦✅</div>
+            <h1>Delivered Successfully!</h1>
+            <p>{{companyName}}</p>
+        </div>
+        
+        <div class="content">
+            <p style="font-size: 18px; margin-bottom: 24px;">Hi {{customerName}},</p>
+            
+            <div class="success-card">
+                <h2 style="color: #22543d; margin-bottom: 16px;">Your Order #{{orderId}} Has Been Delivered!</h2>
+                <p style="color: #22543d;"><strong>Time:</strong> {{deliveryTime}}</p>
+                <p style="color: #22543d;"><strong>Location:</strong> {{deliveryLocation}}</p>
+            </div>
+            
+            <p style="margin: 24px 0;">We hope you love your purchase! Your satisfaction is our top priority.</p>
+            
+            <div style="text-align: center; margin: 32px 0;">
+                <p style="margin-bottom: 16px;">How was your experience?</p>
+                <a href="{{reviewUrl}}" class="review-button">Leave a Review</a>
+            </div>
+        </div>
+    </div>
 </body>
-</html>`,
-    text_template: `✅ Your Order #{{orderNumber}} Has Been Delivered!
-
-Hi {{customerName}},
-
-Great news! Your order has arrived successfully.
-
-📦 Order: #{{orderNumber}}
-🕐 Delivered: {{deliveryTime}}
-
-We hope you love your order! Your satisfaction is our top priority.
-
-Share your experience: {{reviewUrl}}
-
-Questions? Contact us at {{supportEmail}}
-
-Thank you,
-{{companyName}}`
+</html>`
   },
 
-  // ABANDONED CART TEMPLATES (3 templates)
+  // ===== ABANDONED CART TEMPLATES =====
   {
-    template_key: 'abandoned_cart_reminder_1hr',
-    template_name: 'Abandoned Cart - 1 Hour Reminder',
-    subject_template: '🛒 You left something in your cart, {{customerName}}',
-    category: 'abandoned_cart',
-    style: 'modern',
+    template_key: 'cart_reminder_initial',
+    template_name: 'Abandoned Cart - Initial Reminder',
+    subject_template: 'You left something behind! 🛒',
+    category: 'cart',
+    style: 'clean',
     template_type: 'marketing',
-    variables: ['customerName', 'cartTotal', 'cartUrl', 'productNames', 'companyName'],
-    html_template: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Don't Forget Your Cart</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%); line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.15);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 30px 40px; background: linear-gradient(135deg, #ff9a9e 0%, #fad0c4 100%); text-align: center; color: white;">
-              <div style="font-size: 48px; margin-bottom: 15px;">🛒</div>
-              <h1 style="margin: 0; font-size: 28px; font-weight: 700;">Don't Forget Your Cart!</h1>
-              <p style="margin: 12px 0 0 0; font-size: 16px; opacity: 0.9;">Hi {{customerName}}, you have some great items waiting!</p>
-            </td>
-          </tr>
-          
-          <!-- Cart Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="background: #fef7ff; border: 2px solid #d946ef; padding: 25px; border-radius: 12px; margin-bottom: 25px;">
-                <h2 style="margin: 0 0 15px 0; color: #a21caf; font-size: 20px; font-weight: 600;">Your Cart Summary</h2>
-                <p style="margin: 0 0 10px 0; color: #701a75; font-size: 16px;">{{productNames}}</p>
-                <div style="border-top: 1px solid #e879f9; padding-top: 15px; margin-top: 15px;">
-                  <span style="color: #86198f; font-size: 14px;">Total: </span>
-                  <span style="color: #a21caf; font-size: 20px; font-weight: 700;">${{cartTotal}}</span>
-                </div>
-              </div>
-              
-              <div style="text-align: center; margin: 30px 0;">
-                <a href="{{cartUrl}}" style="display: inline-block; background: linear-gradient(135deg, #ec4899 0%, #d946ef 100%); color: white; padding: 16px 32px; border-radius: 25px; text-decoration: none; font-weight: 600; font-size: 16px; box-shadow: 0 4px 15px rgba(236, 72, 153, 0.3);">
-                  Complete Your Order
-                </a>
-              </div>
-              
-              <p style="margin: 30px 0 0 0; color: #6b7280; font-size: 14px; text-align: center;">
-                ⏰ <strong>Hurry!</strong> Items in your cart are popular and may sell out soon.
-              </p>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; background: #f8fafc; text-align: center;">
-              <p style="margin: 0; color: #64748b; font-size: 14px;">
-                Need help with your order? We're here to assist you!
-              </p>
-              <p style="margin: 16px 0 0 0; color: #94a3b8; font-size: 12px;">© {{companyName}}. Making shopping delightful.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`,
-    text_template: `🛒 You left something in your cart, {{customerName}}
+    variables: ['customerName', 'cartItems', 'cartTotal', 'cartUrl', 'companyName'],
+    is_active: true,
+    text_template: `Hi {{customerName}},
 
-Hi {{customerName}},
+We noticed you left some items in your cart. Don't worry, we've saved them for you!
 
-You have some great items waiting in your cart!
+Your cart contains:
+{{cartItems}}
 
-CART SUMMARY:
-{{productNames}}
-Total: ${{cartTotal}}
-
-⏰ Hurry! Items may sell out soon.
-
-Complete your order: {{cartUrl}}
-
-{{companyName}} - Making shopping delightful.`
-  },
-
-  {
-    template_key: 'abandoned_cart_discount_24hr',
-    template_name: 'Abandoned Cart - 24 Hour Discount',
-    subject_template: '💸 20% OFF Your Cart - Limited Time!',
-    category: 'abandoned_cart',
-    style: 'bold',
-    template_type: 'marketing',
-    variables: ['customerName', 'cartTotal', 'discountCode', 'cartUrl', 'productNames', 'companyName', 'discountAmount'],
-    html_template: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Exclusive Discount</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #000000; line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 0; box-shadow: 0 0 40px rgba(255,215,0,0.3);">
-          <!-- Discount Header -->
-          <tr>
-            <td style="padding: 0; background: linear-gradient(45deg, #ffd700, #ffed4e); text-align: center; color: #000000; position: relative;">
-              <div style="padding: 40px; transform: skew(-2deg); margin: -10px 0;">
-                <div style="transform: skew(2deg);">
-                  <h1 style="margin: 0; font-size: 36px; font-weight: 900; text-transform: uppercase; letter-spacing: 3px;">20% OFF!</h1>
-                  <div style="width: 100px; height: 4px; background: #000000; margin: 20px auto; border-radius: 2px;"></div>
-                  <p style="margin: 0; font-size: 18px; font-weight: 700; text-transform: uppercase;">EXCLUSIVE DISCOUNT FOR {{customerName}}</p>
-                </div>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Discount Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="border: 4px solid #ffd700; padding: 30px; margin-bottom: 30px; background: #000000; color: white; text-align: center;">
-                <h2 style="margin: 0 0 20px 0; color: #ffd700; font-size: 24px; font-weight: 800; text-transform: uppercase;">YOUR CART IS WAITING</h2>
-                <div style="background: #ffd700; color: #000000; padding: 20px; margin: 20px 0; transform: skew(-1deg);">
-                  <div style="transform: skew(1deg);">
-                    <div style="font-size: 16px; font-weight: 600; margin-bottom: 10px;">{{productNames}}</div>
-                    <div style="font-size: 28px; font-weight: 900;">WAS ${{cartTotal}} → NOW ${{discountAmount}}</div>
-                  </div>
-                </div>
-                <div style="background: #ff0000; color: white; padding: 15px; margin: 20px 0; text-align: center;">
-                  <div style="font-size: 20px; font-weight: 800; letter-spacing: 2px;">CODE: {{discountCode}}</div>
-                </div>
-              </div>
-              
-              <div style="text-align: center; margin: 40px 0;">
-                <a href="{{cartUrl}}" style="display: inline-block; background: linear-gradient(45deg, #ffd700, #ffed4e); color: #000000; padding: 20px 40px; text-decoration: none; font-weight: 800; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; border-radius: 0; box-shadow: 0 4px 20px rgba(255,215,0,0.4);">
-                  CLAIM 20% OFF NOW
-                </a>
-              </div>
-              
-              <div style="background: #ff0000; color: white; padding: 20px; text-align: center; transform: skew(-1deg); margin: 30px 0;">
-                <div style="transform: skew(1deg);">
-                  <p style="margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase;">
-                    ⚠️ LIMITED TIME: EXPIRES IN 24 HOURS!
-                  </p>
-                </div>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; background: #000000; color: white; text-align: center;">
-              <p style="margin: 0; font-size: 14px; font-weight: 600; text-transform: uppercase;">
-                DON'T MISS OUT - {{companyName}}
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`,
-    text_template: `💸 20% OFF Your Cart - LIMITED TIME!
-
-{{customerName}} - EXCLUSIVE DISCOUNT!
-
-🛒 YOUR CART:
-{{productNames}}
-WAS: ${{cartTotal}}
-NOW: ${{discountAmount}}
-
-🎫 DISCOUNT CODE: {{discountCode}}
-
-⚠️ LIMITED TIME: EXPIRES IN 24 HOURS!
-
-CLAIM YOUR DISCOUNT: {{cartUrl}}
-
-{{companyName}} - DON'T MISS OUT!`
-  },
-
-  {
-    template_key: 'abandoned_cart_final_72hr',
-    template_name: 'Abandoned Cart - Final Attempt (72 hours)',
-    subject_template: '😢 We miss you, {{customerName}} - Last chance!',
-    category: 'abandoned_cart',
-    style: 'elegant',
-    template_type: 'marketing',
-    variables: ['customerName', 'cartTotal', 'cartUrl', 'productNames', 'companyName', 'unsubscribeUrl'],
-    html_template: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>We Miss You</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: Georgia, 'Times New Roman', serif; background-color: #fafafa; line-height: 1.8;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 60px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e8e8e8;">
-          <!-- Elegant Header -->
-          <tr>
-            <td style="padding: 60px 50px 40px 50px; text-align: center; border-bottom: 3px double #b91c1c;">
-              <div style="width: 120px; height: 1px; background: linear-gradient(to right, transparent, #b91c1c, transparent); margin: 0 auto 30px auto;"></div>
-              <h1 style="margin: 0; color: #7f1d1d; font-size: 28px; font-weight: 300; letter-spacing: 2px;">We Miss You</h1>
-              <div style="width: 60px; height: 1px; background: #b91c1c; margin: 20px auto; opacity: 0.7;"></div>
-              <p style="margin: 0; color: #666666; font-size: 16px; font-style: italic;">Dear {{customerName}}, this is our final invitation</p>
-            </td>
-          </tr>
-          
-          <!-- Content -->
-          <tr>
-            <td style="padding: 50px;">
-              <p style="margin: 0 0 30px 0; color: #444444; font-size: 16px; line-height: 1.8;">
-                We noticed that you left some wonderful items in your cart, and we wanted to reach out one last time. 
-                Your thoughtful selections are still waiting for you, and we'd hate for you to miss out.
-              </p>
-              
-              <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 40px 0;">
-                <tr>
-                  <td style="padding: 30px; background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid #b91c1c;">
-                    <h2 style="margin: 0 0 20px 0; color: #7f1d1d; font-size: 18px; font-weight: 400; letter-spacing: 1px;">Your Reserved Items</h2>
-                    <p style="margin: 0 0 15px 0; color: #991b1b; font-size: 16px; line-height: 1.6;">{{productNames}}</p>
-                    <div style="border-top: 1px solid #fca5a5; padding-top: 15px; margin-top: 15px;">
-                      <span style="color: #7f1d1d; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">Total Value: </span>
-                      <span style="color: #991b1b; font-size: 18px; font-weight: 600;">${{cartTotal}}</span>
-                    </div>
-                  </td>
-                </tr>
-              </table>
-              
-              <div style="text-align: center; margin: 40px 0;">
-                <a href="{{cartUrl}}" style="display: inline-block; background: #7f1d1d; color: white; padding: 16px 32px; text-decoration: none; font-weight: 500; font-size: 16px; letter-spacing: 1px; border: none;">
-                  Complete Your Purchase
-                </a>
-              </div>
-              
-              <p style="margin: 40px 0 0 0; color: #666666; font-size: 14px; line-height: 1.8; font-style: italic; text-align: center;">
-                "Quality is never an accident; it is always the result of intelligent effort." - John Ruskin
-              </p>
-              
-              <div style="text-align: center; margin: 40px 0 0 0; padding: 20px 0; border-top: 1px solid #e8e8e8;">
-                <p style="margin: 0 0 15px 0; color: #999999; font-size: 12px;">
-                  If you no longer wish to receive these reminders, you may 
-                  <a href="{{unsubscribeUrl}}" style="color: #b91c1c; text-decoration: none;">unsubscribe here</a>.
-                </p>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 40px 50px 60px 50px; border-top: 3px double #b91c1c; text-align: center;">
-              <div style="width: 120px; height: 1px; background: linear-gradient(to right, transparent, #b91c1c, transparent); margin: 0 auto 30px auto;"></div>
-              <p style="margin: 0; color: #999999; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;">
-                With heartfelt regards, {{companyName}}
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`,
-    text_template: `We Miss You - Final Invitation
-
-Dear {{customerName}},
-
-We noticed that you left some wonderful items in your cart, and we wanted to reach out one last time. Your thoughtful selections are still waiting for you.
-
-YOUR RESERVED ITEMS:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-{{productNames}}
-Total Value: ${{cartTotal}}
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Total: {{cartTotal}}
 
 Complete your purchase: {{cartUrl}}
 
-"Quality is never an accident; it is always the result of intelligent effort." - John Ruskin
+Need help? Just reply to this email.
 
-If you no longer wish to receive these reminders, you may unsubscribe here: {{unsubscribeUrl}}
-
-With heartfelt regards,
-{{companyName}}`
+Thanks,
+{{companyName}}`,
+    html_template: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>You left something behind</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #374151; background-color: #f9fafb; }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+        .header { background-color: #ffffff; padding: 32px 24px; text-align: center; border-bottom: 1px solid #e5e7eb; }
+        .cart-icon { font-size: 48px; margin-bottom: 16px; }
+        .content { padding: 32px 24px; }
+        .cart-items { background-color: #f9fafb; border-radius: 8px; padding: 20px; margin: 24px 0; }
+        .checkout-button { display: inline-block; background-color: #3b82f6; color: white; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: 600; margin-top: 24px; }
+        .total-amount { font-size: 20px; font-weight: 700; color: #1f2937; margin-top: 16px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="cart-icon">🛒</div>
+            <h1 style="color: #1f2937; margin-bottom: 8px;">You left something behind!</h1>
+            <p style="color: #6b7280;">{{companyName}}</p>
+        </div>
+        
+        <div class="content">
+            <p style="margin-bottom: 24px;">Hi {{customerName}},</p>
+            <p style="margin-bottom: 24px;">We noticed you left some great items in your cart. Don't worry, we've saved them for you!</p>
+            
+            <div class="cart-items">
+                <h3 style="color: #374151; margin-bottom: 16px;">Your saved items:</h3>
+                {{cartItems}}
+                <div class="total-amount">Total: {{cartTotal}}</div>
+            </div>
+            
+            <p>Ready to complete your purchase?</p>
+            
+            <div style="text-align: center;">
+                <a href="{{cartUrl}}" class="checkout-button">Complete My Purchase</a>
+            </div>
+            
+            <p style="margin-top: 32px; color: #6b7280; font-size: 14px;">Need help? Just reply to this email and we'll be happy to assist you.</p>
+        </div>
+    </div>
+</body>
+</html>`
   },
 
-  // WELCOME SERIES TEMPLATES (3 templates)
+  {
+    template_key: 'cart_reminder_discount',
+    template_name: 'Abandoned Cart - With Discount',
+    subject_template: "Still thinking? Here's {{discountAmount}} off! 💰",
+    category: 'cart',
+    style: 'modern',
+    template_type: 'marketing',
+    variables: ['customerName', 'cartItems', 'cartTotal', 'discountAmount', 'discountCode', 'cartUrl', 'companyName'],
+    is_active: true,
+    text_template: `{{customerName}}, we have a special offer for you!
+
+Your cart is still waiting, and to sweeten the deal, here's {{discountAmount}} off your order!
+
+Use code: {{discountCode}}
+
+Your cart:
+{{cartItems}}
+Total: {{cartTotal}}
+Discount: {{discountAmount}}
+
+Complete your purchase: {{cartUrl}}
+
+This offer won't last long!
+
+{{companyName}}`,
+    html_template: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Special Discount Just for You</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1a202c; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 40px 24px; text-align: center; color: white; }
+        .discount-badge { background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 20px; display: inline-block; margin-bottom: 16px; }
+        .content { padding: 32px 24px; }
+        .discount-box { background: linear-gradient(135deg, #667eea, #764ba2); color: white; border-radius: 12px; padding: 24px; text-align: center; margin: 24px 0; }
+        .discount-code { background: rgba(255,255,255,0.2); padding: 12px 20px; border-radius: 8px; font-family: monospace; font-size: 18px; font-weight: bold; margin: 16px 0; }
+        .cart-summary { background-color: #f8fafc; border-radius: 12px; padding: 20px; margin: 24px 0; }
+        .checkout-button { display: inline-block; background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; }
+        .urgency-text { color: #e53e3e; font-weight: 600; text-align: center; margin: 16px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="discount-badge">Special Offer 💰</div>
+            <h1 style="margin-bottom: 8px;">{{discountAmount}} Off Just for You!</h1>
+            <p style="opacity: 0.9;">{{companyName}}</p>
+        </div>
+        
+        <div class="content">
+            <p style="font-size: 18px; margin-bottom: 24px;">Hi {{customerName}},</p>
+            <p style="margin-bottom: 24px;">We noticed your cart is still waiting, so we wanted to sweeten the deal for you!</p>
+            
+            <div class="discount-box">
+                <h2 style="margin-bottom: 12px;">Your Exclusive Discount</h2>
+                <div style="font-size: 24px; font-weight: bold; margin-bottom: 16px;">{{discountAmount}} OFF</div>
+                <div style="margin-bottom: 8px;">Use code:</div>
+                <div class="discount-code">{{discountCode}}</div>
+            </div>
+            
+            <div class="cart-summary">
+                <h3 style="color: #2d3748; margin-bottom: 16px;">Your Cart:</h3>
+                {{cartItems}}
+                <div style="margin-top: 16px; padding-top: 16px; border-top: 1px solid #e2e8f0;">
+                    <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                        <span>Subtotal:</span>
+                        <span>{{cartTotal}}</span>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; color: #48bb78; font-weight: 600;">
+                        <span>Discount:</span>
+                        <span>-{{discountAmount}}</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{cartUrl}}" class="checkout-button">Complete Purchase with Discount</a>
+            </div>
+            
+            <div class="urgency-text">⏰ This exclusive offer won't last long!</div>
+        </div>
+    </div>
+</body>
+</html>`
+  },
+
+  {
+    template_key: 'cart_reminder_final',
+    template_name: 'Abandoned Cart - Final Attempt',
+    subject_template: 'Last chance! Your cart expires soon ⏰',
+    category: 'cart',
+    style: 'bold',
+    template_type: 'marketing',
+    variables: ['customerName', 'cartItems', 'cartTotal', 'expiryDate', 'cartUrl', 'companyName'],
+    is_active: true,
+    text_template: `{{customerName}} - FINAL NOTICE!
+
+Your cart will expire on {{expiryDate}}!
+
+Don't miss out on:
+{{cartItems}}
+
+Total Value: {{cartTotal}}
+
+SAVE YOUR CART NOW: {{cartUrl}}
+
+This is your last chance - act fast!
+
+{{companyName}}`,
+    html_template: `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Last Chance - Cart Expires Soon</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Arial Black', Arial, sans-serif; line-height: 1.4; background: linear-gradient(45deg, #ff4757, #ff3838); color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #1a1a1a, #2d2d2d); }
+        .header { background: linear-gradient(135deg, #ff4757, #ff3838); padding: 40px 20px; text-align: center; position: relative; }
+        .warning-icon { font-size: 64px; margin-bottom: 16px; animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.1); } }
+        .content { padding: 40px 24px; }
+        .urgent-banner { background: linear-gradient(45deg, #ffa502, #ff6348); color: #000000; padding: 16px; text-align: center; font-weight: 900; font-size: 18px; margin: 24px 0; border-radius: 8px; text-transform: uppercase; }
+        .cart-box { background: rgba(255,255,255,0.1); border: 2px solid #ff4757; padding: 24px; border-radius: 12px; margin: 24px 0; }
+        .expiry-warning { background: #ff4757; color: #ffffff; padding: 20px; text-align: center; font-weight: 900; font-size: 20px; margin: 24px 0; border-radius: 8px; }
+        .save-button { display: inline-block; background: linear-gradient(135deg, #2ed573, #1e90ff); color: #ffffff; padding: 20px 40px; border-radius: 50px; text-decoration: none; font-weight: 900; font-size: 20px; text-transform: uppercase; margin: 20px 0; box-shadow: 0 4px 8px rgba(0,0,0,0.3); }
+        .final-notice { background: #000000; color: #ff4757; padding: 16px; text-align: center; font-weight: 900; font-size: 16px; border-radius: 8px; margin: 24px 0; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="warning-icon">⚠️</div>
+            <h1 style="font-size: 28px; font-weight: 900; text-transform: uppercase; margin-bottom: 8px;">FINAL NOTICE</h1>
+            <p style="font-size: 18px;">{{companyName}}</p>
+        </div>
+        
+        <div class="content">
+            <div style="text-align: center; margin-bottom: 32px;">
+                <h2 style="font-size: 24px; font-weight: 900; margin-bottom: 16px;">{{customerName}}, DON'T LOSE YOUR ITEMS!</h2>
+            </div>
+            
+            <div class="expiry-warning">
+                ⏰ YOUR CART EXPIRES ON {{expiryDate}} ⏰
+            </div>
+            
+            <div class="cart-box">
+                <h3 style="color: #ff4757; margin-bottom: 16px; font-size: 20px;">YOUR SAVED ITEMS:</h3>
+                {{cartItems}}
+                <div style="margin-top: 20px; font-size: 24px; font-weight: 900; color: #2ed573;">
+                    TOTAL VALUE: {{cartTotal}}
+                </div>
+            </div>
+            
+            <div class="urgent-banner">
+                🚨 THIS IS YOUR LAST CHANCE! 🚨
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{cartUrl}}" class="save-button">SAVE MY CART NOW!</a>
+            </div>
+            
+            <div class="final-notice">
+                ACT FAST - ONCE IT'S GONE, IT'S GONE!
+            </div>
+        </div>
+    </div>
+</body>
+</html>`
+  },
+
+  // ===== WELCOME TEMPLATES =====
   {
     template_key: 'welcome_new_customer',
     template_name: 'Welcome New Customer',
-    subject_template: '🎉 Welcome to {{companyName}}, {{customerName}}!',
+    subject_template: 'Welcome to {{companyName}}! 🎉',
     category: 'welcome',
     style: 'modern',
-    template_type: 'transactional',
-    variables: ['customerName', 'companyName', 'loginUrl', 'supportEmail', 'discountCode'],
+    template_type: 'marketing',
+    variables: ['customerName', 'companyName', 'shopUrl', 'supportEmail'],
+    is_active: true,
+    text_template: `Welcome {{customerName}}! 🎉
+
+We're thrilled to have you join the {{companyName}} family!
+
+Get ready to discover amazing products and exclusive offers just for you.
+
+Start shopping: {{shopUrl}}
+
+Questions? We're here to help: {{supportEmail}}
+
+Welcome aboard!
+The {{companyName}} Team`,
     html_template: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Welcome</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome to {{companyName}}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1a202c; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #48bb78, #38a169); padding: 48px 24px; text-align: center; color: white; }
+        .welcome-icon { font-size: 64px; margin-bottom: 24px; }
+        .content { padding: 40px 24px; text-align: center; }
+        .welcome-card { background: linear-gradient(135deg, #f0fff4, #c6f6d5); border-radius: 12px; padding: 32px 24px; margin: 32px 0; }
+        .cta-button { display: inline-block; background: linear-gradient(135deg, #667eea, #764ba2); color: white; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; margin: 24px 0; }
+        .benefits { text-align: left; margin: 32px 0; }
+        .benefit-item { display: flex; align-items: center; margin: 16px 0; }
+        .benefit-icon { font-size: 24px; margin-right: 12px; }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);">
-          <!-- Welcome Header -->
-          <tr>
-            <td style="padding: 50px 40px 40px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center; color: white;">
-              <div style="font-size: 64px; margin-bottom: 20px;">🎉</div>
-              <h1 style="margin: 0; font-size: 32px; font-weight: 700;">Welcome to {{companyName}}!</h1>
-              <p style="margin: 15px 0 0 0; font-size: 18px; opacity: 0.9;">Hi {{customerName}}, we're thrilled to have you join our community!</p>
-            </td>
-          </tr>
-          
-          <!-- Welcome Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 30px; border-radius: 12px; margin-bottom: 30px; text-align: center; color: white;">
-                <h2 style="margin: 0 0 15px 0; font-size: 22px; font-weight: 600;">Your Welcome Gift 🎁</h2>
-                <div style="background: rgba(255,255,255,0.2); padding: 20px; border-radius: 8px; margin: 15px 0;">
-                  <div style="font-size: 16px; margin-bottom: 8px;">Use code:</div>
-                  <div style="font-size: 28px; font-weight: 700; font-family: 'Courier New', monospace; letter-spacing: 3px;">{{discountCode}}</div>
-                  <div style="font-size: 14px; margin-top: 8px; opacity: 0.9;">Get 15% off your first order!</div>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="welcome-icon">🎉</div>
+            <h1 style="font-size: 32px; margin-bottom: 16px;">Welcome to {{companyName}}!</h1>
+            <p style="font-size: 18px; opacity: 0.9;">We're excited to have you here</p>
+        </div>
+        
+        <div class="content">
+            <h2 style="color: #2d3748; margin-bottom: 16px;">Hi {{customerName}}!</h2>
+            <p style="font-size: 18px; color: #4a5568; margin-bottom: 32px;">Welcome to our community! We're thrilled to have you join the {{companyName}} family.</p>
+            
+            <div class="welcome-card">
+                <h3 style="color: #22543d; margin-bottom: 16px;">What you can expect:</h3>
+                <div class="benefits">
+                    <div class="benefit-item">
+                        <span class="benefit-icon">✨</span>
+                        <span>Exclusive products and collections</span>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="benefit-icon">🎁</span>
+                        <span>Special member-only offers</span>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="benefit-icon">🚚</span>
+                        <span>Fast and reliable shipping</span>
+                    </div>
+                    <div class="benefit-item">
+                        <span class="benefit-icon">💬</span>
+                        <span>24/7 customer support</span>
+                    </div>
                 </div>
-              </div>
-              
-              <h3 style="margin: 0 0 20px 0; color: #1e293b; font-size: 20px; font-weight: 600; text-align: center;">What You Can Do Now:</h3>
-              
-              <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 30px 0;">
-                <div style="background: #f8fafc; padding: 25px; border-radius: 8px; text-align: center;">
-                  <div style="font-size: 32px; margin-bottom: 10px;">🛍️</div>
-                  <h4 style="margin: 0 0 8px 0; color: #1e293b; font-size: 16px; font-weight: 600;">Start Shopping</h4>
-                  <p style="margin: 0; color: #64748b; font-size: 14px;">Browse our amazing collection</p>
-                </div>
-                <div style="background: #f8fafc; padding: 25px; border-radius: 8px; text-align: center;">
-                  <div style="font-size: 32px; margin-bottom: 10px;">❤️</div>
-                  <h4 style="margin: 0 0 8px 0; color: #1e293b; font-size: 16px; font-weight: 600;">Save Favorites</h4>
-                  <p style="margin: 0; color: #64748b; font-size: 14px;">Create your wishlist</p>
-                </div>
-                <div style="background: #f8fafc; padding: 25px; border-radius: 8px; text-align: center;">
-                  <div style="font-size: 32px; margin-bottom: 10px;">📱</div>
-                  <h4 style="margin: 0 0 8px 0; color: #1e293b; font-size: 16px; font-weight: 600;">Track Orders</h4>
-                  <p style="margin: 0; color: #64748b; font-size: 14px;">Monitor your purchases</p>
-                </div>
-                <div style="background: #f8fafc; padding: 25px; border-radius: 8px; text-align: center;">
-                  <div style="font-size: 32px; margin-bottom: 10px;">🎁</div>
-                  <h4 style="margin: 0 0 8px 0; color: #1e293b; font-size: 16px; font-weight: 600;">Exclusive Offers</h4>
-                  <p style="margin: 0; color: #64748b; font-size: 14px;">Access member-only deals</p>
-                </div>
-              </div>
-              
-              <div style="text-align: center; margin: 40px 0;">
-                <a href="{{loginUrl}}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 32px; border-radius: 25px; text-decoration: none; font-weight: 600; font-size: 16px;">
-                  Start Exploring
-                </a>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; background: #f8fafc; text-align: center;">
-              <p style="margin: 0; color: #64748b; font-size: 14px;">
-                Need help getting started? Contact us at <a href="mailto:{{supportEmail}}" style="color: #667eea; text-decoration: none; font-weight: 500;">{{supportEmail}}</a>
-              </p>
-              <p style="margin: 16px 0 0 0; color: #94a3b8; font-size: 12px;">© {{companyName}}. Welcome to the family! ❤️</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+            </div>
+            
+            <p style="margin: 24px 0;">Ready to start exploring?</p>
+            <a href="{{shopUrl}}" class="cta-button">Start Shopping</a>
+            
+            <p style="color: #718096; margin-top: 32px;">Questions? We're here to help at <a href="mailto:{{supportEmail}}" style="color: #48bb78;">{{supportEmail}}</a></p>
+        </div>
+    </div>
 </body>
-</html>`,
-    text_template: `🎉 Welcome to {{companyName}}, {{customerName}}!
-
-Hi {{customerName}},
-
-We're thrilled to have you join our community!
-
-🎁 YOUR WELCOME GIFT:
-Use code: {{discountCode}}
-Get 15% off your first order!
-
-WHAT YOU CAN DO NOW:
-🛍️ Start Shopping - Browse our collection
-❤️ Save Favorites - Create your wishlist  
-📱 Track Orders - Monitor your purchases
-🎁 Exclusive Offers - Access member deals
-
-Start exploring: {{loginUrl}}
-
-Need help? Contact us at {{supportEmail}}
-
-Welcome to the family!
-{{companyName}} ❤️`
-  },
-
-  {
-    template_key: 'getting_started_guide',
-    template_name: 'Getting Started Guide',
-    subject_template: '📚 Your Getting Started Guide - {{companyName}}',
-    category: 'welcome',
-    style: 'clean',
-    template_type: 'transactional',
-    variables: ['customerName', 'companyName', 'helpUrl', 'accountUrl', 'catalogUrl', 'supportEmail'],
-    html_template: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Getting Started Guide</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #f8fafc; line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
-          <!-- Header -->
-          <tr>
-            <td style="padding: 40px 40px 30px 40px; text-align: center; border-bottom: 1px solid #e2e8f0;">
-              <div style="font-size: 48px; margin-bottom: 15px;">📚</div>
-              <h1 style="margin: 0; color: #1e293b; font-size: 28px; font-weight: 600;">Getting Started Guide</h1>
-              <p style="margin: 12px 0 0 0; color: #64748b; font-size: 16px;">Everything you need to know, {{customerName}}</p>
-            </td>
-          </tr>
-          
-          <!-- Guide Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <p style="margin: 0 0 30px 0; color: #374151; font-size: 16px;">
-                Welcome to {{companyName}}! We've put together this quick guide to help you make the most of your experience with us.
-              </p>
-              
-              <!-- Step by Step Guide -->
-              <div style="margin: 30px 0;">
-                <!-- Step 1 -->
-                <div style="display: flex; margin-bottom: 25px;">
-                  <div style="background: #3b82f6; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 20px; flex-shrink: 0;">1</div>
-                  <div style="flex: 1;">
-                    <h3 style="margin: 0 0 8px 0; color: #1e293b; font-size: 18px; font-weight: 600;">Complete Your Profile</h3>
-                    <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.6;">Add your delivery address and payment preferences for faster checkout.</p>
-                    <a href="{{accountUrl}}" style="color: #3b82f6; text-decoration: none; font-weight: 500; font-size: 14px;">Go to Account Settings →</a>
-                  </div>
-                </div>
-                
-                <!-- Step 2 -->
-                <div style="display: flex; margin-bottom: 25px;">
-                  <div style="background: #10b981; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 20px; flex-shrink: 0;">2</div>
-                  <div style="flex: 1;">
-                    <h3 style="margin: 0 0 8px 0; color: #1e293b; font-size: 18px; font-weight: 600;">Browse Our Collection</h3>
-                    <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.6;">Discover our carefully curated selection of products just for you.</p>
-                    <a href="{{catalogUrl}}" style="color: #10b981; text-decoration: none; font-weight: 500; font-size: 14px;">Start Shopping →</a>
-                  </div>
-                </div>
-                
-                <!-- Step 3 -->
-                <div style="display: flex; margin-bottom: 25px;">
-                  <div style="background: #f59e0b; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 20px; flex-shrink: 0;">3</div>
-                  <div style="flex: 1;">
-                    <h3 style="margin: 0 0 8px 0; color: #1e293b; font-size: 18px; font-weight: 600;">Save Your Favorites</h3>
-                    <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.6;">Use the heart icon to save items you love for easy access later.</p>
-                  </div>
-                </div>
-                
-                <!-- Step 4 -->
-                <div style="display: flex; margin-bottom: 0;">
-                  <div style="background: #8b5cf6; color: white; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 600; margin-right: 20px; flex-shrink: 0;">4</div>
-                  <div style="flex: 1;">
-                    <h3 style="margin: 0 0 8px 0; color: #1e293b; font-size: 18px; font-weight: 600;">Track Your Orders</h3>
-                    <p style="margin: 0; color: #64748b; font-size: 14px; line-height: 1.6;">Get real-time updates on your orders from confirmation to delivery.</p>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- Help Section -->
-              <div style="background: #f1f5f9; padding: 25px; border-radius: 8px; margin: 30px 0;">
-                <h3 style="margin: 0 0 15px 0; color: #1e293b; font-size: 18px; font-weight: 600;">Need Help?</h3>
-                <p style="margin: 0 0 15px 0; color: #64748b; font-size: 14px;">We're here to help you every step of the way. Check out our help center or contact our support team.</p>
-                <div style="display: flex; gap: 15px;">
-                  <a href="{{helpUrl}}" style="color: #3b82f6; text-decoration: none; font-weight: 500; font-size: 14px;">Help Center →</a>
-                  <a href="mailto:{{supportEmail}}" style="color: #3b82f6; text-decoration: none; font-weight: 500; font-size: 14px;">Contact Support →</a>
-                </div>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; border-top: 1px solid #e2e8f0; text-align: center;">
-              <p style="margin: 0; color: #64748b; font-size: 14px;">
-                Have questions? We're always happy to help at <a href="mailto:{{supportEmail}}" style="color: #3b82f6; text-decoration: none;">{{supportEmail}}</a>
-              </p>
-              <p style="margin: 16px 0 0 0; color: #94a3b8; font-size: 12px;">© {{companyName}}. Your journey starts here.</p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`,
-    text_template: `📚 Your Getting Started Guide
-
-Hi {{customerName}},
-
-Welcome to {{companyName}}! Here's everything you need to know:
-
-GETTING STARTED:
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-1. Complete Your Profile
-   Add delivery address and payment preferences
-   → {{accountUrl}}
-
-2. Browse Our Collection  
-   Discover our curated selection
-   → {{catalogUrl}}
-
-3. Save Your Favorites
-   Use the heart icon to save items
-
-4. Track Your Orders
-   Get real-time delivery updates
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-NEED HELP?
-Help Center: {{helpUrl}}
-Contact Support: {{supportEmail}}
-
-Your journey starts here!
-{{companyName}}`
+</html>`
   },
 
   {
     template_key: 'first_purchase_incentive',
     template_name: 'First Purchase Incentive',
-    subject_template: '🎯 Ready for Your First Order? Here's 20% OFF!',
+    subject_template: "🎯 Ready for Your First Order? Here's 20% OFF!",
     category: 'welcome',
     style: 'bold',
     template_type: 'marketing',
     variables: ['customerName', 'discountCode', 'expiryDate', 'shopUrl', 'companyName', 'minOrderAmount'],
+    is_active: true,
+    text_template: `🎯 {{customerName}}, Ready for Your First Purchase?
+
+We've got something special for you!
+
+🎁 20% OFF YOUR FIRST ORDER
+Code: {{discountCode}}
+Minimum order: {{minOrderAmount}}
+Expires: {{expiryDate}}
+
+Don't wait - this exclusive offer is just for you!
+
+SHOP NOW: {{shopUrl}}
+
+{{companyName}} - Where Great Deals Meet Quality!`,
     html_template: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>First Purchase Incentive</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Your First Order Discount</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Arial Black', Arial, sans-serif; line-height: 1.4; background: linear-gradient(45deg, #667eea, #764ba2, #f093fb); color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #1a1a1a, #2d2d2d); }
+        .header { background: linear-gradient(135deg, #667eea, #764ba2); padding: 40px 20px; text-align: center; position: relative; overflow: hidden; }
+        .header::before { content: '🎯'; position: absolute; top: 20px; left: 20px; font-size: 24px; }
+        .header::after { content: '🎁'; position: absolute; top: 20px; right: 20px; font-size: 24px; }
+        .content { padding: 40px 24px; }
+        .discount-mega { background: linear-gradient(45deg, #ff6b6b, #ee5a52); padding: 32px; border-radius: 16px; text-align: center; margin: 24px 0; border: 4px solid #ffffff; }
+        .discount-percent { font-size: 48px; font-weight: 900; margin-bottom: 16px; text-shadow: 2px 2px 4px rgba(0,0,0,0.5); }
+        .discount-code { background: rgba(255,255,255,0.2); padding: 16px 24px; border-radius: 8px; font-family: monospace; font-size: 24px; font-weight: 900; margin: 20px 0; border: 2px dashed #ffffff; }
+        .terms-box { background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px; margin: 24px 0; }
+        .shop-button { display: inline-block; background: linear-gradient(135deg, #2ed573, #1e90ff); color: #ffffff; padding: 20px 40px; border-radius: 50px; text-decoration: none; font-weight: 900; font-size: 20px; text-transform: uppercase; margin: 20px 0; box-shadow: 0 8px 16px rgba(0,0,0,0.3); animation: pulse 2s infinite; }
+        @keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+        .urgency-banner { background: #ff4757; color: #ffffff; padding: 16px; text-align: center; font-weight: 900; font-size: 16px; margin: 24px 0; border-radius: 8px; text-transform: uppercase; }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #000000; line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 0; box-shadow: 0 0 40px rgba(34,197,94,0.3);">
-          <!-- Bold Header -->
-          <tr>
-            <td style="padding: 0; background: linear-gradient(45deg, #22c55e, #16a34a); text-align: center; color: white; position: relative;">
-              <div style="padding: 50px 40px; transform: skew(-2deg); margin: -10px 0;">
-                <div style="transform: skew(2deg);">
-                  <h1 style="margin: 0; font-size: 36px; font-weight: 900; text-transform: uppercase; letter-spacing: 3px; text-shadow: 2px 2px 4px rgba(0,0,0,0.3);">FIRST ORDER</h1>
-                  <div style="width: 100px; height: 4px; background: white; margin: 20px auto; border-radius: 2px;"></div>
-                  <p style="margin: 0; font-size: 20px; font-weight: 700; text-transform: uppercase;">{{customerName}} - TIME TO SHOP!</p>
-                </div>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Incentive Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="border: 4px solid #22c55e; padding: 30px; margin-bottom: 30px; background: #000000; color: white; text-align: center;">
-                <h2 style="margin: 0 0 20px 0; color: #22c55e; font-size: 28px; font-weight: 800; text-transform: uppercase;">20% OFF FIRST ORDER!</h2>
-                <div style="background: #22c55e; color: #000000; padding: 25px; margin: 20px 0; transform: skew(-1deg);">
-                  <div style="transform: skew(1deg);">
-                    <div style="font-size: 16px; font-weight: 600; margin-bottom: 10px;">YOUR EXCLUSIVE CODE:</div>
-                    <div style="font-size: 36px; font-weight: 900; letter-spacing: 4px;">{{discountCode}}</div>
-                  </div>
-                </div>
-                <div style="background: #dc2626; color: white; padding: 15px; margin: 20px 0; text-align: center;">
-                  <div style="font-size: 18px; font-weight: 700;">MINIMUM ORDER: ${{minOrderAmount}}</div>
-                </div>
-              </div>
-              
-              <div style="text-align: center; margin: 40px 0;">
-                <a href="{{shopUrl}}" style="display: inline-block; background: linear-gradient(45deg, #22c55e, #16a34a); color: white; padding: 20px 40px; text-decoration: none; font-weight: 800; font-size: 20px; text-transform: uppercase; letter-spacing: 2px; border-radius: 0; box-shadow: 0 4px 20px rgba(34,197,94,0.4);">
-                  CLAIM YOUR 20% OFF
-                </a>
-              </div>
-              
-              <div style="background: #fef3c7; border: 4px solid #f59e0b; padding: 25px; text-align: center; margin: 30px 0;">
-                <h3 style="margin: 0 0 15px 0; color: #92400e; font-size: 20px; font-weight: 800; text-transform: uppercase;">⚡ LIMITED TIME OFFER!</h3>
-                <p style="margin: 0; color: #92400e; font-size: 16px; font-weight: 600;">
-                  Code expires: {{expiryDate}}
-                </p>
-              </div>
-              
-              <div style="background: #000000; color: white; padding: 30px; text-align: center; transform: skew(-1deg); margin: 30px 0;">
-                <div style="transform: skew(1deg);">
-                  <p style="margin: 0; font-size: 18px; font-weight: 700; text-transform: uppercase;">
-                    🚀 WHAT ARE YOU WAITING FOR?
-                  </p>
-                  <p style="margin: 10px 0 0 0; font-size: 14px; opacity: 0.9;">YOUR PERFECT PRODUCTS ARE WAITING!</p>
-                </div>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; background: #000000; color: white; text-align: center;">
-              <p style="margin: 0; font-size: 16px; font-weight: 600; text-transform: uppercase;">
-                GO BIG OR GO HOME - {{companyName}}
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1 style="font-size: 32px; font-weight: 900; text-transform: uppercase; margin-bottom: 16px;">FIRST ORDER SPECIAL!</h1>
+            <p style="font-size: 18px; opacity: 0.9;">{{companyName}}</p>
+        </div>
+        
+        <div class="content">
+            <div style="text-align: center; margin-bottom: 32px;">
+                <h2 style="font-size: 28px; font-weight: 900; margin-bottom: 16px;">{{customerName}}, THIS IS FOR YOU!</h2>
+                <p style="font-size: 18px; opacity: 0.9;">Ready to make your first purchase? We've got you covered!</p>
+            </div>
+            
+            <div class="discount-mega">
+                <div class="discount-percent">20% OFF</div>
+                <div style="font-size: 18px; font-weight: 700; margin-bottom: 16px;">YOUR FIRST ORDER</div>
+                <div style="margin-bottom: 8px;">Use Code:</div>
+                <div class="discount-code">{{discountCode}}</div>
+            </div>
+            
+            <div class="terms-box">
+                <div style="font-weight: 700; margin-bottom: 12px; color: #00ff88;">📋 OFFER DETAILS:</div>
+                <div>✅ Minimum order: {{minOrderAmount}}</div>
+                <div>⏰ Expires: {{expiryDate}}</div>
+                <div>🎁 Valid on first purchase only</div>
+            </div>
+            
+            <div class="urgency-banner">
+                ⚡ LIMITED TIME - DON'T MISS OUT! ⚡
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{shopUrl}}" class="shop-button">SHOP NOW & SAVE!</a>
+            </div>
+            
+            <div style="text-align: center; margin-top: 32px;">
+                <p style="font-size: 16px; font-weight: 600;">{{companyName}} - Where Great Deals Meet Quality!</p>
+            </div>
+        </div>
+    </div>
 </body>
-</html>`,
-    text_template: `🎯 FIRST ORDER - 20% OFF!
-
-{{customerName}} - TIME TO SHOP!
-
-💥 YOUR EXCLUSIVE CODE: {{discountCode}}
-
-🎯 20% OFF FIRST ORDER!
-💰 MINIMUM ORDER: ${{minOrderAmount}}
-⚡ EXPIRES: {{expiryDate}}
-
-🚀 WHAT ARE YOU WAITING FOR?
-YOUR PERFECT PRODUCTS ARE WAITING!
-
-CLAIM YOUR 20% OFF: {{shopUrl}}
-
-GO BIG OR GO HOME - {{companyName}}`
+</html>`
   },
 
-  // PROMOTIONAL TEMPLATES (3 templates)
+  // ===== PROMOTIONAL TEMPLATES =====
   {
-    template_key: 'product_launch_announcement',
+    template_key: 'product_launch',
     template_name: 'Product Launch Announcement',
-    subject_template: '🚀 NEW ARRIVAL: {{productName}} is Here!',
+    subject_template: '🚀 Introducing {{productName}} - Now Available!',
     category: 'promotional',
     style: 'modern',
     template_type: 'marketing',
-    variables: ['customerName', 'productName', 'productDescription', 'originalPrice', 'launchPrice', 'productUrl', 'productImageUrl', 'companyName', 'unsubscribeUrl'],
+    variables: ['productName', 'launchDate', 'description', 'originalPrice', 'launchPrice', 'shopUrl', 'companyName'],
+    is_active: true,
+    text_template: `🚀 BIG NEWS!
+
+{{productName}} is finally here!
+
+{{description}}
+
+Launch Special:
+- Original Price: {{originalPrice}}
+- Launch Price: {{launchPrice}}
+- Available: {{launchDate}}
+
+Get yours before everyone else: {{shopUrl}}
+
+The {{companyName}} Team`,
     html_template: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>New Product Launch</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Launch</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif; line-height: 1.6; color: #1a202c; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); }
+        .container { max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .header { background: linear-gradient(135deg, #ed8936, #dd6b20); padding: 40px 24px; text-align: center; color: white; }
+        .launch-icon { font-size: 64px; margin-bottom: 16px; }
+        .content { padding: 40px 24px; }
+        .product-card { background: linear-gradient(135deg, #fef5e7, #fed7aa); border-radius: 12px; padding: 32px 24px; margin: 32px 0; text-align: center; }
+        .price-comparison { display: flex; justify-content: center; align-items: center; gap: 16px; margin: 24px 0; }
+        .original-price { text-decoration: line-through; color: #a0aec0; font-size: 18px; }
+        .launch-price { color: #d69e2e; font-size: 24px; font-weight: 700; }
+        .shop-button { display: inline-block; background: linear-gradient(135deg, #ed8936, #dd6b20); color: white; padding: 16px 32px; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 16px; margin: 24px 0; }
+        .launch-badge { background: linear-gradient(135deg, #48bb78, #38a169); color: white; padding: 8px 16px; border-radius: 20px; font-size: 14px; font-weight: 600; display: inline-block; margin-bottom: 16px; }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 20px 60px rgba(0,0,0,0.2);">
-          <!-- Launch Header -->
-          <tr>
-            <td style="padding: 40px 40px 30px 40px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); text-align: center; color: white;">
-              <div style="font-size: 56px; margin-bottom: 15px;">🚀</div>
-              <h1 style="margin: 0; font-size: 32px; font-weight: 700;">NEW ARRIVAL!</h1>
-              <p style="margin: 15px 0 0 0; font-size: 18px; opacity: 0.9;">{{customerName}}, discover our latest addition</p>
-            </td>
-          </tr>
-          
-          <!-- Product Showcase -->
-          <tr>
-            <td style="padding: 0;">
-              <img src="{{productImageUrl}}" alt="{{productName}}" style="width: 100%; height: 300px; object-fit: cover; display: block;">
-            </td>
-          </tr>
-          
-          <!-- Product Details -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="text-align: center; margin-bottom: 30px;">
-                <h2 style="margin: 0 0 15px 0; color: #1e293b; font-size: 28px; font-weight: 700;">{{productName}}</h2>
-                <p style="margin: 0; color: #64748b; font-size: 16px; line-height: 1.7;">{{productDescription}}</p>
-              </div>
-              
-              <!-- Launch Pricing -->
-              <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 30px; border-radius: 12px; margin: 30px 0; text-align: center; color: white;">
-                <h3 style="margin: 0 0 15px 0; font-size: 20px; font-weight: 600;">Launch Special!</h3>
-                <div style="display: flex; justify-content: center; align-items: center; gap: 15px; margin: 15px 0;">
-                  <span style="text-decoration: line-through; font-size: 20px; opacity: 0.7;">${{originalPrice}}</span>
-                  <span style="font-size: 32px; font-weight: 700;">${{launchPrice}}</span>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="launch-icon">🚀</div>
+            <h1 style="font-size: 32px; margin-bottom: 16px;">Product Launch!</h1>
+            <p style="opacity: 0.9;">{{companyName}}</p>
+        </div>
+        
+        <div class="content">
+            <div style="text-align: center; margin-bottom: 32px;">
+                <div class="launch-badge">Now Available</div>
+                <h2 style="color: #2d3748; font-size: 28px; margin-bottom: 16px;">{{productName}}</h2>
+                <p style="color: #4a5568; font-size: 18px;">Available from {{launchDate}}</p>
+            </div>
+            
+            <div class="product-card">
+                <p style="color: #744210; font-size: 16px; margin-bottom: 24px;">{{description}}</p>
+                
+                <div style="margin-bottom: 16px; color: #744210; font-weight: 600;">Launch Special Pricing:</div>
+                <div class="price-comparison">
+                    <span class="original-price">{{originalPrice}}</span>
+                    <span style="color: #e53e3e; font-size: 20px;">→</span>
+                    <span class="launch-price">{{launchPrice}}</span>
                 </div>
-                <p style="margin: 15px 0 0 0; font-size: 14px; opacity: 0.9;">Limited time launch pricing</p>
-              </div>
-              
-              <!-- Key Features -->
-              <div style="background: #f8fafc; padding: 25px; border-radius: 8px; margin: 30px 0;">
-                <h4 style="margin: 0 0 15px 0; color: #1e293b; font-size: 18px; font-weight: 600; text-align: center;">Why You'll Love It:</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                  <div style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 8px;">✨</div>
-                    <p style="margin: 0; color: #64748b; font-size: 14px;">Premium Quality</p>
-                  </div>
-                  <div style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 8px;">🎯</div>
-                    <p style="margin: 0; color: #64748b; font-size: 14px;">Perfect Design</p>
-                  </div>
-                  <div style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 8px;">⚡</div>
-                    <p style="margin: 0; color: #64748b; font-size: 14px;">Fast Delivery</p>
-                  </div>
-                  <div style="text-align: center;">
-                    <div style="font-size: 24px; margin-bottom: 8px;">💝</div>
-                    <p style="margin: 0; color: #64748b; font-size: 14px;">Gift Ready</p>
-                  </div>
-                </div>
-              </div>
-              
-              <!-- CTA -->
-              <div style="text-align: center; margin: 40px 0;">
-                <a href="{{productUrl}}" style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 18px 36px; border-radius: 25px; text-decoration: none; font-weight: 600; font-size: 18px; box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);">
-                  Get Yours Now
-                </a>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; background: #f8fafc; text-align: center;">
-              <p style="margin: 0; color: #64748b; font-size: 14px;">
-                Thanks for being part of our community, {{customerName}}!
-              </p>
-              <p style="margin: 16px 0 8px 0; color: #94a3b8; font-size: 12px;">© {{companyName}}. Bringing you the best.</p>
-              <a href="{{unsubscribeUrl}}" style="color: #94a3b8; font-size: 11px; text-decoration: none;">Unsubscribe</a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+            </div>
+            
+            <div style="text-align: center;">
+                <p style="margin-bottom: 24px; color: #4a5568;">Be among the first to experience {{productName}}!</p>
+                <a href="{{shopUrl}}" class="shop-button">Get Yours Now</a>
+            </div>
+        </div>
+    </div>
 </body>
-</html>`,
-    text_template: `🚀 NEW ARRIVAL: {{productName}} is Here!
-
-Hi {{customerName}},
-
-Discover our latest addition!
-
-{{productName}}
-{{productDescription}}
-
-LAUNCH SPECIAL:
-Was: ${{originalPrice}}
-Now: ${{launchPrice}}
-
-WHY YOU'LL LOVE IT:
-✨ Premium Quality
-🎯 Perfect Design
-⚡ Fast Delivery
-💝 Gift Ready
-
-Get yours now: {{productUrl}}
-
-Thanks for being part of our community!
-{{companyName}}
-
-Unsubscribe: {{unsubscribeUrl}}`
+</html>`
   },
 
   {
-    template_key: 'seasonal_sale_campaign',
+    template_key: 'seasonal_sale',
     template_name: 'Seasonal Sale Campaign',
-    subject_template: '🔥 MEGA SALE: Up to {{maxDiscount}}% OFF Everything!',
+    subject_template: '🌟 {{discountPercentage}}% OFF Everything! Limited Time Only',
     category: 'promotional',
     style: 'bold',
     template_type: 'marketing',
-    variables: ['customerName', 'maxDiscount', 'saleEndDate', 'shopUrl', 'companyName', 'unsubscribeUrl', 'freeShippingThreshold'],
+    variables: ['customerName', 'saleDate', 'discountPercentage', 'featuredProducts', 'freeShippingThreshold', 'shopUrl', 'companyName'],
+    is_active: true,
+    text_template: `🌟 MASSIVE SALE ALERT! 🌟
+
+{{customerName}}, this is HUGE!
+
+{{discountPercentage}}% OFF EVERYTHING!
+Sale ends: {{saleDate}}
+
+PLUS: Free shipping on orders over {{freeShippingThreshold}}!
+
+Featured deals:
+{{featuredProducts}}
+
+SHOP THE SALE: {{shopUrl}}
+
+Don't wait - these prices won't last!
+
+{{companyName}}`,
     html_template: `
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mega Sale</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Massive Sale Event</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Arial Black', Arial, sans-serif; line-height: 1.4; background: linear-gradient(45deg, #ff6b6b, #ee5a52, #ff8a80, #ffab91); color: #ffffff; }
+        .container { max-width: 600px; margin: 0 auto; background: linear-gradient(135deg, #1a1a1a, #2d2d2d); }
+        .header { background: linear-gradient(135deg, #ff6b6b, #ee5a52); padding: 48px 20px; text-align: center; position: relative; overflow: hidden; }
+        .header::before { content: ''; position: absolute; top: 0; left: 0; right: 0; bottom: 0; background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><path d="M20,20 Q50,5 80,20 Q95,50 80,80 Q50,95 20,80 Q5,50 20,20" fill="rgba(255,255,255,0.1)"/></svg>'); animation: float 6s ease-in-out infinite; }
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+        .sale-icon { font-size: 72px; margin-bottom: 16px; position: relative; z-index: 1; }
+        .content { padding: 40px 24px; }
+        .mega-discount { background: linear-gradient(45deg, #2ed573, #1e90ff); padding: 32px; border-radius: 20px; text-align: center; margin: 32px 0; border: 4px solid #ffffff; box-shadow: 0 12px 24px rgba(0,0,0,0.3); transform: rotate(-2deg); }
+        .discount-text { font-size: 48px; font-weight: 900; margin-bottom: 12px; text-shadow: 3px 3px 6px rgba(0,0,0,0.5); animation: glow 2s ease-in-out infinite alternate; }
+        @keyframes glow { from { text-shadow: 3px 3px 6px rgba(0,0,0,0.5), 0 0 20px rgba(255,255,255,0.3); } to { text-shadow: 3px 3px 6px rgba(0,0,0,0.5), 0 0 30px rgba(255,255,255,0.6); } }
+        .sale-features { background: rgba(255,255,255,0.1); padding: 24px; border-radius: 12px; margin: 24px 0; }
+        .feature-item { display: flex; align-items: center; margin: 12px 0; font-size: 16px; font-weight: 600; }
+        .feature-icon { font-size: 20px; margin-right: 12px; }
+        .countdown-banner { background: #ff4757; color: #ffffff; padding: 20px; text-align: center; font-weight: 900; font-size: 18px; margin: 24px 0; border-radius: 12px; text-transform: uppercase; border: 2px solid #ffffff; }
+        .shop-mega-button { display: inline-block; background: linear-gradient(135deg, #ffa502, #ff6348); color: #000000; padding: 24px 48px; border-radius: 50px; text-decoration: none; font-weight: 900; font-size: 22px; text-transform: uppercase; margin: 24px 0; box-shadow: 0 12px 24px rgba(0,0,0,0.4); animation: bounce 2s infinite; border: 3px solid #ffffff; }
+        @keyframes bounce { 0%, 20%, 50%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-10px); } 60% { transform: translateY(-5px); } }
+        .products-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin: 24px 0; }
+        .product-item { background: rgba(255,255,255,0.1); padding: 16px; border-radius: 8px; text-align: center; }
+    </style>
 </head>
-<body style="margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background-color: #000000; line-height: 1.6;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 40px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border-radius: 0; box-shadow: 0 0 40px rgba(255,69,0,0.4);">
-          <!-- Bold Sale Header -->
-          <tr>
-            <td style="padding: 0; background: linear-gradient(45deg, #ff4500, #ff6347); text-align: center; color: white; position: relative;">
-              <div style="padding: 60px 40px; transform: skew(-3deg); margin: -15px 0;">
-                <div style="transform: skew(3deg);">
-                  <h1 style="margin: 0; font-size: 48px; font-weight: 900; text-transform: uppercase; letter-spacing: 4px; text-shadow: 3px 3px 6px rgba(0,0,0,0.4);">MEGA SALE</h1>
-                  <div style="width: 120px; height: 6px; background: white; margin: 25px auto; border-radius: 3px;"></div>
-                  <p style="margin: 0; font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">UP TO {{maxDiscount}}% OFF EVERYTHING!</p>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="sale-icon">🌟</div>
+            <h1 style="font-size: 36px; font-weight: 900; text-transform: uppercase; margin-bottom: 16px; position: relative; z-index: 1;">MASSIVE SALE EVENT!</h1>
+            <p style="font-size: 18px; opacity: 0.9; position: relative; z-index: 1;">{{companyName}}</p>
+        </div>
+        
+        <div class="content">
+            <div style="text-align: center; margin-bottom: 32px;">
+                <h2 style="font-size: 28px; font-weight: 900; margin-bottom: 16px;">{{customerName}}, THIS IS HUGE!</h2>
+            </div>
+            
+            <div class="mega-discount">
+                <div class="discount-text">{{discountPercentage}}% OFF</div>
+                <div style="font-size: 20px; font-weight: 700;">EVERYTHING IN STORE!</div>
+            </div>
+            
+            <div class="sale-features">
+                <div style="font-weight: 700; margin-bottom: 16px; font-size: 18px; color: #00ff88;">🎁 SALE FEATURES:</div>
+                <div class="feature-item">
+                    <span class="feature-icon">💥</span>
+                    <span>{{discountPercentage}}% off ALL products</span>
                 </div>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Sale Content -->
-          <tr>
-            <td style="padding: 40px;">
-              <div style="text-align: center; margin-bottom: 40px;">
-                <h2 style="margin: 0 0 20px 0; color: #000000; font-size: 32px; font-weight: 900; text-transform: uppercase; letter-spacing: 2px;">{{customerName}}!</h2>
-                <p style="margin: 0; color: #333333; font-size: 18px; font-weight: 600;">THE BIGGEST SALE OF THE YEAR IS HERE!</p>
-              </div>
-              
-              <!-- Sale Highlights -->
-              <div style="background: #000000; color: white; padding: 40px; margin: 30px 0; text-align: center;">
-                <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 30px; margin: 20px 0;">
-                  <div>
-                    <div style="font-size: 48px; font-weight: 900; color: #ff4500; margin-bottom: 10px;">{{maxDiscount}}%</div>
-                    <div style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">MAX DISCOUNT</div>
-                  </div>
-                  <div>
-                    <div style="font-size: 48px; font-weight: 900; color: #ff4500; margin-bottom: 10px;">${{freeShippingThreshold}}</div>
-                    <div style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">FREE SHIPPING</div>
-                  </div>
-                  <div>
-                    <div style="font-size: 48px; font-weight: 900; color: #ff4500; margin-bottom: 10px;">24H</div>
-                    <div style="font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 1px;">DELIVERY</div>
-                  </div>
+                <div class="feature-item">
+                    <span class="feature-icon">🚚</span>
+                    <span>FREE shipping over {{freeShippingThreshold}}</span>
                 </div>
-              </div>
-              
-              <!-- Urgency Banner -->
-              <div style="background: #dc2626; color: white; padding: 25px; text-align: center; transform: skew(-2deg); margin: 40px 0;">
-                <div style="transform: skew(2deg);">
-                  <h3 style="margin: 0 0 10px 0; font-size: 24px; font-weight: 800; text-transform: uppercase; letter-spacing: 2px;">🚨 SALE ENDS: {{saleEndDate}} 🚨</h3>
-                  <p style="margin: 0; font-size: 16px; font-weight: 600;">DON'T WAIT - STOCKS ARE FLYING OFF THE SHELVES!</p>
+                <div class="feature-item">
+                    <span class="feature-icon">⭐</span>
+                    <span>Featured products included</span>
                 </div>
-              </div>
-              
-              <!-- Mega CTA -->
-              <div style="text-align: center; margin: 50px 0;">
-                <a href="{{shopUrl}}" style="display: inline-block; background: linear-gradient(45deg, #ff4500, #ff6347); color: white; padding: 25px 50px; text-decoration: none; font-weight: 900; font-size: 22px; text-transform: uppercase; letter-spacing: 3px; border-radius: 0; box-shadow: 0 6px 25px rgba(255,69,0,0.5); border: 4px solid #ffffff;">
-                  SHOP THE SALE NOW!
-                </a>
-              </div>
-              
-              <!-- Sale Categories -->
-              <div style="background: #f5f5f5; padding: 30px; margin: 40px 0;">
-                <h4 style="margin: 0 0 20px 0; color: #000000; font-size: 20px; font-weight: 800; text-transform: uppercase; text-align: center;">EVERYTHING ON SALE:</h4>
-                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; text-align: center;">
-                  <div style="background: #ff4500; color: white; padding: 15px; font-weight: 700; text-transform: uppercase;">ELECTRONICS</div>
-                  <div style="background: #ff4500; color: white; padding: 15px; font-weight: 700; text-transform: uppercase;">FASHION</div>
-                  <div style="background: #ff4500; color: white; padding: 15px; font-weight: 700; text-transform: uppercase;">HOME & GARDEN</div>
-                  <div style="background: #ff4500; color: white; padding: 15px; font-weight: 700; text-transform: uppercase;">SPORTS</div>
+                <div class="feature-item">
+                    <span class="feature-icon">⚡</span>
+                    <span>Limited time only!</span>
                 </div>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Footer -->
-          <tr>
-            <td style="padding: 30px 40px; background: #000000; color: white; text-align: center;">
-              <p style="margin: 0; font-size: 16px; font-weight: 700; text-transform: uppercase;">
-                SALE OF THE CENTURY - {{companyName}}
-              </p>
-              <p style="margin: 16px 0 8px 0; color: #666666; font-size: 12px; text-transform: uppercase;">LIMITED TIME ONLY</p>
-              <a href="{{unsubscribeUrl}}" style="color: #666666; font-size: 11px; text-decoration: none;">Unsubscribe</a>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
+            </div>
+            
+            <div style="margin: 24px 0;">
+                <h3 style="color: #00ff88; margin-bottom: 16px; font-size: 18px;">🔥 FEATURED DEALS:</h3>
+                <div style="background: rgba(255,255,255,0.1); padding: 20px; border-radius: 8px;">
+                    {{featuredProducts}}
+                </div>
+            </div>
+            
+            <div class="countdown-banner">
+                ⏰ SALE ENDS {{saleDate}} - DON'T MISS OUT! ⏰
+            </div>
+            
+            <div style="text-align: center;">
+                <a href="{{shopUrl}}" class="shop-mega-button">SHOP THE SALE NOW!</a>
+            </div>
+            
+            <div style="text-align: center; margin-top: 24px;">
+                <p style="font-size: 16px; font-weight: 600; opacity: 0.9;">These prices won't last - grab your favorites before they're gone!</p>
+            </div>
+        </div>
+    </div>
 </body>
-</html>`,
-    text_template: `🔥 MEGA SALE: Up to {{maxDiscount}}% OFF Everything!
-
-{{customerName}}!
-
-THE BIGGEST SALE OF THE YEAR IS HERE!
-
-🔥 UP TO {{maxDiscount}}% OFF EVERYTHING
-🚚 FREE SHIPPING OVER ${{freeShippingThreshold}}
-⚡ 24H DELIVERY AVAILABLE
-
-🚨 SALE ENDS: {{saleEndDate}} 🚨
-DON'T WAIT - STOCKS ARE FLYING!
-
-EVERYTHING ON SALE:
-• ELECTRONICS
-• FASHION  
-• HOME & GARDEN
-• SPORTS
-
-SHOP THE SALE NOW: {{shopUrl}}
-
-SALE OF THE CENTURY - {{companyName}}
-
-Unsubscribe: {{unsubscribeUrl}}`
-  },
-
-  {
-    template_key: 'newsletter_update',
-    template_name: 'Newsletter Update',
-    subject_template: '📰 {{companyName}} Newsletter - {{monthYear}}',
-    category: 'promotional',
-    style: 'elegant',
-    template_type: 'marketing',
-    variables: ['customerName', 'monthYear', 'featuredProduct', 'featuredProductUrl', 'blogPostTitle', 'blogPostUrl', 'upcomingEvents', 'companyName', 'unsubscribeUrl', 'socialLinks'],
-    html_template: `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Newsletter</title>
-</head>
-<body style="margin: 0; padding: 0; font-family: Georgia, 'Times New Roman', serif; background-color: #fafafa; line-height: 1.8;">
-  <table width="100%" cellpadding="0" cellspacing="0" border="0">
-    <tr>
-      <td align="center" style="padding: 60px 20px;">
-        <table width="600" cellpadding="0" cellspacing="0" border="0" style="max-width: 600px; background-color: #ffffff; border: 1px solid #e8e8e8;">
-          <!-- Newsletter Header -->
-          <tr>
-            <td style="padding: 60px 50px 40px 50px; text-align: center; border-bottom: 3px double #2563eb;">
-              <div style="width: 120px; height: 1px; background: linear-gradient(to right, transparent, #2563eb, transparent); margin: 0 auto 30px auto;"></div>
-              <h1 style="margin: 0; color: #1e40af; font-size: 32px; font-weight: 300; letter-spacing: 3px; text-transform: uppercase;">Newsletter</h1>
-              <div style="width: 60px; height: 1px; background: #2563eb; margin: 20px auto; opacity: 0.7;"></div>
-              <p style="margin: 0; color: #666666; font-size: 16px; font-style: italic;">{{monthYear}} Edition - Dear {{customerName}}</p>
-            </td>
-          </tr>
-          
-          <!-- Newsletter Content -->
-          <tr>
-            <td style="padding: 50px;">
-              <p style="margin: 0 0 30px 0; color: #444444; font-size: 16px; line-height: 1.8; font-style: italic;">
-                Greetings and welcome to our monthly newsletter. We are delighted to share our latest updates, featured products, and upcoming events with our valued community.
-              </p>
-              
-              <!-- Featured Product Section -->
-              <div style="margin: 40px 0;">
-                <h2 style="margin: 0 0 25px 0; color: #1e40af; font-size: 22px; font-weight: 400; letter-spacing: 1px; text-align: center; border-bottom: 1px solid #e8e8e8; padding-bottom: 15px;">Featured This Month</h2>
-                
-                <table width="100%" cellpadding="0" cellspacing="0" border="0" style="margin: 30px 0;">
-                  <tr>
-                    <td style="padding: 30px; background: #fbfbfb; border: 1px solid #e8e8e8; border-left: 4px solid #2563eb;">
-                      <h3 style="margin: 0 0 15px 0; color: #1e40af; font-size: 20px; font-weight: 500;">{{featuredProduct}}</h3>
-                      <p style="margin: 0 0 20px 0; color: #666666; font-size: 15px; line-height: 1.7;">
-                        Discover our carefully selected featured product, chosen for its exceptional quality and timeless appeal. 
-                        A perfect addition to your collection.
-                      </p>
-                      <a href="{{featuredProductUrl}}" style="color: #1e40af; text-decoration: none; font-weight: 500; font-size: 14px; text-transform: uppercase; letter-spacing: 1px;">
-                        View Product →
-                      </a>
-                    </td>
-                  </tr>
-                </table>
-              </div>
-              
-              <!-- Latest Blog Post -->
-              <div style="margin: 40px 0;">
-                <h2 style="margin: 0 0 25px 0; color: #1e40af; font-size: 22px; font-weight: 400; letter-spacing: 1px; text-align: center; border-bottom: 1px solid #e8e8e8; padding-bottom: 15px;">From Our Journal</h2>
-                
-                <div style="background: #f8fafc; padding: 25px; border-left: 3px solid #2563eb; margin: 25px 0;">
-                  <h4 style="margin: 0 0 12px 0; color: #1e40af; font-size: 18px; font-weight: 500;">{{blogPostTitle}}</h4>
-                  <p style="margin: 0 0 15px 0; color: #64748b; font-size: 14px; line-height: 1.6;">
-                    Our latest insights and stories, carefully crafted to inform and inspire our community.
-                  </p>
-                  <a href="{{blogPostUrl}}" style="color: #2563eb; text-decoration: none; font-weight: 500; font-size: 14px;">
-                    Read Full Article →
-                  </a>
-                </div>
-              </div>
-              
-              <!-- Upcoming Events -->
-              <div style="margin: 40px 0;">
-                <h2 style="margin: 0 0 25px 0; color: #1e40af; font-size: 22px; font-weight: 400; letter-spacing: 1px; text-align: center; border-bottom: 1px solid #e8e8e8; padding-bottom: 15px;">Upcoming Events</h2>
-                
-                <div style="background: #fef7ff; border: 1px solid #e879f9; padding: 25px; border-radius: 4px;">
-                  <p style="margin: 0; color: #86198f; font-size: 15px; line-height: 1.7;">{{upcomingEvents}}</p>
-                </div>
-              </div>
-              
-              <!-- Elegant Quote -->
-              <div style="text-align: center; margin: 50px 0; padding: 30px 0; border-top: 1px solid #e8e8e8; border-bottom: 1px solid #e8e8e8;">
-                <p style="margin: 0; color: #666666; font-size: 16px; line-height: 1.8; font-style: italic;">
-                  "Excellence is an art won by training and habituation." - Aristotle
-                </p>
-              </div>
-              
-              <!-- Social Links -->
-              <div style="text-align: center; margin: 40px 0;">
-                <h3 style="margin: 0 0 20px 0; color: #1e40af; font-size: 18px; font-weight: 400; letter-spacing: 1px;">Connect With Us</h3>
-                <p style="margin: 0; color: #64748b; font-size: 14px;">{{socialLinks}}</p>
-              </div>
-            </td>
-          </tr>
-          
-          <!-- Elegant Footer -->
-          <tr>
-            <td style="padding: 40px 50px 60px 50px; border-top: 3px double #2563eb; text-align: center;">
-              <div style="width: 120px; height: 1px; background: linear-gradient(to right, transparent, #2563eb, transparent); margin: 0 auto 30px auto;"></div>
-              <p style="margin: 0; color: #666666; font-size: 14px; line-height: 1.6;">
-                Thank you for being a cherished member of our community. Should you wish to modify your subscription preferences, 
-                you may do so <a href="{{unsubscribeUrl}}" style="color: #2563eb; text-decoration: none;">here</a>.
-              </p>
-              <p style="margin: 30px 0 0 0; color: #999999; font-size: 12px; letter-spacing: 1px; text-transform: uppercase;">
-                With distinguished regards, {{companyName}}
-              </p>
-            </td>
-          </tr>
-        </table>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>`,
-    text_template: `📰 {{companyName}} Newsletter - {{monthYear}}
-
-Dear {{customerName}},
-
-Greetings and welcome to our monthly newsletter. We are delighted to share our latest updates with our valued community.
-
-FEATURED THIS MONTH
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-{{featuredProduct}}
-
-Discover our carefully selected featured product, chosen for its exceptional quality and timeless appeal.
-
-View Product: {{featuredProductUrl}}
-
-FROM OUR JOURNAL
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-{{blogPostTitle}}
-
-Our latest insights and stories, carefully crafted to inform and inspire our community.
-
-Read Full Article: {{blogPostUrl}}
-
-UPCOMING EVENTS
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-{{upcomingEvents}}
-
-CONNECT WITH US
-{{socialLinks}}
-
-"Excellence is an art won by training and habituation." - Aristotle
-
-Thank you for being a cherished member of our community.
-
-Modify subscription: {{unsubscribeUrl}}
-
-With distinguished regards,
-{{companyName}}`
+</html>`
   }
 ];

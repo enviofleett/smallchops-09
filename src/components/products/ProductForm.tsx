@@ -188,7 +188,7 @@ export const ProductForm = ({
               <FormLabel>Package Details</FormLabel>
               
               <FormControl>
-                <FeaturesList features={field.value} onChange={field.onChange} placeholder="Add allergen information..." />
+                <FeaturesList features={field.value} onChange={field.onChange} placeholder="list your features" />
               </FormControl>
               <FormMessage />
             </FormItem>} />

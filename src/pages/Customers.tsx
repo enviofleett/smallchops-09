@@ -21,7 +21,7 @@ const Customers = () => {
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [currentEditCustomer, setCurrentEditCustomer] = useState<CustomerDb | null>(null);
 
-  const { data: analytics, isLoading, error } = useQuery({
+  const { data: analytics, isLoading, error, refetch } = useQuery({
     queryKey: ['customer-analytics', dateRange],
     queryFn: () => getCustomerAnalytics(dateRange),
   });
@@ -48,6 +48,7 @@ const Customers = () => {
     setCurrentEditCustomer(null);
     setCustomerDialogOpen(true);
   };
+  
   const openEditCustomer = (customer: Customer) => {
     setCurrentEditCustomer({
       id: customer.id,
@@ -61,9 +62,8 @@ const Customers = () => {
   };
 
   const refetchAnalytics = () => {
-    // If using react-query, you'd use queryClient.invalidateQueries...
-    // But as we're using useQuery, page reload will suffice for now.
-    window.location.reload();
+    // Refetch the analytics data
+    refetch();
   };
 
   return (
@@ -169,11 +169,12 @@ const Customers = () => {
           </div>
         </div>
 
-        <CustomerTable
-          customers={filteredCustomers}
-          isLoading={isLoading}
-          onEditCustomer={openEditCustomer}
-        />
+          <CustomerTable 
+            customers={filteredCustomers}
+            isLoading={isLoading}
+            onEditCustomer={openEditCustomer}
+            onCustomerDeleted={refetchAnalytics}
+          />
       </div>
       <CustomerDialog
         open={customerDialogOpen}

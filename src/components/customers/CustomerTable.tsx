@@ -1,18 +1,24 @@
 import React, { useState } from 'react';
-import { Mail, Phone, Edit } from 'lucide-react';
+import { Mail, Phone, Edit, Trash2 } from 'lucide-react';
 import { Customer } from '@/types/customers';
 import { CustomerDetailsModal } from './CustomerDetailsModal';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
+import { deleteCustomer } from "@/api/customers";
+import { useToast } from "@/hooks/use-toast";
 
 interface CustomerTableProps {
   customers: Customer[];
   isLoading?: boolean;
   onEditCustomer?: (customer: Customer) => void;
+  onCustomerDeleted?: () => void;
 }
 
-export const CustomerTable = ({ customers, isLoading, onEditCustomer }: CustomerTableProps) => {
+export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomerDeleted }: CustomerTableProps) => {
   // Track selected customer for detailed modal
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [deletingCustomerId, setDeletingCustomerId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   const getStatusBadge = (status: string) => {
     const statusColors = {
@@ -21,6 +27,28 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer }: Customer
       'VIP': 'bg-purple-100 text-purple-800'
     };
     return statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800';
+  };
+
+  const handleDeleteCustomer = async (customerId: string, customerName: string) => {
+    try {
+      setDeletingCustomerId(customerId);
+      await deleteCustomer(customerId);
+      
+      toast({
+        title: "Customer Deleted",
+        description: `${customerName} has been successfully deleted.`,
+      });
+      
+      onCustomerDeleted?.();
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to delete customer. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDeletingCustomerId(null);
+    }
   };
 
   if (isLoading) {
@@ -56,7 +84,7 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer }: Customer
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Total Spent</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Last Activity</th>
-                <th className="text-left py-4 px-6 font-medium text-gray-600"></th>
+                <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -126,17 +154,52 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer }: Customer
                     }
                   </td>
                   <td className="py-4 px-6">
-                    {/* Edit button */}
-                    {onEditCustomer && (
-                      <button
-                        className="p-2 rounded-md hover:bg-accent"
-                        aria-label="Edit customer"
-                        onClick={() => onEditCustomer(customer)}
-                        type="button"
-                      >
-                        <Edit className="h-4 w-4 text-gray-700" />
-                      </button>
-                    )}
+                    <div className="flex items-center space-x-2">
+                      {/* Edit button */}
+                      {onEditCustomer && (
+                        <button
+                          className="p-2 rounded-md hover:bg-accent"
+                          aria-label="Edit customer"
+                          onClick={() => onEditCustomer(customer)}
+                          type="button"
+                        >
+                          <Edit className="h-4 w-4 text-gray-700" />
+                        </button>
+                      )}
+                      
+                      {/* Delete button */}
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <button
+                            className="p-2 rounded-md hover:bg-red-50 text-red-600 hover:text-red-700"
+                            aria-label="Delete customer"
+                            disabled={deletingCustomerId === customer.id}
+                            type="button"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent>
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+                            <AlertDialogDescription>
+                              Are you sure you want to delete <strong>{customer.name}</strong>? 
+                              This will permanently remove the customer and all their related data including orders, favorites, and reviews. 
+                              This action cannot be undone.
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={() => handleDeleteCustomer(customer.id, customer.name)}
+                              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                            >
+                              Delete Customer
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
                   </td>
                 </tr>
               ))}

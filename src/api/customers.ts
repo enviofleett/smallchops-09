@@ -136,6 +136,15 @@ export const updateCustomer = async (id: string, data: { name?: string; email?: 
   return updated as CustomerDb;
 };
 
+// Delete a customer (admin only)
+export const deleteCustomer = async (customerId: string) => {
+  const { data, error } = await supabase
+    .rpc('delete_customer_cascade', { p_customer_id: customerId });
+  
+  if (error) throw new Error(error.message);
+  return data;
+};
+
 // Updated getCustomerAnalytics to show ALL customers (including those without orders)
 export const getCustomerAnalytics = async (dateRange: DateRange): Promise<CustomerAnalytics> => {
   const { from, to } = dateRange;

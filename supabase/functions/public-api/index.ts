@@ -302,6 +302,368 @@ serve(async (req) => {
     }
 
     // Public endpoints (no authentication required)
+
+    // POST /customers - Customer registration
+    if (method === "POST" && path === "/customers") {
+      const { name, email, phone, date_of_birth } = await req.json();
+
+      // Validate required fields
+      if (!name || !email) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Name and email are required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Invalid email format" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        // Check if customer already exists
+        const { data: existingCustomer } = await supabaseClient
+          .from('customers')
+          .select('id')
+          .eq('email', email)
+          .single();
+
+        if (existingCustomer) {
+          return new Response(
+            JSON.stringify({ success: true, data: { id: existingCustomer.id, existing: true } }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Create new customer
+        const { data: customer, error } = await supabaseClient
+          .from('customers')
+          .insert({
+            name,
+            email,
+            phone,
+            date_of_birth
+          })
+          .select('id, name, email, phone')
+          .single();
+
+        if (error) {
+          console.error('Error creating customer:', error);
+          return new Response(
+            JSON.stringify({ success: false, error: "Failed to create customer" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        logStep("Customer created", { id: customer.id, email });
+        return new Response(
+          JSON.stringify({ success: true, data: customer }),
+          { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (error) {
+        console.error('Error in customer registration:', error);
+        return new Response(
+          JSON.stringify({ success: false, error: "Registration failed" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // POST /orders - Order creation
+    if (method === "POST" && path === "/orders") {
+      const orderData = await req.json();
+      const {
+        customer_name,
+        customer_email,
+        customer_phone,
+        order_type,
+        delivery_address,
+        special_instructions,
+        promotion_code,
+        items,
+        subtotal,
+        tax_amount,
+        delivery_fee,
+        discount_amount,
+        total_amount
+      } = orderData;
+
+      // Validate required fields
+      if (!customer_name || !customer_email || !customer_phone || !items || items.length === 0) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Missing required order information" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      if (order_type === 'delivery' && !delivery_address) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Delivery address is required for delivery orders" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        // Generate order number
+        const { data: orderNumber } = await supabaseClient.rpc('generate_order_number');
+
+        // Create order with atomic transaction
+        const { data: order, error: orderError } = await supabaseClient
+          .from('orders')
+          .insert({
+            order_number: orderNumber,
+            customer_name,
+            customer_email,
+            customer_phone,
+            order_type: order_type || 'delivery',
+            delivery_address,
+            special_instructions,
+            subtotal: subtotal || 0,
+            tax_amount: tax_amount || 0,
+            delivery_fee: delivery_fee || 0,
+            discount_amount: discount_amount || 0,
+            total_amount: total_amount || 0,
+            status: 'pending',
+            payment_status: 'pending'
+          })
+          .select('id, order_number')
+          .single();
+
+        if (orderError) {
+          console.error('Error creating order:', orderError);
+          return new Response(
+            JSON.stringify({ success: false, error: "Failed to create order" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Create order items
+        const orderItems = items.map((item: any) => ({
+          order_id: order.id,
+          product_id: item.product_id,
+          product_name: item.product_name,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity,
+          customizations: item.customizations,
+          special_instructions: item.special_instructions
+        }));
+
+        const { error: itemsError } = await supabaseClient
+          .from('order_items')
+          .insert(orderItems);
+
+        if (itemsError) {
+          console.error('Error creating order items:', itemsError);
+          // Clean up order if items creation fails
+          await supabaseClient.from('orders').delete().eq('id', order.id);
+          return new Response(
+            JSON.stringify({ success: false, error: "Failed to create order items" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        logStep("Order created", { id: order.id, orderNumber: order.order_number });
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            data: { 
+              id: order.id, 
+              order_number: order.order_number,
+              status: 'pending',
+              total_amount 
+            } 
+          }),
+          { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (error) {
+        console.error('Error in order creation:', error);
+        return new Response(
+          JSON.stringify({ success: false, error: "Order creation failed" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // GET /orders/:id - Order tracking  
+    if (method === "GET" && path.startsWith("/orders/")) {
+      const orderIdOrNumber = path.split('/')[2];
+      
+      if (!orderIdOrNumber) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Order ID or number is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        // Try to find order by ID first, then by order number
+        let query = supabaseClient
+          .from('orders')
+          .select(`
+            id, order_number, status, payment_status, order_type,
+            customer_name, customer_email, customer_phone,
+            delivery_address, special_instructions,
+            subtotal, tax_amount, delivery_fee, discount_amount, total_amount,
+            order_time, delivery_time, pickup_time,
+            order_items (
+              id, product_id, product_name, quantity, unit_price, total_price,
+              customizations, special_instructions
+            )
+          `);
+
+        // Check if it's a UUID (order ID) or order number
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderIdOrNumber);
+        
+        if (isUUID) {
+          query = query.eq('id', orderIdOrNumber);
+        } else {
+          query = query.eq('order_number', orderIdOrNumber);
+        }
+
+        const { data: order, error } = await query.single();
+
+        if (error || !order) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Order not found" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Calculate estimated delivery/pickup time based on status
+        let estimated_time = null;
+        if (order.status !== 'delivered' && order.status !== 'cancelled') {
+          const baseTime = new Date();
+          switch (order.status) {
+            case 'pending':
+            case 'confirmed':
+              baseTime.setMinutes(baseTime.getMinutes() + 45);
+              break;
+            case 'preparing':
+              baseTime.setMinutes(baseTime.getMinutes() + 30);
+              break;
+            case 'ready':
+              if (order.order_type === 'pickup') {
+                estimated_time = 'Ready for pickup';
+              } else {
+                baseTime.setMinutes(baseTime.getMinutes() + 15);
+              }
+              break;
+            case 'out_for_delivery':
+              baseTime.setMinutes(baseTime.getMinutes() + 15);
+              break;
+          }
+          if (estimated_time !== 'Ready for pickup') {
+            estimated_time = baseTime.toISOString();
+          }
+        }
+
+        const response = {
+          ...order,
+          estimated_time,
+          tracking_steps: [
+            { status: 'pending', label: 'Order Received', completed: true },
+            { status: 'confirmed', label: 'Order Confirmed', completed: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'].includes(order.status) },
+            { status: 'preparing', label: 'Preparing Your Order', completed: ['preparing', 'ready', 'out_for_delivery', 'delivered'].includes(order.status) },
+            { status: 'ready', label: order.order_type === 'pickup' ? 'Ready for Pickup' : 'Ready for Delivery', completed: ['ready', 'out_for_delivery', 'delivered'].includes(order.status) },
+            ...(order.order_type === 'delivery' ? [{ status: 'out_for_delivery', label: 'Out for Delivery', completed: ['out_for_delivery', 'delivered'].includes(order.status) }] : []),
+            { status: 'delivered', label: order.order_type === 'pickup' ? 'Picked Up' : 'Delivered', completed: order.status === 'delivered' }
+          ]
+        };
+
+        return new Response(
+          JSON.stringify({ success: true, data: response }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (error) {
+        console.error('Error fetching order:', error);
+        return new Response(
+          JSON.stringify({ success: false, error: "Failed to fetch order" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
+    // POST /validate-promotion - Promotion code validation
+    if (method === "POST" && path === "/validate-promotion") {
+      const { code, order_amount } = await req.json();
+
+      if (!code || order_amount === undefined) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Promotion code and order amount are required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        // Find active promotion
+        const { data: promotion, error } = await supabaseClient
+          .from('promotions')
+          .select('*')
+          .eq('code', code.toUpperCase())
+          .eq('status', 'active')
+          .lte('valid_from', new Date().toISOString())
+          .or('valid_until.is.null,valid_until.gte.' + new Date().toISOString())
+          .single();
+
+        if (error || !promotion) {
+          return new Response(
+            JSON.stringify({ success: false, error: "Invalid or expired promotion code" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Check minimum order amount
+        if (promotion.min_order_amount && order_amount < promotion.min_order_amount) {
+          return new Response(
+            JSON.stringify({ 
+              success: false, 
+              error: `Minimum order amount of $${promotion.min_order_amount} required for this promotion` 
+            }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Calculate discount
+        let discount_amount = 0;
+        if (promotion.type === 'percentage') {
+          discount_amount = (order_amount * promotion.value) / 100;
+          if (promotion.max_discount_amount) {
+            discount_amount = Math.min(discount_amount, promotion.max_discount_amount);
+          }
+        } else if (promotion.type === 'fixed') {
+          discount_amount = Math.min(promotion.value, order_amount);
+        }
+
+        discount_amount = Math.round(discount_amount * 100) / 100; // Round to 2 decimals
+
+        return new Response(
+          JSON.stringify({ 
+            success: true, 
+            data: {
+              promotion_id: promotion.id,
+              code: promotion.code,
+              type: promotion.type,
+              value: promotion.value,
+              discount_amount,
+              description: promotion.description
+            }
+          }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (error) {
+        console.error('Error validating promotion:', error);
+        return new Response(
+          JSON.stringify({ success: false, error: "Failed to validate promotion" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     if (method === "GET" && path === "/categories") {
       // Get all active categories
       const { data: categories, error } = await supabaseClient

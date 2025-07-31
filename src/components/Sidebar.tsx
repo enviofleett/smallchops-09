@@ -1,127 +1,99 @@
-
 import React, { useState } from 'react';
 import { NavLink } from 'react-router-dom';
-import { 
-  LayoutDashboard, 
-  FileText, 
-  User, 
-  ChevronLeft,
-  ChevronRight,
-  Package,
-  Tag,
-  Truck,
-  Settings,
-  Store,
-  Mail
-} from 'lucide-react';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from "@/components/ui/dialog";
+import { LayoutDashboard, FileText, User, ChevronLeft, ChevronRight, Package, Tag, Truck, Settings, Store, Mail } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import CategoriesManager from '@/components/categories/CategoriesManager';
 import { PromotionsSidebarIcon } from "./PromotionsSidebarIcon";
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
-
-
 interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
 }
-
-const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
+const Sidebar = ({
+  isCollapsed,
+  onToggle
+}: SidebarProps) => {
   const [isCategoriesOpen, setCategoriesOpen] = useState(false);
-  const { data: settings } = useBusinessSettings();
-  
-
-  const menuItems = [
-    { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
-    { icon: FileText, label: 'Orders', path: '/orders' },
-    { icon: Tag, label: 'Categories', path: null, action: () => setCategoriesOpen(true) },
-    { icon: Package, label: 'Products', path: '/products' },
-    { icon: User, label: 'Customers', path: '/customers' },
-    { icon: Truck, label: 'Delivery & Pickup', path: '/delivery-pickup' },
-    { icon: PromotionsSidebarIcon, label: 'Promotions & Loyalty', path: '/promotions' },
-    { icon: FileText, label: 'Reports', path: '/reports' },
-    { icon: FileText, label: 'Audit Logs', path: '/audit-logs' },
-    { icon: Settings, label: 'Settings', path: '/settings' },
-  ];
-
-  return (
-    <div className={`bg-white shadow-lg transition-all duration-300 ${
-      isCollapsed ? 'w-16' : 'w-64'
-    } min-h-screen relative`}>
+  const {
+    data: settings
+  } = useBusinessSettings();
+  const menuItems = [{
+    icon: LayoutDashboard,
+    label: 'Dashboard',
+    path: '/'
+  }, {
+    icon: FileText,
+    label: 'Orders',
+    path: '/orders'
+  }, {
+    icon: Tag,
+    label: 'Categories',
+    path: null,
+    action: () => setCategoriesOpen(true)
+  }, {
+    icon: Package,
+    label: 'Products',
+    path: '/products'
+  }, {
+    icon: User,
+    label: 'Customers',
+    path: '/customers'
+  }, {
+    icon: Truck,
+    label: 'Delivery & Pickup',
+    path: '/delivery-pickup'
+  }, {
+    icon: PromotionsSidebarIcon,
+    label: 'Promotions & Loyalty',
+    path: '/promotions'
+  }, {
+    icon: FileText,
+    label: 'Reports',
+    path: '/reports'
+  }, {
+    icon: FileText,
+    label: 'Audit Logs',
+    path: '/audit-logs'
+  }, {
+    icon: Settings,
+    label: 'Settings',
+    path: '/settings'
+  }];
+  return <div className={`bg-white shadow-lg transition-all duration-300 ${isCollapsed ? 'w-16' : 'w-64'} min-h-screen relative`}>
       {/* Toggle Button */}
-      <button
-        onClick={onToggle}
-        className="absolute -right-3 top-6 bg-white shadow-lg rounded-full p-1.5 border hover:shadow-xl transition-shadow"
-      >
-        {isCollapsed ? (
-          <ChevronRight className="h-4 w-4 text-gray-600" />
-        ) : (
-          <ChevronLeft className="h-4 w-4 text-gray-600" />
-        )}
+      <button onClick={onToggle} className="absolute -right-3 top-6 bg-white shadow-lg rounded-full p-1.5 border hover:shadow-xl transition-shadow">
+        {isCollapsed ? <ChevronRight className="h-4 w-4 text-gray-600" /> : <ChevronLeft className="h-4 w-4 text-gray-600" />}
       </button>
 
       {/* Logo */}
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-center space-x-3">
           <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-white shadow-sm">
-            {settings?.logo_url ? (
-              <img 
-                src={settings.logo_url} 
-                alt={settings?.name || 'Logo'} 
-                className="w-full h-full object-contain p-1"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
+            {settings?.logo_url ? <img src={settings.logo_url} alt={settings?.name || 'Logo'} className="w-full h-full object-contain p-1" loading="lazy" /> : <div className="w-full h-full bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
                 <Store className="h-6 w-6 text-primary-foreground" />
-              </div>
-            )}
+              </div>}
           </div>
-          {!isCollapsed && settings?.name && (
-            <span className="font-semibold text-xl text-foreground">{settings.name}</span>
-          )}
+          {!isCollapsed && settings?.name}
         </div>
       </div>
 
       {/* Navigation */}
       <nav className="mt-6 px-4">
-        {menuItems.map((item) => {
-          if (item.path) {
-            return (
-              <NavLink
-                key={item.path}
-                to={item.path}
-                end={item.path === '/'}
-                className={({ isActive }) =>
-                  `flex items-center space-x-3 px-3 py-3 rounded-xl mb-2 transition-all duration-200 group ${
-                    isActive
-                      ? 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-600 shadow-sm'
-                      : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'
-                  }`
-                }
-              >
+        {menuItems.map(item => {
+        if (item.path) {
+          return <NavLink key={item.path} to={item.path} end={item.path === '/'} className={({
+            isActive
+          }) => `flex items-center space-x-3 px-3 py-3 rounded-xl mb-2 transition-all duration-200 group ${isActive ? 'bg-gradient-to-r from-blue-50 to-purple-50 text-blue-600 shadow-sm' : 'text-gray-600 hover:bg-gray-50 hover:text-gray-800'}`}>
                 <item.icon className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
                 {!isCollapsed && <span className="font-medium">{item.label}</span>}
-              </NavLink>
-            );
-          } else {
-            return (
-              <button
-                key={item.label}
-                onClick={item.action}
-                className={`flex items-center space-x-3 px-3 py-3 rounded-xl mb-2 transition-all duration-200 group w-full text-left text-gray-600 hover:bg-gray-50 hover:text-gray-800`}
-              >
+              </NavLink>;
+        } else {
+          return <button key={item.label} onClick={item.action} className={`flex items-center space-x-3 px-3 py-3 rounded-xl mb-2 transition-all duration-200 group w-full text-left text-gray-600 hover:bg-gray-50 hover:text-gray-800`}>
                 <item.icon className={`h-5 w-5 ${isCollapsed ? 'mx-auto' : ''}`} />
                 {!isCollapsed && <span className="font-medium">{item.label}</span>}
-              </button>
-            );
-          }
-        })}
+              </button>;
+        }
+      })}
       </nav>
 
       <Dialog open={isCategoriesOpen} onOpenChange={setCategoriesOpen}>
@@ -137,8 +109,6 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
           </div>
         </DialogContent>
       </Dialog>
-    </div>
-  );
+    </div>;
 };
-
 export default Sidebar;

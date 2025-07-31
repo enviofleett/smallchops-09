@@ -7,6 +7,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import startersLogo from '@/assets/starters-logo.png';
 
 interface CustomerAuthModalProps {
   isOpen: boolean;
@@ -149,7 +150,15 @@ export const CustomerAuthModal = ({ isOpen, onClose, onAuthenticated }: Customer
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Customer Portal Access</DialogTitle>
+          <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden bg-white shadow-lg">
+            <img 
+              src={startersLogo} 
+              alt="Starters" 
+              className="w-full h-full object-contain p-2"
+              loading="lazy"
+            />
+          </div>
+          <DialogTitle className="text-center">Starters Customer Portal</DialogTitle>
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import CategoriesManager from '@/components/categories/CategoriesManager';
 import { PromotionsSidebarIcon } from "./PromotionsSidebarIcon";
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import startersLogo from '@/assets/starters-logo.png';
 interface SidebarProps {
   isCollapsed: boolean;
   onToggle: () => void;
@@ -69,11 +70,9 @@ const Sidebar = ({
       <div className="p-6 border-b border-gray-100">
         <div className="flex items-center space-x-3">
           <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-white shadow-sm">
-            {settings?.logo_url ? <img src={settings.logo_url} alt={settings?.name || 'Logo'} className="w-full h-full object-contain p-1" loading="lazy" /> : <div className="w-full h-full bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
-                <Store className="h-6 w-6 text-primary-foreground" />
-              </div>}
+            <img src={startersLogo} alt="Starters" className="w-full h-full object-contain p-1" loading="lazy" />
           </div>
-          {!isCollapsed && settings?.name}
+          {!isCollapsed && <span className="text-lg font-bold text-gray-800">Starters</span>}
         </div>
       </div>
 

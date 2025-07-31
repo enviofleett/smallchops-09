@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useBusinessSettings } from '../../hooks/useBusinessSettings';
 import { Eye, EyeOff } from 'lucide-react';
+import startersLogo from '@/assets/starters-logo.png';
 
 type AuthView = 'sign_in' | 'sign_up' | 'forgot_password';
 
@@ -110,18 +111,12 @@ const LoginPage = () => {
         <>
           <div className="text-center mb-8">
             <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden bg-white shadow-lg">
-              {settings?.logo_url ? (
-                <img 
-                  src={settings.logo_url} 
-                  alt={settings?.name || 'Logo'} 
-                  className="w-full h-full object-contain p-2"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
-                  <span className="text-3xl text-white">🍽️</span>
-                </div>
-              )}
+              <img 
+                src={startersLogo} 
+                alt="Starters" 
+                className="w-full h-full object-contain p-2"
+                loading="lazy"
+              />
             </div>
             <h1 className="text-2xl font-bold text-gray-800">Create Admin Account</h1>
             <p className="text-gray-600 mt-2">Set up your dashboard access</p>
@@ -200,22 +195,16 @@ const LoginPage = () => {
       <>
         <div className="text-center mb-8">
           <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden bg-white shadow-lg">
-            {settings?.logo_url ? (
-              <img 
-                src={settings.logo_url} 
-                alt={settings?.name || 'Logo'} 
-                className="w-full h-full object-contain p-2"
-                loading="lazy"
-              />
-            ) : (
-              <div className="w-full h-full bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center">
-                <span className="text-3xl text-white">🍽️</span>
-              </div>
-            )}
+            <img 
+              src={startersLogo} 
+              alt="Starters" 
+              className="w-full h-full object-contain p-2"
+              loading="lazy"
+            />
           </div>
-          <h1 className="text-2xl font-bold text-gray-800">{settings?.name || 'Business Dashboard'}</h1>
+          <h1 className="text-2xl font-bold text-gray-800">Starters</h1>
           <p className="text-gray-600 mt-2">
-            {settings?.tagline || 'Admin Dashboard'}
+            Premium Small Chops & Catering Services
           </p>
         </div>
 

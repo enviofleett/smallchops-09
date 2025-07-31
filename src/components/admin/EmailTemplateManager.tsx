@@ -150,16 +150,32 @@ export const EmailTemplateManager = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const queryClient = useQueryClient();
 
+  // Debug logging
+  console.log('All templates:', templates.length, templates);
+  console.log('Selected filters:', { selectedCategory, selectedStyle });
+  
   // Filter templates based on category and style
   const filteredTemplates = templates.filter(template => {
     const categoryMatch = selectedCategory === 'all' || template.category === selectedCategory;
     const styleMatch = selectedStyle === 'all' || template.style === selectedStyle;
+    console.log(`Template ${template.template_name}:`, {
+      category: template.category,
+      style: template.style,
+      categoryMatch,
+      styleMatch,
+      included: categoryMatch && styleMatch
+    });
     return categoryMatch && styleMatch;
   });
+
+  console.log('Filtered templates:', filteredTemplates.length, filteredTemplates);
 
   // Get unique categories and styles for filters
   const categories = [...new Set(templates.map(t => t.category).filter(Boolean))];
   const styles = [...new Set(templates.map(t => t.style).filter(Boolean))];
+  
+  console.log('Available categories:', categories);
+  console.log('Available styles:', styles);
 
   const saveTemplateMutation = useMutation({
     mutationFn: async (templateData: TemplateFormData) => {

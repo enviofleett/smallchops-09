@@ -470,7 +470,7 @@ export type Database = {
           external_id: string | null
           id: string
           last_error: string | null
-          order_id: string
+          order_id: string | null
           payload: Json | null
           processed_at: string | null
           recipient_email: string | null
@@ -490,7 +490,7 @@ export type Database = {
           external_id?: string | null
           id?: string
           last_error?: string | null
-          order_id: string
+          order_id?: string | null
           payload?: Json | null
           processed_at?: string | null
           recipient_email?: string | null
@@ -510,7 +510,7 @@ export type Database = {
           external_id?: string | null
           id?: string
           last_error?: string | null
-          order_id?: string
+          order_id?: string | null
           payload?: Json | null
           processed_at?: string | null
           recipient_email?: string | null

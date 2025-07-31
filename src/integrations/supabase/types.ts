@@ -483,6 +483,7 @@ export type Database = {
         Row: {
           connected_by: string | null
           created_at: string
+          email_provider: string | null
           email_templates: Json | null
           enable_email: boolean | null
           enable_sms: boolean | null
@@ -503,10 +504,12 @@ export type Database = {
           smtp_user: string | null
           triggers: Json | null
           updated_at: string
+          use_smtp: boolean | null
         }
         Insert: {
           connected_by?: string | null
           created_at?: string
+          email_provider?: string | null
           email_templates?: Json | null
           enable_email?: boolean | null
           enable_sms?: boolean | null
@@ -527,10 +530,12 @@ export type Database = {
           smtp_user?: string | null
           triggers?: Json | null
           updated_at?: string
+          use_smtp?: boolean | null
         }
         Update: {
           connected_by?: string | null
           created_at?: string
+          email_provider?: string | null
           email_templates?: Json | null
           enable_email?: boolean | null
           enable_sms?: boolean | null
@@ -551,6 +556,7 @@ export type Database = {
           smtp_user?: string | null
           triggers?: Json | null
           updated_at?: string
+          use_smtp?: boolean | null
         }
         Relationships: []
       }

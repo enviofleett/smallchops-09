@@ -64,7 +64,8 @@ export const EmailManagementDashboard = () => {
     smtp_secure: true,
     sender_name: 'Starters',
     sender_email: 'support@enviofleet.com',
-    enable_email: true
+    use_smtp: true,
+    email_provider: 'smtp'
   });
 
   // Update local settings when remote settings load
@@ -78,7 +79,8 @@ export const EmailManagementDashboard = () => {
         smtp_secure: settings.smtp_secure,
         sender_name: settings.sender_name || 'Starters',
         sender_email: settings.sender_email,
-        enable_email: settings.enable_email
+        use_smtp: settings.use_smtp,
+        email_provider: settings.email_provider || 'smtp'
       });
     }
   }, [settings]);
@@ -344,14 +346,14 @@ export const EmailManagementDashboard = () => {
                        <Label htmlFor="smtp-secure">Use Secure Connection (TLS/SSL)</Label>
                      </div>
 
-                     <div className="flex items-center space-x-2">
-                       <Switch
-                         id="enable-email"
-                         checked={localSettings.enable_email}
-                         onCheckedChange={(checked) => setLocalSettings({...localSettings, enable_email: checked})}
-                       />
-                       <Label htmlFor="enable-email">Enable Email Service</Label>
-                     </div>
+                      <div className="flex items-center space-x-2">
+                        <Switch
+                          id="use-smtp"
+                          checked={localSettings.use_smtp}
+                          onCheckedChange={(checked) => setLocalSettings({...localSettings, use_smtp: checked})}
+                        />
+                        <Label htmlFor="use-smtp">Enable SMTP Service</Label>
+                      </div>
                    </div>
 
                   <Button 

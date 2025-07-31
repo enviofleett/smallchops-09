@@ -11,7 +11,8 @@ export interface SMTPSettings {
   smtp_secure: boolean;
   sender_email: string;
   sender_name?: string;
-  enable_email: boolean;
+  use_smtp: boolean;
+  email_provider?: string;
 }
 
 export const useSMTPSettings = () => {
@@ -25,6 +26,8 @@ export const useSMTPSettings = () => {
       const { data, error } = await supabase
         .from('communication_settings')
         .select('*')
+        .order('created_at', { ascending: false })
+        .limit(1)
         .maybeSingle();
 
       if (error) {
@@ -40,8 +43,9 @@ export const useSMTPSettings = () => {
           smtp_pass: '',
           smtp_secure: true,
           sender_email: '',
-          sender_name: 'Starters',
-          enable_email: false
+          sender_name: '',
+          use_smtp: false,
+          email_provider: 'mailersend'
         };
       }
 
@@ -53,8 +57,9 @@ export const useSMTPSettings = () => {
         smtp_pass: data.smtp_pass || '',
         smtp_secure: data.smtp_secure !== false,
         sender_email: data.sender_email || '',
-        sender_name: data.sender_name || 'Starters',
-        enable_email: data.enable_email || false
+        sender_name: data.sender_name || '',
+        use_smtp: data.use_smtp || false,
+        email_provider: data.email_provider || 'mailersend'
       };
     },
     refetchOnWindowFocus: false,
@@ -74,10 +79,11 @@ export const useSMTPSettings = () => {
           smtp_secure: settings.smtp_secure,
           sender_email: settings.sender_email,
           sender_name: settings.sender_name,
-          enable_email: settings.enable_email
+          use_smtp: settings.use_smtp,
+          email_provider: settings.email_provider || 'mailersend'
         })
         .select()
-        .single();
+        .maybeSingle();
 
       if (error) {
         throw error;

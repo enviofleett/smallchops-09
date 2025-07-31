@@ -3,17 +3,42 @@ import { SMTPClient } from "https://deno.land/x/denomailer@1.6.0/mod.ts"
 
 // PRODUCTION CORS - No wildcards
 function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',').map(o => o.trim()) || [];
   const isDev = Deno.env.get('DENO_ENV') === 'development';
   
+  // Add development origins
   if (isDev) {
     allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
   }
   
-  const isAllowed = origin && allowedOrigins.includes(origin);
+  const isLovableDomain = origin && (
+    origin.includes('.lovable.app') || 
+    origin.includes('.lovableproject.com') ||
+    origin.includes('.lovable.dev') ||
+    origin.includes('id-preview--')
+  );
+  
+  const isLocalhost = origin && (
+    origin.includes('localhost') || 
+    origin.includes('127.0.0.1')
+  );
+  
+  const isExplicitlyAllowed = origin && allowedOrigins.includes(origin);
+  
+  // More permissive in development
+  const shouldAllow = isExplicitlyAllowed || 
+    (isDev && (isLovableDomain || isLocalhost)) || 
+    (!isDev && isLovableDomain) ||
+    allowedOrigins.includes('*');
+  
+  console.log(`CORS Debug - Origin: ${origin}, Environment vars exist: ALLOWED_ORIGINS=${!!Deno.env.get('ALLOWED_ORIGINS')}, DENO_ENV=${!!Deno.env.get('DENO_ENV')}`);
+  console.log(`CORS Analysis - isLovable: ${isLovableDomain}, isLocalhost: ${isLocalhost}, isExplicit: ${isExplicitlyAllowed}, shouldAllow: ${shouldAllow}`);
+  
+  const allowOrigin = shouldAllow ? (origin || '*') : (isDev ? '*' : 'null');
+  console.log(`CORS Result - Access-Control-Allow-Origin: ${allowOrigin}`);
   
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : 'null'),
+    'Access-Control-Allow-Origin': allowOrigin,
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'POST, OPTIONS',
     'Access-Control-Max-Age': '86400',
@@ -150,7 +175,9 @@ Deno.serve(async (req) => {
       const { data, error: configError } = await supabase
         .from('communication_settings')
         .select('smtp_host, smtp_port, smtp_user, smtp_pass, smtp_secure, sender_email, sender_name')
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
       if (configError || !data) {
         console.log(`[${requestId}] Database config not found, using environment variables`);

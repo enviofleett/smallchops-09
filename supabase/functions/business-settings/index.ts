@@ -156,7 +156,9 @@ serve(async (req) => {
         const { data: existingSettings } = await supabaseClient
           .from('communication_settings')
           .select('id')
-          .single();
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         let result;
         if (existingSettings) {
@@ -170,7 +172,7 @@ serve(async (req) => {
             })
             .eq('id', existingSettings.id)
             .select()
-            .single();
+            .maybeSingle();
         } else {
           // Insert new record
           result = await supabaseClient
@@ -180,7 +182,7 @@ serve(async (req) => {
               connected_by: user.user.id
             })
             .select()
-            .single();
+            .maybeSingle();
         }
 
         if (result.error) {
@@ -221,7 +223,9 @@ serve(async (req) => {
         const { data: settings, error: settingsError } = await supabaseClient
           .from('communication_settings')
           .select('*')
-          .single();
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         if (settingsError) {
           console.error('Error fetching communication settings:', settingsError);
@@ -316,7 +320,9 @@ serve(async (req) => {
         const { data: existingSettings } = await supabaseClient
           .from('communication_settings')
           .select('id')
-          .single();
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
         let result;
         if (existingSettings) {
@@ -330,7 +336,7 @@ serve(async (req) => {
             })
             .eq('id', existingSettings.id)
             .select()
-            .single();
+            .maybeSingle();
         } else {
           // Insert new record
           result = await supabaseClient
@@ -340,7 +346,7 @@ serve(async (req) => {
               connected_by: user.user.id
             })
             .select()
-            .single();
+            .maybeSingle();
         }
 
         if (result.error) {

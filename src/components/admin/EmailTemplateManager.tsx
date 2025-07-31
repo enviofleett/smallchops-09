@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import { useEmailService } from '@/hooks/useEmailService';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
@@ -22,7 +23,12 @@ import {
   Trash2, 
   Save,
   TestTube,
-  Copy
+  Copy,
+  Filter,
+  Grid,
+  List,
+  Palette,
+  Tag
 } from 'lucide-react';
 
 interface TemplateFormData {
@@ -32,6 +38,8 @@ interface TemplateFormData {
   html_template: string;
   text_template: string;
   template_type: 'transactional' | 'marketing';
+  category?: string;
+  style?: string;
   is_active: boolean;
   variables: string[];
 }
@@ -137,7 +145,21 @@ export const EmailTemplateManager = () => {
   const [editingTemplate, setEditingTemplate] = useState<TemplateFormData | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [previewData, setPreviewData] = useState<Record<string, string>>({});
+  const [selectedCategory, setSelectedCategory] = useState<string>('all');
+  const [selectedStyle, setSelectedStyle] = useState<string>('all');
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const queryClient = useQueryClient();
+
+  // Filter templates based on category and style
+  const filteredTemplates = templates.filter(template => {
+    const categoryMatch = selectedCategory === 'all' || template.category === selectedCategory;
+    const styleMatch = selectedStyle === 'all' || template.style === selectedStyle;
+    return categoryMatch && styleMatch;
+  });
+
+  // Get unique categories and styles for filters
+  const categories = [...new Set(templates.map(t => t.category).filter(Boolean))];
+  const styles = [...new Set(templates.map(t => t.style).filter(Boolean))];
 
   const saveTemplateMutation = useMutation({
     mutationFn: async (templateData: TemplateFormData) => {
@@ -221,7 +243,9 @@ export const EmailTemplateManager = () => {
       subject_template: template.subject_template,
       html_template: template.html_template,
       text_template: template.text_template || '',
-      template_type: template.template_type,
+      template_type: template.template_type as 'transactional' | 'marketing',
+      category: template.category,
+      style: template.style,
       is_active: template.is_active,
       variables: template.variables || []
     });
@@ -236,6 +260,8 @@ export const EmailTemplateManager = () => {
       html_template: '',
       text_template: '',
       template_type: 'transactional',
+      category: 'transactional',
+      style: 'clean',
       is_active: true,
       variables: []
     });
@@ -268,24 +294,61 @@ export const EmailTemplateManager = () => {
         <div>
           <h2 className="text-2xl font-bold">Email Templates</h2>
           <p className="text-muted-foreground">
-            Manage your email templates for different types of communications
+            Manage your professional email templates with beautiful designs
           </p>
         </div>
         <div className="flex gap-2">
-          {templates.length === 0 && (
-            <Button 
-              onClick={() => createDefaultTemplatesMutation.mutate()}
-              disabled={createDefaultTemplatesMutation.isPending}
-            >
-              <Copy className="mr-2 h-4 w-4" />
-              Create Default Templates
-            </Button>
-          )}
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+          >
+            {viewMode === 'grid' ? <List className="h-4 w-4" /> : <Grid className="h-4 w-4" />}
+          </Button>
           <Button onClick={handleCreate}>
             <Plus className="mr-2 h-4 w-4" />
             New Template
           </Button>
         </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex flex-wrap gap-4 items-center">
+        <div className="flex items-center gap-2">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          <span className="text-sm font-medium">Filter by:</span>
+        </div>
+        
+        <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="All Categories" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Categories</SelectItem>
+            <SelectItem value="order">📦 Order Templates</SelectItem>
+            <SelectItem value="shipping">🚚 Shipping Updates</SelectItem>
+            <SelectItem value="cart">🛒 Cart Recovery</SelectItem>
+            <SelectItem value="welcome">🎉 Welcome Series</SelectItem>
+            <SelectItem value="promotional">⚡ Promotional</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Select value={selectedStyle} onValueChange={setSelectedStyle}>
+          <SelectTrigger className="w-48">
+            <SelectValue placeholder="All Styles" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Styles</SelectItem>
+            <SelectItem value="clean">✨ Clean & Minimal</SelectItem>
+            <SelectItem value="modern">🎨 Modern & Vibrant</SelectItem>
+            <SelectItem value="bold">💥 Bold & Dynamic</SelectItem>
+            <SelectItem value="elegant">👑 Elegant & Refined</SelectItem>
+          </SelectContent>
+        </Select>
+
+        <Badge variant="secondary" className="ml-auto">
+          {filteredTemplates.length} templates
+        </Badge>
       </div>
 
       {isLoadingTemplates ? (
@@ -305,28 +368,82 @@ export const EmailTemplateManager = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {templates.map((template) => (
-            <Card key={template.id}>
+        <div className={viewMode === 'grid' ? "grid gap-4 md:grid-cols-2 lg:grid-cols-3" : "space-y-4"}>
+          {filteredTemplates.map((template) => (
+            <Card key={template.id} className="group hover:shadow-md transition-shadow">
               <CardHeader>
                 <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg">{template.template_name}</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-lg">{template.template_name}</CardTitle>
+                    {template.category && (
+                      <Badge variant="outline" className="text-xs">
+                        <Tag className="h-3 w-3 mr-1" />
+                        {template.category}
+                      </Badge>
+                    )}
+                  </div>
                   <Badge variant={template.is_active ? "default" : "secondary"}>
                     {template.is_active ? "Active" : "Inactive"}
                   </Badge>
                 </div>
-                <CardDescription>
+                <CardDescription className="flex items-center gap-2">
                   {template.template_key} • {template.template_type}
+                  {template.style && (
+                    <Badge variant="secondary" className="text-xs">
+                      <Palette className="h-3 w-3 mr-1" />
+                      {template.style}
+                    </Badge>
+                  )}
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground mb-4">
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-2">
                   {template.subject_template}
                 </p>
+                
+                {/* Template Preview */}
+                <div className="bg-muted/50 p-3 rounded-md mb-4 max-h-24 overflow-hidden">
+                  <div 
+                    className="text-xs text-muted-foreground"
+                    dangerouslySetInnerHTML={{
+                      __html: template.html_template.slice(0, 150) + '...'
+                    }}
+                  />
+                </div>
+
                 <div className="flex gap-2">
                   <Button size="sm" variant="outline" onClick={() => handleEdit(template)}>
                     <Edit className="mr-1 h-3 w-3" />
                     Edit
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline"
+                    onClick={() => {
+                      // Set preview data for this template
+                      const sampleData: Record<string, string> = {};
+                      (template.variables || []).forEach(variable => {
+                        sampleData[variable] = `Sample ${variable}`;
+                      });
+                      setPreviewData(sampleData);
+                      // Create a new template object for preview
+                      setEditingTemplate({
+                        template_key: template.template_key,
+                        template_name: template.template_name,
+                        subject_template: template.subject_template,
+                        html_template: template.html_template,
+                        text_template: template.text_template || '',
+                        template_type: template.template_type as 'transactional' | 'marketing',
+                        category: template.category,
+                        style: template.style,
+                        is_active: template.is_active,
+                        variables: template.variables || []
+                      });
+                      setIsDialogOpen(true);
+                    }}
+                  >
+                    <Eye className="mr-1 h-3 w-3" />
+                    Preview
                   </Button>
                   <Button size="sm" variant="destructive" onClick={() => deleteTemplateMutation.mutate(template.id)}>
                     <Trash2 className="mr-1 h-3 w-3" />

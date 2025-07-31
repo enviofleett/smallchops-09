@@ -1024,11 +1024,13 @@ export type Database = {
       }
       enhanced_email_templates: {
         Row: {
+          category: string | null
           created_at: string
           created_by: string | null
           html_template: string
           id: string
           is_active: boolean | null
+          style: string | null
           subject_template: string
           template_key: string
           template_name: string
@@ -1039,11 +1041,13 @@ export type Database = {
           variables: string[] | null
         }
         Insert: {
+          category?: string | null
           created_at?: string
           created_by?: string | null
           html_template: string
           id?: string
           is_active?: boolean | null
+          style?: string | null
           subject_template: string
           template_key: string
           template_name: string
@@ -1054,11 +1058,13 @@ export type Database = {
           variables?: string[] | null
         }
         Update: {
+          category?: string | null
           created_at?: string
           created_by?: string | null
           html_template?: string
           id?: string
           is_active?: boolean | null
+          style?: string | null
           subject_template?: string
           template_key?: string
           template_name?: string

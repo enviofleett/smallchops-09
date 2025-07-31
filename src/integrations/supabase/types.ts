@@ -3227,6 +3227,17 @@ export type Database = {
           environment: string
         }[]
       }
+      get_all_customers_for_analytics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          customer_id: string
+          customer_name: string
+          customer_email: string
+          customer_phone: string
+          is_registered: boolean
+          registration_date: string
+        }[]
+      }
       get_environment_config: {
         Args: Record<PropertyKey, never>
         Returns: {

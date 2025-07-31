@@ -26,26 +26,13 @@ const Customers = () => {
     queryFn: () => getCustomerAnalytics(dateRange),
   });
 
-  // Deduplicate all customers from the stats arrays for modal/overview
-  const allCustomersMap = React.useMemo(() => {
-    if (!analytics) return {};
-    const map: Record<string, Customer> = {};
-    [
-      ...(analytics.topCustomersByOrders || []),
-      ...(analytics.topCustomersBySpending || []),
-      ...(analytics.repeatCustomers || []),
-    ].forEach((curr) => {
-      if (!map[curr.id]) map[curr.id] = curr;
-    });
-    return map;
-  }, [analytics]);
-  const allUniqueCustomers: Customer[] = Object.values(allCustomersMap);
+  // Get all customers (now includes customers without orders)
+  const allCustomers = analytics?.allCustomers || [];
 
-  const filteredCustomers =
-    analytics?.topCustomersBySpending.filter((customer) =>
-      customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      customer.email.toLowerCase().includes(searchTerm.toLowerCase())
-    ) || [];
+  const filteredCustomers = allCustomers.filter((customer) =>
+    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    customer.email.toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   if (error) {
     return (
@@ -109,7 +96,7 @@ const Customers = () => {
           topCustomersByOrders={analytics.topCustomersByOrders}
           topCustomersBySpending={analytics.topCustomersBySpending}
           repeatCustomers={analytics.repeatCustomers}
-          allCustomers={allUniqueCustomers}
+          allCustomers={allCustomers}
           isLoading={isLoading}
         />
       )}

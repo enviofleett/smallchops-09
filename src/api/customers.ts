@@ -136,17 +136,17 @@ export const updateCustomer = async (id: string, data: { name?: string; email?: 
   return updated as CustomerDb;
 };
 
-// PATCH: Update getCustomerAnalytics to join registered customers where possible
+// Updated getCustomerAnalytics to show ALL customers (including those without orders)
 export const getCustomerAnalytics = async (dateRange: DateRange): Promise<CustomerAnalytics> => {
   const { from, to } = dateRange;
 
-  // Fetch all registered customers
-  const { data: regCustomers, error: rcErr } = await supabase
-    .from('customers')
-    .select('*');
-  if (rcErr) throw new Error(rcErr.message);
+  // Fetch ALL customers using the new function (includes customers without orders)
+  const { data: allCustomersData, error: customersError } = await supabase
+    .rpc('get_all_customers_for_analytics');
+  
+  if (customersError) throw new Error(customersError.message);
 
-  // Fetch orders, join customer_id where possible, fallback to name/phone if guest
+  // Fetch orders within date range
   const { data: ordersData, error: ordersError } = await supabase
     .from('orders')
     .select(`
@@ -165,7 +165,7 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
 
   if (ordersError) throw new Error(ordersError.message);
 
-  // Map all orders to customer buckets (by customer_id if set, else name+phone+email for guest)
+  // Create customer buckets with ALL customers (including those without orders)
   const bucket: Record<string, {
     id: string;
     name: string;
@@ -178,59 +178,59 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
     isGuest: boolean;
   }> = {};
 
-  ordersData?.forEach(order => {
-    // Try to use customer_id if exists (registered)
-    let customerKey = '';
-    let isGuest = false;
-    let name = order.customer_name;
-    let email = order.customer_email || '';
-    let phone = order.customer_phone || '';
-    let _id = '';
+  // First, add ALL customers to the bucket (ensures customers without orders are included)
+  allCustomersData?.forEach(customer => {
+    const customerKey = customer.is_registered ? `reg:${customer.customer_id}` : `guest:${customer.customer_name}|${customer.customer_email || ''}|${customer.customer_phone || ''}`;
+    
+    bucket[customerKey] = {
+      id: customer.customer_id,
+      name: customer.customer_name,
+      email: customer.customer_email || '',
+      phone: customer.customer_phone || '',
+      totalOrders: 0,
+      totalSpent: 0,
+      lastOrderDate: customer.registration_date,
+      status: 'Inactive',
+      isGuest: !customer.is_registered,
+    };
+  });
 
+  // Then, add order data to existing customers
+  ordersData?.forEach(order => {
+    let customerKey = '';
+    
     if (order.customer_id) {
-      // Find in regCustomers
-      const match = regCustomers?.find(c => c.id === order.customer_id);
-      if (match) {
-        _id = match.id;
-        name = match.name;
-        email = match.email;
-        phone = match.phone || '';
-        customerKey = `reg:${_id}`;
-      } else {
-        // If not found just fallback to raw
-        _id = order.customer_id;
-        customerKey = `reg:${_id}`;
-      }
-      isGuest = false;
+      customerKey = `reg:${order.customer_id}`;
     } else {
-      // Fallback to guest (by name/email/phone)
-      _id = `guest:${order.customer_name}|${order.customer_email || ''}|${order.customer_phone || ''}`;
-      customerKey = _id;
-      isGuest = true;
+      customerKey = `guest:${order.customer_name}|${order.customer_email || ''}|${order.customer_phone || ''}`;
     }
 
-    if (!bucket[customerKey]) {
+    // If customer exists in bucket, update their order data
+    if (bucket[customerKey]) {
+      bucket[customerKey].totalOrders += 1;
+      bucket[customerKey].totalSpent += Number(order.total_amount);
+      
+      // Update last order date if this order is more recent
+      if (order.order_time > bucket[customerKey].lastOrderDate) {
+        bucket[customerKey].lastOrderDate = order.order_time;
+      }
+    } else {
+      // If not in bucket (edge case), create entry
       bucket[customerKey] = {
-        id: _id,
-        name,
-        email,
-        phone,
-        totalOrders: 0,
-        totalSpent: 0,
+        id: order.customer_id || `guest:${order.customer_name}|${order.customer_email || ''}|${order.customer_phone || ''}`,
+        name: order.customer_name,
+        email: order.customer_email || '',
+        phone: order.customer_phone || '',
+        totalOrders: 1,
+        totalSpent: Number(order.total_amount),
         lastOrderDate: order.order_time,
         status: 'Inactive',
-        isGuest,
+        isGuest: !order.customer_id,
       };
-    }
-    bucket[customerKey].totalOrders += 1;
-    bucket[customerKey].totalSpent += Number(order.total_amount);
-    // Last order date logic
-    if (order.order_time > bucket[customerKey].lastOrderDate) {
-      bucket[customerKey].lastOrderDate = order.order_time;
     }
   });
 
-  // Compute status
+  // Compute customer status based on spending and orders
   Object.values(bucket).forEach(c => {
     if (c.totalSpent > 5000) c.status = 'VIP';
     else if (c.totalOrders > 1) c.status = 'Active';
@@ -239,7 +239,7 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
 
   const customers: Customer[] = Object.values(bucket);
 
-  // Now, metrics (same as before)
+  // Calculate metrics
   const totalCustomers = customers.length;
   const activeCustomers = customers.filter(c => c.status === 'Active' || c.status === 'VIP').length;
   const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0);
@@ -254,11 +254,11 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
       repeatCustomerRate: totalCustomers > 0 ? (repeatCustomers.length / totalCustomers) * 100 : 0
     },
     topCustomersByOrders: customers
-      .filter(c => !c.isGuest)
+      .filter(c => !c.isGuest && c.totalOrders > 0)
       .sort((a, b) => b.totalOrders - a.totalOrders)
       .slice(0, 10),
     topCustomersBySpending: customers
-      .filter(c => !c.isGuest)
+      .filter(c => !c.isGuest && c.totalSpent > 0)
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 10),
     repeatCustomers: repeatCustomers

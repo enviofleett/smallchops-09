@@ -55,7 +55,7 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer }: Customer
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Orders</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Total Spent</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
-                <th className="text-left py-4 px-6 font-medium text-gray-600">Last Order</th>
+                <th className="text-left py-4 px-6 font-medium text-gray-600">Last Activity</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600"></th>
               </tr>
             </thead>
@@ -76,17 +76,24 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer }: Customer
                       >
                         {customer.name.charAt(0)}
                       </button>
-                      <button
-                        className="font-medium text-gray-800 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-300 text-left"
-                        onClick={() => {
-                          setSelectedCustomer(customer);
-                          setDetailsOpen(true);
-                        }}
-                        type="button"
-                        tabIndex={0}
-                      >
-                        {customer.name}
-                      </button>
+                      <div>
+                        <button
+                          className="font-medium text-gray-800 hover:underline focus:outline-none focus:ring-2 focus:ring-blue-300 text-left"
+                          onClick={() => {
+                            setSelectedCustomer(customer);
+                            setDetailsOpen(true);
+                          }}
+                          type="button"
+                          tabIndex={0}
+                        >
+                          {customer.name}
+                        </button>
+                        {customer.isGuest && (
+                          <span className="ml-2 inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
+                            Guest
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </td>
                   <td className="py-4 px-6">
@@ -113,7 +120,10 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer }: Customer
                     </span>
                   </td>
                   <td className="py-4 px-6 text-gray-600">
-                    {new Date(customer.lastOrderDate).toLocaleDateString()}
+                    {customer.totalOrders > 0 
+                      ? new Date(customer.lastOrderDate).toLocaleDateString()
+                      : 'No orders yet'
+                    }
                   </td>
                   <td className="py-4 px-6">
                     {/* Edit button */}

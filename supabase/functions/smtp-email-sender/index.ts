@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import nodemailer from 'https://esm.sh/nodemailer@6.9.7'
 
 // Environment-aware CORS headers for production
 const getAllowedOrigins = () => {
@@ -122,8 +123,7 @@ serve(async (req) => {
       // Never log the password for security
     });
 
-    // Import nodemailer dynamically
-    const { default: nodemailer } = await import('https://esm.sh/nodemailer@6.9.7');
+    // Use statically imported nodemailer to prevent Deno compatibility issues
 
     // Create transporter with production-ready configuration
     const isProduction = Deno.env.get('DENO_ENV') === 'production';
@@ -131,21 +131,22 @@ serve(async (req) => {
     const transporterConfig: any = {
       host: config.smtp_host,
       port: config.smtp_port,
-      secure: config.smtp_secure, // Use the configured secure setting
+      secure: config.smtp_port === 465, // true for 465, false for other ports
       auth: {
         user: config.smtp_user,
         pass: config.smtp_pass,
       },
-      // Connection timeouts
+      // Production-ready timeouts
       connectionTimeout: 60000,
       greetingTimeout: 30000,
       socketTimeout: 60000,
     };
 
-    // Only add TLS config if not using secure connection or in development
-    if (!config.smtp_secure && !isProduction) {
+    // Add TLS configuration for production SSL/TLS support
+    if (config.smtp_port === 587 || (!config.smtp_secure && !isProduction)) {
       transporterConfig.tls = {
-        rejectUnauthorized: false,
+        ciphers: 'SSLv3',
+        rejectUnauthorized: isProduction,
       };
     }
 

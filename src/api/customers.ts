@@ -157,7 +157,7 @@ export const deleteCustomer = async (customerId: string) => {
 export const getCustomerAnalytics = async (dateRange: DateRange): Promise<CustomerAnalytics> => {
   const { from, to } = dateRange;
 
-  // Fetch registered customers with their auth user emails using JOIN
+  // Fetch registered customers
   const { data: registeredCustomers, error: registeredError } = await supabase
     .from('customer_accounts')
     .select(`
@@ -165,13 +165,13 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
       user_id,
       name,
       phone,
-      created_at,
-      users:user_id (
-        email
-      )
-    `)
+      created_at
+    `);
 
   if (registeredError) throw new Error(registeredError.message);
+
+  // Create a map to store user emails - we'll get them from orders
+  const userEmailMap = new Map<string, string>();
 
   // Fetch ALL orders to get guest customers and order data
   const { data: allOrders, error: ordersError } = await supabase
@@ -203,11 +203,17 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
     isGuest: boolean;
   }> = {};
 
+  // First, collect emails from orders for registered customers
+  allOrders?.forEach(order => {
+    if (order.customer_id && order.customer_email) {
+      userEmailMap.set(order.customer_id, order.customer_email);
+    }
+  });
+
   // Add registered customers to bucket
   registeredCustomers?.forEach(customer => {
     const customerKey = `reg:${customer.id}`;
-    // Access the joined user data
-    const authUser = (customer as any).users;
+    const email = userEmailMap.get(customer.id) || '';
     
     // Fix name vs email issue - if name looks like email, extract name from email
     let displayName = customer.name;
@@ -219,8 +225,8 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
     
     bucket[customerKey] = {
       id: customer.id,
-      name: displayName || (authUser?.email ? authUser.email.split('@')[0] : 'Unknown User'),
-      email: authUser?.email || '',
+      name: displayName || (email ? email.split('@')[0] : 'Unknown User'),
+      email: email,
       phone: customer.phone || '',
       totalOrders: 0,
       totalSpent: 0,

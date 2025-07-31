@@ -61,6 +61,33 @@ export type Database = {
           },
         ]
       }
+      api_metrics: {
+        Row: {
+          dimensions: Json | null
+          endpoint: string
+          id: string
+          metric_type: string
+          metric_value: number
+          timestamp: string
+        }
+        Insert: {
+          dimensions?: Json | null
+          endpoint: string
+          id?: string
+          metric_type: string
+          metric_value: number
+          timestamp?: string
+        }
+        Update: {
+          dimensions?: Json | null
+          endpoint?: string
+          id?: string
+          metric_type?: string
+          metric_value?: number
+          timestamp?: string
+        }
+        Relationships: []
+      }
       api_rate_limits: {
         Row: {
           created_at: string
@@ -85,6 +112,51 @@ export type Database = {
           identifier?: string
           request_count?: number
           window_start?: string
+        }
+        Relationships: []
+      }
+      api_request_logs: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          endpoint: string
+          error_details: Json | null
+          id: string
+          ip_address: unknown | null
+          method: string
+          request_payload: Json | null
+          response_status: number | null
+          response_time_ms: number | null
+          session_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          endpoint: string
+          error_details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          method: string
+          request_payload?: Json | null
+          response_status?: number | null
+          response_time_ms?: number | null
+          session_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          endpoint?: string
+          error_details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          method?: string
+          request_payload?: Json | null
+          response_status?: number | null
+          response_time_ms?: number | null
+          session_id?: string | null
+          user_agent?: string | null
         }
         Relationships: []
       }
@@ -217,6 +289,36 @@ export type Database = {
           old_value?: string | null
           user_agent?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      business_analytics: {
+        Row: {
+          created_at: string
+          dimensions: Json | null
+          id: string
+          metric_name: string
+          metric_value: number
+          period_end: string
+          period_start: string
+        }
+        Insert: {
+          created_at?: string
+          dimensions?: Json | null
+          id?: string
+          metric_name: string
+          metric_value: number
+          period_end: string
+          period_start: string
+        }
+        Update: {
+          created_at?: string
+          dimensions?: Json | null
+          id?: string
+          metric_name?: string
+          metric_value?: number
+          period_end?: string
+          period_start?: string
         }
         Relationships: []
       }
@@ -677,6 +779,36 @@ export type Database = {
           },
         ]
       }
+      customer_notification_channels: {
+        Row: {
+          channel_type: string
+          channel_value: string
+          created_at: string
+          customer_id: string
+          id: string
+          is_verified: boolean | null
+          preferences: Json | null
+        }
+        Insert: {
+          channel_type: string
+          channel_value: string
+          created_at?: string
+          customer_id: string
+          id?: string
+          is_verified?: boolean | null
+          preferences?: Json | null
+        }
+        Update: {
+          channel_type?: string
+          channel_value?: string
+          created_at?: string
+          customer_id?: string
+          id?: string
+          is_verified?: boolean | null
+          preferences?: Json | null
+        }
+        Relationships: []
+      }
       customer_notification_preferences: {
         Row: {
           created_at: string
@@ -801,6 +933,39 @@ export type Database = {
           },
         ]
       }
+      customer_rate_limits: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          endpoint: string
+          id: string
+          ip_address: unknown | null
+          request_count: number
+          tier: string
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          endpoint: string
+          id?: string
+          ip_address?: unknown | null
+          request_count?: number
+          tier?: string
+          window_start?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          endpoint?: string
+          id?: string
+          ip_address?: unknown | null
+          request_count?: number
+          tier?: string
+          window_start?: string
+        }
+        Relationships: []
+      }
       customers: {
         Row: {
           created_at: string
@@ -868,6 +1033,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      delivery_tracking: {
+        Row: {
+          actual_arrival: string | null
+          created_at: string
+          driver_info: Json | null
+          estimated_arrival: string | null
+          id: string
+          location: Json | null
+          notes: string | null
+          order_id: string
+          status: string
+          tracking_url: string | null
+        }
+        Insert: {
+          actual_arrival?: string | null
+          created_at?: string
+          driver_info?: Json | null
+          estimated_arrival?: string | null
+          id?: string
+          location?: Json | null
+          notes?: string | null
+          order_id: string
+          status: string
+          tracking_url?: string | null
+        }
+        Update: {
+          actual_arrival?: string | null
+          created_at?: string
+          driver_info?: Json | null
+          estimated_arrival?: string | null
+          id?: string
+          location?: Json | null
+          notes?: string | null
+          order_id?: string
+          status?: string
+          tracking_url?: string | null
+        }
+        Relationships: []
       }
       delivery_zones: {
         Row: {
@@ -1385,6 +1589,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      order_modifications: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          modification_type: string
+          new_data: Json | null
+          order_id: string
+          original_data: Json | null
+          processed_at: string | null
+          reason: string | null
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          modification_type: string
+          new_data?: Json | null
+          order_id: string
+          original_data?: Json | null
+          processed_at?: string | null
+          reason?: string | null
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          modification_type?: string
+          new_data?: Json | null
+          order_id?: string
+          original_data?: Json | null
+          processed_at?: string | null
+          reason?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       orders: {
         Row: {
@@ -2908,6 +3151,15 @@ export type Database = {
         Args: { email_address: string; email_type?: string }
         Returns: boolean
       }
+      check_customer_rate_limit: {
+        Args: {
+          p_customer_id?: string
+          p_ip_address?: unknown
+          p_endpoint?: string
+          p_tier?: string
+        }
+        Returns: boolean
+      }
       check_enhanced_rate_limit: {
         Args: {
           p_user_id?: string
@@ -3051,6 +3303,21 @@ export type Database = {
         }
         Returns: undefined
       }
+      log_api_request: {
+        Args: {
+          p_endpoint: string
+          p_method: string
+          p_ip_address?: unknown
+          p_user_agent?: string
+          p_request_payload?: Json
+          p_response_status?: number
+          p_response_time_ms?: number
+          p_customer_id?: string
+          p_session_id?: string
+          p_error_details?: Json
+        }
+        Returns: string
+      }
       log_branding_change: {
         Args: {
           p_action: string
@@ -3072,6 +3339,17 @@ export type Database = {
           p_order_id?: string
           p_transaction_reference?: string
           p_severity?: string
+        }
+        Returns: string
+      }
+      log_security_incident: {
+        Args: {
+          p_incident_type: string
+          p_severity?: string
+          p_ip_address?: unknown
+          p_user_agent?: string
+          p_endpoint?: string
+          p_details?: Json
         }
         Returns: string
       }

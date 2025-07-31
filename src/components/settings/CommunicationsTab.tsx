@@ -275,19 +275,59 @@ export const CommunicationsTab = () => {
   return (
     <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium">SMTP Email Settings</h3>
+        <h3 className="text-lg font-medium">Email Configuration</h3>
         <p className="text-sm text-muted-foreground">
-          Configure your SMTP server for sending email notifications to customers.
+          Basic SMTP settings. For advanced email management, templates, and analytics, use the Email Management interface.
         </p>
       </div>
 
-      <SMTPSettingsTab />
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            Email Management Dashboard
+          </CardTitle>
+          <CardDescription>
+            Access the comprehensive email management interface for advanced features
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 border rounded-lg">
+            <div>
+              <h4 className="font-medium">Advanced Email Management</h4>
+              <p className="text-sm text-muted-foreground">
+                Manage SMTP settings, email templates, analytics, and testing in a unified interface
+              </p>
+            </div>
+            <Button 
+              onClick={() => window.open('/email-management', '_blank')}
+              className="shrink-0"
+            >
+              <Settings className="mr-2 h-4 w-4" />
+              Open Email Management
+            </Button>
+          </div>
+          
+          <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
+            <strong>Note:</strong> The Email Management interface provides comprehensive tools for:
+            • Advanced SMTP configuration
+            • Email template creation and editing
+            • Delivery analytics and monitoring
+            • Email testing and queue management
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="border-t pt-6">
+        <h4 className="text-md font-medium mb-4">Quick SMTP Setup</h4>
+        <SMTPSettingsTab />
+      </div>
 
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <TestTube className="h-5 w-5" />
-            Test Email Connection
+            Quick Test
           </CardTitle>
           <CardDescription>
             Send a test email to verify your SMTP configuration

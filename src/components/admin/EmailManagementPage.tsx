@@ -182,8 +182,13 @@ export const EmailManagementPage = () => {
         <div>
           <h1 className="text-3xl font-bold">Email Management</h1>
           <p className="text-muted-foreground">
-            Manage SMTP settings, email templates, and monitor delivery analytics
+            Complete email system management - SMTP settings, templates, analytics, and testing
           </p>
+          <div className="mt-2">
+            <Badge variant="outline" className="text-xs">
+              Recommended Interface
+            </Badge>
+          </div>
         </div>
         <div className="flex gap-2">
           <Button 

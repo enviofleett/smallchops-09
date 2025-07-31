@@ -59,6 +59,7 @@ const App = () => (
                 <Route path="/settings" element={<EnhancedErrorBoundary context="Settings"><Settings /></EnhancedErrorBoundary>} />
                 <Route path="/payment-settings" element={<EnhancedErrorBoundary context="Payment Settings"><PaymentSettings /></EnhancedErrorBoundary>} />
                 <Route path="/admin/email-management" element={<EnhancedErrorBoundary context="Email Management"><EmailManagementPage /></EnhancedErrorBoundary>} />
+                <Route path="/email-management" element={<EnhancedErrorBoundary context="Email Management"><EmailManagementPage /></EnhancedErrorBoundary>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

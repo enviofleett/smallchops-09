@@ -98,6 +98,15 @@ export const CustomerAuthModal = ({ isOpen, onClose, onAuthenticated }: Customer
       return;
     }
 
+    if (!signupData.phone || signupData.phone.trim().length < 10) {
+      toast({
+        title: "Phone number required",
+        description: "Please enter a valid phone number with at least 10 digits.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsLoading(true);
 
     try {
@@ -224,13 +233,14 @@ export const CustomerAuthModal = ({ isOpen, onClose, onAuthenticated }: Customer
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="signup-phone">Phone (Optional)</Label>
+                <Label htmlFor="signup-phone">Phone Number *</Label>
                 <Input
                   id="signup-phone"
                   type="tel"
                   value={signupData.phone}
                   onChange={(e) => setSignupData({ ...signupData, phone: e.target.value })}
-                  placeholder="Enter your phone number"
+                  placeholder="Enter your phone number (e.g., +1234567890)"
+                  required
                 />
               </div>
 

@@ -82,11 +82,49 @@ const commonProviders: SMTPProvider[] = [
   }
 ];
 
+// Add this helper component for better error display
+const SMTPStatusAlert = ({ status, error }: { status: string, error?: string }) => {
+  if (status === 'success') {
+    return (
+      <Alert className="border-green-200 bg-green-50">
+        <CheckCircle2 className="h-4 w-4 text-green-600" />
+        <AlertDescription className="text-green-800">
+          <strong>SMTP Connection Successful!</strong> Your configuration is working correctly.
+          Check your email inbox for the test message.
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  
+  if (status === 'error') {
+    return (
+      <Alert variant="destructive">
+        <AlertCircle className="h-4 w-4" />
+        <AlertDescription>
+          <strong>SMTP Connection Failed:</strong> {error || 'Unknown error'}
+          <div className="mt-2 text-sm">
+            <strong>Common solutions:</strong>
+            <ul className="list-disc list-inside mt-1 space-y-1">
+              <li>For Gmail: Use App Password (16 characters), not regular password</li>
+              <li>Verify host, port, and credentials are correct</li>
+              <li>Check if two-factor authentication is enabled</li>
+              <li>Ensure SMTP access is enabled for your account</li>
+            </ul>
+          </div>
+        </AlertDescription>
+      </Alert>
+    );
+  }
+  
+  return null;
+};
+
 export const SMTPSettingsTab = () => {
   const [loading, setLoading] = useState(false);
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [selectedProvider, setSelectedProvider] = useState<SMTPProvider | null>(null);
+  const [lastError, setLastError] = useState<string>('');
   const { toast } = useToast();
 
   const form = useForm<SMTPFormData>({
@@ -184,68 +222,155 @@ export const SMTPSettingsTab = () => {
     }
   };
 
-  const testSMTPConnection = async () => {
-    setTestingConnection(true);
-    setConnectionStatus('idle');
-    
-    try {
-      const formData = form.getValues();
-      
-      if (!formData.sender_email) {
-        throw new Error('Please enter a sender email address');
-      }
-
-      if (!formData.smtp_host || !formData.smtp_user || !formData.smtp_pass) {
-        throw new Error('Please fill in all SMTP configuration fields');
-      }
-
-      // Validate password is not the same as email (common mistake)
-      if (formData.smtp_pass === formData.smtp_user) {
-        throw new Error('SMTP password cannot be the same as username. Please enter the actual password or app password.');
-      }
-
-      const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
-        body: {
-          to: formData.sender_email,
-          subject: 'SMTP Connection Test',
-          html: `
-            <h2>SMTP Connection Test Successful!</h2>
-            <p>This is a test email to verify your SMTP configuration.</p>
-            <p>If you received this email, your SMTP settings are working correctly.</p>
-            <p>Configuration tested:</p>
-            <ul>
-              <li><strong>Host:</strong> ${formData.smtp_host}</li>
-              <li><strong>Port:</strong> ${formData.smtp_port}</li>
-              <li><strong>Secure:</strong> ${formData.smtp_secure ? 'Yes' : 'No'}</li>
-              <li><strong>User:</strong> ${formData.smtp_user}</li>
-            </ul>
-            <p>Sent at: ${new Date().toLocaleString()}</p>
-          `,
-          text: `SMTP Connection Test Successful!\n\nThis is a test email to verify your SMTP configuration.\nIf you received this email, your SMTP settings are working correctly.\n\nSent at: ${new Date().toLocaleString()}`
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      setConnectionStatus('success');
-      toast({
-        title: 'Test Successful',
-        description: `Test email sent to ${formData.sender_email} via SMTP`,
-      });
-    } catch (error: any) {
-      console.error('SMTP test failed:', error);
-      setConnectionStatus('error');
-      toast({
-        title: 'Test Failed',
-        description: error.message || 'Failed to send test email via SMTP',
-        variant: 'destructive',
-      });
-    } finally {
-      setTestingConnection(false);
+  // Add validation function inside component
+  const validateSMTPCredentials = (data: SMTPFormData): string | null => {
+    if (!data.smtp_host || !data.smtp_user || !data.smtp_pass || !data.sender_email) {
+      return 'Please fill in all required SMTP fields';
     }
+    
+    if (data.smtp_pass === data.smtp_user) {
+      return 'SMTP password cannot be the same as username. Please use your actual password or app-specific password.';
+    }
+    
+    if (data.smtp_pass.length < 6) {
+      return 'SMTP password seems too short. Please ensure you are using the correct password or app-specific password.';
+    }
+    
+    return null;
   };
+
+  // Enhanced testSMTPConnection function:
+const testSMTPConnection = async () => {
+  setTestingConnection(true);
+  setConnectionStatus('idle');
+  
+  try {
+    const formData = form.getValues();
+    
+    // Enhanced validation
+    const validationError = validateSMTPCredentials(formData);
+    if (validationError) {
+      throw new Error(validationError);
+    }
+
+    // Additional Gmail-specific validation
+    if (formData.smtp_host === 'smtp.gmail.com') {
+      if (!formData.smtp_pass.match(/^[a-z]{16}$/)) {
+        toast({
+          title: 'Gmail Configuration Warning',
+          description: 'For Gmail, you need a 16-character app password. Regular Gmail passwords will not work.',
+          variant: 'destructive',
+        });
+      }
+    }
+
+    // Save settings first to ensure they're in the database
+    console.log('Saving SMTP settings before test...');
+    const { error: saveError } = await supabase.functions.invoke('business-settings', {
+      body: {
+        action: 'update_communication_settings',
+        settings: {
+          use_smtp: true, // Temporarily enable for test
+          email_provider: formData.email_provider,
+          smtp_host: formData.smtp_host,
+          smtp_port: formData.smtp_port,
+          smtp_user: formData.smtp_user,
+          smtp_pass: formData.smtp_pass,
+          smtp_secure: formData.smtp_secure,
+          sender_email: formData.sender_email,
+          sender_name: formData.sender_name,
+        }
+      }
+    });
+
+    if (saveError) {
+      throw new Error(`Failed to save settings: ${saveError.message}`);
+    }
+
+    console.log('Settings saved, now testing SMTP connection...');
+
+    // Wait a moment for settings to propagate
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+      body: {
+        to: formData.sender_email,
+        subject: 'SMTP Connection Test - ' + new Date().toISOString(),
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #22c55e;">✅ SMTP Connection Test Successful!</h2>
+            <p>Congratulations! Your SMTP configuration is working correctly.</p>
+            
+            <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+              <h3>Configuration Details:</h3>
+              <ul>
+                <li><strong>Host:</strong> ${formData.smtp_host}</li>
+                <li><strong>Port:</strong> ${formData.smtp_port}</li>
+                <li><strong>Secure:</strong> ${formData.smtp_secure ? 'Yes (TLS/SSL)' : 'No'}</li>
+                <li><strong>Username:</strong> ${formData.smtp_user}</li>
+                <li><strong>Sender:</strong> ${formData.sender_name || 'N/A'} &lt;${formData.sender_email}&gt;</li>
+              </ul>
+            </div>
+            
+            <p style="color: #6b7280; font-size: 14px;">
+              <strong>Test Details:</strong><br>
+              Sent at: ${new Date().toLocaleString()}<br>
+              Test ID: ${Date.now()}
+            </p>
+            
+            <div style="background-color: #dbeafe; padding: 10px; border-radius: 4px; margin-top: 20px;">
+              <p style="margin: 0; color: #1e40af; font-size: 14px;">
+                💡 <strong>Next Steps:</strong> Your SMTP is ready for production use. 
+                You can now send transactional and marketing emails through your custom SMTP server.
+              </p>
+            </div>
+          </div>
+        `,
+        text: `SMTP Connection Test Successful!\n\nYour SMTP configuration is working correctly.\n\nConfiguration:\n- Host: ${formData.smtp_host}\n- Port: ${formData.smtp_port}\n- Secure: ${formData.smtp_secure ? 'Yes' : 'No'}\n- User: ${formData.smtp_user}\n\nSent at: ${new Date().toLocaleString()}`
+      }
+    });
+
+    if (error) {
+      console.error('SMTP test error:', error);
+      throw new Error(error.message || 'SMTP test failed');
+    }
+
+    if (data && data.error) {
+      throw new Error(data.error);
+    }
+
+    setConnectionStatus('success');
+    toast({
+      title: '🎉 SMTP Test Successful!',
+      description: `Test email sent successfully to ${formData.sender_email}. Check your inbox!`,
+    });
+
+    // Auto-save settings after successful test
+    form.setValue('use_smtp', true);
+    
+  } catch (error: any) {
+    console.error('SMTP test failed:', error);
+    setConnectionStatus('error');
+    
+    let errorMessage = error.message || 'Unknown error occurred';
+    
+    // Provide specific guidance based on error type
+    if (errorMessage.includes('535')) {
+      errorMessage = 'Authentication failed (Error 535). Please check:\n• Username and password are correct\n• For Gmail: Use App Password, not regular password\n• Account has SMTP access enabled';
+    } else if (errorMessage.includes('connection')) {
+      errorMessage = 'Connection failed. Please check:\n• SMTP host and port are correct\n• Internet connection is stable\n• Firewall is not blocking the connection';
+    }
+    
+    setLastError(errorMessage);
+    toast({
+      title: 'SMTP Test Failed',
+      description: errorMessage,
+      variant: 'destructive',
+    });
+  } finally {
+    setTestingConnection(false);
+  }
+};
 
   const handleProviderSelect = (provider: SMTPProvider) => {
     setSelectedProvider(provider);
@@ -534,32 +659,36 @@ export const SMTPSettingsTab = () => {
                     )}
                   />
 
-                  <div className="flex items-center gap-4">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={testSMTPConnection}
-                      disabled={testingConnection}
-                      className="flex items-center gap-2"
-                    >
-                      <TestTube className="h-4 w-4" />
-                      {testingConnection ? 'Testing...' : 'Test SMTP Connection'}
-                    </Button>
+                   <div className="space-y-4">
+                     <div className="flex items-center gap-4">
+                       <Button
+                         type="button"
+                         variant="outline"
+                         onClick={testSMTPConnection}
+                         disabled={testingConnection}
+                         className="flex items-center gap-2"
+                       >
+                         <TestTube className="h-4 w-4" />
+                         {testingConnection ? 'Testing...' : 'Test SMTP Connection'}
+                       </Button>
 
-                    {connectionStatus === 'success' && (
-                      <Badge variant="default" className="flex items-center gap-1">
-                        <CheckCircle2 className="h-3 w-3" />
-                        Connection Successful
-                      </Badge>
-                    )}
+                       {connectionStatus === 'success' && (
+                         <Badge variant="default" className="flex items-center gap-1">
+                           <CheckCircle2 className="h-3 w-3" />
+                           Connection Successful
+                         </Badge>
+                       )}
 
-                    {connectionStatus === 'error' && (
-                      <Badge variant="destructive" className="flex items-center gap-1">
-                        <AlertCircle className="h-3 w-3" />
-                        Connection Failed
-                      </Badge>
-                    )}
-                  </div>
+                       {connectionStatus === 'error' && (
+                         <Badge variant="destructive" className="flex items-center gap-1">
+                           <AlertCircle className="h-3 w-3" />
+                           Connection Failed
+                         </Badge>
+                       )}
+                     </div>
+
+                     <SMTPStatusAlert status={connectionStatus} error={lastError} />
+                   </div>
                 </>
               )}
 

@@ -1,256 +1,127 @@
-import React, { useState, useEffect } from 'react';
-import { useForm } from 'react-hook-form';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import React, { useState } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle2, Mail, Send, Settings, TestTube, Server } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { EmailTemplateManager } from '@/components/admin/EmailTemplateManager';
 import { SMTPSettingsTab } from './SMTPSettingsTab';
+import { useEmailService } from '@/hooks/useEmailService';
+import { useSMTPSettings } from '@/hooks/useSMTPSettings';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
+import { 
+  Mail, 
+  Settings, 
+  FileText, 
+  TestTube,
+  Activity,
+  BarChart3,
+  AlertCircle,
+  CheckCircle,
+  Clock,
+  Send,
+  TrendingUp,
+  User
+} from 'lucide-react';
 
-const communicationSchema = z.object({
-  use_smtp: z.boolean().default(true),
-  smtp_host: z.string().min(1, 'SMTP host is required'),
-  smtp_port: z.number().min(1, 'Port is required'),
-  smtp_user: z.string().min(1, 'Username is required'),
-  smtp_pass: z.string().min(1, 'Password is required'),
-  smtp_secure: z.boolean().default(true),
-  sender_email: z.string().email('Invalid email address'),
-  sender_name: z.string().min(1, 'Sender name is required'),
-});
-
-type CommunicationFormData = z.infer<typeof communicationSchema>;
-
-interface EmailTemplate {
-  status: string;
-  subject: string;
-  html_content: string;
-  variables: string[];
+interface EmailStats {
+  totalSent: number;
+  deliveredToday: number;
+  failedToday: number;
+  deliveryRate: number;
+  recentActivity: Array<{
+    id: string;
+    status: string;
+    recipient: string;
+    subject: string;
+    timestamp: string;
+  }>;
 }
 
-const defaultTemplates: EmailTemplate[] = [
-  {
-    status: 'pending',
-    subject: 'Order Confirmation - #{order_number}',
-    html_content: `<h2>Thank you for your order!</h2>
-<p>Dear {customer_name},</p>
-<p>We've received your order <strong>#{order_number}</strong> and it's being processed.</p>
-<p>Order Total: <strong>{total_amount}</strong></p>
-<p>We'll keep you updated on your order status.</p>
-<p>Best regards,<br>Your Team</p>`,
-    variables: ['customer_name', 'order_number', 'total_amount']
-  },
-  {
-    status: 'confirmed',
-    subject: 'Order Confirmed - #{order_number}',
-    html_content: `<h2>Your order has been confirmed!</h2>
-<p>Dear {customer_name},</p>
-<p>Great news! Your order <strong>#{order_number}</strong> has been confirmed and is now being prepared.</p>
-<p>Estimated preparation time: 15-30 minutes</p>
-<p>We'll notify you when your order is ready.</p>
-<p>Best regards,<br>Your Team</p>`,
-    variables: ['customer_name', 'order_number']
-  },
-  {
-    status: 'shipped',
-    subject: 'Order Shipped - #{order_number}',
-    html_content: `<h2>Your order has been shipped!</h2>
-<p>Dear {customer_name},</p>
-<p>Your order <strong>#{order_number}</strong> has been shipped and is on its way.</p>
-<p>You can track your order using this tracking number: <strong>{tracking_number}</strong></p>
-<p>Thank you for shopping with us!</p>
-<p>Best regards,<br>Your Team</p>`,
-    variables: ['customer_name', 'order_number', 'tracking_number']
-  },
-  {
-    status: 'delivered',
-    subject: 'Order Delivered - #{order_number}',
-    html_content: `<h2>Your order has been delivered!</h2>
-<p>Dear {customer_name},</p>
-<p>Your order <strong>#{order_number}</strong> has been successfully delivered.</p>
-<p>We hope you enjoy your purchase!</p>
-<p>If you have any questions or concerns, please contact us.</p>
-<p>Best regards,<br>Your Team</p>`,
-    variables: ['customer_name', 'order_number']
-  },
-  {
-    status: 'cancelled',
-    subject: 'Order Cancelled - #{order_number}',
-    html_content: `<h2>Order Cancelled</h2>
-<p>Dear {customer_name},</p>
-<p>Your order <strong>#{order_number}</strong> has been cancelled.</p>
-<p>If you have any questions or concerns, please contact us.</p>
-<p>Best regards,<br>Your Team</p>`,
-    variables: ['customer_name', 'order_number']
-  },
-  {
-    status: 'refunded',
-    subject: 'Order Refunded - #{order_number}',
-    html_content: `<h2>Order Refunded</h2>
-<p>Dear {customer_name},</p>
-<p>Your order <strong>#{order_number}</strong> has been refunded.</p>
-<p>The refund amount will be credited back to your account within 5-7 business days.</p>
-<p>If you have any questions or concerns, please contact us.</p>
-<p>Best regards,<br>Your Team</p>`,
-    variables: ['customer_name', 'order_number']
-  },
-];
-
 export const CommunicationsTab = () => {
-  const [loading, setLoading] = useState(false);
+  const [testEmail, setTestEmail] = useState('');
   const [testingConnection, setTestingConnection] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [selectedTemplate, setSelectedTemplate] = useState<EmailTemplate>(defaultTemplates[0]);
-  const { toast } = useToast();
+  const [connectionStatus, setConnectionStatus] = useState<'success' | 'error' | null>(null);
+  const [processingQueue, setProcessingQueue] = useState(false);
+  const [emailStats, setEmailStats] = useState<EmailStats | null>(null);
+  
+  const { deliveryLogs, isLoadingLogs } = useEmailService();
+  const { settings: smtpSettings, isLoading: isLoadingSettings } = useSMTPSettings();
 
-  const form = useForm<CommunicationFormData>({
-    resolver: zodResolver(communicationSchema),
-    defaultValues: {
-      use_smtp: true,
-      smtp_host: '',
-      smtp_port: 587,
-      smtp_user: '',
-      smtp_pass: '',
-      smtp_secure: true,
-      sender_email: '',
-      sender_name: '',
-    },
-  });
-
-  useEffect(() => {
-    loadCommunicationSettings();
-  }, []);
-
-  const loadCommunicationSettings = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('communication_settings')
-        .select('*')
-        .single();
-
-      if (error && error.code !== 'PGRST116') {
-        throw error;
-      }
-
-      if (data) {
-        form.reset({
-          use_smtp: data.use_smtp !== false,
-          smtp_host: data.smtp_host || '',
-          smtp_port: data.smtp_port || 587,
-          smtp_user: data.smtp_user || '',
-          smtp_pass: data.smtp_pass || '',
-          smtp_secure: data.smtp_secure !== false,
-          sender_email: data.sender_email || '',
-          sender_name: data.sender_name || '',
-        });
-      }
-    } catch (error: any) {
-      console.error('Error loading communication settings:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load communication settings',
-        variant: 'destructive',
+  // Calculate email statistics
+  React.useEffect(() => {
+    if (deliveryLogs?.length) {
+      const today = new Date().toDateString();
+      const todayLogs = deliveryLogs.filter(log => 
+        new Date(log.created_at).toDateString() === today
+      );
+      
+      const delivered = todayLogs.filter(log => log.delivery_status === 'delivered').length;
+      const failed = todayLogs.filter(log => log.delivery_status === 'failed' || log.delivery_status === 'bounced').length;
+      const total = todayLogs.length;
+      
+      setEmailStats({
+        totalSent: deliveryLogs.length,
+        deliveredToday: delivered,
+        failedToday: failed,
+        deliveryRate: total > 0 ? Math.round((delivered / total) * 100) : 0,
+        recentActivity: deliveryLogs.slice(0, 10).map(log => ({
+          id: log.id,
+          status: log.delivery_status,
+          recipient: log.recipient_email,
+          subject: log.subject || 'No subject',
+          timestamp: log.created_at
+        }))
       });
     }
-  };
-
-  const onSubmit = async (data: CommunicationFormData) => {
-    setLoading(true);
-    try {
-      const { error } = await supabase.functions.invoke('business-settings', {
-        body: {
-          action: 'update_communication_settings',
-          settings: {
-            use_smtp: data.use_smtp,
-            smtp_host: data.smtp_host,
-            smtp_port: data.smtp_port,
-            smtp_user: data.smtp_user,
-            smtp_pass: data.smtp_pass,
-            smtp_secure: data.smtp_secure,
-            sender_email: data.sender_email,
-            sender_name: data.sender_name,
-            email_provider: 'smtp'
-          }
-        }
-      });
-
-      if (error) {
-        throw error;
-      }
-
-      toast({
-        title: 'Settings Saved',
-        description: 'SMTP settings have been updated successfully.',
-      });
-    } catch (error: any) {
-      console.error('Error saving communication settings:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to save communication settings',
-        variant: 'destructive',
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
+  }, [deliveryLogs]);
 
   const testEmailConnection = async () => {
-    setTestingConnection(true);
-    setConnectionStatus('idle');
-    
-    try {
-      const formData = form.getValues();
-      
-      if (!formData.sender_email) {
-        throw new Error('Please enter a sender email address');
-      }
+    if (!testEmail) {
+      toast.error('Please enter an email address');
+      return;
+    }
 
+    setTestingConnection(true);
+    setConnectionStatus(null);
+
+    try {
       const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
         body: {
-          to: formData.sender_email,
-          subject: 'SMTP Connection Test',
+          to: testEmail,
+          subject: 'SMTP Connection Test - ' + new Date().toISOString(),
           html: `
-            <h2>Connection Test Successful!</h2>
-            <p>This is a test email to verify your SMTP configuration.</p>
-            <p>If you received this email, your SMTP settings are working correctly.</p>
-            <p>Sent at: ${new Date().toLocaleString()}</p>
-          `
+            <h2>SMTP Connection Test</h2>
+            <p>This is a test email to verify your SMTP configuration is working correctly.</p>
+            <p><strong>Sent at:</strong> ${new Date().toLocaleString()}</p>
+            <p>If you received this email, your SMTP settings are configured properly.</p>
+          `,
+          text: `SMTP Connection Test - Sent at ${new Date().toLocaleString()}`
         }
       });
 
       if (error) {
-        throw new Error(error.message);
+        throw error;
       }
 
       setConnectionStatus('success');
-      toast({
-        title: 'Test Successful',
-        description: `Test email sent to ${formData.sender_email}`,
-      });
+      toast.success('Test email sent successfully!');
     } catch (error: any) {
-      console.error('Email test failed:', error);
+      console.error('Test email error:', error);
       setConnectionStatus('error');
-      toast({
-        title: 'Test Failed',
-        description: error.message || 'Failed to send test email',
-        variant: 'destructive',
-      });
+      toast.error(`Test failed: ${error.message}`);
     } finally {
       setTestingConnection(false);
     }
   };
 
-  const processQueuedEmails = async () => {
+  const processEmailQueue = async () => {
+    setProcessingQueue(true);
+    
     try {
       const { data, error } = await supabase.functions.invoke('process-communication-events');
       
@@ -258,116 +129,328 @@ export const CommunicationsTab = () => {
         throw error;
       }
 
-      toast({
-        title: 'Queue Processed',
-        description: data.message || 'Email queue has been processed',
-      });
+      toast.success(`Processed ${data.processed || 0} emails, ${data.failed || 0} failed`);
     } catch (error: any) {
-      console.error('Error processing queue:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to process email queue',
-        variant: 'destructive',
-      });
+      console.error('Queue processing error:', error);
+      toast.error(`Queue processing failed: ${error.message}`);
+    } finally {
+      setProcessingQueue(false);
     }
   };
 
+  const StatCard = ({ title, value, icon: Icon, trend, color = 'default' }: {
+    title: string;
+    value: string | number;
+    icon: any;
+    trend?: string;
+    color?: 'default' | 'success' | 'warning' | 'error';
+  }) => (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className={`text-2xl font-bold ${
+              color === 'success' ? 'text-green-600' :
+              color === 'warning' ? 'text-yellow-600' :
+              color === 'error' ? 'text-red-600' : ''
+            }`}>
+              {value}
+            </p>
+            {trend && (
+              <p className="text-xs text-muted-foreground flex items-center mt-1">
+                <TrendingUp className="h-3 w-3 mr-1" />
+                {trend}
+              </p>
+            )}
+          </div>
+          <Icon className={`h-8 w-8 ${
+            color === 'success' ? 'text-green-600' :
+            color === 'warning' ? 'text-yellow-600' :
+            color === 'error' ? 'text-red-600' : 'text-muted-foreground'
+          }`} />
+        </div>
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium">Email Configuration</h3>
-        <p className="text-sm text-muted-foreground">
-          Basic SMTP settings. For advanced email management, templates, and analytics, use the Email Management interface.
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h3 className="text-lg font-medium">Email Management</h3>
+          <p className="text-sm text-muted-foreground">
+            Complete email system management - SMTP settings, templates, analytics, and testing
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <Button 
+            onClick={processEmailQueue}
+            disabled={processingQueue}
+            variant="outline"
+          >
+            <Send className="mr-2 h-4 w-4" />
+            {processingQueue ? 'Processing...' : 'Process Queue'}
+          </Button>
+        </div>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Email Management Dashboard
-          </CardTitle>
-          <CardDescription>
-            Access the comprehensive email management interface for advanced features
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex items-center justify-between p-4 border rounded-lg">
-            <div>
-              <h4 className="font-medium">Advanced Email Management</h4>
-              <p className="text-sm text-muted-foreground">
-                Manage SMTP settings, email templates, analytics, and testing in a unified interface
-              </p>
-            </div>
-            <Button 
-              onClick={() => window.open('/email-management', '_blank')}
-              className="shrink-0"
-            >
-              <Settings className="mr-2 h-4 w-4" />
-              Open Email Management
-            </Button>
-          </div>
-          
-          <div className="text-xs text-muted-foreground bg-muted/50 p-3 rounded-lg">
-            <strong>Note:</strong> The Email Management interface provides comprehensive tools for:
-            • Advanced SMTP configuration
-            • Email template creation and editing
-            • Delivery analytics and monitoring
-            • Email testing and queue management
-          </div>
-        </CardContent>
-      </Card>
+      {/* Email Statistics */}
+      {emailStats && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard
+            title="Total Emails Sent"
+            value={emailStats.totalSent}
+            icon={Mail}
+            trend="All time"
+          />
+          <StatCard
+            title="Delivered Today"
+            value={emailStats.deliveredToday}
+            icon={CheckCircle}
+            color="success"
+            trend="Today"
+          />
+          <StatCard
+            title="Failed Today"
+            value={emailStats.failedToday}
+            icon={AlertCircle}
+            color={emailStats.failedToday > 0 ? 'error' : 'default'}
+            trend="Today"
+          />
+          <StatCard
+            title="Delivery Rate"
+            value={`${emailStats.deliveryRate}%`}
+            icon={BarChart3}
+            color={emailStats.deliveryRate >= 95 ? 'success' : emailStats.deliveryRate >= 85 ? 'warning' : 'error'}
+            trend="Today"
+          />
+        </div>
+      )}
 
-      <div className="border-t pt-6">
-        <h4 className="text-md font-medium mb-4">Quick SMTP Setup</h4>
-        <SMTPSettingsTab />
-      </div>
+      <Tabs defaultValue="settings" className="space-y-4">
+        <TabsList className="grid w-full grid-cols-4">
+          <TabsTrigger value="settings" className="flex items-center gap-2">
+            <Settings className="h-4 w-4" />
+            SMTP Settings
+          </TabsTrigger>
+          <TabsTrigger value="templates" className="flex items-center gap-2">
+            <FileText className="h-4 w-4" />
+            Email Templates
+          </TabsTrigger>
+          <TabsTrigger value="testing" className="flex items-center gap-2">
+            <TestTube className="h-4 w-4" />
+            Testing & Preview
+          </TabsTrigger>
+          <TabsTrigger value="analytics" className="flex items-center gap-2">
+            <Activity className="h-4 w-4" />
+            Analytics
+          </TabsTrigger>
+        </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TestTube className="h-5 w-5" />
-            Quick Test
-          </CardTitle>
-          <CardDescription>
-            Send a test email to verify your SMTP configuration
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="flex space-x-2">
-            <Input
-              placeholder="Enter test email address"
-              type="email"
-              className="flex-1"
-              onChange={(e) => form.setValue('sender_email', e.target.value)}
-            />
-            <Button 
-              onClick={testEmailConnection} 
-              disabled={testingConnection}
-            >
-              {testingConnection ? 'Sending...' : 'Send Test'}
-            </Button>
+        <TabsContent value="settings" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Settings className="h-5 w-5" />
+                SMTP Configuration
+              </CardTitle>
+              <CardDescription>
+                Configure your SMTP server settings for sending emails
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <SMTPSettingsTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="templates" className="space-y-4">
+          <EmailTemplateManager />
+        </TabsContent>
+
+        <TabsContent value="testing" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TestTube className="h-5 w-5" />
+                  Test SMTP Connection
+                </CardTitle>
+                <CardDescription>
+                  Send a test email to verify your SMTP configuration
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="test-email">Test Email Address</Label>
+                  <Input
+                    id="test-email"
+                    type="email"
+                    placeholder="your-email@example.com"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                  />
+                </div>
+                <Button 
+                  onClick={testEmailConnection}
+                  disabled={testingConnection || !testEmail}
+                  className="w-full"
+                >
+                  <TestTube className="mr-2 h-4 w-4" />
+                  {testingConnection ? 'Sending Test Email...' : 'Send Test Email'}
+                </Button>
+
+                {connectionStatus && (
+                  <Alert className={connectionStatus === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+                    {connectionStatus === 'success' ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                    )}
+                    <AlertDescription className={connectionStatus === 'success' ? 'text-green-800' : 'text-red-800'}>
+                      {connectionStatus === 'success' 
+                        ? 'Test email sent successfully! Check your inbox.'
+                        : 'Test email failed. Please check your SMTP settings.'
+                      }
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Send className="h-5 w-5" />
+                  Email Queue Management
+                </CardTitle>
+                <CardDescription>
+                  Process pending emails in the communication queue
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Process queued email events including order confirmations, 
+                  status updates, and notifications.
+                </div>
+                <Button 
+                  onClick={processEmailQueue}
+                  disabled={processingQueue}
+                  className="w-full"
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  {processingQueue ? 'Processing Queue...' : 'Process Email Queue'}
+                </Button>
+              </CardContent>
+            </Card>
           </div>
-          
-          {connectionStatus === 'success' && (
-            <Alert className="mt-4">
-              <CheckCircle2 className="h-4 w-4" />
-              <AlertDescription>
-                Test email sent successfully! Check your inbox.
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {connectionStatus === 'error' && (
-            <Alert className="mt-4" variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                Failed to send test email. Please check your SMTP settings.
-              </AlertDescription>
-            </Alert>
-          )}
-        </CardContent>
-      </Card>
+        </TabsContent>
+
+        <TabsContent value="analytics" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Recent Email Activity
+                </CardTitle>
+                <CardDescription>
+                  Latest email delivery status and activity
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ScrollArea className="h-[300px]">
+                  <div className="space-y-3">
+                    {isLoadingLogs ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        Loading email activity...
+                      </div>
+                    ) : emailStats?.recentActivity?.length ? (
+                      emailStats.recentActivity.map((activity) => (
+                        <div key={activity.id} className="flex items-start gap-3 p-3 border rounded-lg">
+                          <div className={`mt-1 rounded-full p-1 ${
+                            activity.status === 'delivered' ? 'bg-green-100 text-green-600' :
+                            activity.status === 'sent' ? 'bg-blue-100 text-blue-600' :
+                            activity.status === 'failed' ? 'bg-red-100 text-red-600' :
+                            'bg-yellow-100 text-yellow-600'
+                          }`}>
+                            {activity.status === 'delivered' ? <CheckCircle className="h-3 w-3" /> :
+                             activity.status === 'sent' ? <Send className="h-3 w-3" /> :
+                             activity.status === 'failed' ? <AlertCircle className="h-3 w-3" /> :
+                             <Clock className="h-3 w-3" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <User className="h-3 w-3 text-muted-foreground" />
+                              <span className="text-sm font-medium truncate">
+                                {activity.recipient}
+                              </span>
+                              <Badge variant="outline" className="text-xs">
+                                {activity.status}
+                              </Badge>
+                            </div>
+                            <p className="text-sm text-muted-foreground truncate">
+                              {activity.subject}
+                            </p>
+                            <p className="text-xs text-muted-foreground">
+                              {new Date(activity.timestamp).toLocaleString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="text-center py-8 text-muted-foreground">
+                        No email activity found
+                      </div>
+                    )}
+                  </div>
+                </ScrollArea>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChart3 className="h-5 w-5" />
+                  Email Performance
+                </CardTitle>
+                <CardDescription>
+                  Key metrics and delivery statistics
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                    <span className="text-sm font-medium">SMTP Status</span>
+                    <Badge variant={smtpSettings?.use_smtp ? 'default' : 'destructive'}>
+                      {isLoadingSettings ? 'Loading...' : smtpSettings?.use_smtp ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                    <span className="text-sm font-medium">Server</span>
+                    <span className="text-sm text-muted-foreground">
+                      {smtpSettings?.smtp_host || 'Not configured'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                    <span className="text-sm font-medium">Port</span>
+                    <span className="text-sm text-muted-foreground">
+                      {smtpSettings?.smtp_port || 'Not set'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
+                    <span className="text-sm font-medium">Encryption</span>
+                    <Badge variant="outline">
+                      {smtpSettings?.smtp_secure ? 'TLS/SSL' : 'None'}
+                    </Badge>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

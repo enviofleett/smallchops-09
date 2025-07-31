@@ -47,7 +47,6 @@ const Sidebar = ({ isCollapsed, onToggle }: SidebarProps) => {
     { icon: FileText, label: 'Reports', path: '/reports' },
     { icon: FileText, label: 'Audit Logs', path: '/audit-logs' },
     { icon: Settings, label: 'Settings', path: '/settings' },
-    { icon: Mail, label: 'Email Management', path: '/admin/email-management' },
   ];
 
   return (

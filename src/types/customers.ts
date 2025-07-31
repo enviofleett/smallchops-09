@@ -25,6 +25,8 @@ export interface CustomerMetrics {
   activeCustomers: number;
   avgOrderValue: number;
   repeatCustomerRate: number;
+  guestCustomers: number;
+  authenticatedCustomers: number;
 }
 
 export interface DateRange {

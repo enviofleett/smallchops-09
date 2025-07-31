@@ -21,7 +21,7 @@ export const CustomerAnalytics = ({
   allCustomers,
   isLoading
 }: CustomerAnalyticsProps) => {
-  const [modal, setModal] = useState<null | "total" | "active" | "orders" | "spending" | "repeat">(null);
+  const [modal, setModal] = useState<null | "total" | "guest" | "authenticated" | "orders" | "repeat">(null);
 
   if (isLoading) {
     return (
@@ -37,7 +37,7 @@ export const CustomerAnalytics = ({
     );
   }
 
-  // All 5 cards shown, including spending
+  // Updated stats to include guest and authenticated customer counts
   const stats = [
     {
       title: 'Total Customers',
@@ -49,13 +49,22 @@ export const CustomerAnalytics = ({
       customers: allCustomers,
     },
     {
-      title: 'Active Customers',
-      value: metrics.activeCustomers.toLocaleString(),
-      icon: TrendingUp,
+      title: 'Guest Customers',
+      value: metrics.guestCustomers.toLocaleString(),
+      icon: Users,
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-100',
+      key: 'guest',
+      customers: allCustomers.filter(c => c.isGuest),
+    },
+    {
+      title: 'Authenticated',
+      value: metrics.authenticatedCustomers.toLocaleString(),
+      icon: Users,
       color: 'text-green-600',
       bgColor: 'bg-green-100',
-      key: 'active',
-      customers: allCustomers.filter(c => c.status === 'Active' || c.status === 'VIP'),
+      key: 'authenticated',
+      customers: allCustomers.filter(c => !c.isGuest),
     },
     {
       title: 'Top by Orders',
@@ -69,22 +78,11 @@ export const CustomerAnalytics = ({
       customers: topCustomersByOrders,
     },
     {
-      title: 'Top by Spending',
-      value: topCustomersBySpending[0]?.totalSpent
-        ? `₦${topCustomersBySpending[0].totalSpent.toLocaleString()}`
-        : "—",
-      icon: DollarSign,
-      color: 'text-pink-600',
-      bgColor: 'bg-pink-100',
-      key: 'spending',
-      customers: topCustomersBySpending,
-    },
-    {
       title: 'Repeat Customers',
       value: `${metrics.repeatCustomerRate.toFixed(1)}%`,
       icon: Repeat,
-      color: 'text-orange-600',
-      bgColor: 'bg-orange-100',
+      color: 'text-pink-600',
+      bgColor: 'bg-pink-100',
       key: 'repeat',
       customers: repeatCustomers,
     }
@@ -99,17 +97,17 @@ export const CustomerAnalytics = ({
       title: "All Customers",
       customers: allCustomers,
     },
-    active: {
-      title: "Active Customers",
-      customers: allCustomers.filter(c => c.status === 'Active' || c.status === 'VIP'),
+    guest: {
+      title: "Guest Customers",
+      customers: allCustomers.filter(c => c.isGuest),
+    },
+    authenticated: {
+      title: "Authenticated Customers",
+      customers: allCustomers.filter(c => !c.isGuest),
     },
     orders: {
       title: "Top Customers by Orders",
       customers: topCustomersByOrders,
-    },
-    spending: {
-      title: "Top Customers by Spending",
-      customers: topCustomersBySpending,
     },
     repeat: {
       title: "Repeat Customers",

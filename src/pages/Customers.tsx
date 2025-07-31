@@ -5,9 +5,9 @@ import { useQuery } from '@tanstack/react-query';
 import { CustomerAnalytics } from '@/components/customers/CustomerAnalytics';
 import { CustomerFilters } from '@/components/customers/CustomerFilters';
 import { CustomerTable } from '@/components/customers/CustomerTable';
+import { CustomerTypeFilter, CustomerTypeFilter as CustomerTypeFilterType } from '@/components/customers/CustomerTypeFilter';
 import { getCustomerAnalytics } from '@/api/customers';
 import { DateRange, Customer, CustomerDb } from '@/types/customers';
-// ADD THE MISSING IMPORT BELOW:
 import { CustomerDialog } from '@/components/customers/CustomerDialog';
 
 const Customers = () => {
@@ -17,6 +17,7 @@ const Customers = () => {
   });
 
   const [searchTerm, setSearchTerm] = useState('');
+  const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerTypeFilterType>('all');
 
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [currentEditCustomer, setCurrentEditCustomer] = useState<CustomerDb | null>(null);
@@ -29,10 +30,19 @@ const Customers = () => {
   // Get all customers (now includes customers without orders)
   const allCustomers = analytics?.allCustomers || [];
 
-  const filteredCustomers = allCustomers.filter((customer) =>
-    customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    customer.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredCustomers = allCustomers.filter((customer) => {
+    // Search term filter
+    const matchesSearch = customer.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      customer.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (customer.phone && customer.phone.toLowerCase().includes(searchTerm.toLowerCase()));
+    
+    // Customer type filter
+    const matchesType = customerTypeFilter === 'all' || 
+      (customerTypeFilter === 'guest' && customer.isGuest) ||
+      (customerTypeFilter === 'authenticated' && !customer.isGuest);
+    
+    return matchesSearch && matchesType;
+  });
 
   if (error) {
     return (
@@ -101,6 +111,19 @@ const Customers = () => {
         />
       )}
 
+      {/* Customer Type Filter */}
+      {analytics && (
+        <CustomerTypeFilter
+          currentFilter={customerTypeFilter}
+          onFilterChange={setCustomerTypeFilter}
+          counts={{
+            all: analytics.allCustomers.length,
+            authenticated: analytics.metrics.authenticatedCustomers,
+            guest: analytics.metrics.guestCustomers
+          }}
+        />
+      )}
+
       {/* --- REMOVE CHARTS SECTION
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {analytics && (
@@ -128,7 +151,14 @@ const Customers = () => {
             {analytics.repeatCustomers.slice(0, 3).map((customer, index) => (
               <div key={customer.id} className="border rounded-lg p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-medium text-gray-800">{customer.name}</span>
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium text-gray-800">{customer.name}</span>
+                    {customer.isGuest && (
+                      <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                        Guest
+                      </span>
+                    )}
+                  </div>
                   <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
                     #{index + 1}
                   </span>

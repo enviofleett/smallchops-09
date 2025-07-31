@@ -6,6 +6,8 @@ export interface CustomerMetrics {
   activeCustomers: number;
   avgOrderValue: number;
   repeatCustomerRate: number;
+  guestCustomers: number;
+  authenticatedCustomers: number;
 }
 
 // Update CustomerAnalytics to use Customer[] everywhere
@@ -138,6 +140,12 @@ export const updateCustomer = async (id: string, data: { name?: string; email?: 
 
 // Delete a customer (admin only)
 export const deleteCustomer = async (customerId: string) => {
+  // Check if it's a guest customer (guest IDs start with "guest-")
+  if (customerId.startsWith('guest-')) {
+    throw new Error('Guest customers cannot be deleted directly. Consider anonymizing their data instead.');
+  }
+  
+  // For registered customers, use the cascade function
   const { data, error } = await supabase
     .rpc('delete_customer_cascade', { p_customer_id: customerId });
   
@@ -145,18 +153,25 @@ export const deleteCustomer = async (customerId: string) => {
   return data;
 };
 
-// Updated getCustomerAnalytics to show ALL customers (including those without orders)
+// Updated getCustomerAnalytics to show ALL customers (both registered and guest)
 export const getCustomerAnalytics = async (dateRange: DateRange): Promise<CustomerAnalytics> => {
   const { from, to } = dateRange;
 
-  // Fetch ALL customers using the new function (includes customers without orders)
-  const { data: allCustomersData, error: customersError } = await supabase
-    .rpc('get_all_customers_for_analytics');
-  
-  if (customersError) throw new Error(customersError.message);
+  // Fetch registered customers from customer_accounts
+  const { data: registeredCustomers, error: registeredError } = await supabase
+    .from('customer_accounts')
+    .select(`
+      id,
+      user_id,
+      name,
+      phone,
+      created_at
+    `);
 
-  // Fetch orders within date range
-  const { data: ordersData, error: ordersError } = await supabase
+  if (registeredError) throw new Error(registeredError.message);
+
+  // Fetch ALL orders to get guest customers and order data
+  const { data: allOrders, error: ordersError } = await supabase
     .from('orders')
     .select(`
       id,
@@ -168,13 +183,11 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
       order_time,
       status
     `)
-    .gte('order_time', from.toISOString())
-    .lte('order_time', to.toISOString())
     .neq('status', 'cancelled');
 
   if (ordersError) throw new Error(ordersError.message);
 
-  // Create customer buckets with ALL customers (including those without orders)
+  // Create customer buckets
   const bucket: Record<string, {
     id: string;
     name: string;
@@ -187,55 +200,59 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
     isGuest: boolean;
   }> = {};
 
-  // First, add ALL customers to the bucket (ensures customers without orders are included)
-  allCustomersData?.forEach(customer => {
-    const customerKey = customer.is_registered ? `reg:${customer.customer_id}` : `guest:${customer.customer_name}|${customer.customer_email || ''}|${customer.customer_phone || ''}`;
+  // Add registered customers to bucket (simplified without auth users for now)
+  registeredCustomers?.forEach(customer => {
+    const customerKey = `reg:${customer.id}`;
     
     bucket[customerKey] = {
-      id: customer.customer_id,
-      name: customer.customer_name,
-      email: customer.customer_email || '',
-      phone: customer.customer_phone || '',
+      id: customer.id,
+      name: customer.name,
+      email: customer.user_id || '', // We'll populate email later if needed
+      phone: customer.phone || '',
       totalOrders: 0,
       totalSpent: 0,
-      lastOrderDate: customer.registration_date,
+      lastOrderDate: customer.created_at,
       status: 'Inactive',
-      isGuest: !customer.is_registered,
+      isGuest: false,
     };
   });
 
-  // Then, add order data to existing customers
-  ordersData?.forEach(order => {
+  // Process orders and add guest customers
+  allOrders?.forEach(order => {
     let customerKey = '';
     
     if (order.customer_id) {
+      // Registered customer order
       customerKey = `reg:${order.customer_id}`;
     } else {
+      // Guest customer order
       customerKey = `guest:${order.customer_name}|${order.customer_email || ''}|${order.customer_phone || ''}`;
+      
+      // Add guest customer if not already in bucket
+      if (!bucket[customerKey]) {
+        bucket[customerKey] = {
+          id: `guest-${order.customer_name?.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
+          name: order.customer_name || 'Unknown',
+          email: order.customer_email || '',
+          phone: order.customer_phone || '',
+          totalOrders: 0,
+          totalSpent: 0,
+          lastOrderDate: order.order_time,
+          status: 'Inactive',
+          isGuest: true,
+        };
+      }
     }
 
-    // If customer exists in bucket, update their order data
+    // Update order data for both registered and guest customers
     if (bucket[customerKey]) {
       bucket[customerKey].totalOrders += 1;
       bucket[customerKey].totalSpent += Number(order.total_amount);
       
       // Update last order date if this order is more recent
-      if (order.order_time > bucket[customerKey].lastOrderDate) {
+      if (new Date(order.order_time) > new Date(bucket[customerKey].lastOrderDate)) {
         bucket[customerKey].lastOrderDate = order.order_time;
       }
-    } else {
-      // If not in bucket (edge case), create entry
-      bucket[customerKey] = {
-        id: order.customer_id || `guest:${order.customer_name}|${order.customer_email || ''}|${order.customer_phone || ''}`,
-        name: order.customer_name,
-        email: order.customer_email || '',
-        phone: order.customer_phone || '',
-        totalOrders: 1,
-        totalSpent: Number(order.total_amount),
-        lastOrderDate: order.order_time,
-        status: 'Inactive',
-        isGuest: !order.customer_id,
-      };
     }
   });
 
@@ -251,6 +268,8 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
   // Calculate metrics
   const totalCustomers = customers.length;
   const activeCustomers = customers.filter(c => c.status === 'Active' || c.status === 'VIP').length;
+  const guestCustomers = customers.filter(c => c.isGuest).length;
+  const authenticatedCustomers = customers.filter(c => !c.isGuest).length;
   const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0);
   const totalOrders = customers.reduce((sum, c) => sum + c.totalOrders, 0);
   const repeatCustomers = customers.filter(c => c.totalOrders > 1);
@@ -260,14 +279,16 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
       totalCustomers,
       activeCustomers,
       avgOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
-      repeatCustomerRate: totalCustomers > 0 ? (repeatCustomers.length / totalCustomers) * 100 : 0
+      repeatCustomerRate: totalCustomers > 0 ? (repeatCustomers.length / totalCustomers) * 100 : 0,
+      guestCustomers,
+      authenticatedCustomers
     },
     topCustomersByOrders: customers
-      .filter(c => !c.isGuest && c.totalOrders > 0)
+      .filter(c => c.totalOrders > 0)
       .sort((a, b) => b.totalOrders - a.totalOrders)
       .slice(0, 10),
     topCustomersBySpending: customers
-      .filter(c => !c.isGuest && c.totalSpent > 0)
+      .filter(c => c.totalSpent > 0)
       .sort((a, b) => b.totalSpent - a.totalSpent)
       .slice(0, 10),
     repeatCustomers: repeatCustomers

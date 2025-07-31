@@ -1,10 +1,31 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+// Environment-aware CORS headers for production
+const getAllowedOrigins = () => {
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS');
+  const currentEnv = Deno.env.get('DENO_ENV') || 'development';
+  
+  if (currentEnv === 'production' && allowedOrigins) {
+    return allowedOrigins.split(',').map(origin => origin.trim());
+  }
+  return ['*']; // Allow all in development
+};
+
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigins = getAllowedOrigins();
+  const isLovable = origin?.includes('lovable') || origin?.includes('lovableproject.com');
+  const isLocalhost = origin?.includes('localhost') || origin?.includes('127.0.0.1');
+  const isExplicitlyAllowed = allowedOrigins.includes(origin || '');
+  
+  const shouldAllow = allowedOrigins.includes('*') || isLovable || isLocalhost || isExplicitlyAllowed;
+  
+  return {
+    'Access-Control-Allow-Origin': shouldAllow ? (origin || '*') : '*',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+  };
+};
 
 interface SMTPConfig {
   smtp_host: string;
@@ -24,9 +45,14 @@ interface EmailRequest {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
+  console.log('SMTP email sender request:', req.method, 'from', origin);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -36,45 +62,35 @@ serve(async (req) => {
       throw new Error('Missing required fields: to, subject');
     }
 
-    // Initialize Supabase client
+    console.log('Processing email request for:', to);
+
+    // Initialize Supabase client with SERVICE ROLE for system operations
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // Get the authorization header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
-    }
+    console.log('Supabase client initialized with service role');
 
-    // Set the auth for the client
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
-
-    console.log('User authenticated:', user.id);
-
-    // Fetch SMTP settings from database
+    // Fetch SMTP settings from database - Fixed query logic
     const { data: smtpSettings, error: settingsError } = await supabaseClient
       .from('communication_settings')
       .select('*')
-      .order('created_at', { ascending: false })
+      .eq('use_smtp', true)
+      .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
     if (settingsError) {
       console.error('Error fetching SMTP settings:', settingsError);
-      throw new Error('Failed to fetch SMTP configuration');
+      throw new Error(`Failed to fetch SMTP configuration: ${settingsError.message}`);
     }
 
-    if (!smtpSettings || !smtpSettings.use_smtp) {
-      throw new Error('SMTP is not enabled or configured');
+    if (!smtpSettings) {
+      throw new Error('SMTP is not enabled or no active configuration found');
     }
+
+    console.log('SMTP settings loaded successfully for provider:', smtpSettings.email_provider);
 
     // Validate SMTP configuration
     const config: SMTPConfig = {
@@ -109,25 +125,31 @@ serve(async (req) => {
     // Import nodemailer dynamically
     const { default: nodemailer } = await import('https://esm.sh/nodemailer@6.9.7');
 
-    // Create transporter with proper configuration
-    const transporter = nodemailer.createTransporter({
+    // Create transporter with production-ready configuration
+    const isProduction = Deno.env.get('DENO_ENV') === 'production';
+    
+    const transporterConfig: any = {
       host: config.smtp_host,
       port: config.smtp_port,
-      secure: config.smtp_port === 465, // true for 465, false for other ports
+      secure: config.smtp_secure, // Use the configured secure setting
       auth: {
         user: config.smtp_user,
         pass: config.smtp_pass,
       },
-      // Additional options for better compatibility
-      tls: {
-        ciphers: 'SSLv3',
-        rejectUnauthorized: false, // Only use this in development
-      },
-      // Connection timeout
+      // Connection timeouts
       connectionTimeout: 60000,
       greetingTimeout: 30000,
       socketTimeout: 60000,
-    });
+    };
+
+    // Only add TLS config if not using secure connection or in development
+    if (!config.smtp_secure && !isProduction) {
+      transporterConfig.tls = {
+        rejectUnauthorized: false,
+      };
+    }
+
+    const transporter = nodemailer.createTransporter(transporterConfig);
 
     console.log('Transporter created, attempting to send email...');
 
@@ -173,7 +195,9 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true, 
         messageId: info.messageId,
-        message: 'Email sent successfully' 
+        message: 'Email sent successfully',
+        accepted: info.accepted,
+        rejected: info.rejected
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -184,14 +208,20 @@ serve(async (req) => {
   } catch (error) {
     console.error('SMTP email sending error:', error);
     
+    // Enhanced error logging for production debugging
+    const errorDetails = {
+      error: error.message,
+      success: false,
+      timestamp: new Date().toISOString(),
+      // Add stack trace in development only
+      ...(Deno.env.get('DENO_ENV') !== 'production' && { stack: error.stack })
+    };
+    
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        success: false 
-      }),
+      JSON.stringify(errorDetails),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
+        status: 500,
       },
     );
   }

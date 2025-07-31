@@ -10,6 +10,10 @@ export const productSchema = z.object({
   category_id: z.string().uuid('Please select a valid category').optional(),
   status: z.enum(['active', 'archived', 'draft']).default('draft'),
   image_url: z.string().url().optional().or(z.literal('')),
+  features: z.array(z.string().min(1, 'Feature cannot be empty')).default([]),
+  is_promotional: z.boolean().default(false),
+  preparation_time: z.number().int().min(1, 'Preparation time must be at least 1 minute').optional(),
+  allergen_info: z.array(z.string().min(1, 'Allergen info cannot be empty')).default([]),
 });
 
 export type ProductFormData = z.infer<typeof productSchema>;

@@ -5,10 +5,12 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { ImageUpload } from '@/components/ui/image-upload';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
+import { FeaturesList } from './FeaturesList';
 import { ProductFormData, productSchema } from '@/lib/validations/product';
 import { Category, Product } from '@/types/database';
 
@@ -33,6 +35,10 @@ export const ProductForm = ({ product, categories, onSubmit, isLoading }: Produc
       category_id: product?.category_id || '',
       status: product?.status || 'draft',
       image_url: product?.image_url || '',
+      features: Array.isArray(product?.features) ? product.features as string[] : [],
+      is_promotional: Boolean(product?.is_promotional),
+      preparation_time: typeof product?.preparation_time === 'number' ? product.preparation_time : undefined,
+      allergen_info: Array.isArray(product?.allergen_info) ? product.allergen_info as string[] : [],
     },
   });
 
@@ -161,6 +167,46 @@ export const ProductForm = ({ product, categories, onSubmit, isLoading }: Produc
                 </FormItem>
               )}
             />
+
+            <FormField
+              control={form.control}
+              name="is_promotional"
+              render={({ field }) => (
+                <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4">
+                  <div className="space-y-0.5">
+                    <FormLabel className="text-base">Promotional Product</FormLabel>
+                    <FormDescription>
+                      Feature this product as promotional content
+                    </FormDescription>
+                  </div>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="preparation_time"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Preparation Time (minutes)</FormLabel>
+                  <FormControl>
+                    <Input 
+                      type="number" 
+                      placeholder="Enter preparation time" 
+                      {...field}
+                      onChange={(e) => field.onChange(parseInt(e.target.value) || undefined)}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
           </div>
 
           <div className="space-y-4">
@@ -174,6 +220,50 @@ export const ProductForm = ({ product, categories, onSubmit, isLoading }: Produc
             </div>
           </div>
         </div>
+
+        {/* Features Section */}
+        <FormField
+          control={form.control}
+          name="features"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Product Features</FormLabel>
+              <FormDescription>
+                Add key features and highlights for this product
+              </FormDescription>
+              <FormControl>
+                <FeaturesList
+                  features={field.value}
+                  onChange={field.onChange}
+                  placeholder="Add a product feature..."
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
+
+        {/* Allergen Information */}
+        <FormField
+          control={form.control}
+          name="allergen_info"
+          render={({ field }) => (
+            <FormItem>
+              <FormLabel>Allergen Information</FormLabel>
+              <FormDescription>
+                List any allergens present in this product
+              </FormDescription>
+              <FormControl>
+                <FeaturesList
+                  features={field.value}
+                  onChange={field.onChange}
+                  placeholder="Add allergen information..."
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         <FormField
           control={form.control}

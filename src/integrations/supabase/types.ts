@@ -2351,15 +2351,19 @@ export type Database = {
       }
       products: {
         Row: {
+          allergen_info: string[] | null
           category_id: string | null
           created_at: string
           created_by: string | null
           description: string | null
+          features: Json | null
           id: string
           image_url: string | null
           ingredients: string | null
+          is_promotional: boolean | null
           name: string
           nutritional_info: Json | null
+          preparation_time: number | null
           price: number
           sku: string | null
           status: Database["public"]["Enums"]["product_status"]
@@ -2368,15 +2372,19 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          allergen_info?: string[] | null
           category_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          features?: Json | null
           id?: string
           image_url?: string | null
           ingredients?: string | null
+          is_promotional?: boolean | null
           name: string
           nutritional_info?: Json | null
+          preparation_time?: number | null
           price?: number
           sku?: string | null
           status?: Database["public"]["Enums"]["product_status"]
@@ -2385,15 +2393,19 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          allergen_info?: string[] | null
           category_id?: string | null
           created_at?: string
           created_by?: string | null
           description?: string | null
+          features?: Json | null
           id?: string
           image_url?: string | null
           ingredients?: string | null
+          is_promotional?: boolean | null
           name?: string
           nutritional_info?: Json | null
+          preparation_time?: number | null
           price?: number
           sku?: string | null
           status?: Database["public"]["Enums"]["product_status"]

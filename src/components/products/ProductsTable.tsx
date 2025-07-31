@@ -1,9 +1,11 @@
 import React from 'react';
-import { Image as ImageIcon, Terminal, Edit, Trash2 } from 'lucide-react';
+import { Image as ImageIcon, Terminal, Edit, Trash2, Clock, Tag } from 'lucide-react';
 import { ProductWithCategory } from '@/types/database';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { PromotionalBadge } from '@/components/ui/promotional-badge';
 import { FavoriteButton } from '@/components/ui/favorite-button';
 
 interface ProductsTableProps {
@@ -75,14 +77,52 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
             ) : (
               products?.map((product) => (
                 <tr key={product.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                  <td className="py-4 px-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
-                        {product.image_url ? <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 text-gray-400" />}
-                      </div>
-                      <div><p className="font-medium text-gray-800">{product.name}</p></div>
-                    </div>
-                  </td>
+                   <td className="py-4 px-6">
+                     <div className="flex items-center space-x-4">
+                       <div className="relative w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
+                         {product.image_url ? <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 text-gray-400" />}
+                         {product.is_promotional && (
+                           <div className="absolute -top-1 -right-1">
+                             <PromotionalBadge className="text-xs px-1 py-0.5" />
+                           </div>
+                         )}
+                       </div>
+                       <div className="flex-1 min-w-0">
+                         <div className="flex items-center gap-2 mb-1">
+                           <p className="font-medium text-gray-800 truncate">{product.name}</p>
+                           {product.is_promotional && <PromotionalBadge className="text-xs" />}
+                         </div>
+                         <div className="flex items-center gap-3 text-xs text-gray-500">
+                           {product.preparation_time && (
+                             <span className="flex items-center gap-1">
+                               <Clock className="w-3 h-3" />
+                               {product.preparation_time}min
+                             </span>
+                           )}
+                           {Array.isArray(product.features) && product.features.length > 0 && (
+                             <span className="flex items-center gap-1">
+                               <Tag className="w-3 h-3" />
+                               {product.features.length} features
+                             </span>
+                           )}
+                         </div>
+                          {Array.isArray(product.features) && product.features.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-2">
+                              {(product.features as string[]).slice(0, 2).map((feature, idx) => (
+                                <Badge key={idx} variant="outline" className="text-xs py-0 px-1">
+                                  {String(feature)}
+                                </Badge>
+                              ))}
+                              {product.features.length > 2 && (
+                                <Badge variant="outline" className="text-xs py-0 px-1">
+                                  +{product.features.length - 2} more
+                                </Badge>
+                              )}
+                            </div>
+                          )}
+                       </div>
+                     </div>
+                   </td>
                   <td className="py-4 px-6 text-gray-600 font-mono text-sm">{product.sku || 'N/A'}</td>
                   <td className="py-4 px-6 text-gray-600">{product.categories?.name || 'N/A'}</td>
                   <td className="py-4 px-6"><span className={`font-medium ${product.stock_quantity === 0 ? 'text-red-600' : product.stock_quantity <= 10 ? 'text-yellow-600' : 'text-green-600'}`}>{product.stock_quantity}</span></td>

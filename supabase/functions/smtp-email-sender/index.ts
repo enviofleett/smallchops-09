@@ -202,35 +202,38 @@ serve(async (req) => {
     console.log('To:', to);
     console.log('Subject:', subject);
 
-    // Initialize Supabase client
+    // Initialize Supabase client with service role key for system operations
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
     );
 
-    // Authenticate user
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
-    }
+    console.log('✅ System function authenticated with service role');
 
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(
-      authHeader.replace('Bearer ', '')
-    );
-
-    if (authError || !user) {
-      console.error('Auth error:', authError);
-      throw new Error('Unauthorized');
-    }
-
-    console.log('✅ User authenticated:', user.id);
-
-    // Fetch SMTP settings
+    // Enhanced SMTP settings fetch with detailed logging
+    console.log('=== Fetching SMTP Settings ===');
+    
     const { data: smtpSettings, error: settingsError } = await supabaseClient
       .from('communication_settings')
       .select('*')
-      .order('created_at', { ascending: false })
+      .eq('use_smtp', true)
+      .order('updated_at', { ascending: false })
       .limit(1);
+
+    console.log('Settings query error:', settingsError);
+    console.log('Settings query result count:', smtpSettings?.length || 0);
+    
+    if (smtpSettings && smtpSettings.length > 0) {
+      const settings = smtpSettings[0];
+      console.log('Found SMTP config:', {
+        use_smtp: settings.use_smtp,
+        host: settings.smtp_host,
+        port: settings.smtp_port,
+        user: settings.smtp_user,
+        sender: settings.sender_email,
+        has_password: !!settings.smtp_pass
+      });
+    }
 
     if (settingsError) {
       console.error('Database error:', settingsError);

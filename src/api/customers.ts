@@ -157,7 +157,10 @@ export const deleteCustomer = async (customerId: string) => {
 export const getCustomerAnalytics = async (dateRange: DateRange): Promise<CustomerAnalytics> => {
   const { from, to } = dateRange;
 
-  // Fetch registered customers from customer_accounts
+  // Fetch registered customers with their auth user emails
+  const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+  if (authError) throw new Error(authError.message);
+
   const { data: registeredCustomers, error: registeredError } = await supabase
     .from('customer_accounts')
     .select(`
@@ -196,23 +199,42 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
     totalOrders: number;
     totalSpent: number;
     lastOrderDate: string;
-    status: 'VIP' | 'Active' | 'Inactive';
+    status: 'VIP' | 'Active' | 'Inactive' | 'Registered';
     isGuest: boolean;
   }> = {};
 
-  // Add registered customers to bucket (simplified without auth users for now)
+  // Create lookup map for auth users with proper typing
+  const authUserMap = new Map<string, any>();
+  if (authUsers?.users && Array.isArray(authUsers.users)) {
+    authUsers.users.forEach((user: any) => {
+      if (user && user.id) {
+        authUserMap.set(user.id, user);
+      }
+    });
+  }
+
+  // Add registered customers to bucket
   registeredCustomers?.forEach(customer => {
     const customerKey = `reg:${customer.id}`;
+    const authUser = authUserMap.get(customer.user_id);
+    
+    // Fix name vs email issue - if name looks like email, extract name from email
+    let displayName = customer.name;
+    if (customer.name && customer.name.includes('@')) {
+      // Extract name from email (part before @)
+      displayName = customer.name.split('@')[0].replace(/[._]/g, ' ');
+      displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+    }
     
     bucket[customerKey] = {
       id: customer.id,
-      name: customer.name,
-      email: customer.user_id || '', // We'll populate email later if needed
+      name: displayName || (authUser?.email ? authUser.email.split('@')[0] : 'Unknown User'),
+      email: authUser?.email || '',
       phone: customer.phone || '',
       totalOrders: 0,
       totalSpent: 0,
       lastOrderDate: customer.created_at,
-      status: 'Inactive',
+      status: 'Registered', // Default status for authenticated users
       isGuest: false,
     };
   });
@@ -258,9 +280,19 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
 
   // Compute customer status based on spending and orders
   Object.values(bucket).forEach(c => {
-    if (c.totalSpent > 5000) c.status = 'VIP';
-    else if (c.totalOrders > 1) c.status = 'Active';
-    else c.status = 'Inactive';
+    if (c.totalSpent > 5000) {
+      c.status = 'VIP';
+    } else if (c.totalOrders > 1) {
+      c.status = 'Active';
+    } else if (c.totalOrders === 1) {
+      c.status = 'Active';
+    } else if (!c.isGuest) {
+      // Authenticated users with no orders stay as "Registered"
+      c.status = 'Registered';
+    } else {
+      // Guest customers with no orders are "Inactive"
+      c.status = 'Inactive';
+    }
   });
 
   const customers: Customer[] = Object.values(bucket);

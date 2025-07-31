@@ -6,7 +6,7 @@ export interface Customer {
   phone?: string;
   totalOrders: number;
   totalSpent: number;
-  status: 'VIP' | 'Active' | 'Inactive';
+  status: 'VIP' | 'Active' | 'Inactive' | 'Registered';
   lastOrderDate: string;
   isGuest?: boolean; // NEW - true if the customer only ever checked out as guest
 }

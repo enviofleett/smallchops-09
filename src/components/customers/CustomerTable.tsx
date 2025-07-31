@@ -24,7 +24,8 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
     const statusColors = {
       'Active': 'bg-green-100 text-green-800',
       'Inactive': 'bg-gray-100 text-gray-800',
-      'VIP': 'bg-purple-100 text-purple-800'
+      'VIP': 'bg-purple-100 text-purple-800',
+      'Registered': 'bg-blue-100 text-blue-800'
     };
     return statusColors[status as keyof typeof statusColors] || 'bg-gray-100 text-gray-800';
   };
@@ -147,12 +148,14 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
                       {customer.status}
                     </span>
                   </td>
-                  <td className="py-4 px-6 text-gray-600">
-                    {customer.totalOrders > 0 
-                      ? new Date(customer.lastOrderDate).toLocaleDateString()
-                      : 'No orders yet'
-                    }
-                  </td>
+                   <td className="py-4 px-6 text-gray-600">
+                     {customer.totalOrders > 0 
+                       ? new Date(customer.lastOrderDate).toLocaleDateString()
+                       : customer.isGuest 
+                         ? 'No orders yet'
+                         : `Registered ${new Date(customer.lastOrderDate).toLocaleDateString()}`
+                     }
+                   </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-2">
                       {/* Edit button */}

@@ -274,6 +274,13 @@ Deno.serve(async (req) => {
 
     // 6. Send email via SMTP with retry logic
     console.log(`[${requestId}] Sending email via SMTP to ${smtpConfig.smtp_host}:${smtpConfig.smtp_port}`)
+    console.log(`[${requestId}] SMTP Config: host=${smtpConfig.smtp_host}, port=${smtpConfig.smtp_port}, secure=${smtpConfig.smtp_secure}, user=${smtpConfig.smtp_user}`)
+    
+    // Validate password is not the same as email
+    if (smtpConfig.smtp_pass === smtpConfig.smtp_user) {
+      console.log(`[${requestId}] SMTP authentication error: password appears to be same as username`)
+      throw new Error('SMTP password cannot be the same as username. Check your database configuration.')
+    }
 
     let messageId: string;
     let smtpResponse: string;
@@ -285,7 +292,7 @@ Deno.serve(async (req) => {
 
     for (let attempt = 0; attempt < maxRetries; attempt++) {
       try {
-        console.log(`[${requestId}] SMTP attempt ${attempt + 1}/${maxRetries}`);
+        console.log(`[${requestId}] SMTP attempt ${attempt + 1}/${maxRetries} with config: ${smtpConfig.smtp_host}:${smtpConfig.smtp_port} (secure: ${smtpConfig.smtp_secure})`);
         
         // Create SMTP client with timeout
         client = new SMTPClient({
@@ -325,6 +332,11 @@ Deno.serve(async (req) => {
 
       } catch (smtpError) {
         console.error(`[${requestId}] SMTP attempt ${attempt + 1} failed:`, smtpError);
+        console.log(`[${requestId}] Error details:`, {
+          code: smtpError.code,
+          command: smtpError.command,
+          response: smtpError.response
+        });
         
         // Always try to close the client
         if (client) {

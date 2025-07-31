@@ -113,9 +113,11 @@ export const SMTPSettingsTab = () => {
       const { data, error } = await supabase
         .from('communication_settings')
         .select('*')
-        .single();
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
+      if (error) {
         throw error;
       }
 
@@ -195,6 +197,11 @@ export const SMTPSettingsTab = () => {
 
       if (!formData.smtp_host || !formData.smtp_user || !formData.smtp_pass) {
         throw new Error('Please fill in all SMTP configuration fields');
+      }
+
+      // Validate password is not the same as email (common mistake)
+      if (formData.smtp_pass === formData.smtp_user) {
+        throw new Error('SMTP password cannot be the same as username. Please enter the actual password or app password.');
       }
 
       const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
@@ -430,27 +437,36 @@ export const SMTPSettingsTab = () => {
                       )}
                     />
 
-                    <FormField
-                      control={form.control}
-                      name="smtp_pass"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>SMTP Password</FormLabel>
-                          <FormControl>
-                            <Input 
-                              type="password"
-                              placeholder="Your app password" 
-                              {...field} 
-                              value={field.value || ''}
-                            />
-                          </FormControl>
-                          <FormDescription>
-                            Your SMTP password or app-specific password
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
+                     <FormField
+                       control={form.control}
+                       name="smtp_pass"
+                       render={({ field }) => (
+                         <FormItem>
+                           <FormLabel>SMTP Password</FormLabel>
+                           <FormControl>
+                             <Input 
+                               type="password"
+                               placeholder="Your app password" 
+                               {...field} 
+                               value={field.value || ''}
+                             />
+                           </FormControl>
+                           <FormDescription>
+                             Your SMTP password or app-specific password
+                           </FormDescription>
+                           {field.value === form.watch('smtp_user') && field.value && (
+                             <Alert variant="destructive">
+                               <AlertCircle className="h-4 w-4" />
+                               <AlertDescription>
+                                 <strong>Critical Issue:</strong> Password cannot be the same as username. 
+                                 Please enter your actual SMTP password or app-specific password.
+                               </AlertDescription>
+                             </Alert>
+                           )}
+                           <FormMessage />
+                         </FormItem>
+                       )}
+                     />
 
                     <FormField
                       control={form.control}

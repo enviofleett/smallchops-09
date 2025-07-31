@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { removeBackground, loadImage } from "@/lib/backgroundRemoval";
+
 
 interface LogoUploadProps {
   value?: string;
@@ -15,7 +15,7 @@ interface LogoUploadProps {
 
 export const LogoUpload = ({ value, onChange, disabled }: LogoUploadProps) => {
   const [isUploading, setIsUploading] = useState(false);
-  const [isProcessing, setIsProcessing] = useState(false);
+  
   const [preview, setPreview] = useState<string | null>(value || null);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
@@ -42,29 +42,9 @@ export const LogoUpload = ({ value, onChange, disabled }: LogoUploadProps) => {
       const fileExt = file.name.split('.').pop();
       const fileName = `logo_${Date.now()}.${fileExt}`;
 
-      // First try background removal if it's supported
-      let uploadBlob: File | Blob = file;
-      let uploadContentType = file.type;
-
-      if (file.type.startsWith('image/')) {
-        try {
-          setIsProcessing(true);
-          toast.info('Removing background from logo...');
-          
-          const imageElement = await loadImage(file);
-          const processedBlob = await removeBackground(imageElement);
-          
-          uploadBlob = processedBlob;
-          uploadContentType = 'image/png';
-          setIsProcessing(false);
-          toast.info('Background removed! Uploading logo...');
-        } catch (bgRemovalError) {
-          console.warn('Background removal failed, uploading original:', bgRemovalError);
-          setIsProcessing(false);
-          toast.info('Uploading original logo...');
-          // Continue with original file
-        }
-      }
+      // Upload the original file directly
+      const uploadBlob = file;
+      const uploadContentType = file.type;
 
       // Upload to Supabase Storage
       const { data, error } = await supabase.storage
@@ -92,7 +72,6 @@ export const LogoUpload = ({ value, onChange, disabled }: LogoUploadProps) => {
       toast.error('Failed to upload logo. Please try again.');
     } finally {
       setIsUploading(false);
-      setIsProcessing(false);
     }
   }, [onChange]);
 
@@ -102,7 +81,7 @@ export const LogoUpload = ({ value, onChange, disabled }: LogoUploadProps) => {
       'image/*': ['.png', '.jpg', '.jpeg', '.webp']
     },
     maxFiles: 1,
-    disabled: disabled || isUploading || isProcessing
+    disabled: disabled || isUploading
   });
 
   const removeLogo = () => {
@@ -145,12 +124,7 @@ export const LogoUpload = ({ value, onChange, disabled }: LogoUploadProps) => {
       >
         <input {...getInputProps()} />
         <div className="flex flex-col items-center justify-center h-full space-y-2 p-4">
-          {isProcessing ? (
-            <>
-              <Loader2 className="h-8 w-8 text-muted-foreground animate-spin" />
-              <p className="text-sm text-muted-foreground">Removing background...</p>
-            </>
-          ) : isUploading ? (
+          {isUploading ? (
             <>
               <Upload className="h-8 w-8 text-muted-foreground animate-pulse" />
               <p className="text-sm text-muted-foreground">Uploading...</p>
@@ -164,7 +138,6 @@ export const LogoUpload = ({ value, onChange, disabled }: LogoUploadProps) => {
                   : "Click to upload or drag and drop your logo"}
               </p>
               <p className="text-xs text-muted-foreground">PNG, JPG, WEBP up to 5MB</p>
-              <p className="text-xs text-primary">Background will be automatically removed</p>
             </>
           )}
         </div>

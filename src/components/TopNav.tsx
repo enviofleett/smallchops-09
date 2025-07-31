@@ -21,25 +21,14 @@ const TopNav = () => {
         {/* Business branding and search */}
         <div className="flex items-center space-x-6 flex-1">
           <div className="flex items-center space-x-3">
-            <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-white shadow-sm">
-              {settings?.logo_url ? (
-                <img 
-                  src={settings.logo_url} 
-                  alt={settings?.name || 'Logo'} 
-                  className="w-full h-full object-contain p-1"
-                  loading="lazy"
-                />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
-                  <span className="text-primary-foreground font-bold text-sm">
-                    {settings?.name?.charAt(0) || 'S'}
-                  </span>
-                </div>
-              )}
+            <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-gradient-to-br from-primary to-primary/80 shadow-sm">
+              <span className="text-primary-foreground font-bold text-lg">
+                Starters
+              </span>
             </div>
-            {settings?.name && (
-              <h1 className="text-lg font-semibold text-foreground">{settings.name}</h1>
-            )}
+            <h1 className="text-lg font-semibold text-foreground">
+              {settings?.name || 'Starters Business'}
+            </h1>
           </div>
           
           <div className="flex-1 max-w-md">

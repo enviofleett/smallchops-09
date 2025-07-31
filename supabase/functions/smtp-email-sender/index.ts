@@ -1,204 +1,313 @@
+// supabase/functions/smtp-email-sender/index.ts
+// Native SMTP implementation - NO external dependencies
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import nodemailer from 'https://esm.sh/nodemailer@6.9.7'
 
-// Environment-aware CORS headers for production
-const getAllowedOrigins = () => {
-  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS');
-  const currentEnv = Deno.env.get('DENO_ENV') || 'development';
-  
-  if (currentEnv === 'production' && allowedOrigins) {
-    return allowedOrigins.split(',').map(origin => origin.trim());
-  }
-  return ['*']; // Allow all in development
-};
-
-const getCorsHeaders = (origin: string | null) => {
-  const allowedOrigins = getAllowedOrigins();
-  const isLovable = origin?.includes('lovable') || origin?.includes('lovableproject.com');
-  const isLocalhost = origin?.includes('localhost') || origin?.includes('127.0.0.1');
-  const isExplicitlyAllowed = allowedOrigins.includes(origin || '');
-  
-  const shouldAllow = allowedOrigins.includes('*') || isLovable || isLocalhost || isExplicitlyAllowed;
-  
-  return {
-    'Access-Control-Allow-Origin': shouldAllow ? (origin || '*') : '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  };
-};
-
-interface SMTPConfig {
-  smtp_host: string;
-  smtp_port: number;
-  smtp_user: string;
-  smtp_pass: string;
-  smtp_secure: boolean;
-  sender_email: string;
-  sender_name?: string;
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-interface EmailRequest {
-  to: string;
-  subject: string;
-  html?: string;
-  text?: string;
+// Native SMTP client implementation
+async function sendSMTPEmail(config: any, emailData: any) {
+  const { host, port, auth, secure } = config;
+  const { from, to, subject, html, text } = emailData;
+
+  console.log(`=== Connecting to SMTP: ${host}:${port} ===`);
+
+  let conn: Deno.TlsConn | Deno.Conn | null = null;
+
+  try {
+    // For secure connections (port 465), we need TLS from the start
+    // For port 587, we'll use STARTTLS
+    
+    if (port === 465) {
+      // Direct TLS connection for port 465
+      conn = await Deno.connectTls({
+        hostname: host,
+        port: port,
+      });
+    } else {
+      // Plain connection for port 587 (will upgrade with STARTTLS)
+      conn = await Deno.connect({
+        hostname: host,
+        port: port,
+      });
+    }
+
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    // Helper to send command and get response
+    async function sendCommand(command: string): Promise<string> {
+      if (!conn) throw new Error('No connection available');
+      
+      const cmdToLog = command.startsWith('AUTH PLAIN') || command.includes('PASS') 
+        ? command.replace(/PASS .+/, 'PASS ***').replace(/AUTH PLAIN .+/, 'AUTH PLAIN ***')
+        : command;
+      
+      console.log(`SMTP > ${cmdToLog}`);
+      
+      await conn.write(encoder.encode(command + '\r\n'));
+      
+      const buffer = new Uint8Array(1024);
+      const bytesRead = await conn.read(buffer);
+      
+      if (bytesRead === null) {
+        throw new Error('Connection closed unexpectedly');
+      }
+      
+      const response = decoder.decode(buffer.slice(0, bytesRead)).trim();
+      console.log(`SMTP < ${response}`);
+      
+      return response;
+    }
+
+    // Read initial greeting
+    const buffer = new Uint8Array(1024);
+    const bytesRead = await conn.read(buffer);
+    if (bytesRead === null) throw new Error('No greeting received');
+    
+    const greeting = decoder.decode(buffer.slice(0, bytesRead)).trim();
+    console.log(`SMTP < ${greeting}`);
+    
+    if (!greeting.startsWith('220')) {
+      throw new Error(`Invalid greeting: ${greeting}`);
+    }
+
+    // Send EHLO
+    let response = await sendCommand(`EHLO ${host}`);
+    if (!response.startsWith('250')) {
+      throw new Error(`EHLO failed: ${response}`);
+    }
+
+    // STARTTLS for port 587
+    if (port === 587 && secure) {
+      response = await sendCommand('STARTTLS');
+      if (!response.startsWith('220')) {
+        throw new Error(`STARTTLS failed: ${response}`);
+      }
+      
+      // Close current connection and create TLS connection
+      conn.close();
+      
+      conn = await Deno.connectTls({
+        hostname: host,
+        port: port,
+      });
+      
+      // Send EHLO again after TLS
+      response = await sendCommand(`EHLO ${host}`);
+      if (!response.startsWith('250')) {
+        throw new Error(`EHLO after STARTTLS failed: ${response}`);
+      }
+    }
+
+    // Authentication using AUTH PLAIN - use built-in btoa
+    const authString = btoa(`\0${auth.user}\0${auth.pass}`);
+    response = await sendCommand(`AUTH PLAIN ${authString}`);
+    
+    if (!response.startsWith('235')) {
+      throw new Error(`Authentication failed: ${response}`);
+    }
+
+    // Send MAIL FROM
+    const fromEmail = from.includes('<') ? from.match(/<([^>]+)>/)?.[1] || from : from;
+    response = await sendCommand(`MAIL FROM:<${fromEmail}>`);
+    if (!response.startsWith('250')) {
+      throw new Error(`MAIL FROM failed: ${response}`);
+    }
+
+    // Send RCPT TO
+    response = await sendCommand(`RCPT TO:<${to}>`);
+    if (!response.startsWith('250')) {
+      throw new Error(`RCPT TO failed: ${response}`);
+    }
+
+    // Send DATA
+    response = await sendCommand('DATA');
+    if (!response.startsWith('354')) {
+      throw new Error(`DATA failed: ${response}`);
+    }
+
+    // Construct and send email content with proper MIME headers
+    const messageId = `native-smtp-${Date.now()}@${host}`;
+    const emailContent = [
+      `Message-ID: <${messageId}>`,
+      `Date: ${new Date().toUTCString()}`,
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      html ? 'Content-Type: text/html; charset=UTF-8' : 'Content-Type: text/plain; charset=UTF-8',
+      '',
+      html || text || '',
+      '.'
+    ].join('\r\n');
+
+    await conn.write(encoder.encode(emailContent + '\r\n'));
+    
+    const dataBuffer = new Uint8Array(1024);
+    const dataRead = await conn.read(dataBuffer);
+    if (dataRead === null) throw new Error('No response to DATA');
+    
+    const dataResponse = decoder.decode(dataBuffer.slice(0, dataRead)).trim();
+    console.log(`SMTP < ${dataResponse}`);
+    
+    if (!dataResponse.startsWith('250')) {
+      throw new Error(`Email sending failed: ${dataResponse}`);
+    }
+
+    // Send QUIT
+    await sendCommand('QUIT');
+    conn.close();
+    conn = null;
+
+    console.log('✅ Email sent successfully via native SMTP');
+    
+    return {
+      messageId,
+      accepted: [to],
+      rejected: [],
+      response: dataResponse
+    };
+
+  } catch (error) {
+    // Ensure connection is closed on error
+    if (conn) {
+      try {
+        conn.close();
+      } catch (closeError) {
+        console.error('Error closing connection:', closeError);
+      }
+    }
+    console.error('❌ Native SMTP error:', error);
+    throw error;
+  }
 }
 
 serve(async (req) => {
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  
-  console.log('SMTP email sender request:', req.method, 'from', origin);
-  
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { to, subject, html, text } = await req.json() as EmailRequest;
+    const { to, subject, html, text } = await req.json();
 
     if (!to || !subject) {
       throw new Error('Missing required fields: to, subject');
     }
 
-    console.log('Processing email request for:', to);
+    console.log('=== SMTP Email Request Started ===');
+    console.log('To:', to);
+    console.log('Subject:', subject);
 
-    // Initialize Supabase client with SERVICE ROLE for system operations
+    // Initialize Supabase client
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
     );
 
-    console.log('Supabase client initialized with service role');
+    // Authenticate user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
+    }
 
-    // Fetch SMTP settings from database - Fixed query logic
+    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(
+      authHeader.replace('Bearer ', '')
+    );
+
+    if (authError || !user) {
+      console.error('Auth error:', authError);
+      throw new Error('Unauthorized');
+    }
+
+    console.log('✅ User authenticated:', user.id);
+
+    // Fetch SMTP settings
     const { data: smtpSettings, error: settingsError } = await supabaseClient
       .from('communication_settings')
       .select('*')
-      .eq('use_smtp', true)
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .order('created_at', { ascending: false })
+      .limit(1);
 
     if (settingsError) {
-      console.error('Error fetching SMTP settings:', settingsError);
-      throw new Error(`Failed to fetch SMTP configuration: ${settingsError.message}`);
+      console.error('Database error:', settingsError);
+      throw new Error(`Database error: ${settingsError.message}`);
     }
 
-    if (!smtpSettings) {
-      throw new Error('SMTP is not enabled or no active configuration found');
+    if (!smtpSettings || smtpSettings.length === 0) {
+      throw new Error('No SMTP configuration found');
     }
 
-    console.log('SMTP settings loaded successfully for provider:', smtpSettings.email_provider);
+    const settings = smtpSettings[0];
+    console.log('=== SMTP Settings Loaded ===');
+    console.log('Host:', settings.smtp_host);
+    console.log('Port:', settings.smtp_port);
+    console.log('User:', settings.smtp_user);
+    console.log('Secure:', settings.smtp_secure);
 
-    // Validate SMTP configuration
-    const config: SMTPConfig = {
-      smtp_host: smtpSettings.smtp_host,
-      smtp_port: smtpSettings.smtp_port || 587,
-      smtp_user: smtpSettings.smtp_user,
-      smtp_pass: smtpSettings.smtp_pass,
-      smtp_secure: smtpSettings.smtp_secure !== false,
-      sender_email: smtpSettings.sender_email,
-      sender_name: smtpSettings.sender_name || 'System',
-    };
-
-    // Validate required SMTP fields
-    if (!config.smtp_host || !config.smtp_user || !config.smtp_pass || !config.sender_email) {
-      throw new Error('Incomplete SMTP configuration. Please check host, user, password, and sender email.');
+    if (!settings.use_smtp) {
+      throw new Error('SMTP is disabled in settings');
     }
 
-    // Critical validation: ensure password is not same as username
-    if (config.smtp_pass === config.smtp_user) {
-      throw new Error('SMTP password cannot be the same as username. Please use your actual password or app-specific password.');
+    // Validate required fields
+    if (!settings.smtp_host || !settings.smtp_user || !settings.smtp_pass || !settings.sender_email) {
+      throw new Error('Incomplete SMTP configuration. Missing: ' + 
+        [
+          !settings.smtp_host && 'host',
+          !settings.smtp_user && 'user', 
+          !settings.smtp_pass && 'password',
+          !settings.sender_email && 'sender_email'
+        ].filter(Boolean).join(', '));
     }
 
-    console.log('SMTP Config loaded:', {
-      host: config.smtp_host,
-      port: config.smtp_port,
-      user: config.smtp_user,
-      secure: config.smtp_secure,
-      sender: config.sender_email,
-      // Never log the password for security
-    });
+    if (settings.smtp_pass === settings.smtp_user) {
+      throw new Error('SMTP password cannot be the same as username');
+    }
 
-    // Use statically imported nodemailer to prevent Deno compatibility issues
-
-    // Create transporter with production-ready configuration
-    const isProduction = Deno.env.get('DENO_ENV') === 'production';
-    
-    const transporterConfig: any = {
-      host: config.smtp_host,
-      port: config.smtp_port,
-      secure: config.smtp_port === 465, // true for 465, false for other ports
+    // Prepare SMTP configuration
+    const smtpConfig = {
+      host: settings.smtp_host,
+      port: settings.smtp_port || 587,
+      secure: settings.smtp_secure !== false,
       auth: {
-        user: config.smtp_user,
-        pass: config.smtp_pass,
+        user: settings.smtp_user,
+        pass: settings.smtp_pass,
       },
-      // Production-ready timeouts
-      connectionTimeout: 60000,
-      greetingTimeout: 30000,
-      socketTimeout: 60000,
     };
 
-    // Add TLS configuration for production SSL/TLS support
-    if (config.smtp_port === 587 || (!config.smtp_secure && !isProduction)) {
-      transporterConfig.tls = {
-        ciphers: 'SSLv3',
-        rejectUnauthorized: isProduction,
-      };
-    }
-
-    const transporter = nodemailer.createTransporter(transporterConfig);
-
-    console.log('Transporter created, attempting to send email...');
-
-    // Verify SMTP connection before sending
-    try {
-      await transporter.verify();
-      console.log('SMTP connection verified successfully');
-    } catch (verifyError) {
-      console.error('SMTP verification failed:', verifyError);
-      throw new Error(`SMTP connection failed: ${verifyError.message}`);
-    }
-
-    // Prepare email options
-    const mailOptions = {
-      from: config.sender_name 
-        ? `"${config.sender_name}" <${config.sender_email}>`
-        : config.sender_email,
+    // Prepare email data
+    const emailData = {
+      from: settings.sender_name 
+        ? `"${settings.sender_name}" <${settings.sender_email}>`
+        : settings.sender_email,
       to: to,
       subject: subject,
       html: html,
       text: text || (html ? html.replace(/<[^>]*>/g, '') : ''),
     };
 
-    console.log('Sending email with options:', {
-      from: mailOptions.from,
-      to: mailOptions.to,
-      subject: mailOptions.subject,
-    });
+    console.log('=== Sending Email via Native SMTP ===');
+    console.log('From:', emailData.from);
+    console.log('To:', emailData.to);
 
-    // Send email
-    const info = await transporter.sendMail(mailOptions);
-    
-    console.log('Email sent successfully:', {
-      messageId: info.messageId,
-      accepted: info.accepted,
-      rejected: info.rejected,
-    });
+    // Send email using native SMTP
+    const result = await sendSMTPEmail(smtpConfig, emailData);
 
-    // Close the transporter
-    transporter.close();
+    console.log('=== Email Sent Successfully ===');
+    console.log('Message ID:', result.messageId);
+    console.log('Accepted:', result.accepted);
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        messageId: info.messageId,
-        message: 'Email sent successfully',
-        accepted: info.accepted,
-        rejected: info.rejected
+        messageId: result.messageId,
+        message: 'Email sent successfully via native SMTP',
+        accepted: result.accepted,
+        rejected: result.rejected,
+        method: 'native-smtp'
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -207,22 +316,20 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('SMTP email sending error:', error);
-    
-    // Enhanced error logging for production debugging
-    const errorDetails = {
-      error: error.message,
-      success: false,
-      timestamp: new Date().toISOString(),
-      // Add stack trace in development only
-      ...(Deno.env.get('DENO_ENV') !== 'production' && { stack: error.stack })
-    };
+    console.error('=== SMTP Email Error ===');
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     
     return new Response(
-      JSON.stringify(errorDetails),
+      JSON.stringify({ 
+        error: error.message,
+        success: false,
+        timestamp: new Date().toISOString(),
+        method: 'native-smtp'
+      }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
+        status: 400,
       },
     );
   }

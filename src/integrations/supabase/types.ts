@@ -485,17 +485,9 @@ export type Database = {
           created_at: string
           email_provider: string | null
           email_templates: Json | null
-          enable_email: boolean | null
-          enable_sms: boolean | null
           id: string
-          mailersend_api_token: string | null
-          mailersend_domain: string | null
-          mailersend_domain_verified: boolean | null
           sender_email: string | null
           sender_name: string | null
-          sms_api_key: string | null
-          sms_provider: string | null
-          sms_sender_id: string | null
           sms_templates: Json | null
           smtp_host: string | null
           smtp_pass: string | null
@@ -511,17 +503,9 @@ export type Database = {
           created_at?: string
           email_provider?: string | null
           email_templates?: Json | null
-          enable_email?: boolean | null
-          enable_sms?: boolean | null
           id?: string
-          mailersend_api_token?: string | null
-          mailersend_domain?: string | null
-          mailersend_domain_verified?: boolean | null
           sender_email?: string | null
           sender_name?: string | null
-          sms_api_key?: string | null
-          sms_provider?: string | null
-          sms_sender_id?: string | null
           sms_templates?: Json | null
           smtp_host?: string | null
           smtp_pass?: string | null
@@ -537,17 +521,9 @@ export type Database = {
           created_at?: string
           email_provider?: string | null
           email_templates?: Json | null
-          enable_email?: boolean | null
-          enable_sms?: boolean | null
           id?: string
-          mailersend_api_token?: string | null
-          mailersend_domain?: string | null
-          mailersend_domain_verified?: boolean | null
           sender_email?: string | null
           sender_name?: string | null
-          sms_api_key?: string | null
-          sms_provider?: string | null
-          sms_sender_id?: string | null
           sms_templates?: Json | null
           smtp_host?: string | null
           smtp_pass?: string | null

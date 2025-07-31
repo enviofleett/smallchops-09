@@ -399,14 +399,16 @@ serve(async (req) => {
         email_id: result.messageId,
         recipient_email: emailData.to,
         subject: emailData.subject,
-        status: 'sent',
-        event_type: 'sent',
-        template_key: emailData.templateId || null,
+        delivery_status: 'sent',
+        provider: 'smtp',
+        smtp_response: result.response,
         email_type: emailData.emailType || 'transactional',
-        webhook_data: {
+        delivery_timestamp: new Date().toISOString(),
+        metadata: {
           messageId: result.messageId,
           method: 'native-smtp',
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          templateUsed: emailData.templateId || null
         }
       });
       console.log('📊 Email delivery logged successfully');

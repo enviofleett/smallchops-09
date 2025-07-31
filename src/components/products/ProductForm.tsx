@@ -184,14 +184,7 @@ export const ProductForm = ({
         {/* Allergen Information */}
         <FormField control={form.control} name="allergen_info" render={({
         field
-      }) => <FormItem>
-              <FormLabel>Package Details</FormLabel>
-              
-              <FormControl>
-                <FeaturesList features={field.value} onChange={field.onChange} placeholder="list your features" />
-              </FormControl>
-              <FormMessage />
-            </FormItem>} />
+      }) => {}} />
 
         <FormField control={form.control} name="description" render={({
         field

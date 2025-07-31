@@ -12,7 +12,6 @@ export interface SMTPSettings {
   sender_email: string;
   sender_name?: string;
   use_smtp: boolean;
-  email_provider?: string;
 }
 
 export const useSMTPSettings = () => {
@@ -44,8 +43,7 @@ export const useSMTPSettings = () => {
           smtp_secure: true,
           sender_email: '',
           sender_name: '',
-          use_smtp: false,
-          email_provider: 'mailersend'
+          use_smtp: false
         };
       }
 
@@ -58,8 +56,7 @@ export const useSMTPSettings = () => {
         smtp_secure: data.smtp_secure !== false,
         sender_email: data.sender_email || '',
         sender_name: data.sender_name || '',
-        use_smtp: data.use_smtp || false,
-        email_provider: data.email_provider || 'mailersend'
+        use_smtp: data.use_smtp || false
       };
     },
     refetchOnWindowFocus: false,
@@ -79,8 +76,7 @@ export const useSMTPSettings = () => {
           smtp_secure: settings.smtp_secure,
           sender_email: settings.sender_email,
           sender_name: settings.sender_name,
-          use_smtp: settings.use_smtp,
-          email_provider: settings.email_provider || 'mailersend'
+          use_smtp: settings.use_smtp
         })
         .select()
         .maybeSingle();

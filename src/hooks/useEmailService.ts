@@ -12,7 +12,6 @@ export interface EmailRequest {
   variables?: Record<string, any>;
   emailType?: 'marketing' | 'transactional';
   priority?: 'high' | 'normal' | 'low';
-  provider?: 'smtp' | 'mailersend' | 'auto';
 }
 
 export interface EmailTemplate {
@@ -34,7 +33,7 @@ export interface EmailDeliveryLog {
   sender_email?: string;
   subject?: string;
   delivery_status: 'queued' | 'sent' | 'delivered' | 'bounced' | 'complained' | 'failed';
-  provider: 'smtp' | 'mailersend';
+  provider: 'smtp';
   error_message?: string;
   smtp_response?: string;
   delivery_timestamp?: string;
@@ -45,17 +44,10 @@ export interface EmailDeliveryLog {
 export const useEmailService = () => {
   const { toast } = useToast();
 
-  // Send email mutation
+  // Send email mutation - only using SMTP
   const sendEmailMutation = useMutation({
     mutationFn: async (emailRequest: EmailRequest) => {
-      const provider = emailRequest.provider || 'auto';
-      
-      // Determine which service to use - default to SMTP for better reliability
-      const functionName = provider === 'smtp' ? 'smtp-email-sender' : 
-                           provider === 'mailersend' ? 'send-email-standardized' :
-                           'smtp-email-sender'; // Default to SMTP for 'auto'
-
-      const { data, error } = await supabase.functions.invoke(functionName, {
+      const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
         body: {
           to: emailRequest.to,
           toName: emailRequest.toName,
@@ -158,7 +150,7 @@ export const useEmailService = () => {
         })));
       }
 
-      // Add communication events
+      // Add communication events (converted to SMTP format)
       if (!commError && commEvents) {
         logs.push(...commEvents.map((event: any) => ({
           id: event.id,
@@ -166,7 +158,7 @@ export const useEmailService = () => {
           recipient_email: event.recipient_email,
           subject: event.template_id,
           delivery_status: event.status,
-          provider: 'mailersend' as const,
+          provider: 'smtp' as const,
           error_message: event.error_message,
           delivery_timestamp: event.sent_at,
           created_at: event.created_at,
@@ -194,8 +186,7 @@ export const useEmailService = () => {
       orderDate?: string;
       deliveryAddress?: string;
       pickupAddress?: string;
-    },
-    provider: 'smtp' | 'mailersend' | 'auto' = 'auto'
+    }
   ) => {
     const templateKey = `order_${orderData.orderStatus.toLowerCase()}`;
     
@@ -212,8 +203,7 @@ export const useEmailService = () => {
         deliveryAddress: orderData.deliveryAddress,
         pickupAddress: orderData.pickupAddress,
       },
-      emailType: 'transactional',
-      provider
+      emailType: 'transactional'
     });
   };
 
@@ -222,8 +212,7 @@ export const useEmailService = () => {
     customerData: {
       email: string;
       name: string;
-    },
-    provider: 'smtp' | 'mailersend' | 'auto' = 'auto'
+    }
   ) => {
     return sendEmailMutation.mutateAsync({
       to: customerData.email,
@@ -232,8 +221,7 @@ export const useEmailService = () => {
       variables: {
         customerName: customerData.name,
       },
-      emailType: 'transactional',
-      provider
+      emailType: 'transactional'
     });
   };
 

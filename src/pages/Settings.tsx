@@ -5,6 +5,7 @@ import { BrandingTab } from "@/components/settings/BrandingTab";
 import { AdminUserControl } from "@/components/settings/AdminUserControl";
 import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
 import { PaymentSettingsTab } from "@/components/payments/PaymentSettingsTab";
+import { ContentManagementTab } from "@/components/blog/ContentManagementTab";
 import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -44,10 +45,11 @@ const Settings = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4 lg:grid-cols-6">
+        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-7">
           <TabsTrigger value="branding">Branding</TabsTrigger>
           <TabsTrigger value="communications">Communications</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
+          <TabsTrigger value="content">Content</TabsTrigger>
           <TabsTrigger value="customer-registration">Customer Registration</TabsTrigger>
           {isAdmin && <TabsTrigger value="admin">Admin User Control</TabsTrigger>}
           {isAdmin && <TabsTrigger value="developer">Developer</TabsTrigger>}
@@ -91,6 +93,10 @@ const Settings = () => {
               <PaymentSettingsTab />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="content" className="space-y-6">
+          <ContentManagementTab />
         </TabsContent>
 
         <TabsContent value="customer-registration" className="space-y-6">

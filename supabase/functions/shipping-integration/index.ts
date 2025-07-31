@@ -7,7 +7,8 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   // Allow any Lovable project domain for development/preview
   const allowedOrigins = [
     'https://oknnklksdiqaifhxaccs.lovableproject.com', // Production
-    /^https:\/\/[\w-]+\.lovableproject\.com$/ // Dev/Preview domains
+    /^https:\/\/[\w-]+\.lovableproject\.com$/, // Dev/Preview domains
+    /^https:\/\/[\w-]+\.lovable\.dev$/ // lovable.dev domains
   ];
   
   const isAllowed = origin && allowedOrigins.some(allowed => 

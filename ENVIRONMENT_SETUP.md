@@ -12,7 +12,7 @@ Navigate to: **Project Settings → Edge Functions → Environment Variables**
 #### ALLOWED_ORIGINS
 ```
 Variable Name: ALLOWED_ORIGINS
-Value: https://id-preview--7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.app
+Value: https://id-preview--7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.app,https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.dev
 ```
 
 #### DENO_ENV  

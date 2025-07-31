@@ -9,6 +9,7 @@ const getCorsHeaders = (origin: string | null): Record<string, string> => {
   const isLovableDomain = origin && (
     origin.includes('.lovable.app') || 
     origin.includes('.lovableproject.com') ||
+    origin.includes('.lovable.dev') ||
     origin.includes('id-preview--')
   );
   

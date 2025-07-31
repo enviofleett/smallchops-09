@@ -219,7 +219,7 @@ async function processOrderStatusUpdate(supabase: any, event: any): Promise<bool
     emailType: 'transactional'
   }
 
-  const { error } = await supabase.functions.invoke('send-email-standardized', {
+  const { error } = await supabase.functions.invoke('smtp-email-sender', {
     body: emailPayload
   })
 
@@ -251,7 +251,7 @@ async function processPriceChangeNotification(supabase: any, event: any): Promis
     emailType: 'marketing'
   }
 
-  const { error } = await supabase.functions.invoke('send-email-standardized', {
+  const { error } = await supabase.functions.invoke('smtp-email-sender', {
     body: emailPayload
   })
 
@@ -283,7 +283,7 @@ async function processPromotionAlert(supabase: any, event: any): Promise<boolean
     emailType: 'marketing'
   }
 
-  const { error } = await supabase.functions.invoke('send-email-standardized', {
+  const { error } = await supabase.functions.invoke('smtp-email-sender', {
     body: emailPayload
   })
 
@@ -313,7 +313,7 @@ async function processWelcomeEmail(supabase: any, event: any): Promise<boolean> 
     emailType: 'transactional'
   }
 
-  const { error } = await supabase.functions.invoke('send-email-standardized', {
+  const { error } = await supabase.functions.invoke('smtp-email-sender', {
     body: emailPayload
   })
 

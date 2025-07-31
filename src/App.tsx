@@ -19,6 +19,7 @@ import DeliveryPickup from "./pages/DeliveryPickup";
 import AuditLogs from "./pages/AuditLogs";
 import Settings from "./pages/Settings";
 import CustomerPortal from "./pages/CustomerPortal";
+import { EmailManagementPage } from "./components/admin/EmailManagementPage";
 
 import CustomerFavorites from "./pages/CustomerFavorites";
 import PurchaseHistory from "./pages/PurchaseHistory";
@@ -57,6 +58,7 @@ const App = () => (
                 <Route path="/audit-logs" element={<EnhancedErrorBoundary context="Audit Logs"><AuditLogs /></EnhancedErrorBoundary>} />
                 <Route path="/settings" element={<EnhancedErrorBoundary context="Settings"><Settings /></EnhancedErrorBoundary>} />
                 <Route path="/payment-settings" element={<EnhancedErrorBoundary context="Payment Settings"><PaymentSettings /></EnhancedErrorBoundary>} />
+                <Route path="/admin/email-management" element={<EnhancedErrorBoundary context="Email Management"><EmailManagementPage /></EnhancedErrorBoundary>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

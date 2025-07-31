@@ -1,11 +1,21 @@
 // supabase/functions/smtp-email-sender/index.ts
-// Native SMTP implementation - NO external dependencies
+// Enhanced SMTP implementation with template support
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+}
+
+// Template variable replacement function
+function replaceVariables(template: string, variables: Record<string, string>): string {
+  let result = template;
+  Object.entries(variables).forEach(([key, value]) => {
+    const regex = new RegExp(`{{${key}}}`, 'g');
+    result = result.replace(regex, value || '');
+  });
+  return result;
 }
 
 // Native SMTP client implementation
@@ -192,17 +202,101 @@ serve(async (req) => {
   }
 
   try {
-    const { to, subject, html, text } = await req.json();
+    const requestBody = await req.json();
+    
+    // Support both template-based and direct email formats
+    let emailData;
+    
+    if (requestBody.templateId) {
+      // Template-based email
+      const { templateId, recipient, variables = {}, emailType = 'transactional' } = requestBody;
+      
+      if (!templateId || !recipient?.email) {
+        throw new Error('Missing required fields: templateId, recipient.email');
+      }
 
-    if (!to || !subject) {
-      throw new Error('Missing required fields: to, subject');
+      console.log('=== Template-Based Email Request ===');
+      console.log('Template ID:', templateId);
+      console.log('Recipient:', recipient.email);
+      console.log('Variables:', Object.keys(variables));
+
+      // Initialize Supabase client
+      const supabaseClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      );
+
+      // Fetch email template
+      const { data: template, error: templateError } = await supabaseClient
+        .from('enhanced_email_templates')
+        .select('*')
+        .eq('template_key', templateId)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (templateError) {
+        throw new Error(`Template fetch error: ${templateError.message}`);
+      }
+
+      if (!template) {
+        throw new Error(`Template not found: ${templateId}`);
+      }
+
+      console.log('✅ Template found:', template.template_name);
+
+      // Get business settings for default variables
+      const { data: businessSettings } = await supabaseClient
+        .from('business_settings')
+        .select('name, email, website_url, primary_color, secondary_color')
+        .limit(1)
+        .maybeSingle();
+
+      // Merge variables with business settings
+      const allVariables = {
+        companyName: businessSettings?.name || 'Your Store',
+        supportEmail: businessSettings?.email || 'support@example.com',
+        websiteUrl: businessSettings?.website_url || 'https://example.com',
+        primaryColor: businessSettings?.primary_color || '#3b82f6',
+        secondaryColor: businessSettings?.secondary_color || '#1e40af',
+        customerName: recipient.name || 'Valued Customer',
+        ...variables
+      };
+
+      console.log('Processed variables:', Object.keys(allVariables));
+
+      // Process template with variables
+      const processedSubject = replaceVariables(template.subject_template, allVariables);
+      const processedHtml = replaceVariables(template.html_template, allVariables);
+      const processedText = template.text_template 
+        ? replaceVariables(template.text_template, allVariables) 
+        : processedHtml.replace(/<[^>]*>/g, '');
+
+      emailData = {
+        to: recipient.email,
+        subject: processedSubject,
+        html: processedHtml,
+        text: processedText,
+        templateId,
+        emailType
+      };
+
+      console.log('✅ Template processed successfully');
+
+    } else {
+      // Direct email format (backward compatibility)
+      const { to, subject, html, text } = requestBody;
+      
+      if (!to || !subject) {
+        throw new Error('Missing required fields: to, subject');
+      }
+
+      emailData = { to, subject, html, text };
+      console.log('=== Direct Email Request ===');
+      console.log('To:', to);
+      console.log('Subject:', subject);
     }
 
-    console.log('=== SMTP Email Request Started ===');
-    console.log('To:', to);
-    console.log('Subject:', subject);
-
-    // Initialize Supabase client with service role key for system operations
+    // Initialize Supabase client for SMTP settings
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -210,7 +304,7 @@ serve(async (req) => {
 
     console.log('✅ System function authenticated with service role');
 
-    // Enhanced SMTP settings fetch with detailed logging
+    // Fetch SMTP settings
     console.log('=== Fetching SMTP Settings ===');
     
     const { data: smtpSettings, error: settingsError } = await supabaseClient
@@ -281,23 +375,44 @@ serve(async (req) => {
       },
     };
 
-    // Prepare email data
-    const emailData = {
+    // Prepare final email data
+    const finalEmailData = {
       from: settings.sender_name 
         ? `"${settings.sender_name}" <${settings.sender_email}>`
         : settings.sender_email,
-      to: to,
-      subject: subject,
-      html: html,
-      text: text || (html ? html.replace(/<[^>]*>/g, '') : ''),
+      to: emailData.to,
+      subject: emailData.subject,
+      html: emailData.html,
+      text: emailData.text || (emailData.html ? emailData.html.replace(/<[^>]*>/g, '') : ''),
     };
 
     console.log('=== Sending Email via Native SMTP ===');
-    console.log('From:', emailData.from);
-    console.log('To:', emailData.to);
+    console.log('From:', finalEmailData.from);
+    console.log('To:', finalEmailData.to);
 
     // Send email using native SMTP
-    const result = await sendSMTPEmail(smtpConfig, emailData);
+    const result = await sendSMTPEmail(smtpConfig, finalEmailData);
+
+    // Log email sending for analytics
+    try {
+      await supabaseClient.from('smtp_delivery_logs').insert({
+        email_id: result.messageId,
+        recipient_email: emailData.to,
+        subject: emailData.subject,
+        status: 'sent',
+        event_type: 'sent',
+        template_key: emailData.templateId || null,
+        email_type: emailData.emailType || 'transactional',
+        webhook_data: {
+          messageId: result.messageId,
+          method: 'native-smtp',
+          timestamp: new Date().toISOString()
+        }
+      });
+      console.log('📊 Email delivery logged successfully');
+    } catch (logError) {
+      console.warn('⚠️ Failed to log email delivery:', logError.message);
+    }
 
     console.log('=== Email Sent Successfully ===');
     console.log('Message ID:', result.messageId);
@@ -310,7 +425,8 @@ serve(async (req) => {
         message: 'Email sent successfully via native SMTP',
         accepted: result.accepted,
         rejected: result.rejected,
-        method: 'native-smtp'
+        method: 'native-smtp',
+        templateUsed: emailData.templateId || null
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

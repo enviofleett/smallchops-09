@@ -3213,6 +3213,10 @@ export type Database = {
         Args: { customer_uuid: string; product_uuid: string }
         Returns: boolean
       }
+      delete_customer_cascade: {
+        Args: { p_customer_id: string }
+        Returns: Json
+      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string

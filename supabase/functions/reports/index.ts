@@ -30,103 +30,185 @@ serve(async (req) => {
       },
     });
 
-    console.log("Fetching dashboard analytics data");
+    console.log("Fetching dashboard analytics data with enhanced error handling");
 
-    // Get total stats
-    const [productsResult, ordersResult, customersResult] = await Promise.all([
-      supabase.from('products').select('id', { count: 'exact', head: true }),
-      supabase.from('orders').select('id, total_amount', { count: 'exact' }),
-      supabase.from('customers').select('id', { count: 'exact', head: true })
-    ]);
+    // Initialize default values for fallback
+    let totalProducts = 0;
+    let totalOrders = 0;
+    let totalCustomers = 0;
+    let totalRevenue = 0;
 
-    const totalProducts = productsResult.count || 0;
-    const totalOrders = ordersResult.count || 0;
-    const totalCustomers = customersResult.count || 0;
-    const totalRevenue = ordersResult.data?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+    try {
+      // Get total stats with individual error handling
+      const [productsResult, ordersResult, customersResult] = await Promise.allSettled([
+        supabase.from('products').select('id', { count: 'exact', head: true }),
+        supabase.from('orders').select('id, total_amount', { count: 'exact' }),
+        supabase.from('customers').select('id', { count: 'exact', head: true })
+      ]);
 
-    // Get revenue trends (last 7 days)
-    const { data: revenueTrends } = await supabase
-      .from('orders')
-      .select('order_time, total_amount')
-      .gte('order_time', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-      .order('order_time', { ascending: true });
+      // Handle products count
+      if (productsResult.status === 'fulfilled' && !productsResult.value.error) {
+        totalProducts = productsResult.value.count || 0;
+        console.log(`Products count: ${totalProducts}`);
+      } else {
+        console.error("Products query failed:", productsResult.status === 'fulfilled' ? productsResult.value.error : productsResult.reason);
+      }
 
-    // Group revenue by date
-    const revenueByDate = (revenueTrends || []).reduce((acc, order) => {
-      const date = new Date(order.order_time).toISOString().split('T')[0];
-      acc[date] = (acc[date] || 0) + order.total_amount;
-      return acc;
-    }, {} as Record<string, number>);
+      // Handle orders count and revenue
+      if (ordersResult.status === 'fulfilled' && !ordersResult.value.error) {
+        totalOrders = ordersResult.value.count || 0;
+        totalRevenue = ordersResult.value.data?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
+        console.log(`Orders count: ${totalOrders}, Revenue: ${totalRevenue}`);
+      } else {
+        console.error("Orders query failed:", ordersResult.status === 'fulfilled' ? ordersResult.value.error : ordersResult.reason);
+      }
 
-    const revenueTrendsFormatted = Object.entries(revenueByDate).map(([date, revenue]) => ({
-      date,
-      revenue
-    }));
+      // Handle customers count
+      if (customersResult.status === 'fulfilled' && !customersResult.value.error) {
+        totalCustomers = customersResult.value.count || 0;
+        console.log(`Customers count: ${totalCustomers}`);
+      } else {
+        console.error("Customers query failed:", customersResult.status === 'fulfilled' ? customersResult.value.error : customersResult.reason);
+      }
+    } catch (statsError) {
+      console.error("Error fetching basic stats:", statsError);
+    }
 
-    // Get order trends (last 7 days)
-    const { data: orderTrends } = await supabase
-      .from('orders')
-      .select('order_time')
-      .gte('order_time', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-      .order('order_time', { ascending: true });
+    // Get revenue trends (last 7 days) with error handling
+    let revenueTrendsFormatted = [];
+    try {
+      const { data: revenueTrends, error: revenueError } = await supabase
+        .from('orders')
+        .select('order_time, total_amount')
+        .gte('order_time', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .order('order_time', { ascending: true });
 
-    const ordersByDate = (orderTrends || []).reduce((acc, order) => {
-      const date = new Date(order.order_time).toISOString().split('T')[0];
-      acc[date] = (acc[date] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+      if (revenueError) {
+        console.error("Revenue trends query error:", revenueError);
+      } else {
+        // Group revenue by date
+        const revenueByDate = (revenueTrends || []).reduce((acc, order) => {
+          const date = new Date(order.order_time).toISOString().split('T')[0];
+          acc[date] = (acc[date] || 0) + (order.total_amount || 0);
+          return acc;
+        }, {} as Record<string, number>);
 
-    const orderTrendsFormatted = Object.entries(ordersByDate).map(([date, orders]) => ({
-      date,
-      orders
-    }));
+        revenueTrendsFormatted = Object.entries(revenueByDate).map(([date, revenue]) => ({
+          date,
+          revenue
+        }));
+        console.log(`Revenue trends: ${revenueTrendsFormatted.length} data points`);
+      }
+    } catch (revenueError) {
+      console.error("Error fetching revenue trends:", revenueError);
+    }
 
-    // Get top customers by orders
-    const { data: topCustomersByOrders } = await supabase
-      .from('orders')
-      .select('customer_name, customer_email')
-      .limit(100);
+    // Get order trends (last 7 days) with error handling
+    let orderTrendsFormatted = [];
+    try {
+      const { data: orderTrends, error: orderTrendsError } = await supabase
+        .from('orders')
+        .select('order_time')
+        .gte('order_time', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .order('order_time', { ascending: true });
 
-    const customerOrderCounts = (topCustomersByOrders || []).reduce((acc, order) => {
-      const key = `${order.customer_name}-${order.customer_email}`;
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
+      if (orderTrendsError) {
+        console.error("Order trends query error:", orderTrendsError);
+      } else {
+        const ordersByDate = (orderTrends || []).reduce((acc, order) => {
+          const date = new Date(order.order_time).toISOString().split('T')[0];
+          acc[date] = (acc[date] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
 
-    const topCustomersByOrdersFormatted = Object.entries(customerOrderCounts)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([key, orders]) => {
-        const [name, email] = key.split('-');
-        return { customer_name: name, customer_email: email, orders };
-      });
+        orderTrendsFormatted = Object.entries(ordersByDate).map(([date, orders]) => ({
+          date,
+          orders
+        }));
+        console.log(`Order trends: ${orderTrendsFormatted.length} data points`);
+      }
+    } catch (orderTrendsError) {
+      console.error("Error fetching order trends:", orderTrendsError);
+    }
 
-    // Get top customers by spending
-    const { data: topCustomersBySpending } = await supabase
-      .from('orders')
-      .select('customer_name, customer_email, total_amount')
-      .limit(100);
+    // Get top customers by orders with error handling
+    let topCustomersByOrdersFormatted = [];
+    try {
+      const { data: topCustomersByOrders, error: customersOrdersError } = await supabase
+        .from('orders')
+        .select('customer_name, customer_email')
+        .limit(100);
 
-    const customerSpending = (topCustomersBySpending || []).reduce((acc, order) => {
-      const key = `${order.customer_name}-${order.customer_email}`;
-      acc[key] = (acc[key] || 0) + order.total_amount;
-      return acc;
-    }, {} as Record<string, number>);
+      if (customersOrdersError) {
+        console.error("Top customers by orders query error:", customersOrdersError);
+      } else {
+        const customerOrderCounts = (topCustomersByOrders || []).reduce((acc, order) => {
+          const key = `${order.customer_name || 'Unknown'}-${order.customer_email || 'unknown@email.com'}`;
+          acc[key] = (acc[key] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
 
-    const topCustomersBySpendingFormatted = Object.entries(customerSpending)
-      .sort(([,a], [,b]) => b - a)
-      .slice(0, 5)
-      .map(([key, spending]) => {
-        const [name, email] = key.split('-');
-        return { customer_name: name, customer_email: email, spending };
-      });
+        topCustomersByOrdersFormatted = Object.entries(customerOrderCounts)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 5)
+          .map(([key, orders]) => {
+            const [name, email] = key.split('-');
+            return { customer_name: name, customer_email: email, orders };
+          });
+        console.log(`Top customers by orders: ${topCustomersByOrdersFormatted.length} customers`);
+      }
+    } catch (customersOrdersError) {
+      console.error("Error fetching top customers by orders:", customersOrdersError);
+    }
 
-    // Get recent orders
-    const { data: recentOrders } = await supabase
-      .from('orders')
-      .select('id, order_number, customer_name, total_amount, status, order_time')
-      .order('order_time', { ascending: false })
-      .limit(10);
+    // Get top customers by spending with error handling
+    let topCustomersBySpendingFormatted = [];
+    try {
+      const { data: topCustomersBySpending, error: customersSpendingError } = await supabase
+        .from('orders')
+        .select('customer_name, customer_email, total_amount')
+        .limit(100);
+
+      if (customersSpendingError) {
+        console.error("Top customers by spending query error:", customersSpendingError);
+      } else {
+        const customerSpending = (topCustomersBySpending || []).reduce((acc, order) => {
+          const key = `${order.customer_name || 'Unknown'}-${order.customer_email || 'unknown@email.com'}`;
+          acc[key] = (acc[key] || 0) + (order.total_amount || 0);
+          return acc;
+        }, {} as Record<string, number>);
+
+        topCustomersBySpendingFormatted = Object.entries(customerSpending)
+          .sort(([,a], [,b]) => b - a)
+          .slice(0, 5)
+          .map(([key, spending]) => {
+            const [name, email] = key.split('-');
+            return { customer_name: name, customer_email: email, spending };
+          });
+        console.log(`Top customers by spending: ${topCustomersBySpendingFormatted.length} customers`);
+      }
+    } catch (customersSpendingError) {
+      console.error("Error fetching top customers by spending:", customersSpendingError);
+    }
+
+    // Get recent orders with error handling
+    let recentOrders = [];
+    try {
+      const { data: recentOrdersData, error: recentOrdersError } = await supabase
+        .from('orders')
+        .select('id, order_number, customer_name, total_amount, status, order_time')
+        .order('order_time', { ascending: false })
+        .limit(10);
+
+      if (recentOrdersError) {
+        console.error("Recent orders query error:", recentOrdersError);
+      } else {
+        recentOrders = recentOrdersData || [];
+        console.log(`Recent orders: ${recentOrders.length} orders`);
+      }
+    } catch (recentOrdersError) {
+      console.error("Error fetching recent orders:", recentOrdersError);
+    }
 
     const dashboardData = {
       stats: {
@@ -139,19 +221,49 @@ serve(async (req) => {
       orderTrends: orderTrendsFormatted,
       topCustomersByOrders: topCustomersByOrdersFormatted,
       topCustomersBySpending: topCustomersBySpendingFormatted,
-      recentOrders: recentOrders || []
+      recentOrders: recentOrders
     };
 
-    console.log("Dashboard data retrieved successfully");
+    console.log("Dashboard data retrieved successfully:", {
+      totalProducts,
+      totalOrders,
+      totalCustomers,
+      totalRevenue,
+      revenueTrendsCount: revenueTrendsFormatted.length,
+      orderTrendsCount: orderTrendsFormatted.length,
+      topCustomersByOrdersCount: topCustomersByOrdersFormatted.length,
+      topCustomersBySpendingCount: topCustomersBySpendingFormatted.length,
+      recentOrdersCount: recentOrders.length
+    });
 
     return new Response(JSON.stringify({ data: dashboardData }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("Reports function error:", e);
-    return new Response(JSON.stringify({ error: String(e) }), {
-      status: 500,
+    console.error("Reports function critical error:", e);
+    
+    // Return fallback data structure to prevent frontend crashes
+    const fallbackData = {
+      stats: {
+        totalProducts: 0,
+        totalOrders: 0,
+        totalCustomers: 0,
+        totalRevenue: 0
+      },
+      revenueTrends: [],
+      orderTrends: [],
+      topCustomersByOrders: [],
+      topCustomersBySpending: [],
+      recentOrders: []
+    };
+
+    return new Response(JSON.stringify({ 
+      data: fallbackData, 
+      error: "Dashboard temporarily unavailable",
+      message: "Unable to load dashboard data. Please try again later."
+    }), {
+      status: 200, // Return 200 with fallback data instead of 500
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

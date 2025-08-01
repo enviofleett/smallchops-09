@@ -42,14 +42,20 @@ export const useDashboardData = () => {
       setIsLoading(true);
       setError(null);
       
-      const result = await fetchReportsData();
+      const result = await fetchReportsData(3); // Retry up to 3 times
       
-      setData(result);
+      // Validate the returned data structure
+      if (result && typeof result === 'object') {
+        setData(result);
+      } else {
+        throw new Error('Invalid data structure received from API');
+      }
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load dashboard data');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load dashboard data';
+      setError(errorMessage);
       
-      // Set empty data structure on error
+      // Set fallback data structure with user-friendly message
       setData({
         stats: {
           totalProducts: 0,

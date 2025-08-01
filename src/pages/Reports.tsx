@@ -36,8 +36,9 @@ export default function Reports() {
   // Fetch analytics from API via react-query
   const { data, isLoading, error } = useQuery({
     queryKey: ["reports/analytics"],
-    queryFn: fetchReportsData,
-    staleTime: 3 * 60 * 1000 // 3min cache
+    queryFn: () => fetchReportsData(3), // Pass retry count as argument
+    staleTime: 3 * 60 * 1000, // 3min cache
+    retry: false // Disable react-query retry since fetchReportsData handles its own retry logic
   });
 
   // Fix: Call error handler only when error changes, not on every render

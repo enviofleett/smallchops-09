@@ -6,6 +6,7 @@ import { AdminUserControl } from "@/components/settings/AdminUserControl";
 import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
 import { PaymentSettingsTab } from "@/components/payments/PaymentSettingsTab";
 import { ContentManagementTab } from "@/components/blog/ContentManagementTab";
+import { EmailProcessingTab } from "@/components/settings/EmailProcessingTab";
 import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -45,9 +46,10 @@ const Settings = () => {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5 lg:grid-cols-7">
+        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-8">
           <TabsTrigger value="branding">Branding</TabsTrigger>
           <TabsTrigger value="communications">Communications</TabsTrigger>
+          <TabsTrigger value="email-processing">Email Queue</TabsTrigger>
           <TabsTrigger value="payments">Payments</TabsTrigger>
           <TabsTrigger value="content">Content</TabsTrigger>
           <TabsTrigger value="customer-registration">Customer Registration</TabsTrigger>
@@ -77,6 +79,20 @@ const Settings = () => {
             </CardHeader>
             <CardContent>
               <CommunicationsTab />
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="email-processing" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Email Queue Processing</CardTitle>
+              <CardDescription>
+                Monitor and manage email queue processing and delivery
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmailProcessingTab />
             </CardContent>
           </Card>
         </TabsContent>

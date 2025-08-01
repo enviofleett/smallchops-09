@@ -236,6 +236,198 @@ if (!signupData.phone || signupData.phone.trim().length < 10) {
         {isAdmin && <TabsContent value="developer" className="space-y-6">
             <Card>
               <CardHeader>
+                <CardTitle>Google OAuth Configuration</CardTitle>
+                <CardDescription>
+                  Setup Google OAuth authentication for customer login
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-6">
+                  
+                  {/* Google OAuth Setup Instructions */}
+                  <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3">🔐 Google OAuth Setup Instructions</h3>
+                    <div className="space-y-4 text-sm text-blue-800 dark:text-blue-200">
+                      <div>
+                        <h4 className="font-medium mb-2">1. Google Cloud Console Setup</h4>
+                        <ul className="space-y-1 ml-4">
+                          <li>• Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline">Google Cloud Console</a></li>
+                          <li>• Create a new project or select existing project</li>
+                          <li>• Enable the Google+ API</li>
+                        </ul>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium mb-2">2. OAuth Consent Screen</h4>
+                        <ul className="space-y-1 ml-4">
+                          <li>• Go to APIs & Services → OAuth consent screen</li>
+                          <li>• Choose "External" user type</li>
+                          <li>• Add authorized domains: <code className="bg-muted px-1 py-0.5 rounded">oknnklksdiqaifhxaccs.supabase.co</code></li>
+                          <li>• Add your production domain when ready</li>
+                        </ul>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium mb-2">3. Create OAuth Credentials</h4>
+                        <ul className="space-y-1 ml-4">
+                          <li>• Go to APIs & Services → Credentials</li>
+                          <li>• Click "Create Credentials" → "OAuth Client ID"</li>
+                          <li>• Choose "Web application"</li>
+                          <li>• Add JavaScript origins and redirect URIs (see below)</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Required URLs */}
+                  <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
+                    <h3 className="font-semibold text-green-900 dark:text-green-100 mb-3">🌐 Required URLs for Google OAuth</h3>
+                    <div className="space-y-3 text-sm">
+                      <div>
+                        <h4 className="font-medium text-green-800 dark:text-green-200 mb-1">Authorized JavaScript Origins:</h4>
+                        <div className="bg-muted p-2 rounded font-mono text-xs space-y-1">
+                          <div>https://oknnklksdiqaifhxaccs.supabase.co</div>
+                          <div>http://localhost:3000 (for development)</div>
+                          <div>https://your-production-domain.com (when live)</div>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium text-green-800 dark:text-green-200 mb-1">Authorized Redirect URIs:</h4>
+                        <div className="bg-muted p-2 rounded font-mono text-xs space-y-1">
+                          <div>https://oknnklksdiqaifhxaccs.supabase.co/auth/v1/callback</div>
+                          <div>http://localhost:54321/auth/v1/callback (for local dev)</div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Supabase Configuration */}
+                  <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
+                    <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-3">⚙️ Supabase Dashboard Configuration</h3>
+                    <div className="space-y-3 text-sm text-amber-800 dark:text-amber-200">
+                      <div>
+                        <h4 className="font-medium mb-2">1. Enable Google Provider</h4>
+                        <ul className="space-y-1 ml-4">
+                          <li>• Go to Supabase Dashboard → Authentication → Providers</li>
+                          <li>• Enable Google provider</li>
+                          <li>• Add your Google OAuth Client ID and Secret</li>
+                        </ul>
+                      </div>
+                      
+                      <div>
+                        <h4 className="font-medium mb-2">2. Configure Redirect URLs</h4>
+                        <ul className="space-y-1 ml-4">
+                          <li>• Go to Authentication → URL Configuration</li>
+                          <li>• Set Site URL: <code className="bg-muted px-1 py-0.5 rounded">https://your-domain.com</code></li>
+                          <li>• Add Redirect URLs for each environment</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Implementation Status */}
+                  <div className="bg-purple-50 dark:bg-purple-950 p-4 rounded-lg">
+                    <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-3">✅ Implementation Status</h3>
+                    <div className="space-y-2 text-sm text-purple-800 dark:text-purple-200">
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span>Google OAuth button added to customer login modal</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span>Google OAuth button added to customer signup modal</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span>Automatic customer account creation for Google users</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span>Redirect to customer portal after successful authentication</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                        <span>Requires Google OAuth credentials configuration in Supabase</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Security & Production Notes */}
+                  <div className="bg-red-50 dark:bg-red-950 p-4 rounded-lg">
+                    <h3 className="font-semibold text-red-900 dark:text-red-100 mb-3">🔒 Security & Production Checklist</h3>
+                    <div className="space-y-2 text-sm text-red-800 dark:text-red-200">
+                      <div className="flex items-start space-x-2">
+                        <span className="w-2 h-2 bg-red-500 rounded-full mt-2"></span>
+                        <span><strong>Domain Verification:</strong> Ensure all domains are verified in Google Cloud Console</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <span className="w-2 h-2 bg-red-500 rounded-full mt-2"></span>
+                        <span><strong>SSL/HTTPS:</strong> All URLs must use HTTPS in production</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <span className="w-2 h-2 bg-red-500 rounded-full mt-2"></span>
+                        <span><strong>Privacy Policy:</strong> Required for Google OAuth consent screen</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <span className="w-2 h-2 bg-red-500 rounded-full mt-2"></span>
+                        <span><strong>Terms of Service:</strong> Required for production OAuth app</span>
+                      </div>
+                      <div className="flex items-start space-x-2">
+                        <span className="w-2 h-2 bg-red-500 rounded-full mt-2"></span>
+                        <span><strong>Scope Minimization:</strong> Only request necessary permissions (email, profile)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Quick Links */}
+                  <div className="border rounded-lg p-4">
+                    <h3 className="font-semibold mb-3">🔗 Quick Links</h3>
+                    <div className="grid md:grid-cols-2 gap-3 text-sm">
+                      <a 
+                        href="https://console.cloud.google.com/apis/credentials" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors"
+                      >
+                        <span>Google Cloud Credentials</span>
+                        <span className="text-xs">↗</span>
+                      </a>
+                      <a 
+                        href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/auth/providers" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors"
+                      >
+                        <span>Supabase Auth Providers</span>
+                        <span className="text-xs">↗</span>
+                      </a>
+                      <a 
+                        href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/auth/url-configuration" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors"
+                      >
+                        <span>Supabase URL Config</span>
+                        <span className="text-xs">↗</span>
+                      </a>
+                      <a 
+                        href="https://supabase.com/docs/guides/auth/social-login/auth-google" 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors"
+                      >
+                        <span>Supabase Google Auth Docs</span>
+                        <span className="text-xs">↗</span>
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
                 <CardTitle>Frontend API Integration Guide</CardTitle>
                 <CardDescription>
                   Complete guide for integrating your frontend application with the backend APIs

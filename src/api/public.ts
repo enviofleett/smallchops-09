@@ -16,6 +16,7 @@ export interface CheckoutData {
   customer_phone: string;
   order_type: 'delivery' | 'pickup';
   delivery_address?: string;
+  delivery_zone_id?: string;
   special_instructions?: string;
   promotion_code?: string;
 }
@@ -157,6 +158,13 @@ class PublicAPIService {
 
     if (response.error) throw new Error(response.error.message);
     return response.data;
+  }
+
+  // Delivery zones
+  async getDeliveryZones() {
+    const response = await fetch(`${this.baseUrl}/delivery-zones`);
+    if (!response.ok) throw new Error('Failed to fetch delivery zones');
+    return response.json();
   }
 }
 

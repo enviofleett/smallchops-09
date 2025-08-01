@@ -63,11 +63,10 @@ export const useCart = () => {
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify({ items: cart.items }));
   }, [cart.items]);
 
-  const calculateCartSummary = (items: CartItem[], discountAmount = 0, orderType: 'delivery' | 'pickup' = 'delivery'): Cart => {
+  const calculateCartSummary = (items: CartItem[], discountAmount = 0, deliveryFee = 0): Cart => {
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
     const tax_amount = subtotal * TAX_RATE;
-    const delivery_fee = orderType === 'delivery' && subtotal < FREE_DELIVERY_THRESHOLD ? DELIVERY_FEE : 0;
-    const total_amount = subtotal + tax_amount + delivery_fee - discountAmount;
+    const total_amount = subtotal + tax_amount + deliveryFee - discountAmount;
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
     return {
@@ -75,7 +74,7 @@ export const useCart = () => {
       summary: {
         subtotal: Math.round(subtotal * 100) / 100,
         tax_amount: Math.round(tax_amount * 100) / 100,
-        delivery_fee: Math.round(delivery_fee * 100) / 100,
+        delivery_fee: Math.round(deliveryFee * 100) / 100,
         discount_amount: Math.round(discountAmount * 100) / 100,
         total_amount: Math.round(total_amount * 100) / 100
       },
@@ -140,8 +139,12 @@ export const useCart = () => {
     localStorage.removeItem(CART_STORAGE_KEY);
   };
 
-  const updateCartSummary = (discountAmount = 0, orderType: 'delivery' | 'pickup' = 'delivery') => {
-    setCart(calculateCartSummary(cart.items, discountAmount, orderType));
+  const updateDeliveryFee = (deliveryFee: number) => {
+    setCart(calculateCartSummary(cart.items, cart.summary.discount_amount, deliveryFee));
+  };
+
+  const updateCartSummary = (discountAmount = 0, deliveryFee = cart.summary.delivery_fee) => {
+    setCart(calculateCartSummary(cart.items, discountAmount, deliveryFee));
   };
 
   const getCartTotal = () => cart.summary.total_amount;
@@ -154,6 +157,7 @@ export const useCart = () => {
     removeItem,
     updateQuantity,
     clearCart,
+    updateDeliveryFee,
     updateCartSummary,
     getCartTotal,
     getItemCount,

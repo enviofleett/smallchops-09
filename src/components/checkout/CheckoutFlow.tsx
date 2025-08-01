@@ -18,7 +18,7 @@ interface CheckoutFlowProps {
 }
 
 export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) => {
-  const { cart, clearCart } = useCart();
+  const { cart, clearCart, updateDeliveryFee } = useCart();
   const { placeOrder, loading: orderLoading } = useOrderManagement();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
@@ -220,8 +220,7 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
                     selectedZoneId={checkoutData.delivery_zone_id}
                     onZoneSelect={(zoneId, deliveryFee) => {
                       handleInputChange('delivery_zone_id', zoneId);
-                      // Update cart delivery fee
-                      cart.updateDeliveryFee(deliveryFee);
+                      updateDeliveryFee(deliveryFee);
                     }}
                     orderSubtotal={cart.summary.subtotal}
                   />

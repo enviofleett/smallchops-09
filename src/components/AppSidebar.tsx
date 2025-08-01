@@ -129,25 +129,25 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-sidebar-border">
-      <SidebarHeader className="border-b border-sidebar-border px-4 py-4">
+      <SidebarHeader className="border-b border-sidebar-border px-4 md:px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center overflow-hidden bg-sidebar-accent">
+          <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden bg-sidebar-accent">
             <img 
               src={startersLogo} 
               alt="Starters" 
-              className="w-full h-full object-contain p-0.5" 
+              className="w-full h-full object-contain p-1" 
               loading="lazy" 
             />
           </div>
           {!collapsed && (
-            <span className="text-lg font-bold text-sidebar-foreground">
+            <span className="text-xl font-bold text-sidebar-foreground">
               Starters
             </span>
           )}
         </div>
       </SidebarHeader>
 
-      <SidebarContent className="px-2">
+      <SidebarContent className="px-2 py-2">
         {renderMenuGroup(coreOperations, "Core")}
         {renderMenuGroup(management, "Management")}
         {renderMenuGroup(administration, "Administration")}

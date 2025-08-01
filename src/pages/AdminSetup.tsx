@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+import { createClient } from '@supabase/supabase-js';
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, CheckCircle2, Shield } from "lucide-react";
+
+const SUPABASE_URL = "https://oknnklksdiqaifhxaccs.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA";
+
+const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const setupSchema = z.object({
   fullName: z.string().min(2, "Name must be at least 2 characters"),
@@ -63,18 +68,18 @@ export default function AdminSetup() {
     }
 
     try {
-      // Use direct database query to validate token
-      const result = await supabase
+      // Query the admin_invitations table directly  
+      const response: any = await supabase
         .from('admin_invitations')
         .select('id, email, role, expires_at, status, accepted_at')
-        .eq('invitation_token', token)
-        .maybeSingle();
+        .eq('invitation_token', token);
       
-      const { data, error } = result;
+      const { data: invitations, error } = response;
 
       if (error) throw error;
 
-      if (!data) {
+      const invitation = invitations?.[0];
+      if (!invitation) {
         setError("Invalid or expired invitation token.");
         setIsLoading(false);
         return;
@@ -82,13 +87,13 @@ export default function AdminSetup() {
 
       // Check if invitation is valid
       const now = new Date();
-      const expiresAt = new Date(data.expires_at);
-      const isValid = expiresAt > now && data.status === 'pending' && !data.accepted_at;
+      const expiresAt = new Date(invitation.expires_at);
+      const isValid = expiresAt > now && invitation.status === 'pending' && !invitation.accepted_at;
       
       if (!isValid) {
         if (expiresAt <= now) {
           setError("This invitation has expired.");
-        } else if (data.accepted_at) {
+        } else if (invitation.accepted_at) {
           setError("This invitation has already been used.");
         } else {
           setError("This invitation is no longer valid.");
@@ -98,11 +103,11 @@ export default function AdminSetup() {
       }
 
       setInvitationData({
-        invitation_id: data.id,
-        email: data.email,
-        role: data.role,
+        invitation_id: invitation.id,
+        email: invitation.email,
+        role: invitation.role,
         is_valid: isValid,
-        expires_at: data.expires_at,
+        expires_at: invitation.expires_at,
       });
     } catch (err: any) {
       console.error('Token validation error:', err);

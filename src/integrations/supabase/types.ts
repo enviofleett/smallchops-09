@@ -2682,6 +2682,7 @@ export type Database = {
           environment: string | null
           id: string
           integration_data: Json | null
+          last_health_check: string | null
           live_public_key: string | null
           live_secret_key: string | null
           live_webhook_secret: string | null
@@ -2690,6 +2691,7 @@ export type Database = {
           provider: string
           public_key: string | null
           secret_key: string | null
+          security_score: number | null
           supported_methods: Json | null
           test_mode: boolean | null
           transaction_fee: number | null
@@ -2706,6 +2708,7 @@ export type Database = {
           environment?: string | null
           id?: string
           integration_data?: Json | null
+          last_health_check?: string | null
           live_public_key?: string | null
           live_secret_key?: string | null
           live_webhook_secret?: string | null
@@ -2714,6 +2717,7 @@ export type Database = {
           provider: string
           public_key?: string | null
           secret_key?: string | null
+          security_score?: number | null
           supported_methods?: Json | null
           test_mode?: boolean | null
           transaction_fee?: number | null
@@ -2730,6 +2734,7 @@ export type Database = {
           environment?: string | null
           id?: string
           integration_data?: Json | null
+          last_health_check?: string | null
           live_public_key?: string | null
           live_secret_key?: string | null
           live_webhook_secret?: string | null
@@ -2738,6 +2743,7 @@ export type Database = {
           provider?: string
           public_key?: string | null
           secret_key?: string | null
+          security_score?: number | null
           supported_methods?: Json | null
           test_mode?: boolean | null
           transaction_fee?: number | null
@@ -3142,6 +3148,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      production_checklist: {
+        Row: {
+          category: string
+          completed_at: string | null
+          completed_by: string | null
+          created_at: string
+          id: string
+          is_completed: boolean | null
+          item_description: string | null
+          item_name: string
+          priority_level: string | null
+          updated_at: string
+        }
+        Insert: {
+          category: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean | null
+          item_description?: string | null
+          item_name: string
+          priority_level?: string | null
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          completed_at?: string | null
+          completed_by?: string | null
+          created_at?: string
+          id?: string
+          is_completed?: boolean | null
+          item_description?: string | null
+          item_name?: string
+          priority_level?: string | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       products: {
         Row: {
@@ -4039,6 +4084,10 @@ export type Database = {
         Args: { p_email: string; p_purpose: string }
         Returns: boolean
       }
+      check_paystack_production_readiness: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       check_upload_rate_limit: {
         Args: { p_user_id: string }
         Returns: boolean
@@ -4282,6 +4331,16 @@ export type Database = {
         }
         Returns: string
       }
+      log_payment_security_event: {
+        Args: {
+          event_type: string
+          severity?: string
+          details?: Json
+          ip_address?: unknown
+          user_agent?: string
+        }
+        Returns: string
+      }
       log_security_incident: {
         Args: {
           p_incident_type: string
@@ -4326,6 +4385,10 @@ export type Database = {
       }
       validate_admin_permission: {
         Args: { required_permission?: string }
+        Returns: boolean
+      }
+      validate_paystack_webhook_ip: {
+        Args: { request_ip: unknown }
         Returns: boolean
       }
       verify_payment_atomic: {

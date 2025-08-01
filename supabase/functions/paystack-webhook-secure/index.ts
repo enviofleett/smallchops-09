@@ -4,11 +4,14 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// PRODUCTION CORS - Restrict to Paystack IPs only
+// Updated Paystack IPs (2025) - Enhanced security
 const PAYSTACK_IPS = [
   '52.31.139.75',
-  '52.49.173.169', 
-  '52.214.14.220'
+  '52.49.173.169',
+  '52.214.14.220',
+  '54.154.89.105',
+  '54.154.151.138',
+  '54.217.79.138'
 ];
 
 const corsHeaders = {
@@ -75,12 +78,10 @@ async function verifyWebhookSignature(payload: string, signature: string, secret
 
 async function logSecurityIncident(type: string, description: string, severity: string, metadata: any = {}) {
   try {
-    await supabase.from('security_incidents').insert({
-      type,
-      description,
-      severity,
-      request_data: metadata,
-      created_at: new Date().toISOString()
+    await supabase.rpc('log_payment_security_event', {
+      event_type: type,
+      severity: severity,
+      details: { description, ...metadata }
     });
   } catch (error) {
     console.error('Failed to log security incident:', error);
@@ -227,19 +228,24 @@ serve(async (req) => {
                     req.headers.get('x-real-ip') || 
                     'unknown';
 
-    // Verify request comes from Paystack (production security)
-    if (Deno.env.get('DENO_ENV') === 'production' && !PAYSTACK_IPS.includes(clientIP)) {
-      await logSecurityIncident(
-        'unauthorized_webhook_ip',
-        `Webhook request from unauthorized IP: ${clientIP}`,
-        'high',
-        { ip: clientIP, user_agent: req.headers.get('user-agent') }
-      );
+    // Enhanced IP validation using database function
+    if (Deno.env.get('DENO_ENV') === 'production') {
+      const { data: isValidIP, error: ipCheckError } = await supabase
+        .rpc('validate_paystack_webhook_ip', { request_ip: clientIP });
+      
+      if (ipCheckError || !isValidIP) {
+        await logSecurityIncident(
+          'unauthorized_webhook_ip',
+          `Webhook request from unauthorized IP: ${clientIP}`,
+          'high',
+          { ip: clientIP, user_agent: req.headers.get('user-agent'), validation_error: ipCheckError?.message }
+        );
 
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 403,
-      });
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 403,
+        });
+      }
     }
     
     // CRITICAL SECURITY 1: Verify webhook signature

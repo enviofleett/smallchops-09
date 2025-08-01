@@ -15,6 +15,7 @@ import { TransactionMonitor } from '@/components/admin/TransactionMonitor';
 import { PaymentHealthCheck } from '@/components/admin/PaymentHealthCheck';
 import { EnvironmentSwitcher } from '@/components/environment/EnvironmentSwitcher';
 import { PaymentErrorTracker } from '@/components/admin/PaymentErrorTracker';
+import { PaystackProductionDashboard } from '@/components/payments/PaystackProductionDashboard';
 import { AlertCircle, CheckCircle, Copy, ExternalLink, Lock, UserX } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHasPermission } from '@/hooks/usePermissions';
@@ -311,8 +312,9 @@ export const PaymentSettings: React.FC = () => {
       </div>
 
       <Tabs defaultValue="environment" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="environment">Environment</TabsTrigger>
+          <TabsTrigger value="production">Production</TabsTrigger>
           <TabsTrigger value="configuration">Configuration</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
           <TabsTrigger value="transactions">Transactions</TabsTrigger>
@@ -322,6 +324,10 @@ export const PaymentSettings: React.FC = () => {
 
         <TabsContent value="environment" className="space-y-6">
           <EnvironmentSwitcher />
+        </TabsContent>
+
+        <TabsContent value="production" className="space-y-6">
+          <PaystackProductionDashboard />
         </TabsContent>
 
           <TabsContent value="configuration" className="space-y-6">

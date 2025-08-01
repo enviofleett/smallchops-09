@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Car, Motorcycle, Bike, Truck } from 'lucide-react';
+import { Plus, Edit, Trash2, Car, Bike, Truck2, Truck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -9,8 +9,8 @@ import type { Driver } from '@/api/drivers';
 
 const vehicleIcons = {
   car: Car,
-  motorcycle: Motorcycle,
-  bicycle: Bike,
+  motorcycle: Bike,
+  bicycle: Truck2,
   van: Truck
 };
 

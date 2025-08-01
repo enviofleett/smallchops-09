@@ -78,6 +78,12 @@ Deno.serve(async (req) => {
               case 'order_status_update':
                 success = await processOrderStatusUpdate(supabase, event)
                 break
+              case 'order_confirmation':
+                success = await processOrderEmail(supabase, event)
+                break
+              case 'payment_confirmation':
+                success = await processOrderEmail(supabase, event)
+                break
               case 'price_change':
                 success = await processPriceChangeNotification(supabase, event)
                 break
@@ -86,6 +92,9 @@ Deno.serve(async (req) => {
                 break
               case 'welcome_email':
                 success = await processWelcomeEmail(supabase, event)
+                break
+              case 'customer_welcome': // FIXED: Handle the correct event type
+                success = await processCustomerWelcomeEmail(supabase, event)
                 break
               default:
                 console.log(`Unknown event type: ${event.event_type}`)
@@ -318,6 +327,90 @@ async function processWelcomeEmail(supabase: any, event: any): Promise<boolean> 
   })
 
   return !error
+}
+
+async function processOrderEmail(supabase: any, event: any): Promise<boolean> {
+  console.log(`Processing order email (${event.event_type}) for ${event.recipient_email}`)
+  
+  if (!event.recipient_email) {
+    console.error('Missing recipient email for order email')
+    return false
+  }
+
+  // Map event types to template IDs
+  const templateMap: Record<string, string> = {
+    'order_confirmation': 'order_confirmation',
+    'payment_confirmation': 'payment_confirmation'
+  }
+
+  const templateId = templateMap[event.event_type] || 'order_confirmation'
+
+  const emailPayload = {
+    to: event.recipient_email,
+    templateId: templateId,
+    variables: {
+      ...event.variables,
+      ...event.template_variables
+    },
+    emailType: 'transactional'
+  }
+
+  const { error } = await supabase.functions.invoke('smtp-email-sender', {
+    body: emailPayload
+  })
+
+  if (error) {
+    console.error('Failed to send order email:', error)
+    return false
+  }
+
+  console.log(`Order email sent successfully to ${event.recipient_email}`)
+  return true
+}
+
+async function processCustomerWelcomeEmail(supabase: any, event: any): Promise<boolean> {
+  console.log(`Processing customer welcome email for ${event.recipient_email}`)
+  
+  if (!event.recipient_email) {
+    console.error('Missing recipient email for customer welcome email')
+    return false
+  }
+
+  // Get business settings for company details
+  const { data: businessSettings } = await supabase
+    .from('business_settings')
+    .select('*')
+    .order('updated_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  // Enhance variables with business settings
+  const enhancedVariables = {
+    ...event.variables,
+    ...event.template_variables,
+    companyName: businessSettings?.name || 'Starters',
+    siteUrl: 'https://oknnklksdiqaifhxaccs.supabase.co',
+    customerName: event.variables?.customerName || event.template_variables?.customerName || 'Valued Customer'
+  }
+
+  const emailPayload = {
+    to: event.recipient_email,
+    templateId: 'welcome_customer',
+    variables: enhancedVariables,
+    emailType: 'transactional'
+  }
+
+  const { error } = await supabase.functions.invoke('smtp-email-sender', {
+    body: emailPayload
+  })
+
+  if (error) {
+    console.error('Failed to send customer welcome email:', error)
+    return false
+  }
+
+  console.log(`Customer welcome email sent successfully to ${event.recipient_email}`)
+  return true
 }
 
 // Helper function to get site URL dynamically

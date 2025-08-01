@@ -374,6 +374,166 @@ const verification = await handlePaymentSuccess(sessionId, orderId);`}</pre>
                       </div>
                     </div>
 
+                    {/* OTP Authentication */}
+                    <div className="border rounded-lg p-4">
+                      <h4 className="font-medium mb-3">🔐 OTP Authentication System</h4>
+                      <div className="space-y-4">
+                        <div className="bg-blue-50 dark:bg-blue-950 p-3 rounded-lg">
+                          <h5 className="font-medium text-blue-900 dark:text-blue-100 mb-2">Overview</h5>
+                          <p className="text-sm text-blue-800 dark:text-blue-200">
+                            Email-based One-Time Password authentication for secure login, registration verification, and password reset.
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          <h5 className="font-medium">Frontend Integration</h5>
+                          <div className="bg-muted/50 p-3 rounded text-sm">
+                            <pre>{`import { useOTPAuth } from '@/hooks/useOTPAuth';
+
+const { sendOTP, verifyOTP, isLoading } = useOTPAuth();
+
+// Send OTP for login
+const result = await sendOTP(
+  'user@example.com',
+  'login',
+  'John Doe' // optional customer name
+);
+
+// Verify OTP code
+const verification = await verifyOTP(
+  'user@example.com',
+  '123456',
+  'login'
+);
+
+if (verification.success && verification.loginVerified) {
+  // User successfully authenticated
+}`}</pre>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <h5 className="font-medium">API Reference</h5>
+                          <div className="space-y-2">
+                            <div className="border-l-4 border-blue-500 pl-3">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-mono">POST</span>
+                                <code className="text-sm">generate-otp-email</code>
+                              </div>
+                              <p className="text-sm text-muted-foreground">Generate and send OTP via email</p>
+                              <div className="bg-muted/30 p-2 rounded text-xs mt-2">
+                                <pre>{`{
+  "email": "user@example.com",
+  "purpose": "login|registration|password_reset",
+  "customerName": "John Doe" // optional
+}`}</pre>
+                              </div>
+                            </div>
+                            <div className="border-l-4 border-green-500 pl-3">
+                              <div className="flex items-center space-x-2 mb-1">
+                                <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-xs font-mono">POST</span>
+                                <code className="text-sm">verify-otp</code>
+                              </div>
+                              <p className="text-sm text-muted-foreground">Verify OTP code</p>
+                              <div className="bg-muted/30 p-2 rounded text-xs mt-2">
+                                <pre>{`{
+  "email": "user@example.com",
+  "code": "123456",
+  "purpose": "login|registration|password_reset"
+}`}</pre>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <h5 className="font-medium">Security Features</h5>
+                          <ul className="text-sm space-y-1">
+                            <li>• Rate limiting: 5 OTPs per hour per email</li>
+                            <li>• 6-digit numeric codes with 5-minute expiration</li>
+                            <li>• Maximum 3 verification attempts per OTP</li>
+                            <li>• Automatic cleanup of expired codes</li>
+                            <li>• Purpose-specific verification (login/registration/reset)</li>
+                          </ul>
+                        </div>
+
+                        <div className="space-y-3">
+                          <h5 className="font-medium">Complete Implementation Example</h5>
+                          <div className="bg-muted/50 p-3 rounded text-sm">
+                            <pre>{`// Login with OTP flow
+const LoginWithOTP = () => {
+  const [email, setEmail] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
+  const { sendOTP, completeOTPLogin, isLoading } = useOTPAuth();
+
+  const handleSendOTP = async () => {
+    const result = await sendOTP(email, 'login');
+    if (result.success) {
+      setOtpSent(true);
+    }
+  };
+
+  const handleVerifyOTP = async (code: string) => {
+    const result = await completeOTPLogin(email, code);
+    if (result.success && result.loginVerified) {
+      // Redirect to dashboard or update auth state
+      window.location.href = '/dashboard';
+    }
+  };
+
+  return otpSent ? (
+    <OTPInput
+      email={email}
+      purpose="login"
+      onVerified={handleVerifyOTP}
+      onBack={() => setOtpSent(false)}
+    />
+  ) : (
+    <LoginForm onSubmit={handleSendOTP} />
+  );
+};`}</pre>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <h5 className="font-medium">Error Handling</h5>
+                          <div className="bg-amber-50 dark:bg-amber-950 p-3 rounded-lg">
+                            <div className="text-sm space-y-2">
+                              <div><code>rateLimited</code> - Too many OTP requests</div>
+                              <div><code>expired</code> - OTP code has expired</div>
+                              <div><code>invalidCode</code> - Wrong OTP code entered</div>
+                              <div><code>maxAttemptsReached</code> - Too many failed attempts</div>
+                              <div><code>notFound</code> - No valid OTP found for email</div>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-3">
+                          <h5 className="font-medium">Database Schema</h5>
+                          <div className="bg-muted/50 p-3 rounded text-sm">
+                            <pre>{`-- email_otp_verification table
+CREATE TABLE email_otp_verification (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  email text NOT NULL,
+  code text NOT NULL,
+  purpose text NOT NULL,
+  expires_at timestamptz NOT NULL,
+  is_verified boolean DEFAULT false,
+  attempts integer DEFAULT 0,
+  created_at timestamptz DEFAULT now(),
+  verified_at timestamptz
+);
+
+-- Automatic cleanup of expired OTPs
+SELECT cleanup_expired_otps();
+
+-- Rate limiting check
+SELECT check_otp_rate_limit('email@example.com', 'login');`}</pre>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Promotions */}
                     <div className="border rounded-lg p-4">
                       <h4 className="font-medium mb-3">🎟️ Promotions & Discounts</h4>

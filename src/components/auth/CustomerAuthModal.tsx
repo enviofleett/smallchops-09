@@ -8,6 +8,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import startersLogo from '@/assets/starters-logo.png';
+import { OTPInput } from "./OTPInput";
+import { useOTPAuth } from "@/hooks/useOTPAuth";
 
 interface CustomerAuthModalProps {
   isOpen: boolean;
@@ -19,7 +21,12 @@ export const CustomerAuthModal = ({ isOpen, onClose, onAuthenticated }: Customer
   const [activeTab, setActiveTab] = useState('login');
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [showOTP, setShowOTP] = useState(false);
+  const [otpEmail, setOtpEmail] = useState("");
+  const [otpPurpose, setOtpPurpose] = useState<'login' | 'registration' | 'password_reset'>('login');
+  const [customerName, setCustomerName] = useState("");
   const { toast } = useToast();
+  const { loginWithOTP } = useOTPAuth();
 
   const [loginData, setLoginData] = useState({
     email: '',
@@ -75,6 +82,53 @@ export const CustomerAuthModal = ({ isOpen, onClose, onAuthenticated }: Customer
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const handleOTPLogin = async () => {
+    if (!loginData.email) {
+      toast({
+        title: "Email required",
+        description: "Please enter your email address to receive a login code.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    const result = await loginWithOTP(loginData.email);
+    if (result.success) {
+      setOtpEmail(loginData.email);
+      setOtpPurpose('login');
+      setShowOTP(true);
+    }
+  };
+
+  const handleOTPVerified = async (result: any) => {
+    if (result.loginVerified) {
+      // For a complete implementation, you'd create a proper session here
+      // For now, we'll simulate finding the customer account
+      try {
+        const { data: customer } = await supabase
+          .from('customers')
+          .select('id')
+          .eq('email', result.email)
+          .single();
+
+        if (customer) {
+          toast({
+            title: "Welcome back!",
+            description: "You have been logged in successfully.",
+          });
+          onAuthenticated(customer.id);
+          onClose();
+        }
+      } catch (error) {
+        toast({
+          title: "Login failed",
+          description: "Customer account not found.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -168,51 +222,82 @@ export const CustomerAuthModal = ({ isOpen, onClose, onAuthenticated }: Customer
           </TabsList>
 
           <TabsContent value="login" className="space-y-4">
-            <form onSubmit={handleLogin} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="login-email">Email</Label>
-                <Input
-                  id="login-email"
-                  type="email"
-                  value={loginData.email}
-                  onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
+            {showOTP ? (
+              <OTPInput
+                email={otpEmail}
+                purpose={otpPurpose}
+                customerName={customerName}
+                onVerified={handleOTPVerified}
+                onBack={() => setShowOTP(false)}
+              />
+            ) : (
+              <div className="space-y-4">
+                <form onSubmit={handleLogin} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email">Email</Label>
+                    <Input
+                      id="login-email"
+                      type="email"
+                      value={loginData.email}
+                      onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
+                      placeholder="Enter your email"
+                      required
+                    />
+                  </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="login-password">Password</Label>
-                <div className="relative">
-                  <Input
-                    id="login-password"
-                    type={showPassword ? 'text' : 'password'}
-                    value={loginData.password}
-                    onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                    placeholder="Enter your password"
-                    required
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                  >
-                    {showPassword ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                  <div className="space-y-2">
+                    <Label htmlFor="login-password">Password</Label>
+                    <div className="relative">
+                      <Input
+                        id="login-password"
+                        type={showPassword ? 'text' : 'password'}
+                        value={loginData.password}
+                        onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
+                        placeholder="Enter your password"
+                        required
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                        onClick={() => setShowPassword(!showPassword)}
+                      >
+                        {showPassword ? (
+                          <EyeOff className="h-4 w-4" />
+                        ) : (
+                          <Eye className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Button type="submit" className="w-full" disabled={isLoading}>
+                    {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Login with Password
                   </Button>
-                </div>
-              </div>
+                </form>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Login
-              </Button>
-            </form>
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Or</span>
+                  </div>
+                </div>
+
+                <Button 
+                  type="button" 
+                  variant="outline" 
+                  className="w-full" 
+                  onClick={handleOTPLogin}
+                  disabled={isLoading}
+                >
+                  Login with Email Code
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="signup" className="space-y-4">

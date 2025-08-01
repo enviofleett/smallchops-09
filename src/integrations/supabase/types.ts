@@ -1758,6 +1758,54 @@ export type Database = {
         }
         Relationships: []
       }
+      email_otp_verification: {
+        Row: {
+          attempts: number
+          code: string
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          ip_address: unknown | null
+          max_attempts: number
+          purpose: string
+          updated_at: string
+          user_agent: string | null
+          verified: boolean
+          verified_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          code: string
+          created_at?: string
+          email: string
+          expires_at: string
+          id?: string
+          ip_address?: unknown | null
+          max_attempts?: number
+          purpose: string
+          updated_at?: string
+          user_agent?: string | null
+          verified?: boolean
+          verified_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          code?: string
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          ip_address?: unknown | null
+          max_attempts?: number
+          purpose?: string
+          updated_at?: string
+          user_agent?: string | null
+          verified?: boolean
+          verified_at?: string | null
+        }
+        Relationships: []
+      }
       email_suppression_list: {
         Row: {
           created_at: string | null
@@ -3987,6 +4035,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      check_otp_rate_limit: {
+        Args: { p_email: string; p_purpose: string }
+        Returns: boolean
+      }
       check_upload_rate_limit: {
         Args: { p_user_id: string }
         Returns: boolean
@@ -4002,6 +4054,10 @@ export type Database = {
       cleanup_expired_admin_invitations: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      cleanup_expired_otps: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       cleanup_expired_rate_limits: {
         Args: Record<PropertyKey, never>

@@ -23,7 +23,7 @@ export async function fetchReportsData() {
       console.warn("No session found, proceeding without authentication");
     }
     
-    const res = await fetch("https://lpcviyjdsgghvuddthxr.functions.supabase.co/reports", {
+    const res = await fetch("https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/reports", {
       method: "GET",
       headers
     });

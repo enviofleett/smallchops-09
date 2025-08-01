@@ -2,8 +2,9 @@ import React from 'react';
 import { OrderWithItems } from '@/api/orders';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
-import { Eye, Printer, Package, Truck } from 'lucide-react';
+import { Eye, Printer, Package, Truck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Tooltip,
   TooltipContent,
@@ -14,6 +15,10 @@ import {
 interface OrdersTableProps {
   orders: OrderWithItems[];
   onViewOrder: (order: OrderWithItems) => void;
+  onDeleteOrder: (order: OrderWithItems) => void;
+  selectedOrders: string[];
+  onSelectOrder: (orderId: string, selected: boolean) => void;
+  onSelectAll: (selected: boolean) => void;
 }
 
 const statusConfig: Record<OrderStatus, { label: string; className: string }> = {
@@ -31,7 +36,7 @@ const getStatusBadge = (status: OrderStatus) => {
   return statusConfig[status] || { label: 'Unknown', className: 'bg-gray-100 text-gray-800' };
 };
 
-const OrdersTable = ({ orders, onViewOrder }: OrdersTableProps) => {
+const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSelectOrder, onSelectAll }: OrdersTableProps) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
   };
@@ -42,6 +47,12 @@ const OrdersTable = ({ orders, onViewOrder }: OrdersTableProps) => {
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">
+                <Checkbox
+                  checked={selectedOrders.length === orders.length && orders.length > 0}
+                  onCheckedChange={onSelectAll}
+                />
+              </th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Order ID</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Customer</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Order Time</th>
@@ -54,6 +65,12 @@ const OrdersTable = ({ orders, onViewOrder }: OrdersTableProps) => {
           <tbody>
             {orders.map((order) => (
               <tr key={order.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                <td className="py-4 px-6">
+                  <Checkbox
+                    checked={selectedOrders.includes(order.id)}
+                    onCheckedChange={(checked) => onSelectOrder(order.id, checked as boolean)}
+                  />
+                </td>
                 <td className="py-4 px-6">
                   <span className="font-medium text-blue-600">{order.order_number}</span>
                 </td>
@@ -115,6 +132,22 @@ const OrdersTable = ({ orders, onViewOrder }: OrdersTableProps) => {
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>Print Order</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                            onClick={() => onDeleteOrder(order)}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                            <span className="sr-only">Delete Order</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Delete Order</p>
                         </TooltipContent>
                       </Tooltip>
                     </div>

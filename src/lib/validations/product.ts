@@ -8,7 +8,7 @@ export const productSchema = z.object({
   price: z.number().min(0, 'Price must be a positive number'),
   stock_quantity: z.number().int().min(0, 'Stock quantity must be a non-negative integer'),
   category_id: z.string().uuid('Please select a valid category').optional(),
-  status: z.enum(['active', 'archived', 'draft']).default('draft'),
+  status: z.enum(['active', 'archived', 'draft', 'discontinued']).default('draft'),
   image_url: z.string().url().optional().or(z.literal('')),
   features: z.array(z.string().min(1, 'Feature cannot be empty')).default([]),
   is_promotional: z.boolean().default(false),

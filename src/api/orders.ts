@@ -74,6 +74,30 @@ export const updateOrder = async (
   return data;
 };
 
+export const deleteOrder = async (orderId: string): Promise<void> => {
+  const { error } = await supabase
+    .from('orders')
+    .delete()
+    .eq('id', orderId);
+
+  if (error) {
+    console.error('Error deleting order:', error);
+    throw new Error(error.message);
+  }
+};
+
+export const bulkDeleteOrders = async (orderIds: string[]): Promise<void> => {
+  const { error } = await supabase
+    .from('orders')
+    .delete()
+    .in('id', orderIds);
+
+  if (error) {
+    console.error('Error bulk deleting orders:', error);
+    throw new Error(error.message);
+  }
+};
+
 export const manuallyQueueCommunicationEvent = async (
   order: OrderWithItems,
   status: OrderStatus

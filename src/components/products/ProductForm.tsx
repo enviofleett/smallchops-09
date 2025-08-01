@@ -129,6 +129,7 @@ export const ProductForm = ({
                       <SelectItem value="draft">Draft</SelectItem>
                       <SelectItem value="active">Active</SelectItem>
                       <SelectItem value="archived">Archived</SelectItem>
+                      <SelectItem value="discontinued">Discontinued</SelectItem>
                     </SelectContent>
                   </Select>
                   <FormMessage />

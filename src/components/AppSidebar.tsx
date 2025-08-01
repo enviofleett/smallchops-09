@@ -131,7 +131,7 @@ export function AppSidebar() {
     <Sidebar collapsible="icon" className="border-sidebar-border">
       <SidebarHeader className="border-b border-sidebar-border px-4 md:px-6 py-4 min-h-[73px] flex items-center">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-sidebar-accent">
+          <div className="w-14 h-14 rounded-lg flex items-center justify-center overflow-hidden bg-sidebar-accent">
             <img 
               src={startersLogo} 
               alt="Starters" 

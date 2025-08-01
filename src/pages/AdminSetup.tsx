@@ -129,7 +129,7 @@ export default function AdminSetup() {
 
     setIsSubmitting(true);
     try {
-      // Create user via Supabase Auth
+      // Create user via Supabase Auth with email redirect
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: invitationData.email,
         password: data.password,
@@ -137,54 +137,130 @@ export default function AdminSetup() {
           data: {
             name: data.fullName,
             role: invitationData.role,
+            invitation_id: invitationData.invitation_id,
           },
+          emailRedirectTo: `${window.location.origin}/settings`,
         },
       });
 
       if (authError) throw authError;
 
-      if (authData.user) {
-        // Update the invitation as accepted
-        const { error: updateError } = await supabase
-          .from('admin_invitations')
-          .update({
-            status: 'accepted',
-            accepted_at: new Date().toISOString(),
-            setup_completed_at: new Date().toISOString(),
-          })
-          .eq('id', invitationData.invitation_id);
+      if (!authData.user) {
+        throw new Error("Failed to create user account");
+      }
 
-        if (updateError) {
-          console.error('Failed to update invitation:', updateError);
-        }
+      // Update the invitation as accepted
+      const { error: updateError } = await supabase
+        .from('admin_invitations')
+        .update({
+          status: 'accepted',
+          accepted_at: new Date().toISOString(),
+          setup_completed_at: new Date().toISOString(),
+        })
+        .eq('id', invitationData.invitation_id);
 
-        // Create or update profile
-        const { error: profileError } = await supabase
-          .from('profiles')
-          .upsert({
-            id: authData.user.id,
-            name: data.fullName,
-            role: invitationData.role as any,
-            status: 'active',
-          });
+      if (updateError) {
+        console.error('Failed to update invitation:', updateError);
+        // Don't fail the entire process for this
+      }
 
-        if (profileError) {
-          console.error('Failed to create profile:', profileError);
-        }
-
-        toast({
-          title: "Account Created Successfully",
-          description: "Your admin account has been set up. You can now access the admin panel.",
+      // Create or update profile
+      const { error: profileError } = await supabase
+        .from('profiles')
+        .upsert({
+          id: authData.user.id,
+          name: data.fullName,
+          role: invitationData.role as any,
+          status: 'active',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         });
 
-        // Redirect to login or dashboard
-        navigate('/');
+      if (profileError) {
+        console.error('Failed to create profile:', profileError);
+        // Profile creation may be handled by triggers, so don't fail
       }
+
+      // Log the successful admin setup
+      try {
+        await supabase
+          .from('audit_logs')
+          .insert({
+            user_id: authData.user.id,
+            action: 'admin_setup_completed',
+            category: 'Admin Management',
+            entity_type: 'admin_invitation',
+            entity_id: invitationData.invitation_id,
+            message: `Admin setup completed for ${invitationData.email} with role ${invitationData.role}`,
+            new_values: {
+              user_id: authData.user.id,
+              email: invitationData.email,
+              role: invitationData.role,
+              full_name: data.fullName,
+              setup_timestamp: new Date().toISOString(),
+            }
+          });
+      } catch (logError) {
+        console.error('Failed to log admin setup:', logError);
+      }
+
+      toast({
+        title: "Account Created Successfully!",
+        description: "Your admin account has been set up. You can now access the admin panel.",
+      });
+
+      // Automatically sign in the user
+      try {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: invitationData.email,
+          password: data.password,
+        });
+
+        if (signInError) {
+          console.error('Auto sign-in failed:', signInError);
+          toast({
+            title: "Account Created",
+            description: "Please sign in with your new credentials.",
+          });
+          navigate('/auth');
+          return;
+        }
+
+        // Successful auto sign-in, redirect to admin panel
+        toast({
+          title: "Welcome!",
+          description: "You are now logged in. Redirecting to admin panel...",
+        });
+
+        setTimeout(() => {
+          navigate('/settings');
+        }, 2000);
+
+      } catch (signInError) {
+        console.error('Sign-in error:', signInError);
+        navigate('/auth');
+      }
+
     } catch (err: any) {
       console.error('Setup error:', err);
+      
+      let errorMessage = "Failed to create account. Please try again.";
+      
+      if (err.message?.includes('email already')) {
+        errorMessage = "An account with this email already exists. Please contact support.";
+      } else if (err.message?.includes('password')) {
+        errorMessage = "Password does not meet security requirements. Please use a stronger password.";
+      } else if (err.message?.includes('network') || err.message?.includes('fetch')) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      } else if (err.message?.includes('invalid')) {
+        errorMessage = "Invalid invitation data. Please request a new invitation.";
+      } else if (err.message) {
+        errorMessage = err.message;
+      }
+      
       toast({
         title: "Setup Failed",
-        description: err.message || "Failed to create account. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

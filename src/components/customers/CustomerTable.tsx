@@ -5,6 +5,8 @@ import { CustomerDetailsModal } from './CustomerDetailsModal';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { deleteCustomer } from "@/api/customers";
 import { useToast } from "@/hooks/use-toast";
+import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
+import { Button } from '@/components/ui/button';
 
 interface CustomerTableProps {
   customers: Customer[];
@@ -72,9 +74,124 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
     );
   }
 
+  const mobileComponent = (
+    <div className="space-y-3">
+      {customers.map((customer) => (
+        <MobileCard 
+          key={customer.id}
+          onClick={() => {
+            setSelectedCustomer(customer);
+            setDetailsOpen(true);
+          }}
+        >
+          <MobileCardHeader>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 flex items-center justify-center text-white font-medium">
+                {customer.name.charAt(0)}
+              </div>
+              <div>
+                <p className="font-medium text-gray-800">{customer.name}</p>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray-600">{customer.email}</span>
+                  {customer.isGuest && (
+                    <span className="inline-block px-2 py-0.5 text-xs font-medium rounded-full bg-orange-100 text-orange-800">
+                      Guest
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(customer.status)}`}>
+              {customer.status}
+            </span>
+          </MobileCardHeader>
+          
+          <MobileCardContent>
+            {customer.phone && (
+              <MobileCardRow 
+                label="Phone" 
+                value={customer.phone} 
+              />
+            )}
+            <MobileCardRow 
+              label="Orders" 
+              value={customer.totalOrders} 
+            />
+            <MobileCardRow 
+              label="Total Spent" 
+              value={<span className="font-semibold">₦{customer.totalSpent.toLocaleString()}</span>} 
+            />
+            <MobileCardRow 
+              label="Last Activity" 
+              value={customer.totalOrders > 0 
+                ? new Date(customer.lastOrderDate).toLocaleDateString()
+                : customer.isGuest 
+                  ? 'No orders yet'
+                  : `Registered ${new Date(customer.lastOrderDate).toLocaleDateString()}`
+              } 
+            />
+          </MobileCardContent>
+          
+          <MobileCardActions>
+            {onEditCustomer && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEditCustomer(customer);
+                }}
+                className="flex items-center gap-2"
+              >
+                <Edit className="h-4 w-4" />
+                Edit
+              </Button>
+            )}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={(e) => e.stopPropagation()}
+                  disabled={deletingCustomerId === customer.id}
+                  className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  Delete
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Customer</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Are you sure you want to delete <strong>{customer.name}</strong>? 
+                    This will permanently remove the customer and all their related data including orders, favorites, and reviews. 
+                    This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={() => handleDeleteCustomer(customer.id, customer.name)}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete Customer
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </MobileCardActions>
+        </MobileCard>
+      ))}
+    </div>
+  );
+
   return (
     <>
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+      <ResponsiveTable
+        className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+        mobileComponent={mobileComponent}
+      >
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b border-gray-100">
@@ -209,7 +326,7 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
             </tbody>
           </table>
         </div>
-      </div>
+      </ResponsiveTable>
       <CustomerDetailsModal
         open={detailsOpen}
         onOpenChange={(open) => {

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Loader2 } from "lucide-react";
+import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow } from "@/components/ui/responsive-table";
 
 interface AuditLogRow {
   id: string;
@@ -82,8 +83,93 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
     fetchLogs();
   }, [filters, page]);
 
+  const mobileComponent = (
+    <div className="space-y-3">
+      {loading ? (
+        <div className="flex justify-center py-7">
+          <Loader2 className="animate-spin h-5 w-5 text-gray-400" />
+        </div>
+      ) : logs.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-400">No logs found for these filters.</p>
+        </div>
+      ) : (
+        logs.map((log) => (
+          <MobileCard key={log.id}>
+            <MobileCardHeader>
+              <div>
+                <p className="font-medium text-gray-800">
+                  <span className="capitalize font-semibold text-blue-700">{log.action}</span>
+                </p>
+                <p className="text-sm text-gray-600">{new Date(log.event_time).toLocaleString()}</p>
+              </div>
+              <div className="text-right">
+                {log.category && (
+                  <span className="inline-block px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
+                    {log.category}
+                  </span>
+                )}
+              </div>
+            </MobileCardHeader>
+            
+            <MobileCardContent>
+              <MobileCardRow 
+                label="User" 
+                value={log.user_name || log.user_id || <span className="text-gray-300">system</span>} 
+              />
+              {log.entity_type && (
+                <MobileCardRow 
+                  label="Entity" 
+                  value={log.entity_type} 
+                />
+              )}
+              {log.message && (
+                <div className="mt-2">
+                  <span className="text-sm font-medium text-gray-600">Message:</span>
+                  <div className="text-sm text-gray-900 mt-1 whitespace-pre-line break-words">
+                    {log.message}
+                  </div>
+                </div>
+              )}
+              {log.ip_address && (
+                <MobileCardRow 
+                  label="IP Address" 
+                  value={<span className="text-xs font-mono">{log.ip_address}</span>} 
+                />
+              )}
+            </MobileCardContent>
+          </MobileCard>
+        ))
+      )}
+      
+      {/* Mobile Pagination */}
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
+        <button
+          className="px-4 py-2 bg-gray-100 rounded text-sm w-full sm:w-auto disabled:opacity-50"
+          disabled={page === 1 || loading}
+          onClick={() => setPage(page - 1)}
+        >
+          Previous
+        </button>
+        <span className="text-sm text-gray-500">
+          Page {page}
+        </span>
+        <button
+          className="px-4 py-2 bg-gray-100 rounded text-sm w-full sm:w-auto disabled:opacity-50"
+          disabled={!hasMore || loading}
+          onClick={() => setPage(page + 1)}
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+
   return (
-    <div className="relative border rounded-xl overflow-x-auto bg-white">
+    <ResponsiveTable
+      className="relative border rounded-xl overflow-x-auto bg-white"
+      mobileComponent={mobileComponent}
+    >
       <Table>
         <TableHeader>
           <TableRow>
@@ -141,7 +227,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
       {/* Pagination */}
       <div className="p-3 flex items-center justify-end gap-2">
         <button
-          className="px-3 py-1 bg-gray-100 rounded text-sm"
+          className="px-3 py-1 bg-gray-100 rounded text-sm disabled:opacity-50"
           disabled={page === 1 || loading}
           onClick={() => setPage(page - 1)}
         >
@@ -151,14 +237,14 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
           Page {page}
         </span>
         <button
-          className="px-3 py-1 bg-gray-100 rounded text-sm"
+          className="px-3 py-1 bg-gray-100 rounded text-sm disabled:opacity-50"
           disabled={!hasMore || loading}
           onClick={() => setPage(page + 1)}
         >
           Next
         </button>
       </div>
-    </div>
+    </ResponsiveTable>
   );
 };
 

@@ -11,6 +11,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
 
 interface OrdersTableProps {
   orders: OrderWithItems[];
@@ -42,8 +43,111 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
   };
 
+  const mobileComponent = (
+    <div className="space-y-3">
+      {selectedOrders.length > 0 && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-blue-800">
+              {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onSelectAll(false)}
+              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+            >
+              Clear
+            </Button>
+          </div>
+        </div>
+      )}
+      
+      {orders.map((order) => (
+        <MobileCard key={order.id}>
+          <MobileCardHeader>
+            <div className="flex items-center gap-3">
+              <Checkbox
+                checked={selectedOrders.includes(order.id)}
+                onCheckedChange={(checked) => onSelectOrder(order.id, checked as boolean)}
+              />
+              <div>
+                <p className="font-medium text-blue-600">{order.order_number}</p>
+                <p className="text-sm text-gray-600">{order.customer_name}</p>
+              </div>
+            </div>
+            <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
+              {getStatusBadge(order.status).label}
+            </span>
+          </MobileCardHeader>
+          
+          <MobileCardContent>
+            <MobileCardRow 
+              label="Customer Phone" 
+              value={order.customer_phone} 
+            />
+            <MobileCardRow 
+              label="Order Time" 
+              value={format(new Date(order.order_time), 'MMM d, yyyy h:mm a')} 
+            />
+            <MobileCardRow 
+              label="Amount" 
+              value={<span className="font-semibold">{formatCurrency(order.total_amount)}</span>} 
+            />
+            <MobileCardRow 
+              label="Type" 
+              value={
+                <div className="flex items-center gap-2">
+                  {order.order_type === 'delivery' ? (
+                    <Truck className="h-4 w-4 text-gray-500" />
+                  ) : (
+                    <Package className="h-4 w-4 text-gray-500" />
+                  )}
+                  <span className="capitalize">{order.order_type}</span>
+                </div>
+              } 
+            />
+          </MobileCardContent>
+          
+          <MobileCardActions>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onViewOrder(order)}
+              className="flex items-center gap-2"
+            >
+              <Eye className="h-4 w-4" />
+              View
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => console.log('Print order:', order.id)}
+              className="flex items-center gap-2"
+            >
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onDeleteOrder(order)}
+              className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
+            >
+              <Trash2 className="h-4 w-4" />
+              Delete
+            </Button>
+          </MobileCardActions>
+        </MobileCard>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+    <ResponsiveTable
+      className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+      mobileComponent={mobileComponent}
+    >
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50 border-b border-gray-100">
@@ -159,7 +263,7 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
           </tbody>
         </table>
       </div>
-    </div>
+    </ResponsiveTable>
   );
 };
 

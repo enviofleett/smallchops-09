@@ -11,6 +11,7 @@ import { CategoryFormData, generateSlug } from '@/lib/validations/category';
 import CategoryDialog from './CategoryDialog';
 import DeleteCategoryDialog from './DeleteCategoryDialog';
 import { useToast } from '@/hooks/use-toast';
+import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
 
 const CategoriesManager = () => {
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -164,16 +165,81 @@ const CategoriesManager = () => {
     );
   }
 
+  const mobileComponent = (
+    <div className="space-y-3">
+      {categories?.length === 0 ? (
+        <div className="text-center py-8">
+          <p className="text-gray-500">No categories found. Create your first category to get started.</p>
+        </div>
+      ) : (
+        categories?.map((category) => (
+          <MobileCard key={category.id}>
+            <MobileCardHeader>
+              <div className="flex items-center gap-3">
+                {category.banner_url ? (
+                  <img
+                    src={category.banner_url}
+                    alt={category.name}
+                    className="w-12 h-9 object-cover rounded border"
+                  />
+                ) : (
+                  <div className="w-12 h-9 bg-gray-100 rounded border flex items-center justify-center">
+                    <span className="text-xs text-gray-400">No image</span>
+                  </div>
+                )}
+                <div>
+                  <p className="font-medium text-gray-800">{category.name}</p>
+                  <p className="text-sm text-gray-500">Category</p>
+                </div>
+              </div>
+            </MobileCardHeader>
+            
+            <MobileCardContent>
+              <div>
+                <span className="text-sm font-medium text-gray-600">Description:</span>
+                <p className="text-sm text-gray-900 mt-1">{renderDescription(category.description)}</p>
+              </div>
+            </MobileCardContent>
+            
+            <MobileCardActions>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setEditingCategory(category)}
+                className="flex items-center gap-2"
+              >
+                <Edit className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button 
+                variant="outline"
+                size="sm"
+                onClick={() => setDeletingCategory(category)}
+                className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
+            </MobileCardActions>
+          </MobileCard>
+        ))
+      )}
+    </div>
+  );
+
   return (
     <div className="p-1">
-      <div className="flex justify-end mb-4">
-        <Button onClick={() => setIsAddDialogOpen(true)}>
+      <div className="flex flex-col sm:flex-row sm:justify-end mb-4 gap-3">
+        <Button onClick={() => setIsAddDialogOpen(true)} className="w-full sm:w-auto min-h-[44px]">
           <PlusCircle className="mr-2 h-4 w-4" />
           Add Category
         </Button>
       </div>
       
-      <div className="border rounded-md">
+      <ResponsiveTable
+        className="border rounded-md"
+        mobileComponent={mobileComponent}
+      >
         <Table>
           <TableHeader>
             <TableRow>
@@ -232,7 +298,7 @@ const CategoriesManager = () => {
             )}
           </TableBody>
         </Table>
-      </div>
+      </ResponsiveTable>
 
       {/* Add Category Dialog */}
       <CategoryDialog

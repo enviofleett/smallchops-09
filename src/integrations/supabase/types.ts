@@ -4206,6 +4206,17 @@ export type Database = {
           delivery_rate: number
         }[]
       }
+      get_public_delivery_zones: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          id: string
+          name: string
+          description: string
+          base_fee: number
+          fee_per_km: number
+          min_order_for_free_delivery: number
+        }[]
+      }
       get_queued_communication_events: {
         Args: { batch_size?: number }
         Returns: {

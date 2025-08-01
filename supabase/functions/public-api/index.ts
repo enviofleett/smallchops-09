@@ -723,6 +723,29 @@ serve(async (req) => {
       );
     }
 
+    if (method === "GET" && path === "/delivery-zones") {
+      // Get delivery zones with fees for checkout
+      const { data: zones, error } = await supabaseClient
+        .from('delivery_zones')
+        .select(`
+          id,
+          name,
+          description,
+          delivery_fees (
+            base_fee,
+            fee_per_km,
+            min_order_for_free_delivery
+          )
+        `);
+
+      if (error) throw error;
+
+      return new Response(
+        JSON.stringify({ success: true, data: zones }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Default 404 response
     return new Response(
       JSON.stringify({ success: false, error: "Endpoint not found" }),

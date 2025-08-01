@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Edit, Trash2, Car, Bike, Truck2, Truck } from 'lucide-react';
+import { Plus, Edit, Trash2, Car, Bike, Truck } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -10,7 +10,7 @@ import type { Driver } from '@/api/drivers';
 const vehicleIcons = {
   car: Car,
   motorcycle: Bike,
-  bicycle: Truck2,
+  bicycle: Truck,
   van: Truck
 };
 
@@ -69,7 +69,7 @@ export const DriverManagement = () => {
                       <CardTitle className="text-lg">{driver.name}</CardTitle>
                       <p className="text-sm text-muted-foreground">{driver.phone}</p>
                     </div>
-                    <Badge variant={driver.is_active ? "success" : "secondary"}>
+                    <Badge variant={driver.is_active ? "default" : "secondary"}>
                       {driver.is_active ? "Active" : "Inactive"}
                     </Badge>
                   </div>

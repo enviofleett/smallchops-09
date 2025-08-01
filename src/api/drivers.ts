@@ -31,84 +31,42 @@ export interface NewDriver {
 
 export const getDrivers = async (): Promise<Driver[]> => {
   const { data, error } = await supabase
-    .from('drivers')
+    .from('drivers' as any)
     .select('*')
     .order('name');
 
   if (error) throw error;
-  return data || [];
+  return (data || []) as unknown as Driver[];
 };
 
 export const createDriver = async (driver: NewDriver): Promise<Driver> => {
   const { data, error } = await supabase
-    .from('drivers')
+    .from('drivers' as any)
     .insert(driver)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as unknown as Driver;
 };
 
 export const updateDriver = async (id: string, updates: Partial<Driver>): Promise<Driver> => {
   const { data, error } = await supabase
-    .from('drivers')
+    .from('drivers' as any)
     .update(updates)
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data;
+  return data as unknown as Driver;
 };
 
 export const deleteDriver = async (id: string): Promise<void> => {
   const { error } = await supabase
-    .from('drivers')
+    .from('drivers' as any)
     .delete()
     .eq('id', id);
 
   if (error) throw error;
-};
-
-export const assignVehicleToDriver = async (driverId: string, vehicleId: string, notes?: string) => {
-  // First deactivate any existing assignments for this vehicle
-  await supabase
-    .from('vehicle_assignments')
-    .update({ is_active: false, unassigned_at: new Date().toISOString() })
-    .eq('vehicle_id', vehicleId)
-    .eq('is_active', true);
-
-  // Create new assignment
-  const { data, error } = await supabase
-    .from('vehicle_assignments')
-    .insert({
-      driver_id: driverId,
-      vehicle_id: vehicleId,
-      notes,
-      is_active: true
-    })
-    .select()
-    .single();
-
-  if (error) throw error;
-  return data;
-};
-
-export const getDriverWithVehicle = async (driverId: string) => {
-  const { data, error } = await supabase
-    .from('drivers')
-    .select(`
-      *,
-      vehicle_assignments!inner(
-        *,
-        vehicles(*)
-      )
-    `)
-    .eq('id', driverId)
-    .eq('vehicle_assignments.is_active', true)
-    .single();
-
-  if (error) throw error;
-  return data;
 };

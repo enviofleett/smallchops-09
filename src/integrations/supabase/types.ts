@@ -21,9 +21,11 @@ export type Database = {
           email: string
           expires_at: string
           id: string
+          invitation_token: string | null
           invited_at: string
           invited_by: string | null
           role: Database["public"]["Enums"]["user_role"]
+          setup_completed_at: string | null
           status: string
           updated_at: string
         }
@@ -33,9 +35,11 @@ export type Database = {
           email: string
           expires_at?: string
           id?: string
+          invitation_token?: string | null
           invited_at?: string
           invited_by?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          setup_completed_at?: string | null
           status?: string
           updated_at?: string
         }
@@ -45,9 +49,11 @@ export type Database = {
           email?: string
           expires_at?: string
           id?: string
+          invitation_token?: string | null
           invited_at?: string
           invited_by?: string | null
           role?: Database["public"]["Enums"]["user_role"]
+          setup_completed_at?: string | null
           status?: string
           updated_at?: string
         }
@@ -594,6 +600,8 @@ export type Database = {
           sent_at: string | null
           status: Database["public"]["Enums"]["communication_event_status"]
           template_id: string | null
+          template_key: string | null
+          template_variables: Json | null
           updated_at: string
           variables: Json | null
         }
@@ -614,6 +622,8 @@ export type Database = {
           sent_at?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
           template_id?: string | null
+          template_key?: string | null
+          template_variables?: Json | null
           updated_at?: string
           variables?: Json | null
         }
@@ -634,6 +644,8 @@ export type Database = {
           sent_at?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
           template_id?: string | null
+          template_key?: string | null
+          template_variables?: Json | null
           updated_at?: string
           variables?: Json | null
         }
@@ -802,7 +814,7 @@ export type Database = {
           date_of_birth: string | null
           id: string
           name: string
-          phone: string
+          phone: string | null
           updated_at: string
           user_id: string
         }
@@ -811,7 +823,7 @@ export type Database = {
           date_of_birth?: string | null
           id?: string
           name: string
-          phone: string
+          phone?: string | null
           updated_at?: string
           user_id: string
         }
@@ -820,7 +832,7 @@ export type Database = {
           date_of_birth?: string | null
           id?: string
           name?: string
-          phone?: string
+          phone?: string | null
           updated_at?: string
           user_id?: string
         }
@@ -3271,12 +3283,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      bulk_safe_delete_products: {
+        Args: { product_ids: string[] }
+        Returns: Json
+      }
       calculate_brand_consistency_score: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
       can_send_email_to: {
         Args: { email_address: string; email_type?: string }
+        Returns: boolean
+      }
+      check_admin_invitation_rate_limit: {
+        Args: { user_id_param: string }
         Returns: boolean
       }
       check_customer_rate_limit: {
@@ -3309,6 +3329,10 @@ export type Database = {
           required_level_param?: string
         }
         Returns: boolean
+      }
+      cleanup_expired_admin_invitations: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       cleanup_expired_rate_limits: {
         Args: Record<PropertyKey, never>
@@ -3359,6 +3383,16 @@ export type Database = {
           environment: string
         }[]
       }
+      get_admin_invitation_metrics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_invitations: number
+          pending_invitations: number
+          accepted_invitations: number
+          expired_invitations: number
+          success_rate: number
+        }[]
+      }
       get_all_customers_for_analytics: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -3369,6 +3403,10 @@ export type Database = {
           is_registered: boolean
           registration_date: string
         }[]
+      }
+      get_dashboard_data: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       get_environment_config: {
         Args: Record<PropertyKey, never>
@@ -3387,6 +3425,31 @@ export type Database = {
           failed_attempts: number
           bounce_rate: number
           delivery_rate: number
+        }[]
+      }
+      get_queued_communication_events: {
+        Args: { batch_size?: number }
+        Returns: {
+          created_at: string
+          delivery_status: string | null
+          email_type: string | null
+          error_message: string | null
+          event_type: string
+          external_id: string | null
+          id: string
+          last_error: string | null
+          order_id: string | null
+          payload: Json | null
+          processed_at: string | null
+          recipient_email: string | null
+          retry_count: number
+          sent_at: string | null
+          status: Database["public"]["Enums"]["communication_event_status"]
+          template_id: string | null
+          template_key: string | null
+          template_variables: Json | null
+          updated_at: string
+          variables: Json | null
         }[]
       }
       get_user_role: {
@@ -3509,6 +3572,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      safe_delete_product: {
+        Args: { product_id: string }
+        Returns: Json
+      }
       sync_payment_to_order_status: {
         Args: {
           p_transaction_id: string
@@ -3516,6 +3583,16 @@ export type Database = {
           p_order_status?: string
         }
         Returns: undefined
+      }
+      validate_admin_invitation_token: {
+        Args: { token: string }
+        Returns: {
+          invitation_id: string
+          email: string
+          role: string
+          is_valid: boolean
+          expires_at: string
+        }[]
       }
       validate_admin_permission: {
         Args: { required_permission?: string }
@@ -3573,7 +3650,7 @@ export type Database = {
         | "refunded"
         | "partially_refunded"
       permission_level: "none" | "view" | "edit"
-      product_status: "active" | "archived" | "draft"
+      product_status: "active" | "archived" | "draft" | "discontinued"
       promotion_status: "active" | "inactive" | "expired" | "scheduled"
       promotion_type:
         | "percentage"
@@ -3753,7 +3830,7 @@ export const Constants = {
         "partially_refunded",
       ],
       permission_level: ["none", "view", "edit"],
-      product_status: ["active", "archived", "draft"],
+      product_status: ["active", "archived", "draft", "discontinued"],
       promotion_status: ["active", "inactive", "expired", "scheduled"],
       promotion_type: [
         "percentage",

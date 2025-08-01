@@ -16,6 +16,7 @@ interface CustomerAuthState {
   customerAccount: CustomerAccount | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  error: string | null;
 }
 
 export const useCustomerAuth = () => {
@@ -25,6 +26,7 @@ export const useCustomerAuth = () => {
     customerAccount: null,
     isLoading: true,
     isAuthenticated: false,
+    error: null,
   });
 
   useEffect(() => {
@@ -40,21 +42,37 @@ export const useCustomerAuth = () => {
             if (!mounted) return;
             
             if (session?.user) {
-              // Get customer account
-              setTimeout(async () => {
+              setAuthState(prev => ({ 
+                ...prev, 
+                user: session.user, 
+                session, 
+                isLoading: true,
+                error: null
+              }));
+
+              try {
+                const customerAccount = await getCustomerAccountWithRetry(session.user.id);
                 if (mounted) {
-                  const customerAccount = await getCustomerAccount(session.user.id);
-                  if (mounted) {
-                    setAuthState({
-                      user: session.user,
-                      session,
-                      customerAccount,
-                      isLoading: false,
-                      isAuthenticated: !!customerAccount,
-                    });
-                  }
+                  setAuthState(prev => ({
+                    ...prev,
+                    customerAccount,
+                    isLoading: false,
+                    isAuthenticated: !!customerAccount,
+                    error: customerAccount ? null : 'Customer account not found'
+                  }));
                 }
-              }, 0);
+              } catch (error) {
+                console.error('Error loading customer account:', error);
+                if (mounted) {
+                  setAuthState(prev => ({
+                    ...prev,
+                    customerAccount: null,
+                    isLoading: false,
+                    isAuthenticated: false,
+                    error: error instanceof Error ? error.message : 'Failed to load customer account'
+                  }));
+                }
+              }
             } else {
               setAuthState({
                 user: null,
@@ -62,6 +80,7 @@ export const useCustomerAuth = () => {
                 customerAccount: null,
                 isLoading: false,
                 isAuthenticated: false,
+                error: null,
               });
             }
           }
@@ -73,15 +92,35 @@ export const useCustomerAuth = () => {
         if (!mounted) return;
 
         if (initialSession?.user) {
-          const customerAccount = await getCustomerAccount(initialSession.user.id);
-          if (mounted) {
-            setAuthState({
-              user: initialSession.user,
-              session: initialSession,
-              customerAccount,
-              isLoading: false,
-              isAuthenticated: !!customerAccount,
-            });
+          setAuthState(prev => ({ 
+            ...prev, 
+            user: initialSession.user, 
+            session: initialSession, 
+            isLoading: true 
+          }));
+
+          try {
+            const customerAccount = await getCustomerAccountWithRetry(initialSession.user.id);
+            if (mounted) {
+              setAuthState(prev => ({
+                ...prev,
+                customerAccount,
+                isLoading: false,
+                isAuthenticated: !!customerAccount,
+                error: customerAccount ? null : 'Customer account not found'
+              }));
+            }
+          } catch (error) {
+            console.error('Error loading customer account on init:', error);
+            if (mounted) {
+              setAuthState(prev => ({
+                ...prev,
+                customerAccount: null,
+                isLoading: false,
+                isAuthenticated: false,
+                error: error instanceof Error ? error.message : 'Failed to load customer account'
+              }));
+            }
           }
         } else {
           if (mounted) {
@@ -96,7 +135,11 @@ export const useCustomerAuth = () => {
       } catch (error) {
         console.error('Customer auth initialization error:', error);
         if (mounted) {
-          setAuthState(prev => ({ ...prev, isLoading: false }));
+          setAuthState(prev => ({ 
+            ...prev, 
+            isLoading: false,
+            error: error instanceof Error ? error.message : 'Authentication initialization failed'
+          }));
         }
       }
     };
@@ -108,24 +151,42 @@ export const useCustomerAuth = () => {
     };
   }, []);
 
-  const getCustomerAccount = async (userId: string): Promise<CustomerAccount | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('customer_accounts')
-        .select('*')
-        .eq('user_id', userId)
-        .single();
-      
-      if (error) {
-        console.error('Error fetching customer account:', error);
-        return null;
-      }
+  const getCustomerAccountWithRetry = async (userId: string, maxRetries = 3): Promise<CustomerAccount | null> => {
+    for (let attempt = 0; attempt < maxRetries; attempt++) {
+      try {
+        const { data, error } = await supabase
+          .from('customer_accounts')
+          .select('*')
+          .eq('user_id', userId)
+          .single();
+        
+        if (error) {
+          // If customer account doesn't exist yet (common for new registrations), retry with exponential backoff
+          if (error.code === 'PGRST116' && attempt < maxRetries - 1) {
+            const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+            console.log(`Customer account not found yet, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            continue;
+          }
+          
+          console.error('Error fetching customer account:', error);
+          return null;
+        }
 
-      return data;
-    } catch (error) {
-      console.error('Customer account fetch error:', error);
-      return null;
+        return data;
+      } catch (error) {
+        console.error(`Customer account fetch error (attempt ${attempt + 1}):`, error);
+        if (attempt === maxRetries - 1) {
+          throw error;
+        }
+        
+        // Wait before retrying
+        const delay = Math.pow(2, attempt) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
     }
+    
+    return null;
   };
 
   const logout = async () => {
@@ -157,6 +218,10 @@ export const useCustomerAuth = () => {
     ...authState,
     logout,
     updateCustomerAccount,
-    getCustomerAccount,
+    refetch: () => {
+      if (authState.session?.user) {
+        getCustomerAccountWithRetry(authState.session.user.id);
+      }
+    },
   };
 };

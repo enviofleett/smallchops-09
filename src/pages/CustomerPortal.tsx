@@ -20,7 +20,7 @@ export default function CustomerPortal() {
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [recentOrders, setRecentOrders] = useState<OrderWithItems[]>([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
-  const { user, customerAccount, isLoading, isAuthenticated, logout } = useCustomerAuth();
+  const { user, customerAccount, isLoading, isAuthenticated, error: authError, refetch, logout } = useCustomerAuth();
   const { toast } = useToast();
 
   const handleAuthenticated = (customerId: string) => {
@@ -81,10 +81,47 @@ export default function CustomerPortal() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex items-center gap-2">
-          <Loader2 className="h-6 w-6 animate-spin" />
-          <span>Loading...</span>
+        <div className="flex flex-col items-center gap-4 max-w-md text-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <div>
+            <h3 className="text-lg font-medium">Setting up your account...</h3>
+            <p className="text-muted-foreground text-sm mt-1">
+              {user ? 'Preparing your customer profile' : 'Checking authentication status'}
+            </p>
+          </div>
         </div>
+      </div>
+    );
+  }
+
+  // Handle case where user is signed in but customer account creation failed
+  if (user && !customerAccount && authError) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="text-destructive">Account Setup Issue</CardTitle>
+            <CardDescription>
+              There was an issue setting up your customer account
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="text-sm text-muted-foreground">
+              {authError}
+            </div>
+            <div className="flex flex-col gap-2">
+              <Button onClick={() => refetch()}>
+                Try Again
+              </Button>
+              <Button variant="outline" onClick={handleLogout}>
+                Sign Out and Try Different Account
+              </Button>
+            </div>
+            <div className="text-xs text-muted-foreground text-center">
+              If this problem persists, please contact support.
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }

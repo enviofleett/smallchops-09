@@ -155,7 +155,7 @@ const CustomerRegister = () => {
       if (data.user) {
         toast({
           title: "Registration successful!",
-          description: "Please check your email to verify your account before logging in.",
+          description: "Setting up your account... You'll be redirected to the customer portal.",
         });
 
         // Clear form
@@ -167,10 +167,8 @@ const CustomerRegister = () => {
           confirmPassword: '',
         });
 
-        // Redirect to customer portal after a delay
-        setTimeout(() => {
-          navigate('/customer-portal');
-        }, 2000);
+        // Redirect to customer portal immediately - the portal will handle loading states
+        navigate('/customer-portal');
       }
     } catch (error: any) {
       console.error('Unexpected error:', error);

@@ -6,7 +6,7 @@ import logger from '../lib/logger';
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
-  signUp: (credentials: LoginCredentials & { name: string }) => Promise<void>;
+  signUp: (credentials: LoginCredentials & { name: string; phone?: string }) => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   session: Session | null;
@@ -154,15 +154,18 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     if (error) throw error;
   };
 
-  const signUp = async ({ email, password, name }: LoginCredentials & { name: string }) => {
+  const signUp = async ({ email, password, name, phone }: LoginCredentials & { name: string; phone?: string }) => {
+    const userData: Record<string, any> = { name };
+    if (phone && phone.trim()) {
+      userData.phone = phone;
+    }
+
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         emailRedirectTo: `${window.location.origin}/`,
-        data: {
-          name: name,
-        },
+        data: userData,
       },
     });
     if (error) throw error;

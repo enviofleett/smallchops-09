@@ -104,10 +104,16 @@ export default function CustomerPortal() {
           </CardHeader>
           <CardContent className="space-y-4">
             <Button onClick={() => setShowAuthModal(true)} className="w-full">
-              Sign In / Sign Up
+              Sign In
             </Button>
+            <div className="flex items-center justify-center space-x-2 text-sm">
+              <span className="text-muted-foreground">New customer?</span>
+              <Link to="/register" className="text-primary hover:underline font-medium">
+                Create Account
+              </Link>
+            </div>
             <div className="text-center text-sm text-muted-foreground">
-              Create an account or sign in to manage your orders and favorites
+              Sign in to manage your orders and favorites
             </div>
           </CardContent>
         </Card>

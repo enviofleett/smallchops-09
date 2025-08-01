@@ -25,6 +25,8 @@ import CustomerFavorites from "./pages/CustomerFavorites";
 import PurchaseHistory from "./pages/PurchaseHistory";
 import PaymentCallback from "./pages/PaymentCallback";
 import Unsubscribe from "./pages/Unsubscribe";
+import AdminSetup from "./pages/AdminSetup";
+import CustomerRegister from "./pages/CustomerRegister";
 
 const queryClient = new QueryClient();
 
@@ -45,6 +47,8 @@ const App = () => (
               <Route path="/payment/success" element={<PaymentCallback />} />
               <Route path="/payment/failed" element={<PaymentCallback />} />
               <Route path="/unsubscribe" element={<Unsubscribe />} />
+              <Route path="/register" element={<CustomerRegister />} />
+              <Route path="/admin-setup/:token" element={<AdminSetup />} />
               
               {/* Protected routes */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>

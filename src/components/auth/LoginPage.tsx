@@ -42,7 +42,8 @@ const LoginPage = () => {
       await signUp({ 
         email: formData.email, 
         password: formData.password, 
-        name: formData.name 
+        name: formData.name
+        // Note: Admin users don't need phone numbers, only customer registrations do
       });
       setMessage('Registration successful! Please check your email for verification.');
       setView('sign_in');

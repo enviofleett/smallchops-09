@@ -11,7 +11,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 const Settings = () => {
-  const [activeTab, setActiveTab] = useState("branding");
+  const [activeTab, setActiveTab] = useState("communications");
 
   // Check if current user is admin to show admin controls
   const {
@@ -47,56 +47,64 @@ const Settings = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <div className="overflow-x-auto pb-2">
-          <TabsList className="grid w-full min-w-[600px] grid-cols-6 lg:grid-cols-8 lg:min-w-0">
-            <TabsTrigger value="branding" className="text-xs sm:text-sm">Branding</TabsTrigger>
+          <TabsList className="grid w-full min-w-[480px] grid-cols-4 lg:grid-cols-6 lg:min-w-0">
             <TabsTrigger value="communications" className="text-xs sm:text-sm">Comms</TabsTrigger>
-            <TabsTrigger value="email-processing" className="text-xs sm:text-sm">Email</TabsTrigger>
             <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>
-            <TabsTrigger value="content" className="text-xs sm:text-sm">Content</TabsTrigger>
             <TabsTrigger value="customer-registration" className="text-xs sm:text-sm">Customer</TabsTrigger>
             {isAdmin && <TabsTrigger value="admin" className="text-xs sm:text-sm">Admin</TabsTrigger>}
             {isAdmin && <TabsTrigger value="developer" className="text-xs sm:text-sm">Dev</TabsTrigger>}
           </TabsList>
         </div>
 
-        <TabsContent value="branding" className="space-y-6">
-          <Card>
-            <CardHeader>
-              
-              
-            </CardHeader>
-            <CardContent>
-              <BrandingTab />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
         <TabsContent value="communications" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Communication Settings</CardTitle>
-              <CardDescription>
-                Configure email and SMS notifications for your customers
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <CommunicationsTab />
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="email-processing" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Email Queue Processing</CardTitle>
-              <CardDescription>
-                Monitor and manage email queue processing and delivery
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <EmailProcessingTab />
-            </CardContent>
-          </Card>
+          <Tabs defaultValue="branding" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-4">
+              <TabsTrigger value="branding">Branding</TabsTrigger>
+              <TabsTrigger value="email">Email</TabsTrigger>
+              <TabsTrigger value="content">Content</TabsTrigger>
+              <TabsTrigger value="email-processing">Queue</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="branding">
+              <Card>
+                <CardContent className="pt-6">
+                  <BrandingTab />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="email">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Communication Settings</CardTitle>
+                  <CardDescription>
+                    Configure email and SMS notifications for your customers
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CommunicationsTab />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="content">
+              <ContentManagementTab />
+            </TabsContent>
+            
+            <TabsContent value="email-processing">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Email Queue Processing</CardTitle>
+                  <CardDescription>
+                    Monitor and manage email queue processing and delivery
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <EmailProcessingTab />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
         <TabsContent value="payments" className="space-y-6">
@@ -113,9 +121,6 @@ const Settings = () => {
           </Card>
         </TabsContent>
 
-        <TabsContent value="content" className="space-y-6">
-          <ContentManagementTab />
-        </TabsContent>
 
         <TabsContent value="customer-registration" className="space-y-6">
           <Card>

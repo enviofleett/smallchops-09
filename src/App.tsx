@@ -18,6 +18,7 @@ import Promotions from "./pages/Promotions";
 import DeliveryPickup from "./pages/DeliveryPickup";
 import AuditLogs from "./pages/AuditLogs";
 import Settings from "./pages/Settings";
+import Categories from "./pages/Categories";
 import CustomerPortal from "./pages/CustomerPortal";
 
 
@@ -55,6 +56,7 @@ const App = () => (
                 <Route path="/" element={<EnhancedErrorBoundary context="Dashboard"><Index /></EnhancedErrorBoundary>} />
                 <Route path="/orders" element={<EnhancedErrorBoundary context="Orders"><Orders /></EnhancedErrorBoundary>} />
                 <Route path="/products" element={<EnhancedErrorBoundary context="Products"><Products /></EnhancedErrorBoundary>} />
+                <Route path="/categories" element={<EnhancedErrorBoundary context="Categories"><Categories /></EnhancedErrorBoundary>} />
                 <Route path="/customers" element={<EnhancedErrorBoundary context="Customers"><Customers /></EnhancedErrorBoundary>} />
                 <Route path="/delivery-pickup" element={<EnhancedErrorBoundary context="Delivery"><DeliveryPickup /></EnhancedErrorBoundary>} />
                 <Route path="/reports" element={<EnhancedErrorBoundary context="Reports"><Reports /></EnhancedErrorBoundary>} />

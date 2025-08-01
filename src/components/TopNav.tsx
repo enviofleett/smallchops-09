@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
-import { Search, Bell, User, LogOut } from 'lucide-react';
+import { Search, Bell, User, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
+import { SidebarTrigger } from "@/components/ui/sidebar";
+import { useIsMobile } from "@/hooks/use-mobile";
 const TopNav = () => {
   const {
     user,
@@ -11,57 +13,73 @@ const TopNav = () => {
     data: settings
   } = useBusinessSettings();
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const isMobile = useIsMobile();
   const handleLogout = async () => {
     await logout();
     setShowUserMenu(false);
   };
-  return <header className="bg-white border-b border-gray-200 px-6 py-4">
-      <div className="flex items-center justify-between">
-        {/* Business branding and search */}
-        <div className="flex items-center space-x-6 flex-1">
+  return <header className="bg-background border-b border-border px-4 md:px-6 py-4 sticky top-0 z-40">
+      <div className="flex items-center justify-between gap-4">
+        {/* Mobile menu trigger */}
+        <div className="flex items-center gap-4">
+          <SidebarTrigger className="md:hidden" />
           
-          
+          {/* Search - responsive */}
           <div className="flex-1 max-w-md">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-              <input type="text" placeholder="Search orders, customers, products..." className="w-full pl-10 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <input 
+                type="text" 
+                placeholder={isMobile ? "Search..." : "Search orders, customers, products..."} 
+                className="w-full pl-10 pr-4 py-2 bg-muted/50 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-sm"
+              />
             </div>
           </div>
         </div>
 
         {/* Right side */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center gap-2 md:gap-4">
           {/* Notifications */}
-          <button className="relative p-2 text-gray-600 hover:text-gray-800 transition-colors">
-            <Bell className="h-5 w-5" />
-            <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+          <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
+            <Bell className="h-4 w-4 md:h-5 md:w-5" />
+            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-4 w-4 md:h-5 md:w-5 flex items-center justify-center">
               3
             </span>
           </button>
 
           {/* User Menu */}
           <div className="relative">
-            <button onClick={() => setShowUserMenu(!showUserMenu)} className="flex items-center space-x-3 p-2 rounded-xl hover:bg-gray-50 transition-colors">
-              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                <User className="h-4 w-4 text-orange-600" />
+            <button 
+              onClick={() => setShowUserMenu(!showUserMenu)} 
+              className="flex items-center gap-2 md:gap-3 p-2 rounded-lg hover:bg-accent transition-colors"
+            >
+              <div className="w-7 h-7 md:w-8 md:h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                <User className="h-3 w-3 md:h-4 md:w-4 text-primary" />
               </div>
-              <div className="text-left">
-                <p className="text-sm font-medium text-gray-800">{user?.name}</p>
-                <p className="text-xs text-gray-600 capitalize">{user?.role}</p>
-              </div>
+              {!isMobile && (
+                <div className="text-left">
+                  <p className="text-sm font-medium text-foreground">{user?.name}</p>
+                  <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
+                </div>
+              )}
             </button>
 
-            {showUserMenu && <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-lg border border-gray-100 py-2 z-50">
-                <button className="w-full px-4 py-2 text-left text-gray-700 hover:bg-gray-50 flex items-center space-x-2">
+            {showUserMenu && (
+              <div className="absolute right-0 mt-2 w-44 md:w-48 bg-popover rounded-lg shadow-lg border border-border py-2 z-50">
+                <button className="w-full px-4 py-2 text-left text-popover-foreground hover:bg-accent flex items-center gap-2">
                   <User className="h-4 w-4" />
                   <span>Profile</span>
                 </button>
-                <hr className="my-2" />
-                <button onClick={handleLogout} className="w-full px-4 py-2 text-left text-red-600 hover:bg-red-50 flex items-center space-x-2">
+                <hr className="my-2 border-border" />
+                <button 
+                  onClick={handleLogout} 
+                  className="w-full px-4 py-2 text-left text-destructive hover:bg-destructive/10 flex items-center gap-2"
+                >
                   <LogOut className="h-4 w-4" />
                   <span>Logout</span>
                 </button>
-              </div>}
+              </div>
+            )}
           </div>
         </div>
       </div>

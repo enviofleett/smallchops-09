@@ -98,4 +98,36 @@
   body {
     @apply bg-background text-foreground;
   }
+  
+  /* Mobile optimizations */
+  html {
+    @apply scroll-smooth;
+  }
+  
+  /* Touch targets for mobile */
+  button, [role="button"], input, select, textarea {
+    @apply min-h-[44px] min-w-[44px];
+  }
+  
+  /* Improve readability on mobile */
+  @media (max-width: 768px) {
+    body {
+      @apply text-sm;
+    }
+  }
+}
+
+@layer components {
+  /* Mobile-first responsive classes */
+  .mobile-card {
+    @apply bg-card border border-border rounded-lg p-4 shadow-sm;
+  }
+  
+  .mobile-nav-item {
+    @apply flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-accent;
+  }
+  
+  .mobile-safe-area {
+    @apply pb-safe-bottom pl-safe-left pr-safe-right;
+  }
 }

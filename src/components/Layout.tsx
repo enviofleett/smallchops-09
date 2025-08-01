@@ -1,25 +1,23 @@
 
-import React, { useState } from 'react';
-import Sidebar from './Sidebar';
-import TopNav from './TopNav';
+import React from 'react';
 import { Outlet } from 'react-router-dom';
+import { SidebarProvider, SidebarInset } from "@/components/ui/sidebar";
+import { AppSidebar } from './AppSidebar';
+import TopNav from './TopNav';
 
 const Layout = () => {
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
   return (
-    <div className="flex min-h-screen bg-gray-50">
-      <Sidebar 
-        isCollapsed={sidebarCollapsed} 
-        onToggle={() => setSidebarCollapsed(!sidebarCollapsed)} 
-      />
-      <div className="flex-1 flex flex-col">
-        <TopNav />
-        <main className="flex-1 p-6">
-          <Outlet />
-        </main>
+    <SidebarProvider>
+      <div className="flex min-h-screen w-full bg-background">
+        <AppSidebar />
+        <SidebarInset className="flex-1">
+          <TopNav />
+          <main className="flex-1 p-4 md:p-6">
+            <Outlet />
+          </main>
+        </SidebarInset>
       </div>
-    </div>
+    </SidebarProvider>
   );
 };
 

@@ -19,25 +19,25 @@ const Dashboard = () => {
         <DashboardHeader />
         
         {/* Loading Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+            <div key={i} className="bg-card rounded-2xl shadow-sm border border-border p-4 md:p-6">
               <Skeleton className="h-4 w-24 mb-2" />
-              <Skeleton className="h-8 w-16 mb-2" />
+              <Skeleton className="h-6 md:h-8 w-16 mb-2" />
               <Skeleton className="h-3 w-20" />
             </div>
           ))}
         </div>
 
         {/* Loading Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <Skeleton className="h-6 w-32 mb-4" />
-            <Skeleton className="h-64 w-full" />
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+          <div className="bg-card p-4 md:p-6 rounded-xl shadow-sm border border-border">
+            <Skeleton className="h-5 md:h-6 w-32 mb-4" />
+            <Skeleton className="h-48 md:h-64 w-full" />
           </div>
-          <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-            <Skeleton className="h-6 w-32 mb-4" />
-            <Skeleton className="h-64 w-full" />
+          <div className="bg-card p-4 md:p-6 rounded-xl shadow-sm border border-border">
+            <Skeleton className="h-5 md:h-6 w-32 mb-4" />
+            <Skeleton className="h-48 md:h-64 w-full" />
           </div>
         </div>
       </div>
@@ -57,17 +57,17 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <DashboardHeader />
         <Button
           onClick={refresh}
           variant="outline"
           size="sm"
-          className="flex items-center gap-2"
+          className="flex items-center gap-2 self-start sm:self-auto"
         >
           <RefreshCw className="w-4 h-4" />
-          Refresh
+          <span className="hidden sm:inline">Refresh</span>
         </Button>
       </div>
       
@@ -78,45 +78,49 @@ const Dashboard = () => {
       )}
       
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
         <DashboardCard
           title="Total Products"
           value={formatNumber(data?.stats.totalProducts || 0)}
-          icon={<Package className="w-6 h-6 text-blue-600" />}
+          icon={<Package className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />}
         />
         <DashboardCard
           title="Total Orders"
           value={formatNumber(data?.stats.totalOrders || 0)}
-          icon={<ShoppingCart className="w-6 h-6 text-green-600" />}
+          icon={<ShoppingCart className="w-5 h-5 md:w-6 md:h-6 text-green-600" />}
         />
         <DashboardCard
           title="Total Customers"
           value={formatNumber(data?.stats.totalCustomers || 0)}
-          icon={<Users className="w-6 h-6 text-purple-600" />}
+          icon={<Users className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />}
         />
         <DashboardCard
           title="Revenue"
           value={formatCurrency(data?.stats.totalRevenue || 0)}
-          icon={<TrendingUp className="w-6 h-6 text-orange-600" />}
+          icon={<TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />}
         />
       </div>
 
       {/* Charts Section */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Revenue Overview</h3>
-          <RevenueChart data={data?.revenueTrends} />
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
+        <div className="bg-card p-4 md:p-6 rounded-xl shadow-sm border border-border">
+          <h3 className="text-base md:text-lg font-semibold text-card-foreground mb-4">Revenue Overview</h3>
+          <div className="min-h-[200px] md:min-h-[250px]">
+            <RevenueChart data={data?.revenueTrends} />
+          </div>
         </div>
         
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">Orders This Week</h3>
-          <OrdersChart data={data?.orderTrends} />
+        <div className="bg-card p-4 md:p-6 rounded-xl shadow-sm border border-border">
+          <h3 className="text-base md:text-lg font-semibold text-card-foreground mb-4">Orders This Week</h3>
+          <div className="min-h-[200px] md:min-h-[250px]">
+            <OrdersChart data={data?.orderTrends} />
+          </div>
         </div>
       </div>
 
       {/* Top Customers Section */}
       {data?.topCustomersByOrders && data.topCustomersByOrders.length > 0 && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
           <TopCustomersChart 
             customers={data.topCustomersByOrders} 
             type="orders" 
@@ -132,11 +136,11 @@ const Dashboard = () => {
 
       {/* Empty State for No Data */}
       {(!data?.topCustomersByOrders || data.topCustomersByOrders.length === 0) && (
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100">
+        <div className="bg-card p-6 md:p-8 rounded-xl shadow-sm border border-border">
           <div className="text-center">
-            <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-gray-800 mb-2">No Data Available</h3>
-            <p className="text-gray-600">Start adding products and taking orders to see analytics here.</p>
+            <Package className="w-10 h-10 md:w-12 md:h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-base md:text-lg font-semibold text-card-foreground mb-2">No Data Available</h3>
+            <p className="text-sm md:text-base text-muted-foreground">Start adding products and taking orders to see analytics here.</p>
           </div>
         </div>
       )}

@@ -1,8 +1,9 @@
 
 import React, { useCallback, useState, useEffect } from 'react';
-import { Upload, X, ImageIcon } from 'lucide-react';
+import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { resizeImage } from '@/lib/imageProcessing';
 
 interface ImageUploadProps {
   value?: string;
@@ -15,6 +16,7 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
   const [isDragOver, setIsDragOver] = useState(false);
   const [preview, setPreview] = useState<string | null>(value || null);
   const [error, setError] = useState<string | null>(null);
+  const [isProcessing, setIsProcessing] = useState(false);
   
   // Generate unique ID for the file input
   const inputId = React.useId();
@@ -25,8 +27,9 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
     setPreview(value || null);
   }, [value]);
 
-  const handleFileChange = useCallback((file: File | null) => {
+  const handleFileChange = useCallback(async (file: File | null) => {
     setError(null);
+    setIsProcessing(false);
     console.log("ImageUpload: handleFileChange called with file:", file?.name, file?.size);
     
     if (file) {
@@ -36,27 +39,57 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
         return;
       }
 
-      // Validate file size (5MB max)
-      if (file.size > 5 * 1024 * 1024) {
-        setError('File size must be less than 5MB');
+      // Validate file size (10MB max for processing)
+      if (file.size > 10 * 1024 * 1024) {
+        setError('File size must be less than 10MB');
         return;
       }
 
-      console.log("ImageUpload: Creating preview for file:", file.name);
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        console.log("ImageUpload: Preview created successfully, length:", result.length);
-        setPreview(result);
-      };
-      reader.readAsDataURL(file);
+      try {
+        setIsProcessing(true);
+        console.log("ImageUpload: Processing image to 1000x1000px");
+        
+        // Resize image to 1000x1000px
+        const resizedBlob = await resizeImage(file, {
+          targetWidth: 1000,
+          targetHeight: 1000,
+          quality: 0.9,
+          format: 'jpeg'
+        });
+        
+        // Create File object from blob
+        const resizedFile = new File([resizedBlob], file.name, {
+          type: 'image/jpeg',
+          lastModified: Date.now(),
+        });
+        
+        console.log("ImageUpload: Image processed successfully", {
+          originalSize: file.size,
+          newSize: resizedFile.size,
+          dimensions: '1000x1000px'
+        });
+        
+        // Create preview
+        const reader = new FileReader();
+        reader.onload = () => {
+          const result = reader.result as string;
+          setPreview(result);
+          setIsProcessing(false);
+        };
+        reader.readAsDataURL(resizedFile);
+        
+        // Pass the resized file to parent
+        onChange(resizedFile);
+      } catch (error) {
+        console.error("ImageUpload: Error processing image:", error);
+        setError(error instanceof Error ? error.message : 'Failed to process image');
+        setIsProcessing(false);
+      }
     } else {
       setPreview(null);
       console.log("ImageUpload: File removed, clearing preview");
+      onChange(file);
     }
-    
-    console.log("ImageUpload: Calling onChange with file:", file?.name);
-    onChange(file);
   }, [onChange]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
@@ -99,16 +132,27 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
     <div className={cn("space-y-2", className)}>
       {preview ? (
         <div className="relative group">
-          <img
-            src={preview}
-            alt="Preview"
-            className="w-full h-48 object-cover rounded-lg border"
-            onError={(e) => {
-              console.error("ImageUpload: Failed to load preview image:", preview);
-              setError("Failed to load image preview");
-            }}
-          />
-          {!disabled && (
+          <div className="relative">
+            <img
+              src={preview}
+              alt="Preview"
+              className="w-full h-48 object-cover rounded-lg border"
+              onError={(e) => {
+                console.error("ImageUpload: Failed to load preview image:", preview);
+                setError("Failed to load image preview");
+              }}
+            />
+            {isProcessing && (
+              <div className="absolute inset-0 bg-black/50 rounded-lg flex items-center justify-center">
+                <div className="text-white text-center">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  <p className="text-sm">Processing image...</p>
+                  <p className="text-xs opacity-75">Resizing to 1000x1000px</p>
+                </div>
+              </div>
+            )}
+          </div>
+          {!disabled && !isProcessing && (
             <Button
               type="button"
               variant="destructive"
@@ -119,6 +163,9 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
               <X className="h-4 w-4" />
             </Button>
           )}
+          <div className="mt-2 text-xs text-gray-500 text-center">
+            Image will be automatically resized to 1000×1000px
+          </div>
         </div>
       ) : (
         <div
@@ -142,7 +189,10 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
             Drop an image here, or click to select
           </p>
           <p className="text-xs text-gray-400">
-            PNG, JPG, WebP up to 5MB
+            PNG, JPG, WebP up to 10MB
+          </p>
+          <p className="text-xs text-gray-500 mt-1">
+            Images will be automatically resized to 1000×1000px
           </p>
           <input
             id={inputId}

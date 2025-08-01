@@ -6,14 +6,14 @@ const BUCKET_NAME = 'product-images';
 
 const validateImageFile = (file: File): void => {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
-    const maxSize = 5 * 1024 * 1024; // 5MB
+    const maxSize = 10 * 1024 * 1024; // 10MB - allowing for high quality 1000x1000 images
 
     if (!validTypes.includes(file.type)) {
         throw new Error('Invalid file type. Please upload a JPEG, PNG, or WebP image.');
     }
 
     if (file.size > maxSize) {
-        throw new Error('File size too large. Please upload an image smaller than 5MB.');
+        throw new Error('File size too large. Please upload an image smaller than 10MB.');
     }
 };
 
@@ -27,12 +27,20 @@ const sanitizeFileName = (fileName: string): string => {
 const uploadProductImage = async (file: File): Promise<string> => {
     validateImageFile(file);
     
-    const sanitizedName = sanitizeFileName(file.name);
-    const fileName = `${Date.now()}-${sanitizedName}`;
+    // Generate timestamp-based filename for better organization
+    const timestamp = Date.now();
+    const randomId = Math.random().toString(36).substring(2);
+    const fileName = `product-${timestamp}-${randomId}.jpg`;
+    
+    console.log('Uploading processed image:', fileName, file.size);
     
     const { data, error } = await supabase.storage
         .from(BUCKET_NAME)
-        .upload(fileName, file);
+        .upload(fileName, file, {
+            cacheControl: '86400', // Cache for 24 hours
+            upsert: false,
+            contentType: 'image/jpeg'
+        });
 
     if (error) {
         throw new Error(`Image upload failed: ${error.message}`);
@@ -42,6 +50,7 @@ const uploadProductImage = async (file: File): Promise<string> => {
         .from(BUCKET_NAME)
         .getPublicUrl(data.path);
 
+    console.log('Image uploaded successfully:', publicUrl);
     return publicUrl;
 };
 

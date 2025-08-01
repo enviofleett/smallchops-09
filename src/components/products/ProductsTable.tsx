@@ -161,15 +161,28 @@ const ProductsTable = ({ products, isLoading, isError, error, onEditProduct, onD
                     </button>
                   </td>
                    <td className="py-4 px-6">
-                     <div className="flex items-center space-x-4">
-                       <div className="relative w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
-                         {product.image_url ? <img src={product.image_url} alt={product.name} className="w-full h-full object-cover" /> : <ImageIcon className="h-6 w-6 text-gray-400" />}
-                         {product.is_promotional && (
-                           <div className="absolute -top-1 -right-1">
-                             <PromotionalBadge className="text-xs px-1 py-0.5" />
-                           </div>
-                         )}
-                       </div>
+                      <div className="flex items-center space-x-4">
+                        <div className="relative w-12 h-12 bg-gray-100 rounded-lg overflow-hidden flex items-center justify-center flex-shrink-0">
+                          {product.image_url ? (
+                            <img 
+                              src={product.image_url} 
+                              alt={product.name} 
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                              }}
+                            />
+                          ) : null}
+                          {!product.image_url && <ImageIcon className="h-6 w-6 text-gray-400" />}
+                          <ImageIcon className="h-6 w-6 text-gray-400 hidden" />
+                          {product.is_promotional && (
+                            <div className="absolute -top-1 -right-1">
+                              <PromotionalBadge className="text-xs px-1 py-0.5" />
+                            </div>
+                          )}
+                        </div>
                        <div className="flex-1 min-w-0">
                          <div className="flex items-center gap-2 mb-1">
                            <p className="font-medium text-gray-800 truncate">{product.name}</p>

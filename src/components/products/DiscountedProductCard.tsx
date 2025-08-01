@@ -51,12 +51,18 @@ export function DiscountedProductCard({
               src={product.image_url} 
               alt={product.name}
               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+              loading="lazy"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
             />
-          ) : (
-            <div className="w-full h-full flex items-center justify-center bg-muted text-muted-foreground">
-              No Image
-            </div>
-          )}
+          ) : null}
+          
+          {/* Fallback for missing images */}
+          <div className={`w-full h-full flex items-center justify-center bg-muted text-muted-foreground ${product.image_url ? 'hidden' : ''}`}>
+            No Image
+          </div>
           
           {/* Promotion Info Overlay */}
           {product.has_discount && product.active_promotion && (

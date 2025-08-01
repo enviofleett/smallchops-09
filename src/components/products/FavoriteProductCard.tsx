@@ -33,6 +33,11 @@ export const FavoriteProductCard = ({
             <img 
               src={product.image_url} 
               alt={product.name}
+              loading="lazy"
+              onError={(e) => {
+                e.currentTarget.style.display = 'none';
+                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+              }}
               className="w-full h-full object-cover"
             />
           ) : (

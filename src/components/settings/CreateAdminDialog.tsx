@@ -39,28 +39,39 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
   const onSubmit = async (data: CreateAdminFormData) => {
     setIsSubmitting(true);
     try {
-      // Create invitation record
+      // Create invitation record - the trigger will automatically send the email
       const { error } = await supabase
         .from('admin_invitations')
         .insert({
           email: data.email,
           role: data.role,
+          invited_by: (await supabase.auth.getUser()).data.user?.id,
         });
 
       if (error) throw error;
 
       toast({
         title: "Admin invitation sent",
-        description: `An invitation has been sent to ${data.email}`,
+        description: `A secure invitation email has been sent to ${data.email} with setup instructions.`,
       });
 
       form.reset();
       onOpenChange(false);
       onSuccess?.();
     } catch (error: any) {
+      console.error('Admin invitation error:', error);
+      
+      // Handle specific errors
+      let errorMessage = "Failed to send invitation";
+      if (error.message?.includes('duplicate key')) {
+        errorMessage = "An invitation for this email already exists";
+      } else if (error.message?.includes('permission')) {
+        errorMessage = "You don't have permission to create admin invitations";
+      }
+      
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {

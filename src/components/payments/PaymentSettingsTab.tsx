@@ -276,13 +276,6 @@ export const PaymentSettingsTab: React.FC = () => {
 
       <div className="grid gap-6">
         {renderProviderCard(
-          'stripe',
-          <Globe className="h-6 w-6" />,
-          'Stripe',
-          'Global payment processing with support for cards and wallets'
-        )}
-
-        {renderProviderCard(
           'paystack',
           <Building2 className="h-6 w-6" />,
           'Paystack',

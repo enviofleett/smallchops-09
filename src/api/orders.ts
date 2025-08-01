@@ -64,7 +64,7 @@ export const updateOrder = async (
     .update(updates)
     .eq('id', orderId)
     .select('*, order_items (*)')
-    .single();
+    .maybeSingle();
 
   if (error) {
     console.error('Error updating order:', error);

@@ -4,6 +4,7 @@ import { paystackService } from '@/lib/paystack';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PaymentErrorHandler } from '@/lib/payment-error-handler';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 
 export interface PaymentResult {
   success: boolean;
@@ -25,6 +26,7 @@ export type PaymentProvider = 'stripe' | 'paystack';
 export const usePayment = () => {
   const [loading, setLoading] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const { handleError } = useErrorHandler();
 
   const initiatePayment = async (
     orderId: string,
@@ -63,12 +65,8 @@ export const usePayment = () => {
       }
     } catch (error) {
       console.error('Payment initiation error:', error);
+      handleError(error, 'payment initiation');
       const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
-      
-      toast.error(errorInfo.title, {
-        description: errorInfo.message,
-        duration: 5000,
-      });
       
       return {
         success: false,

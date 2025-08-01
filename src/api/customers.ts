@@ -98,7 +98,7 @@ export const resolveOrCreateCustomer = async ({
     .from('customers')
     .select('*')
     .eq('email', email)
-    .single();
+    .maybeSingle();
 
   if (found) return found as CustomerDb;
 
@@ -107,7 +107,7 @@ export const resolveOrCreateCustomer = async ({
     .from('customers')
     .insert([{ email, name, phone }])
     .select('*')
-    .single();
+    .maybeSingle();
 
   if (createError) throw new Error(createError.message);
   return created as CustomerDb;
@@ -121,7 +121,7 @@ export const createCustomer = async (data: { name: string; email: string; phone?
     .from('customers')
     .insert([{ name: data.name, email: data.email, phone: data.phone }])
     .select('*')
-    .single();
+    .maybeSingle();
   if (error) throw new Error(error.message);
   return created as CustomerDb;
 };
@@ -133,7 +133,7 @@ export const updateCustomer = async (id: string, data: { name?: string; email?: 
     .update(data)
     .eq('id', id)
     .select('*')
-    .single();
+    .maybeSingle();
   if (error) throw new Error(error.message);
   return updated as CustomerDb;
 };

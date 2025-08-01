@@ -9,6 +9,7 @@ import { useCart } from '@/hooks/useCart';
 import { useOrderManagement } from '@/hooks/useOrderManagement';
 import { usePayment } from '@/hooks/usePayment';
 import { PaymentModal } from '@/components/payments/PaymentModal';
+import { DeliveryZoneSelector } from '@/components/delivery/DeliveryZoneSelector';
 import { toast } from 'sonner';
 
 interface CheckoutFlowProps {
@@ -28,6 +29,7 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
     customer_phone: '',
     order_type: 'delivery' as 'delivery' | 'pickup',
     delivery_address: '',
+    delivery_zone_id: '',
     special_instructions: ''
   });
 
@@ -36,7 +38,7 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
   };
 
   const validateForm = () => {
-    const { customer_name, customer_email, customer_phone, order_type, delivery_address } = checkoutData;
+    const { customer_name, customer_email, customer_phone, order_type, delivery_address, delivery_zone_id } = checkoutData;
     
     if (!customer_name.trim()) {
       toast.error('Please enter your name');
@@ -53,9 +55,15 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
       return false;
     }
     
-    if (order_type === 'delivery' && !delivery_address.trim()) {
-      toast.error('Please enter a delivery address');
-      return false;
+    if (order_type === 'delivery') {
+      if (!delivery_address.trim()) {
+        toast.error('Please enter a delivery address');
+        return false;
+      }
+      if (!delivery_zone_id) {
+        toast.error('Please select a delivery zone');
+        return false;
+      }
     }
     
     return true;
@@ -198,13 +206,24 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
               </RadioGroup>
               
               {checkoutData.order_type === 'delivery' && (
-                <div>
-                  <Label htmlFor="delivery_address">Delivery Address *</Label>
-                  <Input
-                    id="delivery_address"
-                    value={checkoutData.delivery_address}
-                    onChange={(e) => handleInputChange('delivery_address', e.target.value)}
-                    placeholder="Enter your delivery address"
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="delivery_address">Delivery Address *</Label>
+                    <Input
+                      id="delivery_address"
+                      value={checkoutData.delivery_address}
+                      onChange={(e) => handleInputChange('delivery_address', e.target.value)}
+                      placeholder="Enter your delivery address"
+                    />
+                  </div>
+                  <DeliveryZoneSelector
+                    selectedZoneId={checkoutData.delivery_zone_id}
+                    onZoneSelect={(zoneId, deliveryFee) => {
+                      handleInputChange('delivery_zone_id', zoneId);
+                      // Update cart delivery fee
+                      cart.updateDeliveryFee(deliveryFee);
+                    }}
+                    orderSubtotal={cart.summary.subtotal}
                   />
                 </div>
               )}

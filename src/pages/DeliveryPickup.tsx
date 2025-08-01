@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MapPin, BarChart3, Calendar } from "lucide-react";
 import { DriverManagement } from "@/components/delivery/DriverManagement";
+import { DeliveryZonesManager } from "@/components/delivery/DeliveryZonesManager";
 
 export default function DeliveryPickupPage() {
   const [activeTab, setActiveTab] = useState("overview");
@@ -98,16 +99,7 @@ export default function DeliveryPickupPage() {
           </TabsContent>
 
           <TabsContent value="zones">
-            <Card>
-              <CardHeader>
-                <CardTitle>Delivery Zones</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  Delivery zones management will be implemented here.
-                </div>
-              </CardContent>
-            </Card>
+            <DeliveryZonesManager />
           </TabsContent>
 
 

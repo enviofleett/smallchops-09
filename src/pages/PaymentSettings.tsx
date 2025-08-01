@@ -16,6 +16,9 @@ import { PaymentHealthCheck } from '@/components/admin/PaymentHealthCheck';
 import { EnvironmentSwitcher } from '@/components/environment/EnvironmentSwitcher';
 import { PaymentErrorTracker } from '@/components/admin/PaymentErrorTracker';
 import { PaystackProductionDashboard } from '@/components/payments/PaystackProductionDashboard';
+import { LiveKeysConfiguration } from '@/components/payments/LiveKeysConfiguration';
+import { ProductionTestingSuite } from '@/components/payments/ProductionTestingSuite';
+import { ProductionMonitoring } from '@/components/payments/ProductionMonitoring';
 import { AlertCircle, CheckCircle, Copy, ExternalLink, Lock, UserX } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHasPermission } from '@/hooks/usePermissions';
@@ -312,14 +315,15 @@ export const PaymentSettings: React.FC = () => {
       </div>
 
       <Tabs defaultValue="environment" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="environment">Environment</TabsTrigger>
           <TabsTrigger value="production">Production</TabsTrigger>
+          <TabsTrigger value="live-keys">Live Keys</TabsTrigger>
+          <TabsTrigger value="testing">Testing</TabsTrigger>
+          <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
           <TabsTrigger value="configuration">Configuration</TabsTrigger>
           <TabsTrigger value="analytics">Analytics</TabsTrigger>
-          <TabsTrigger value="transactions">Transactions</TabsTrigger>
           <TabsTrigger value="health">Health Check</TabsTrigger>
-          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
         </TabsList>
 
         <TabsContent value="environment" className="space-y-6">
@@ -328,6 +332,18 @@ export const PaymentSettings: React.FC = () => {
 
         <TabsContent value="production" className="space-y-6">
           <PaystackProductionDashboard />
+        </TabsContent>
+
+        <TabsContent value="live-keys" className="space-y-6">
+          <LiveKeysConfiguration />
+        </TabsContent>
+
+        <TabsContent value="testing" className="space-y-6">
+          <ProductionTestingSuite />
+        </TabsContent>
+
+        <TabsContent value="monitoring" className="space-y-6">
+          <ProductionMonitoring />
         </TabsContent>
 
           <TabsContent value="configuration" className="space-y-6">

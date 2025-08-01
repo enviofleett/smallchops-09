@@ -11,7 +11,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Building2, Globe, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
 interface PaymentIntegration {
   id: string;
   provider: string;
@@ -22,33 +21,31 @@ interface PaymentIntegration {
   connection_status: string | null;
   supported_methods: any; // Using any to handle Json type from Supabase
 }
-
 export const PaymentSettingsTab: React.FC = () => {
   const [integrations, setIntegrations] = useState<PaymentIntegration[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showSecrets, setShowSecrets] = useState<Record<string, boolean>>({});
   const [formData, setFormData] = useState<Record<string, Partial<PaymentIntegration>>>({});
-
   useEffect(() => {
     loadIntegrations();
   }, []);
-
   const loadIntegrations = async () => {
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('payment_integrations')
-        .select('*');
-
+      const {
+        data,
+        error
+      } = await supabase.from('payment_integrations').select('*');
       if (error) throw error;
-
       if (data) {
         setIntegrations(data);
         // Initialize form data
         const initialFormData: Record<string, Partial<PaymentIntegration>> = {};
         data.forEach(integration => {
-          initialFormData[integration.provider] = { ...integration };
+          initialFormData[integration.provider] = {
+            ...integration
+          };
         });
         setFormData(initialFormData);
       }
@@ -59,27 +56,25 @@ export const PaymentSettingsTab: React.FC = () => {
       setLoading(false);
     }
   };
-
   const saveIntegration = async (provider: string) => {
     setSaving(true);
     try {
       const data = formData[provider];
       if (!data) return;
-
-      const { error } = await supabase
-        .from('payment_integrations')
-        .upsert({
-          provider,
-          public_key: data.public_key || '',
-          secret_key: data.secret_key || '',
-          webhook_secret: data.webhook_secret || '',
-          test_mode: data.test_mode || false,
-          connection_status: (data.public_key && data.secret_key) ? 'connected' : 'disconnected',
-          supported_methods: data.supported_methods || ['card']
-        }, { onConflict: 'provider' });
-
+      const {
+        error
+      } = await supabase.from('payment_integrations').upsert({
+        provider,
+        public_key: data.public_key || '',
+        secret_key: data.secret_key || '',
+        webhook_secret: data.webhook_secret || '',
+        test_mode: data.test_mode || false,
+        connection_status: data.public_key && data.secret_key ? 'connected' : 'disconnected',
+        supported_methods: data.supported_methods || ['card']
+      }, {
+        onConflict: 'provider'
+      });
       if (error) throw error;
-
       toast.success(`${provider} settings saved successfully`);
       loadIntegrations();
     } catch (error) {
@@ -89,7 +84,6 @@ export const PaymentSettingsTab: React.FC = () => {
       setSaving(false);
     }
   };
-
   const testConnection = async (provider: string) => {
     try {
       const data = formData[provider];
@@ -104,7 +98,6 @@ export const PaymentSettingsTab: React.FC = () => {
       toast.error(`${provider} connection test failed`);
     }
   };
-
   const updateFormData = (provider: string, field: string, value: any) => {
     setFormData(prev => ({
       ...prev,
@@ -114,21 +107,17 @@ export const PaymentSettingsTab: React.FC = () => {
       }
     }));
   };
-
   const toggleSecretVisibility = (key: string) => {
     setShowSecrets(prev => ({
       ...prev,
       [key]: !prev[key]
     }));
   };
-
   const renderProviderCard = (provider: string, icon: React.ReactNode, title: string, description: string) => {
     const integration = integrations.find(i => i.provider === provider);
     const form = formData[provider] || {};
     const isConnected = integration?.connection_status === 'connected';
-
-    return (
-      <Card key={provider}>
+    return <Card key={provider}>
         <CardHeader>
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -139,17 +128,13 @@ export const PaymentSettingsTab: React.FC = () => {
               </div>
             </div>
             <Badge variant={isConnected ? 'default' : 'secondary'}>
-              {isConnected ? (
-                <>
+              {isConnected ? <>
                   <CheckCircle className="h-3 w-3 mr-1" />
                   Connected
-                </>
-              ) : (
-                <>
+                </> : <>
                   <AlertCircle className="h-3 w-3 mr-1" />
                   Disconnected
-                </>
-              )}
+                </>}
             </Badge>
           </div>
         </CardHeader>
@@ -157,74 +142,31 @@ export const PaymentSettingsTab: React.FC = () => {
           <div className="grid gap-4">
             <div className="space-y-2">
               <Label htmlFor={`${provider}-public-key`}>Public Key</Label>
-              <Input
-                id={`${provider}-public-key`}
-                placeholder={`Enter ${title} public key`}
-                value={form.public_key || ''}
-                onChange={(e) => updateFormData(provider, 'public_key', e.target.value)}
-              />
+              <Input id={`${provider}-public-key`} placeholder={`Enter ${title} public key`} value={form.public_key || ''} onChange={e => updateFormData(provider, 'public_key', e.target.value)} />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor={`${provider}-secret-key`}>Secret Key</Label>
               <div className="relative">
-                <Input
-                  id={`${provider}-secret-key`}
-                  type={showSecrets[`${provider}-secret`] ? 'text' : 'password'}
-                  placeholder={`Enter ${title} secret key`}
-                  value={form.secret_key || ''}
-                  onChange={(e) => updateFormData(provider, 'secret_key', e.target.value)}
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => toggleSecretVisibility(`${provider}-secret`)}
-                >
-                  {showSecrets[`${provider}-secret`] ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                <Input id={`${provider}-secret-key`} type={showSecrets[`${provider}-secret`] ? 'text' : 'password'} placeholder={`Enter ${title} secret key`} value={form.secret_key || ''} onChange={e => updateFormData(provider, 'secret_key', e.target.value)} />
+                <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => toggleSecretVisibility(`${provider}-secret`)}>
+                  {showSecrets[`${provider}-secret`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
             </div>
 
-            {provider === 'paystack' && (
-              <div className="space-y-2">
+            {provider === 'paystack' && <div className="space-y-2">
                 <Label htmlFor={`${provider}-webhook-secret`}>Webhook Secret</Label>
                 <div className="relative">
-                  <Input
-                    id={`${provider}-webhook-secret`}
-                    type={showSecrets[`${provider}-webhook`] ? 'text' : 'password'}
-                    placeholder="Enter webhook secret"
-                    value={form.webhook_secret || ''}
-                    onChange={(e) => updateFormData(provider, 'webhook_secret', e.target.value)}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3"
-                    onClick={() => toggleSecretVisibility(`${provider}-webhook`)}
-                  >
-                    {showSecrets[`${provider}-webhook`] ? (
-                      <EyeOff className="h-4 w-4" />
-                    ) : (
-                      <Eye className="h-4 w-4" />
-                    )}
+                  <Input id={`${provider}-webhook-secret`} type={showSecrets[`${provider}-webhook`] ? 'text' : 'password'} placeholder="Enter webhook secret" value={form.webhook_secret || ''} onChange={e => updateFormData(provider, 'webhook_secret', e.target.value)} />
+                  <Button type="button" variant="ghost" size="sm" className="absolute right-0 top-0 h-full px-3" onClick={() => toggleSecretVisibility(`${provider}-webhook`)}>
+                    {showSecrets[`${provider}-webhook`] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
-              </div>
-            )}
+              </div>}
 
             <div className="flex items-center space-x-2">
-              <Switch
-                id={`${provider}-test-mode`}
-                checked={form.test_mode || false}
-                onCheckedChange={(checked) => updateFormData(provider, 'test_mode', checked)}
-              />
+              <Switch id={`${provider}-test-mode`} checked={form.test_mode || false} onCheckedChange={checked => updateFormData(provider, 'test_mode', checked)} />
               <Label htmlFor={`${provider}-test-mode`}>Test Mode</Label>
             </div>
           </div>
@@ -232,55 +174,34 @@ export const PaymentSettingsTab: React.FC = () => {
           <Separator />
 
           <div className="flex space-x-2">
-            <Button
-              onClick={() => saveIntegration(provider)}
-              disabled={saving}
-              className="flex-1"
-            >
+            <Button onClick={() => saveIntegration(provider)} disabled={saving} className="flex-1">
               {saving ? 'Saving...' : 'Save Settings'}
             </Button>
-            <Button
-              variant="outline"
-              onClick={() => testConnection(provider)}
-              disabled={!form.public_key || !form.secret_key}
-            >
+            <Button variant="outline" onClick={() => testConnection(provider)} disabled={!form.public_key || !form.secret_key}>
               Test Connection
             </Button>
           </div>
 
-          {provider === 'paystack' && (
-            <Alert>
+          {provider === 'paystack' && <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
                 Webhook URL: <code className="text-xs">{window.location.origin}/api/webhooks/paystack</code>
               </AlertDescription>
-            </Alert>
-          )}
+            </Alert>}
         </CardContent>
-      </Card>
-    );
+      </Card>;
   };
-
   if (loading) {
     return <div>Loading payment settings...</div>;
   }
-
-  return (
-    <div className="space-y-6">
+  return <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium">Payment Integrations</h3>
-        <p className="text-sm text-muted-foreground">
-          Configure your payment providers to accept payments from customers.
-        </p>
+        
+        
       </div>
 
       <div className="grid gap-6">
-        {renderProviderCard(
-          'paystack',
-          <Building2 className="h-6 w-6" />,
-          'Paystack',
-          'African payment processing with local payment methods'
-        )}
+        {renderProviderCard('paystack', <Building2 className="h-6 w-6" />, 'Paystack', 'African payment processing with local payment methods')}
       </div>
 
       <Alert>
@@ -290,6 +211,5 @@ export const PaymentSettingsTab: React.FC = () => {
           Never share your secret keys or webhook secrets publicly.
         </AlertDescription>
       </Alert>
-    </div>
-  );
+    </div>;
 };

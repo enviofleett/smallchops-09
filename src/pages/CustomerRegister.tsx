@@ -47,10 +47,21 @@ const CustomerRegister = () => {
       return false;
     }
 
-    if (!formData.phone.trim() || formData.phone.trim().length < 10) {
+    if (!formData.phone.trim()) {
       toast({
         title: "Phone number required",
-        description: "Please enter a valid phone number with at least 10 digits.",
+        description: "Phone number is required for customer registration.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    // Enhanced phone validation - strip non-digits and check length
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    if (phoneDigits.length < 10) {
+      toast({
+        title: "Invalid phone number",
+        description: "Phone number must be at least 10 digits long.",
         variant: "destructive",
       });
       return false;
@@ -100,23 +111,35 @@ const CustomerRegister = () => {
       if (error) {
         console.error('Registration error:', error);
         
-        // Handle specific error cases
+        // Handle specific error cases with better messaging
         if (error.message.includes('User already registered')) {
           toast({
             title: "Account already exists",
             description: "An account with this email already exists. Please try logging in instead.",
             variant: "destructive",
           });
-        } else if (error.message.includes('Phone number is required')) {
+        } else if (error.message.includes('Phone number is required') || error.message.includes('Phone number must be at least')) {
           toast({
             title: "Phone number required",
-            description: "Please provide a valid phone number to complete registration.",
+            description: "A valid phone number with at least 10 digits is required for customer registration.",
+            variant: "destructive",
+          });
+        } else if (error.message.includes('Database error saving new user')) {
+          toast({
+            title: "Registration error",
+            description: "There was an issue creating your account. Please ensure all fields are filled correctly and try again.",
             variant: "destructive",
           });
         } else if (error.message.includes('Password should be at least 6 characters')) {
           toast({
             title: "Password too short",
             description: "Password must be at least 6 characters long.",
+            variant: "destructive",
+          });
+        } else if (error.message.includes('Invalid email')) {
+          toast({
+            title: "Invalid email",
+            description: "Please enter a valid email address.",
             variant: "destructive",
           });
         } else {

@@ -124,7 +124,7 @@ export const PaymentSettingsTab: React.FC = () => {
               {icon}
               <div>
                 <CardTitle className="text-lg">{title}</CardTitle>
-                <p className="text-sm text-muted-foreground">{description}</p>
+                
               </div>
             </div>
             <Badge variant={isConnected ? 'default' : 'secondary'}>

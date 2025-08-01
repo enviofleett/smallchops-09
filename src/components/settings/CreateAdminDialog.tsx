@@ -39,20 +39,39 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
   const onSubmit = async (data: CreateAdminFormData) => {
     setIsSubmitting(true);
     try {
+      // Get current user
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) {
+        throw new Error("You must be logged in to send invitations");
+      }
+
+      // Check for existing invitation
+      const { data: existingInvitation } = await supabase
+        .from('admin_invitations')
+        .select('id, status, expires_at')
+        .eq('email', data.email)
+        .eq('status', 'pending')
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle();
+
+      if (existingInvitation) {
+        throw new Error("A pending invitation already exists for this email address");
+      }
+
       // Create invitation record - the trigger will automatically send the email
       const { error } = await supabase
         .from('admin_invitations')
         .insert({
           email: data.email,
           role: data.role,
-          invited_by: (await supabase.auth.getUser()).data.user?.id,
+          invited_by: user.id,
         });
 
       if (error) throw error;
 
       toast({
         title: "Admin invitation sent",
-        description: `A secure invitation email has been sent to ${data.email} with setup instructions.`,
+        description: `A secure invitation email has been sent to ${data.email} with setup instructions. The invitation will expire in 7 days.`,
       });
 
       form.reset();
@@ -61,12 +80,21 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
     } catch (error: any) {
       console.error('Admin invitation error:', error);
       
-      // Handle specific errors
+      // Handle specific errors with user-friendly messages
       let errorMessage = "Failed to send invitation";
-      if (error.message?.includes('duplicate key')) {
+      
+      if (error.message?.includes('duplicate key') || error.message?.includes('already exists')) {
         errorMessage = "An invitation for this email already exists";
-      } else if (error.message?.includes('permission')) {
+      } else if (error.message?.includes('permission') || error.message?.includes('authorized')) {
         errorMessage = "You don't have permission to create admin invitations";
+      } else if (error.message?.includes('rate limit') || error.message?.includes('limit')) {
+        errorMessage = "You've reached the invitation limit. Please wait before sending more invitations.";
+      } else if (error.message?.includes('logged in')) {
+        errorMessage = "You must be logged in to send invitations";
+      } else if (error.message?.includes('network') || error.message?.includes('fetch')) {
+        errorMessage = "Network error. Please check your connection and try again.";
+      } else if (error.message) {
+        errorMessage = error.message;
       }
       
       toast({

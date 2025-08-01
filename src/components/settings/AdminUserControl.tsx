@@ -8,6 +8,7 @@ import { CreateAdminDialog } from "./CreateAdminDialog";
 import { EnhancedUserPermissionsMatrix } from "./EnhancedUserPermissionsMatrix";
 import { AdminActionsLog } from "./AdminActionsLog";
 import { AdminHealthMonitor } from "../admin/AdminHealthMonitor";
+import { AdminInvitationMonitor } from "./AdminInvitationMonitor";
 import { useAdminManagement } from '@/hooks/useAdminManagement';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { UserPlus, Shield, Activity, Trash2 } from "lucide-react";
@@ -73,9 +74,10 @@ export const AdminUserControl = () => {
       </div>
 
       <Tabs defaultValue="users" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="users">Admin Users</TabsTrigger>
           <TabsTrigger value="invitations">Invitations</TabsTrigger>
+          <TabsTrigger value="monitor">Monitor</TabsTrigger>
           <TabsTrigger value="permissions">Permissions</TabsTrigger>
           <TabsTrigger value="audit">Audit Log</TabsTrigger>
           <TabsTrigger value="health">System Health</TabsTrigger>
@@ -232,6 +234,10 @@ export const AdminUserControl = () => {
               )}
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="monitor">
+          <AdminInvitationMonitor />
         </TabsContent>
 
         <TabsContent value="permissions">

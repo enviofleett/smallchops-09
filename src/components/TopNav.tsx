@@ -18,8 +18,8 @@ const TopNav = () => {
     await logout();
     setShowUserMenu(false);
   };
-  return <header className="bg-background border-b border-border px-4 md:px-6 py-4 sticky top-0 z-40">
-      <div className="flex items-center justify-between gap-4">
+  return <header className="bg-background border-b border-border px-4 md:px-6 py-4 sticky top-0 z-40 min-h-[73px] flex items-center">
+      <div className="flex items-center justify-between gap-4 w-full">
         {/* Mobile menu trigger */}
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden" />

@@ -129,18 +129,18 @@ export function AppSidebar() {
 
   return (
     <Sidebar collapsible="icon" className="border-sidebar-border">
-      <SidebarHeader className="border-b border-sidebar-border px-4 md:px-6 py-4">
+      <SidebarHeader className="border-b border-sidebar-border px-4 md:px-6 py-4 min-h-[73px] flex items-center">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-lg flex items-center justify-center overflow-hidden bg-sidebar-accent">
+          <div className="w-12 h-12 rounded-lg flex items-center justify-center overflow-hidden bg-primary/10 shadow-sm border border-primary/20">
             <img 
               src={startersLogo} 
               alt="Starters" 
-              className="w-full h-full object-contain p-1" 
+              className="w-full h-full object-contain p-1.5" 
               loading="lazy" 
             />
           </div>
           {!collapsed && (
-            <span className="text-xl font-bold text-sidebar-foreground">
+            <span className="text-2xl font-bold text-sidebar-foreground tracking-tight">
               Starters
             </span>
           )}

@@ -25,6 +25,15 @@ const CustomerRegister = () => {
   });
 
   const handleInputChange = (field: string, value: string) => {
+    if (field === 'phone') {
+      // Format Nigerian phone number as user types
+      const digits = value.replace(/\D/g, '');
+      if (digits.length <= 11) {
+        if (digits.length >= 1) {
+          value = `(${digits.slice(0, 11)})`;
+        }
+      }
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
@@ -56,12 +65,12 @@ const CustomerRegister = () => {
       return false;
     }
 
-    // Enhanced phone validation - strip non-digits and check length
+    // Nigerian phone validation - expect format like (09120020048)
     const phoneDigits = formData.phone.replace(/\D/g, '');
-    if (phoneDigits.length < 10) {
+    if (phoneDigits.length !== 11 || !phoneDigits.startsWith('0')) {
       toast({
         title: "Invalid phone number",
-        description: "Phone number must be at least 10 digits long.",
+        description: "Please enter a valid Nigerian phone number in format (09120020048)",
         variant: "destructive",
       });
       return false;
@@ -120,8 +129,8 @@ const CustomerRegister = () => {
           });
         } else if (error.message.includes('Phone number is required') || error.message.includes('Phone number must be at least')) {
           toast({
-            title: "Phone number required",
-            description: "A valid phone number with at least 10 digits is required for customer registration.",
+            title: "Invalid phone number",
+            description: "Please enter a valid Nigerian phone number in format (09120020048)",
             variant: "destructive",
           });
         } else if (error.message.includes('Database error saving new user')) {
@@ -235,12 +244,13 @@ const CustomerRegister = () => {
                 type="tel"
                 value={formData.phone}
                 onChange={(e) => handleInputChange('phone', e.target.value)}
-                placeholder="Enter your phone number (e.g., +1234567890)"
+                placeholder="(09120020048)"
                 required
                 disabled={isLoading}
+                maxLength={13}
               />
               <p className="text-xs text-muted-foreground">
-                Phone number is required for order notifications and delivery updates
+                Enter your Nigerian phone number. Format: (09120020048)
               </p>
             </div>
 

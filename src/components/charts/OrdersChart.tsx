@@ -3,35 +3,34 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Default fallback data
-const defaultData = [
-  { name: 'Mon', orders: 24 },
-  { name: 'Tue', orders: 38 },
-  { name: 'Wed', orders: 29 },
-  { name: 'Thu', orders: 45 },
-  { name: 'Fri', orders: 52 },
-  { name: 'Sat', orders: 48 },
-  { name: 'Sun', orders: 35 },
-];
-
 interface OrdersChartProps {
-  data?: Array<{ day?: string; name?: string; orders: number }>;
+  data?: Array<{ day: string; name: string; orders: number; revenue?: number }>;
   isLoading?: boolean;
 }
 
 const OrdersChart = ({ data, isLoading }: OrdersChartProps) => {
-  // Use real data if available, otherwise fallback to default
   const chartData = data && Array.isArray(data) && data.length > 0 
     ? data.map(item => ({
         name: item.day || item.name || 'Day',
         orders: Number(item.orders) || 0
       }))
-    : defaultData;
+    : [];
 
   if (isLoading) {
     return (
       <div className="h-64">
         <Skeleton className="w-full h-full rounded" />
+      </div>
+    );
+  }
+
+  if (!chartData || chartData.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-400 text-sm">No order data available</div>
+          <div className="text-gray-300 text-xs mt-1">Start taking orders to see trends</div>
+        </div>
       </div>
     );
   }

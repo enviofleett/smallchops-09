@@ -1,10 +1,17 @@
 
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Customer } from '@/types/customers';
+
+interface DashboardCustomer {
+  id: string;
+  name: string;
+  email: string;
+  totalOrders: number;
+  totalSpent: number;
+}
 
 interface TopCustomersChartProps {
-  customers: Customer[];
+  customers: DashboardCustomer[];
   type: 'orders' | 'spending';
   title: string;
 }

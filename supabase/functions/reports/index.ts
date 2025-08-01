@@ -66,18 +66,19 @@ serve(async (req) => {
 
     console.log("Dashboard data retrieved successfully:", data);
 
-    // The data is already in the correct format from the enhanced function
+    // Return the dashboard data directly from the database function
     const transformedData = {
-      kpiStats: data?.kpiStats || {
-        todaysRevenue: 0,
-        ordersToday: 0,
-        pendingOrders: 0,
-        completedOrders: 0
+      stats: data?.stats || {
+        totalProducts: 0,
+        totalOrders: 0,
+        totalCustomers: 0,
+        totalRevenue: 0
       },
       revenueTrends: data?.revenueTrends || [],
       orderTrends: data?.orderTrends || [],
-      recentOrders: data?.recentOrders || [],
-      popularItems: data?.popularItems || []
+      topCustomersByOrders: data?.topCustomersByOrders || [],
+      topCustomersBySpending: data?.topCustomersBySpending || [],
+      recentOrders: data?.recentOrders || []
     };
 
     return new Response(JSON.stringify({ data: transformedData }), {

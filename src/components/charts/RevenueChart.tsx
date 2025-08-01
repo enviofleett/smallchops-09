@@ -3,35 +3,34 @@ import React from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 
-// Default fallback data
-const defaultData = [
-  { name: 'Mon', revenue: 4000 },
-  { name: 'Tue', revenue: 3000 },
-  { name: 'Wed', revenue: 5000 },
-  { name: 'Thu', revenue: 4500 },
-  { name: 'Fri', revenue: 6000 },
-  { name: 'Sat', revenue: 5500 },
-  { name: 'Sun', revenue: 4200 },
-];
-
 interface RevenueChartProps {
-  data?: Array<{ day?: string; name?: string; revenue: number }>;
+  data?: Array<{ day: string; name: string; revenue: number; orders?: number }>;
   isLoading?: boolean;
 }
 
 const RevenueChart = ({ data, isLoading }: RevenueChartProps) => {
-  // Use real data if available, otherwise fallback to default
   const chartData = data && Array.isArray(data) && data.length > 0 
     ? data.map(item => ({
         name: item.day || item.name || 'Day',
         revenue: Number(item.revenue) || 0
       }))
-    : defaultData;
+    : [];
 
   if (isLoading) {
     return (
       <div className="h-64">
         <Skeleton className="w-full h-full rounded" />
+      </div>
+    );
+  }
+
+  if (!chartData || chartData.length === 0) {
+    return (
+      <div className="h-64 flex items-center justify-center">
+        <div className="text-center">
+          <div className="text-gray-400 text-sm">No revenue data available</div>
+          <div className="text-gray-300 text-xs mt-1">Complete some orders to see revenue trends</div>
+        </div>
       </div>
     );
   }

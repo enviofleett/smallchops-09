@@ -10,7 +10,7 @@ import type { Driver } from '@/api/drivers';
 const vehicleIcons = {
   car: Car,
   motorcycle: Bike,
-  bicycle: Truck,
+  bicycle: Bike,
   van: Truck
 };
 

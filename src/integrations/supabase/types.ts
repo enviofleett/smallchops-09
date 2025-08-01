@@ -871,6 +871,54 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_delivery_preferences: {
+        Row: {
+          contact_email: string | null
+          contact_phone: string | null
+          created_at: string
+          customer_id: string
+          delivery_instructions: string | null
+          email_notifications: boolean | null
+          id: string
+          notifications_enabled: boolean | null
+          preferred_days: string[] | null
+          preferred_delivery_time_end: string | null
+          preferred_delivery_time_start: string | null
+          sms_notifications: boolean | null
+          updated_at: string
+        }
+        Insert: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          customer_id: string
+          delivery_instructions?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          notifications_enabled?: boolean | null
+          preferred_days?: string[] | null
+          preferred_delivery_time_end?: string | null
+          preferred_delivery_time_start?: string | null
+          sms_notifications?: boolean | null
+          updated_at?: string
+        }
+        Update: {
+          contact_email?: string | null
+          contact_phone?: string | null
+          created_at?: string
+          customer_id?: string
+          delivery_instructions?: string | null
+          email_notifications?: boolean | null
+          id?: string
+          notifications_enabled?: boolean | null
+          preferred_days?: string[] | null
+          preferred_delivery_time_end?: string | null
+          preferred_delivery_time_start?: string | null
+          sms_notifications?: boolean | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       customer_favorites: {
         Row: {
           created_at: string
@@ -1094,6 +1142,53 @@ export type Database = {
         }
         Relationships: []
       }
+      customer_satisfaction_ratings: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          delivery_rating: number | null
+          delivery_time_rating: number | null
+          driver_id: string | null
+          driver_rating: number | null
+          feedback: string | null
+          id: string
+          order_id: string | null
+          overall_rating: number | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          delivery_rating?: number | null
+          delivery_time_rating?: number | null
+          driver_id?: string | null
+          driver_rating?: number | null
+          feedback?: string | null
+          id?: string
+          order_id?: string | null
+          overall_rating?: number | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          delivery_rating?: number | null
+          delivery_time_rating?: number | null
+          driver_id?: string | null
+          driver_rating?: number | null
+          feedback?: string | null
+          id?: string
+          order_id?: string | null
+          overall_rating?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_satisfaction_ratings_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       customers: {
         Row: {
           created_at: string
@@ -1123,6 +1218,59 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      delivery_analytics: {
+        Row: {
+          average_delivery_time: number | null
+          created_at: string
+          customer_rating: number | null
+          date: string
+          driver_id: string | null
+          failed_deliveries: number | null
+          fuel_cost: number | null
+          id: string
+          successful_deliveries: number | null
+          total_deliveries: number | null
+          total_distance: number | null
+          total_duration: number | null
+        }
+        Insert: {
+          average_delivery_time?: number | null
+          created_at?: string
+          customer_rating?: number | null
+          date: string
+          driver_id?: string | null
+          failed_deliveries?: number | null
+          fuel_cost?: number | null
+          id?: string
+          successful_deliveries?: number | null
+          total_deliveries?: number | null
+          total_distance?: number | null
+          total_duration?: number | null
+        }
+        Update: {
+          average_delivery_time?: number | null
+          created_at?: string
+          customer_rating?: number | null
+          date?: string
+          driver_id?: string | null
+          failed_deliveries?: number | null
+          fuel_cost?: number | null
+          id?: string
+          successful_deliveries?: number | null
+          total_deliveries?: number | null
+          total_distance?: number | null
+          total_duration?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_analytics_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       delivery_fees: {
         Row: {
@@ -1155,6 +1303,210 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "delivery_fees_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_notifications: {
+        Row: {
+          channel: string
+          content: Json | null
+          created_at: string
+          customer_email: string
+          id: string
+          notification_type: string
+          order_id: string | null
+          sent_at: string | null
+          status: string | null
+        }
+        Insert: {
+          channel: string
+          content?: Json | null
+          created_at?: string
+          customer_email: string
+          id?: string
+          notification_type: string
+          order_id?: string | null
+          sent_at?: string | null
+          status?: string | null
+        }
+        Update: {
+          channel?: string
+          content?: Json | null
+          created_at?: string
+          customer_email?: string
+          id?: string
+          notification_type?: string
+          order_id?: string | null
+          sent_at?: string | null
+          status?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_performance_metrics: {
+        Row: {
+          average_delivery_time: number | null
+          created_at: string
+          customer_rating: number | null
+          driver_id: string | null
+          failed_deliveries: number | null
+          fuel_cost: number | null
+          id: string
+          metric_date: string
+          on_time_deliveries: number | null
+          successful_deliveries: number | null
+          total_deliveries: number | null
+          total_distance: number | null
+          zone_id: string | null
+        }
+        Insert: {
+          average_delivery_time?: number | null
+          created_at?: string
+          customer_rating?: number | null
+          driver_id?: string | null
+          failed_deliveries?: number | null
+          fuel_cost?: number | null
+          id?: string
+          metric_date: string
+          on_time_deliveries?: number | null
+          successful_deliveries?: number | null
+          total_deliveries?: number | null
+          total_distance?: number | null
+          zone_id?: string | null
+        }
+        Update: {
+          average_delivery_time?: number | null
+          created_at?: string
+          customer_rating?: number | null
+          driver_id?: string | null
+          failed_deliveries?: number | null
+          fuel_cost?: number | null
+          id?: string
+          metric_date?: string
+          on_time_deliveries?: number | null
+          successful_deliveries?: number | null
+          total_deliveries?: number | null
+          total_distance?: number | null
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_performance_metrics_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_performance_metrics_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_routes: {
+        Row: {
+          actual_duration: number | null
+          created_at: string
+          driver_id: string | null
+          estimated_duration: number | null
+          id: string
+          route_date: string
+          route_points: Json | null
+          status: string
+          total_distance: number | null
+          total_orders: number | null
+          updated_at: string
+        }
+        Insert: {
+          actual_duration?: number | null
+          created_at?: string
+          driver_id?: string | null
+          estimated_duration?: number | null
+          id?: string
+          route_date: string
+          route_points?: Json | null
+          status?: string
+          total_distance?: number | null
+          total_orders?: number | null
+          updated_at?: string
+        }
+        Update: {
+          actual_duration?: number | null
+          created_at?: string
+          driver_id?: string | null
+          estimated_duration?: number | null
+          id?: string
+          route_date?: string
+          route_points?: Json | null
+          status?: string
+          total_distance?: number | null
+          total_orders?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_routes_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_time_slots: {
+        Row: {
+          created_at: string
+          current_bookings: number | null
+          day_of_week: number
+          end_time: string
+          id: string
+          is_active: boolean | null
+          max_capacity: number | null
+          start_time: string
+          updated_at: string
+          zone_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          current_bookings?: number | null
+          day_of_week: number
+          end_time: string
+          id?: string
+          is_active?: boolean | null
+          max_capacity?: number | null
+          start_time: string
+          updated_at?: string
+          zone_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          current_bookings?: number | null
+          day_of_week?: number
+          end_time?: string
+          id?: string
+          is_active?: boolean | null
+          max_capacity?: number | null
+          start_time?: string
+          updated_at?: string
+          zone_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_time_slots_zone_id_fkey"
             columns: ["zone_id"]
             isOneToOne: false
             referencedRelation: "delivery_zones"
@@ -1227,6 +1579,112 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      driver_location_tracking: {
+        Row: {
+          accuracy: number | null
+          battery_level: number | null
+          driver_id: string | null
+          heading: number | null
+          id: string
+          is_online: boolean | null
+          latitude: number
+          longitude: number
+          speed: number | null
+          tracked_at: string
+        }
+        Insert: {
+          accuracy?: number | null
+          battery_level?: number | null
+          driver_id?: string | null
+          heading?: number | null
+          id?: string
+          is_online?: boolean | null
+          latitude: number
+          longitude: number
+          speed?: number | null
+          tracked_at?: string
+        }
+        Update: {
+          accuracy?: number | null
+          battery_level?: number | null
+          driver_id?: string | null
+          heading?: number | null
+          id?: string
+          is_online?: boolean | null
+          latitude?: number
+          longitude?: number
+          speed?: number | null
+          tracked_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_location_tracking_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      drivers: {
+        Row: {
+          created_at: string
+          current_location: Json | null
+          email: string | null
+          id: string
+          is_active: boolean | null
+          license_number: string | null
+          license_plate: string | null
+          name: string
+          phone: string
+          profile_id: string | null
+          updated_at: string
+          vehicle_brand: string | null
+          vehicle_model: string | null
+          vehicle_type: string
+        }
+        Insert: {
+          created_at?: string
+          current_location?: Json | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          license_number?: string | null
+          license_plate?: string | null
+          name: string
+          phone: string
+          profile_id?: string | null
+          updated_at?: string
+          vehicle_brand?: string | null
+          vehicle_model?: string | null
+          vehicle_type: string
+        }
+        Update: {
+          created_at?: string
+          current_location?: Json | null
+          email?: string | null
+          id?: string
+          is_active?: boolean | null
+          license_number?: string | null
+          license_plate?: string | null
+          name?: string
+          phone?: string
+          profile_id?: string | null
+          updated_at?: string
+          vehicle_brand?: string | null
+          vehicle_model?: string | null
+          vehicle_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "drivers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       email_consents: {
         Row: {
@@ -1616,6 +2074,62 @@ export type Database = {
           },
         ]
       }
+      notification_delivery_log: {
+        Row: {
+          channel: string
+          created_at: string
+          customer_id: string | null
+          delivered_at: string | null
+          error_message: string | null
+          failed_at: string | null
+          id: string
+          order_id: string | null
+          provider_response: Json | null
+          recipient: string
+          sent_at: string | null
+          status: string | null
+          template_id: string | null
+        }
+        Insert: {
+          channel: string
+          created_at?: string
+          customer_id?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          failed_at?: string | null
+          id?: string
+          order_id?: string | null
+          provider_response?: Json | null
+          recipient: string
+          sent_at?: string | null
+          status?: string | null
+          template_id?: string | null
+        }
+        Update: {
+          channel?: string
+          created_at?: string
+          customer_id?: string | null
+          delivered_at?: string | null
+          error_message?: string | null
+          failed_at?: string | null
+          id?: string
+          order_id?: string | null
+          provider_response?: Json | null
+          recipient?: string
+          sent_at?: string | null
+          status?: string | null
+          template_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_delivery_log_template_id_fkey"
+            columns: ["template_id"]
+            isOneToOne: false
+            referencedRelation: "notification_templates"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_queue: {
         Row: {
           created_at: string
@@ -1666,6 +2180,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_templates: {
+        Row: {
+          channel: string
+          content: string
+          created_at: string
+          id: string
+          is_active: boolean | null
+          subject: string | null
+          template_key: string
+          template_name: string
+          updated_at: string
+          variables: Json | null
+        }
+        Insert: {
+          channel: string
+          content: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          subject?: string | null
+          template_key: string
+          template_name: string
+          updated_at?: string
+          variables?: Json | null
+        }
+        Update: {
+          channel?: string
+          content?: string
+          created_at?: string
+          id?: string
+          is_active?: boolean | null
+          subject?: string | null
+          template_key?: string
+          template_name?: string
+          updated_at?: string
+          variables?: Json | null
+        }
+        Relationships: []
       }
       order_items: {
         Row: {
@@ -1769,6 +2322,7 @@ export type Database = {
           delivery_address: string | null
           delivery_fee: number | null
           delivery_time: string | null
+          delivery_time_slot_id: string | null
           delivery_zone_id: string | null
           discount_amount: number | null
           id: string
@@ -1778,7 +2332,9 @@ export type Database = {
           payment_method: string | null
           payment_reference: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
+          pickup_point_id: string | null
           pickup_time: string | null
+          preferred_delivery_time: string | null
           special_instructions: string | null
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
@@ -1798,6 +2354,7 @@ export type Database = {
           delivery_address?: string | null
           delivery_fee?: number | null
           delivery_time?: string | null
+          delivery_time_slot_id?: string | null
           delivery_zone_id?: string | null
           discount_amount?: number | null
           id?: string
@@ -1807,7 +2364,9 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          pickup_point_id?: string | null
           pickup_time?: string | null
+          preferred_delivery_time?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
@@ -1827,6 +2386,7 @@ export type Database = {
           delivery_address?: string | null
           delivery_fee?: number | null
           delivery_time?: string | null
+          delivery_time_slot_id?: string | null
           delivery_zone_id?: string | null
           discount_amount?: number | null
           id?: string
@@ -1836,7 +2396,9 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          pickup_point_id?: string | null
           pickup_time?: string | null
+          preferred_delivery_time?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
@@ -1861,10 +2423,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "orders_delivery_time_slot_id_fkey"
+            columns: ["delivery_time_slot_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_time_slots"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orders_delivery_zone_id_fkey"
             columns: ["delivery_zone_id"]
             isOneToOne: false
             referencedRelation: "delivery_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_pickup_point_id_fkey"
+            columns: ["pickup_point_id"]
+            isOneToOne: false
+            referencedRelation: "pickup_points"
             referencedColumns: ["id"]
           },
         ]
@@ -2336,6 +2912,48 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      pickup_points: {
+        Row: {
+          address: string
+          capacity: number | null
+          contact_phone: string | null
+          coordinates: Json | null
+          created_at: string
+          id: string
+          instructions: string | null
+          is_active: boolean | null
+          name: string
+          operating_hours: Json | null
+          updated_at: string
+        }
+        Insert: {
+          address: string
+          capacity?: number | null
+          contact_phone?: string | null
+          coordinates?: Json | null
+          created_at?: string
+          id?: string
+          instructions?: string | null
+          is_active?: boolean | null
+          name: string
+          operating_hours?: Json | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string
+          capacity?: number | null
+          contact_phone?: string | null
+          coordinates?: Json | null
+          created_at?: string
+          id?: string
+          instructions?: string | null
+          is_active?: boolean | null
+          name?: string
+          operating_hours?: Json | null
+          updated_at?: string
+        }
+        Relationships: []
       }
       product_price_history: {
         Row: {
@@ -2821,6 +3439,57 @@ export type Database = {
             columns: ["review_id"]
             isOneToOne: false
             referencedRelation: "product_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      route_order_assignments: {
+        Row: {
+          actual_arrival: string | null
+          created_at: string
+          delivery_notes: string | null
+          delivery_status: string | null
+          estimated_arrival: string | null
+          id: string
+          order_id: string | null
+          route_id: string | null
+          sequence_number: number
+        }
+        Insert: {
+          actual_arrival?: string | null
+          created_at?: string
+          delivery_notes?: string | null
+          delivery_status?: string | null
+          estimated_arrival?: string | null
+          id?: string
+          order_id?: string | null
+          route_id?: string | null
+          sequence_number: number
+        }
+        Update: {
+          actual_arrival?: string | null
+          created_at?: string
+          delivery_notes?: string | null
+          delivery_status?: string | null
+          estimated_arrival?: string | null
+          id?: string
+          order_id?: string | null
+          route_id?: string | null
+          sequence_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "route_order_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_order_assignments_route_id_fkey"
+            columns: ["route_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_routes"
             referencedColumns: ["id"]
           },
         ]
@@ -3406,7 +4075,12 @@ export type Database = {
       }
       get_dashboard_data: {
         Args: Record<PropertyKey, never>
-        Returns: Json
+        Returns: {
+          total_products: number
+          total_orders: number
+          total_customers: number
+          total_revenue: number
+        }[]
       }
       get_environment_config: {
         Args: Record<PropertyKey, never>
@@ -3642,6 +4316,7 @@ export type Database = {
         | "delivered"
         | "cancelled"
         | "refunded"
+        | "completed"
       order_type: "delivery" | "pickup" | "dine_in"
       payment_status:
         | "pending"
@@ -3820,6 +4495,7 @@ export const Constants = {
         "delivered",
         "cancelled",
         "refunded",
+        "completed",
       ],
       order_type: ["delivery", "pickup", "dine_in"],
       payment_status: [

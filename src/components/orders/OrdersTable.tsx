@@ -28,6 +28,7 @@ const statusConfig: Record<OrderStatus, { label: string; className: string }> = 
   ready: { label: 'Ready', className: 'bg-indigo-100 text-indigo-800' },
   out_for_delivery: { label: 'Out for Delivery', className: 'bg-purple-100 text-purple-800' },
   delivered: { label: 'Delivered', className: 'bg-green-100 text-green-800' },
+  completed: { label: 'Completed', className: 'bg-green-100 text-green-800' },
   cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
   refunded: { label: 'Refunded', className: 'bg-gray-100 text-gray-800' },
 };

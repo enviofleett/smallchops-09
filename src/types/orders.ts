@@ -6,6 +6,7 @@ export type OrderStatus =
   | 'out_for_delivery' 
   | 'delivered' 
   | 'cancelled'
-  | 'refunded';
+  | 'refunded'
+  | 'completed';
 
 export type PaymentStatus = 'pending' | 'paid' | 'refunded' | 'failed';

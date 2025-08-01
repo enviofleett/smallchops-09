@@ -73,42 +73,42 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
+      <DialogContent className="max-w-full sm:max-w-3xl h-full sm:h-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Order Details</DialogTitle>
+          <DialogTitle className="text-xl">Order Details</DialogTitle>
           <DialogClose asChild>
             <Button variant="ghost" size="icon" className="absolute top-4 right-4">
               <X className="h-4 w-4" />
             </Button>
           </DialogClose>
         </DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 p-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-4 md:p-6">
           <div>
             <h3 className="font-semibold text-lg mb-4">Customer Information</h3>
             <div className="space-y-3 text-sm">
               <div className="flex items-center">
-                <User className="h-4 w-4 mr-3 text-gray-500" />
-                <span>{order.customer_name}</span>
+                <User className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
+                <span className="break-words">{order.customer_name}</span>
               </div>
               <div className="flex items-center">
-                <Phone className="h-4 w-4 mr-3 text-gray-500" />
-                <span>{order.customer_phone}</span>
+                <Phone className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
+                <span className="break-words">{order.customer_phone}</span>
               </div>
               <div className="flex items-start">
-                <MapPin className="h-4 w-4 mr-3 mt-1 text-gray-500" />
-                <span>{order.delivery_address || 'N/A'}</span>
+                <MapPin className="h-4 w-4 mr-3 mt-1 text-gray-500 flex-shrink-0" />
+                <span className="break-words">{order.delivery_address || 'N/A'}</span>
               </div>
             </div>
 
             <h3 className="font-semibold text-lg mb-4 mt-6">Order Information</h3>
              <div className="space-y-3 text-sm">
                 <div className="flex items-center">
-                    <Hash className="h-4 w-4 mr-3 text-gray-500" />
-                    <span>Order ID: <span className="font-medium text-blue-600">{order.order_number}</span></span>
+                    <Hash className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
+                    <span>Order ID: <span className="font-medium text-blue-600 break-words">{order.order_number}</span></span>
                 </div>
                 <div className="flex items-center">
-                    <Calendar className="h-4 w-4 mr-3 text-gray-500" />
-                    <span>{format(new Date(order.order_time), 'MMM d, yyyy h:mm a')}</span>
+                    <Calendar className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
+                    <span className="break-words">{format(new Date(order.order_time), 'MMM d, yyyy h:mm a')}</span>
                 </div>
              </div>
           </div>
@@ -116,9 +116,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
             <h3 className="font-semibold text-lg mb-4">Order Actions</h3>
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium">Update Status</label>
+                <label className="text-sm font-medium block mb-2">Update Status</label>
                 <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as OrderStatus)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -131,13 +131,13 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium">Assign Dispatch Rider</label>
+                <label className="text-sm font-medium block mb-2">Assign Dispatch Rider</label>
                 <Select
                   value={assignedRider ?? 'unassigned'}
                   onValueChange={(value) => setAssignedRider(value === 'unassigned' ? null : value)}
                   disabled={isLoadingRiders}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select a rider" />
                   </SelectTrigger>
                   <SelectContent>
@@ -151,8 +151,8 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                 </Select>
               </div>
               <div>
-                <label className="text-sm font-medium">Send Manual Notification</label>
-                <div className="flex items-center gap-2 mt-1">
+                <label className="text-sm font-medium block mb-2">Send Manual Notification</label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <Select value={manualStatus} onValueChange={(value) => setManualStatus(value as OrderStatus)}>
                     <SelectTrigger className="w-full">
                       <SelectValue placeholder="Select notification type" />
@@ -169,6 +169,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                     variant="secondary" 
                     onClick={handleManualSend}
                     disabled={!manualStatus || manualSendMutation.isPending}
+                    className="w-full sm:w-auto min-h-[44px]"
                   >
                     {manualSendMutation.isPending ? 'Sending...' : 'Send'}
                   </Button>
@@ -181,9 +182,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
             </div>
           </div>
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleUpdate} disabled={updateMutation.isPending}>
+        <DialogFooter className="flex flex-col sm:flex-row gap-3 sm:gap-0">
+          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Cancel</Button>
+          <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="w-full sm:w-auto">
             {updateMutation.isPending ? 'Updating...' : 'Update Order'}
           </Button>
         </DialogFooter>

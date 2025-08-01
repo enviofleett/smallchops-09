@@ -22,6 +22,7 @@ import type { Promotion, PromotionStatus } from "@/api/promotions";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query"; // For the usage counts
+import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
 
 // --- Add helper for status colors ---
 const statusColors: Record<string, string> = {
@@ -143,16 +144,16 @@ export default function PromotionsPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8 px-4 md:px-0">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-y-4">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div className="space-y-1.5">
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-2">
-            <Trophy className="w-8 h-8 text-yellow-500" /> Promotions
+          <h1 className="text-2xl md:text-3xl font-bold text-gray-900 flex items-center gap-2">
+            <Trophy className="w-6 h-6 md:w-8 md:h-8 text-yellow-500" /> Promotions
           </h1>
           <p className="text-gray-600">Manage your discounts, loyalty and referral promotions here.</p>
         </div>
-        <Button size="lg" variant="default" onClick={() => setDialogOpen(true)}>
+        <Button size="lg" variant="default" onClick={() => setDialogOpen(true)} className="w-full sm:w-auto min-h-[44px]">
           <PlusCircle className="w-5 h-5" />
           Create Promotion
         </Button>
@@ -171,7 +172,94 @@ export default function PromotionsPage() {
           {isLoading && <div className="p-8 text-center">Loading...</div>}
           {isError && <div className="p-8 text-center text-red-500">Failed to load promotions.</div>}
           {!isLoading && !isError && (
-            <div className="overflow-x-auto rounded-xl border bg-white p-2">
+            <ResponsiveTable
+              className="overflow-x-auto rounded-xl border bg-white p-2"
+              mobileComponent={
+                <div className="space-y-3">
+                  {data.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">No promotions found.</div>
+                  ) : (
+                    data.map(promo => (
+                      <MobileCard key={promo.id}>
+                        <MobileCardHeader>
+                          <div>
+                            <h3 className="font-semibold text-gray-900">{promo.name}</h3>
+                            <p className="text-sm text-gray-600 capitalize">{promo.type}</p>
+                          </div>
+                          <StatusBadge status={promo.status ?? "active"} />
+                        </MobileCardHeader>
+                        
+                        <MobileCardContent>
+                          <MobileCardRow 
+                            label="Discount" 
+                            value={promo.value ? `₦${promo.value}` : "-"} 
+                          />
+                          <MobileCardRow 
+                            label="Min. Purchase" 
+                            value={promo.min_order_amount || "-"} 
+                          />
+                          <MobileCardRow 
+                            label="Valid From" 
+                            value={promo.valid_from ? promo.valid_from.substring(0,10) : "-"} 
+                          />
+                          <MobileCardRow 
+                            label="Expires" 
+                            value={promo.valid_until ? promo.valid_until.substring(0,10) : "-"} 
+                          />
+                          <MobileCardRow 
+                            label="Usage" 
+                            value={<span className="font-semibold">{usageData[promo.id] ?? 0}</span>} 
+                          />
+                        </MobileCardContent>
+                        
+                        <MobileCardActions>
+                          <Button size="sm" variant="outline"
+                            onClick={() => onEditPromotion(promo)}
+                            className="flex items-center gap-2">
+                            <Edit className="w-4 h-4" />
+                            Edit
+                          </Button>
+                          <Button size="sm" variant="outline"
+                            onClick={() => deleteMutation.mutate(promo.id)}
+                            className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50">
+                            <Trash className="w-4 h-4" />
+                            Delete
+                          </Button>
+                        </MobileCardActions>
+                        
+                        {/* Status buttons for mobile */}
+                        <div className="flex flex-wrap gap-2 mt-3 pt-3 border-t border-gray-100">
+                          {promo.status !== "active" &&
+                            <Button
+                              size="sm"
+                              variant="secondary"
+                              onClick={() => handleStatusChange(promo, "active")}
+                              className="flex-1 min-w-0"
+                            >Activate</Button>
+                          }
+                          {promo.status !== "inactive" &&
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleStatusChange(promo, "inactive")}
+                              className="flex-1 min-w-0"
+                            >Pause</Button>
+                          }
+                          {promo.status !== "expired" &&
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              onClick={() => handleStatusChange(promo, "expired")}
+                              className="flex-1 min-w-0"
+                            >Expire</Button>
+                          }
+                        </div>
+                      </MobileCard>
+                    ))
+                  )}
+                </div>
+              }
+            >
               <table className="w-full text-left">
                 <thead>
                   <tr className="border-b text-sm text-gray-600">
@@ -246,7 +334,7 @@ export default function PromotionsPage() {
                   }
                 </tbody>
               </table>
-            </div>
+            </ResponsiveTable>
           )}
         </TabsContent>
       </Tabs>

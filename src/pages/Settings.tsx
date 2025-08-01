@@ -34,28 +34,30 @@ const Settings = () => {
     }
   });
   const isAdmin = userProfile?.role === 'admin';
-  return <div className="container mx-auto py-6 space-y-6">
-      <div className="flex items-center space-x-4">
-        <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center">
+  return <div className="container mx-auto py-4 md:py-6 space-y-6 px-4">
+      <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
+        <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center flex-shrink-0">
           <SettingsIcon className="w-6 h-6 text-primary-foreground" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold">Settings</h1>
+          <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
           <p className="text-muted-foreground">Manage your business settings and preferences</p>
         </div>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6 lg:grid-cols-8">
-          <TabsTrigger value="branding">Branding</TabsTrigger>
-          <TabsTrigger value="communications">Communications</TabsTrigger>
-          <TabsTrigger value="email-processing">Email Queue</TabsTrigger>
-          <TabsTrigger value="payments">Payments</TabsTrigger>
-          <TabsTrigger value="content">Content</TabsTrigger>
-          <TabsTrigger value="customer-registration">Customer Registration</TabsTrigger>
-          {isAdmin && <TabsTrigger value="admin">Admin User Control</TabsTrigger>}
-          {isAdmin && <TabsTrigger value="developer">Developer</TabsTrigger>}
-        </TabsList>
+        <div className="overflow-x-auto pb-2">
+          <TabsList className="grid w-full min-w-[600px] grid-cols-6 lg:grid-cols-8 lg:min-w-0">
+            <TabsTrigger value="branding" className="text-xs sm:text-sm">Branding</TabsTrigger>
+            <TabsTrigger value="communications" className="text-xs sm:text-sm">Comms</TabsTrigger>
+            <TabsTrigger value="email-processing" className="text-xs sm:text-sm">Email</TabsTrigger>
+            <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>
+            <TabsTrigger value="content" className="text-xs sm:text-sm">Content</TabsTrigger>
+            <TabsTrigger value="customer-registration" className="text-xs sm:text-sm">Customer</TabsTrigger>
+            {isAdmin && <TabsTrigger value="admin" className="text-xs sm:text-sm">Admin</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="developer" className="text-xs sm:text-sm">Dev</TabsTrigger>}
+          </TabsList>
+        </div>
 
         <TabsContent value="branding" className="space-y-6">
           <Card>

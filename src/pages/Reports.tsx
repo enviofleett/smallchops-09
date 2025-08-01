@@ -17,12 +17,12 @@ const kpiIconClasses = [
 // Render skeleton state for KPI cards (while loading)
 function KpiSkeletons() {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
       {[...Array(4)].map((_, idx) => (
-        <div key={idx} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col gap-3">
-          <div className="rounded-xl flex items-center justify-center w-12 h-12 bg-gray-100" />
+        <div key={idx} className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 flex flex-col gap-3">
+          <div className="rounded-xl flex items-center justify-center w-10 h-10 md:w-12 md:h-12 bg-gray-100" />
           <div className="h-4 bg-gray-200 rounded w-2/3 mb-1" />
-          <div className="h-6 bg-gray-100 rounded w-1/2 mb-1" />
+          <div className="h-5 md:h-6 bg-gray-100 rounded w-1/2 mb-1" />
           <div className="h-3 bg-gray-200 rounded w-1/3" />
         </div>
       ))}
@@ -104,21 +104,21 @@ export default function Reports() {
     : [];
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6 md:space-y-8 px-4 md:px-0">
       {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-extrabold text-gray-800">
+          <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800">
             Reports & Analytics
           </h1>
           <p className="text-gray-600 mt-2">
             Track your business performance and insights
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
           {/* Weekly Dropdown */}
           <select
-            className="rounded-xl px-4 py-2 bg-gray-100 border border-gray-200 text-teal-700 font-medium focus:outline-none"
+            className="rounded-xl px-4 py-2 bg-gray-100 border border-gray-200 text-teal-700 font-medium focus:outline-none min-h-[44px]"
             defaultValue="weekly"
           >
             <option value="weekly">Weekly</option>
@@ -126,29 +126,35 @@ export default function Reports() {
             <option value="custom">Custom</option>
           </select>
           {/* Export Buttons */}
-          <button className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm">
-            <FileText className="w-4 h-4" /> Export CSV
-          </button>
-          <button className="flex items-center gap-2 bg-white text-gray-700 border border-gray-200 px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm">
-            <Download className="w-4 h-4" /> Export PDF
-          </button>
+          <div className="flex gap-2">
+            <button className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none">
+              <FileText className="w-4 h-4" /> 
+              <span className="hidden sm:inline">Export CSV</span>
+              <span className="sm:hidden">CSV</span>
+            </button>
+            <button className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none">
+              <Download className="w-4 h-4" /> 
+              <span className="hidden sm:inline">Export PDF</span>
+              <span className="sm:hidden">PDF</span>
+            </button>
+          </div>
         </div>
       </div>
       {/* KPI Cards */}
       {isLoading ? (
         <KpiSkeletons />
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {kpiData.map((kpi, i) => (
             <div
               key={kpi.label}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 flex flex-col gap-3"
+              className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 flex flex-col gap-3"
             >
-              <div className={`rounded-xl flex items-center justify-center w-12 h-12 ${kpi.className}`}>
+              <div className={`rounded-xl flex items-center justify-center w-10 h-10 md:w-12 md:h-12 ${kpi.className}`}>
                 {kpi.icon}
               </div>
-              <div className="text-sm text-gray-500 font-semibold">{kpi.label}</div>
-              <div className="text-2xl font-bold text-gray-800">{kpi.value}</div>
+              <div className="text-xs md:text-sm text-gray-500 font-semibold">{kpi.label}</div>
+              <div className="text-xl md:text-2xl font-bold text-gray-800">{kpi.value}</div>
               {/* Optionally add sub: Not implemented yet in get_dashboard_data, left empty. */}
             </div>
           ))}
@@ -156,7 +162,7 @@ export default function Reports() {
       )}
 
       {/* Chart & Tabs Section */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
         <ReportTabs reportsData={data} isLoading={isLoading} />
       </div>
     </div>

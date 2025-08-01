@@ -27,18 +27,20 @@ export const ProductDialog = ({ open, onOpenChange, product, categories, onSubmi
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-full sm:max-w-2xl h-full sm:h-auto max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
+          <DialogTitle className="text-xl">
             {product ? 'Edit Product' : 'Add New Product'}
           </DialogTitle>
         </DialogHeader>
-        <ProductForm 
-          product={product} 
-          categories={categories}
-          onSubmit={handleSubmit}
-          isLoading={isSubmitting}
-        />
+        <div className="p-4 sm:p-0">
+          <ProductForm 
+            product={product} 
+            categories={categories}
+            onSubmit={handleSubmit}
+            isLoading={isSubmitting}
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

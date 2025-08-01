@@ -94,7 +94,14 @@ export const updateProduct = async (id: string, updates: UpdatedProduct & { imag
     return data;
 };
 
-export const deleteProduct = async (id: string): Promise<void> => {
-  const { error } = await supabase.from('products').delete().eq('id', id);
+export const deleteProduct = async (id: string): Promise<{ action: 'deleted' | 'discontinued'; message: string }> => {
+  const { data, error } = await supabase.rpc('safe_delete_product' as any, { product_id: id });
   if (error) throw new Error(error.message);
+  return data as { action: 'deleted' | 'discontinued'; message: string };
+};
+
+export const bulkDeleteProducts = async (productIds: string[]): Promise<{ deleted_count: number; discontinued_count: number; total_processed: number; message: string }> => {
+  const { data, error } = await supabase.rpc('bulk_safe_delete_products' as any, { product_ids: productIds });
+  if (error) throw new Error(error.message);
+  return data as { deleted_count: number; discontinued_count: number; total_processed: number; message: string };
 };

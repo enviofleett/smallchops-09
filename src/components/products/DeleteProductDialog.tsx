@@ -26,9 +26,13 @@ export const DeleteProductDialog = ({ open, onOpenChange, product }: DeleteProdu
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteProduct(id),
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success('Product deleted successfully');
+      if (result.action === 'discontinued') {
+        toast.success('Product discontinued due to existing orders');
+      } else {
+        toast.success('Product deleted successfully');
+      }
       onOpenChange(false);
     },
     onError: (error) => {
@@ -48,7 +52,11 @@ export const DeleteProductDialog = ({ open, onOpenChange, product }: DeleteProdu
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Product</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete "{product?.name}"? This action cannot be undone.
+            Are you sure you want to remove "{product?.name}"? 
+            <br />
+            <span className="text-sm text-muted-foreground mt-2 block">
+              Note: Products with existing orders will be discontinued instead of deleted to preserve order history.
+            </span>
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
@@ -58,7 +66,7 @@ export const DeleteProductDialog = ({ open, onOpenChange, product }: DeleteProdu
             className="bg-red-600 hover:bg-red-700"
             disabled={deleteMutation.isPending}
           >
-            {deleteMutation.isPending ? 'Deleting...' : 'Delete'}
+            {deleteMutation.isPending ? 'Removing...' : 'Remove Product'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

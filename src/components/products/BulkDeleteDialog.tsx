@@ -10,7 +10,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { deleteProduct } from '@/api/products';
+import { bulkDeleteProducts } from '@/api/products';
 import { ProductWithCategory } from '@/types/database';
 import { toast } from '@/components/ui/sonner';
 
@@ -31,18 +31,16 @@ export const BulkDeleteDialog = ({
 
   const bulkDeleteMutation = useMutation({
     mutationFn: async (productIds: string[]) => {
-      // Delete products one by one since we don't have a bulk delete API
-      const deletePromises = productIds.map(id => deleteProduct(id));
-      await Promise.all(deletePromises);
+      return await bulkDeleteProducts(productIds);
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       queryClient.invalidateQueries({ queryKey: ['products'] });
-      toast.success(`Successfully deleted ${selectedProducts.length} product${selectedProducts.length > 1 ? 's' : ''}`);
+      toast.success(result.message);
       onClearSelection();
       onOpenChange(false);
     },
     onError: (error) => {
-      toast.error('Failed to delete some products: ' + error.message);
+      toast.error('Failed to process products: ' + error.message);
     },
   });
 
@@ -57,14 +55,18 @@ export const BulkDeleteDialog = ({
         <AlertDialogHeader>
           <AlertDialogTitle>Delete Products</AlertDialogTitle>
           <AlertDialogDescription>
-            Are you sure you want to delete {selectedProducts.length} selected product{selectedProducts.length > 1 ? 's' : ''}? 
-            This action cannot be undone.
+            Are you sure you want to remove {selectedProducts.length} selected product{selectedProducts.length > 1 ? 's' : ''}?
             <div className="mt-3 max-h-32 overflow-y-auto">
-              <ul className="text-sm text-gray-600 space-y-1">
+              <ul className="text-sm text-muted-foreground space-y-1">
                 {selectedProducts.map(product => (
                   <li key={product.id} className="truncate">• {product.name}</li>
                 ))}
               </ul>
+            </div>
+            <div className="mt-3 p-3 bg-blue-50 rounded-md">
+              <p className="text-sm text-blue-800">
+                <strong>Note:</strong> Products with existing orders will be discontinued instead of deleted to preserve order history.
+              </p>
             </div>
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -75,7 +77,7 @@ export const BulkDeleteDialog = ({
             className="bg-red-600 hover:bg-red-700"
             disabled={bulkDeleteMutation.isPending}
           >
-            {bulkDeleteMutation.isPending ? 'Deleting...' : `Delete ${selectedProducts.length} Product${selectedProducts.length > 1 ? 's' : ''}`}
+            {bulkDeleteMutation.isPending ? 'Processing...' : `Remove ${selectedProducts.length} Product${selectedProducts.length > 1 ? 's' : ''}`}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

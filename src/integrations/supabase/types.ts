@@ -4656,6 +4656,17 @@ export type Database = {
         Args: { p_customer_id: string }
         Returns: Json
       }
+      detect_orphaned_customer_records: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          email: string
+          has_customer_record: boolean
+          has_auth_user: boolean
+          has_customer_account: boolean
+          communication_events_count: number
+          issue_type: string
+        }[]
+      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -4916,6 +4927,10 @@ export type Database = {
           p_threshold_value?: number
         }
         Returns: undefined
+      }
+      recover_customer_email: {
+        Args: { p_email: string }
+        Returns: Json
       }
       requeue_failed_welcome_emails: {
         Args: Record<PropertyKey, never>

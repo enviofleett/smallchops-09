@@ -123,10 +123,10 @@ const CustomerRegister = () => {
         console.error('Registration error:', error);
         
         // Handle specific error cases with better messaging
-        if (error.message.includes('User already registered')) {
+        if (error.message.includes('User already registered') || error.message.includes('duplicate key value violates unique constraint')) {
           toast({
             title: "Account already exists",
-            description: "An account with this email already exists. Please try logging in instead.",
+            description: "An account with this email already exists. Please try logging in instead, or contact support if you believe this is an error.",
             variant: "destructive",
           });
         } else if (error.message.includes('Phone number is required') || error.message.includes('Phone number must be at least')) {
@@ -135,10 +135,10 @@ const CustomerRegister = () => {
             description: "Please enter a valid Nigerian phone number in format (09120020048)",
             variant: "destructive",
           });
-        } else if (error.message.includes('Database error saving new user')) {
+        } else if (error.message.includes('Database error saving new user') || error.message.includes('customers_email_unique')) {
           toast({
-            title: "Registration error",
-            description: "There was an issue creating your account. Please ensure all fields are filled correctly and try again.",
+            title: "Registration temporarily unavailable",
+            description: "There was an issue creating your account. This email may have been used before. Please try a different email or contact support.",
             variant: "destructive",
           });
         } else if (error.message.includes('Password should be at least 6 characters')) {
@@ -153,10 +153,16 @@ const CustomerRegister = () => {
             description: "Please enter a valid email address.",
             variant: "destructive",
           });
+        } else if (error.message.includes('rate limit') || error.message.includes('too many requests')) {
+          toast({
+            title: "Too many attempts",
+            description: "Please wait a moment before trying to register again.",
+            variant: "destructive",
+          });
         } else {
           toast({
             title: "Registration failed",
-            description: error.message || "An error occurred during registration. Please try again.",
+            description: error.message || "An error occurred during registration. Please try again or contact support if the problem persists.",
             variant: "destructive",
           });
         }

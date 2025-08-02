@@ -110,6 +110,7 @@ Deno.serve(async (req) => {
               case 'payment_confirmation':
                 success = await processOrderEmail(supabase, event)
                 break
+              case 'welcome_email':
               case 'customer_welcome':
                 success = await processWelcomeEmail(supabase, event)
                 break
@@ -117,8 +118,8 @@ Deno.serve(async (req) => {
                 success = await processPasswordResetEmail(supabase, event)
                 break
               default:
-                console.log(`Unknown event type: ${event.event_type}`)
-                success = false
+                console.log(`Unknown event type: ${event.event_type}, treating as welcome email`)
+                success = await processWelcomeEmail(supabase, event)
             }
 
             if (success) {

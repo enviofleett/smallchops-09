@@ -5,12 +5,14 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { useCart } from '@/hooks/useCart';
 import { useOrderManagement } from '@/hooks/useOrderManagement';
 import { usePayment } from '@/hooks/usePayment';
 import { PaymentModal } from '@/components/payments/PaymentModal';
 import { DeliveryZoneSelector } from '@/components/delivery/DeliveryZoneSelector';
 import { toast } from 'sonner';
+import { Loader2, Tag, X, Gift } from 'lucide-react';
 
 interface CheckoutFlowProps {
   isOpen: boolean;
@@ -18,10 +20,12 @@ interface CheckoutFlowProps {
 }
 
 export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) => {
-  const { cart, clearCart, updateDeliveryFee } = useCart();
+  const { cart, clearCart, updateDeliveryFee, applyPromotionCode, removePromotionCode } = useCart();
   const { placeOrder, loading: orderLoading } = useOrderManagement();
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [orderId, setOrderId] = useState<string | null>(null);
+  const [promotionCode, setPromotionCode] = useState('');
+  const [isApplyingPromotion, setIsApplyingPromotion] = useState(false);
   
   const [checkoutData, setCheckoutData] = useState({
     customer_name: '',
@@ -35,6 +39,33 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
 
   const handleInputChange = (field: string, value: string) => {
     setCheckoutData(prev => ({ ...prev, [field]: value }));
+  };
+
+  const handleApplyPromotionCode = async () => {
+    if (!promotionCode.trim()) {
+      toast.error('Please enter a promotion code');
+      return;
+    }
+
+    setIsApplyingPromotion(true);
+    try {
+      const result = await applyPromotionCode(promotionCode.trim());
+      if (result.success) {
+        toast.success(result.message);
+        setPromotionCode('');
+      } else {
+        toast.error(result.message);
+      }
+    } catch (error) {
+      toast.error('Failed to apply promotion code');
+    } finally {
+      setIsApplyingPromotion(false);
+    }
+  };
+
+  const handleRemovePromotion = (promotionId: string) => {
+    removePromotionCode();
+    toast.success('Promotion removed');
   };
 
   const validateForm = () => {
@@ -139,14 +170,110 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
                   </div>
                   <div className="flex justify-between">
                     <span>Delivery Fee:</span>
-                    <span>₦{cart.summary.delivery_fee.toFixed(2)}</span>
+                    <span className={cart.summary.delivery_discount > 0 ? 'line-through text-muted-foreground' : ''}>
+                      ₦{cart.summary.delivery_fee.toFixed(2)}
+                    </span>
                   </div>
+                  {cart.summary.delivery_discount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Delivery Discount:</span>
+                      <span>-₦{cart.summary.delivery_discount.toFixed(2)}</span>
+                    </div>
+                  )}
+                  {cart.summary.discount_amount > 0 && (
+                    <div className="flex justify-between text-green-600">
+                      <span>Promotion Discount:</span>
+                      <span>-₦{cart.summary.discount_amount.toFixed(2)}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between font-semibold">
                     <span>Total:</span>
                     <span>₦{cart.summary.total_amount.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
+            </div>
+
+            <Separator />
+
+            {/* Promotion Code Section */}
+            <div className="space-y-4">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Tag className="w-4 h-4" />
+                Promotion Code
+              </h3>
+              
+              {/* Applied Promotions */}
+              {cart.summary.applied_promotions.length > 0 && (
+                <div className="space-y-2">
+                  {cart.summary.applied_promotions.map((promotion) => (
+                    <div key={promotion.id} className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+                      <div className="flex items-center gap-2">
+                        <Gift className="w-4 h-4 text-green-600" />
+                        <div>
+                          <p className="font-medium text-green-800">{promotion.name}</p>
+                          {promotion.code && (
+                            <p className="text-sm text-green-600">Code: {promotion.code}</p>
+                          )}
+                          <p className="text-sm text-green-600">
+                            {promotion.type === 'free_delivery' ? 'Free Delivery' : 
+                             promotion.type === 'buy_one_get_one' ? 'Buy One Get One' :
+                             `₦${promotion.discount_amount.toFixed(2)} off`}
+                          </p>
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleRemovePromotion(promotion.id)}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Promotion Code Input */}
+              {cart.summary.applied_promotions.length === 0 && (
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Enter promotion code"
+                    value={promotionCode}
+                    onChange={(e) => setPromotionCode(e.target.value.toUpperCase())}
+                    onKeyPress={(e) => e.key === 'Enter' && handleApplyPromotionCode()}
+                  />
+                  <Button 
+                    onClick={handleApplyPromotionCode} 
+                    disabled={isApplyingPromotion || !promotionCode.trim()}
+                    variant="outline"
+                  >
+                    {isApplyingPromotion ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      'Apply'
+                    )}
+                  </Button>
+                </div>
+              )}
+
+              {/* BOGO Items Display */}
+              {cart.summary.applied_promotions.some(p => p.bogo_items?.length) && (
+                <div className="mt-4">
+                  <h4 className="font-medium text-sm text-green-800 mb-2">Free Items (BOGO):</h4>
+                  {cart.summary.applied_promotions
+                    .filter(p => p.bogo_items?.length)
+                    .map(promotion => 
+                      promotion.bogo_items?.map(item => (
+                        <div key={`${promotion.id}-${item.product_id}`} className="flex justify-between text-sm text-green-700">
+                          <span>{item.product_name} x{item.free_quantity}</span>
+                          <span className="font-medium">FREE!</span>
+                        </div>
+                      ))
+                    )}
+                </div>
+              )}
             </div>
 
             <Separator />

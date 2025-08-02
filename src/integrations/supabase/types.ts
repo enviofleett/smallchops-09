@@ -371,6 +371,51 @@ export type Database = {
         }
         Relationships: []
       }
+      bogo_allocations: {
+        Row: {
+          created_at: string | null
+          free_quantity: number
+          id: string
+          order_id: string | null
+          paid_quantity: number
+          product_id: string
+          promotion_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          free_quantity?: number
+          id?: string
+          order_id?: string | null
+          paid_quantity?: number
+          product_id: string
+          promotion_id: string
+        }
+        Update: {
+          created_at?: string | null
+          free_quantity?: number
+          id?: string
+          order_id?: string | null
+          paid_quantity?: number
+          product_id?: string
+          promotion_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bogo_allocations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "bogo_allocations_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "promotions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       brand_assets: {
         Row: {
           asset_name: string | null
@@ -3545,6 +3590,56 @@ export type Database = {
         }
         Relationships: []
       }
+      promotion_analytics: {
+        Row: {
+          avg_order_value: number | null
+          conversion_rate: number | null
+          created_at: string | null
+          date: string
+          id: string
+          promotion_id: string
+          total_discount_given: number | null
+          total_revenue_impact: number | null
+          total_usage: number | null
+          unique_customers: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          avg_order_value?: number | null
+          conversion_rate?: number | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          promotion_id: string
+          total_discount_given?: number | null
+          total_revenue_impact?: number | null
+          total_usage?: number | null
+          unique_customers?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          avg_order_value?: number | null
+          conversion_rate?: number | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          promotion_id?: string
+          total_discount_given?: number | null
+          total_revenue_impact?: number | null
+          total_usage?: number | null
+          unique_customers?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotion_analytics_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "promotions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       promotion_usage: {
         Row: {
           customer_email: string
@@ -3580,6 +3675,53 @@ export type Database = {
           },
           {
             foreignKeyName: "promotion_usage_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "promotions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      promotion_usage_audit: {
+        Row: {
+          created_at: string | null
+          customer_email: string | null
+          discount_amount: number
+          final_order_amount: number | null
+          id: string
+          metadata: Json | null
+          order_id: string | null
+          original_order_amount: number | null
+          promotion_id: string
+          usage_type: string
+        }
+        Insert: {
+          created_at?: string | null
+          customer_email?: string | null
+          discount_amount?: number
+          final_order_amount?: number | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          original_order_amount?: number | null
+          promotion_id: string
+          usage_type: string
+        }
+        Update: {
+          created_at?: string | null
+          customer_email?: string | null
+          discount_amount?: number
+          final_order_amount?: number | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          original_order_amount?: number | null
+          promotion_id?: string
+          usage_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotion_usage_audit_promotion_id_fkey"
             columns: ["promotion_id"]
             isOneToOne: false
             referencedRelation: "promotions"
@@ -4602,6 +4744,10 @@ export type Database = {
         Args: { product_ids: string[] }
         Returns: Json
       }
+      calculate_bogo_discount: {
+        Args: { p_promotion_id: string; p_cart_items: Json }
+        Returns: Json
+      }
       calculate_brand_consistency_score: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -4874,6 +5020,18 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      increment_promotion_usage: {
+        Args: {
+          p_promotion_id: string
+          p_order_id: string
+          p_customer_email: string
+          p_discount_amount: number
+          p_original_amount: number
+          p_final_amount: number
+          p_metadata?: Json
+        }
+        Returns: undefined
+      }
       increment_rate_limit_counter: {
         Args: { p_identifier: string; p_identifier_type?: string }
         Returns: undefined
@@ -5057,6 +5215,15 @@ export type Database = {
       validate_paystack_webhook_ip: {
         Args: { request_ip: unknown }
         Returns: boolean
+      }
+      validate_promotion_usage: {
+        Args: {
+          p_promotion_id: string
+          p_order_amount: number
+          p_customer_email?: string
+          p_promotion_code?: string
+        }
+        Returns: Json
       }
       verify_payment_atomic: {
         Args: {

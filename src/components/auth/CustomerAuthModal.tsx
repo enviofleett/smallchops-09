@@ -119,10 +119,10 @@ export const CustomerAuthModal = ({ isOpen, onClose, onAuthenticated }: Customer
 
       if (error) throw error;
 
-      // The actual authentication will be handled by the auth state change
+      // The actual authentication and instant welcome email will be handled by the auth state change
       toast({
         title: "Redirecting to Google",
-        description: "Please complete authentication with Google.",
+        description: "You'll receive a welcome email instantly after signing in.",
       });
     } catch (error: any) {
       toast({
@@ -214,7 +214,7 @@ export const CustomerAuthModal = ({ isOpen, onClose, onAuthenticated }: Customer
       if (data.user) {
         toast({
           title: "Account created!",
-          description: "Please check your email to verify your account.",
+          description: "Please check your email to verify your account. You'll receive a welcome email instantly upon verification.",
         });
 
         // Switch to login tab

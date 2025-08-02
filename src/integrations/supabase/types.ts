@@ -3644,6 +3644,45 @@ export type Database = {
         }
         Relationships: []
       }
+      registration_attempts: {
+        Row: {
+          attempt_type: string
+          created_at: string | null
+          customer_id: string | null
+          email: string
+          error_details: Json | null
+          id: string
+          ip_address: unknown | null
+          status: string
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          attempt_type: string
+          created_at?: string | null
+          customer_id?: string | null
+          email: string
+          error_details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          status: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          attempt_type?: string
+          created_at?: string | null
+          customer_id?: string | null
+          email?: string
+          error_details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          status?: string
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       review_media: {
         Row: {
           alt_text: string | null
@@ -4667,6 +4706,10 @@ export type Database = {
           issue_type: string
         }[]
       }
+      diagnose_registration_issues: {
+        Args: { p_email: string }
+        Returns: Json
+      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -4929,6 +4972,10 @@ export type Database = {
         Returns: undefined
       }
       recover_customer_email: {
+        Args: { p_email: string }
+        Returns: Json
+      }
+      recover_failed_registration: {
         Args: { p_email: string }
         Returns: Json
       }

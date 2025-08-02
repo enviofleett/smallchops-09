@@ -122,48 +122,76 @@ const CustomerRegister = () => {
       if (error) {
         console.error('Registration error:', error);
         
-        // Handle specific error cases with better messaging
-        if (error.message.includes('User already registered') || error.message.includes('duplicate key value violates unique constraint')) {
+        // Enhanced error handling for production
+        if (error.message.includes('User already registered') || 
+            error.message.includes('duplicate key value violates unique constraint') ||
+            error.message.includes('already registered')) {
           toast({
-            title: "Account already exists",
-            description: "An account with this email already exists. Please try logging in instead, or contact support if you believe this is an error.",
+            title: "Account Already Exists",
+            description: "An account with this email already exists. Please sign in instead or use a different email address.",
             variant: "destructive",
           });
-        } else if (error.message.includes('Phone number is required') || error.message.includes('Phone number must be at least')) {
+        } else if (error.message.includes('Database error saving new user') || 
+                   error.message.includes('record "new" has no field "name"') ||
+                   error.message.includes('customers_email') ||
+                   error.message.includes('Registration failed at')) {
           toast({
-            title: "Invalid phone number",
+            title: "Registration Processing Error",
+            description: "We're experiencing technical difficulties with registration. Our team has been notified. Please try again in a few minutes or contact support.",
+            variant: "destructive",
+            duration: 8000,
+          });
+        } else if (error.message.includes('Phone number is required') || 
+                   error.message.includes('Phone number must be at least') ||
+                   error.message.includes('10 digits')) {
+          toast({
+            title: "Invalid Phone Number",
             description: "Please enter a valid Nigerian phone number in format (09120020048)",
             variant: "destructive",
           });
-        } else if (error.message.includes('Database error saving new user') || error.message.includes('customers_email_unique')) {
+        } else if (error.message.includes('Password should be at least 6 characters') ||
+                   error.message.includes('password') && error.message.includes('6')) {
           toast({
-            title: "Registration temporarily unavailable",
-            description: "There was an issue creating your account. This email may have been used before. Please try a different email or contact support.",
-            variant: "destructive",
-          });
-        } else if (error.message.includes('Password should be at least 6 characters')) {
-          toast({
-            title: "Password too short",
+            title: "Password Too Short",
             description: "Password must be at least 6 characters long.",
             variant: "destructive",
           });
-        } else if (error.message.includes('Invalid email')) {
+        } else if (error.message.includes('Invalid email') || 
+                   error.message.includes('email')) {
           toast({
-            title: "Invalid email",
+            title: "Invalid Email",
             description: "Please enter a valid email address.",
             variant: "destructive",
           });
-        } else if (error.message.includes('rate limit') || error.message.includes('too many requests')) {
+        } else if (error.message.includes('rate limit') || 
+                   error.message.includes('too many requests') ||
+                   error.message.includes('too many')) {
           toast({
-            title: "Too many attempts",
-            description: "Please wait a moment before trying to register again.",
+            title: "Too Many Attempts",
+            description: "Please wait a few minutes before trying to register again.",
+            variant: "destructive",
+          });
+        } else if (error.message.includes('timeout') || 
+                   error.message.includes('network') ||
+                   error.message.includes('connection')) {
+          toast({
+            title: "Connection Issue",
+            description: "Network connection problem. Please check your internet and try again.",
+            variant: "destructive",
+          });
+        } else if (error.message.includes('confirm') || 
+                   error.message.includes('verification')) {
+          toast({
+            title: "Email Verification Required",
+            description: "Please check your email and click the verification link before signing in.",
             variant: "destructive",
           });
         } else {
           toast({
-            title: "Registration failed",
-            description: error.message || "An error occurred during registration. Please try again or contact support if the problem persists.",
+            title: "Registration Failed",
+            description: `Unable to complete registration: ${error.message}. Please try again or contact our support team for assistance.`,
             variant: "destructive",
+            duration: 10000,
           });
         }
         return;

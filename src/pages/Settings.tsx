@@ -75,12 +75,7 @@ const Settings = () => {
             
             <TabsContent value="email">
               <Card>
-                <CardHeader>
-                  <CardTitle>Communication Settings</CardTitle>
-                  <CardDescription>
-                    Configure email and SMS notifications for your customers
-                  </CardDescription>
-                </CardHeader>
+                
                 <CardContent>
                   <CommunicationsTab />
                 </CardContent>
@@ -389,39 +384,19 @@ if (!signupData.phone || signupData.phone.trim().length < 10) {
                   <div className="border rounded-lg p-4">
                     <h3 className="font-semibold mb-3">🔗 Quick Links</h3>
                     <div className="grid md:grid-cols-2 gap-3 text-sm">
-                      <a 
-                        href="https://console.cloud.google.com/apis/credentials" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors"
-                      >
+                      <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors">
                         <span>Google Cloud Credentials</span>
                         <span className="text-xs">↗</span>
                       </a>
-                      <a 
-                        href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/auth/providers" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors"
-                      >
+                      <a href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/auth/providers" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors">
                         <span>Supabase Auth Providers</span>
                         <span className="text-xs">↗</span>
                       </a>
-                      <a 
-                        href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/auth/url-configuration" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors"
-                      >
+                      <a href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/auth/url-configuration" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors">
                         <span>Supabase URL Config</span>
                         <span className="text-xs">↗</span>
                       </a>
-                      <a 
-                        href="https://supabase.com/docs/guides/auth/social-login/auth-google" 
-                        target="_blank" 
-                        rel="noopener noreferrer"
-                        className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors"
-                      >
+                      <a href="https://supabase.com/docs/guides/auth/social-login/auth-google" target="_blank" rel="noopener noreferrer" className="flex items-center space-x-2 p-2 border rounded hover:bg-muted transition-colors">
                         <span>Supabase Google Auth Docs</span>
                         <span className="text-xs">↗</span>
                       </a>

@@ -4061,6 +4061,10 @@ export type Database = {
         Args: { user_id_param: string }
         Returns: boolean
       }
+      check_customer_operation_rate_limit: {
+        Args: { p_admin_id: string; p_operation: string; p_limit?: number }
+        Returns: boolean
+      }
       check_customer_rate_limit: {
         Args: {
           p_customer_id?: string
@@ -4122,6 +4126,18 @@ export type Database = {
           p_amount: number
           p_paystack_data: Json
           p_confirmed_at: string
+        }
+        Returns: Json
+      }
+      create_customer_with_validation: {
+        Args: {
+          p_name: string
+          p_email: string
+          p_phone?: string
+          p_admin_id?: string
+          p_send_welcome_email?: boolean
+          p_ip_address?: unknown
+          p_user_agent?: string
         }
         Returns: Json
       }
@@ -4330,6 +4346,17 @@ export type Database = {
         }
         Returns: string
       }
+      log_customer_operation: {
+        Args: {
+          p_action: string
+          p_customer_id?: string
+          p_customer_data?: Json
+          p_admin_id?: string
+          p_ip_address?: unknown
+          p_user_agent?: string
+        }
+        Returns: string
+      }
       log_payment_error: {
         Args: {
           p_error_code: string
@@ -4383,6 +4410,18 @@ export type Database = {
           p_order_status?: string
         }
         Returns: undefined
+      }
+      update_customer_with_validation: {
+        Args: {
+          p_customer_id: string
+          p_name?: string
+          p_email?: string
+          p_phone?: string
+          p_admin_id?: string
+          p_ip_address?: unknown
+          p_user_agent?: string
+        }
+        Returns: Json
       }
       validate_admin_invitation_token: {
         Args: { token: string }

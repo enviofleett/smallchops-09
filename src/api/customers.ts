@@ -29,6 +29,16 @@ export interface DateRange {
   to: Date;
 }
 
+// Response types for database functions
+interface DatabaseOperationResult {
+  success: boolean;
+  errors?: string[];
+  message?: string;
+  customer_id?: string;
+  welcome_email_queued?: boolean;
+  changes?: Record<string, any>;
+}
+
 /**
  * Fetch all delivery details (orders) for a specific customer, including products/line items.
  * Match by exact customer_name & customer_phone for precision.
@@ -115,27 +125,133 @@ export const resolveOrCreateCustomer = async ({
 
 // Usage: when creating an order on frontend, pass customer_id if session user exists
 
-// Create a new customer
-export const createCustomer = async (data: { name: string; email: string; phone?: string }) => {
-  const { data: created, error } = await supabase
-    .from('customers')
-    .insert([{ name: data.name, email: data.email, phone: data.phone }])
-    .select('*')
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return created as CustomerDb;
+// Enhanced customer creation with production validations and email integration
+export const createCustomer = async (
+  data: { name: string; email: string; phone?: string },
+  sendWelcomeEmail: boolean = true
+) => {
+  try {
+    // Get user agent and IP for audit logging (if available)
+    const userAgent = navigator?.userAgent || 'Unknown';
+    
+    // Call the enhanced database function with validations
+    const { data: result, error } = await supabase.rpc('create_customer_with_validation', {
+      p_name: data.name,
+      p_email: data.email,
+      p_phone: data.phone || null,
+      p_admin_id: (await supabase.auth.getUser()).data.user?.id || null,
+      p_send_welcome_email: sendWelcomeEmail,
+      p_user_agent: userAgent
+    });
+
+    if (error) {
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    const resultData = result as unknown as DatabaseOperationResult;
+    if (!resultData.success) {
+      const errorMessage = Array.isArray(resultData.errors) 
+        ? resultData.errors.join(', ') 
+        : resultData.message || 'Failed to create customer';
+      throw new Error(errorMessage);
+    }
+
+    // Fetch the created customer data
+    const { data: customerData, error: fetchError } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', resultData.customer_id)
+      .maybeSingle();
+
+    if (fetchError || !customerData) {
+      throw new Error('Customer created but failed to retrieve data');
+    }
+
+    return {
+      ...customerData,
+      welcomeEmailQueued: resultData.welcome_email_queued
+    } as CustomerDb & { welcomeEmailQueued: boolean };
+
+  } catch (error: any) {
+    // Enhanced error handling with specific error types
+    if (error.message.includes('already exists')) {
+      throw new Error('A customer with this email already exists. Please use a different email address.');
+    } else if (error.message.includes('Invalid email')) {
+      throw new Error('Please enter a valid email address.');
+    } else if (error.message.includes('Phone number')) {
+      throw new Error('Please enter a valid phone number with at least 10 digits.');
+    } else if (error.message.includes('required')) {
+      throw new Error('Please fill in all required fields.');
+    } else if (error.message.includes('rate limit')) {
+      throw new Error('You are creating customers too quickly. Please wait a moment and try again.');
+    } else {
+      console.error('Customer creation error:', error);
+      throw new Error(error.message || 'Failed to create customer. Please try again.');
+    }
+  }
 };
 
-// Update an existing customer
-export const updateCustomer = async (id: string, data: { name?: string; email?: string; phone?: string }) => {
-  const { data: updated, error } = await supabase
-    .from('customers')
-    .update(data)
-    .eq('id', id)
-    .select('*')
-    .maybeSingle();
-  if (error) throw new Error(error.message);
-  return updated as CustomerDb;
+// Enhanced customer update with production validations
+export const updateCustomer = async (
+  id: string, 
+  data: { name?: string; email?: string; phone?: string }
+) => {
+  try {
+    // Get user agent for audit logging (if available)
+    const userAgent = navigator?.userAgent || 'Unknown';
+    
+    // Call the enhanced database function with validations
+    const { data: result, error } = await supabase.rpc('update_customer_with_validation', {
+      p_customer_id: id,
+      p_name: data.name || null,
+      p_email: data.email || null,
+      p_phone: data.phone || null,
+      p_admin_id: (await supabase.auth.getUser()).data.user?.id || null,
+      p_user_agent: userAgent
+    });
+
+    if (error) {
+      throw new Error(`Database error: ${error.message}`);
+    }
+
+    const resultData = result as unknown as DatabaseOperationResult;
+    if (!resultData.success) {
+      const errorMessage = Array.isArray(resultData.errors) 
+        ? resultData.errors.join(', ') 
+        : resultData.message || 'Failed to update customer';
+      throw new Error(errorMessage);
+    }
+
+    // Fetch the updated customer data
+    const { data: customerData, error: fetchError } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError || !customerData) {
+      throw new Error('Customer updated but failed to retrieve updated data');
+    }
+
+    return customerData as CustomerDb;
+
+  } catch (error: any) {
+    // Enhanced error handling with specific error types
+    if (error.message.includes('not found')) {
+      throw new Error('Customer not found. The customer may have been deleted.');
+    } else if (error.message.includes('already exists')) {
+      throw new Error('Another customer with this email already exists. Please use a different email address.');
+    } else if (error.message.includes('Invalid email')) {
+      throw new Error('Please enter a valid email address.');
+    } else if (error.message.includes('Phone number')) {
+      throw new Error('Please enter a valid phone number with at least 10 digits.');
+    } else if (error.message.includes('cannot be empty')) {
+      throw new Error('Customer name and email cannot be empty.');
+    } else {
+      console.error('Customer update error:', error);
+      throw new Error(error.message || 'Failed to update customer. Please try again.');
+    }
+  }
 };
 
 // Delete a customer (admin only)

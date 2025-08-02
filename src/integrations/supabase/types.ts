@@ -1539,6 +1539,48 @@ export type Database = {
         }
         Relationships: []
       }
+      debug_logs: {
+        Row: {
+          category: string
+          created_at: string | null
+          details: Json | null
+          id: string
+          ip_address: unknown | null
+          level: string
+          message: string
+          session_id: string | null
+          timestamp: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          level?: string
+          message: string
+          session_id?: string | null
+          timestamp?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          level?: string
+          message?: string
+          session_id?: string | null
+          timestamp?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       delivery_analytics: {
         Row: {
           average_delivery_time: number | null
@@ -5631,6 +5673,19 @@ export type Database = {
           p_field_changed?: string
           p_old_value?: string
           p_new_value?: string
+          p_ip_address?: unknown
+          p_user_agent?: string
+        }
+        Returns: string
+      }
+      log_registration_debug: {
+        Args: {
+          p_message: string
+          p_level?: string
+          p_category?: string
+          p_details?: Json
+          p_user_id?: string
+          p_session_id?: string
           p_ip_address?: unknown
           p_user_agent?: string
         }

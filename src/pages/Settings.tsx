@@ -12,6 +12,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DeliveryZoneDevTools } from "@/components/settings/DeliveryZoneDevTools";
+import RegistrationHealth from "./RegistrationHealth";
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 
@@ -236,14 +237,21 @@ if (!signupData.phone || signupData.phone.trim().length < 10) {
 
 
         {isAdmin && <TabsContent value="developer" className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Google OAuth Configuration</CardTitle>
-                <CardDescription>
-                  Setup Google OAuth authentication for customer login
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
+            <Tabs defaultValue="oauth" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
+                <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="oauth">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Google OAuth Configuration</CardTitle>
+                    <CardDescription>
+                      Setup Google OAuth authentication for customer login
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
                 <div className="space-y-6">
                   
                   {/* Google OAuth Setup Instructions */}
@@ -1433,8 +1441,24 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                   <DeliveryZoneDevTools />
 
                 </div>
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+              
+              <TabsContent value="registration-health">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Registration System Monitoring</CardTitle>
+                    <CardDescription>
+                      Monitor and debug customer registration system health
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <RegistrationHealth />
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>}
       </Tabs>
     </div>;

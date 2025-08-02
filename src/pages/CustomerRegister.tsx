@@ -5,7 +5,8 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, EyeOff, Loader2, ArrowLeft } from 'lucide-react';
+import { Eye, EyeOff, Loader2, ArrowLeft, CheckCircle, Mail } from 'lucide-react';
+import { useEnhancedEmailProcessing } from '@/hooks/useEnhancedEmailProcessing';
 import { Link, useNavigate } from 'react-router-dom';
 import startersLogo from '@/assets/starters-logo.png';
 
@@ -13,8 +14,10 @@ const CustomerRegister = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [emailProcessingStatus, setEmailProcessingStatus] = useState<'idle' | 'processing' | 'success'>('idle');
   const { toast } = useToast();
   const navigate = useNavigate();
+  const { triggerEnhancedProcessing } = useEnhancedEmailProcessing();
 
   const [formData, setFormData] = useState({
     name: '',
@@ -200,8 +203,24 @@ const CustomerRegister = () => {
       if (data.user) {
         toast({
           title: "Registration successful!",
-          description: "Welcome! Your account has been created and a welcome email is being sent. You'll be redirected to your customer portal.",
+          description: "Welcome! Your account has been created and welcome email is being processed.",
         });
+
+        // Trigger enhanced email processing for immediate welcome email
+        setEmailProcessingStatus('processing');
+        try {
+          const success = await triggerEnhancedProcessing(formData.email, 'customer_welcome');
+          if (success) {
+            setEmailProcessingStatus('success');
+            toast({
+              title: "Welcome Email Sent!",
+              description: "Your welcome email has been sent successfully.",
+            });
+          }
+        } catch (error) {
+          console.error('Enhanced email processing failed:', error);
+          // Continue with registration even if email fails
+        }
 
         // Clear form
         setFormData({
@@ -212,8 +231,10 @@ const CustomerRegister = () => {
           confirmPassword: '',
         });
 
-        // Redirect to customer portal immediately - the portal will handle loading states
-        navigate('/customer-portal');
+        // Small delay to show email processing status, then redirect
+        setTimeout(() => {
+          navigate('/customer-portal');
+        }, 2000);
       }
     } catch (error: any) {
       console.error('Unexpected error:', error);
@@ -353,6 +374,21 @@ const CustomerRegister = () => {
               {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Create Account
             </Button>
+
+            {/* Email processing status indicator */}
+            {emailProcessingStatus === 'processing' && (
+              <div className="flex items-center justify-center space-x-2 text-sm text-blue-600 bg-blue-50 p-3 rounded-lg">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <span>Sending welcome email...</span>
+              </div>
+            )}
+
+            {emailProcessingStatus === 'success' && (
+              <div className="flex items-center justify-center space-x-2 text-sm text-green-600 bg-green-50 p-3 rounded-lg">
+                <CheckCircle className="h-4 w-4" />
+                <span>Welcome email sent successfully!</span>
+              </div>
+            )}
 
             <div className="flex items-center justify-center space-x-2 text-sm">
               <span className="text-muted-foreground">Already have an account?</span>

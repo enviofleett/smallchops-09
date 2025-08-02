@@ -2284,6 +2284,59 @@ export type Database = {
         }
         Relationships: []
       }
+      email_processing_queue: {
+        Row: {
+          attempts: number | null
+          created_at: string | null
+          error_details: Json | null
+          event_id: string | null
+          id: string
+          last_attempt_at: string | null
+          max_attempts: number | null
+          next_retry_at: string | null
+          priority: string | null
+          scheduled_for: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string | null
+          error_details?: Json | null
+          event_id?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          priority?: string | null
+          scheduled_for?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string | null
+          error_details?: Json | null
+          event_id?: string | null
+          id?: string
+          last_attempt_at?: string | null
+          max_attempts?: number | null
+          next_retry_at?: string | null
+          priority?: string | null
+          scheduled_for?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_processing_queue_event_id_fkey"
+            columns: ["event_id"]
+            isOneToOne: false
+            referencedRelation: "communication_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_rate_limits: {
         Row: {
           created_at: string
@@ -2368,6 +2421,45 @@ export type Database = {
           unsubscribe_type?: string
           unsubscribed_at?: string
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      enhanced_email_config: {
+        Row: {
+          batch_size: number | null
+          created_at: string | null
+          fallback_ports: number[] | null
+          id: string
+          instant_processing_enabled: boolean | null
+          max_retries: number | null
+          processing_interval_seconds: number | null
+          retry_intervals: number[] | null
+          updated_at: string | null
+          use_enhanced_smtp: boolean | null
+        }
+        Insert: {
+          batch_size?: number | null
+          created_at?: string | null
+          fallback_ports?: number[] | null
+          id?: string
+          instant_processing_enabled?: boolean | null
+          max_retries?: number | null
+          processing_interval_seconds?: number | null
+          retry_intervals?: number[] | null
+          updated_at?: string | null
+          use_enhanced_smtp?: boolean | null
+        }
+        Update: {
+          batch_size?: number | null
+          created_at?: string | null
+          fallback_ports?: number[] | null
+          id?: string
+          instant_processing_enabled?: boolean | null
+          max_retries?: number | null
+          processing_interval_seconds?: number | null
+          retry_intervals?: number[] | null
+          updated_at?: string | null
+          use_enhanced_smtp?: boolean | null
         }
         Relationships: []
       }
@@ -4528,6 +4620,51 @@ export type Database = {
         }
         Relationships: []
       }
+      smtp_health_monitoring: {
+        Row: {
+          authentication_success: boolean | null
+          connection_success: boolean
+          created_at: string | null
+          error_message: string | null
+          health_score: number | null
+          id: string
+          response_time_ms: number | null
+          smtp_host: string
+          smtp_port: number
+          ssl_status: boolean | null
+          test_email_sent: boolean | null
+          timestamp: string | null
+        }
+        Insert: {
+          authentication_success?: boolean | null
+          connection_success: boolean
+          created_at?: string | null
+          error_message?: string | null
+          health_score?: number | null
+          id?: string
+          response_time_ms?: number | null
+          smtp_host: string
+          smtp_port: number
+          ssl_status?: boolean | null
+          test_email_sent?: boolean | null
+          timestamp?: string | null
+        }
+        Update: {
+          authentication_success?: boolean | null
+          connection_success?: boolean
+          created_at?: string | null
+          error_message?: string | null
+          health_score?: number | null
+          id?: string
+          response_time_ms?: number | null
+          smtp_host?: string
+          smtp_port?: number
+          ssl_status?: boolean | null
+          test_email_sent?: boolean | null
+          timestamp?: string | null
+        }
+        Relationships: []
+      }
       smtp_provider_configs: {
         Row: {
           consecutive_failures: number | null
@@ -5126,6 +5263,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      cleanup_email_processing_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       cleanup_expired_admin_invitations: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -5471,6 +5612,10 @@ export type Database = {
           p_details?: Json
         }
         Returns: string
+      }
+      process_email_queue_manual: {
+        Args: { batch_size?: number }
+        Returns: Json
       }
       process_email_queue_real_time: {
         Args: Record<PropertyKey, never>

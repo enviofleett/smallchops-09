@@ -29,6 +29,10 @@ import Unsubscribe from "./pages/Unsubscribe";
 import AdminSetup from "./pages/AdminSetup";
 import CustomerRegister from "./pages/CustomerRegister";
 import CustomerProfile from "./pages/CustomerProfile";
+import AuthPage from "./pages/AuthPage";
+import AuthCallback from "./pages/AuthCallback";
+import EmailVerificationPage from "./pages/EmailVerificationPage";
+import PasswordResetPage from "./pages/PasswordResetPage";
 
 const queryClient = new QueryClient();
 
@@ -42,15 +46,26 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               {/* Public routes */}
+              {/* Authentication routes */}
+              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/auth/verify" element={<EmailVerificationPage />} />
+              <Route path="/auth/reset" element={<PasswordResetPage />} />
+              
+              {/* Customer routes */}
               <Route path="/customer-portal" element={<CustomerPortal />} />
               <Route path="/customer-profile" element={<CustomerProfile />} />
               <Route path="/customer-favorites" element={<CustomerFavorites />} />
               <Route path="/purchase-history" element={<PurchaseHistory />} />
+              <Route path="/register" element={<CustomerRegister />} />
+              
+              {/* Payment routes */}
               <Route path="/payment/callback" element={<PaymentCallback />} />
               <Route path="/payment/success" element={<PaymentCallback />} />
               <Route path="/payment/failed" element={<PaymentCallback />} />
+              
+              {/* Misc routes */}
               <Route path="/unsubscribe" element={<Unsubscribe />} />
-              <Route path="/register" element={<CustomerRegister />} />
               <Route path="/admin-setup/:token" element={<AdminSetup />} />
               
               {/* Protected routes */}

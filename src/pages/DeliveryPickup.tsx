@@ -1,16 +1,12 @@
-
 import React, { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MapPin, BarChart3, Calendar } from "lucide-react";
 import { DriverManagement } from "@/components/delivery/DriverManagement";
 import { DeliveryZonesManager } from "@/components/delivery/DeliveryZonesManager";
-
 export default function DeliveryPickupPage() {
   const [activeTab, setActiveTab] = useState("overview");
-
-  return (
-    <div className="w-full min-h-[calc(100vh-110px)] p-4 md:p-6">
+  return <div className="w-full min-h-[calc(100vh-110px)] p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
           <div>
@@ -37,11 +33,7 @@ export default function DeliveryPickupPage() {
                 <span className="hidden sm:inline">Zones</span>
                 <span className="sm:hidden">Zone</span>
               </TabsTrigger>
-              <TabsTrigger value="schedule" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
-                <Calendar className="w-3 h-3 md:w-4 md:h-4" />
-                <span className="hidden sm:inline">Schedule</span>
-                <span className="sm:hidden">Sched</span>
-              </TabsTrigger>
+              
             </TabsList>
           </div>
 
@@ -117,6 +109,5 @@ export default function DeliveryPickupPage() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
-  );
+    </div>;
 }

@@ -3,7 +3,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BlogCategoriesManager } from './BlogCategoriesManager';
 import { BlogArticlesManager } from './BlogArticlesManager';
-import { FileText, FolderOpen } from 'lucide-react';
+import { AboutUsManager } from '../about/AboutUsManager';
+import { FileText, FolderOpen, Users } from 'lucide-react';
 
 export const ContentManagementTab = () => {
   return (
@@ -16,7 +17,7 @@ export const ContentManagementTab = () => {
       </CardHeader>
       <CardContent>
         <Tabs defaultValue="categories" className="w-full">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="categories" className="flex items-center gap-2">
               <FolderOpen className="h-4 w-4" />
               Categories
@@ -24,6 +25,10 @@ export const ContentManagementTab = () => {
             <TabsTrigger value="articles" className="flex items-center gap-2">
               <FileText className="h-4 w-4" />
               Articles
+            </TabsTrigger>
+            <TabsTrigger value="about" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              About Us
             </TabsTrigger>
           </TabsList>
 
@@ -33,6 +38,10 @@ export const ContentManagementTab = () => {
 
           <TabsContent value="articles" className="mt-6">
             <BlogArticlesManager />
+          </TabsContent>
+
+          <TabsContent value="about" className="mt-6">
+            <AboutUsManager />
           </TabsContent>
         </Tabs>
       </CardContent>

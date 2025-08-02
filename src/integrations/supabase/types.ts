@@ -14,6 +14,99 @@ export type Database = {
   }
   public: {
     Tables: {
+      about_us_gallery: {
+        Row: {
+          alt_text: string | null
+          category: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          image_url: string
+          is_published: boolean | null
+          sort_order: number | null
+          title: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          alt_text?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url: string
+          is_published?: boolean | null
+          sort_order?: number | null
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          alt_text?: string | null
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          image_url?: string
+          is_published?: boolean | null
+          sort_order?: number | null
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      about_us_sections: {
+        Row: {
+          content: string | null
+          created_at: string
+          created_by: string | null
+          id: string
+          image_url: string | null
+          is_published: boolean | null
+          section_type: string
+          seo_description: string | null
+          seo_title: string | null
+          sort_order: number | null
+          title: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_url?: string | null
+          is_published?: boolean | null
+          section_type: string
+          seo_description?: string | null
+          seo_title?: string | null
+          sort_order?: number | null
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          content?: string | null
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          image_url?: string | null
+          is_published?: boolean | null
+          section_type?: string
+          seo_description?: string | null
+          seo_title?: string | null
+          sort_order?: number | null
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       admin_invitations: {
         Row: {
           accepted_at: string | null
@@ -4432,6 +4525,57 @@ export type Database = {
           total_bounced?: number | null
           total_complaints?: number | null
           total_sent?: number | null
+        }
+        Relationships: []
+      }
+      team_members: {
+        Row: {
+          bio: string | null
+          created_at: string
+          created_by: string | null
+          email: string | null
+          id: string
+          image_url: string | null
+          is_active: boolean | null
+          linkedin_url: string | null
+          name: string
+          phone: string | null
+          position: string
+          sort_order: number | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          bio?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          linkedin_url?: string | null
+          name: string
+          phone?: string | null
+          position: string
+          sort_order?: number | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          bio?: string | null
+          created_at?: string
+          created_by?: string | null
+          email?: string | null
+          id?: string
+          image_url?: string | null
+          is_active?: boolean | null
+          linkedin_url?: string | null
+          name?: string
+          phone?: string | null
+          position?: string
+          sort_order?: number | null
+          updated_at?: string
+          updated_by?: string | null
         }
         Relationships: []
       }

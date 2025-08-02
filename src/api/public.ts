@@ -166,6 +166,55 @@ class PublicAPIService {
     if (!response.ok) throw new Error('Failed to fetch delivery zones');
     return response.json();
   }
+
+  // About Us API endpoints
+  async getAboutUsComplete() {
+    const response = await fetch(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/public-about-api/complete`);
+    if (!response.ok) throw new Error('Failed to fetch about us content');
+    return response.json();
+  }
+
+  async getAboutUsHero() {
+    const response = await fetch(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/public-about-api/hero`);
+    if (!response.ok) throw new Error('Failed to fetch hero section');
+    return response.json();
+  }
+
+  async getAboutUsStory() {
+    const response = await fetch(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/public-about-api/story`);
+    if (!response.ok) throw new Error('Failed to fetch story section');
+    return response.json();
+  }
+
+  async getAboutUsValues() {
+    const response = await fetch(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/public-about-api/values`);
+    if (!response.ok) throw new Error('Failed to fetch values section');
+    return response.json();
+  }
+
+  async getAboutUsTeam() {
+    const response = await fetch(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/public-about-api/team`);
+    if (!response.ok) throw new Error('Failed to fetch team data');
+    return response.json();
+  }
+
+  async getAboutUsGallery(category?: string, limit: number = 20, offset: number = 0) {
+    const params = new URLSearchParams({ 
+      limit: limit.toString(), 
+      offset: offset.toString() 
+    });
+    if (category) params.append('category', category);
+    
+    const response = await fetch(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/public-about-api/gallery?${params}`);
+    if (!response.ok) throw new Error('Failed to fetch gallery');
+    return response.json();
+  }
+
+  async getAboutUsContact() {
+    const response = await fetch(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/public-about-api/contact`);
+    if (!response.ok) throw new Error('Failed to fetch contact section');
+    return response.json();
+  }
 }
 
 export const publicAPI = new PublicAPIService();

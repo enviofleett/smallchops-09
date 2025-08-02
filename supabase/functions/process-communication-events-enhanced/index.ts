@@ -215,7 +215,7 @@ async function processWelcomeEmail(supabase: any, event: CommunicationEvent): Pr
     const enhancedVariables = {
       ...event.variables,
       supportEmail: businessSettings?.email || 'support@yourbusiness.com',
-      websiteUrl: businessSettings?.website_url || window.location.origin
+      websiteUrl: businessSettings?.website_url || 'https://oknnklksdiqaifhxaccs.supabase.co'
     }
 
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {

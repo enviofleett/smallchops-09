@@ -113,6 +113,8 @@ const CustomerRegister = () => {
           data: {
             name: formData.name,
             phone: formData.phone,
+            full_name: formData.name,
+            registration_source: 'frontend'
           }
         }
       });
@@ -164,7 +166,7 @@ const CustomerRegister = () => {
       if (data.user) {
         toast({
           title: "Registration successful!",
-          description: "Setting up your account... You'll be redirected to the customer portal.",
+          description: "Welcome! Your account has been created and a welcome email is being sent. You'll be redirected to your customer portal.",
         });
 
         // Clear form

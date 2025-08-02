@@ -103,26 +103,52 @@ export const useSMTPSettings = () => {
     },
   });
 
-  // Test SMTP connection
+  // Test SMTP connection with enhanced error handling
   const testConnectionMutation = useMutation({
     mutationFn: async (testEmail: string) => {
-      const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
-        body: {
-          to: testEmail,
-          toName: 'Test User',
-          subject: 'SMTP Connection Test',
-          html: '<h1>Connection Test</h1><p>If you receive this email, your SMTP configuration is working correctly!</p>',
-          text: 'Connection Test - If you receive this email, your SMTP configuration is working correctly!',
-          emailType: 'transactional',
-          priority: 'normal'
+      // Try enhanced SMTP sender first, fallback to regular
+      let lastError: Error | null = null;
+      
+      for (const sender of ['enhanced-smtp-sender', 'smtp-email-sender']) {
+        try {
+          const { data, error } = await supabase.functions.invoke(sender, {
+            body: {
+              to: testEmail,
+              subject: 'SMTP Connection Test - Enhanced',
+              html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                  <h2 style="color: #3b82f6;">✅ SMTP Connection Test Successful!</h2>
+                  <p>Congratulations! Your SMTP configuration is working correctly.</p>
+                  <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <h3 style="margin-top: 0;">Connection Details:</h3>
+                    <p><strong>Email Sender:</strong> ${sender}</p>
+                    <p><strong>Test Time:</strong> ${new Date().toLocaleString()}</p>
+                    <p><strong>Status:</strong> <span style="color: #22c55e;">Connected Successfully</span></p>
+                  </div>
+                  <p style="color: #64748b;">You can now send emails reliably to your customers.</p>
+                </div>
+              `,
+              text: `SMTP Connection Test Successful! Your email configuration is working correctly. Test completed at ${new Date().toLocaleString()} using ${sender}.`,
+              emailType: 'transactional'
+            }
+          });
+
+          if (error) {
+            lastError = new Error(error.message || `Failed to send test email via ${sender}`);
+            console.warn(`${sender} failed:`, error.message);
+            continue;
+          }
+
+          console.log(`Test email sent successfully via ${sender}`);
+          return { ...data, sender };
+        } catch (senderError) {
+          lastError = senderError as Error;
+          console.warn(`${sender} failed:`, senderError);
+          continue;
         }
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to send test email');
       }
-
-      return data;
+      
+      throw lastError || new Error('All email senders failed');
     },
     onSuccess: () => {
       toast({

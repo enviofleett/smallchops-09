@@ -785,6 +785,7 @@ export type Database = {
           last_error: string | null
           order_id: string | null
           payload: Json | null
+          priority: string | null
           processed_at: string | null
           recipient_email: string | null
           retry_count: number
@@ -807,6 +808,7 @@ export type Database = {
           last_error?: string | null
           order_id?: string | null
           payload?: Json | null
+          priority?: string | null
           processed_at?: string | null
           recipient_email?: string | null
           retry_count?: number
@@ -829,6 +831,7 @@ export type Database = {
           last_error?: string | null
           order_id?: string | null
           payload?: Json | null
+          priority?: string | null
           processed_at?: string | null
           recipient_email?: string | null
           retry_count?: number
@@ -5284,6 +5287,7 @@ export type Database = {
           last_error: string | null
           order_id: string | null
           payload: Json | null
+          priority: string | null
           processed_at: string | null
           recipient_email: string | null
           retry_count: number

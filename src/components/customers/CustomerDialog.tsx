@@ -12,6 +12,7 @@ import { z } from "zod";
 import { CustomerDb } from "@/types/customers";
 import { useToast } from "@/hooks/use-toast";
 import { createCustomer, updateCustomer } from "@/api/customers";
+import { supabase } from "@/integrations/supabase/client";
 
 interface CustomerDialogProps {
   open: boolean;
@@ -115,7 +116,7 @@ export const CustomerDialog = ({
           description: "Customer information has been saved.",
         });
       } else {
-        // Create new customer with optional welcome email
+        // Create new customer with enhanced welcome email processing
         const result = await createCustomer({
           name: data.name,
           email: data.email,
@@ -123,12 +124,26 @@ export const CustomerDialog = ({
         }, data.sendWelcomeEmail);
         
         setSubmitSuccess(true);
+        
+        // Enhanced success message with email status
+        const emailStatus = result.welcomeEmailQueued 
+          ? "A welcome email has been automatically queued and will be sent within 30 seconds."
+          : "No welcome email was sent as requested.";
+        
         toast({ 
           title: "Customer created successfully!", 
-          description: result.welcomeEmailQueued 
-            ? "Customer has been created and a welcome email has been queued for delivery."
-            : "Customer has been created successfully.",
+          description: `Customer has been created successfully. ${emailStatus}`,
         });
+        
+        // Trigger instant email processing for welcome emails
+        if (result.welcomeEmailQueued) {
+          try {
+            await supabase.functions.invoke('instant-email-processor');
+            console.log('Instant email processing triggered');
+          } catch (emailError) {
+            console.warn('Failed to trigger instant email processing:', emailError);
+          }
+        }
       }
       
       // Close dialog and refresh list after a short delay to show success state

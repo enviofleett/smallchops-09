@@ -67,6 +67,47 @@ export type Database = {
           },
         ]
       }
+      admin_notification_preferences: {
+        Row: {
+          admin_id: string | null
+          created_at: string
+          id: string
+          is_enabled: boolean
+          notification_channel: string
+          notification_type: string
+          threshold_value: number | null
+          updated_at: string
+        }
+        Insert: {
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          notification_channel?: string
+          notification_type: string
+          threshold_value?: number | null
+          updated_at?: string
+        }
+        Update: {
+          admin_id?: string | null
+          created_at?: string
+          id?: string
+          is_enabled?: boolean
+          notification_channel?: string
+          notification_type?: string
+          threshold_value?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "admin_notification_preferences_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       api_metrics: {
         Row: {
           dimensions: Json | null
@@ -471,6 +512,7 @@ export type Database = {
           seo_description: string | null
           seo_keywords: string | null
           seo_title: string | null
+          site_url: string | null
           social_card_url: string | null
           tagline: string | null
           tiktok_url: string | null
@@ -506,6 +548,7 @@ export type Database = {
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
+          site_url?: string | null
           social_card_url?: string | null
           tagline?: string | null
           tiktok_url?: string | null
@@ -541,6 +584,7 @@ export type Database = {
           seo_description?: string | null
           seo_keywords?: string | null
           seo_title?: string | null
+          site_url?: string | null
           social_card_url?: string | null
           tagline?: string | null
           tiktok_url?: string | null
@@ -1850,6 +1894,90 @@ export type Database = {
           user_agent?: string | null
           verified?: boolean
           verified_at?: string | null
+        }
+        Relationships: []
+      }
+      email_processing_metrics: {
+        Row: {
+          average_processing_time: number | null
+          bounce_rate: number | null
+          created_at: string
+          date: string
+          delivery_rate: number | null
+          error_categories: Json | null
+          id: string
+          peak_queue_size: number | null
+          total_bounced: number | null
+          total_delivered: number | null
+          total_failed: number | null
+          total_queued: number | null
+          total_sent: number | null
+          updated_at: string
+        }
+        Insert: {
+          average_processing_time?: number | null
+          bounce_rate?: number | null
+          created_at?: string
+          date: string
+          delivery_rate?: number | null
+          error_categories?: Json | null
+          id?: string
+          peak_queue_size?: number | null
+          total_bounced?: number | null
+          total_delivered?: number | null
+          total_failed?: number | null
+          total_queued?: number | null
+          total_sent?: number | null
+          updated_at?: string
+        }
+        Update: {
+          average_processing_time?: number | null
+          bounce_rate?: number | null
+          created_at?: string
+          date?: string
+          delivery_rate?: number | null
+          error_categories?: Json | null
+          id?: string
+          peak_queue_size?: number | null
+          total_bounced?: number | null
+          total_delivered?: number | null
+          total_failed?: number | null
+          total_queued?: number | null
+          total_sent?: number | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      email_rate_limits: {
+        Row: {
+          created_at: string
+          email_type: string
+          id: string
+          identifier: string
+          limit_per_day: number
+          limit_per_hour: number
+          request_count: number
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          email_type: string
+          id?: string
+          identifier: string
+          limit_per_day?: number
+          limit_per_hour?: number
+          request_count?: number
+          window_start?: string
+        }
+        Update: {
+          created_at?: string
+          email_type?: string
+          id?: string
+          identifier?: string
+          limit_per_day?: number
+          limit_per_hour?: number
+          request_count?: number
+          window_start?: string
         }
         Relationships: []
       }
@@ -4100,6 +4228,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      calculate_daily_email_metrics: {
+        Args: { target_date?: string }
+        Returns: Json
+      }
       can_send_email_to: {
         Args: { email_address: string; email_type?: string }
         Returns: boolean
@@ -4119,6 +4251,10 @@ export type Database = {
           p_endpoint?: string
           p_tier?: string
         }
+        Returns: boolean
+      }
+      check_email_rate_limit: {
+        Args: { p_identifier: string; p_email_type?: string }
         Returns: boolean
       }
       check_enhanced_rate_limit: {

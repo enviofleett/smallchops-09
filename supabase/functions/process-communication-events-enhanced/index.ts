@@ -11,6 +11,7 @@ interface CommunicationEvent {
   event_type: string
   recipient_email: string
   template_id?: string
+  template_key?: string
   email_type: string
   status: string
   variables: Record<string, any>
@@ -82,6 +83,7 @@ Deno.serve(async (req) => {
 
     let processedCount = 0
     let failedCount = 0
+    let rateLimitedCount = 0
 
     // Process events in batches of 10
     const batchSize = 10
@@ -96,10 +98,36 @@ Deno.serve(async (req) => {
         .in('id', eventIds)
 
       // Process each event in the batch
-      await Promise.allSettled(
+      const batchResults = await Promise.allSettled(
         batch.map(async (event: CommunicationEvent) => {
           try {
             console.log(`Processing event ${event.id}: ${event.event_type}`)
+            
+            // Check rate limits before processing
+            const { data: rateLimitResult, error: rateLimitError } = await supabase.rpc(
+              'check_email_rate_limit',
+              {
+                p_identifier: event.recipient_email,
+                p_email_type: event.email_type || 'transactional'
+              }
+            )
+
+            if (rateLimitError || !rateLimitResult) {
+              console.warn(`Rate limit exceeded for ${event.recipient_email}`)
+              await logProcessingEvent(supabase, event.id, 'rate_limited', 'Rate limit exceeded')
+              
+              // Mark as queued for later retry
+              await supabase
+                .from('communication_events')
+                .update({ 
+                  status: 'queued',
+                  error_message: 'Rate limit exceeded - will retry later'
+                })
+                .eq('id', event.id)
+              
+              rateLimitedCount++
+              return false
+            }
             
             let success = false
             
@@ -117,13 +145,16 @@ Deno.serve(async (req) => {
               case 'password_reset':
                 success = await processPasswordResetEmail(supabase, event)
                 break
+              case 'admin_notification':
+                success = await processAdminNotification(supabase, event)
+                break
               default:
                 console.log(`Unknown event type: ${event.event_type}, treating as welcome email`)
                 success = await processWelcomeEmail(supabase, event)
             }
 
             if (success) {
-              // Mark as sent
+              // Mark as sent and create delivery confirmation
               await supabase
                 .from('communication_events')
                 .update({ 
@@ -132,30 +163,48 @@ Deno.serve(async (req) => {
                 })
                 .eq('id', event.id)
               
+              // Create delivery confirmation tracking
+              await createDeliveryConfirmation(supabase, event.id, event.recipient_email, 'sent')
+              
+              // Log successful processing for analytics
+              await logProcessingEvent(supabase, event.id, 'sent', `Successfully processed ${event.event_type}`)
+              
               processedCount++
               console.log(`Successfully processed event ${event.id}`)
+              return true
             } else {
               // Handle failure
               await handleEventFailure(supabase, event)
               failedCount++
+              return false
             }
 
           } catch (error) {
             console.error(`Error processing event ${event.id}:`, error)
             await handleEventFailure(supabase, event, error.message)
             failedCount++
+            return false
           }
         })
       )
     }
 
-    console.log(`Processing complete. Processed: ${processedCount}, Failed: ${failedCount}`)
+    // Calculate daily metrics after processing
+    try {
+      await supabase.rpc('calculate_daily_email_metrics')
+    } catch (error) {
+      console.warn('Error calculating daily metrics:', error)
+    }
+
+    console.log(`Processing complete. Processed: ${processedCount}, Failed: ${failedCount}, Rate Limited: ${rateLimitedCount}`)
 
     return new Response(
       JSON.stringify({ 
         message: 'Communication events processed', 
         processed: processedCount,
-        failed: failedCount 
+        failed: failedCount,
+        rate_limited: rateLimitedCount,
+        total: events.length
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
@@ -174,15 +223,33 @@ Deno.serve(async (req) => {
 
 async function processOrderEmail(supabase: any, event: CommunicationEvent): Promise<boolean> {
   try {
+    // Get business settings for dynamic URL resolution
+    const { data: businessSettings } = await supabase
+      .from('business_settings')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const siteUrl = businessSettings?.site_url || 
+                   businessSettings?.website_url || 
+                   'https://oknnklksdiqaifhxaccs.supabase.co'
+
+    const enhancedVariables = {
+      ...event.variables,
+      siteUrl,
+      companyName: businessSettings?.name || 'Starters'
+    }
+
     // Invoke SMTP email sender
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
       body: {
-        templateId: event.template_id || event.template_key || 'welcome_customer',
+        templateId: event.template_id || event.template_key || 'order_confirmation',
         recipient: {
           email: event.recipient_email,
-          name: event.variables?.customerName || 'Valued Customer'
+          name: enhancedVariables?.customerName || 'Valued Customer'
         },
-        variables: event.variables,
+        variables: enhancedVariables,
         emailType: event.email_type,
         priority: 'normal'
       }
@@ -204,19 +271,26 @@ async function processOrderEmail(supabase: any, event: CommunicationEvent): Prom
 
 async function processWelcomeEmail(supabase: any, event: CommunicationEvent): Promise<boolean> {
   try {
-    // Get business settings for welcome email customization
+    // Get business settings with fallbacks for dynamic URL resolution
     const { data: businessSettings } = await supabase
       .from('business_settings')
       .select('*')
       .order('updated_at', { ascending: false })
       .limit(1)
-      .single()
+      .maybeSingle()
 
-    // Enhance variables with business info
+    // Dynamic URL resolution from business settings
+    const siteUrl = businessSettings?.site_url || 
+                   businessSettings?.website_url || 
+                   'https://oknnklksdiqaifhxaccs.supabase.co'
+
+    // Enhance variables with business info and dynamic URL
     const enhancedVariables = {
       ...event.variables,
-      supportEmail: businessSettings?.email || 'support@yourbusiness.com',
-      websiteUrl: businessSettings?.website_url || 'https://oknnklksdiqaifhxaccs.supabase.co'
+      supportEmail: businessSettings?.email || businessSettings?.admin_notification_email || 'support@yourbusiness.com',
+      websiteUrl: siteUrl,
+      companyName: businessSettings?.name || 'Starters',
+      siteUrl
     }
 
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
@@ -248,14 +322,32 @@ async function processWelcomeEmail(supabase: any, event: CommunicationEvent): Pr
 
 async function processPasswordResetEmail(supabase: any, event: CommunicationEvent): Promise<boolean> {
   try {
+    // Get business settings for dynamic URL resolution
+    const { data: businessSettings } = await supabase
+      .from('business_settings')
+      .select('*')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    const siteUrl = businessSettings?.site_url || 
+                   businessSettings?.website_url || 
+                   'https://oknnklksdiqaifhxaccs.supabase.co'
+
+    const enhancedVariables = {
+      ...event.variables,
+      siteUrl,
+      companyName: businessSettings?.name || 'Starters'
+    }
+
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
       body: {
         templateId: event.template_id || event.template_key || 'password_reset',
         recipient: {
           email: event.recipient_email,
-          name: event.variables?.customerName || 'User'
+          name: enhancedVariables?.customerName || 'User'
         },
-        variables: event.variables,
+        variables: enhancedVariables,
         emailType: event.email_type,
         priority: 'high' // High priority for security emails
       }
@@ -275,9 +367,41 @@ async function processPasswordResetEmail(supabase: any, event: CommunicationEven
   }
 }
 
+async function processAdminNotification(supabase: any, event: CommunicationEvent): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+      body: {
+        templateId: event.template_id || event.template_key || 'admin_notification',
+        recipient: {
+          email: event.recipient_email,
+          name: 'Admin'
+        },
+        variables: event.variables,
+        emailType: 'transactional',
+        priority: 'high'
+      }
+    })
+
+    if (error) {
+      console.error('SMTP function error for admin notification:', error)
+      return false
+    }
+
+    console.log('Admin notification sent successfully:', data)
+    return true
+
+  } catch (error) {
+    console.error('Error processing admin notification:', error)
+    return false
+  }
+}
+
 async function handleEventFailure(supabase: any, event: CommunicationEvent, errorMessage?: string): Promise<void> {
   const newRetryCount = event.retry_count + 1
   const maxRetries = 3
+
+  // Log processing event for analytics
+  await logProcessingEvent(supabase, event.id, 'failed', errorMessage || 'Unknown error')
 
   if (newRetryCount >= maxRetries) {
     // Mark as failed permanently
@@ -291,10 +415,16 @@ async function handleEventFailure(supabase: any, event: CommunicationEvent, erro
       })
       .eq('id', event.id)
     
+    // Create delivery confirmation for failed email
+    await createDeliveryConfirmation(supabase, event.id, event.recipient_email, 'failed', errorMessage)
+    
+    // Check if admin notification is needed
+    await checkAdminNotification(supabase, event, errorMessage)
+    
     console.log(`Event ${event.id} marked as permanently failed after ${maxRetries} attempts`)
   } else {
-    // Schedule for retry
-    const retryDelay = Math.pow(2, newRetryCount) * 60 * 1000 // Exponential backoff: 2^retry * 60 seconds
+    // Schedule for retry with exponential backoff
+    const retryDelay = Math.pow(2, newRetryCount) * 60 * 1000 // 2^retry * 60 seconds
     const nextRetryAt = new Date(Date.now() + retryDelay).toISOString()
     
     await supabase
@@ -308,5 +438,113 @@ async function handleEventFailure(supabase: any, event: CommunicationEvent, erro
       .eq('id', event.id)
     
     console.log(`Event ${event.id} scheduled for retry ${newRetryCount}/${maxRetries} at ${nextRetryAt}`)
+  }
+}
+
+// Helper function to create delivery confirmation tracking
+async function createDeliveryConfirmation(
+  supabase: any, 
+  eventId: string, 
+  recipientEmail: string, 
+  status: string, 
+  errorMessage?: string
+): Promise<void> {
+  try {
+    await supabase
+      .from('email_delivery_confirmations')
+      .insert({
+        communication_event_id: eventId,
+        recipient_email: recipientEmail,
+        delivery_status: status,
+        delivery_timestamp: new Date().toISOString(),
+        error_message: errorMessage,
+        provider_response: { 
+          status, 
+          timestamp: new Date().toISOString(),
+          error: errorMessage 
+        }
+      })
+  } catch (error) {
+    console.error('Error creating delivery confirmation:', error)
+  }
+}
+
+// Helper function to log processing events for analytics
+async function logProcessingEvent(
+  supabase: any, 
+  eventId: string, 
+  action: string, 
+  details?: string
+): Promise<void> {
+  try {
+    await supabase
+      .from('audit_logs')
+      .insert({
+        action: `email_processing_${action}`,
+        category: 'Email Processing',
+        entity_type: 'communication_event',
+        entity_id: eventId,
+        message: `Email processing ${action}: ${details || 'No details'}`,
+        new_values: { 
+          action, 
+          details, 
+          timestamp: new Date().toISOString(),
+          event_id: eventId 
+        }
+      })
+  } catch (error) {
+    console.error('Error logging processing event:', error)
+  }
+}
+
+// Helper function to check if admin notification is needed
+async function checkAdminNotification(
+  supabase: any, 
+  event: CommunicationEvent, 
+  errorMessage?: string
+): Promise<void> {
+  try {
+    // Get admin notification preferences
+    const { data: preferences } = await supabase
+      .from('admin_notification_preferences')
+      .select('*')
+      .eq('notification_type', 'email_failure')
+      .eq('is_enabled', true)
+
+    if (preferences && preferences.length > 0) {
+      // Get business settings for admin email
+      const { data: businessSettings } = await supabase
+        .from('business_settings')
+        .select('admin_notification_email')
+        .limit(1)
+        .maybeSingle()
+
+      const adminEmail = businessSettings?.admin_notification_email
+      
+      if (adminEmail) {
+        // Queue admin notification
+        await supabase
+          .from('communication_events')
+          .insert({
+            event_type: 'admin_notification',
+            recipient_email: adminEmail,
+            template_key: 'email_failure_notification',
+            email_type: 'transactional',
+            status: 'queued',
+            variables: {
+              failedEventId: event.id,
+              recipientEmail: event.recipient_email,
+              eventType: event.event_type,
+              errorMessage: errorMessage || 'Unknown error',
+              timestamp: new Date().toISOString(),
+              subject: `Email Delivery Failure - ${event.event_type}`
+            }
+          })
+        
+        console.log(`Admin notification queued for failed event ${event.id}`)
+      }
+    }
+  } catch (error) {
+    console.error('Error checking admin notification:', error)
   }
 }

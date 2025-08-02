@@ -4586,6 +4586,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      requeue_failed_welcome_emails: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       safe_delete_product: {
         Args: { product_id: string }
         Returns: Json

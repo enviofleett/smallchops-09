@@ -1515,6 +1515,7 @@ export type Database = {
           name: string
           phone: string | null
           updated_at: string
+          user_id: string | null
         }
         Insert: {
           created_at?: string
@@ -1524,6 +1525,7 @@ export type Database = {
           name: string
           phone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Update: {
           created_at?: string
@@ -1533,6 +1535,7 @@ export type Database = {
           name?: string
           phone?: string | null
           updated_at?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -5693,6 +5696,14 @@ export type Database = {
           p_order_status?: string
         }
         Returns: undefined
+      }
+      test_registration_system: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          component: string
+          status: string
+          message: string
+        }[]
       }
       update_customer_with_validation: {
         Args: {

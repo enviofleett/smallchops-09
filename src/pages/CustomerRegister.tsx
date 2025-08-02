@@ -27,12 +27,12 @@ const CustomerRegister = () => {
 
   const handleInputChange = (field: string, value: string) => {
     if (field === 'phone') {
-      // Format Nigerian phone number as user types
+      // Clean and format Nigerian phone number
       const digits = value.replace(/\D/g, '');
       if (digits.length <= 11) {
-        if (digits.length >= 1) {
-          value = `(${digits.slice(0, 11)})`;
-        }
+        // Store clean digits but display formatted
+        setFormData(prev => ({ ...prev, [field]: digits }));
+        return;
       }
     }
     setFormData(prev => ({ ...prev, [field]: value }));
@@ -66,12 +66,12 @@ const CustomerRegister = () => {
       return false;
     }
 
-    // Nigerian phone validation - expect format like (09120020048)
+    // Nigerian phone validation - expect 11 digits starting with 0
     const phoneDigits = formData.phone.replace(/\D/g, '');
     if (phoneDigits.length !== 11 || !phoneDigits.startsWith('0')) {
       toast({
         title: "Invalid phone number",
-        description: "Please enter a valid Nigerian phone number in format (09120020048)",
+        description: "Please enter a valid Nigerian phone number in format 09120020048",
         variant: "destructive",
       });
       return false;
@@ -113,6 +113,11 @@ const CustomerRegister = () => {
         phone: formData.phone
       });
 
+      toast({
+        title: "Registration successful!",
+        description: "Please check your email to verify your account and complete registration.",
+      });
+
       // Clear form on success
       setFormData({
         name: '',
@@ -125,9 +130,24 @@ const CustomerRegister = () => {
       // Redirect to customer portal
       navigate('/customer-portal');
     } catch (error: any) {
+      console.error('Registration error:', error);
+      
+      // Provide specific error messages
+      let errorMessage = "An error occurred during registration";
+      
+      if (error.message?.includes('Database error')) {
+        errorMessage = "Database error during registration. Please try again or contact support.";
+      } else if (error.message?.includes('User already registered')) {
+        errorMessage = "An account with this email already exists. Please sign in instead.";
+      } else if (error.message?.includes('Invalid email')) {
+        errorMessage = "Please enter a valid email address.";
+      } else if (error.message) {
+        errorMessage = error.message;
+      }
+      
       toast({
         title: "Registration failed",
-        description: error.message || "An error occurred during registration",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -209,7 +229,7 @@ const CustomerRegister = () => {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="(09120020048)"
+                  placeholder="09120020048"
                   className="pl-10"
                   required
                   disabled={isLoading}
@@ -217,7 +237,7 @@ const CustomerRegister = () => {
                 />
               </div>
               <p className="text-xs text-muted-foreground">
-                Enter your Nigerian phone number. Format: (09120020048)
+                Enter your Nigerian phone number. Format: 09120020048
               </p>
             </div>
 

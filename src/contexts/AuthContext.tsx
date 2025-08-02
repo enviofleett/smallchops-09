@@ -159,11 +159,11 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async ({ email, password, name, phone }: LoginCredentials & { name: string; phone?: string }) => {
     try {
-
       const redirectUrl = `${window.location.origin}/auth/callback`;
       const userData: Record<string, any> = { 
         name, 
-        full_name: name 
+        full_name: name,
+        user_type: 'customer' // Explicitly mark as customer registration
       };
       
       if (phone && phone.trim()) {

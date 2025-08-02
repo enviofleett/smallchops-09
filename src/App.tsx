@@ -28,6 +28,7 @@ import PaymentCallback from "./pages/PaymentCallback";
 import Unsubscribe from "./pages/Unsubscribe";
 import AdminSetup from "./pages/AdminSetup";
 import CustomerRegister from "./pages/CustomerRegister";
+import CustomerProfile from "./pages/CustomerProfile";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/customer-portal" element={<CustomerPortal />} />
+              <Route path="/customer-profile" element={<CustomerProfile />} />
               <Route path="/customer-favorites" element={<CustomerFavorites />} />
               <Route path="/purchase-history" element={<PurchaseHistory />} />
               <Route path="/payment/callback" element={<PaymentCallback />} />

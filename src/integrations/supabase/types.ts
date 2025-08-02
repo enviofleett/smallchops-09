@@ -1001,31 +1001,100 @@ export type Database = {
       }
       customer_accounts: {
         Row: {
+          avatar_url: string | null
+          bio: string | null
           created_at: string
           date_of_birth: string | null
+          email_verified: boolean | null
           id: string
           name: string
           phone: string | null
+          phone_verified: boolean | null
+          profile_completion_percentage: number | null
           updated_at: string
           user_id: string
         }
         Insert: {
+          avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           date_of_birth?: string | null
+          email_verified?: boolean | null
           id?: string
           name: string
           phone?: string | null
+          phone_verified?: boolean | null
+          profile_completion_percentage?: number | null
           updated_at?: string
           user_id: string
         }
         Update: {
+          avatar_url?: string | null
+          bio?: string | null
           created_at?: string
           date_of_birth?: string | null
+          email_verified?: boolean | null
           id?: string
           name?: string
           phone?: string | null
+          phone_verified?: boolean | null
+          profile_completion_percentage?: number | null
           updated_at?: string
           user_id?: string
+        }
+        Relationships: []
+      }
+      customer_addresses: {
+        Row: {
+          address_line_1: string
+          address_line_2: string | null
+          address_type: string
+          city: string
+          country: string
+          created_at: string
+          customer_id: string
+          delivery_instructions: string | null
+          id: string
+          is_default: boolean
+          landmark: string | null
+          phone_number: string | null
+          postal_code: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          address_line_1: string
+          address_line_2?: string | null
+          address_type?: string
+          city: string
+          country?: string
+          created_at?: string
+          customer_id: string
+          delivery_instructions?: string | null
+          id?: string
+          is_default?: boolean
+          landmark?: string | null
+          phone_number?: string | null
+          postal_code: string
+          state: string
+          updated_at?: string
+        }
+        Update: {
+          address_line_1?: string
+          address_line_2?: string | null
+          address_type?: string
+          city?: string
+          country?: string
+          created_at?: string
+          customer_id?: string
+          delivery_instructions?: string | null
+          id?: string
+          is_default?: boolean
+          landmark?: string | null
+          phone_number?: string | null
+          postal_code?: string
+          state?: string
+          updated_at?: string
         }
         Relationships: []
       }
@@ -1250,6 +1319,57 @@ export type Database = {
           sms_notifications?: boolean | null
           updated_at?: string | null
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      customer_preferences: {
+        Row: {
+          created_at: string
+          customer_id: string
+          email_notifications: boolean
+          id: string
+          marketing_emails: boolean
+          newsletter_subscription: boolean
+          order_updates: boolean
+          preferred_currency: string
+          preferred_language: string
+          price_alerts: boolean
+          promotion_alerts: boolean
+          push_notifications: boolean
+          sms_notifications: boolean
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          customer_id: string
+          email_notifications?: boolean
+          id?: string
+          marketing_emails?: boolean
+          newsletter_subscription?: boolean
+          order_updates?: boolean
+          preferred_currency?: string
+          preferred_language?: string
+          price_alerts?: boolean
+          promotion_alerts?: boolean
+          push_notifications?: boolean
+          sms_notifications?: boolean
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string
+          email_notifications?: boolean
+          id?: string
+          marketing_emails?: boolean
+          newsletter_subscription?: boolean
+          order_updates?: boolean
+          preferred_currency?: string
+          preferred_language?: string
+          price_alerts?: boolean
+          promotion_alerts?: boolean
+          push_notifications?: boolean
+          sms_notifications?: boolean
+          updated_at?: string
         }
         Relationships: []
       }
@@ -3650,6 +3770,42 @@ export type Database = {
           },
         ]
       }
+      profile_activity_log: {
+        Row: {
+          action_type: string
+          created_at: string
+          customer_id: string
+          field_changed: string | null
+          id: string
+          ip_address: unknown | null
+          new_value: string | null
+          old_value: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          customer_id: string
+          field_changed?: string | null
+          id?: string
+          ip_address?: unknown | null
+          new_value?: string | null
+          old_value?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          customer_id?: string
+          field_changed?: string | null
+          id?: string
+          ip_address?: unknown | null
+          new_value?: string | null
+          old_value?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -4900,6 +5056,10 @@ export type Database = {
         Args: Record<PropertyKey, never> | { target_date?: string }
         Returns: Json
       }
+      calculate_profile_completion: {
+        Args: { customer_uuid: string }
+        Returns: number
+      }
       calculate_sender_reputation: {
         Args: { p_domain: string }
         Returns: Json
@@ -5270,6 +5430,18 @@ export type Database = {
           details?: Json
           ip_address?: unknown
           user_agent?: string
+        }
+        Returns: string
+      }
+      log_profile_activity: {
+        Args: {
+          p_customer_id: string
+          p_action_type: string
+          p_field_changed?: string
+          p_old_value?: string
+          p_new_value?: string
+          p_ip_address?: unknown
+          p_user_agent?: string
         }
         Returns: string
       }

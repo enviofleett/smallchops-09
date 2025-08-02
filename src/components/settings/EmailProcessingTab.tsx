@@ -2,9 +2,11 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Mail, Send, Clock, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, Mail, Send, Clock, CheckCircle, XCircle, Shield, AlertTriangle } from 'lucide-react';
+import { EmailDeliveryMonitor } from './EmailDeliveryMonitor';
 
 export const EmailProcessingTab = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -83,59 +85,110 @@ export const EmailProcessingTab = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Email Queue Management
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex gap-3">
-            <Button
-              onClick={processEmailQueue}
-              disabled={isProcessing}
-              className="flex items-center gap-2"
-            >
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-              Process Email Queue
-            </Button>
-            
-            <Button
-              variant="outline"
-              onClick={fetchQueueStats}
-              disabled={isLoading}
-              className="flex items-center gap-2"
-            >
-              {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-              Refresh Stats
-            </Button>
-          </div>
+    <Tabs defaultValue="queue" className="space-y-6">
+      <TabsList>
+        <TabsTrigger value="queue">Email Queue</TabsTrigger>
+        <TabsTrigger value="monitoring">Delivery Monitoring</TabsTrigger>
+        <TabsTrigger value="security">Security Status</TabsTrigger>
+      </TabsList>
 
-          {queueStats && (
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(queueStats).map(([status, count]: [string, any]) => (
-                <div key={status} className="text-center p-3 border rounded-lg">
-                  <div className="flex items-center justify-center gap-2 mb-1">
-                    {getStatusIcon(status)}
-                    <Badge className={getStatusColor(status)}>
-                      {status}
-                    </Badge>
-                  </div>
-                  <div className="text-2xl font-semibold">{count}</div>
-                </div>
-              ))}
+      <TabsContent value="queue">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Mail className="h-5 w-5" />
+              Email Queue Management
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex gap-3">
+              <Button
+                onClick={processEmailQueue}
+                disabled={isProcessing}
+                className="flex items-center gap-2"
+              >
+                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                Process Email Queue
+              </Button>
+              
+              <Button
+                variant="outline"
+                onClick={fetchQueueStats}
+                disabled={isLoading}
+                className="flex items-center gap-2"
+              >
+                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                Refresh Stats
+              </Button>
             </div>
-          )}
 
-          <div className="text-sm text-muted-foreground">
-            <p>• Emails are automatically processed every 5 minutes via GitHub Actions</p>
-            <p>• Use "Process Email Queue" to manually trigger processing</p>
-            <p>• Failed emails will be retried with exponential backoff</p>
-          </div>
-        </CardContent>
-      </Card>
-    </div>
+            {queueStats && (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {Object.entries(queueStats).map(([status, count]: [string, any]) => (
+                  <div key={status} className="text-center p-3 border rounded-lg">
+                    <div className="flex items-center justify-center gap-2 mb-1">
+                      {getStatusIcon(status)}
+                      <Badge className={getStatusColor(status)}>
+                        {status}
+                      </Badge>
+                    </div>
+                    <div className="text-2xl font-semibold">{count}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+              <div className="flex items-center gap-2 text-green-800 mb-2">
+                <CheckCircle className="h-4 w-4" />
+                <span className="font-medium">Real-Time Processing Enabled</span>
+              </div>
+              <div className="text-sm text-green-700 space-y-1">
+                <p>✓ Emails are automatically processed in real-time when queued</p>
+                <p>✓ Database trigger ensures immediate processing</p>
+                <p>✓ Backup GitHub Actions runs every 5 minutes for failed emails</p>
+                <p>✓ Failed emails are retried with exponential backoff</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="monitoring">
+        <EmailDeliveryMonitor />
+      </TabsContent>
+
+      <TabsContent value="security">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              Security Alert
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="flex items-center gap-2 text-red-800 mb-3">
+                <Shield className="h-4 w-4" />
+                <span className="font-medium">CRITICAL: SMTP Password Exposed</span>
+              </div>
+              <div className="text-sm text-red-700 space-y-2">
+                <p>⚠️ Your SMTP password is visible in the database: <code>@Octopus100%</code></p>
+                <p>⚠️ This is a serious security risk that needs immediate attention</p>
+                <div className="mt-3 p-3 bg-white border rounded">
+                  <p className="font-medium mb-2">Immediate Actions Required:</p>
+                  <ol className="list-decimal list-inside space-y-1 text-sm">
+                    <li>Change your SMTP password immediately</li>
+                    <li>Update the SMTP settings with the new password</li>
+                    <li>Review database access logs for unauthorized access</li>
+                    <li>Consider implementing password encryption</li>
+                  </ol>
+                </div>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
   );
 };

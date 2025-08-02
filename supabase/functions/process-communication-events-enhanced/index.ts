@@ -32,18 +32,42 @@ Deno.serve(async (req) => {
 
     console.log('Starting enhanced communication events processing...')
 
-    // Fetch queued communication events (limit to 50 at a time)
-    const { data: events, error: fetchError } = await supabase
-      .from('communication_events')
-      .select('*')
-      .eq('status', 'queued')
-      .lt('retry_count', 3) // Only retry up to 3 times
-      .order('created_at', { ascending: true })
-      .limit(50)
+    // Check if this is immediate processing for a specific event
+    const requestBody = req.method === 'POST' ? await req.json().catch(() => ({})) : {};
+    const immediateProcessing = requestBody.immediate_processing;
+    const specificEventId = requestBody.event_id;
 
-    if (fetchError) {
-      console.error('Error fetching communication events:', fetchError)
-      throw fetchError
+    let events = [];
+    
+    if (immediateProcessing && specificEventId) {
+      // Process specific event immediately
+      const { data: specificEvent, error: specificError } = await supabase
+        .from('communication_events')
+        .select('*')
+        .eq('id', specificEventId)
+        .eq('status', 'queued')
+        .single();
+      
+      if (specificEvent && !specificError) {
+        events = [specificEvent];
+        console.log(`Processing specific event immediately: ${specificEventId}`);
+      }
+    } else {
+      // Fetch queued communication events (limit to 50 at a time)
+      const { data: queuedEvents, error: fetchError } = await supabase
+        .from('communication_events')
+        .select('*')
+        .eq('status', 'queued')
+        .lt('retry_count', 3) // Only retry up to 3 times
+        .order('created_at', { ascending: true })
+        .limit(50)
+
+      if (fetchError) {
+        console.error('Error fetching communication events:', fetchError)
+        throw fetchError
+      }
+      
+      events = queuedEvents || [];
     }
 
     if (!events || events.length === 0) {

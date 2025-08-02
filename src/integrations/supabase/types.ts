@@ -1722,6 +1722,44 @@ export type Database = {
         }
         Relationships: []
       }
+      email_delivery_confirmations: {
+        Row: {
+          communication_event_id: string | null
+          created_at: string | null
+          delivered_at: string | null
+          delivery_status: string
+          id: string
+          provider_response: Json | null
+          updated_at: string | null
+        }
+        Insert: {
+          communication_event_id?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status: string
+          id?: string
+          provider_response?: Json | null
+          updated_at?: string | null
+        }
+        Update: {
+          communication_event_id?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          delivery_status?: string
+          id?: string
+          provider_response?: Json | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "email_delivery_confirmations_communication_event_id_fkey"
+            columns: ["communication_event_id"]
+            isOneToOne: false
+            referencedRelation: "communication_events"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       email_delivery_logs: {
         Row: {
           created_at: string | null

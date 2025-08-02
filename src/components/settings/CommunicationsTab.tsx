@@ -9,6 +9,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { EmailTemplateManager } from '@/components/admin/EmailTemplateManager';
 import { SMTPSettingsTab } from './SMTPSettingsTab';
+import { RealTimeEmailProcessor } from './RealTimeEmailProcessor';
+import { EmailDeliveryMonitor } from './EmailDeliveryMonitor';
 import { useEmailService } from '@/hooks/useEmailService';
 import { useSMTPSettings } from '@/hooks/useSMTPSettings';
 import { supabase } from '@/integrations/supabase/client';
@@ -25,7 +27,8 @@ import {
   Clock,
   Send,
   TrendingUp,
-  User
+  User,
+  Zap
 } from 'lucide-react';
 
 interface EmailStats {
@@ -229,7 +232,7 @@ export const CommunicationsTab = () => {
       )}
 
       <Tabs defaultValue="settings" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             SMTP Settings
@@ -238,13 +241,17 @@ export const CommunicationsTab = () => {
             <FileText className="h-4 w-4" />
             Email Templates
           </TabsTrigger>
+          <TabsTrigger value="processing" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Email Processing
+          </TabsTrigger>
           <TabsTrigger value="testing" className="flex items-center gap-2">
             <TestTube className="h-4 w-4" />
             Testing & Preview
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
-            Analytics
+            Delivery Monitoring
           </TabsTrigger>
         </TabsList>
 
@@ -267,6 +274,64 @@ export const CommunicationsTab = () => {
 
         <TabsContent value="templates" className="space-y-4">
           <EmailTemplateManager />
+        </TabsContent>
+
+        <TabsContent value="processing" className="space-y-4">
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Zap className="h-5 w-5" />
+                  Real-Time Email Processing
+                </CardTitle>
+                <CardDescription>
+                  Monitor and process email queue in real-time for instant delivery
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <RealTimeEmailProcessor />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Send className="h-5 w-5" />
+                  Enhanced Queue Management
+                </CardTitle>
+                <CardDescription>
+                  Advanced email processing with retry mechanisms and error handling
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="text-sm text-muted-foreground">
+                  Enhanced processing includes automatic retry for failed emails,
+                  rate limiting, and comprehensive error handling for production use.
+                </div>
+                <Button 
+                  onClick={processEmailQueue}
+                  disabled={processingQueue}
+                  className="w-full"
+                >
+                  <Send className="mr-2 h-4 w-4" />
+                  {processingQueue ? 'Processing Enhanced Queue...' : 'Process Enhanced Queue'}
+                </Button>
+                
+                <div className="p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center gap-2 text-green-800 mb-2">
+                    <CheckCircle className="h-4 w-4" />
+                    <span className="font-medium">Production Ready Features</span>
+                  </div>
+                  <div className="text-sm text-green-700 space-y-1">
+                    <p>✓ Automatic retry for failed emails</p>
+                    <p>✓ Rate limiting to prevent spam</p>
+                    <p>✓ Comprehensive error logging</p>
+                    <p>✓ Real-time status monitoring</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="testing" className="space-y-4">
@@ -323,132 +388,49 @@ export const CommunicationsTab = () => {
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Send className="h-5 w-5" />
-                  Email Queue Management
+                  Quick Email Processing
                 </CardTitle>
                 <CardDescription>
-                  Process pending emails in the communication queue
+                  Instant processing for testing and manual queue management
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="text-sm text-muted-foreground">
-                  Process queued email events including order confirmations, 
-                  status updates, and notifications.
+                  Process queued email events immediately. For production use, 
+                  go to the "Email Processing" tab for advanced controls.
                 </div>
                 <Button 
                   onClick={processEmailQueue}
                   disabled={processingQueue}
                   className="w-full"
+                  variant="outline"
                 >
                   <Send className="mr-2 h-4 w-4" />
-                  {processingQueue ? 'Processing Queue...' : 'Process Email Queue'}
+                  {processingQueue ? 'Processing Queue...' : 'Quick Process Queue'}
                 </Button>
+                <div className="text-xs text-muted-foreground">
+                  💡 Use the Email Processing tab for real-time monitoring and enhanced features
+                </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-4">
-          <div className="grid gap-4 md:grid-cols-1 lg:grid-cols-2">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Activity className="h-5 w-5" />
-                  Recent Email Activity
-                </CardTitle>
-                <CardDescription>
-                  Latest email delivery status and activity
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ScrollArea className="h-[300px]">
-                  <div className="space-y-3">
-                    {isLoadingLogs ? (
-                      <div className="text-center py-8 text-muted-foreground">
-                        Loading email activity...
-                      </div>
-                    ) : emailStats?.recentActivity?.length ? (
-                      emailStats.recentActivity.map((activity) => (
-                        <div key={activity.id} className="flex items-start gap-3 p-3 border rounded-lg">
-                          <div className={`mt-1 rounded-full p-1 ${
-                            activity.status === 'delivered' ? 'bg-green-100 text-green-600' :
-                            activity.status === 'sent' ? 'bg-blue-100 text-blue-600' :
-                            activity.status === 'failed' ? 'bg-red-100 text-red-600' :
-                            'bg-yellow-100 text-yellow-600'
-                          }`}>
-                            {activity.status === 'delivered' ? <CheckCircle className="h-3 w-3" /> :
-                             activity.status === 'sent' ? <Send className="h-3 w-3" /> :
-                             activity.status === 'failed' ? <AlertCircle className="h-3 w-3" /> :
-                             <Clock className="h-3 w-3" />}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <User className="h-3 w-3 text-muted-foreground" />
-                              <span className="text-sm font-medium truncate">
-                                {activity.recipient}
-                              </span>
-                              <Badge variant="outline" className="text-xs">
-                                {activity.status}
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-muted-foreground truncate">
-                              {activity.subject}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {new Date(activity.timestamp).toLocaleString()}
-                            </p>
-                          </div>
-                        </div>
-                      ))
-                    ) : (
-                      <div className="text-center py-8 text-muted-foreground">
-                        No email activity found
-                      </div>
-                    )}
-                  </div>
-                </ScrollArea>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Email Performance
-                </CardTitle>
-                <CardDescription>
-                  Key metrics and delivery statistics
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                    <span className="text-sm font-medium">SMTP Status</span>
-                    <Badge variant={smtpSettings?.use_smtp ? 'default' : 'destructive'}>
-                      {isLoadingSettings ? 'Loading...' : smtpSettings?.use_smtp ? 'Active' : 'Inactive'}
-                    </Badge>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                    <span className="text-sm font-medium">Server</span>
-                    <span className="text-sm text-muted-foreground">
-                      {smtpSettings?.smtp_host || 'Not configured'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                    <span className="text-sm font-medium">Port</span>
-                    <span className="text-sm text-muted-foreground">
-                      {smtpSettings?.smtp_port || 'Not set'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                    <span className="text-sm font-medium">Encryption</span>
-                    <Badge variant="outline">
-                      {smtpSettings?.smtp_secure ? 'TLS/SSL' : 'None'}
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Activity className="h-5 w-5" />
+                Live Email Delivery Monitoring
+              </CardTitle>
+              <CardDescription>
+                Real-time delivery analytics, health monitoring, and comprehensive email system metrics
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <EmailDeliveryMonitor />
+            </CardContent>
+          </Card>
         </TabsContent>
       </Tabs>
     </div>

@@ -64,7 +64,7 @@ export const ProductionDashboard: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="analytics" className="space-y-6">
-          <EmailDeliveryMonitor />
+          <EmailHealthDashboard />
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-6">

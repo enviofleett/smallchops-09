@@ -107,6 +107,12 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                 </div>
               } 
             />
+            {order.order_type === 'delivery' && (order as any).delivery_zones && (
+              <MobileCardRow 
+                label="Delivery Zone" 
+                value={(order as any).delivery_zones.name} 
+              />
+            )}
           </MobileCardContent>
           
           <MobileCardActions>
@@ -162,7 +168,7 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
               <th className="text-left py-4 px-6 font-medium text-gray-600">Customer</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Order Time</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Amount</th>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">Method</th>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Type/Zone</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
             </tr>
@@ -196,7 +202,14 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                     ) : (
                       <Package className="h-4 w-4 text-gray-500" />
                     )}
-                    <span className="text-gray-600 capitalize">{order.order_type}</span>
+                    <div>
+                      <span className="text-gray-600 capitalize">{order.order_type}</span>
+                      {order.order_type === 'delivery' && (order as any).delivery_zones && (
+                        <p className="text-xs text-gray-500">
+                          {(order as any).delivery_zones.name}
+                        </p>
+                      )}
+                    </div>
                   </div>
                 </td>
                 <td className="py-4 px-6">

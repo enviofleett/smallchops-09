@@ -30,7 +30,10 @@ export const getOrders = async ({
 
   let query = supabase
     .from('orders')
-    .select('*, order_items (*)', { count: 'exact' });
+    .select(`*, 
+      order_items (*),
+      delivery_zones (id, name, description)
+    `, { count: 'exact' });
 
   if (status !== 'all') {
     query = query.eq('status', status);
@@ -63,7 +66,10 @@ export const updateOrder = async (
     .from('orders')
     .update(updates)
     .eq('id', orderId)
-    .select('*, order_items (*)')
+    .select(`*, 
+      order_items (*),
+      delivery_zones (id, name, description)
+    `)
     .maybeSingle();
 
   if (error) {

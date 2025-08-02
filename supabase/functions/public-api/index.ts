@@ -382,6 +382,7 @@ serve(async (req) => {
         customer_phone,
         order_type,
         delivery_address,
+        delivery_zone_id,
         special_instructions,
         promotion_code,
         items,
@@ -421,6 +422,7 @@ serve(async (req) => {
             customer_phone,
             order_type: order_type || 'delivery',
             delivery_address,
+            delivery_zone_id: delivery_zone_id || null,
             special_instructions,
             subtotal: subtotal || 0,
             tax_amount: tax_amount || 0,
@@ -507,9 +509,12 @@ serve(async (req) => {
           .select(`
             id, order_number, status, payment_status, order_type,
             customer_name, customer_email, customer_phone,
-            delivery_address, special_instructions,
+            delivery_address, delivery_zone_id, special_instructions,
             subtotal, tax_amount, delivery_fee, discount_amount, total_amount,
             order_time, delivery_time, pickup_time,
+            delivery_zones (
+              id, name, description
+            ),
             order_items (
               id, product_id, product_name, quantity, unit_price, total_price,
               customizations, special_instructions

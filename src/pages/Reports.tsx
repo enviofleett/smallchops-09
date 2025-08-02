@@ -1,6 +1,7 @@
 import React, { useEffect } from "react";
 import { Download, FileText } from "lucide-react";
 import ReportTabs from "@/components/ReportTabs";
+import { RevenueBreakdown } from "@/components/reports/RevenueBreakdown";
 import { fetchReportsData } from "@/api/reports";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -160,6 +161,9 @@ export default function Reports() {
           ))}
         </div>
       )}
+
+      {/* Revenue Breakdown */}
+      <RevenueBreakdown data={data} isLoading={isLoading} />
 
       {/* Chart & Tabs Section */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">

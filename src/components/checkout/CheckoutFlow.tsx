@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,6 +11,7 @@ import { useOrderManagement } from '@/hooks/useOrderManagement';
 import { usePayment } from '@/hooks/usePayment';
 import { PaymentModal } from '@/components/payments/PaymentModal';
 import { DeliveryZoneSelector } from '@/components/delivery/DeliveryZoneSelector';
+import { getDeliveryZonesWithFees, DeliveryZoneWithFee } from '@/api/delivery';
 import { toast } from 'sonner';
 import { Loader2, Tag, X, Gift } from 'lucide-react';
 
@@ -26,6 +27,7 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
   const [orderId, setOrderId] = useState<string | null>(null);
   const [promotionCode, setPromotionCode] = useState('');
   const [isApplyingPromotion, setIsApplyingPromotion] = useState(false);
+  const [zones, setZones] = useState<DeliveryZoneWithFee[]>([]);
   
   const [checkoutData, setCheckoutData] = useState({
     customer_name: '',
@@ -36,6 +38,21 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
     delivery_zone_id: '',
     special_instructions: ''
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchZones();
+    }
+  }, [isOpen]);
+
+  const fetchZones = async () => {
+    try {
+      const data = await getDeliveryZonesWithFees();
+      setZones(data);
+    } catch (error) {
+      console.error('Error fetching zones:', error);
+    }
+  };
 
   const handleInputChange = (field: string, value: string) => {
     setCheckoutData(prev => ({ ...prev, [field]: value }));
@@ -165,15 +182,20 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
                     <span>₦{cart.summary.subtotal.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tax:</span>
+                    <span>Tax (8%):</span>
                     <span>₦{cart.summary.tax_amount.toFixed(2)}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Delivery Fee:</span>
-                    <span className={cart.summary.delivery_discount > 0 ? 'line-through text-muted-foreground' : ''}>
-                      ₦{cart.summary.delivery_fee.toFixed(2)}
-                    </span>
-                  </div>
+                  {checkoutData.order_type === 'delivery' && (
+                    <div className="flex justify-between">
+                      <span>
+                        Shipping{zones.find(z => z.id === checkoutData.delivery_zone_id)?.name ? 
+                          ` - ${zones.find(z => z.id === checkoutData.delivery_zone_id)?.name}` : ''}:
+                      </span>
+                      <span className={cart.summary.delivery_discount > 0 ? 'line-through text-muted-foreground' : ''}>
+                        ₦{cart.summary.delivery_fee.toFixed(2)}
+                      </span>
+                    </div>
+                  )}
                   {cart.summary.delivery_discount > 0 && (
                     <div className="flex justify-between text-green-600">
                       <span>Delivery Discount:</span>
@@ -186,7 +208,8 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
                       <span>-₦{cart.summary.discount_amount.toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between font-semibold">
+                  <Separator />
+                  <div className="flex justify-between font-semibold text-base">
                     <span>Total:</span>
                     <span>₦{cart.summary.total_amount.toFixed(2)}</span>
                   </div>

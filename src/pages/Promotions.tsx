@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Trophy, PlusCircle, Edit, Trash, ChevronRight } from "lucide-react";
+import { Trophy, PlusCircle, Edit, Trash, ChevronRight, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   Tabs,
@@ -23,6 +23,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query"; // For the usage counts
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
+import { PromotionGuidelinesSection } from '@/components/promotions/PromotionGuidelinesSection';
 
 // --- Add helper for status colors ---
 const statusColors: Record<string, string> = {
@@ -55,6 +56,7 @@ async function getPromotionUsage(): Promise<Record<string, number>> {
 
 const tabDefs = [
   { label: "Promotions", value: "promotions" },
+  { label: "Guidelines", value: "guidelines" },
 ];
 
 type PromotionFormData = {
@@ -336,6 +338,10 @@ export default function PromotionsPage() {
               </table>
             </ResponsiveTable>
           )}
+        </TabsContent>
+        
+        <TabsContent value="guidelines">
+          <PromotionGuidelinesSection />
         </TabsContent>
       </Tabs>
 

@@ -1,9 +1,9 @@
-import React from "react";
+import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { CalendarIcon, Plus, Percent, Gift } from "lucide-react";
+import { CalendarIcon, Plus, Percent, DollarSign, Gift, Truck, Shuffle, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCreatePromotion } from "@/hooks/usePromotions";
 import {
@@ -29,25 +29,38 @@ import {
   PopoverContent,
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
+import { PromotionHelpPanel } from "./PromotionHelpPanel";
 
 const PromotionFormSchema = z.object({
   name: z.string().min(2, "Name is required"),
   description: z.string().max(256).optional(),
   type: z.enum([
-    "discount",
-    "loyalty",
-    "referral",
-    "bundle",
-    "flash_sale",
+    "percentage",
+    "fixed_amount", 
+    "buy_one_get_one",
+    "free_delivery",
   ]),
   value: z
-    .union([z.number().min(1), z.nan()])
+    .union([z.number().min(0), z.nan()])
     .optional()
     .transform(val => isNaN(val as any) ? undefined : val),
   min_order_amount: z
     .union([z.number().min(0), z.nan()])
     .optional()
     .transform(val => isNaN(val as any) ? undefined : val),
+  max_discount_amount: z
+    .union([z.number().min(0), z.nan()])
+    .optional()
+    .transform(val => isNaN(val as any) ? undefined : val),
+  usage_limit: z
+    .union([z.number().min(1), z.nan()])
+    .optional()
+    .transform(val => isNaN(val as any) ? undefined : val),
+  code: z.string().optional(),
+  applicable_categories: z.array(z.string()).optional(),
+  applicable_products: z.array(z.string()).optional(),
   valid_from: z.date().optional(),
   valid_until: z.date().optional(),
 });
@@ -61,21 +74,46 @@ export default function CreatePromotionForm({
   onSuccess?: () => void;
   disabled?: boolean;
 }) {
+  const [showHelp, setShowHelp] = useState(true);
+  const [generateCode, setGenerateCode] = useState(false);
+  
   const createMutation = useCreatePromotion();
   const form = useForm<PromotionFormData>({
     resolver: zodResolver(PromotionFormSchema),
     defaultValues: {
       name: "",
       description: "",
-      type: "discount",
+      type: "percentage",
       value: undefined,
       min_order_amount: undefined,
+      max_discount_amount: undefined,
+      usage_limit: undefined,
+      code: "",
+      applicable_categories: [],
+      applicable_products: [],
       valid_from: undefined,
       valid_until: undefined,
     },
   });
 
   const watchType = form.watch("type");
+  
+  // Generate random promotion code
+  const generatePromotionCode = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let result = '';
+    for (let i = 0; i < 8; i++) {
+      result += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return result;
+  };
+
+  // Auto-generate code when enabled
+  React.useEffect(() => {
+    if (generateCode && !form.getValues('code')) {
+      form.setValue('code', generatePromotionCode());
+    }
+  }, [generateCode, form]);
 
   // Safe type guard to check for a Date object
   function isDate(val: unknown): val is Date {
@@ -115,12 +153,26 @@ export default function CreatePromotionForm({
   }
 
   return (
-    <Form {...form}>
-      <form
-        className="space-y-6"
-        onSubmit={form.handleSubmit(handleSubmit)}
-        autoComplete="off"
-      >
+    <div className="space-y-6">
+      {/* Help Toggle */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Create New Promotion</h3>
+        <div className="flex items-center gap-2">
+          <Eye className="w-4 h-4" />
+          <span className="text-sm">Show Help</span>
+          <Switch checked={showHelp} onCheckedChange={setShowHelp} />
+        </div>
+      </div>
+
+      {/* Help Panel */}
+      {showHelp && <PromotionHelpPanel selectedType={watchType} />}
+
+      <Form {...form}>
+        <form
+          className="space-y-6"
+          onSubmit={form.handleSubmit(handleSubmit)}
+          autoComplete="off"
+        >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Name */}
           <FormField
@@ -163,20 +215,22 @@ export default function CreatePromotionForm({
                     </SelectTrigger>
                   </FormControl>
                   <SelectContent>
-                    <SelectItem value="discount">
+                    <SelectItem value="percentage">
                       <Percent className="inline-block w-4 h-4 mr-2" />
-                      Discount
+                      Percentage Discount
                     </SelectItem>
-                    <SelectItem value="loyalty">
+                    <SelectItem value="fixed_amount">
+                      <DollarSign className="inline-block w-4 h-4 mr-2" />
+                      Fixed Amount
+                    </SelectItem>
+                    <SelectItem value="buy_one_get_one">
                       <Gift className="inline-block w-4 h-4 mr-2" />
-                      Loyalty
+                      Buy One Get One
                     </SelectItem>
-                    <SelectItem value="referral">
-                      <Plus className="inline-block w-4 h-4 mr-2" />
-                      Referral
+                    <SelectItem value="free_delivery">
+                      <Truck className="inline-block w-4 h-4 mr-2" />
+                      Free Delivery
                     </SelectItem>
-                    <SelectItem value="bundle">Bundle</SelectItem>
-                    <SelectItem value="flash_sale">Flash Sale</SelectItem>
                   </SelectContent>
                 </Select>
               </FormItem>
@@ -191,10 +245,11 @@ export default function CreatePromotionForm({
               <FormItem className="col-span-1 md:col-span-2">
                 <FormLabel>Description</FormLabel>
                 <FormControl>
-                  <Input
-                    placeholder="Promotion description..."
+                  <Textarea
+                    placeholder="Describe how this promotion works and when it applies..."
                     {...field}
                     disabled={disabled}
+                    rows={3}
                   />
                 </FormControl>
                 <FormMessage />
@@ -203,47 +258,30 @@ export default function CreatePromotionForm({
           />
         </div>
 
-        {/* Conditional fields */}
+        {/* Value and Configuration Fields */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Discount fields (show for discount/flash_sale/bundle) */}
-          {(watchType === "discount" || watchType === "flash_sale" || watchType === "bundle") && (
-            <>
-              <FormField
-                control={form.control}
-                name="value"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Value (% or ₦)</FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter discount value"
-                        type="number"
-                        min={1}
-                        {...field}
-                        value={field.value ?? ""}
-                        disabled={disabled}
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </>
-          )}
-
-          {/* Loyalty fields */}
-          {watchType === "loyalty" && (
+          {/* Value field - different labels based on type */}
+          {watchType !== "free_delivery" && (
             <FormField
               control={form.control}
               name="value"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Loyalty Points Reward</FormLabel>
+                  <FormLabel>
+                    {watchType === "percentage" && "Discount Percentage (1-100)"}
+                    {watchType === "fixed_amount" && "Discount Amount (₦)"}
+                    {watchType === "buy_one_get_one" && "Free Item Discount % (0-100)"}
+                  </FormLabel>
                   <FormControl>
                     <Input
-                      placeholder="Points"
+                      placeholder={
+                        watchType === "percentage" ? "e.g., 20" :
+                        watchType === "fixed_amount" ? "e.g., 500" :
+                        "e.g., 100 (completely free)"
+                      }
                       type="number"
-                      min={1}
+                      min={0}
+                      max={watchType === "percentage" ? 100 : undefined}
                       {...field}
                       value={field.value ?? ""}
                       disabled={disabled}
@@ -261,16 +299,109 @@ export default function CreatePromotionForm({
             name="min_order_amount"
             render={({ field }) => (
               <FormItem>
-                <FormLabel>Min. Purchase (₦)</FormLabel>
+                <FormLabel>
+                  Minimum Order Amount (₦)
+                  {watchType === "free_delivery" && " *"}
+                </FormLabel>
                 <FormControl>
                   <Input
-                    placeholder="0"
+                    placeholder={
+                      watchType === "free_delivery" ? "e.g., 3000" : "Optional, e.g., 1000"
+                    }
                     type="number"
                     min={0}
                     {...field}
                     value={field.value ?? ""}
                     disabled={disabled}
                   />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+
+          {/* Max Discount Amount (for percentage) */}
+          {watchType === "percentage" && (
+            <FormField
+              control={form.control}
+              name="max_discount_amount"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Maximum Discount Cap (₦)</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Optional, e.g., 2000"
+                      type="number"
+                      min={0}
+                      {...field}
+                      value={field.value ?? ""}
+                      disabled={disabled}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          )}
+
+          {/* Usage Limit */}
+          <FormField
+            control={form.control}
+            name="usage_limit"
+            render={({ field }) => (
+              <FormItem>
+                <FormLabel>Usage Limit</FormLabel>
+                <FormControl>
+                  <Input
+                    placeholder="Optional, e.g., 100"
+                    type="number"
+                    min={1}
+                    {...field}
+                    value={field.value ?? ""}
+                    disabled={disabled}
+                  />
+                </FormControl>
+                <FormMessage />
+              </FormItem>
+            )}
+          />
+        </div>
+
+        {/* Promotion Code Section */}
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <FormLabel>Promotion Code</FormLabel>
+            <div className="flex items-center gap-2">
+              <Shuffle className="w-4 h-4" />
+              <span className="text-sm">Auto-generate</span>
+              <Switch checked={generateCode} onCheckedChange={setGenerateCode} />
+            </div>
+          </div>
+          
+          <FormField
+            control={form.control}
+            name="code"
+            render={({ field }) => (
+              <FormItem>
+                <FormControl>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Optional promo code (e.g., SAVE20)"
+                      {...field}
+                      disabled={disabled || generateCode}
+                      className="uppercase"
+                    />
+                    {!generateCode && (
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => form.setValue('code', generatePromotionCode())}
+                        disabled={disabled}
+                      >
+                        Generate
+                      </Button>
+                    )}
+                  </div>
                 </FormControl>
                 <FormMessage />
               </FormItem>
@@ -373,7 +504,8 @@ export default function CreatePromotionForm({
             Create Promotion
           </Button>
         </div>
-      </form>
-    </Form>
+        </form>
+      </Form>
+    </div>
   );
 }

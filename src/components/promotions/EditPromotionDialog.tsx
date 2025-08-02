@@ -42,20 +42,28 @@ const EditPromotionSchema = z.object({
   name: z.string().min(2, "Name is required"),
   description: z.string().max(256).optional(),
   type: z.enum([
-    "discount",
-    "loyalty",
-    "referral",
-    "bundle",
-    "flash_sale",
+    "percentage",
+    "fixed_amount", 
+    "buy_one_get_one",
+    "free_delivery",
   ]),
   value: z
-    .union([z.number().min(1), z.nan()])
+    .union([z.number().min(0), z.nan()])
     .optional()
     .transform(val => isNaN(val as any) ? undefined : val),
   min_order_amount: z
     .union([z.number().min(0), z.nan()])
     .optional()
     .transform(val => isNaN(val as any) ? undefined : val),
+  max_discount_amount: z
+    .union([z.number().min(0), z.nan()])
+    .optional()
+    .transform(val => isNaN(val as any) ? undefined : val),
+  usage_limit: z
+    .union([z.number().min(1), z.nan()])
+    .optional()
+    .transform(val => isNaN(val as any) ? undefined : val),
+  code: z.string().optional(),
   valid_from: z.date().optional(),
   valid_until: z.date().optional(),
 });
@@ -70,11 +78,10 @@ interface EditPromotionDialogProps {
 }
 
 const typeList = [
-  { value: "discount", label: "Discount" },
-  { value: "loyalty", label: "Loyalty" },
-  { value: "referral", label: "Referral" },
-  { value: "bundle", label: "Bundle" },
-  { value: "flash_sale", label: "Flash Sale" },
+  { value: "percentage", label: "Percentage Discount" },
+  { value: "fixed_amount", label: "Fixed Amount" },
+  { value: "buy_one_get_one", label: "Buy One Get One" },
+  { value: "free_delivery", label: "Free Delivery" },
 ];
 
 export default function EditPromotionDialog({
@@ -90,9 +97,12 @@ export default function EditPromotionDialog({
     defaultValues: {
       name: "",
       description: "",
-      type: "discount",
+      type: "percentage",
       value: undefined,
       min_order_amount: undefined,
+      max_discount_amount: undefined,
+      usage_limit: undefined,
+      code: "",
       valid_from: undefined,
       valid_until: undefined,
     },
@@ -241,13 +251,16 @@ export default function EditPromotionDialog({
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>
-                        {watchType === "loyalty" ? "Loyalty Points" : "Value (% or ₦)"}
+                        {watchType === "percentage" && "Discount Percentage (1-100)"}
+                        {watchType === "fixed_amount" && "Discount Amount (₦)"}
+                        {watchType === "buy_one_get_one" && "Free Item Discount % (0-100)"}
+                        {watchType === "free_delivery" && "Value"}
                       </FormLabel>
                       <FormControl>
                         <Input
-                          placeholder={watchType === "loyalty" ? "Points" : "Enter value"}
+                          placeholder="Enter value"
                           type="number"
-                          min={1}
+                          min={0}
                           {...field}
                           value={field.value ?? ""}
                         />

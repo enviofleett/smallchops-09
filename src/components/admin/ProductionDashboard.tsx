@@ -5,6 +5,7 @@ import { ProductionReadinessMonitor } from '@/components/admin/ProductionReadine
 import { RealTimeEmailProcessor } from '@/components/settings/RealTimeEmailProcessor';
 import { EmailDeliveryMonitor } from '@/components/settings/EmailDeliveryMonitor';
 import { EmailProcessingTab } from '@/components/settings/EmailProcessingTab';
+import { EmailHealthDashboard } from '@/components/admin/EmailHealthDashboard';
 import { Shield, Zap, BarChart3, Settings } from 'lucide-react';
 
 export const ProductionDashboard: React.FC = () => {

@@ -176,8 +176,11 @@ async function processOrderEmail(supabase: any, event: CommunicationEvent): Prom
     // Invoke SMTP email sender
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
       body: {
-        to: event.recipient_email,
-        templateKey: event.template_id,
+        templateId: event.template_id || event.template_key || 'welcome_customer',
+        recipient: {
+          email: event.recipient_email,
+          name: event.variables?.customerName || 'Valued Customer'
+        },
         variables: event.variables,
         emailType: event.email_type,
         priority: 'normal'
@@ -217,8 +220,11 @@ async function processWelcomeEmail(supabase: any, event: CommunicationEvent): Pr
 
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
       body: {
-        to: event.recipient_email,
-        templateKey: event.template_id,
+        templateId: event.template_id || event.template_key || 'welcome_customer',
+        recipient: {
+          email: event.recipient_email,
+          name: enhancedVariables?.customerName || 'Valued Customer'
+        },
         variables: enhancedVariables,
         emailType: event.email_type,
         priority: 'normal'
@@ -243,8 +249,11 @@ async function processPasswordResetEmail(supabase: any, event: CommunicationEven
   try {
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
       body: {
-        to: event.recipient_email,
-        templateKey: event.template_id,
+        templateId: event.template_id || event.template_key || 'password_reset',
+        recipient: {
+          email: event.recipient_email,
+          name: event.variables?.customerName || 'User'
+        },
         variables: event.variables,
         emailType: event.email_type,
         priority: 'high' // High priority for security emails

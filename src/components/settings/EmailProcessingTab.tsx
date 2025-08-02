@@ -5,7 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Mail, Send, Clock, CheckCircle, XCircle, Shield, AlertTriangle } from 'lucide-react';
+import { Loader2, Mail, Send, Clock, CheckCircle, XCircle, Shield, AlertTriangle, Zap } from 'lucide-react';
 import { EmailDeliveryMonitor } from './EmailDeliveryMonitor';
 
 export const EmailProcessingTab = () => {
@@ -32,6 +32,32 @@ export const EmailProcessingTab = () => {
       toast({
         title: "Error processing emails",
         description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const triggerInstantProcessing = async () => {
+    setIsProcessing(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('instant-email-processor');
+      
+      if (error) throw error;
+      
+      toast({
+        title: "✅ Instant processing completed",
+        description: `Successfully processed ${data?.successful || 0} emails, ${data?.failed || 0} failed`,
+      });
+      
+      // Refresh the queue stats after processing
+      await fetchQueueStats();
+    } catch (error: any) {
+      console.error('Error in instant processing:', error);
+      toast({
+        title: "Error",
+        description: "Failed to trigger instant email processing",
         variant: "destructive",
       });
     } finally {
@@ -101,25 +127,37 @@ export const EmailProcessingTab = () => {
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="flex gap-3">
+            <div className="space-y-3">
               <Button
-                onClick={processEmailQueue}
+                onClick={triggerInstantProcessing}
                 disabled={isProcessing}
-                className="flex items-center gap-2"
+                className="w-full bg-green-600 hover:bg-green-700 text-white"
               >
-                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
-                Process Email Queue
+                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />}
+                ⚡ Process All Queued Emails Instantly
               </Button>
               
-              <Button
-                variant="outline"
-                onClick={fetchQueueStats}
-                disabled={isLoading}
-                className="flex items-center gap-2"
-              >
-                {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
-                Refresh Stats
-              </Button>
+              <div className="flex gap-3">
+                <Button
+                  variant="outline"
+                  onClick={processEmailQueue}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2"
+                >
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
+                  Standard Process
+                </Button>
+                
+                <Button
+                  variant="outline"
+                  onClick={fetchQueueStats}
+                  disabled={isLoading}
+                  className="flex items-center gap-2"
+                >
+                  {isLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Mail className="h-4 w-4" />}
+                  Refresh Stats
+                </Button>
+              </div>
             </div>
 
             {queueStats && (

@@ -1,1 +1,65 @@
 project_id = "oknnklksdiqaifhxaccs"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "storage", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+major_version = 15
+
+[db.pooler]
+enabled = false
+port = 5432
+pool_mode = "transaction"
+default_parameter_status = "off"
+
+[realtime]
+enabled = true
+ip_version = "ipv6"
+
+[studio]
+enabled = true
+port = 54323
+api_url = "http://127.0.0.1:54321"
+
+[inbucket]
+enabled = true
+port = 54324
+smtp_port = 54325
+pop3_port = 54326
+
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:3000"
+additional_redirect_urls = ["https://lovable.dev"]
+jwt_expiry = 3600
+enable_signup = true
+enable_email_confirmations = false
+enable_sms_confirmations = false
+
+[auth.email]
+enable_signup = true
+double_confirm_changes = true
+enable_confirmations = false
+secure_password_change = false
+
+[auth.sms]
+enable_signup = false
+enable_confirmations = false
+
+[edge_functions]
+enabled = true
+verify_jwt = true
+
+[functions.instant-email-processor]
+verify_jwt = false
+
+[analytics]
+enabled = false

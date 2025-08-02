@@ -393,8 +393,9 @@ serve(async (req) => {
     // Send email using native SMTP
     const result = await sendSMTPEmail(smtpConfig, finalEmailData);
 
-    // Log email sending for analytics
+    // Log email sending for analytics and delivery confirmation
     try {
+      // Log to smtp_delivery_logs
       await supabaseClient.from('smtp_delivery_logs').insert({
         email_id: result.messageId,
         recipient_email: emailData.to,
@@ -411,7 +412,24 @@ serve(async (req) => {
           templateUsed: emailData.templateId || null
         }
       });
-      console.log('📊 Email delivery logged successfully');
+
+      // Log to email_delivery_confirmations for real-time monitoring
+      await supabaseClient.from('email_delivery_confirmations').insert({
+        email_id: result.messageId,
+        recipient_email: emailData.to,
+        delivery_status: 'delivered',
+        delivery_timestamp: new Date().toISOString(),
+        provider_response: {
+          messageId: result.messageId,
+          response: result.response,
+          accepted: result.accepted,
+          method: 'native-smtp'
+        },
+        template_used: emailData.templateId || null,
+        email_type: emailData.emailType || 'transactional'
+      });
+
+      console.log('📊 Email delivery logged successfully to both tables');
     } catch (logError) {
       console.warn('⚠️ Failed to log email delivery:', logError.message);
     }

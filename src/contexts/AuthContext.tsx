@@ -3,10 +3,12 @@ import { Session } from '@supabase/supabase-js';
 import { supabase } from '../integrations/supabase/client';
 import { User, AuthState, LoginCredentials } from '../types/auth';
 import logger from '../lib/logger';
+import { useToast } from '@/hooks/use-toast';
 
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<void>;
   signUp: (credentials: LoginCredentials & { name: string; phone?: string }) => Promise<void>;
+  signUpWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
   session: Session | null;
@@ -27,6 +29,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
     let mounted = true;
@@ -155,20 +158,90 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const signUp = async ({ email, password, name, phone }: LoginCredentials & { name: string; phone?: string }) => {
-    const userData: Record<string, any> = { name };
-    if (phone && phone.trim()) {
-      userData.phone = phone;
-    }
+    try {
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/`,
-        data: userData,
-      },
-    });
-    if (error) throw error;
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const userData: Record<string, any> = { 
+        name, 
+        full_name: name 
+      };
+      
+      if (phone && phone.trim()) {
+        userData.phone = phone;
+      }
+
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: userData,
+        },
+      });
+
+      if (error) {
+        // Log security incident for failed registrations
+        await supabase.rpc('log_security_incident', {
+          p_incident_type: 'registration_failure',
+          p_severity: 'medium',
+          p_endpoint: '/auth/signup',
+          p_details: {
+            email: email,
+            error: error.message
+          }
+        });
+        
+        throw error;
+      }
+
+      toast({
+        title: "Registration successful!",
+        description: "Please check your email to verify your account.",
+      });
+    } catch (error: any) {
+      console.error('Sign up error:', error);
+      throw error;
+    }
+  };
+
+  const signUpWithGoogle = async () => {
+    try {
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
+        }
+      });
+
+      if (error) {
+        // Log OAuth error
+        await supabase.rpc('log_security_incident', {
+          p_incident_type: 'oauth_failure',
+          p_severity: 'medium',
+          p_endpoint: '/auth/google',
+          p_details: {
+            provider: 'google',
+            error: error.message
+          }
+        });
+        
+        throw error;
+      }
+    } catch (error: any) {
+      console.error('Google sign up error:', error);
+      toast({
+        title: "Google sign up failed",
+        description: error.message || "Please try again or use email registration.",
+        variant: "destructive",
+      });
+      throw error;
+    }
   };
 
   const logout = async () => {
@@ -190,6 +263,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isLoading,
     login,
     signUp,
+    signUpWithGoogle,
     logout,
     resetPassword,
     checkUser,

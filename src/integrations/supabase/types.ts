@@ -1739,6 +1739,48 @@ export type Database = {
           },
         ]
       }
+      email_bounce_tracking: {
+        Row: {
+          bounce_count: number | null
+          bounce_reason: string | null
+          bounce_type: string
+          created_at: string | null
+          email_address: string
+          first_bounce_at: string | null
+          id: string
+          last_bounce_at: string | null
+          smtp_provider: string | null
+          suppressed_at: string | null
+          suppression_reason: string | null
+        }
+        Insert: {
+          bounce_count?: number | null
+          bounce_reason?: string | null
+          bounce_type: string
+          created_at?: string | null
+          email_address: string
+          first_bounce_at?: string | null
+          id?: string
+          last_bounce_at?: string | null
+          smtp_provider?: string | null
+          suppressed_at?: string | null
+          suppression_reason?: string | null
+        }
+        Update: {
+          bounce_count?: number | null
+          bounce_reason?: string | null
+          bounce_type?: string
+          created_at?: string | null
+          email_address?: string
+          first_bounce_at?: string | null
+          id?: string
+          last_bounce_at?: string | null
+          smtp_provider?: string | null
+          suppressed_at?: string | null
+          suppression_reason?: string | null
+        }
+        Relationships: []
+      }
       email_consents: {
         Row: {
           consent_source: string | null
@@ -3870,6 +3912,78 @@ export type Database = {
         }
         Relationships: []
       }
+      smtp_connection_audit: {
+        Row: {
+          connection_attempt_at: string | null
+          connection_success: boolean
+          connection_time_ms: number | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          provider_name: string
+          source_ip: unknown | null
+          user_agent: string | null
+        }
+        Insert: {
+          connection_attempt_at?: string | null
+          connection_success: boolean
+          connection_time_ms?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          provider_name: string
+          source_ip?: unknown | null
+          user_agent?: string | null
+        }
+        Update: {
+          connection_attempt_at?: string | null
+          connection_success?: boolean
+          connection_time_ms?: number | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          provider_name?: string
+          source_ip?: unknown | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      smtp_delivery_confirmations: {
+        Row: {
+          created_at: string | null
+          delivery_status: string
+          delivery_time_ms: number | null
+          email_id: string
+          id: string
+          message_id: string | null
+          provider_response: Json | null
+          provider_used: string
+          recipient_email: string
+        }
+        Insert: {
+          created_at?: string | null
+          delivery_status: string
+          delivery_time_ms?: number | null
+          email_id: string
+          id?: string
+          message_id?: string | null
+          provider_response?: Json | null
+          provider_used: string
+          recipient_email: string
+        }
+        Update: {
+          created_at?: string | null
+          delivery_status?: string
+          delivery_time_ms?: number | null
+          email_id?: string
+          id?: string
+          message_id?: string | null
+          provider_response?: Json | null
+          provider_used?: string
+          recipient_email?: string
+        }
+        Relationships: []
+      }
       smtp_delivery_logs: {
         Row: {
           created_at: string
@@ -3912,6 +4026,198 @@ export type Database = {
           sender_email?: string | null
           smtp_response?: string | null
           subject?: string | null
+        }
+        Relationships: []
+      }
+      smtp_health_metrics: {
+        Row: {
+          alert_sent: boolean | null
+          id: string
+          metric_type: string
+          metric_value: number
+          provider_name: string
+          recorded_at: string | null
+          threshold_breached: boolean | null
+          threshold_value: number | null
+        }
+        Insert: {
+          alert_sent?: boolean | null
+          id?: string
+          metric_type: string
+          metric_value: number
+          provider_name: string
+          recorded_at?: string | null
+          threshold_breached?: boolean | null
+          threshold_value?: number | null
+        }
+        Update: {
+          alert_sent?: boolean | null
+          id?: string
+          metric_type?: string
+          metric_value?: number
+          provider_name?: string
+          recorded_at?: string | null
+          threshold_breached?: boolean | null
+          threshold_value?: number | null
+        }
+        Relationships: []
+      }
+      smtp_provider_configs: {
+        Row: {
+          consecutive_failures: number | null
+          created_at: string | null
+          daily_limit: number | null
+          failure_count: number | null
+          health_score: number | null
+          host: string
+          hourly_limit: number | null
+          id: string
+          is_active: boolean | null
+          is_primary: boolean | null
+          last_failure_at: string | null
+          last_health_check: string | null
+          name: string
+          password_encrypted: string | null
+          port: number
+          priority: number | null
+          updated_at: string | null
+          username: string | null
+        }
+        Insert: {
+          consecutive_failures?: number | null
+          created_at?: string | null
+          daily_limit?: number | null
+          failure_count?: number | null
+          health_score?: number | null
+          host: string
+          hourly_limit?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          last_failure_at?: string | null
+          last_health_check?: string | null
+          name: string
+          password_encrypted?: string | null
+          port: number
+          priority?: number | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Update: {
+          consecutive_failures?: number | null
+          created_at?: string | null
+          daily_limit?: number | null
+          failure_count?: number | null
+          health_score?: number | null
+          host?: string
+          hourly_limit?: number | null
+          id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          last_failure_at?: string | null
+          last_health_check?: string | null
+          name?: string
+          password_encrypted?: string | null
+          port?: number
+          priority?: number | null
+          updated_at?: string | null
+          username?: string | null
+        }
+        Relationships: []
+      }
+      smtp_rate_limits: {
+        Row: {
+          created_at: string | null
+          current_day_count: number | null
+          current_hour_count: number | null
+          daily_limit: number
+          day_reset_at: string | null
+          hourly_limit: number
+          id: string
+          identifier: string
+          identifier_type: string | null
+          last_send_at: string | null
+          last_violation_at: string | null
+          reputation_tier: string | null
+          updated_at: string | null
+          violation_count: number | null
+          window_reset_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_day_count?: number | null
+          current_hour_count?: number | null
+          daily_limit: number
+          day_reset_at?: string | null
+          hourly_limit: number
+          id?: string
+          identifier: string
+          identifier_type?: string | null
+          last_send_at?: string | null
+          last_violation_at?: string | null
+          reputation_tier?: string | null
+          updated_at?: string | null
+          violation_count?: number | null
+          window_reset_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_day_count?: number | null
+          current_hour_count?: number | null
+          daily_limit?: number
+          day_reset_at?: string | null
+          hourly_limit?: number
+          id?: string
+          identifier?: string
+          identifier_type?: string | null
+          last_send_at?: string | null
+          last_violation_at?: string | null
+          reputation_tier?: string | null
+          updated_at?: string | null
+          violation_count?: number | null
+          window_reset_at?: string | null
+        }
+        Relationships: []
+      }
+      smtp_reputation_scores: {
+        Row: {
+          bounce_rate: number | null
+          complaint_rate: number | null
+          created_at: string | null
+          domain: string
+          id: string
+          last_updated: string | null
+          reputation_score: number | null
+          status: string | null
+          total_bounced: number | null
+          total_complaints: number | null
+          total_sent: number | null
+        }
+        Insert: {
+          bounce_rate?: number | null
+          complaint_rate?: number | null
+          created_at?: string | null
+          domain: string
+          id?: string
+          last_updated?: string | null
+          reputation_score?: number | null
+          status?: string | null
+          total_bounced?: number | null
+          total_complaints?: number | null
+          total_sent?: number | null
+        }
+        Update: {
+          bounce_rate?: number | null
+          complaint_rate?: number | null
+          created_at?: string | null
+          domain?: string
+          id?: string
+          last_updated?: string | null
+          reputation_score?: number | null
+          status?: string | null
+          total_bounced?: number | null
+          total_complaints?: number | null
+          total_sent?: number | null
         }
         Relationships: []
       }
@@ -4232,6 +4538,10 @@ export type Database = {
         Args: { target_date?: string }
         Returns: Json
       }
+      calculate_sender_reputation: {
+        Args: { p_domain: string }
+        Returns: Json
+      }
       can_send_email_to: {
         Args: { email_address: string; email_type?: string }
         Returns: boolean
@@ -4273,6 +4583,10 @@ export type Database = {
       }
       check_paystack_production_readiness: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      check_rate_limit_with_reputation: {
+        Args: { p_identifier: string; p_identifier_type?: string }
         Returns: Json
       }
       check_upload_rate_limit: {
@@ -4377,6 +4691,10 @@ export type Database = {
           registration_date: string
         }[]
       }
+      get_best_smtp_provider: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_dashboard_data: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -4468,6 +4786,10 @@ export type Database = {
       health_check: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      increment_rate_limit_counter: {
+        Args: { p_identifier: string; p_identifier_type?: string }
+        Returns: undefined
       }
       is_admin: {
         Args: Record<PropertyKey, never>
@@ -4583,6 +4905,15 @@ export type Database = {
           p_metric_value: number
           p_metric_unit?: string
           p_metadata?: Json
+        }
+        Returns: undefined
+      }
+      record_smtp_health_metric: {
+        Args: {
+          p_provider_name: string
+          p_metric_type: string
+          p_metric_value: number
+          p_threshold_value?: number
         }
         Returns: undefined
       }

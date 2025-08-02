@@ -5417,6 +5417,10 @@ export type Database = {
         Args: { p_email: string }
         Returns: Json
       }
+      fix_user_linking: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -5530,7 +5534,7 @@ export type Database = {
         Returns: Json
       }
       get_user_role: {
-        Args: { user_id_to_check: string }
+        Args: { user_uuid: string }
         Returns: string
       }
       handle_successful_payment: {

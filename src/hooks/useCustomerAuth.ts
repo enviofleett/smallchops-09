@@ -52,32 +52,32 @@ export const useCustomerAuth = () => {
 
               try {
                 const customerAccount = await getCustomerAccountWithRetry(session.user.id);
-                if (mounted) {
-                  setAuthState(prev => ({
-                    ...prev,
-                    customerAccount,
-                    isLoading: false,
-                    isAuthenticated: !!customerAccount,
-                    error: customerAccount ? null : 'Customer account not found'
-                  }));
+                  if (mounted) {
+                    setAuthState(prev => ({
+                      ...prev,
+                      customerAccount,
+                      isLoading: false,
+                      isAuthenticated: !!customerAccount,
+                      error: customerAccount ? null : 'Customer account not found'
+                    }));
 
-                  // Trigger instant welcome email processing for new OAuth users
-                  if (event === 'SIGNED_IN' && session.user.app_metadata?.provider !== 'email') {
-                    setTimeout(async () => {
-                      try {
-                        console.log('🚀 Triggering instant welcome email processing for OAuth user');
-                        const { error: processError } = await supabase.functions.invoke('instant-welcome-processor');
-                        if (processError) {
-                          console.warn('Welcome email processing warning:', processError);
-                        } else {
-                          console.log('✅ Welcome email processing triggered successfully');
+                    // Trigger instant welcome email processing for new OAuth users
+                    if (event === 'SIGNED_IN' && session.user.app_metadata?.provider === 'google') {
+                      setTimeout(async () => {
+                        try {
+                          console.log('🚀 Triggering instant welcome email processing for OAuth user');
+                          const { error: processError } = await supabase.functions.invoke('instant-welcome-processor');
+                          if (processError) {
+                            console.warn('Welcome email processing warning:', processError);
+                          } else {
+                            console.log('✅ Welcome email processing triggered successfully');
+                          }
+                        } catch (error) {
+                          console.warn('Welcome email processing error:', error);
                         }
-                      } catch (error) {
-                        console.warn('Welcome email processing error:', error);
-                      }
-                    }, 2000); // 2 second delay to ensure database trigger has completed
+                      }, 3000); // 3 second delay to ensure database trigger has completed
+                    }
                   }
-                }
               } catch (error) {
                 console.error('Error loading customer account:', error);
                 if (mounted) {

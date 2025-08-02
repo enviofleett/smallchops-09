@@ -1891,6 +1891,39 @@ export type Database = {
         }
         Relationships: []
       }
+      email_health_metrics: {
+        Row: {
+          created_at: string
+          delivery_rate: number
+          failed_events: number
+          id: string
+          period: string
+          sent_events: number
+          timestamp: string
+          total_events: number
+        }
+        Insert: {
+          created_at?: string
+          delivery_rate?: number
+          failed_events?: number
+          id?: string
+          period?: string
+          sent_events?: number
+          timestamp?: string
+          total_events?: number
+        }
+        Update: {
+          created_at?: string
+          delivery_rate?: number
+          failed_events?: number
+          id?: string
+          period?: string
+          sent_events?: number
+          timestamp?: string
+          total_events?: number
+        }
+        Relationships: []
+      }
       email_otp_verification: {
         Row: {
           attempts: number
@@ -4574,7 +4607,7 @@ export type Database = {
         Returns: number
       }
       calculate_daily_email_metrics: {
-        Args: { target_date?: string }
+        Args: Record<PropertyKey, never> | { target_date?: string }
         Returns: Json
       }
       calculate_sender_reputation: {

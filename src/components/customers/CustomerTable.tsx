@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { Mail, Phone, Edit, Trash2 } from 'lucide-react';
 import { Customer } from '@/types/customers';
 import { CustomerDetailsModal } from './CustomerDetailsModal';
+import { EmailStatusBadge } from './EmailStatusBadge';
+import { EmailActions } from './EmailActions';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { deleteCustomer } from "@/api/customers";
 import { useToast } from "@/hooks/use-toast";
@@ -13,9 +15,10 @@ interface CustomerTableProps {
   isLoading?: boolean;
   onEditCustomer?: (customer: Customer) => void;
   onCustomerDeleted?: () => void;
+  onEmailResent?: () => void;
 }
 
-export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomerDeleted }: CustomerTableProps) => {
+export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomerDeleted, onEmailResent }: CustomerTableProps) => {
   // Track selected customer for detailed modal
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -130,6 +133,24 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
                   : `Registered ${new Date(customer.lastOrderDate).toLocaleDateString()}`
               } 
             />
+            <MobileCardRow 
+              label="Email Status" 
+              value={
+                <div className="flex items-center gap-2">
+                  <EmailStatusBadge 
+                    status={customer.emailStatus || 'none'}
+                    sentAt={customer.emailSentAt}
+                    lastAttempt={customer.emailLastAttempt}
+                  />
+                  <EmailActions
+                    customerEmail={customer.email}
+                    customerName={customer.name}
+                    emailStatus={customer.emailStatus || 'none'}
+                    onEmailResent={onEmailResent}
+                  />
+                </div>
+              } 
+            />
           </MobileCardContent>
           
           <MobileCardActions>
@@ -201,6 +222,7 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Orders</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Total Spent</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
+                <th className="text-left py-4 px-6 font-medium text-gray-600">Email Status</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Last Activity</th>
                 <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
               </tr>
@@ -260,19 +282,34 @@ export const CustomerTable = ({ customers, isLoading, onEditCustomer, onCustomer
                   <td className="py-4 px-6 font-medium text-gray-800">
                     ₦{customer.totalSpent.toLocaleString()}
                   </td>
-                  <td className="py-4 px-6">
-                    <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(customer.status)}`}>
-                      {customer.status}
-                    </span>
-                  </td>
-                   <td className="py-4 px-6 text-gray-600">
-                     {customer.totalOrders > 0 
-                       ? new Date(customer.lastOrderDate).toLocaleDateString()
-                       : customer.isGuest 
-                         ? 'No orders yet'
-                         : `Registered ${new Date(customer.lastOrderDate).toLocaleDateString()}`
-                     }
+                   <td className="py-4 px-6">
+                     <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(customer.status)}`}>
+                       {customer.status}
+                     </span>
                    </td>
+                   <td className="py-4 px-6">
+                     <div className="flex items-center gap-2">
+                       <EmailStatusBadge 
+                         status={customer.emailStatus || 'none'}
+                         sentAt={customer.emailSentAt}
+                         lastAttempt={customer.emailLastAttempt}
+                       />
+                       <EmailActions
+                         customerEmail={customer.email}
+                         customerName={customer.name}
+                         emailStatus={customer.emailStatus || 'none'}
+                         onEmailResent={onEmailResent}
+                       />
+                     </div>
+                   </td>
+                    <td className="py-4 px-6 text-gray-600">
+                      {customer.totalOrders > 0 
+                        ? new Date(customer.lastOrderDate).toLocaleDateString()
+                        : customer.isGuest 
+                          ? 'No orders yet'
+                          : `Registered ${new Date(customer.lastOrderDate).toLocaleDateString()}`
+                      }
+                    </td>
                   <td className="py-4 px-6">
                     <div className="flex items-center space-x-2">
                       {/* Edit button */}

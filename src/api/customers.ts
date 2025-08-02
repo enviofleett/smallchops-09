@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Customer, CustomerDb, CustomerAnalytics as CustomerAnalyticsType } from '@/types/customers';
+import { getCustomerEmailStatuses } from './emailStatus';
 
 export interface CustomerMetrics {
   totalCustomers: number;
@@ -409,6 +410,21 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
   });
 
   const customers: Customer[] = Object.values(bucket);
+
+  // Get email statuses for all customers
+  const emailStatuses = await getCustomerEmailStatuses(customers.map(c => c.email).filter(email => email));
+  
+  // Add email status to customers
+  customers.forEach(customer => {
+    const emailStatus = emailStatuses[customer.email];
+    if (emailStatus) {
+      customer.emailStatus = emailStatus.status;
+      customer.emailSentAt = emailStatus.sentAt;
+      customer.emailLastAttempt = emailStatus.lastAttempt;
+    } else {
+      customer.emailStatus = 'none';
+    }
+  });
 
   // Calculate metrics
   const totalCustomers = customers.length;

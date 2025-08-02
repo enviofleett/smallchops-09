@@ -9,6 +9,9 @@ export interface Customer {
   status: 'VIP' | 'Active' | 'Inactive' | 'Registered';
   lastOrderDate: string;
   isGuest?: boolean; // NEW - true if the customer only ever checked out as guest
+  emailStatus?: 'sent' | 'failed' | 'pending' | 'bounced' | 'none';
+  emailSentAt?: string;
+  emailLastAttempt?: string;
 }
 
 export interface CustomerDb {

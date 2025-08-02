@@ -633,6 +633,7 @@ export type Database = {
           brand_guidelines: string | null
           business_hours: Json | null
           created_at: string
+          default_vat_rate: number | null
           email: string | null
           facebook_url: string | null
           favicon_url: string | null
@@ -669,6 +670,7 @@ export type Database = {
           brand_guidelines?: string | null
           business_hours?: Json | null
           created_at?: string
+          default_vat_rate?: number | null
           email?: string | null
           facebook_url?: string | null
           favicon_url?: string | null
@@ -705,6 +707,7 @@ export type Database = {
           brand_guidelines?: string | null
           business_hours?: Json | null
           created_at?: string
+          default_vat_rate?: number | null
           email?: string | null
           facebook_url?: string | null
           favicon_url?: string | null
@@ -2873,6 +2876,7 @@ export type Database = {
       }
       order_items: {
         Row: {
+          cost_price: number | null
           customizations: Json | null
           id: string
           order_id: string
@@ -2882,8 +2886,11 @@ export type Database = {
           special_instructions: string | null
           total_price: number
           unit_price: number
+          vat_amount: number | null
+          vat_rate: number | null
         }
         Insert: {
+          cost_price?: number | null
           customizations?: Json | null
           id?: string
           order_id: string
@@ -2893,8 +2900,11 @@ export type Database = {
           special_instructions?: string | null
           total_price: number
           unit_price: number
+          vat_amount?: number | null
+          vat_rate?: number | null
         }
         Update: {
+          cost_price?: number | null
           customizations?: Json | null
           id?: string
           order_id?: string
@@ -2904,6 +2914,8 @@ export type Database = {
           special_instructions?: string | null
           total_price?: number
           unit_price?: number
+          vat_amount?: number | null
+          vat_rate?: number | null
         }
         Relationships: [
           {
@@ -2989,8 +3001,10 @@ export type Database = {
           special_instructions: string | null
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
+          subtotal_cost: number | null
           tax_amount: number
           total_amount: number
+          total_vat: number | null
           updated_at: string
           updated_by: string | null
         }
@@ -3021,8 +3035,10 @@ export type Database = {
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
+          subtotal_cost?: number | null
           tax_amount?: number
           total_amount?: number
+          total_vat?: number | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -3053,8 +3069,10 @@ export type Database = {
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
+          subtotal_cost?: number | null
           tax_amount?: number
           total_amount?: number
+          total_vat?: number | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -3795,6 +3813,7 @@ export type Database = {
         Row: {
           allergen_info: string[] | null
           category_id: string | null
+          cost_price: number | null
           created_at: string
           created_by: string | null
           description: string | null
@@ -3812,10 +3831,13 @@ export type Database = {
           stock_quantity: number
           updated_at: string
           updated_by: string | null
+          vat_amount: number | null
+          vat_rate: number | null
         }
         Insert: {
           allergen_info?: string[] | null
           category_id?: string | null
+          cost_price?: number | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -3833,10 +3855,13 @@ export type Database = {
           stock_quantity?: number
           updated_at?: string
           updated_by?: string | null
+          vat_amount?: number | null
+          vat_rate?: number | null
         }
         Update: {
           allergen_info?: string[] | null
           category_id?: string | null
+          cost_price?: number | null
           created_at?: string
           created_by?: string | null
           description?: string | null
@@ -3854,6 +3879,8 @@ export type Database = {
           stock_quantity?: number
           updated_at?: string
           updated_by?: string | null
+          vat_amount?: number | null
+          vat_rate?: number | null
         }
         Relationships: [
           {
@@ -5202,6 +5229,10 @@ export type Database = {
       }
       calculate_sender_reputation: {
         Args: { p_domain: string }
+        Returns: Json
+      }
+      calculate_vat_breakdown: {
+        Args: { cart_items: Json; delivery_fee?: number }
         Returns: Json
       }
       can_send_email_to: {

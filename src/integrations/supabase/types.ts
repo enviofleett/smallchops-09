@@ -5142,6 +5142,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      cleanup_old_email_events: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       confirm_payment_atomic: {
         Args: {
           p_reference: string
@@ -5244,6 +5248,10 @@ export type Database = {
           total_revenue: number
         }[]
       }
+      get_email_health_status: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_environment_config: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -5299,6 +5307,10 @@ export type Database = {
           updated_at: string
           variables: Json | null
         }[]
+      }
+      get_smtp_config_with_fallback: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       get_user_role: {
         Args: { user_id_to_check: string }

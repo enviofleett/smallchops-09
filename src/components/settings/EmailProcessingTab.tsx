@@ -7,6 +7,7 @@ import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Mail, Send, Clock, CheckCircle, XCircle, Shield, AlertTriangle, Zap } from 'lucide-react';
 import { EmailDeliveryMonitor } from './EmailDeliveryMonitor';
+import { RealTimeEmailProcessor } from './RealTimeEmailProcessor';
 
 export const EmailProcessingTab = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -111,12 +112,17 @@ export const EmailProcessingTab = () => {
   };
 
   return (
-    <Tabs defaultValue="queue" className="space-y-6">
-      <TabsList>
-        <TabsTrigger value="queue">Email Queue</TabsTrigger>
-        <TabsTrigger value="monitoring">Delivery Monitoring</TabsTrigger>
-        <TabsTrigger value="security">Security Status</TabsTrigger>
-      </TabsList>
+        <Tabs defaultValue="realtime" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="realtime">Real-Time Processing</TabsTrigger>
+            <TabsTrigger value="queue">Email Queue</TabsTrigger>
+            <TabsTrigger value="monitoring">Delivery Monitoring</TabsTrigger>
+            <TabsTrigger value="security">Security Status</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="realtime" className="space-y-6">
+            <RealTimeEmailProcessor />
+          </TabsContent>
 
       <TabsContent value="queue">
         <Card>

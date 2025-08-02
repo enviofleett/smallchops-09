@@ -448,6 +448,9 @@ export type Database = {
         Row: {
           accent_color: string | null
           address: string | null
+          admin_notification_email: string | null
+          admin_order_notifications: boolean | null
+          admin_payment_notifications: boolean | null
           brand_guidelines: string | null
           business_hours: Json | null
           created_at: string
@@ -480,6 +483,9 @@ export type Database = {
         Insert: {
           accent_color?: string | null
           address?: string | null
+          admin_notification_email?: string | null
+          admin_order_notifications?: boolean | null
+          admin_payment_notifications?: boolean | null
           brand_guidelines?: string | null
           business_hours?: Json | null
           created_at?: string
@@ -512,6 +518,9 @@ export type Database = {
         Update: {
           accent_color?: string | null
           address?: string | null
+          admin_notification_email?: string | null
+          admin_order_notifications?: boolean | null
+          admin_payment_notifications?: boolean | null
           brand_guidelines?: string | null
           business_hours?: Json | null
           created_at?: string
@@ -4427,6 +4436,10 @@ export type Database = {
           p_details?: Json
         }
         Returns: string
+      }
+      process_email_queue_real_time: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       record_payment_metric: {
         Args: {

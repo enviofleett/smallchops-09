@@ -13,7 +13,7 @@ import { getCustomerAnalytics } from '@/api/customers';
 import { DateRange, Customer, CustomerDb } from '@/types/customers';
 import { CustomerDialog } from '@/components/customers/CustomerDialog';
 import { Button } from '@/components/ui/button';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useCustomerRateLimit } from '@/hooks/useCustomerRateLimit';
 
 const Customers = () => {
@@ -26,7 +26,7 @@ const Customers = () => {
   const [customerTypeFilter, setCustomerTypeFilter] = useState<CustomerTypeFilterType>('all');
   const [customerDialogOpen, setCustomerDialogOpen] = useState(false);
   const [currentEditCustomer, setCurrentEditCustomer] = useState<CustomerDb | null>(null);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [securitySectionOpen, setSecuritySectionOpen] = useState(false);
 
   // Rate limiting for customer operations
   const rateLimitStatus = useCustomerRateLimit('create', 50);
@@ -121,127 +121,117 @@ const Customers = () => {
         isAllowed={rateLimitStatus.isAllowed}
         onRefresh={rateLimitStatus.checkRateLimit}
       />
-      
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="overview" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Overview & Analytics
-          </TabsTrigger>
-          <TabsTrigger value="customers" className="flex items-center gap-2">
-            <Users className="h-4 w-4" />
-            Customer Management
-          </TabsTrigger>
-          <TabsTrigger value="security" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Security & Audit
-          </TabsTrigger>
-        </TabsList>
+      {/* Analytics Overview */}
+      {analytics && (
+        <CustomerAnalytics
+          metrics={analytics.metrics}
+          topCustomersByOrders={analytics.topCustomersByOrders}
+          topCustomersBySpending={analytics.topCustomersBySpending}
+          repeatCustomers={analytics.repeatCustomers}
+          allCustomers={allCustomers}
+          isLoading={isLoading}
+        />
+      )}
 
-        <TabsContent value="overview" className="space-y-6">
-          {/* Analytics Overview */}
-          {analytics && (
-            <CustomerAnalytics
-              metrics={analytics.metrics}
-              topCustomersByOrders={analytics.topCustomersByOrders}
-              topCustomersBySpending={analytics.topCustomersBySpending}
-              repeatCustomers={analytics.repeatCustomers}
-              allCustomers={allCustomers}
-              isLoading={isLoading}
-            />
-          )}
-
-          {/* Repeat Business Analysis */}
-          {analytics && analytics.repeatCustomers.length > 0 && (
-            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-              <h3 className="text-lg font-semibold text-gray-800 mb-4">Repeat Business Champions</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                {analytics.repeatCustomers.slice(0, 3).map((customer, index) => (
-                  <div key={customer.id} className="border rounded-lg p-4">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center space-x-2">
-                        <span className="font-medium text-gray-800">{customer.name}</span>
-                        {customer.isGuest && (
-                          <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
-                            Guest
-                          </span>
-                        )}
-                      </div>
-                      <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
-                        #{index + 1}
+      {/* Repeat Business Analysis */}
+      {analytics && analytics.repeatCustomers.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+          <h3 className="text-lg font-semibold text-gray-800 mb-4">Repeat Business Champions</h3>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {analytics.repeatCustomers.slice(0, 3).map((customer, index) => (
+              <div key={customer.id} className="border rounded-lg p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-2">
+                    <span className="font-medium text-gray-800">{customer.name}</span>
+                    {customer.isGuest && (
+                      <span className="text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                        Guest
                       </span>
-                    </div>
-                    <div className="text-sm text-gray-600 space-y-1">
-                      <div>{customer.totalOrders} orders</div>
-                      <div>₦{customer.totalSpent.toLocaleString()} total</div>
-                      <div className="text-xs text-gray-500">
-                        Avg: ₦{Math.round(customer.totalSpent / customer.totalOrders).toLocaleString()} per order
-                      </div>
-                    </div>
+                    )}
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </TabsContent>
-
-        <TabsContent value="customers" className="space-y-6">
-          {/* Customer Type Filter */}
-          {analytics && (
-            <CustomerTypeFilter
-              currentFilter={customerTypeFilter}
-              onFilterChange={setCustomerTypeFilter}
-              counts={{
-                all: analytics.allCustomers.length,
-                authenticated: analytics.metrics.authenticatedCustomers,
-                guest: analytics.metrics.guestCustomers
-              }}
-            />
-          )}
-
-          {/* Search and Customer Table */}
-          <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 mb-6">
-              <h3 className="text-lg font-semibold text-gray-800">All Customers</h3>
-              
-              <div className="flex items-center space-x-4">
-                <div className="relative flex-1 max-w-md">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                  <input
-                    type="text"
-                    placeholder="Search customers..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                  <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full">
+                    #{index + 1}
+                  </span>
                 </div>
-                <BulkEmailActions onEmailsRequeued={refetchAnalytics} />
-                <Button 
-                  variant="outline"
-                  className="flex items-center space-x-2"
-                  onClick={openAddCustomer}
-                  disabled={!rateLimitStatus.isAllowed || rateLimitStatus.isChecking}
-                >
-                  <UserPlus className="h-4 w-4" />
-                  <span>Add Customer</span>
-                </Button>
+                <div className="text-sm text-gray-600 space-y-1">
+                  <div>{customer.totalOrders} orders</div>
+                  <div>₦{customer.totalSpent.toLocaleString()} total</div>
+                  <div className="text-xs text-gray-500">
+                    Avg: ₦{Math.round(customer.totalSpent / customer.totalOrders).toLocaleString()} per order
+                  </div>
+                </div>
               </div>
-            </div>
-
-            <CustomerTable 
-              customers={filteredCustomers}
-              isLoading={isLoading}
-              onEditCustomer={openEditCustomer}
-              onCustomerDeleted={refetchAnalytics}
-              onEmailResent={refetchAnalytics}
-            />
+            ))}
           </div>
-        </TabsContent>
+        </div>
+      )}
 
-        <TabsContent value="security" className="space-y-6">
+      {/* Customer Type Filter */}
+      {analytics && (
+        <CustomerTypeFilter
+          currentFilter={customerTypeFilter}
+          onFilterChange={setCustomerTypeFilter}
+          counts={{
+            all: analytics.allCustomers.length,
+            authenticated: analytics.metrics.authenticatedCustomers,
+            guest: analytics.metrics.guestCustomers
+          }}
+        />
+      )}
+
+      {/* Search and Customer Table */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0 mb-6">
+          <h3 className="text-lg font-semibold text-gray-800">All Customers</h3>
+          
+          <div className="flex items-center space-x-4">
+            <div className="relative flex-1 max-w-md">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+              <input
+                type="text"
+                placeholder="Search customers..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+            <BulkEmailActions onEmailsRequeued={refetchAnalytics} />
+            <Button 
+              variant="outline"
+              className="flex items-center space-x-2"
+              onClick={openAddCustomer}
+              disabled={!rateLimitStatus.isAllowed || rateLimitStatus.isChecking}
+            >
+              <UserPlus className="h-4 w-4" />
+              <span>Add Customer</span>
+            </Button>
+          </div>
+        </div>
+
+        <CustomerTable 
+          customers={filteredCustomers}
+          isLoading={isLoading}
+          onEditCustomer={openEditCustomer}
+          onCustomerDeleted={refetchAnalytics}
+          onEmailResent={refetchAnalytics}
+        />
+      </div>
+
+      {/* Collapsible Security Section */}
+      <Collapsible open={securitySectionOpen} onOpenChange={setSecuritySectionOpen}>
+        <CollapsibleTrigger asChild>
+          <Button variant="outline" className="w-full flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4" />
+              Security & Audit Dashboard
+            </div>
+            <Filter className={`h-4 w-4 transition-transform ${securitySectionOpen ? 'rotate-180' : ''}`} />
+          </Button>
+        </CollapsibleTrigger>
+        <CollapsibleContent className="space-y-6 mt-6">
           <CustomerSecurityDashboard />
-        </TabsContent>
-      </Tabs>
+        </CollapsibleContent>
+      </Collapsible>
       
       <CustomerDialog
         open={customerDialogOpen}

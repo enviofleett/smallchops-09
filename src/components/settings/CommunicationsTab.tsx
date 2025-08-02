@@ -15,22 +15,7 @@ import { useEmailService } from '@/hooks/useEmailService';
 import { useSMTPSettings } from '@/hooks/useSMTPSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { 
-  Mail, 
-  Settings, 
-  FileText, 
-  TestTube,
-  Activity,
-  BarChart3,
-  AlertCircle,
-  CheckCircle,
-  Clock,
-  Send,
-  TrendingUp,
-  User,
-  Zap
-} from 'lucide-react';
-
+import { Mail, Settings, FileText, TestTube, Activity, BarChart3, AlertCircle, CheckCircle, Clock, Send, TrendingUp, User, Zap } from 'lucide-react';
 interface EmailStats {
   totalSent: number;
   deliveredToday: number;
@@ -44,34 +29,34 @@ interface EmailStats {
     timestamp: string;
   }>;
 }
-
 export const CommunicationsTab = () => {
   const [testEmail, setTestEmail] = useState('');
   const [testingConnection, setTestingConnection] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'success' | 'error' | null>(null);
   const [processingQueue, setProcessingQueue] = useState(false);
   const [emailStats, setEmailStats] = useState<EmailStats | null>(null);
-  
-  const { deliveryLogs, isLoadingLogs } = useEmailService();
-  const { settings: smtpSettings, isLoading: isLoadingSettings } = useSMTPSettings();
+  const {
+    deliveryLogs,
+    isLoadingLogs
+  } = useEmailService();
+  const {
+    settings: smtpSettings,
+    isLoading: isLoadingSettings
+  } = useSMTPSettings();
 
   // Calculate email statistics
   React.useEffect(() => {
     if (deliveryLogs?.length) {
       const today = new Date().toDateString();
-      const todayLogs = deliveryLogs.filter(log => 
-        new Date(log.created_at).toDateString() === today
-      );
-      
+      const todayLogs = deliveryLogs.filter(log => new Date(log.created_at).toDateString() === today);
       const delivered = todayLogs.filter(log => log.delivery_status === 'delivered').length;
       const failed = todayLogs.filter(log => log.delivery_status === 'failed' || log.delivery_status === 'bounced').length;
       const total = todayLogs.length;
-      
       setEmailStats({
         totalSent: deliveryLogs.length,
         deliveredToday: delivered,
         failedToday: failed,
-        deliveryRate: total > 0 ? Math.round((delivered / total) * 100) : 0,
+        deliveryRate: total > 0 ? Math.round(delivered / total * 100) : 0,
         recentActivity: deliveryLogs.slice(0, 10).map(log => ({
           id: log.id,
           status: log.delivery_status,
@@ -82,18 +67,18 @@ export const CommunicationsTab = () => {
       });
     }
   }, [deliveryLogs]);
-
   const testEmailConnection = async () => {
     if (!testEmail) {
       toast.error('Please enter an email address');
       return;
     }
-
     setTestingConnection(true);
     setConnectionStatus(null);
-
     try {
-      const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('smtp-email-sender', {
         body: {
           to: testEmail,
           subject: 'SMTP Connection Test - ' + new Date().toISOString(),
@@ -106,11 +91,9 @@ export const CommunicationsTab = () => {
           text: `SMTP Connection Test - Sent at ${new Date().toLocaleString()}`
         }
       });
-
       if (error) {
         throw error;
       }
-
       setConnectionStatus('success');
       toast.success('Test email sent successfully!');
     } catch (error: any) {
@@ -121,17 +104,16 @@ export const CommunicationsTab = () => {
       setTestingConnection(false);
     }
   };
-
   const processEmailQueue = async () => {
     setProcessingQueue(true);
-    
     try {
-      const { data, error } = await supabase.functions.invoke('process-communication-events');
-      
+      const {
+        data,
+        error
+      } = await supabase.functions.invoke('process-communication-events');
       if (error) {
         throw error;
       }
-
       toast.success(`Processed ${data.processed || 0} emails, ${data.failed || 0} failed`);
     } catch (error: any) {
       console.error('Queue processing error:', error);
@@ -140,45 +122,36 @@ export const CommunicationsTab = () => {
       setProcessingQueue(false);
     }
   };
-
-  const StatCard = ({ title, value, icon: Icon, trend, color = 'default' }: {
+  const StatCard = ({
+    title,
+    value,
+    icon: Icon,
+    trend,
+    color = 'default'
+  }: {
     title: string;
     value: string | number;
     icon: any;
     trend?: string;
     color?: 'default' | 'success' | 'warning' | 'error';
-  }) => (
-    <Card>
+  }) => <Card>
       <CardContent className="p-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-medium text-muted-foreground">{title}</p>
-            <p className={`text-2xl font-bold ${
-              color === 'success' ? 'text-green-600' :
-              color === 'warning' ? 'text-yellow-600' :
-              color === 'error' ? 'text-red-600' : ''
-            }`}>
+            <p className={`text-2xl font-bold ${color === 'success' ? 'text-green-600' : color === 'warning' ? 'text-yellow-600' : color === 'error' ? 'text-red-600' : ''}`}>
               {value}
             </p>
-            {trend && (
-              <p className="text-xs text-muted-foreground flex items-center mt-1">
+            {trend && <p className="text-xs text-muted-foreground flex items-center mt-1">
                 <TrendingUp className="h-3 w-3 mr-1" />
                 {trend}
-              </p>
-            )}
+              </p>}
           </div>
-          <Icon className={`h-8 w-8 ${
-            color === 'success' ? 'text-green-600' :
-            color === 'warning' ? 'text-yellow-600' :
-            color === 'error' ? 'text-red-600' : 'text-muted-foreground'
-          }`} />
+          <Icon className={`h-8 w-8 ${color === 'success' ? 'text-green-600' : color === 'warning' ? 'text-yellow-600' : color === 'error' ? 'text-red-600' : 'text-muted-foreground'}`} />
         </div>
       </CardContent>
-    </Card>
-  );
-
-  return (
-    <div className="space-y-6">
+    </Card>;
+  return <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-medium">Email Management</h3>
@@ -187,11 +160,7 @@ export const CommunicationsTab = () => {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button 
-            onClick={processEmailQueue}
-            disabled={processingQueue}
-            variant="outline"
-          >
+          <Button onClick={processEmailQueue} disabled={processingQueue} variant="outline">
             <Send className="mr-2 h-4 w-4" />
             {processingQueue ? 'Processing...' : 'Process Queue'}
           </Button>
@@ -199,37 +168,12 @@ export const CommunicationsTab = () => {
       </div>
 
       {/* Email Statistics */}
-      {emailStats && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          <StatCard
-            title="Total Emails Sent"
-            value={emailStats.totalSent}
-            icon={Mail}
-            trend="All time"
-          />
-          <StatCard
-            title="Delivered Today"
-            value={emailStats.deliveredToday}
-            icon={CheckCircle}
-            color="success"
-            trend="Today"
-          />
-          <StatCard
-            title="Failed Today"
-            value={emailStats.failedToday}
-            icon={AlertCircle}
-            color={emailStats.failedToday > 0 ? 'error' : 'default'}
-            trend="Today"
-          />
-          <StatCard
-            title="Delivery Rate"
-            value={`${emailStats.deliveryRate}%`}
-            icon={BarChart3}
-            color={emailStats.deliveryRate >= 95 ? 'success' : emailStats.deliveryRate >= 85 ? 'warning' : 'error'}
-            trend="Today"
-          />
-        </div>
-      )}
+      {emailStats && <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <StatCard title="Total Emails Sent" value={emailStats.totalSent} icon={Mail} trend="All time" />
+          <StatCard title="Delivered Today" value={emailStats.deliveredToday} icon={CheckCircle} color="success" trend="Today" />
+          <StatCard title="Failed Today" value={emailStats.failedToday} icon={AlertCircle} color={emailStats.failedToday > 0 ? 'error' : 'default'} trend="Today" />
+          <StatCard title="Delivery Rate" value={`${emailStats.deliveryRate}%`} icon={BarChart3} color={emailStats.deliveryRate >= 95 ? 'success' : emailStats.deliveryRate >= 85 ? 'warning' : 'error'} trend="Today" />
+        </div>}
 
       <Tabs defaultValue="settings" className="space-y-4">
         <TabsList className="grid w-full grid-cols-5">
@@ -257,15 +201,7 @@ export const CommunicationsTab = () => {
 
         <TabsContent value="settings" className="space-y-4">
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Settings className="h-5 w-5" />
-                SMTP Configuration
-              </CardTitle>
-              <CardDescription>
-                Configure your SMTP server settings for sending emails
-              </CardDescription>
-            </CardHeader>
+            
             <CardContent>
               <SMTPSettingsTab />
             </CardContent>
@@ -308,11 +244,7 @@ export const CommunicationsTab = () => {
                   Enhanced processing includes automatic retry for failed emails,
                   rate limiting, and comprehensive error handling for production use.
                 </div>
-                <Button 
-                  onClick={processEmailQueue}
-                  disabled={processingQueue}
-                  className="w-full"
-                >
+                <Button onClick={processEmailQueue} disabled={processingQueue} className="w-full">
                   <Send className="mr-2 h-4 w-4" />
                   {processingQueue ? 'Processing Enhanced Queue...' : 'Process Enhanced Queue'}
                 </Button>
@@ -349,38 +281,19 @@ export const CommunicationsTab = () => {
               <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="test-email">Test Email Address</Label>
-                  <Input
-                    id="test-email"
-                    type="email"
-                    placeholder="your-email@example.com"
-                    value={testEmail}
-                    onChange={(e) => setTestEmail(e.target.value)}
-                  />
+                  <Input id="test-email" type="email" placeholder="your-email@example.com" value={testEmail} onChange={e => setTestEmail(e.target.value)} />
                 </div>
-                <Button 
-                  onClick={testEmailConnection}
-                  disabled={testingConnection || !testEmail}
-                  className="w-full"
-                >
+                <Button onClick={testEmailConnection} disabled={testingConnection || !testEmail} className="w-full">
                   <TestTube className="mr-2 h-4 w-4" />
                   {testingConnection ? 'Sending Test Email...' : 'Send Test Email'}
                 </Button>
 
-                {connectionStatus && (
-                  <Alert className={connectionStatus === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
-                    {connectionStatus === 'success' ? (
-                      <CheckCircle className="h-4 w-4 text-green-600" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 text-red-600" />
-                    )}
+                {connectionStatus && <Alert className={connectionStatus === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+                    {connectionStatus === 'success' ? <CheckCircle className="h-4 w-4 text-green-600" /> : <AlertCircle className="h-4 w-4 text-red-600" />}
                     <AlertDescription className={connectionStatus === 'success' ? 'text-green-800' : 'text-red-800'}>
-                      {connectionStatus === 'success' 
-                        ? 'Test email sent successfully! Check your inbox.'
-                        : 'Test email failed. Please check your SMTP settings.'
-                      }
+                      {connectionStatus === 'success' ? 'Test email sent successfully! Check your inbox.' : 'Test email failed. Please check your SMTP settings.'}
                     </AlertDescription>
-                  </Alert>
-                )}
+                  </Alert>}
               </CardContent>
             </Card>
 
@@ -399,12 +312,7 @@ export const CommunicationsTab = () => {
                   Process queued email events immediately. For production use, 
                   go to the "Email Processing" tab for advanced controls.
                 </div>
-                <Button 
-                  onClick={processEmailQueue}
-                  disabled={processingQueue}
-                  className="w-full"
-                  variant="outline"
-                >
+                <Button onClick={processEmailQueue} disabled={processingQueue} className="w-full" variant="outline">
                   <Send className="mr-2 h-4 w-4" />
                   {processingQueue ? 'Processing Queue...' : 'Quick Process Queue'}
                 </Button>
@@ -433,6 +341,5 @@ export const CommunicationsTab = () => {
           </Card>
         </TabsContent>
       </Tabs>
-    </div>
-  );
+    </div>;
 };

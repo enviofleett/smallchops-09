@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
 import { BrandingTab } from "@/components/settings/BrandingTab";
 import { AdminUserControl } from "@/components/settings/AdminUserControl";
 import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
@@ -10,6 +11,7 @@ import { EmailProcessingTab } from "@/components/settings/EmailProcessingTab";
 import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DeliveryZoneDevTools } from "@/components/settings/DeliveryZoneDevTools";
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 
@@ -1424,6 +1426,11 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                       </div>
                     </div>
                   </div>
+
+                  <Separator className="my-8" />
+                  
+                  {/* Delivery Zone Development Tools */}
+                  <DeliveryZoneDevTools />
 
                 </div>
               </CardContent>

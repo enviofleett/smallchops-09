@@ -143,8 +143,8 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({ data, isLoad
                   <Receipt className="w-4 h-4 text-yellow-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-yellow-900">Tax Revenue</p>
-                  <p className="text-sm text-yellow-600">8% VAT collected</p>
+                  <p className="font-medium text-yellow-900">VAT Revenue</p>
+                  <p className="text-sm text-yellow-600">7.5% VAT collected</p>
                 </div>
               </div>
               <div className="text-right">

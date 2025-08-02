@@ -128,6 +128,8 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
     try {
       const orderData = await placeOrder(checkoutData, cart.items, {
         subtotal: cart.summary.subtotal,
+        subtotal_cost: cart.summary.subtotal_cost,
+        total_vat: cart.summary.total_vat,
         tax_amount: cart.summary.tax_amount,
         delivery_fee: cart.summary.delivery_fee,
         discount_amount: cart.summary.discount_amount,
@@ -178,12 +180,12 @@ export const CheckoutFlow: React.FC<CheckoutFlowProps> = ({ isOpen, onClose }) =
                 <Separator />
                 <div className="space-y-1">
                   <div className="flex justify-between">
-                    <span>Subtotal:</span>
-                    <span>₦{cart.summary.subtotal.toFixed(2)}</span>
+                    <span>Product Cost:</span>
+                    <span>₦{cart.summary.subtotal_cost.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Tax (8%):</span>
-                    <span>₦{cart.summary.tax_amount.toFixed(2)}</span>
+                    <span>VAT (7.5%):</span>
+                    <span>₦{cart.summary.total_vat.toFixed(2)}</span>
                   </div>
                   {checkoutData.order_type === 'delivery' && (
                     <div className="flex justify-between">

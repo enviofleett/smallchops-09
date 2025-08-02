@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { calculateAdvancedOrderDiscount, CartPromotion } from '@/lib/discountCalculations';
+import { calculateCartVATSummary } from '@/lib/vatCalculations';
 import { validatePromotionCode } from '@/api/productsWithDiscounts';
 import { usePromotions } from './usePromotions';
 
@@ -11,12 +12,15 @@ export interface CartItem {
   original_price?: number;
   discount_amount?: number;
   quantity: number;
+  vat_rate?: number;
   customizations?: Record<string, any>;
   special_instructions?: string;
 }
 
 export interface OrderSummary {
   subtotal: number;
+  subtotal_cost: number;
+  total_vat: number;
   tax_amount: number;
   delivery_fee: number;
   discount_amount: number;
@@ -43,6 +47,8 @@ export const useCart = () => {
     items: [],
     summary: {
       subtotal: 0,
+      subtotal_cost: 0,
+      total_vat: 0,
       tax_amount: 0,
       delivery_fee: 0,
       discount_amount: 0,
@@ -78,10 +84,21 @@ export const useCart = () => {
     promotionCode?: string
   ): Cart => {
     const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-    const tax_amount = subtotal * TAX_RATE;
     const itemCount = items.reduce((sum, item) => sum + item.quantity, 0);
 
-    // Calculate promotions using advanced discount calculation
+    // Calculate VAT breakdown
+    const vatSummary = calculateCartVATSummary(
+      items.map(item => ({
+        product_id: item.product_id,
+        product_name: item.product_name,
+        price: item.price,
+        quantity: item.quantity,
+        vat_rate: item.vat_rate || 7.5
+      })),
+      deliveryFee
+    );
+
+    // Calculate promotions using advanced discount calculation (after VAT calculation)
     const promotionResult = calculateAdvancedOrderDiscount(
       items.map(item => ({
         id: item.id,
@@ -98,7 +115,7 @@ export const useCart = () => {
     );
 
     const finalDeliveryFee = deliveryFee - promotionResult.delivery_discount;
-    const total_amount = subtotal + tax_amount + finalDeliveryFee - promotionResult.total_discount;
+    const total_amount = subtotal + finalDeliveryFee - promotionResult.total_discount;
 
     return {
       items: promotionResult.updated_cart_items.map(updatedItem => {
@@ -107,7 +124,9 @@ export const useCart = () => {
       }).filter(Boolean) as CartItem[],
       summary: {
         subtotal: Math.round(subtotal * 100) / 100,
-        tax_amount: Math.round(tax_amount * 100) / 100,
+        subtotal_cost: Math.round(vatSummary.subtotal_cost * 100) / 100,
+        total_vat: Math.round(vatSummary.total_vat * 100) / 100,
+        tax_amount: 0, // Deprecated - VAT replaces this
         delivery_fee: Math.round(deliveryFee * 100) / 100,
         discount_amount: Math.round(promotionResult.total_discount * 100) / 100,
         delivery_discount: Math.round(promotionResult.delivery_discount * 100) / 100,
@@ -125,6 +144,7 @@ export const useCart = () => {
     price: number;
     original_price?: number;
     discount_amount?: number;
+    vat_rate?: number;
     customizations?: Record<string, any>;
     special_instructions?: string;
   }, quantity = 1) => {
@@ -136,6 +156,7 @@ export const useCart = () => {
       original_price: product.original_price,
       discount_amount: product.discount_amount,
       quantity,
+      vat_rate: product.vat_rate || 7.5,
       customizations: product.customizations,
       special_instructions: product.special_instructions
     };
@@ -166,6 +187,8 @@ export const useCart = () => {
       items: [],
       summary: {
         subtotal: 0,
+        subtotal_cost: 0,
+        total_vat: 0,
         tax_amount: 0,
         delivery_fee: 0,
         discount_amount: 0,

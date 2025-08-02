@@ -23,6 +23,8 @@ export const useOrderManagement = () => {
     items: CartItem[],
     summary: {
       subtotal: number;
+      subtotal_cost: number;
+      total_vat: number;
       tax_amount: number;
       delivery_fee: number;
       discount_amount: number;

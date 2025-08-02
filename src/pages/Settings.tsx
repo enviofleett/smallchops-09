@@ -12,6 +12,7 @@ import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { DeliveryZoneDevTools } from "@/components/settings/DeliveryZoneDevTools";
+import { AuthenticationEndpointsTab } from "@/components/settings/AuthenticationEndpointsTab";
 import RegistrationHealth from "./RegistrationHealth";
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
@@ -237,11 +238,16 @@ if (!signupData.phone || signupData.phone.trim().length < 10) {
 
 
         {isAdmin && <TabsContent value="developer" className="space-y-6">
-            <Tabs defaultValue="oauth" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-2">
+            <Tabs defaultValue="auth-endpoints" className="space-y-6">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="auth-endpoints">Auth API</TabsTrigger>
                 <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
                 <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
               </TabsList>
+              
+              <TabsContent value="auth-endpoints">
+                <AuthenticationEndpointsTab />
+              </TabsContent>
               
               <TabsContent value="oauth">
                 <Card>

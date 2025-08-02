@@ -166,7 +166,7 @@ export const addCustomerAddress = async (address: Omit<CustomerAddress, 'id' | '
     }
   });
 
-  return data;
+  return data as CustomerAddress;
 };
 
 export const updateCustomerAddress = async (addressId: string, updates: Partial<CustomerAddress>): Promise<CustomerAddress> => {
@@ -191,7 +191,7 @@ export const updateCustomerAddress = async (addressId: string, updates: Partial<
     .single();
 
   if (error) throw new Error(error.message);
-  return data;
+  return data as CustomerAddress;
 };
 
 export const deleteCustomerAddress = async (addressId: string): Promise<void> => {

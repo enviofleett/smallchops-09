@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-import { useOTPAuth } from '@/hooks/useOTPAuth';
+import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
 import { useToast } from '@/hooks/use-toast';
 import AuthLayout from '@/components/auth/AuthLayout';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
@@ -17,25 +15,31 @@ import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader2 } from 'lucide
 type AuthMode = 'admin' | 'customer';
 type AuthView = 'login' | 'register' | 'forgot-password' | 'otp-verification';
 
-const AuthPage = () => {
+const UnifiedAuthPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Auth hooks
-  const { login: adminLogin, signUp: adminSignUp, signUpWithGoogle, resetPassword, isLoading: adminLoading } = useAuth();
-  const { customerAccount, isLoading: customerLoading } = useCustomerAuth();
-  const { sendOTP, verifyRegistrationOTP, loginWithOTP, completeOTPLogin, isLoading: otpLoading } = useOTPAuth();
+  // Unified auth hook
+  const {
+    isLoading,
+    isOTPRequired,
+    otpEmail,
+    otpPurpose,
+    customerAccount,
+    login,
+    register,
+    completeOTPVerification,
+    handleGoogleAuth,
+    cancelOTP
+  } = useUnifiedAuth();
 
   // State
   const [mode, setMode] = useState<AuthMode>('customer');
   const [view, setView] = useState<AuthView>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [otpEmail, setOtpEmail] = useState('');
-  const [otpPurpose, setOtpPurpose] = useState<'login' | 'registration'>('login');
   const [showValidation, setShowValidation] = useState(false);
-  const [tempRegistrationData, setTempRegistrationData] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -44,8 +48,6 @@ const AuthPage = () => {
     name: '',
     phone: ''
   });
-
-  const isLoading = adminLoading || customerLoading || otpLoading;
 
   // Initialize from URL params
   useEffect(() => {
@@ -67,6 +69,13 @@ const AuthPage = () => {
       navigate('/customer-portal');
     }
   }, [customerAccount, navigate]);
+
+  // Handle OTP requirement
+  useEffect(() => {
+    if (isOTPRequired) {
+      setView('otp-verification');
+    }
+  }, [isOTPRequired]);
 
   const handleInputChange = (field: string, value: string) => {
     if (field === 'phone') {
@@ -113,25 +122,10 @@ const AuthPage = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    try {
-      if (mode === 'admin') {
-        await adminLogin({ email: formData.email, password: formData.password });
-        navigate('/');
-      } else {
-        // Customer login - use OTP flow
-        const result = await loginWithOTP(formData.email);
-        if (result.success) {
-          setOtpEmail(formData.email);
-          setOtpPurpose('login');
-          setView('otp-verification');
-        }
-      }
-    } catch (error: any) {
-      toast({
-        title: "Login failed",
-        description: error.message || "Please check your credentials and try again.",
-        variant: "destructive"
-      });
+    const result = await login(formData.email, formData.password, mode);
+    
+    if (result.success && 'redirect' in result && result.redirect) {
+      navigate(result.redirect);
     }
   };
 
@@ -140,102 +134,58 @@ const AuthPage = () => {
     
     if (!validateForm()) return;
 
-    try {
-      if (mode === 'admin') {
-        await adminSignUp({
-          email: formData.email,
-          password: formData.password,
-          name: formData.name
-        });
-        toast({
-          title: "Registration successful!",
-          description: "Please check your email for verification.",
-        });
-        setView('login');
-      } else {
-        // Customer registration - start OTP flow
-        const result = await sendOTP(formData.email, 'registration', formData.name);
-        if (result.success) {
-          setTempRegistrationData(formData);
-          setOtpEmail(formData.email);
-          setOtpPurpose('registration');
-          setView('otp-verification');
-        }
+    const result = await register({
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+      phone: formData.phone
+    }, mode);
+
+    if (result.success && 'requiresEmailVerification' in result && result.requiresEmailVerification) {
+      setView('login');
+    }
+  };
+
+  const handleOTPVerification = async (result: { success: boolean; code?: string }) => {
+    if (result.success && result.code) {
+      const verificationResult = await completeOTPVerification(result.code);
+      
+      if (verificationResult.success && 'redirect' in verificationResult && verificationResult.redirect) {
+        navigate(verificationResult.redirect);
       }
-    } catch (error: any) {
-      toast({
-        title: "Registration failed",
-        description: error.message || "Please try again.",
-        variant: "destructive"
-      });
     }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    try {
-      await resetPassword(formData.email);
-      toast({
-        title: "Reset email sent",
-        description: "Please check your email for password reset instructions.",
-      });
-      setView('login');
-    } catch (error: any) {
-      toast({
-        title: "Reset failed",
-        description: error.message || "Please try again.",
-        variant: "destructive"
-      });
-    }
+    // This would use the existing password reset flow
+    toast({
+      title: "Feature coming soon",
+      description: "Password reset will be implemented with OTP verification.",
+    });
   };
 
-  const handleOTPVerification = async (code: string) => {
-    try {
-      if (otpPurpose === 'login') {
-        const result = await completeOTPLogin(otpEmail, code);
-        if (result.success) {
-          navigate('/customer-portal');
-        } else {
-          toast({
-            title: "Verification failed",
-            description: "Invalid or expired code. Please try again.",
-            variant: "destructive"
-          });
-        }
-      } else if (otpPurpose === 'registration') {
-        const result = await verifyRegistrationOTP(otpEmail, code);
-        if (result.success) {
-          // Complete customer registration
-          await adminSignUp({
-            email: formData.email,
-            password: formData.password,
-            name: formData.name,
-            phone: formData.phone
-          });
-          
-          toast({
-            title: "Registration successful!",
-            description: "Welcome! Your account has been created.",
-          });
-          
-          // Navigate to customer portal
-          navigate('/customer-portal');
-        } else {
-          toast({
-            title: "Verification failed",
-            description: "Invalid or expired code. Please try again.",
-            variant: "destructive"
-          });
-        }
-      }
-    } catch (error: any) {
-      toast({
-        title: "Verification failed",
-        description: error.message || "Please try again.",
-        variant: "destructive"
-      });
+  const handleBackFromOTP = () => {
+    cancelOTP();
+    setView(otpPurpose === 'registration' ? 'register' : 'login');
+  };
+
+  const getTitle = () => {
+    if (view === 'otp-verification') {
+      return 'Verify Your Email';
     }
+    return view === 'login' ? 'Welcome back' : view === 'register' ? 'Create account' : 'Reset password';
+  };
+
+  const getSubtitle = () => {
+    if (view === 'otp-verification') {
+      return `Check your email for the verification code`;
+    }
+    return view === 'login' 
+      ? `Sign in to your ${mode} account` 
+      : view === 'register' 
+      ? `Create your ${mode} account`
+      : 'Enter your email to reset your password';
   };
 
   const renderModeSelector = () => (
@@ -310,9 +260,12 @@ const AuthPage = () => {
       </div>
 
       <GoogleAuthButton 
-        onGoogleAuth={mode === 'customer' ? signUpWithGoogle : async () => {}} 
+        onGoogleAuth={async () => {
+          await handleGoogleAuth();
+        }} 
         isLoading={isLoading} 
-        text={mode === 'customer' ? "Continue with Google" : "Google Auth (Admin)"}
+        text="Continue with Google"
+        mode="login"
       />
 
       <div className="flex justify-between text-sm">
@@ -473,9 +426,12 @@ const AuthPage = () => {
       </div>
 
       <GoogleAuthButton 
-        onGoogleAuth={mode === 'customer' ? signUpWithGoogle : async () => {}} 
+        onGoogleAuth={async () => {
+          await handleGoogleAuth();
+        }} 
         isLoading={isLoading} 
-        text={mode === 'customer' ? "Sign up with Google" : "Google Auth (Admin)"}
+        text="Sign up with Google"
+        mode="register"
       />
 
       <div className="text-center">
@@ -511,7 +467,7 @@ const AuthPage = () => {
 
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Send Reset Email
+        Send Reset Code
       </Button>
 
       <div className="text-center">
@@ -528,65 +484,35 @@ const AuthPage = () => {
   );
 
   const renderOTPVerification = () => (
-    <div className="space-y-4">
-      <div className="text-center">
-        <h3 className="text-lg font-semibold">Check your email</h3>
-        <p className="text-sm text-muted-foreground">
-          We sent a verification code to {otpEmail}
-        </p>
-      </div>
-
-      <OTPInput 
-        email={otpEmail}
-        purpose={otpPurpose}
-        customerName={otpPurpose === 'registration' ? formData.name : undefined}
-        onVerified={async (result) => {
-          await handleOTPVerification(result.code || '');
-        }}
-        onBack={() => {
-          setView(otpPurpose === 'registration' ? 'register' : 'login');
-          setOtpEmail('');
-          setTempRegistrationData(null);
-        }}
-      />
-
-      <div className="text-center">
-        <button
-          type="button"
-          onClick={() => setView('login')}
-          className="text-sm text-primary hover:underline flex items-center justify-center space-x-1"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back to login</span>
-        </button>
-      </div>
-    </div>
+    <OTPInput 
+      email={otpEmail}
+      purpose={otpPurpose || 'login'}
+      customerName={otpPurpose === 'registration' ? formData.name : undefined}
+      onVerified={handleOTPVerification}
+      onBack={handleBackFromOTP}
+    />
   );
 
-  const getTitle = () => {
-    if (view === 'otp-verification') return 'Email Verification';
-    if (view === 'forgot-password') return 'Reset Password';
-    if (view === 'register') return `Create ${mode} Account`;
-    return mode === 'admin' ? 'Admin Login' : 'Customer Login';
-  };
+  const renderCurrentView = () => {
+    if (view === 'otp-verification') {
+      return renderOTPVerification();
+    }
 
-  const getSubtitle = () => {
-    if (view === 'otp-verification') return 'Enter the code we sent to your email';
-    if (view === 'forgot-password') return 'Enter your email to reset your password';
-    if (view === 'register') return `Join Starters ${mode === 'admin' ? 'Administration' : 'Community'}`;
-    return 'Welcome back to Starters';
+    return (
+      <>
+        {renderModeSelector()}
+        {view === 'login' && renderLoginForm()}
+        {view === 'register' && renderRegisterForm()}
+        {view === 'forgot-password' && renderForgotPasswordForm()}
+      </>
+    );
   };
 
   return (
     <AuthLayout title={getTitle()} subtitle={getSubtitle()}>
-      {view !== 'otp-verification' && renderModeSelector()}
-      
-      {view === 'login' && renderLoginForm()}
-      {view === 'register' && renderRegisterForm()}
-      {view === 'forgot-password' && renderForgotPasswordForm()}
-      {view === 'otp-verification' && renderOTPVerification()}
+      {renderCurrentView()}
     </AuthLayout>
   );
 };
 
-export default AuthPage;
+export default UnifiedAuthPage;

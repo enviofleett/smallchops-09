@@ -7,21 +7,30 @@ interface GoogleAuthButtonProps {
   isLoading: boolean;
   text?: string;
   variant?: "default" | "outline" | "secondary" | "ghost" | "link" | "destructive";
+  mode?: 'login' | 'register';
+  disabled?: boolean;
 }
 
 const GoogleAuthButton = ({ 
   onGoogleAuth, 
   isLoading, 
   text = "Continue with Google",
-  variant = "outline" 
+  variant = "outline",
+  mode = 'login',
+  disabled = false
 }: GoogleAuthButtonProps) => {
+  
+  const handleClick = async () => {
+    if (disabled || isLoading) return;
+    await onGoogleAuth();
+  };
   return (
     <Button
       type="button"
       variant={variant}
       className="w-full"
-      onClick={onGoogleAuth}
-      disabled={isLoading}
+      onClick={handleClick}
+      disabled={isLoading || disabled}
     >
       {isLoading ? (
         <Loader2 className="mr-2 h-4 w-4 animate-spin" />

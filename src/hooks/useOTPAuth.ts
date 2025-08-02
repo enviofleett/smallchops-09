@@ -128,12 +128,41 @@ export const useOTPAuth = () => {
     return await verifyOTP(email, code, 'password_reset');
   };
 
+  const registerWithOTP = async (email: string, name: string, phone?: string) => {
+    // Step 1: Send OTP for registration
+    const sendResult = await sendOTP(email, 'registration', name);
+    if (!sendResult.success) {
+      return sendResult;
+    }
+
+    // Return success - the component will handle OTP input and completion
+    return { success: true, otpSent: true };
+  };
+
+  const completeOTPRegistration = async (
+    email: string, 
+    code: string, 
+    registrationData: { name: string; password: string; phone?: string }
+  ) => {
+    // Step 2: Verify OTP 
+    const verifyResult = await verifyOTP(email, code, 'registration');
+    
+    if (!verifyResult.success) {
+      return verifyResult;
+    }
+
+    // OTP verified, ready for account creation by parent component
+    return { success: true, verified: true, ...verifyResult };
+  };
+
   return {
     isLoading,
     sendOTP,
     verifyOTP,
     loginWithOTP,
     completeOTPLogin,
+    registerWithOTP,
+    completeOTPRegistration,
     verifyRegistrationOTP,
     resetPasswordWithOTP,
     verifyPasswordResetOTP

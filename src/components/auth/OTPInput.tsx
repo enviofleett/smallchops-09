@@ -8,7 +8,7 @@ interface OTPInputProps {
   email: string;
   purpose: 'login' | 'registration' | 'password_reset';
   customerName?: string;
-  onVerified: (result: any) => void;
+  onVerified: (result: { success: boolean; code?: string; [key: string]: any }) => void;
   onBack?: () => void;
 }
 
@@ -141,7 +141,7 @@ export const OTPInput: React.FC<OTPInputProps> = ({
         description: "Your email has been verified successfully.",
       });
 
-      onVerified(data);
+      onVerified({ success: true, code: otp, ...data });
       
     } catch (error: any) {
       console.error('Error verifying OTP:', error);

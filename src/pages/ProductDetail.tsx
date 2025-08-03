@@ -183,11 +183,11 @@ const ProductDetail = () => {
       <div className="container mx-auto px-4 py-8">
         {/* Product Main Section */}
         <div className="grid lg:grid-cols-2 gap-12 mb-12">
-          {/* Product Image */}
+          {/* Product Image - Reduced by 20% */}
           <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-lg bg-gray-100">
+            <div className="aspect-square overflow-hidden rounded-lg bg-gray-100 w-4/5 mx-auto">
               <img
-                src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=600&h=600&fit=crop'}
+                src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=480&h=480&fit=crop'}
                 alt={product.name}
                 className="w-full h-full object-cover hover:scale-105 transition-transform"
               />
@@ -278,6 +278,44 @@ const ProductDetail = () => {
                   size="lg"
                 />
               </div>
+
+              {/* Delivery Location Selection - Moved under Add to Cart */}
+              <div className="space-y-4 border-t pt-4">
+                <h3 className="text-sm font-semibold flex items-center">
+                  <MapPin className="h-4 w-4 mr-2 text-red-500" />
+                  Select Delivery Location
+                </h3>
+                <div className="grid md:grid-cols-3 gap-3">
+                  <Select value={selectedState} onValueChange={setSelectedState}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select State" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="lagos">Lagos</SelectItem>
+                      <SelectItem value="abuja">Abuja</SelectItem>
+                      <SelectItem value="ogun">Ogun</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Select value={selectedCity} onValueChange={setSelectedCity}>
+                    <SelectTrigger className="h-9">
+                      <SelectValue placeholder="Select City" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="ikeja">Ikeja</SelectItem>
+                      <SelectItem value="lekki">Lekki</SelectItem>
+                      <SelectItem value="victoria-island">Victoria Island</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  
+                  <Input 
+                    placeholder="Enter full address"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    className="h-9"
+                  />
+                </div>
+              </div>
             </div>
 
             {/* Social Sharing */}
@@ -320,67 +358,6 @@ const ProductDetail = () => {
             </div>
           </div>
         </div>
-
-        {/* Location Selection */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4 flex items-center">
-              <MapPin className="h-5 w-5 mr-2 text-red-500" />
-              Select Delivery Location
-            </h3>
-            <div className="grid md:grid-cols-3 gap-4">
-              <Select value={selectedState} onValueChange={setSelectedState}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select State" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="lagos">Lagos</SelectItem>
-                  <SelectItem value="abuja">Abuja</SelectItem>
-                  <SelectItem value="ogun">Ogun</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Select value={selectedCity} onValueChange={setSelectedCity}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select City" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ikeja">Ikeja</SelectItem>
-                  <SelectItem value="lekki">Lekki</SelectItem>
-                  <SelectItem value="victoria-island">Victoria Island</SelectItem>
-                </SelectContent>
-              </Select>
-              
-              <Input 
-                placeholder="Enter full address"
-                value={address}
-                onChange={(e) => setAddress(e.target.value)}
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Contact Section */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Phone className="h-5 w-5 text-red-500" />
-                <div>
-                  <h3 className="font-semibold">Need Help?</h3>
-                  <p className="text-sm text-muted-foreground">Call us for quick orders</p>
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="font-bold text-lg">+234 808 123 4567</p>
-                <Button variant="outline" size="sm" className="mt-1">
-                  <MessageCircle className="h-4 w-4 mr-1" />
-                  Chat Now
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
 
         {/* Reviews Section */}
         <Card className="mb-8">

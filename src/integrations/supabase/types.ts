@@ -2233,54 +2233,6 @@ export type Database = {
         }
         Relationships: []
       }
-      email_otp_verification: {
-        Row: {
-          attempts: number
-          code: string
-          created_at: string
-          email: string
-          expires_at: string
-          id: string
-          ip_address: unknown | null
-          max_attempts: number
-          purpose: string
-          updated_at: string
-          user_agent: string | null
-          verified: boolean
-          verified_at: string | null
-        }
-        Insert: {
-          attempts?: number
-          code: string
-          created_at?: string
-          email: string
-          expires_at: string
-          id?: string
-          ip_address?: unknown | null
-          max_attempts?: number
-          purpose: string
-          updated_at?: string
-          user_agent?: string | null
-          verified?: boolean
-          verified_at?: string | null
-        }
-        Update: {
-          attempts?: number
-          code?: string
-          created_at?: string
-          email?: string
-          expires_at?: string
-          id?: string
-          ip_address?: unknown | null
-          max_attempts?: number
-          purpose?: string
-          updated_at?: string
-          user_agent?: string | null
-          verified?: boolean
-          verified_at?: string | null
-        }
-        Relationships: []
-      }
       email_processing_metrics: {
         Row: {
           average_processing_time: number | null

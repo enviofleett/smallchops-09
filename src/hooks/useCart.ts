@@ -147,38 +147,52 @@ export const useCart = () => {
     customizations?: Record<string, any>;
     special_instructions?: string;
   }, quantity = 1) => {
-    // Check if product already exists in cart
-    const existingItemIndex = cart.items.findIndex(item => item.product_id === product.id);
+    console.log('🛒 addItem called with:', { product, quantity });
+    console.log('🛒 Current cart state:', cart);
     
-    let updatedItems: CartItem[];
-    
-    if (existingItemIndex >= 0) {
-      // Product exists, update quantity
-      updatedItems = cart.items.map((item, index) => 
-        index === existingItemIndex 
-          ? { ...item, quantity: item.quantity + quantity }
-          : item
-      );
-    } else {
-      // New product, add to cart
-      const newItem: CartItem = {
-        id: `${product.id}_${Date.now()}`,
-        product_id: product.id,
-        product_name: product.name,
-        price: product.price,
-        original_price: product.original_price,
-        discount_amount: product.discount_amount,
-        quantity,
-        vat_rate: product.vat_rate || 7.5,
-        image_url: product.image_url,
-        customizations: product.customizations,
-        special_instructions: product.special_instructions
-      };
-      updatedItems = [...cart.items, newItem];
+    try {
+      // Check if product already exists in cart
+      const existingItemIndex = cart.items.findIndex(item => item.product_id === product.id);
+      console.log('🛒 Existing item index:', existingItemIndex);
+      
+      let updatedItems: CartItem[];
+      
+      if (existingItemIndex >= 0) {
+        // Product exists, update quantity
+        console.log('🛒 Updating existing item quantity');
+        updatedItems = cart.items.map((item, index) => 
+          index === existingItemIndex 
+            ? { ...item, quantity: item.quantity + quantity }
+            : item
+        );
+      } else {
+        // New product, add to cart
+        console.log('🛒 Adding new item to cart');
+        const newItem: CartItem = {
+          id: `${product.id}_${Date.now()}`,
+          product_id: product.id,
+          product_name: product.name,
+          price: product.price,
+          original_price: product.original_price,
+          discount_amount: product.discount_amount,
+          quantity,
+          vat_rate: product.vat_rate || 7.5,
+          image_url: product.image_url,
+          customizations: product.customizations,
+          special_instructions: product.special_instructions
+        };
+        console.log('🛒 New item created:', newItem);
+        updatedItems = [...cart.items, newItem];
+      }
+      
+      console.log('🛒 Updated items:', updatedItems);
+      const newCart = calculateCartSummary(updatedItems, cart.summary.delivery_fee, cart.promotion_code);
+      console.log('🛒 New cart calculated:', newCart);
+      setCart(newCart);
+      console.log('🛒 Cart state updated successfully');
+    } catch (error) {
+      console.error('🛒 Error in addItem:', error);
     }
-    
-    const newCart = calculateCartSummary(updatedItems, cart.summary.delivery_fee, cart.promotion_code);
-    setCart(newCart);
   };
 
   const removeItem = (cartItemId: string) => {

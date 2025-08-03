@@ -14,28 +14,17 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader2, Shield, Users } from 'lucide-react';
 
-type AuthView = 'customer-login' | 'customer-register' | 'otp-verification' | 'admin-login' | 'forgot-password';
-type AuthMode = 'customer' | 'admin';
+type AuthView = 'customer-login' | 'customer-register' | 'otp-verification' | 'forgot-password';
 
 const AuthPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Determine auth mode from URL params
-  const [authMode, setAuthMode] = useState<AuthMode>(() => {
-    const mode = searchParams.get('mode');
-    return mode === 'admin' ? 'admin' : 'customer';
-  });
+  // Customer-only authentication page
+  const [view, setView] = useState<AuthView>('customer-login');
   
-  // Set initial view based on mode
-  const [view, setView] = useState<AuthView>(() => {
-    const mode = searchParams.get('mode');
-    return mode === 'admin' ? 'admin-login' : 'customer-login';
-  });
-  
-  // Auth hooks - separated by type
-  const { login: adminLogin, isLoading: isAdminLoading } = useAuth();
+  // Customer authentication hooks only
   const { login: customerLogin, signUpWithGoogle, isLoading: isCustomerLoading } = useCustomerDirectAuth();
   const { 
     initiateRegistration, 
@@ -69,13 +58,13 @@ const AuthPage = () => {
     phone?: string;
   } | null>(null);
 
-  // Update view when auth mode changes
+  // Redirect admins to dedicated admin auth page
   useEffect(() => {
     const mode = searchParams.get('mode');
-    const newAuthMode: AuthMode = mode === 'admin' ? 'admin' : 'customer';
-    setAuthMode(newAuthMode);
-    setView(newAuthMode === 'admin' ? 'admin-login' : 'customer-login');
-  }, [searchParams]);
+    if (mode === 'admin') {
+      navigate('/admin/auth', { replace: true });
+    }
+  }, [searchParams, navigate]);
 
   // Handle registration step changes
   useEffect(() => {
@@ -92,7 +81,6 @@ const AuthPage = () => {
   }, [registrationStep, registrationEmail, toast]);
 
   const getCurrentLoadingState = () => {
-    if (view === 'admin-login') return isAdminLoading;
     if (view === 'customer-login') return isCustomerLoading;
     if (view === 'customer-register' || view === 'otp-verification') return isRegistrationLoading;
     if (view === 'forgot-password') return isPasswordResetLoading;
@@ -140,15 +128,6 @@ const AuthPage = () => {
     return true;
   };
 
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const result = await adminLogin({ email: formData.email, password: formData.password });
-    
-    if (result.success && result.redirect) {
-      navigate(result.redirect);
-    }
-  };
 
   const handleCustomerLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -242,7 +221,7 @@ const AuthPage = () => {
     const result = await sendPasswordReset(formData.email);
     
     if (result.success) {
-      setView(authMode === 'admin' ? 'admin-login' : 'customer-login');
+      setView('customer-login');
     }
   };
 
@@ -250,41 +229,9 @@ const AuthPage = () => {
     await signUpWithGoogle();
   };
 
-  const renderModeSelector = () => (
-    <div className="flex flex-col space-y-3 mb-6">
-      <div className="flex space-x-2">
-        <Button
-          type="button"
-          variant={authMode === 'customer' ? 'default' : 'outline'}
-          className="flex-1"
-          onClick={() => {
-            setAuthMode('customer');
-            setView('customer-login');
-            navigate('/auth?mode=customer');
-          }}
-        >
-          <Users className="mr-2 h-4 w-4" />
-          Customer
-        </Button>
-        <Button
-          type="button"
-          variant={authMode === 'admin' ? 'default' : 'outline'}
-          className="flex-1"
-          onClick={() => {
-            setAuthMode('admin');
-            setView('admin-login');
-            navigate('/auth?mode=admin');
-          }}
-        >
-          <Shield className="mr-2 h-4 w-4" />
-          Admin
-        </Button>
-      </div>
-    </div>
-  );
 
   const renderLoginForm = () => (
-    <form onSubmit={view === 'admin-login' ? handleAdminLogin : handleCustomerLogin} className="space-y-4">
+    <form onSubmit={handleCustomerLogin} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <div className="relative">
@@ -334,35 +281,29 @@ const AuthPage = () => {
         Sign In
       </Button>
 
-      {authMode === 'customer' && (
-        <>
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-            </div>
-          </div>
+      <div className="relative">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t" />
+        </div>
+        <div className="relative flex justify-center text-xs uppercase">
+          <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+        </div>
+      </div>
 
-          <GoogleAuthButton 
-            onGoogleAuth={handleGoogleAuth} 
-            isLoading={getCurrentLoadingState()} 
-            text="Continue with Google"
-          />
-        </>
-      )}
+      <GoogleAuthButton 
+        onGoogleAuth={handleGoogleAuth} 
+        isLoading={getCurrentLoadingState()} 
+        text="Continue with Google"
+      />
 
       <div className="flex justify-between text-sm">
-        {authMode === 'customer' && (
-          <button
-            type="button"
-            onClick={() => setView('customer-register')}
-            className="text-primary hover:underline"
-          >
-            Create account
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setView('customer-register')}
+          className="text-primary hover:underline"
+        >
+          Create account
+        </button>
         <button
           type="button"
           onClick={() => setView('forgot-password')}
@@ -624,7 +565,7 @@ const AuthPage = () => {
       <div className="text-center">
         <button
           type="button"
-          onClick={() => setView(authMode === 'admin' ? 'admin-login' : 'customer-login')}
+          onClick={() => setView('customer-login')}
           className="text-sm text-primary hover:underline flex items-center justify-center space-x-1"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -637,7 +578,6 @@ const AuthPage = () => {
   const getTitle = () => {
     switch (view) {
       case 'customer-login': return 'Welcome back';
-      case 'admin-login': return 'Admin Login';
       case 'customer-register': return 'Create account';
       case 'otp-verification': return 'Verify your email';
       case 'forgot-password': return 'Reset password';
@@ -648,7 +588,6 @@ const AuthPage = () => {
   const getSubtitle = () => {
     switch (view) {
       case 'customer-login': return 'Sign in to your customer account';
-      case 'admin-login': return 'Access admin dashboard';
       case 'customer-register': return 'Create your customer account';
       case 'otp-verification': return 'Enter the verification code sent to your email';
       case 'forgot-password': return 'Enter your email to reset your password';
@@ -658,18 +597,15 @@ const AuthPage = () => {
 
   return (
     <AuthLayout title={getTitle()} subtitle={getSubtitle()}>
-      {/* Mode selector - only show if not in OTP verification flow */}
-      {view !== 'otp-verification' && renderModeSelector()}
-      
-      {/* Auth mode indicator */}
-      <div className="flex justify-center mb-4">
-        <Badge variant={authMode === 'admin' ? 'default' : 'secondary'}>
-          {authMode === 'admin' ? 'Admin Portal' : 'Customer Portal'}
+      {/* Customer Portal Badge */}
+      <div className="flex justify-center mb-6">
+        <Badge variant="secondary" className="px-4 py-1">
+          Customer Portal
         </Badge>
       </div>
 
       {/* Render appropriate form */}
-      {(view === 'customer-login' || view === 'admin-login') && renderLoginForm()}
+      {view === 'customer-login' && renderLoginForm()}
       {view === 'customer-register' && renderCustomerRegisterForm()}
       {view === 'otp-verification' && renderOTPVerificationForm()}
       {view === 'forgot-password' && renderForgotPasswordForm()}

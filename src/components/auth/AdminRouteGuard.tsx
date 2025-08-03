@@ -12,7 +12,7 @@ interface AdminRouteGuardProps {
 const AdminRouteGuard = ({ 
   children, 
   requiredRole,
-  fallbackPath = '/auth?mode=admin'
+  fallbackPath = '/admin/auth'
 }: AdminRouteGuardProps) => {
   const location = useLocation();
   const { user, userType, isAuthenticated, isLoading } = useAuth();

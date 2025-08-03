@@ -34,7 +34,7 @@ const ProtectedRoute = ({
 
   // Strict separation: Only allow admin users for protected routes
   if (!isAuthenticated || userType !== 'admin' || !user) {
-    return <Navigate to="/auth?mode=admin" replace />;
+    return <Navigate to="/admin/auth" replace />;
   }
 
   // Check role-based access (legacy)

@@ -34,6 +34,7 @@ import AdminSetup from "./pages/AdminSetup";
 import CustomerRegister from "./pages/CustomerRegister";
 import CustomerProfile from "./pages/CustomerProfile";
 import AuthPage from "./pages/AuthPage";
+import AdminAuth from "./pages/admin/AdminAuth";
 import AuthRouter from "./components/auth/AuthRouter";
 import Cart from "./pages/Cart";
 import Booking from "./pages/Booking";
@@ -63,15 +64,18 @@ const App = () => (
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/category/:categoryId" element={<CategoryProducts />} />
               
-              {/* Authentication routes - customer only */}
+              {/* Authentication routes */}
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/auth-callback" element={<AuthCallback />} />
               <Route path="/auth/verify" element={<EmailVerificationPage />} />
               <Route path="/auth/reset" element={<PasswordResetPage />} />
               
+              {/* Admin authentication */}
+              <Route path="/admin/auth" element={<AdminAuth />} />
+              
               {/* Legacy redirects */}
               <Route path="/login" element={<Navigate to="/auth" replace />} />
-              <Route path="/admin/login" element={<Navigate to="/auth?mode=admin" replace />} />
+              <Route path="/admin/login" element={<Navigate to="/admin/auth" replace />} />
               <Route path="/register" element={<Navigate to="/auth?view=register" replace />} />
               
               {/* Customer routes */}

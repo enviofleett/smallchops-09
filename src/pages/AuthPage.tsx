@@ -99,7 +99,7 @@ const AuthPage = () => {
     
     const result = await login(formData.email, formData.password);
     
-    if (result.success && result.redirect) {
+    if (result.success && 'redirect' in result && result.redirect) {
       navigate(result.redirect);
     }
   };
@@ -117,13 +117,13 @@ const AuthPage = () => {
     });
 
     if (result.success) {
-      if (result.requiresEmailVerification) {
+      if ('requiresEmailVerification' in result && result.requiresEmailVerification) {
         toast({
           title: "Registration successful!",
           description: "Please check your email to verify your account.",
         });
         setView('login');
-      } else if (result.redirect) {
+      } else if ('redirect' in result && result.redirect) {
         navigate(result.redirect);
       }
     }
@@ -141,7 +141,6 @@ const AuthPage = () => {
   const handleGoogleAuth = async () => {
     await signUpWithGoogle();
   };
-
 
   const renderLoginForm = () => (
     <form onSubmit={handleLogin} className="space-y-4">
@@ -419,64 +418,23 @@ const AuthPage = () => {
     </form>
   );
 
-  const renderOTPVerification = () => (
-    <div className="space-y-4">
-      <div className="text-center">
-        <h3 className="text-lg font-semibold">Check your email</h3>
-        <p className="text-sm text-muted-foreground">
-          We sent a verification code to {otpEmail}
-        </p>
-      </div>
-
-      <OTPInput 
-        email={otpEmail}
-        purpose={otpPurpose}
-        customerName={otpPurpose === 'registration' ? formData.name : undefined}
-        onVerified={async (result) => {
-          await handleOTPVerification(result.code || '');
-        }}
-        onBack={() => {
-          setView(otpPurpose === 'registration' ? 'register' : 'login');
-          setOtpEmail('');
-          setTempRegistrationData(null);
-        }}
-      />
-
-      <div className="text-center">
-        <button
-          type="button"
-          onClick={() => setView('login')}
-          className="text-sm text-primary hover:underline flex items-center justify-center space-x-1"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          <span>Back to login</span>
-        </button>
-      </div>
-    </div>
-  );
-
   const getTitle = () => {
-    if (view === 'otp-verification') return 'Email Verification';
-    if (view === 'forgot-password') return 'Reset Password';
-    if (view === 'register') return `Create ${mode} Account`;
-    return mode === 'admin' ? 'Admin Login' : 'Customer Login';
+    return view === 'login' ? 'Welcome back' : view === 'register' ? 'Create account' : 'Reset password';
   };
 
   const getSubtitle = () => {
-    if (view === 'otp-verification') return 'Enter the code we sent to your email';
-    if (view === 'forgot-password') return 'Enter your email to reset your password';
-    if (view === 'register') return `Join Starters ${mode === 'admin' ? 'Administration' : 'Community'}`;
-    return 'Welcome back to Starters';
+    return view === 'login' 
+      ? 'Sign in to your customer account' 
+      : view === 'register' 
+      ? 'Create your customer account'
+      : 'Enter your email to reset your password';
   };
 
   return (
     <AuthLayout title={getTitle()} subtitle={getSubtitle()}>
-      {view !== 'otp-verification' && renderModeSelector()}
-      
       {view === 'login' && renderLoginForm()}
       {view === 'register' && renderRegisterForm()}
       {view === 'forgot-password' && renderForgotPasswordForm()}
-      {view === 'otp-verification' && renderOTPVerification()}
     </AuthLayout>
   );
 };

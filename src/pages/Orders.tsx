@@ -13,6 +13,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { useToast } from '@/hooks/use-toast';
 import AbandonedCartsManager from '@/components/admin/AbandonedCartsManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import OrdersErrorBoundary from '@/components/orders/OrdersErrorBoundary';
 
 const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
@@ -162,94 +163,96 @@ const Orders = () => {
   }
 
   return (
-    <div className="space-y-6">
-      <OrdersHeader 
-        selectedCount={selectedOrders.length}
-        onBulkDelete={handleBulkDelete}
-      />
-      
-      <Tabs defaultValue="orders" className="w-full">
-        <TabsList>
-          <TabsTrigger value="orders">Active Orders</TabsTrigger>
-          <TabsTrigger value="abandoned">Abandoned Carts</TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="orders" className="space-y-6">
-          <OrdersFilter 
-            statusFilter={statusFilter}
-            onStatusChange={handleStatusChange}
-            onSearch={handleSearch}
-          />
-          <OrdersTable 
-            orders={orders} 
-            onViewOrder={handleViewOrder}
-            onDeleteOrder={handleDeleteOrder}
-            selectedOrders={selectedOrders}
-            onSelectOrder={handleSelectOrder}
-            onSelectAll={handleSelectAll}
-          />
-          <OrdersPagination 
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            totalResults={totalCount}
-            pageSize={PAGE_SIZE}
-          />
-        </TabsContent>
-        
-        <TabsContent value="abandoned">
-          <AbandonedCartsManager />
-        </TabsContent>
-      </Tabs>
-      
-      {selectedOrder && (
-        <OrderDetailsDialog 
-          isOpen={isDialogOpen}
-          onClose={handleCloseDialog}
-          order={selectedOrder}
+    <OrdersErrorBoundary>
+      <div className="space-y-6">
+        <OrdersHeader 
+          selectedCount={selectedOrders.length}
+          onBulkDelete={handleBulkDelete}
         />
-      )}
+        
+        <Tabs defaultValue="orders" className="w-full">
+          <TabsList>
+            <TabsTrigger value="orders">Active Orders</TabsTrigger>
+            <TabsTrigger value="abandoned">Abandoned Carts</TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="orders" className="space-y-6">
+            <OrdersFilter 
+              statusFilter={statusFilter}
+              onStatusChange={handleStatusChange}
+              onSearch={handleSearch}
+            />
+            <OrdersTable 
+              orders={orders} 
+              onViewOrder={handleViewOrder}
+              onDeleteOrder={handleDeleteOrder}
+              selectedOrders={selectedOrders}
+              onSelectOrder={handleSelectOrder}
+              onSelectAll={handleSelectAll}
+            />
+            <OrdersPagination 
+              currentPage={currentPage}
+              totalPages={totalPages}
+              onPageChange={setCurrentPage}
+              totalResults={totalCount}
+              pageSize={PAGE_SIZE}
+            />
+          </TabsContent>
+          
+          <TabsContent value="abandoned">
+            <AbandonedCartsManager />
+          </TabsContent>
+        </Tabs>
+        
+        {selectedOrder && (
+          <OrderDetailsDialog 
+            isOpen={isDialogOpen}
+            onClose={handleCloseDialog}
+            order={selectedOrder}
+          />
+        )}
 
-      <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Order</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete order {orderToDelete?.order_number}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => orderToDelete && deleteOrderMutation.mutate(orderToDelete.id)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Order</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete order {orderToDelete?.order_number}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => orderToDelete && deleteOrderMutation.mutate(orderToDelete.id)}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
-      <AlertDialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Delete Multiple Orders</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''}? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => bulkDeleteMutation.mutate(selectedOrders)}
-              className="bg-red-600 hover:bg-red-700"
-            >
-              Delete All
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+        <AlertDialog open={bulkDeleteConfirmOpen} onOpenChange={setBulkDeleteConfirmOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete Multiple Orders</AlertDialogTitle>
+              <AlertDialogDescription>
+                Are you sure you want to delete {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''}? This action cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                onClick={() => bulkDeleteMutation.mutate(selectedOrders)}
+                className="bg-red-600 hover:bg-red-700"
+              >
+                Delete All
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </OrdersErrorBoundary>
   );
 };
 

@@ -50,5 +50,64 @@ export const EmailQueueProcessor = () => {
       setIsProcessing(false);
     }
   };
-  return;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Mail className="h-5 w-5" />
+          Email Queue Processor
+        </CardTitle>
+        <CardDescription>
+          Process queued emails and monitor queue status
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm text-muted-foreground">
+              Queued emails: {queueStats?.queued ?? 'Loading...'}
+            </p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={fetchQueueStats}
+            disabled={isProcessing}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Refresh
+          </Button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <Button
+            onClick={() => processQueue('enhanced-email-processor', 'Enhanced Email Processor')}
+            disabled={isProcessing}
+            className="justify-start"
+          >
+            {isProcessing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4 mr-2" />
+            )}
+            Process Queue (Enhanced)
+          </Button>
+          
+          <Button
+            onClick={() => processQueue('instant-email-processor', 'Instant Email Processor')}
+            disabled={isProcessing}
+            variant="outline"
+            className="justify-start"
+          >
+            {isProcessing ? (
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+            ) : (
+              <Play className="h-4 w-4 mr-2" />
+            )}
+            Process Queue (Instant)
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 };

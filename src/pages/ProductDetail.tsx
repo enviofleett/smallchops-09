@@ -21,6 +21,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DeliveryZoneDropdown } from '@/components/delivery/DeliveryZoneDropdown';
 import { PublicHeader } from '@/components/layout/PublicHeader';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import { ProductRatingsSummary } from '@/components/reviews/ProductRatingsSummary';
 import { ReviewCard } from '@/components/reviews/ReviewCard';
 import { useCart } from '@/hooks/useCart';
@@ -500,6 +501,9 @@ const ProductDetail = () => {
           </div>
         )}
       </div>
+      
+      {/* Footer */}
+      <PublicFooter />
     </div>
   );
 };

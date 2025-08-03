@@ -21,22 +21,11 @@ export const PublicHeader = () => {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
-            {settings?.logo_url ? (
-              <img
-                src={settings.logo_url}
-                alt={settings?.logo_alt_text || settings?.name || 'Logo'}
-                className="h-8 w-auto"
-              />
-            ) : (
-              <div className="h-8 w-8 bg-primary rounded-full flex items-center justify-center">
-                <span className="text-primary-foreground font-bold text-sm">
-                  {settings?.name?.charAt(0) || 'S'}
-                </span>
-              </div>
-            )}
-            <span className="font-bold text-lg text-foreground">
-              {settings?.name || 'Starters'}
-            </span>
+            <img
+              src="/lovable-uploads/d12bf821-fae2-4372-a35c-69998d00a17a.png"
+              alt="Starters Logo"
+              className="h-10 w-auto"
+            />
           </Link>
 
           {/* Desktop Navigation */}

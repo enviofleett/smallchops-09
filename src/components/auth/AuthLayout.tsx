@@ -19,10 +19,7 @@ const AuthLayout = ({
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/40 z-10" />
         <img src="/lovable-uploads/c25fd79f-d9c7-466d-9189-55f68cc44b83.png" alt="Delicious family meal" className="w-full h-full object-cover" />
         <div className="absolute inset-0 z-20 flex flex-col justify-center items-center text-white p-12">
-          <div className="text-center space-y-6 max-w-md">
-            <h2 className="text-4xl font-bold mb-4">Crispy, savory small chops, freshly made and delivered fast.</h2>
-            <p className="text-xl opacity-90">Experience the perfect blend of taste and convenience with every order.</p>
-          </div>
+          
         </div>
       </div>
 

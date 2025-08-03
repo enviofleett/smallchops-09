@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import { OTPInput } from '@/components/auth/OTPInput';
-import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-react';
 import startersLogo from '@/assets/starters-logo.png';
 
 // Form schemas

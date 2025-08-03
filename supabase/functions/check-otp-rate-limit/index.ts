@@ -48,6 +48,51 @@ serve(async (req) => {
       );
     }
 
+    // If rate limit check passes, queue OTP email
+    if (data?.allowed) {
+      // Generate OTP code
+      const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Queue OTP email with proper format
+      const { error: emailError } = await supabaseAdmin
+        .from('communication_events')
+        .insert({
+          event_type: 'login_otp',
+          recipient_email: email,
+          status: 'queued',
+          template_key: 'login_otp',
+          template_variables: {
+            otpCode: otpCode,
+            email: email
+          },
+          priority: 'high'
+        });
+
+      if (emailError) {
+        console.error('Error queuing OTP email:', emailError);
+      } else {
+        console.log('OTP email queued successfully for:', email);
+        
+        // Trigger immediate processing
+        try {
+          await supabaseAdmin.functions.invoke('instant-email-processor');
+        } catch (processingError) {
+          console.error('Error triggering email processing:', processingError);
+        }
+      }
+    }
+
+    if (error) {
+      console.error('Rate limit check error:', error);
+      return new Response(
+        JSON.stringify({ error: "Rate limit check failed" }),
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
     return new Response(
       JSON.stringify(data),
       { 

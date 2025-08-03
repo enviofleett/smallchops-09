@@ -6,26 +6,24 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRegistrationDebug } from '@/services/registrationDebugService';
-import { useOTPAuth } from '@/hooks/useOTPAuth';
+
 import { Eye, EyeOff, Loader2, ArrowLeft, CheckCircle, Mail, User, Phone, Lock } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import startersLogo from '@/assets/starters-logo.png';
 import AuthFormValidation from '@/components/auth/AuthFormValidation';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
-import { OTPInput } from '@/components/auth/OTPInput';
+
 
 const CustomerRegister = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
-  const [showOTPVerification, setShowOTPVerification] = useState(false);
-  const [tempFormData, setTempFormData] = useState<any>(null);
   const { toast } = useToast();
   const navigate = useNavigate();
   const { signUp, signUpWithGoogle } = useAuth();
   const { logDebug } = useRegistrationDebug();
-  const { sendOTP } = useOTPAuth();
+  
 
   const [formData, setFormData] = useState({
     name: '',
@@ -123,21 +121,36 @@ const CustomerRegister = () => {
     });
 
     try {
-      // Store form data temporarily
-      setTempFormData(formData);
-      
-      // Send OTP for registration verification
-      const result = await sendOTP(formData.email, 'registration', formData.name);
-      
-      if (result.success) {
-        setShowOTPVerification(true);
-        toast({
-          title: "Verification code sent",
-          description: `Please check ${formData.email} for your 6-digit verification code.`,
-        });
-      } else {
-        throw new Error(result.error || 'Failed to send verification code');
-      }
+      // Create account directly
+      await signUp({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name,
+        phone: formData.phone
+      });
+
+      // Log successful registration
+      await logDebug('Customer registration successful', 'info', {
+        email: formData.email,
+        timestamp: new Date().toISOString()
+      });
+
+      toast({
+        title: "Registration successful!",
+        description: "Your account has been created. Please check your email for verification.",
+      });
+
+      // Clear form on success
+      setFormData({
+        name: '',
+        email: '',
+        phone: '',
+        password: '',
+        confirmPassword: '',
+      });
+
+      // Redirect to customer portal
+      navigate('/customer-portal');
     } catch (error: any) {
       console.error('Registration error:', error);
       
@@ -150,64 +163,6 @@ const CustomerRegister = () => {
       
       toast({
         title: "Registration failed",
-        description: error.message || "Failed to send verification code. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleOTPVerified = async (verificationResult: any) => {
-    if (!tempFormData) return;
-    
-    setIsLoading(true);
-    
-    try {
-      // Create account with confirmed email
-      await signUp({
-        email: tempFormData.email,
-        password: tempFormData.password,
-        name: tempFormData.name,
-        phone: tempFormData.phone
-      });
-
-      // Log successful registration
-      await logDebug('Customer registration successful', 'info', {
-        email: tempFormData.email,
-        timestamp: new Date().toISOString()
-      });
-
-      toast({
-        title: "Registration successful!",
-        description: "Your account has been created successfully.",
-      });
-
-      // Clear form on success
-      setFormData({
-        name: '',
-        email: '',
-        phone: '',
-        password: '',
-        confirmPassword: '',
-      });
-      setTempFormData(null);
-      setShowOTPVerification(false);
-
-      // Redirect to customer portal
-      navigate('/customer-portal');
-    } catch (error: any) {
-      console.error('Account creation error:', error);
-      
-      // Log registration failure
-      await logDebug('Customer account creation failed', 'error', {
-        email: tempFormData.email,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
-      
-      toast({
-        title: "Account creation failed",
         description: error.message || "Failed to create account. Please try again.",
         variant: "destructive",
       });
@@ -216,10 +171,6 @@ const CustomerRegister = () => {
     }
   };
 
-  const handleBackToForm = () => {
-    setShowOTPVerification(false);
-    setTempFormData(null);
-  };
 
   const handleGoogleSignUp = async () => {
     setIsLoading(true);
@@ -251,15 +202,7 @@ const CustomerRegister = () => {
         </CardHeader>
 
         <CardContent>
-          {showOTPVerification ? (
-            <OTPInput
-              email={tempFormData?.email || ''}
-              purpose="registration"
-              customerName={tempFormData?.name}
-              onVerified={handleOTPVerified}
-              onBack={handleBackToForm}
-            />
-          ) : (
+          <div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name *</Label>
@@ -391,7 +334,7 @@ const CustomerRegister = () => {
 
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Send Verification Code
+                Create Account
               </Button>
 
               <div className="relative">
@@ -428,7 +371,7 @@ const CustomerRegister = () => {
                 </Link>
               </div>
             </form>
-          )}
+          </div>
         </CardContent>
       </Card>
     </div>

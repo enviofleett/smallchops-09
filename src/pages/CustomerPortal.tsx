@@ -10,7 +10,7 @@ import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
 import { FavoritesSection } from '@/components/customers/FavoritesSection';
 import { ProductCatalog } from '@/components/products/ProductCatalog';
 import { CustomerReviewsTab } from '@/components/customer/CustomerReviewsTab';
-import { CustomerAuthModal } from '@/components/auth/CustomerAuthModal';
+
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
 import { getCustomerOrderHistory } from '@/api/purchaseHistory';
@@ -155,11 +155,6 @@ export default function CustomerPortal() {
           </CardContent>
         </Card>
 
-        <CustomerAuthModal
-          isOpen={showAuthModal}
-          onClose={() => setShowAuthModal(false)}
-          onAuthenticated={handleAuthenticated}
-        />
       </div>
     );
   }

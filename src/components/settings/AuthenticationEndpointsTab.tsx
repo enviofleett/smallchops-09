@@ -560,13 +560,11 @@ const handleAuthError = (error, operation) => {
               <Separator />
 
               <div>
-                <h3 className="font-semibold mb-3">State Management Pattern</h3>
+                <h3 className="font-semibold mb-3">Authentication Pattern</h3>
                 <div className="relative">
                   <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto">
-{`// Unified authentication state management
-const useUnifiedAuth = () => {
-  const [isOTPRequired, setIsOTPRequired] = useState(false);
-  const [tempData, setTempData] = useState(null);
+{`// Customer authentication with email/password
+const useCustomerDirectAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   
   const initiateOTPFlow = async (email, purpose, additionalData = {}) => {

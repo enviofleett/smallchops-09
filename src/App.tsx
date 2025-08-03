@@ -33,7 +33,7 @@ import AdminSetup from "./pages/AdminSetup";
 import CustomerRegister from "./pages/CustomerRegister";
 import CustomerProfile from "./pages/CustomerProfile";
 import AuthPage from "./pages/AuthPage";
-import SplitScreenLoginPage from "./components/auth/SplitScreenLoginPage";
+
 import AuthCallback from "./pages/AuthCallback";
 import EmailVerificationPage from "./pages/EmailVerificationPage";
 import PasswordResetPage from "./pages/PasswordResetPage";
@@ -62,7 +62,7 @@ const App = () => (
               <Route path="/auth/reset" element={<PasswordResetPage />} />
               
               {/* Admin login route */}
-              <Route path="/admin/login" element={<SplitScreenLoginPage />} />
+              <Route path="/admin/login" element={<AuthPage />} />
               
               {/* Customer routes */}
               <Route path="/customer-portal" element={<CustomerPortal />} />

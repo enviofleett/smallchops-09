@@ -584,12 +584,12 @@ const verification = await handlePaymentSuccess(sessionId, orderId);`}</pre>
                         <div className="space-y-3">
                           <h5 className="font-medium">Frontend Integration</h5>
                           <div className="bg-muted/50 p-3 rounded text-sm">
-                            <pre>{`import { useOTPAuth } from '@/hooks/useOTPAuth';
+                             <pre>{`import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
 
-const { sendOTP, verifyOTP, isLoading } = useOTPAuth();
+const { login, register, isLoading } = useCustomerDirectAuth();
 
-// Send OTP for login
-const result = await sendOTP(
+// Login with email/password
+const result = await login(
   'user@example.com',
   'login',
   'John Doe' // optional customer name
@@ -656,14 +656,14 @@ if (verification.success && verification.loginVerified) {
                         <div className="space-y-3">
                           <h5 className="font-medium">Complete Implementation Example</h5>
                           <div className="bg-muted/50 p-3 rounded text-sm">
-                            <pre>{`// Login with OTP flow
-const LoginWithOTP = () => {
+                             <pre>{`// Login with direct authentication
+const LoginForm = () => {
   const [email, setEmail] = useState('');
-  const [otpSent, setOtpSent] = useState(false);
-  const { sendOTP, completeOTPLogin, isLoading } = useOTPAuth();
+  const [password, setPassword] = useState('');
+  const { login, isLoading } = useCustomerDirectAuth();
 
-  const handleSendOTP = async () => {
-    const result = await sendOTP(email, 'login');
+  const handleLogin = async () => {
+    const result = await login(email, password);
     if (result.success) {
       setOtpSent(true);
     }

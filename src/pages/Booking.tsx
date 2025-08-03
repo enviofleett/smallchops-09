@@ -120,7 +120,7 @@ const Booking = () => {
               </p>
 
               <p className="font-semibold text-foreground text-left">
-                Submit your request to receive a custom quote—we'll handle the logistics.
+                Submit your request to receive a custom quote
               </p>
             </div>
           </div>

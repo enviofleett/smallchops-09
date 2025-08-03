@@ -58,8 +58,8 @@ export const PublicHeader = () => {
             </Link>
           </nav>
 
-          {/* Search Bar */}
-          <div className="hidden md:flex flex-1 max-w-md mx-8">
+          {/* Search Bar - Hidden on mobile, shown in mobile menu */}
+          <div className="hidden lg:flex flex-1 max-w-md mx-8">
             <div className="relative w-full">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
               <input
@@ -70,13 +70,13 @@ export const PublicHeader = () => {
             </div>
           </div>
 
-          {/* Right Actions */}
-          <div className="flex items-center space-x-4">
-            {/* Favorites */}
+          {/* Right Actions - Mobile optimized */}
+          <div className="flex items-center space-x-2 sm:space-x-4">
+            {/* Favorites - Hidden on small mobile */}
             <Button
               variant="ghost"
               size="icon"
-              className="hidden md:flex"
+              className="hidden sm:flex"
               onClick={() => navigate('/customer-favorites')}
             >
               <Heart className="h-5 w-5" />
@@ -97,8 +97,8 @@ export const PublicHeader = () => {
               )}
             </Button>
 
-            {/* User Account */}
-            <div className="flex items-center gap-2">
+            {/* User Account - Mobile optimized */}
+            <div className="flex items-center gap-1 sm:gap-2">
               <Button
                 variant="ghost"
                 size="icon"
@@ -113,7 +113,7 @@ export const PublicHeader = () => {
                 <User className="h-5 w-5" />
               </Button>
               {isAuthenticated && customerAccount && !isLoading && (
-                <span className="hidden sm:block text-sm font-medium text-foreground">
+                <span className="hidden md:block text-sm font-medium text-foreground">
                   {customerAccount.name ? customerAccount.name.split(' ')[0] : 'Customer'}
                 </span>
               )}
@@ -123,7 +123,7 @@ export const PublicHeader = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="md:hidden"
+              className="lg:hidden"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
             >
               {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -131,53 +131,53 @@ export const PublicHeader = () => {
           </div>
         </div>
 
-        {/* Mobile Menu */}
+        {/* Mobile Menu - Improved */}
         {isMenuOpen && (
-          <div className="md:hidden border-t border-border py-4">
+          <div className="lg:hidden border-t border-border py-4 bg-background">
             <div className="space-y-4">
               {/* Mobile Search */}
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+              <div className="relative px-4">
+                <Search className="absolute left-7 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
                 <input
                   type="text"
                   placeholder="Search products..."
-                  className="w-full pl-10 pr-4 py-2 bg-muted/50 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-sm"
+                  className="w-full pl-10 pr-4 py-3 bg-muted/50 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-base"
                 />
               </div>
 
               {/* Mobile Navigation */}
-              <nav className="flex flex-col space-y-2">
+              <nav className="flex flex-col space-y-1 px-4">
                 <Link 
                   to="/" 
-                  className="text-foreground hover:text-primary transition-colors py-2"
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Home
                 </Link>
                 <Link 
                   to="/products" 
-                  className="text-foreground hover:text-primary transition-colors py-2"
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Shop
                 </Link>
                 <Link 
                   to="/customer-favorites" 
-                  className="text-foreground hover:text-primary transition-colors py-2"
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Favorites
                 </Link>
                 <Link 
                   to="/about" 
-                  className="text-foreground hover:text-primary transition-colors py-2"
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   About
                 </Link>
                 <Link 
                   to="/contact" 
-                  className="text-foreground hover:text-primary transition-colors py-2"
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Contact

@@ -236,12 +236,12 @@ const ProductDetail = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
+      <div className="container mx-auto px-4 py-6 sm:py-8">
         {/* Product Main Section */}
-        <div className="grid lg:grid-cols-2 gap-12 mb-12">
-          {/* Product Image - Reduced by 20% */}
+        <div className="grid lg:grid-cols-2 gap-8 sm:gap-12 mb-8 sm:mb-12">
+          {/* Product Image - Mobile optimized */}
           <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-lg bg-muted w-4/5 mx-auto">
+            <div className="aspect-square overflow-hidden rounded-lg bg-muted w-full sm:w-4/5 mx-auto">
               <img
                 src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=480&h=480&fit=crop'}
                 alt={product.name}
@@ -251,9 +251,9 @@ const ProductDetail = () => {
           </div>
 
           {/* Product Details */}
-          <div className="space-y-6">
+          <div className="space-y-4 sm:space-y-6">
             <div>
-              <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold mb-2">{product.name}</h1>
               <div className="flex items-center gap-4 mb-4">
                 <StarRating 
                   rating={ratingSummary?.average_rating || 0} 
@@ -337,10 +337,10 @@ const ProductDetail = () => {
                 </div>
               </div>
 
-              <div className="flex gap-3">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <Button 
                   onClick={handleAddToCart}
-                  className="flex-1 bg-red-500 hover:bg-red-600 text-white"
+                  className="flex-1 bg-red-500 hover:bg-red-600 text-white order-2 sm:order-1"
                   size="lg"
                 >
                   <ShoppingCart className="h-5 w-5 mr-2" />
@@ -350,6 +350,7 @@ const ProductDetail = () => {
                   isFavorite={isFavorite}
                   onToggle={() => setIsFavorite(!isFavorite)}
                   size="lg"
+                  className="order-1 sm:order-2 self-center sm:self-auto"
                 />
               </div>
 

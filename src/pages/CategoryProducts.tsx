@@ -91,10 +91,10 @@ const CategoryProducts = () => {
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-          {/* Left Sidebar - Categories */}
-          <div className="lg:col-span-1">
+      <div className="container mx-auto px-4 py-6 sm:py-8">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
+          {/* Left Sidebar - Categories - Hidden on mobile */}
+          <div className="hidden lg:block lg:col-span-1">
             <Card className="bg-white sticky top-4">
               <CardContent className="p-6">
                 <h3 className="text-xl font-bold text-red-600 mb-4">Categories</h3>
@@ -123,26 +123,52 @@ const CategoryProducts = () => {
                 </div>
               </CardContent>
             </Card>
+            </div>
+
+          {/* Mobile Categories - Horizontal scroll */}
+          <div className="lg:hidden col-span-full mb-6">
+            <h3 className="text-lg font-bold text-red-600 mb-3 px-2">Categories</h3>
+            <div className="flex space-x-3 overflow-x-auto pb-3 px-2">
+              <button
+                onClick={() => navigate('/')}
+                className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-700 border border-gray-200"
+              >
+                All Products
+              </button>
+              {categories.map((category) => (
+                <button
+                  key={category.id}
+                  onClick={() => navigate(`/category/${category.id}`)}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    categoryId === category.id 
+                      ? 'bg-red-600 text-white' 
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  {category.name}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* Right Side - Products */}
-          <div className="lg:col-span-3">
+          <div className="col-span-full lg:col-span-3">
             {/* Header */}
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold mb-4">{currentCategory?.name || 'Products'}</h1>
+            <div className="mb-6 sm:mb-8">
+              <h1 className="text-2xl sm:text-3xl font-bold mb-4">{currentCategory?.name || 'Products'}</h1>
               {currentCategory?.description && (
-                <p className="text-muted-foreground mb-6">{currentCategory.description}</p>
+                <p className="text-muted-foreground mb-4 sm:mb-6">{currentCategory.description}</p>
               )}
               
               {/* Search */}
-              <div className="max-w-md">
+              <div className="max-w-md mx-auto lg:mx-0">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
                   <Input
                     placeholder="Search products..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="pl-10 py-3 text-base"
                   />
                 </div>
               </div>
@@ -150,12 +176,12 @@ const CategoryProducts = () => {
 
             {/* Products Grid */}
             {isLoadingProducts ? (
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Card key={i} className="animate-pulse">
                     <CardContent className="p-0">
                       <div className="aspect-square bg-muted rounded-t-lg"></div>
-                      <div className="p-4 space-y-2">
+                      <div className="p-3 sm:p-4 space-y-2">
                         <div className="h-4 bg-muted rounded"></div>
                         <div className="h-3 bg-muted rounded w-2/3"></div>
                         <div className="h-6 bg-muted rounded w-1/2"></div>
@@ -165,9 +191,9 @@ const CategoryProducts = () => {
                 ))}
               </div>
             ) : filteredProducts.length === 0 ? (
-              <div className="text-center py-12">
-                <h3 className="text-xl font-semibold mb-2">No products found</h3>
-                <p className="text-muted-foreground mb-4">
+              <div className="text-center py-8 sm:py-12">
+                <h3 className="text-lg sm:text-xl font-semibold mb-2">No products found</h3>
+                <p className="text-muted-foreground mb-4 px-4">
                   {searchTerm ? 'Try adjusting your search terms.' : 'This category has no products yet.'}
                 </p>
                 <Button onClick={() => navigate('/')}>
@@ -176,7 +202,7 @@ const CategoryProducts = () => {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6 mb-8">
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-8">
                   {currentProducts.map((product) => (
                     <Card 
                       key={product.id} 
@@ -191,7 +217,7 @@ const CategoryProducts = () => {
                           loading="lazy"
                         />
                         {(product.discount_percentage || 0) > 0 && (
-                          <div className="absolute top-2 left-2">
+                          <div className="absolute top-1 sm:top-2 left-1 sm:left-2">
                             <DiscountBadge 
                               discountPercentage={product.discount_percentage || 0}
                               size="sm"
@@ -199,11 +225,11 @@ const CategoryProducts = () => {
                           </div>
                         )}
                       </div>
-                      <CardContent className="p-4">
-                        <h3 className="font-semibold mb-2 line-clamp-2">{product.name}</h3>
-                        <div className="flex items-center space-x-1 mb-2">
+                      <CardContent className="p-2 sm:p-3 lg:p-4">
+                        <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
+                        <div className="flex items-center space-x-1 mb-1 sm:mb-2">
                           {renderStars(4)} {/* Using static rating for now */}
-                          <span className="text-sm text-muted-foreground">(0)</span>
+                          <span className="text-xs text-muted-foreground">(0)</span>
                         </div>
                         <div className="flex items-center justify-between">
                           <PriceDisplay
@@ -218,8 +244,9 @@ const CategoryProducts = () => {
                               e.stopPropagation();
                               handleAddToCart(product);
                             }}
+                            className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
                           >
-                            Add to Cart
+                            Add
                           </Button>
                         </div>
                       </CardContent>

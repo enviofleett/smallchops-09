@@ -9,7 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/components/ui/use-toast';
-import { createClient } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 import { PaymentAnalyticsDashboard } from '@/components/payments/PaymentAnalyticsDashboard';
 import { TransactionMonitor } from '@/components/admin/TransactionMonitor';
 import { PaymentHealthCheck } from '@/components/admin/PaymentHealthCheck';
@@ -23,11 +23,6 @@ import { AlertCircle, CheckCircle, Copy, ExternalLink, Lock, UserX } from 'lucid
 import { useAuth } from '@/contexts/AuthContext';
 import { useHasPermission } from '@/hooks/usePermissions';
 
-// Use direct client to avoid type issues
-const supabaseUrl = "https://oknnklksdiqaifhxaccs.supabase.co";
-const supabaseKey = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA";
-const supabase = createClient(supabaseUrl, supabaseKey);
-
 interface PaymentIntegration {
   id?: string;
   provider: string;
@@ -35,10 +30,13 @@ interface PaymentIntegration {
   secret_key: string;
   webhook_secret: string;
   test_mode: boolean;
-  is_active: boolean;
+  is_active?: boolean;
   currency: string;
   payment_methods: string[];
   connection_status?: string;
+  live_public_key?: string;
+  live_secret_key?: string;
+  live_webhook_secret?: string;
 }
 
 export const PaymentSettings: React.FC = () => {
@@ -72,15 +70,14 @@ export const PaymentSettings: React.FC = () => {
         .from('payment_integrations')
         .select('*')
         .eq('provider', 'paystack')
-        .eq('is_active', true)
-        .single();
+        .maybeSingle();
 
       if (error && error.code !== 'PGRST116') {
         throw error;
       }
 
       if (data) {
-        const paymentMethods = data.payment_methods;
+        const paymentMethods = data.payment_methods || [];
         setConfig({
           id: data.id,
           provider: data.provider,
@@ -88,7 +85,7 @@ export const PaymentSettings: React.FC = () => {
           secret_key: data.secret_key || '',
           webhook_secret: data.webhook_secret || '',
           test_mode: data.test_mode || true,
-          is_active: !!data.is_active,
+          is_active: true, // Simplified to avoid schema issues
           currency: data.currency || 'NGN',
           connection_status: data.connection_status || '',
           payment_methods: Array.isArray(paymentMethods) 

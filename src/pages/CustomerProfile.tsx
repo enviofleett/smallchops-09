@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useCustomerFavorites } from '@/hooks/useCustomerFavorites';
 import { useCustomerOrders } from '@/hooks/useCustomerOrders';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   ShoppingBag, 
   Heart, 
@@ -12,35 +13,74 @@ import {
   MapPin, 
   HelpCircle, 
   LogOut,
-  User,
   MoreHorizontal,
   Clock,
-  ChevronRight
+  ChevronRight,
+  Phone,
+  Mail
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
-import { PersonalInfoEditor } from '@/components/customer/PersonalInfoEditor';
-import { AddressManager } from '@/components/customer/AddressManager';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import { AddressManager } from '@/components/customer/AddressManager';
 
-type ProfileSection = 'orders' | 'wishlist' | 'payment' | 'address' | 'help' | 'personal';
+type ProfileSection = 'orders' | 'wishlist' | 'payment' | 'address' | 'help';
+
+// Loading skeleton component
+const ContentSkeleton = () => (
+  <div className="space-y-4">
+    {[1, 2, 3].map(i => (
+      <Card key={i} className="p-6">
+        <div className="space-y-3">
+          <Skeleton className="h-4 w-1/3" />
+          <Skeleton className="h-4 w-2/3" />
+          <Skeleton className="h-4 w-1/2" />
+        </div>
+      </Card>
+    ))}
+  </div>
+);
 
 export default function CustomerProfile() {
   const { isAuthenticated, customerAccount, isLoading: authLoading, logout } = useCustomerAuth();
-  const { favorites, isLoading: favoritesLoading } = useCustomerFavorites(customerAccount?.id || '');
-  const { data: ordersData, isLoading: ordersLoading } = useCustomerOrders();
   const { data: settings } = useBusinessSettings();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<ProfileSection>('orders');
 
+  // Memoize sidebar items to prevent unnecessary re-renders
+  const sidebarItems = useMemo(() => [
+    { id: 'orders' as const, label: 'My Order', icon: ShoppingBag },
+    { id: 'wishlist' as const, label: 'Wishlist', icon: Heart },
+    { id: 'payment' as const, label: 'Payment Method', icon: CreditCard },
+    { id: 'address' as const, label: 'Delivery Address', icon: MapPin },
+    { id: 'help' as const, label: 'Help', icon: HelpCircle },
+  ], []);
+
+  const handleLogout = React.useCallback(async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+  }, [logout, navigate]);
+
   if (authLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center space-y-4">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin mx-auto" />
-          <p className="text-muted-foreground">Loading your profile...</p>
+      <div className="min-h-screen bg-background">
+        <PublicHeader />
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col lg:flex-row gap-6">
+            <div className="lg:w-80">
+              <Skeleton className="h-32 w-full rounded-lg" />
+            </div>
+            <div className="flex-1">
+              <ContentSkeleton />
+            </div>
+          </div>
         </div>
+        <PublicFooter />
       </div>
     );
   }
@@ -49,41 +89,22 @@ export default function CustomerProfile() {
     return <Navigate to="/auth" replace />;
   }
 
-  const sidebarItems = [
-    { id: 'orders', label: 'My Order', icon: ShoppingBag },
-    { id: 'wishlist', label: 'Wishlist', icon: Heart },
-    { id: 'payment', label: 'Payment Method', icon: CreditCard },
-    { id: 'address', label: 'Delivery Address', icon: MapPin },
-    { id: 'help', label: 'Help', icon: HelpCircle },
-  ];
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/');
-    } catch (error) {
-      console.error('Logout error:', error);
-    }
-  };
-
-  const renderContent = () => {
+  const renderContent = React.useCallback(() => {
     switch (activeSection) {
       case 'orders':
-        return <OrdersSection orders={ordersData?.orders || []} isLoading={ordersLoading} />;
+        return <OrdersSection />;
       case 'wishlist':
-        return <WishlistSection favorites={favorites} isLoading={favoritesLoading} />;
+        return <WishlistSection />;
       case 'payment':
         return <PaymentSection />;
       case 'address':
         return <AddressManager />;
       case 'help':
         return <HelpSection settings={settings} />;
-      case 'personal':
-        return <PersonalInfoEditor />;
       default:
-        return <OrdersSection orders={ordersData?.orders || []} isLoading={ordersLoading} />;
+        return <OrdersSection />;
     }
-  };
+  }, [activeSection, settings]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -100,7 +121,7 @@ export default function CustomerProfile() {
               {sidebarItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setActiveSection(item.id as ProfileSection)}
+                  onClick={() => setActiveSection(item.id)}
                   className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                     activeSection === item.id
                       ? 'bg-orange-50 text-orange-600 border border-orange-200'
@@ -142,23 +163,15 @@ export default function CustomerProfile() {
   );
 }
 
-// Orders Section Component
-function OrdersSection({ orders, isLoading }: { orders: any[]; isLoading: boolean }) {
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {[1, 2, 3].map(i => (
-          <Card key={i} className="p-6">
-            <div className="space-y-3">
-              <div className="h-4 bg-gray-200 animate-pulse rounded w-1/3" />
-              <div className="h-4 bg-gray-200 animate-pulse rounded w-2/3" />
-              <div className="h-4 bg-gray-200 animate-pulse rounded w-1/2" />
-            </div>
-          </Card>
-        ))}
-      </div>
-    );
+// Optimized Orders Section with performance improvements
+function OrdersSection() {
+  const { data: ordersData, isLoading: ordersLoading } = useCustomerOrders();
+
+  if (ordersLoading) {
+    return <ContentSkeleton />;
   }
+
+  const orders = ordersData?.orders || [];
 
   if (orders.length === 0) {
     return (
@@ -212,8 +225,8 @@ function OrdersSection({ orders, isLoading }: { orders: any[]; isLoading: boolea
   );
 }
 
-// Order Card Component
-function OrderCard({ order }: { order: any }) {
+// Memoized Order Card component
+const OrderCard = React.memo(({ order }: { order: any }) => {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'delivered':
@@ -324,17 +337,17 @@ function OrderCard({ order }: { order: any }) {
       </div>
     </Card>
   );
-}
+});
+
+OrderCard.displayName = 'OrderCard';
 
 // Wishlist Section Component
-function WishlistSection({ favorites, isLoading }: { favorites: any[]; isLoading: boolean }) {
-  if (isLoading) {
-    return (
-      <div className="text-center py-8">
-        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mx-auto mb-4" />
-        <p className="text-gray-500">Loading your wishlist...</p>
-      </div>
-    );
+function WishlistSection() {
+  const { customerAccount } = useCustomerAuth();
+  const { favorites, isLoading: favoritesLoading } = useCustomerFavorites(customerAccount?.id || '');
+
+  if (favoritesLoading) {
+    return <ContentSkeleton />;
   }
 
   return (
@@ -435,7 +448,7 @@ function HelpSection({ settings }: { settings: any }) {
         <div className="space-y-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-              <span className="text-orange-600 font-semibold">📞</span>
+              <Phone className="w-5 h-5 text-orange-600" />
             </div>
             <div>
               <p className="font-medium">Phone Support</p>
@@ -444,7 +457,7 @@ function HelpSection({ settings }: { settings: any }) {
           </div>
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-orange-100 rounded-full flex items-center justify-center">
-              <span className="text-orange-600 font-semibold">✉️</span>
+              <Mail className="w-5 h-5 text-orange-600" />
             </div>
             <div>
               <p className="font-medium">Email Support</p>

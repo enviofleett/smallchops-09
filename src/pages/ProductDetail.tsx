@@ -11,28 +11,29 @@ import {
   Phone, 
   ChevronRight,
   MessageCircle,
-  Share
+  Share,
+  ThumbsUp,
+  ThumbsDown,
+  Timer
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { DeliveryZoneDropdown } from '@/components/delivery/DeliveryZoneDropdown';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { ProductRatingsSummary } from '@/components/reviews/ProductRatingsSummary';
+import { ReviewCard } from '@/components/reviews/ReviewCard';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { getProductWithDiscounts, getProductsWithDiscounts } from '@/api/productsWithDiscounts';
+import { useProductReviews, useProductRatingSummary, useVoteOnReview } from '@/hooks/useProductReviews';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { StarRating } from '@/components/ui/star-rating';
 import { FavoriteButton } from '@/components/ui/favorite-button';
+import { DiscountBadge } from '@/components/ui/discount-badge';
 import { ProductWithDiscount } from '@/lib/discountCalculations';
 
-interface Review {
-  id: string;
-  customer_name: string;
-  rating: number;
-  comment: string;
-  created_at: string;
-  verified: boolean;
-}
+// Remove the mock Review interface since we're using the real one from API
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -42,12 +43,22 @@ const ProductDetail = () => {
 
   const [product, setProduct] = useState<ProductWithDiscount | null>(null);
   const [relatedProducts, setRelatedProducts] = useState<ProductWithDiscount[]>([]);
-  const [reviews, setReviews] = useState<Review[]>([]);
   const [quantity, setQuantity] = useState(1);
   const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
+  const [reviewFilter, setReviewFilter] = useState<{ rating?: number; sortBy: string }>({ sortBy: 'newest' });
+
+  // Fetch reviews and rating summary
+  const { data: reviewsData } = useProductReviews(id || '', { 
+    page: 1, 
+    limit: 10, 
+    rating: reviewFilter.rating,
+    sortBy: reviewFilter.sortBy as any
+  });
+  const { data: ratingSummary } = useProductRatingSummary(id || '');
+  const voteOnReviewMutation = useVoteOnReview();
 
   useEffect(() => {
     console.log('ProductDetail component mounted, ID from params:', id);
@@ -82,25 +93,7 @@ const ProductDetail = () => {
         console.log('No product found with ID:', id);
       }
 
-      // Mock reviews data
-      setReviews([
-        {
-          id: '1',
-          customer_name: 'John D.',
-          rating: 5,
-          comment: 'Amazing taste! Fresh and crispy. Will definitely order again.',
-          created_at: '2024-01-15',
-          verified: true
-        },
-        {
-          id: '2',
-          customer_name: 'Sarah M.',
-          rating: 4,
-          comment: 'Good quality and fast delivery. Highly recommended.',
-          created_at: '2024-01-10',
-          verified: true
-        }
-      ]);
+      // Reviews are now handled by the useProductReviews hook
       
     } catch (error) {
       console.error('Error fetching product:', error);
@@ -149,6 +142,53 @@ const ProductDetail = () => {
     }
   };
 
+  const handleReviewVote = (reviewId: string, voteType: 'helpful' | 'not_helpful') => {
+    voteOnReviewMutation.mutate({ reviewId, voteType }, {
+      onSuccess: () => {
+        toast({ title: "Thank you for your feedback!" });
+      },
+      onError: () => {
+        toast({ title: "Failed to record vote", variant: "destructive" });
+      }
+    });
+  };
+
+  const getPromotionBadge = () => {
+    if (!product?.active_promotion) return null;
+    
+    const promotion = product.active_promotion;
+    if (promotion.type === 'percentage') {
+      return `${promotion.value}% OFF`;
+    } else if (promotion.type === 'fixed_amount') {
+      return `₦${promotion.value} OFF`;
+    } else if (promotion.type === 'free_delivery') {
+      return 'FREE DELIVERY';
+    }
+    return 'SPECIAL OFFER';
+  };
+
+  const getPromotionTimeLeft = () => {
+    if (!product?.active_promotion?.valid_until) return null;
+    
+    const now = new Date();
+    const validUntil = new Date(product.active_promotion.valid_until);
+    const timeDiff = validUntil.getTime() - now.getTime();
+    
+    if (timeDiff <= 0) return null;
+    
+    const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+    const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (hours > 24) {
+      const days = Math.floor(hours / 24);
+      return `${days} day${days > 1 ? 's' : ''} left`;
+    } else if (hours > 0) {
+      return `${hours}h ${minutes}m left`;
+    } else {
+      return `${minutes}m left`;
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -170,9 +210,12 @@ const ProductDetail = () => {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <header className="bg-white border-b sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-4">
+      {/* Website Header */}
+      <PublicHeader />
+      
+      {/* Breadcrumb */}
+      <div className="bg-muted/30 border-b">
+        <div className="container mx-auto px-4 py-3">
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
             <Link to="/" className="hover:text-primary">Home</Link>
             <ChevronRight className="h-4 w-4" />
@@ -181,7 +224,7 @@ const ProductDetail = () => {
             <span className="text-foreground">{product.name}</span>
           </nav>
         </div>
-      </header>
+      </div>
 
       <div className="container mx-auto px-4 py-8">
         {/* Product Main Section */}
@@ -202,15 +245,33 @@ const ProductDetail = () => {
             <div>
               <h1 className="text-3xl font-bold mb-2">{product.name}</h1>
               <div className="flex items-center gap-4 mb-4">
-                <StarRating rating={4.5} />
-                <span className="text-sm text-muted-foreground">(24 reviews)</span>
+                <StarRating 
+                  rating={ratingSummary?.average_rating || 0} 
+                  size="md"
+                />
+                <span className="text-sm text-muted-foreground">
+                  ({ratingSummary?.total_reviews || 0} review{ratingSummary?.total_reviews !== 1 ? 's' : ''})
+                </span>
               </div>
             </div>
 
-            {/* Hot Deals Banner */}
-            {product.discount_percentage && product.discount_percentage > 0 && (
-              <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-2 rounded-lg inline-block">
-                <span className="font-bold">🔥 Hot Deals - {product.discount_percentage}% OFF</span>
+            {/* Promotion Banner */}
+            {product.active_promotion && (
+              <div className="bg-gradient-to-r from-destructive to-orange-500 text-destructive-foreground px-4 py-3 rounded-lg">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-bold text-lg">🔥 {getPromotionBadge()}</span>
+                    <p className="text-sm mt-1 opacity-90">Limited time offer - don't miss out!</p>
+                  </div>
+                  {getPromotionTimeLeft() && (
+                    <div className="text-right">
+                      <div className="flex items-center gap-1 text-sm">
+                        <Timer className="h-4 w-4" />
+                        {getPromotionTimeLeft()}
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
 
@@ -334,30 +395,61 @@ const ProductDetail = () => {
         </div>
 
         {/* Reviews Section */}
-        <Card className="mb-8">
-          <CardContent className="p-6">
-            <h3 className="text-lg font-semibold mb-4">Customer Reviews</h3>
-            <div className="space-y-4">
-              {reviews.map((review) => (
-                <div key={review.id} className="border-b pb-4 last:border-b-0">
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <span className="font-medium">{review.customer_name}</span>
-                      {review.verified && (
-                        <Badge variant="secondary" className="text-xs">Verified</Badge>
-                      )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <StarRating rating={review.rating} size="sm" />
-                      <span className="text-sm text-muted-foreground">{review.created_at}</span>
-                    </div>
+        <div className="space-y-6 mb-8">
+          <div className="flex items-center justify-between">
+            <h3 className="text-2xl font-bold">Customer Reviews</h3>
+          </div>
+
+          {/* Rating Summary */}
+          <Card>
+            <CardContent className="p-6">
+              <ProductRatingsSummary summary={ratingSummary} />
+            </CardContent>
+          </Card>
+
+          {/* Review Filters */}
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant={!reviewFilter.rating ? "default" : "outline"}
+              size="sm"
+              onClick={() => setReviewFilter({ ...reviewFilter, rating: undefined })}
+            >
+              All Reviews
+            </Button>
+            {[5, 4, 3, 2, 1].map((rating) => (
+              <Button
+                key={rating}
+                variant={reviewFilter.rating === rating ? "default" : "outline"}
+                size="sm"
+                onClick={() => setReviewFilter({ ...reviewFilter, rating })}
+              >
+                {rating} ⭐
+              </Button>
+            ))}
+          </div>
+
+          {/* Reviews List */}
+          <div className="space-y-4">
+            {reviewsData && reviewsData.reviews.length > 0 ? (
+              reviewsData.reviews.map((review) => (
+                <ReviewCard
+                  key={review.id}
+                  review={review}
+                  onVoteUpdate={() => {}}
+                />
+              ))
+            ) : (
+              <Card>
+                <CardContent className="p-8 text-center">
+                  <div className="space-y-2">
+                    <h4 className="text-lg font-medium">No reviews yet</h4>
+                    <p className="text-muted-foreground">Be the first to review this product!</p>
                   </div>
-                  <p className="text-muted-foreground">{review.comment}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        </div>
 
         {/* Related Products */}
         {relatedProducts.length > 0 && (
@@ -379,15 +471,23 @@ const ProductDetail = () => {
                   <CardContent className="p-4">
                     <h4 className="font-semibold mb-2">{relatedProduct.name}</h4>
                     <div className="flex items-center justify-between">
-                    <PriceDisplay
-                      originalPrice={relatedProduct.price}
-                      discountedPrice={relatedProduct.discounted_price}
-                      hasDiscount={(relatedProduct.discount_percentage || 0) > 0}
-                      size="sm"
-                    />
+                      <div className="flex flex-col">
+                        <PriceDisplay
+                          originalPrice={relatedProduct.price}
+                          discountedPrice={relatedProduct.discounted_price}
+                          hasDiscount={(relatedProduct.discount_percentage || 0) > 0}
+                          size="sm"
+                        />
+                        {(relatedProduct.discount_percentage || 0) > 0 && (
+                          <DiscountBadge 
+                            discountPercentage={relatedProduct.discount_percentage || 0}
+                            size="sm"
+                            className="mt-1"
+                          />
+                        )}
+                      </div>
                       <Button 
                         size="sm" 
-                        className="bg-red-500 hover:bg-red-600 text-white"
                         onClick={() => addItem(relatedProduct, 1)}
                       >
                         Add to Cart

@@ -12,7 +12,7 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, type: 'lo
     // Determine the correct template key based on the email type
     const templateKey = type === 'password_reset' ? 'password_reset_otp' : type === 'login' ? 'login_otp' : 'registration_otp';
 
-    // Directly invoke the SMTP sender function with the correct payload
+    // Directly invoke the SMTP sender function with the corrected payload
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
       body: {
         templateId: templateKey,

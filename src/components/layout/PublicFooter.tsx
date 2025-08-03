@@ -35,7 +35,7 @@ const PublicFooterContent = () => {
           <div>
             <h3 className="text-lg font-bold mb-4 text-white">Services</h3>
             <div className="space-y-2">
-              <Link to="/" className="block text-gray-300 hover:text-white transition-colors">Home</Link>
+              <Link to="/" className="block text-gray-300 hover:text-white transition-colors">Catering services</Link>
               
               <Link to="/blog" className="block text-gray-300 hover:text-white transition-colors">Blog</Link>
             </div>

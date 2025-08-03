@@ -25,6 +25,8 @@ export const FavoriteProductGrid: React.FC<FavoriteProductGridProps> = ({
       id: product.id,
       name: product.name,
       price: product.price,
+      vat_rate: 7.5, // Default VAT rate
+      image_url: product.image_url,
     });
   };
 

@@ -47,7 +47,11 @@ const PublicHome = () => {
     addItem({
       id: product.id,
       name: product.name,
-      price: product.price,
+      price: product.discounted_price || product.price,
+      original_price: product.price,
+      discount_amount: product.discount_amount,
+      vat_rate: 7.5, // Default VAT rate
+      image_url: product.image_url,
     });
     
     toast({

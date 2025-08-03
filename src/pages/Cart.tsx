@@ -6,6 +6,8 @@ import { useCart } from '@/hooks/useCart';
 import { CartItemRow } from '@/components/cart/CartItemRow';
 import { CartSummary } from '@/components/cart/CartSummary';
 import { CheckoutButton } from '@/components/ui/checkout-button';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 
 export default function Cart() {
   const navigate = useNavigate();
@@ -17,6 +19,9 @@ export default function Cart() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Public Header */}
+      <PublicHeader />
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
@@ -78,6 +83,9 @@ export default function Cart() {
           <CheckoutButton />
         </div>
       )}
+
+      {/* Public Footer */}
+      <PublicFooter />
     </div>
   );
 }

@@ -20,11 +20,8 @@ const AuthLayout = ({
         <img src="/lovable-uploads/c25fd79f-d9c7-466d-9189-55f68cc44b83.png" alt="Delicious family meal" className="w-full h-full object-cover" />
         <div className="absolute inset-0 z-20 flex flex-col justify-center items-center text-white p-12">
           <div className="text-center space-y-6 max-w-md">
-            <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center overflow-hidden bg-white/20 backdrop-blur-sm border border-white/30">
-              <img src={startersLogo} alt="Starters" className="w-full h-full object-contain p-2" loading="lazy" />
-            </div>
-            
-            
+            <h2 className="text-4xl font-bold mb-4">Crispy, savory small chops, freshly made and delivered fast.</h2>
+            <p className="text-xl opacity-90">Experience the perfect blend of taste and convenience with every order.</p>
           </div>
         </div>
       </div>
@@ -32,19 +29,13 @@ const AuthLayout = ({
       {/* Right Side - Form Section */}
       <div className="w-full lg:w-1/2 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
-          {showLogo && <div className="text-center lg:hidden">
-              <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden bg-primary/10">
+          {showLogo && <div className="text-center">
+              <div className="w-20 h-20 rounded-full mx-auto mb-6 flex items-center justify-center overflow-hidden bg-primary/10">
                 <img src={startersLogo} alt="Starters" className="w-full h-full object-contain p-2" loading="lazy" />
               </div>
-              <h1 className="text-2xl font-bold text-foreground">{title}</h1>
-              <p className="text-muted-foreground mt-2">{subtitle}</p>
+              <h1 className="text-3xl font-bold text-foreground">{title}</h1>
+              <p className="text-muted-foreground mt-2 text-lg">{subtitle}</p>
             </div>}
-          
-          {/* Desktop title */}
-          <div className="hidden lg:block text-center">
-            <h1 className="text-3xl font-bold text-foreground">{title}</h1>
-            <p className="text-muted-foreground mt-2 text-lg">{subtitle}</p>
-          </div>
 
           <Card className="p-8 shadow-lg border">
             {children}

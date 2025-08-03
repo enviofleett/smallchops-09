@@ -3,24 +3,21 @@ import { Link } from 'react-router-dom';
 import { Facebook, Twitter, Instagram, Mail, Phone, MapPin } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
-
 export const PublicFooter = () => {
-  return (
-    <ProductionErrorBoundary context="PublicFooter" showErrorDetails={false}>
+  return <ProductionErrorBoundary context="PublicFooter" showErrorDetails={false}>
       <PublicFooterContent />
-    </ProductionErrorBoundary>
-  );
+    </ProductionErrorBoundary>;
 };
-
 const PublicFooterContent = () => {
-  const { data: settings, error } = useBusinessSettings();
+  const {
+    data: settings,
+    error
+  } = useBusinessSettings();
 
   // Graceful degradation
   const businessName = settings?.name || 'Starters';
   const logoUrl = settings?.logo_url || "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
-
-  return (
-    <footer className="bg-gray-900 text-white py-16">
+  return <footer className="bg-gray-900 text-white py-16">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
           {/* Address */}
@@ -28,7 +25,7 @@ const PublicFooterContent = () => {
             <h3 className="text-lg font-bold mb-4 text-white">Address</h3>
             <div className="space-y-2 text-gray-300">
               <div className="font-medium">Headquarters:</div>
-              <div>No.31, Kubwa Road,</div>
+              <div>346 Adeoye Ogunlana St, lifecamp, Abuja</div>
               <div>3rd Avenue.</div>
               <div>Abuja.</div>
             </div>
@@ -70,46 +67,23 @@ const PublicFooterContent = () => {
           <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
             {/* Logo and Tagline */}
             <div className="flex items-center space-x-3">
-              <img
-                src={logoUrl}
-                alt={`${businessName} Logo`}
-                className="h-8 w-auto"
-                onError={(e) => {
-                  e.currentTarget.src = "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
-                }}
-              />
+              <img src={logoUrl} alt={`${businessName} Logo`} className="h-8 w-auto" onError={e => {
+              e.currentTarget.src = "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
+            }} />
               <span className="text-gray-400 text-sm">{settings?.tagline || 'SMALL CHOPS'}</span>
             </div>
 
             {/* Social Media Icons */}
             <div className="flex items-center space-x-4">
-              {settings?.facebook_url && (
-                <Link 
-                  to={settings.facebook_url} 
-                  className="text-gray-400 hover:text-white transition-colors"
-                  target="_blank"
-                >
+              {settings?.facebook_url && <Link to={settings.facebook_url} className="text-gray-400 hover:text-white transition-colors" target="_blank">
                   <Facebook className="w-5 h-5" />
-                </Link>
-              )}
-              {settings?.twitter_url && (
-                <Link 
-                  to={settings.twitter_url} 
-                  className="text-gray-400 hover:text-white transition-colors"
-                  target="_blank"
-                >
+                </Link>}
+              {settings?.twitter_url && <Link to={settings.twitter_url} className="text-gray-400 hover:text-white transition-colors" target="_blank">
                   <Twitter className="w-5 h-5" />
-                </Link>
-              )}
-              {settings?.instagram_url && (
-                <Link 
-                  to={settings.instagram_url} 
-                  className="text-gray-400 hover:text-white transition-colors"
-                  target="_blank"
-                >
+                </Link>}
+              {settings?.instagram_url && <Link to={settings.instagram_url} className="text-gray-400 hover:text-white transition-colors" target="_blank">
                   <Instagram className="w-5 h-5" />
-                </Link>
-              )}
+                </Link>}
             </div>
           </div>
         </div>
@@ -121,6 +95,5 @@ const PublicFooterContent = () => {
           </p>
         </div>
       </div>
-    </footer>
-  );
+    </footer>;
 };

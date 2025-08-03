@@ -140,23 +140,51 @@ const SplitScreenLoginPage = () => {
     <div className="min-h-screen bg-background flex">
       {/* Left Side - Hero Image */}
       <div className="hidden lg:flex lg:flex-1 relative overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/40" />
         <div 
           className="w-full h-full bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url('/lovable-uploads/cbbd489f-c162-4793-86de-b95b5429317b.png')`
+            backgroundImage: `url('https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80')`
           }}
         />
         <div className="absolute inset-0 bg-black/40" />
         
         {/* Hero Content */}
-        <div className="absolute bottom-16 left-8 right-8">
-          <div className="bg-black/20 backdrop-blur-sm border border-white/20 rounded-lg p-6 text-white">
-            <h2 className="text-2xl font-bold mb-2">
-              Delicious Bites, Big Smiles
+        <div className="relative z-10 flex flex-col justify-center px-12 text-white">
+          <div className="max-w-md">
+            <div className="flex items-center space-x-3 mb-8">
+              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
+                <img 
+                  src={startersLogo} 
+                  alt="Starters" 
+                  className="w-8 h-8 object-contain"
+                />
+              </div>
+              <h1 className="text-2xl font-bold">Starters</h1>
+            </div>
+            
+            <h2 className="text-4xl font-bold mb-4 leading-tight">
+              Premium Small Chops & Catering
             </h2>
-            <p className="text-white/90">
-              Crispy, savory small chops, freshly made and delivered fast.
+            <p className="text-xl text-white/90 mb-8">
+              Delicious Nigerian small chops delivered fresh to your doorstep. 
+              Experience the finest taste in every bite.
             </p>
+            
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-white rounded-full" />
+                <span>Fresh ingredients, premium quality</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-white rounded-full" />
+                <span>Fast delivery across Lagos</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-white rounded-full" />
+                <span>Perfect for events & parties</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -164,58 +192,62 @@ const SplitScreenLoginPage = () => {
       {/* Right Side - Auth Forms */}
       <div className="flex-1 lg:max-w-md xl:max-w-lg flex items-center justify-center p-8">
         <div className="w-full max-w-sm space-y-8">
-          {/* Back Button */}
-          <button 
-            onClick={() => window.history.back()}
-            className="flex items-center text-muted-foreground hover:text-foreground transition-colors"
-          >
-            <ArrowLeft className="h-4 w-4" />
-          </button>
-
-          {/* Logo */}
-          <div className="text-center">
-            <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-primary">
+          {/* Mobile Logo */}
+          <div className="lg:hidden text-center">
+            <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-primary/10">
               <img 
                 src={startersLogo} 
                 alt="Starters" 
                 className="w-10 h-10 object-contain"
               />
             </div>
+            <h1 className="text-2xl font-bold text-foreground">Starters</h1>
+            <p className="text-muted-foreground">Premium Small Chops</p>
           </div>
 
           {/* Auth Header */}
           <div className="text-center space-y-2">
             <h2 className="text-2xl font-bold tracking-tight">
-              {view === 'login' ? 'Welcome Back' : 'Create Account'}
+              {view === 'login' ? 'Welcome back' : 'Create account'}
             </h2>
+            <p className="text-muted-foreground">
+              {view === 'login' 
+                ? 'Sign in to your account to continue' 
+                : 'Join us for the best small chops experience'
+              }
+            </p>
           </div>
 
           {/* Forms */}
           {view === 'login' ? (
-            <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-6">
+            <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Email"
-                  className="w-full h-12 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  {...loginForm.register('email')}
-                  disabled={isLoading}
-                />
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    className="pl-10"
+                    {...loginForm.register('email')}
+                    disabled={isLoading}
+                  />
+                </div>
                 {loginForm.formState.errors.email && (
                   <p className="text-sm text-destructive">{loginForm.formState.errors.email.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Password"
-                    className="w-full h-12 px-4 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="Enter your password"
+                    className="pl-10 pr-10"
                     {...loginForm.register('password')}
                     disabled={isLoading}
                   />
@@ -223,11 +255,11 @@ const SplitScreenLoginPage = () => {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 h-auto p-0 hover:bg-transparent"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
                 {loginForm.formState.errors.password && (
@@ -235,27 +267,18 @@ const SplitScreenLoginPage = () => {
                 )}
               </div>
 
-              <div className="text-right">
-                <button
-                  type="button"
-                  onClick={() => setView('register')}
-                  className="text-sm text-primary hover:underline"
-                >
-                  Forgot Password
-                </button>
-              </div>
-
-              <Button 
-                type="submit" 
-                className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Login
+                Sign In
               </Button>
 
-              <div className="text-center text-sm text-gray-500">
-                Or
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
               </div>
 
               <GoogleAuthButton 
@@ -263,70 +286,77 @@ const SplitScreenLoginPage = () => {
                   await handleGoogleAuth();
                 }} 
                 isLoading={isLoading} 
-                text="Login with Google"
-                variant="outline"
+                text="Continue with Google"
                 mode="login"
               />
 
               <div className="text-center">
-                <span className="text-sm text-gray-600">Are you new here? </span>
                 <button
                   type="button"
                   onClick={() => setView('register')}
-                  className="text-sm text-primary hover:underline font-medium"
+                  className="text-sm text-primary hover:underline"
                 >
-                  Create Account
+                  Don't have an account? Sign up
                 </button>
               </div>
             </form>
           ) : (
-            <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-6">
+            <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
               <div className="space-y-2">
-                <Label htmlFor="name" className="text-sm font-medium text-gray-700">Full Name</Label>
-                <Input
-                  id="name"
-                  type="text"
-                  placeholder="Full Name"
-                  className="w-full h-12 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  {...registerForm.register('name')}
-                  disabled={isLoading}
-                />
+                <Label htmlFor="name">Full Name</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    type="text"
+                    placeholder="Enter your full name"
+                    className="pl-10"
+                    {...registerForm.register('name')}
+                    disabled={isLoading}
+                  />
+                </div>
                 {registerForm.formState.errors.name && (
                   <p className="text-sm text-destructive">{registerForm.formState.errors.name.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="email" className="text-sm font-medium text-gray-700">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Email"
-                  className="w-full h-12 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  {...registerForm.register('email')}
-                  disabled={isLoading}
-                />
+                <Label htmlFor="email">Email</Label>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="Enter your email"
+                    className="pl-10"
+                    {...registerForm.register('email')}
+                    disabled={isLoading}
+                  />
+                </div>
                 {registerForm.formState.errors.email && (
                   <p className="text-sm text-destructive">{registerForm.formState.errors.email.message}</p>
                 )}
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-sm font-medium text-gray-700">Phone Number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  placeholder="09120020048"
-                  className="w-full h-12 px-4 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
-                  {...registerForm.register('phone', {
-                    onChange: (e) => {
-                      e.target.value = formatPhoneNumber(e.target.value);
-                    }
-                  })}
-                  disabled={isLoading}
-                  maxLength={11}
-                />
-                <p className="text-xs text-gray-500">
+                <Label htmlFor="phone">Phone Number</Label>
+                <div className="relative">
+                  <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="phone"
+                    type="tel"
+                    placeholder="09120020048"
+                    className="pl-10"
+                    {...registerForm.register('phone', {
+                      onChange: (e) => {
+                        e.target.value = formatPhoneNumber(e.target.value);
+                      }
+                    })}
+                    disabled={isLoading}
+                    maxLength={11}
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground">
                   Enter your Nigerian phone number
                 </p>
                 {registerForm.formState.errors.phone && (
@@ -335,13 +365,14 @@ const SplitScreenLoginPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="password" className="text-sm font-medium text-gray-700">Password</Label>
+                <Label htmlFor="password">Password</Label>
                 <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="password"
                     type={showPassword ? 'text' : 'password'}
-                    placeholder="Password"
-                    className="w-full h-12 px-4 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="Create a password"
+                    className="pl-10 pr-10"
                     {...registerForm.register('password')}
                     disabled={isLoading}
                   />
@@ -349,11 +380,11 @@ const SplitScreenLoginPage = () => {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 h-auto p-0 hover:bg-transparent"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowPassword(!showPassword)}
                     disabled={isLoading}
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
                 {registerForm.formState.errors.password && (
@@ -362,13 +393,14 @@ const SplitScreenLoginPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="confirmPassword" className="text-sm font-medium text-gray-700">Confirm Password</Label>
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <div className="relative">
+                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                   <Input
                     id="confirmPassword"
                     type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm Password"
-                    className="w-full h-12 px-4 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent"
+                    placeholder="Confirm your password"
+                    className="pl-10 pr-10"
                     {...registerForm.register('confirmPassword')}
                     disabled={isLoading}
                   />
@@ -376,11 +408,11 @@ const SplitScreenLoginPage = () => {
                     type="button"
                     variant="ghost"
                     size="sm"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 h-auto p-0 hover:bg-transparent"
+                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     disabled={isLoading}
                   >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4 text-gray-400" /> : <Eye className="h-4 w-4 text-gray-400" />}
+                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </Button>
                 </div>
                 {registerForm.formState.errors.confirmPassword && (
@@ -388,17 +420,18 @@ const SplitScreenLoginPage = () => {
                 )}
               </div>
 
-              <Button 
-                type="submit" 
-                className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-medium rounded-lg"
-                disabled={isLoading}
-              >
+              <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Create Account
               </Button>
 
-              <div className="text-center text-sm text-gray-500">
-                Or
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <span className="w-full border-t" />
+                </div>
+                <div className="relative flex justify-center text-xs uppercase">
+                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                </div>
               </div>
 
               <GoogleAuthButton 
@@ -407,18 +440,16 @@ const SplitScreenLoginPage = () => {
                 }} 
                 isLoading={isLoading} 
                 text="Sign up with Google"
-                variant="outline"
                 mode="register"
               />
 
               <div className="text-center">
-                <span className="text-sm text-gray-600">Already have an account? </span>
                 <button
                   type="button"
                   onClick={() => setView('login')}
-                  className="text-sm text-primary hover:underline font-medium"
+                  className="text-sm text-primary hover:underline"
                 >
-                  Sign in
+                  Already have an account? Sign in
                 </button>
               </div>
             </form>

@@ -82,11 +82,11 @@ const ProductDetail = () => {
       if (productData) {
         setProduct(productData);
         
-        // Fetch related products from same category
+        // Fetch related products from same category - show up to 4 products
         const allProducts = await getProductsWithDiscounts(productData.category_id);
         const related = allProducts
           .filter((p: ProductWithDiscount) => p.id !== id)
-          .slice(0, 3);
+          .slice(0, 4);
         setRelatedProducts(related);
         console.log('Related products:', related);
       } else {
@@ -231,11 +231,11 @@ const ProductDetail = () => {
         <div className="grid lg:grid-cols-2 gap-12 mb-12">
           {/* Product Image - Reduced by 20% */}
           <div className="space-y-4">
-            <div className="aspect-square overflow-hidden rounded-lg bg-gray-100 w-4/5 mx-auto">
+            <div className="aspect-square overflow-hidden rounded-lg bg-muted w-4/5 mx-auto">
               <img
                 src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=480&h=480&fit=crop'}
                 alt={product.name}
-                className="w-full h-full object-cover hover:scale-105 transition-transform"
+                className="w-full h-full object-cover hover:scale-105 transition-transform duration-300"
               />
             </div>
           </div>
@@ -455,7 +455,7 @@ const ProductDetail = () => {
         {relatedProducts.length > 0 && (
           <div>
             <h3 className="text-2xl font-bold mb-6">You might also like</h3>
-            <div className="grid md:grid-cols-3 gap-6">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
               {relatedProducts.map((relatedProduct) => (
                 <Card key={relatedProduct.id} className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
                   <div 

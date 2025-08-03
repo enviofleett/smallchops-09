@@ -9,7 +9,7 @@ import DashboardHeader from '@/components/DashboardHeader';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { EmailQueueProcessor } from '@/components/admin/EmailQueueProcessor';
+
 
 const Dashboard = () => {
   const { data, isLoading, error, refresh } = useDashboardData();
@@ -78,8 +78,6 @@ const Dashboard = () => {
         </div>
       )}
 
-      {/* Email Queue Processor */}
-      <EmailQueueProcessor />
       
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">

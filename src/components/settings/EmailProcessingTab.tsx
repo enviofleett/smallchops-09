@@ -8,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Mail, Send, Clock, CheckCircle, XCircle, Shield, AlertTriangle, Zap } from 'lucide-react';
 import { EmailDeliveryMonitor } from './EmailDeliveryMonitor';
 import { RealTimeEmailProcessor } from './RealTimeEmailProcessor';
+import { EmailQueueProcessor } from '@/components/admin/EmailQueueProcessor';
 
 export const EmailProcessingTab = () => {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -124,12 +125,14 @@ export const EmailProcessingTab = () => {
             <RealTimeEmailProcessor />
           </TabsContent>
 
-      <TabsContent value="queue">
+      <TabsContent value="queue" className="space-y-6">
+        <EmailQueueProcessor />
+        
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Mail className="h-5 w-5" />
-              Email Queue Management
+              Advanced Queue Management
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">

@@ -8,6 +8,8 @@ import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
 import { PaymentSettingsTab } from "@/components/payments/PaymentSettingsTab";
 import { ContentManagementTab } from "@/components/blog/ContentManagementTab";
 import { EmailProcessingTab } from "@/components/settings/EmailProcessingTab";
+import { EmailDeliveryMonitor } from "@/components/settings/EmailDeliveryMonitor";
+import { EmailHealthDashboard } from "@/components/admin/EmailHealthDashboard";
 import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -79,12 +81,44 @@ const Settings = () => {
             </TabsContent>
             
             <TabsContent value="email">
-              <Card>
+              <Tabs defaultValue="communications" className="space-y-6">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="communications">Settings</TabsTrigger>
+                  <TabsTrigger value="processing">Processing</TabsTrigger>
+                  <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+                  <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                </TabsList>
                 
-                <CardContent>
-                  <CommunicationsTab />
-                </CardContent>
-              </Card>
+                <TabsContent value="communications">
+                  <Card>
+                    <CardContent>
+                      <CommunicationsTab />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="processing">
+                  <Card>
+                    <CardHeader>
+                      <CardTitle>Email Processing & Queue Management</CardTitle>
+                      <CardDescription>
+                        Process queued emails and manage email queue
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <EmailProcessingTab />
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+                
+                <TabsContent value="monitoring">
+                  <EmailDeliveryMonitor />
+                </TabsContent>
+                
+                <TabsContent value="analytics">
+                  <EmailHealthDashboard />
+                </TabsContent>
+              </Tabs>
             </TabsContent>
             
             <TabsContent value="content">

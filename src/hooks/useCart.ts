@@ -59,25 +59,48 @@ export const useCart = () => {
     },
     itemCount: 0
   });
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Load cart from localStorage on mount
   useEffect(() => {
+    if (isInitialized) return; // Prevent double initialization
+    
+    console.log('🛒 useCart - Loading cart from localStorage...');
     const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+    console.log('🛒 useCart - Raw saved cart:', savedCart);
+    
     if (savedCart) {
       try {
         const parsedCart = JSON.parse(savedCart);
-        setCart(parsedCart);
+        console.log('🛒 useCart - Parsed cart from storage:', parsedCart);
+        console.log('🛒 useCart - Parsed cart items length:', parsedCart.items?.length);
+        
+        // Validate the parsed cart structure
+        if (parsedCart && typeof parsedCart === 'object' && Array.isArray(parsedCart.items)) {
+          setCart(parsedCart);
+          console.log('🛒 useCart - Cart state set from localStorage');
+        } else {
+          console.warn('🛒 useCart - Invalid cart structure in localStorage, clearing...');
+          localStorage.removeItem(CART_STORAGE_KEY);
+        }
       } catch (error) {
-        console.error('Error parsing cart from localStorage:', error);
+        console.error('🛒 useCart - Error parsing cart from localStorage:', error);
         localStorage.removeItem(CART_STORAGE_KEY);
       }
+    } else {
+      console.log('🛒 useCart - No saved cart found in localStorage');
     }
-  }, []);
+    
+    setIsInitialized(true);
+  }, [isInitialized]);
 
-  // Save cart to localStorage whenever it changes
+  // Save cart to localStorage whenever it changes (only after initialization)
   useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-  }, [cart]);
+    if (isInitialized) {
+      console.log('🛒 useCart - Saving cart to localStorage:', cart);
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+    }
+  }, [cart, isInitialized]);
 
   const calculateCartSummary = (
     items: CartItem[], 

@@ -779,6 +779,65 @@ export type Database = {
         }
         Relationships: []
       }
+      cart_sessions: {
+        Row: {
+          abandoned_at: string | null
+          cart_data: Json
+          checkout_started_at: string | null
+          created_at: string | null
+          customer_email: string | null
+          customer_id: string | null
+          customer_phone: string | null
+          id: string
+          is_abandoned: boolean | null
+          last_activity: string | null
+          session_id: string
+          total_items: number | null
+          total_value: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          abandoned_at?: string | null
+          cart_data?: Json
+          checkout_started_at?: string | null
+          created_at?: string | null
+          customer_email?: string | null
+          customer_id?: string | null
+          customer_phone?: string | null
+          id?: string
+          is_abandoned?: boolean | null
+          last_activity?: string | null
+          session_id: string
+          total_items?: number | null
+          total_value?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          abandoned_at?: string | null
+          cart_data?: Json
+          checkout_started_at?: string | null
+          created_at?: string | null
+          customer_email?: string | null
+          customer_id?: string | null
+          customer_phone?: string | null
+          id?: string
+          is_abandoned?: boolean | null
+          last_activity?: string | null
+          session_id?: string
+          total_items?: number | null
+          total_value?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cart_sessions_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       categories: {
         Row: {
           banner_url: string | null
@@ -5897,6 +5956,10 @@ export type Database = {
         Args: { p_customer_id: string }
         Returns: Json
       }
+      detect_abandoned_carts: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       detect_orphaned_customer_records: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -6031,6 +6094,10 @@ export type Database = {
       get_smtp_config_with_fallback: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      get_time_ago: {
+        Args: { target_time: string }
+        Returns: string
       }
       get_user_role: {
         Args: { user_uuid: string }

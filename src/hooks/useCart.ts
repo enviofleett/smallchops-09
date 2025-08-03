@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useCartTracking } from '@/hooks/useCartTracking';
 import { calculateAdvancedOrderDiscount, CartPromotion } from '@/lib/discountCalculations';
 import { calculateCartVATSummary } from '@/lib/vatCalculations';
 import { validatePromotionCode } from '@/api/productsWithDiscounts';
@@ -60,6 +61,9 @@ export const useCart = () => {
     itemCount: 0
   });
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Initialize cart tracking
+  const { trackCart } = useCartTracking(cart);
 
   // Load cart from localStorage on mount
   useEffect(() => {

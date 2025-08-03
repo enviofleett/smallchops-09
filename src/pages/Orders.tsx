@@ -11,6 +11,8 @@ import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { useToast } from '@/hooks/use-toast';
+import AbandonedCartsManager from '@/components/admin/AbandonedCartsManager';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
@@ -165,26 +167,40 @@ const Orders = () => {
         selectedCount={selectedOrders.length}
         onBulkDelete={handleBulkDelete}
       />
-      <OrdersFilter 
-        statusFilter={statusFilter}
-        onStatusChange={handleStatusChange}
-        onSearch={handleSearch}
-      />
-      <OrdersTable 
-        orders={orders} 
-        onViewOrder={handleViewOrder}
-        onDeleteOrder={handleDeleteOrder}
-        selectedOrders={selectedOrders}
-        onSelectOrder={handleSelectOrder}
-        onSelectAll={handleSelectAll}
-      />
-      <OrdersPagination 
-        currentPage={currentPage}
-        totalPages={totalPages}
-        onPageChange={setCurrentPage}
-        totalResults={totalCount}
-        pageSize={PAGE_SIZE}
-      />
+      
+      <Tabs defaultValue="orders" className="w-full">
+        <TabsList>
+          <TabsTrigger value="orders">Active Orders</TabsTrigger>
+          <TabsTrigger value="abandoned">Abandoned Carts</TabsTrigger>
+        </TabsList>
+        
+        <TabsContent value="orders" className="space-y-6">
+          <OrdersFilter 
+            statusFilter={statusFilter}
+            onStatusChange={handleStatusChange}
+            onSearch={handleSearch}
+          />
+          <OrdersTable 
+            orders={orders} 
+            onViewOrder={handleViewOrder}
+            onDeleteOrder={handleDeleteOrder}
+            selectedOrders={selectedOrders}
+            onSelectOrder={handleSelectOrder}
+            onSelectAll={handleSelectAll}
+          />
+          <OrdersPagination 
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+            totalResults={totalCount}
+            pageSize={PAGE_SIZE}
+          />
+        </TabsContent>
+        
+        <TabsContent value="abandoned">
+          <AbandonedCartsManager />
+        </TabsContent>
+      </Tabs>
       
       {selectedOrder && (
         <OrderDetailsDialog 

@@ -137,86 +137,64 @@ const SplitScreenLoginPage = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background flex">
+    <div className="min-h-screen bg-background flex flex-col lg:flex-row">
       {/* Left Side - Hero Image */}
-      <div className="hidden lg:flex lg:flex-1 relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/40" />
+      <div className="lg:flex-1 relative overflow-hidden h-64 lg:h-screen">
         <div 
           className="w-full h-full bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url('https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?ixlib=rb-4.0.3&auto=format&fit=crop&w=1080&q=80')`
+            backgroundImage: `url('/hero-family.jpg')`
           }}
         />
-        <div className="absolute inset-0 bg-black/40" />
+        <div className="absolute inset-0 bg-black/50" />
         
         {/* Hero Content */}
-        <div className="relative z-10 flex flex-col justify-center px-12 text-white">
+        <div className="absolute inset-0 flex flex-col justify-center px-6 lg:px-12 text-white">
           <div className="max-w-md">
-            <div className="flex items-center space-x-3 mb-8">
-              <div className="w-12 h-12 rounded-full bg-white flex items-center justify-center">
-                <img 
-                  src={startersLogo} 
-                  alt="Starters" 
-                  className="w-8 h-8 object-contain"
-                />
-              </div>
-              <h1 className="text-2xl font-bold">Starters</h1>
-            </div>
-            
-            <h2 className="text-4xl font-bold mb-4 leading-tight">
-              Premium Small Chops & Catering
+            <h2 className="text-3xl lg:text-4xl font-bold mb-4 leading-tight">
+              Delicious Bites, Big Smiles
             </h2>
-            <p className="text-xl text-white/90 mb-8">
-              Delicious Nigerian small chops delivered fresh to your doorstep. 
-              Experience the finest taste in every bite.
+            <p className="text-lg lg:text-xl text-white/90">
+              Crispy, savory small chops, freshly made and delivered fast.
             </p>
-            
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-white rounded-full" />
-                <span>Fresh ingredients, premium quality</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-white rounded-full" />
-                <span>Fast delivery across Lagos</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-white rounded-full" />
-                <span>Perfect for events & parties</span>
-              </div>
-            </div>
           </div>
         </div>
       </div>
 
       {/* Right Side - Auth Forms */}
-      <div className="flex-1 lg:max-w-md xl:max-w-lg flex items-center justify-center p-8">
-        <div className="w-full max-w-sm space-y-8">
-          {/* Mobile Logo */}
-          <div className="lg:hidden text-center">
-            <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center bg-primary/10">
-              <img 
-                src={startersLogo} 
-                alt="Starters" 
-                className="w-10 h-10 object-contain"
-              />
-            </div>
-            <h1 className="text-2xl font-bold text-foreground">Starters</h1>
-            <p className="text-muted-foreground">Premium Small Chops</p>
-          </div>
+      <div className="flex-1 lg:max-w-md xl:max-w-lg flex flex-col">
+        {/* Top Bar with Back Arrow and Logo */}
+        <div className="flex justify-between items-center p-6 lg:p-8">
+          <Button 
+            variant="ghost" 
+            size="sm" 
+            onClick={() => navigate('/')}
+            className="p-2"
+          >
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <img 
+            src={startersLogo} 
+            alt="Starters" 
+            className="h-8 w-auto object-contain"
+          />
+        </div>
 
-          {/* Auth Header */}
-          <div className="text-center space-y-2">
-            <h2 className="text-2xl font-bold tracking-tight">
-              {view === 'login' ? 'Welcome back' : 'Create account'}
-            </h2>
-            <p className="text-muted-foreground">
-              {view === 'login' 
-                ? 'Sign in to your account to continue' 
-                : 'Join us for the best small chops experience'
-              }
-            </p>
-          </div>
+        {/* Auth Content */}
+        <div className="flex-1 flex items-center justify-center px-6 lg:px-8 pb-8">
+          <div className="w-full max-w-sm space-y-6">
+            {/* Auth Header */}
+            <div className="text-left space-y-2">
+              <h2 className="text-2xl font-bold tracking-tight">
+                {view === 'login' ? 'Welcome Back' : 'Create Account'}
+              </h2>
+              <p className="text-muted-foreground text-sm">
+                {view === 'login' 
+                  ? 'Enter your email and password to sign in' 
+                  : 'Fill in your details to get started'
+                }
+              </p>
+            </div>
 
           {/* Forms */}
           {view === 'login' ? (

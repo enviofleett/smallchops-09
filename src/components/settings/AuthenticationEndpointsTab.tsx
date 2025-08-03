@@ -43,16 +43,6 @@ export const AuthenticationEndpointsTab = () => {
       let response;
       
       switch (endpointKey) {
-        case 'generate-otp':
-          response = await supabase.functions.invoke('generate-otp-email', {
-            body: payload
-          });
-          break;
-        case 'verify-otp':
-          response = await supabase.functions.invoke('verify-otp', {
-            body: payload
-          });
-          break;
         case 'google-oauth':
           response = await supabase.auth.signInWithOAuth({
             provider: 'google',
@@ -106,56 +96,6 @@ export const AuthenticationEndpointsTab = () => {
   };
 
   const endpoints = [
-    {
-      key: 'generate-otp',
-      title: 'Generate OTP Email',
-      method: 'POST',
-      path: '/functions/v1/generate-otp-email',
-      description: 'Generate and send OTP code via email for authentication',
-      payload: {
-        email: 'customer@example.com',
-        purpose: 'login',
-        customerName: 'John Doe'
-      },
-      response: {
-        success: true,
-        message: 'OTP sent successfully',
-        expiresIn: 300
-      },
-      usage: `// Generate OTP for login
-const { data, error } = await supabase.functions.invoke('generate-otp-email', {
-  body: {
-    email: 'customer@example.com',
-    purpose: 'login', // 'login' | 'registration' | 'password_reset'
-    customerName: 'John Doe' // Optional
-  }
-});`
-    },
-    {
-      key: 'verify-otp',
-      title: 'Verify OTP Code',
-      method: 'POST',
-      path: '/functions/v1/verify-otp',
-      description: 'Verify OTP code and complete authentication',
-      payload: {
-        email: 'customer@example.com',
-        code: '123456',
-        purpose: 'login'
-      },
-      response: {
-        success: true,
-        loginVerified: true,
-        email: 'customer@example.com'
-      },
-      usage: `// Verify OTP code
-const { data, error } = await supabase.functions.invoke('verify-otp', {
-  body: {
-    email: 'customer@example.com',
-    code: '123456',
-    purpose: 'login' // 'login' | 'registration' | 'password_reset'
-  }
-});`
-    },
     {
       key: 'google-oauth',
       title: 'Google OAuth Flow',
@@ -410,68 +350,54 @@ const { data, error } = await supabase.auth.signInWithOAuth({
               <CardDescription>Best practices for implementing authentication in your React app</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div>
-                <h3 className="font-semibold mb-3">OTP Registration Flow</h3>
+               <div>
+                <h3 className="font-semibold mb-3">Direct Email/Password Registration</h3>
                 <div className="relative">
                   <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto">
-{`// Complete OTP registration workflow
-const registerWithOTP = async (userData) => {
+{`// Customer registration with direct email/password
+const registerCustomer = async (userData) => {
   try {
-    // Step 1: Generate OTP
-    const { data: otpData, error: otpError } = await supabase.functions.invoke('generate-otp-email', {
-      body: {
-        email: userData.email,
-        purpose: 'registration',
-        customerName: userData.name
+    // Create Supabase user account
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: userData.email,
+      password: userData.password,
+      options: {
+        emailRedirectTo: \`\${window.location.origin}/customer-portal\`,
+        data: {
+          name: userData.name,
+          phone: userData.phone
+        }
       }
     });
 
-    if (otpError) throw otpError;
-    
-    // Step 2: Show OTP input form
-    setShowOTPInput(true);
-    setTempRegistrationData(userData);
-    
-    // Step 3: Verify OTP and complete registration
-    const verifyAndRegister = async (otpCode) => {
-      const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-otp', {
-        body: {
-          email: userData.email,
-          code: otpCode,
-          purpose: 'registration'
-        }
+    if (authError) throw authError;
+
+    // Create customer account record
+    const { error: customerError } = await supabase
+      .from('customer_accounts')
+      .insert({
+        user_id: authData.user.id,
+        name: userData.name,
+        phone: userData.phone
       });
-      
-      if (verifyError) throw verifyError;
-      
-      if (verifyData.emailVerified) {
-        // OTP verified, now create account
-        const { data: authData, error: authError } = await supabase.auth.signUp({
-          email: userData.email,
-          password: userData.password,
-          options: {
-            data: {
-              name: userData.name,
-              phone: userData.phone
-            }
-          }
-        });
-        
-        if (authError) throw authError;
-        
-        toast({
-          title: "Registration successful!",
-          description: "Welcome to our platform."
-        });
-      }
-    };
-    
+
+    if (customerError) {
+      console.error('Customer account creation error:', customerError);
+    }
+
+    toast({
+      title: "Registration successful!",
+      description: "Please check your email to verify your account."
+    });
+
+    return { success: true, user: authData.user };
   } catch (error) {
     toast({
       title: "Registration failed",
       description: error.message,
       variant: "destructive"
     });
+    return { success: false, error };
   }
 };`}
                   </pre>
@@ -479,7 +405,7 @@ const registerWithOTP = async (userData) => {
                     size="sm"
                     variant="ghost"
                     className="absolute top-2 right-2"
-                    onClick={() => copyToClipboard(`// Complete OTP registration workflow...`)}
+                    onClick={() => copyToClipboard(`// Customer registration with direct email/password...`)}
                   >
                     <Copy className="w-3 h-3" />
                   </Button>
@@ -489,150 +415,37 @@ const registerWithOTP = async (userData) => {
               <Separator />
 
               <div>
-                <h3 className="font-semibold mb-3">Error Handling Best Practices</h3>
+                <h3 className="font-semibold mb-3">Google OAuth Authentication</h3>
                 <div className="relative">
                   <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto">
-{`// Comprehensive error handling for auth endpoints
-const handleAuthError = (error, operation) => {
-  console.error(\`\${operation} error:\`, error);
-  
-  // Rate limiting errors
-  if (error.message?.includes('rate limit') || error.status === 429) {
+{`// Google OAuth authentication flow
+const authenticateWithGoogle = async () => {
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: \`\${window.location.origin}/customer-portal\`
+      }
+    });
+
+    if (error) throw error;
+
+    return { success: true };
+  } catch (error) {
     toast({
-      title: "Too many requests",
-      description: "Please wait before trying again.",
+      title: "Google authentication failed",
+      description: error.message,
       variant: "destructive"
     });
-    return;
+    return { success: false, error };
   }
-  
-  // OTP specific errors
-  if (operation === 'otp-verify') {
-    if (error.message?.includes('expired')) {
-      toast({
-        title: "Code expired",
-        description: "Please request a new verification code.",
-        variant: "destructive"
-      });
-      setShowOTPInput(false);
-      return;
-    }
-    
-    if (error.message?.includes('invalid')) {
-      toast({
-        title: "Invalid code",
-        description: "Please check your code and try again.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    if (error.message?.includes('max attempts')) {
-      toast({
-        title: "Too many attempts",
-        description: "Please request a new verification code.",
-        variant: "destructive"
-      });
-      setShowOTPInput(false);
-      return;
-    }
-  }
-  
-  // Generic error fallback
-  toast({
-    title: "Authentication error",
-    description: error.message || "Something went wrong. Please try again.",
-    variant: "destructive"
-  });
 };`}
                   </pre>
                   <Button
                     size="sm"
                     variant="ghost"
                     className="absolute top-2 right-2"
-                    onClick={() => copyToClipboard(`// Comprehensive error handling...`)}
-                  >
-                    <Copy className="w-3 h-3" />
-                  </Button>
-                </div>
-              </div>
-
-              <Separator />
-
-              <div>
-                <h3 className="font-semibold mb-3">Authentication Pattern</h3>
-                <div className="relative">
-                  <pre className="bg-muted p-4 rounded-lg text-xs overflow-x-auto">
-{`// Customer authentication with email/password
-const useCustomerDirectAuth = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const initiateOTPFlow = async (email, purpose, additionalData = {}) => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('generate-otp-email', {
-        body: { email, purpose, ...additionalData }
-      });
-      
-      if (error) throw error;
-      
-      setIsOTPRequired(true);
-      setTempData({ email, purpose, ...additionalData });
-      
-      return { success: true };
-    } catch (error) {
-      handleAuthError(error, 'otp-generate');
-      return { success: false, error };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  const completeOTPVerification = async (code) => {
-    if (!tempData) throw new Error('No OTP session found');
-    
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('verify-otp', {
-        body: {
-          email: tempData.email,
-          code,
-          purpose: tempData.purpose
-        }
-      });
-      
-      if (error) throw error;
-      
-      setIsOTPRequired(false);
-      setTempData(null);
-      
-      return { success: true, data };
-    } catch (error) {
-      handleAuthError(error, 'otp-verify');
-      return { success: false, error };
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  return {
-    isOTPRequired,
-    isLoading,
-    tempData,
-    initiateOTPFlow,
-    completeOTPVerification,
-    resetOTPState: () => {
-      setIsOTPRequired(false);
-      setTempData(null);
-    }
-  };
-};`}
-                  </pre>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="absolute top-2 right-2"
-                    onClick={() => copyToClipboard(`// Unified authentication state management...`)}
+                    onClick={() => copyToClipboard(`// Google OAuth authentication flow...`)}
                   >
                     <Copy className="w-3 h-3" />
                   </Button>
@@ -649,18 +462,18 @@ const useCustomerDirectAuth = () => {
               <CardDescription>Monitor authentication performance and security</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">98.5%</div>
-                  <div className="text-sm text-blue-700 dark:text-blue-300">OTP Delivery Rate</div>
+                  <div className="text-2xl font-bold text-blue-900 dark:text-blue-100">99.2%</div>
+                  <div className="text-sm text-blue-700 dark:text-blue-300">Auth Success Rate</div>
                 </div>
                 <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-green-900 dark:text-green-100">1.2s</div>
+                  <div className="text-2xl font-bold text-green-900 dark:text-green-100">0.8s</div>
                   <div className="text-sm text-green-700 dark:text-green-300">Avg Response Time</div>
                 </div>
                 <div className="bg-purple-50 dark:bg-purple-950 p-4 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">156</div>
-                  <div className="text-sm text-purple-700 dark:text-purple-300">Today's Authentications</div>
+                  <div className="text-2xl font-bold text-purple-900 dark:text-purple-100">89</div>
+                  <div className="text-sm text-purple-700 dark:text-purple-300">Today's Logins</div>
                 </div>
               </div>
 
@@ -668,18 +481,18 @@ const useCustomerDirectAuth = () => {
                 <h4 className="font-medium">Monitoring Links</h4>
                 <div className="space-y-2">
                   <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                    <a href={`https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/functions/generate-otp-email/logs`} target="_blank" rel="noopener noreferrer">
-                      OTP Generation Logs
-                    </a>
-                  </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start" asChild>
-                    <a href={`https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/functions/verify-otp/logs`} target="_blank" rel="noopener noreferrer">
-                      OTP Verification Logs
-                    </a>
-                  </Button>
-                  <Button variant="outline" size="sm" className="w-full justify-start" asChild>
                     <a href={`https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/auth/users`} target="_blank" rel="noopener noreferrer">
                       User Management
+                    </a>
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full justify-start" asChild>
+                    <a href={`https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/auth/providers`} target="_blank" rel="noopener noreferrer">
+                      Auth Providers
+                    </a>
+                  </Button>
+                  <Button variant="outline" size="sm" className="w-full justify-start" asChild>
+                    <a href={`https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/logs/explorer`} target="_blank" rel="noopener noreferrer">
+                      Authentication Logs
                     </a>
                   </Button>
                 </div>

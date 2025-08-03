@@ -4,7 +4,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { useAuth } from '@/contexts/AuthContext';
+import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
 import { useRegistrationDebug } from '@/services/registrationDebugService';
 
 import { Eye, EyeOff, Loader2, ArrowLeft, CheckCircle, Mail, User, Phone, Lock } from 'lucide-react';
@@ -21,7 +21,7 @@ const CustomerRegister = () => {
   const [showValidation, setShowValidation] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { signUp, signUpWithGoogle } = useAuth();
+  const { register, signUpWithGoogle } = useCustomerDirectAuth();
   const { logDebug } = useRegistrationDebug();
   
 
@@ -121,13 +121,17 @@ const CustomerRegister = () => {
     });
 
     try {
-      // Create account directly
-      await signUp({
+      // Create account using customer direct auth
+      const result = await register({
         email: formData.email,
         password: formData.password,
         name: formData.name,
         phone: formData.phone
       });
+
+      if (!result.success) {
+        throw new Error(result.error || 'Registration failed');
+      }
 
       // Log successful registration
       await logDebug('Customer registration successful', 'info', {

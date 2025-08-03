@@ -34,9 +34,9 @@ export const useCustomerAuth = () => {
 
     const initializeAuth = async () => {
       try {
-        // Set up auth state listener
+        // Set up auth state listener - CRITICAL: No Supabase calls inside this callback
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
+          (event, session) => {
             console.log('Customer auth state change:', event, session?.user?.id);
             
             if (!mounted) return;
@@ -50,8 +50,11 @@ export const useCustomerAuth = () => {
                 error: null
               }));
 
-              try {
-                const customerAccount = await getCustomerAccountWithRetry(session.user.id);
+              // Defer async operations to prevent deadlock
+              setTimeout(() => {
+                if (!mounted) return;
+                
+                getCustomerAccountWithRetry(session.user.id).then(customerAccount => {
                   if (mounted) {
                     setAuthState(prev => ({
                       ...prev,
@@ -63,33 +66,32 @@ export const useCustomerAuth = () => {
 
                     // Trigger instant welcome email processing for new OAuth users
                     if (event === 'SIGNED_IN' && session.user.app_metadata?.provider === 'google') {
-                      setTimeout(async () => {
-                        try {
-                          console.log('🚀 Triggering instant welcome email processing for OAuth user');
-                          const { error: processError } = await supabase.functions.invoke('instant-welcome-processor');
+                      setTimeout(() => {
+                        supabase.functions.invoke('instant-welcome-processor').then(({ error: processError }) => {
                           if (processError) {
                             console.warn('Welcome email processing warning:', processError);
                           } else {
                             console.log('✅ Welcome email processing triggered successfully');
                           }
-                        } catch (error) {
+                        }).catch(error => {
                           console.warn('Welcome email processing error:', error);
-                        }
-                      }, 3000); // 3 second delay to ensure database trigger has completed
+                        });
+                      }, 3000);
                     }
                   }
-              } catch (error) {
-                console.error('Error loading customer account:', error);
-                if (mounted) {
-                  setAuthState(prev => ({
-                    ...prev,
-                    customerAccount: null,
-                    isLoading: false,
-                    isAuthenticated: false,
-                    error: error instanceof Error ? error.message : 'Failed to load customer account'
-                  }));
-                }
-              }
+                }).catch(error => {
+                  console.error('Error loading customer account:', error);
+                  if (mounted) {
+                    setAuthState(prev => ({
+                      ...prev,
+                      customerAccount: null,
+                      isLoading: false,
+                      isAuthenticated: false,
+                      error: error instanceof Error ? error.message : 'Failed to load customer account'
+                    }));
+                  }
+                });
+              }, 0);
             } else {
               setAuthState({
                 user: null,

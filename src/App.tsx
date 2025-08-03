@@ -62,7 +62,7 @@ const App = () => (
               <Route path="/auth/reset" element={<PasswordResetPage />} />
               
               {/* Admin login route */}
-              <Route path="/admin/login" element={<AuthPage />} />
+              <Route path="/admin/login" element={<Index />} />
               
               {/* Customer routes */}
               <Route path="/customer-portal" element={<CustomerPortal />} />

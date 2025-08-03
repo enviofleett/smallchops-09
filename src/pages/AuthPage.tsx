@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
+import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
+import { useCustomerRegistration } from '@/hooks/useCustomerRegistration';
 import { usePasswordReset } from '@/hooks/usePasswordReset';
 import { useToast } from '@/hooks/use-toast';
 import AuthLayout from '@/components/auth/AuthLayout';
@@ -9,21 +11,43 @@ import AuthFormValidation from '@/components/auth/AuthFormValidation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader2 } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader2, Shield, Users } from 'lucide-react';
 
-type AuthView = 'login' | 'register' | 'forgot-password' | 'email-verification';
+type AuthView = 'customer-login' | 'customer-register' | 'otp-verification' | 'admin-login' | 'forgot-password';
+type AuthMode = 'customer' | 'admin';
 
 const AuthPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Auth hooks - unified
-  const { login, signUp, resendOtp, signUpWithGoogle, isLoading } = useAuth();
+  // Determine auth mode from URL params
+  const [authMode, setAuthMode] = useState<AuthMode>(() => {
+    const mode = searchParams.get('mode');
+    return mode === 'admin' ? 'admin' : 'customer';
+  });
+  
+  // Set initial view based on mode
+  const [view, setView] = useState<AuthView>(() => {
+    const mode = searchParams.get('mode');
+    return mode === 'admin' ? 'admin-login' : 'customer-login';
+  });
+  
+  // Auth hooks - separated by type
+  const { login: adminLogin, isLoading: isAdminLoading } = useAuth();
+  const { login: customerLogin, signUpWithGoogle, isLoading: isCustomerLoading } = useCustomerDirectAuth();
+  const { 
+    initiateRegistration, 
+    verifyOTPAndCompleteRegistration, 
+    resendOTP,
+    registrationStep,
+    registrationEmail,
+    isLoading: isRegistrationLoading 
+  } = useCustomerRegistration();
   const { sendPasswordReset, isLoading: isPasswordResetLoading } = usePasswordReset();
 
   // State
-  const [view, setView] = useState<AuthView>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showValidation, setShowValidation] = useState(false);
@@ -38,21 +62,42 @@ const AuthPage = () => {
   });
 
   // Store registration data for OTP verification
-  const [registrationData, setRegistrationData] = useState<{
+  const [pendingRegistration, setPendingRegistration] = useState<{
     email: string;
     password: string;
+    name: string;
+    phone?: string;
   } | null>(null);
 
-  // Initialize from URL params
+  // Update view when auth mode changes
   useEffect(() => {
-    const viewParam = searchParams.get('view');
-    
-    if (viewParam === 'register' || viewParam === 'forgot-password') {
-      setView(viewParam);
-    }
+    const mode = searchParams.get('mode');
+    const newAuthMode: AuthMode = mode === 'admin' ? 'admin' : 'customer';
+    setAuthMode(newAuthMode);
+    setView(newAuthMode === 'admin' ? 'admin-login' : 'customer-login');
   }, [searchParams]);
 
-  // Removed auto-redirect logic - handled by AuthRouter
+  // Handle registration step changes
+  useEffect(() => {
+    if (registrationStep === 'otp_verification' && registrationEmail) {
+      setView('otp-verification');
+    } else if (registrationStep === 'completed') {
+      setView('customer-login');
+      setPendingRegistration(null);
+      toast({
+        title: "Registration completed!",
+        description: "You can now log in with your credentials.",
+      });
+    }
+  }, [registrationStep, registrationEmail, toast]);
+
+  const getCurrentLoadingState = () => {
+    if (view === 'admin-login') return isAdminLoading;
+    if (view === 'customer-login') return isCustomerLoading;
+    if (view === 'customer-register' || view === 'otp-verification') return isRegistrationLoading;
+    if (view === 'forgot-password') return isPasswordResetLoading;
+    return false;
+  };
 
   const handleInputChange = (field: string, value: string) => {
     if (field === 'phone') {
@@ -66,87 +111,120 @@ const AuthPage = () => {
     setFormData(prev => ({ ...prev, [field]: value }));
   };
 
-  const validateForm = () => {
-    if (view === 'register') {
-      if (!formData.name.trim()) {
-        toast({ title: "Name required", description: "Please enter your full name.", variant: "destructive" });
-        return false;
-      }
-      
-      if (!formData.phone.trim()) {
-        toast({ title: "Phone required", description: "Phone number is required for customer registration.", variant: "destructive" });
-        return false;
-      }
-      
-      if (formData.phone.length !== 11) {
-        toast({ title: "Invalid phone", description: "Please enter a valid 11-digit Nigerian phone number.", variant: "destructive" });
-        return false;
-      }
-      
-      if (formData.password.length < 6) {
-        toast({ title: "Password too short", description: "Password must be at least 6 characters.", variant: "destructive" });
-        return false;
-      }
-      
-      if (formData.password !== formData.confirmPassword) {
-        toast({ title: "Password mismatch", description: "Passwords do not match.", variant: "destructive" });
-        return false;
-      }
+  const validateCustomerRegistration = () => {
+    if (!formData.name.trim()) {
+      toast({ title: "Name required", description: "Please enter your full name.", variant: "destructive" });
+      return false;
     }
+    
+    if (!formData.phone.trim()) {
+      toast({ title: "Phone required", description: "Phone number is required for customer registration.", variant: "destructive" });
+      return false;
+    }
+    
+    if (formData.phone.length !== 11) {
+      toast({ title: "Invalid phone", description: "Please enter a valid 11-digit Nigerian phone number.", variant: "destructive" });
+      return false;
+    }
+    
+    if (formData.password.length < 8) {
+      toast({ title: "Password too short", description: "Password must be at least 8 characters.", variant: "destructive" });
+      return false;
+    }
+    
+    if (formData.password !== formData.confirmPassword) {
+      toast({ title: "Password mismatch", description: "Passwords do not match.", variant: "destructive" });
+      return false;
+    }
+    
     return true;
   };
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleAdminLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const result = await login({ email: formData.email, password: formData.password });
+    const result = await adminLogin({ email: formData.email, password: formData.password });
     
-    if (result.success && 'redirect' in result && result.redirect) {
+    if (result.success && result.redirect) {
       navigate(result.redirect);
     }
   };
 
-  const handleRegister = async (e: React.FormEvent) => {
+  const handleCustomerLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) return;
+    const result = await customerLogin(formData.email, formData.password);
+    
+    if (result.success && result.redirect) {
+      navigate(result.redirect);
+    }
+  };
 
-    const result = await signUp({
+  const handleCustomerRegistration = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!validateCustomerRegistration()) return;
+
+    const result = await initiateRegistration({
       name: formData.name,
       email: formData.email,
       password: formData.password,
       phone: formData.phone
     });
 
-    if (result.success && 'requiresEmailVerification' in result) {
-      // Show email verification message
-      setRegistrationData({
+    if (result.success && result.requiresOtpVerification) {
+      setPendingRegistration({
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        name: formData.name,
+        phone: formData.phone
       });
-      setView('email-verification');
     }
   };
 
-  const handleResendEmail = async () => {
-    if (!registrationData) {
+  const handleOTPVerification = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!pendingRegistration) {
       toast({ 
         title: "Error", 
-        description: "Registration data not found. Please try again.", 
+        description: "Registration data not found. Please restart registration.", 
         variant: "destructive" 
       });
-      setView('register');
+      setView('customer-register');
       return;
     }
 
-    const result = await resendOtp(registrationData.email);
-    
-    if (result.success) {
-      toast({
-        title: "Email sent",
-        description: "A new verification email has been sent to your inbox.",
+    if (!formData.otp || formData.otp.length !== 6) {
+      toast({ 
+        title: "Invalid OTP", 
+        description: "Please enter the 6-digit verification code.", 
+        variant: "destructive" 
       });
+      return;
     }
+
+    await verifyOTPAndCompleteRegistration({
+      email: pendingRegistration.email,
+      otpCode: formData.otp,
+      password: pendingRegistration.password,
+      name: pendingRegistration.name,
+      phone: pendingRegistration.phone
+    });
+  };
+
+  const handleResendOTP = async () => {
+    if (!pendingRegistration) {
+      toast({ 
+        title: "Error", 
+        description: "Registration data not found. Please restart registration.", 
+        variant: "destructive" 
+      });
+      setView('customer-register');
+      return;
+    }
+
+    await resendOTP(pendingRegistration.email);
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
@@ -164,17 +242,49 @@ const AuthPage = () => {
     const result = await sendPasswordReset(formData.email);
     
     if (result.success) {
-      setView('login');
+      setView(authMode === 'admin' ? 'admin-login' : 'customer-login');
     }
   };
-
 
   const handleGoogleAuth = async () => {
     await signUpWithGoogle();
   };
 
+  const renderModeSelector = () => (
+    <div className="flex flex-col space-y-3 mb-6">
+      <div className="flex space-x-2">
+        <Button
+          type="button"
+          variant={authMode === 'customer' ? 'default' : 'outline'}
+          className="flex-1"
+          onClick={() => {
+            setAuthMode('customer');
+            setView('customer-login');
+            navigate('/auth?mode=customer');
+          }}
+        >
+          <Users className="mr-2 h-4 w-4" />
+          Customer
+        </Button>
+        <Button
+          type="button"
+          variant={authMode === 'admin' ? 'default' : 'outline'}
+          className="flex-1"
+          onClick={() => {
+            setAuthMode('admin');
+            setView('admin-login');
+            navigate('/auth?mode=admin');
+          }}
+        >
+          <Shield className="mr-2 h-4 w-4" />
+          Admin
+        </Button>
+      </div>
+    </div>
+  );
+
   const renderLoginForm = () => (
-    <form onSubmit={handleLogin} className="space-y-4">
+    <form onSubmit={view === 'admin-login' ? handleAdminLogin : handleCustomerLogin} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <div className="relative">
@@ -187,7 +297,7 @@ const AuthPage = () => {
             placeholder="Enter your email"
             className="pl-10"
             required
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
           />
         </div>
       </div>
@@ -204,7 +314,7 @@ const AuthPage = () => {
             placeholder="Enter your password"
             className="pl-10 pr-10"
             required
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
           />
           <Button
             type="button"
@@ -212,41 +322,47 @@ const AuthPage = () => {
             size="sm"
             className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
             onClick={() => setShowPassword(!showPassword)}
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
         </div>
       </div>
 
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      <Button type="submit" className="w-full" disabled={getCurrentLoadingState()}>
+        {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Sign In
       </Button>
 
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <span className="w-full border-t" />
-        </div>
-        <div className="relative flex justify-center text-xs uppercase">
-          <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-        </div>
-      </div>
+      {authMode === 'customer' && (
+        <>
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+            </div>
+          </div>
 
-      <GoogleAuthButton 
-        onGoogleAuth={handleGoogleAuth} 
-        isLoading={isLoading} 
-        text="Continue with Google"
-      />
+          <GoogleAuthButton 
+            onGoogleAuth={handleGoogleAuth} 
+            isLoading={getCurrentLoadingState()} 
+            text="Continue with Google"
+          />
+        </>
+      )}
 
       <div className="flex justify-between text-sm">
-        <button
-          type="button"
-          onClick={() => setView('register')}
-          className="text-primary hover:underline"
-        >
-          Create account
-        </button>
+        {authMode === 'customer' && (
+          <button
+            type="button"
+            onClick={() => setView('customer-register')}
+            className="text-primary hover:underline"
+          >
+            Create account
+          </button>
+        )}
         <button
           type="button"
           onClick={() => setView('forgot-password')}
@@ -258,8 +374,8 @@ const AuthPage = () => {
     </form>
   );
 
-  const renderRegisterForm = () => (
-    <form onSubmit={handleRegister} className="space-y-4">
+  const renderCustomerRegisterForm = () => (
+    <form onSubmit={handleCustomerRegistration} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="name">Full Name</Label>
         <div className="relative">
@@ -272,7 +388,7 @@ const AuthPage = () => {
             placeholder="Enter your full name"
             className="pl-10"
             required
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
           />
         </div>
       </div>
@@ -289,7 +405,7 @@ const AuthPage = () => {
             placeholder="Enter your email"
             className="pl-10"
             required
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
             onFocus={() => setShowValidation(true)}
           />
         </div>
@@ -307,7 +423,7 @@ const AuthPage = () => {
             placeholder="09120020048"
             className="pl-10"
             required
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
             maxLength={11}
           />
         </div>
@@ -328,7 +444,7 @@ const AuthPage = () => {
             placeholder="Create a password"
             className="pl-10 pr-10"
             required
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
             onFocus={() => setShowValidation(true)}
           />
           <Button
@@ -337,7 +453,7 @@ const AuthPage = () => {
             size="sm"
             className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
             onClick={() => setShowPassword(!showPassword)}
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
           >
             {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
@@ -356,7 +472,7 @@ const AuthPage = () => {
             placeholder="Confirm your password"
             className="pl-10 pr-10"
             required
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
           />
           <Button
             type="button"
@@ -364,7 +480,7 @@ const AuthPage = () => {
             size="sm"
             className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
             onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
           >
             {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
           </Button>
@@ -380,8 +496,8 @@ const AuthPage = () => {
         />
       )}
 
-      <Button type="submit" className="w-full" disabled={isLoading}>
-        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      <Button type="submit" className="w-full" disabled={getCurrentLoadingState()}>
+        {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Create Account
       </Button>
 
@@ -396,18 +512,87 @@ const AuthPage = () => {
 
       <GoogleAuthButton 
         onGoogleAuth={handleGoogleAuth} 
-        isLoading={isLoading} 
+        isLoading={getCurrentLoadingState()} 
         text="Sign up with Google"
       />
 
       <div className="text-center">
         <button
           type="button"
-          onClick={() => setView('login')}
+          onClick={() => setView('customer-login')}
           className="text-sm text-primary hover:underline"
         >
           Already have an account? Sign in
         </button>
+      </div>
+    </form>
+  );
+
+  const renderOTPVerificationForm = () => (
+    <form onSubmit={handleOTPVerification} className="space-y-6">
+      <div className="text-center space-y-4">
+        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
+          <Mail className="h-6 w-6 text-primary" />
+        </div>
+        <div className="space-y-2">
+          <h3 className="text-lg font-semibold">Enter verification code</h3>
+          <p className="text-muted-foreground">
+            We've sent a 6-digit code to{' '}
+            <span className="font-medium">{pendingRegistration?.email}</span>
+          </p>
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="otp">Verification Code</Label>
+        <Input
+          id="otp"
+          type="text"
+          value={formData.otp}
+          onChange={(e) => handleInputChange('otp', e.target.value.replace(/\D/g, ''))}
+          placeholder="Enter 6-digit code"
+          className="text-center text-lg tracking-widest"
+          maxLength={6}
+          required
+          disabled={getCurrentLoadingState()}
+        />
+      </div>
+
+      <Button type="submit" className="w-full" disabled={getCurrentLoadingState()}>
+        {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Verify & Complete Registration
+      </Button>
+
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground text-center">
+          Didn't receive the code? Check your spam folder or request a new one.
+        </p>
+
+        <Button 
+          type="button" 
+          variant="outline" 
+          className="w-full" 
+          onClick={handleResendOTP}
+          disabled={getCurrentLoadingState()}
+        >
+          {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+          Resend code
+        </Button>
+
+        <div className="text-center">
+          <button
+            type="button"
+            onClick={() => {
+              setView('customer-register');
+              setPendingRegistration(null);
+              setFormData(prev => ({ ...prev, otp: '' }));
+            }}
+            className="text-sm text-primary hover:underline flex items-center justify-center space-x-1"
+          >
+            <ArrowLeft className="h-4 w-4" />
+            <span>Back to registration</span>
+          </button>
+        </div>
       </div>
     </form>
   );
@@ -426,20 +611,20 @@ const AuthPage = () => {
             placeholder="Enter your email"
             className="pl-10"
             required
-            disabled={isLoading}
+            disabled={getCurrentLoadingState()}
           />
         </div>
       </div>
 
-      <Button type="submit" className="w-full" disabled={isPasswordResetLoading}>
-        {isPasswordResetLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      <Button type="submit" className="w-full" disabled={getCurrentLoadingState()}>
+        {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Send Reset Email
       </Button>
 
       <div className="text-center">
         <button
           type="button"
-          onClick={() => setView('login')}
+          onClick={() => setView(authMode === 'admin' ? 'admin-login' : 'customer-login')}
           className="text-sm text-primary hover:underline flex items-center justify-center space-x-1"
         >
           <ArrowLeft className="h-4 w-4" />
@@ -449,62 +634,12 @@ const AuthPage = () => {
     </form>
   );
 
-
-  const renderEmailVerificationForm = () => (
-    <div className="space-y-6">
-      <div className="text-center space-y-4">
-        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-          <Mail className="h-6 w-6 text-primary" />
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold">Check your email</h3>
-          <p className="text-muted-foreground">
-            We've sent a verification link to{' '}
-            <span className="font-medium">{registrationData?.email}</span>
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground text-center">
-          Click the link in your email to complete your registration. 
-          If you don't see it, check your spam folder.
-        </p>
-
-        <Button 
-          type="button" 
-          variant="outline" 
-          className="w-full" 
-          onClick={handleResendEmail}
-          disabled={isLoading}
-        >
-          {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Resend verification email
-        </Button>
-
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setView('register');
-              setRegistrationData(null);
-              setFormData(prev => ({ ...prev, otp: '' }));
-            }}
-            className="text-sm text-primary hover:underline flex items-center justify-center space-x-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to registration</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-
   const getTitle = () => {
     switch (view) {
-      case 'login': return 'Welcome back';
-      case 'register': return 'Create account';
-      case 'email-verification': return 'Verify your email';
+      case 'customer-login': return 'Welcome back';
+      case 'admin-login': return 'Admin Login';
+      case 'customer-register': return 'Create account';
+      case 'otp-verification': return 'Verify your email';
       case 'forgot-password': return 'Reset password';
       default: return 'Welcome';
     }
@@ -512,9 +647,10 @@ const AuthPage = () => {
 
   const getSubtitle = () => {
     switch (view) {
-      case 'login': return 'Sign in to your customer account';
-      case 'register': return 'Create your customer account';
-      case 'email-verification': return 'Check your email and click the verification link';
+      case 'customer-login': return 'Sign in to your customer account';
+      case 'admin-login': return 'Access admin dashboard';
+      case 'customer-register': return 'Create your customer account';
+      case 'otp-verification': return 'Enter the verification code sent to your email';
       case 'forgot-password': return 'Enter your email to reset your password';
       default: return '';
     }
@@ -522,9 +658,20 @@ const AuthPage = () => {
 
   return (
     <AuthLayout title={getTitle()} subtitle={getSubtitle()}>
-      {view === 'login' && renderLoginForm()}
-      {view === 'register' && renderRegisterForm()}
-      {view === 'email-verification' && renderEmailVerificationForm()}
+      {/* Mode selector - only show if not in OTP verification flow */}
+      {view !== 'otp-verification' && renderModeSelector()}
+      
+      {/* Auth mode indicator */}
+      <div className="flex justify-center mb-4">
+        <Badge variant={authMode === 'admin' ? 'default' : 'secondary'}>
+          {authMode === 'admin' ? 'Admin Portal' : 'Customer Portal'}
+        </Badge>
+      </div>
+
+      {/* Render appropriate form */}
+      {(view === 'customer-login' || view === 'admin-login') && renderLoginForm()}
+      {view === 'customer-register' && renderCustomerRegisterForm()}
+      {view === 'otp-verification' && renderOTPVerificationForm()}
       {view === 'forgot-password' && renderForgotPasswordForm()}
     </AuthLayout>
   );

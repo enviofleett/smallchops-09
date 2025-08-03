@@ -1105,6 +1105,8 @@ export type Database = {
           created_at: string
           date_of_birth: string | null
           email: string | null
+          email_verification_expires_at: string | null
+          email_verification_token: string | null
           email_verified: boolean | null
           id: string
           name: string
@@ -1120,6 +1122,8 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           email?: string | null
+          email_verification_expires_at?: string | null
+          email_verification_token?: string | null
           email_verified?: boolean | null
           id?: string
           name: string
@@ -1135,6 +1139,8 @@ export type Database = {
           created_at?: string
           date_of_birth?: string | null
           email?: string | null
+          email_verification_expires_at?: string | null
+          email_verification_token?: string | null
           email_verified?: boolean | null
           id?: string
           name?: string
@@ -1199,6 +1205,56 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      customer_auth_audit: {
+        Row: {
+          action: string
+          created_at: string | null
+          customer_id: string | null
+          email: string
+          failure_reason: string | null
+          id: string
+          ip_address: unknown | null
+          metadata: Json | null
+          session_id: string | null
+          success: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          customer_id?: string | null
+          email: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          session_id?: string | null
+          success?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          customer_id?: string | null
+          email?: string
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          session_id?: string | null
+          success?: boolean
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_auth_audit_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customer_communication_preferences: {
         Row: {
@@ -1383,6 +1439,59 @@ export type Database = {
             foreignKeyName: "customer_notification_preferences_customer_id_fkey"
             columns: ["customer_id"]
             isOneToOne: true
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      customer_otp_codes: {
+        Row: {
+          attempts: number | null
+          created_at: string | null
+          created_by_ip: unknown | null
+          customer_id: string | null
+          email: string
+          expires_at: string
+          id: string
+          max_attempts: number | null
+          otp_code: string
+          otp_type: string
+          used_at: string | null
+          verification_metadata: Json | null
+        }
+        Insert: {
+          attempts?: number | null
+          created_at?: string | null
+          created_by_ip?: unknown | null
+          customer_id?: string | null
+          email: string
+          expires_at: string
+          id?: string
+          max_attempts?: number | null
+          otp_code: string
+          otp_type: string
+          used_at?: string | null
+          verification_metadata?: Json | null
+        }
+        Update: {
+          attempts?: number | null
+          created_at?: string | null
+          created_by_ip?: unknown | null
+          customer_id?: string | null
+          email?: string
+          expires_at?: string
+          id?: string
+          max_attempts?: number | null
+          otp_code?: string
+          otp_type?: string
+          used_at?: string | null
+          verification_metadata?: Json | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "customer_otp_codes_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
             referencedRelation: "customer_accounts"
             referencedColumns: ["id"]
           },
@@ -5713,6 +5822,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      cleanup_expired_customer_otps: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       cleanup_expired_otp_codes: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -6238,6 +6351,15 @@ export type Database = {
           p_order_amount: number
           p_customer_email?: string
           p_promotion_code?: string
+        }
+        Returns: Json
+      }
+      verify_customer_otp: {
+        Args: {
+          p_email: string
+          p_otp_code: string
+          p_otp_type: string
+          p_ip_address?: unknown
         }
         Returns: Json
       }

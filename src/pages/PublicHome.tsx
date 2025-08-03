@@ -102,7 +102,7 @@ const PublicHome = () => {
                 <img 
                   src="/lovable-uploads/8dfaab0f-8bc9-434a-ba8b-158885d43565.png" 
                   alt="Delicious meat pies" 
-                  className="w-full h-full object-cover rounded-2xl shadow-xl"
+                  className="w-full h-full object-cover rounded-2xl"
                 />
               </div>
             </div>

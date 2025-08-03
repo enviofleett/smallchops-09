@@ -24,13 +24,24 @@ export const getAbandonedCarts = async (filters: AbandonedCartFilters = {}) => {
 
   // Apply time range filter
   if (timeRange !== 'all') {
-    const timeMap = {
-      hour: '1 hour',
-      day: '1 day', 
-      week: '1 week'
-    };
+    const now = new Date();
+    let cutoffDate: Date;
     
-    query = query.gte('abandoned_at', `now() - interval '${timeMap[timeRange]}'`);
+    switch (timeRange) {
+      case 'hour':
+        cutoffDate = new Date(now.getTime() - (60 * 60 * 1000));
+        break;
+      case 'day':
+        cutoffDate = new Date(now.getTime() - (24 * 60 * 60 * 1000));
+        break;
+      case 'week':
+        cutoffDate = new Date(now.getTime() - (7 * 24 * 60 * 60 * 1000));
+        break;
+      default:
+        cutoffDate = now;
+    }
+    
+    query = query.gte('abandoned_at', cutoffDate.toISOString());
   }
 
   const { data, error, count } = await query

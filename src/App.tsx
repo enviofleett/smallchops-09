@@ -14,6 +14,7 @@ import Reports from "./pages/Reports";
 import { PaymentSettings } from "./pages/PaymentSettings";
 import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
+import PublicHome from "./pages/PublicHome";
 import Promotions from "./pages/Promotions";
 import DeliveryPickup from "./pages/DeliveryPickup";
 import AuditLogs from "./pages/AuditLogs";
@@ -47,6 +48,8 @@ const App = () => (
           <BrowserRouter>
             <Routes>
               {/* Public routes */}
+              <Route path="/" element={<PublicHome />} />
+              
               {/* Authentication routes */}
               <Route path="/login" element={<SplitScreenLoginPage />} />
               <Route path="/auth" element={<AuthPage />} />
@@ -70,9 +73,10 @@ const App = () => (
               <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/admin-setup/:token" element={<AdminSetup />} />
               
-              {/* Protected routes */}
+              {/* Protected admin routes */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-                <Route path="/" element={<EnhancedErrorBoundary context="Dashboard"><Index /></EnhancedErrorBoundary>} />
+                <Route path="/admin" element={<EnhancedErrorBoundary context="Dashboard"><Index /></EnhancedErrorBoundary>} />
+                <Route path="/dashboard" element={<EnhancedErrorBoundary context="Dashboard"><Index /></EnhancedErrorBoundary>} />
                 <Route path="/orders" element={<EnhancedErrorBoundary context="Orders"><Orders /></EnhancedErrorBoundary>} />
                 <Route path="/products" element={<EnhancedErrorBoundary context="Products"><Products /></EnhancedErrorBoundary>} />
                 <Route path="/categories" element={<EnhancedErrorBoundary context="Categories"><Categories /></EnhancedErrorBoundary>} />

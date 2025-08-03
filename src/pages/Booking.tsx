@@ -114,22 +114,46 @@ const Booking = () => {
             <h1 className="text-4xl font-bold text-foreground mb-6">
               Hosting an Event? We've Got You Covered.
             </h1>
-            <div className="text-lg text-muted-foreground space-y-4 max-w-3xl mx-auto">
-              <p>
+            <div className="text-lg text-muted-foreground space-y-6 max-w-3xl mx-auto leading-relaxed">
+              <p className="text-center">
                 Welcome to Starters, your partner in creating a flawlessly catered event. To begin the planning process, please fill in the details of your upcoming event. Our team will review your information and connect with you promptly to finalize a menu that fits your needs and exceeds your expectations.
               </p>
-              <p className="font-medium">
-                Please Provide:
-              </p>
-              <ul className="text-left space-y-1 inline-block">
-                <li>• Full Name</li>
-                <li>• Email Address</li>
-                <li>• Phone Number</li>
-                <li>• Event Date</li>
-                <li>• Number of Guests Expected</li>
-                <li>• Additional Details or Requests</li>
-              </ul>
-              <p className="font-medium">
+              
+              <div className="space-y-4">
+                <p className="font-semibold text-foreground text-center">
+                  Please Provide:
+                </p>
+                <div className="flex justify-center">
+                  <ul className="text-left space-y-2 text-base">
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0"></span>
+                      Full Name
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0"></span>
+                      Email Address
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0"></span>
+                      Phone Number
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0"></span>
+                      Event Date
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0"></span>
+                      Number of Guests Expected
+                    </li>
+                    <li className="flex items-center gap-2">
+                      <span className="w-1.5 h-1.5 bg-primary rounded-full flex-shrink-0"></span>
+                      Additional Details or Requests
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              <p className="font-semibold text-foreground text-center">
                 Submit your request to receive a custom quote—we'll handle the logistics.
               </p>
             </div>

@@ -99,7 +99,13 @@ const PublicHeaderContent = () => {
               variant="ghost"
               size="icon"
               className="hidden sm:flex"
-              onClick={() => navigate('/customer-favorites')}
+              onClick={() => {
+                if (isAuthenticated) {
+                  navigate('/customer-favorites');
+                } else {
+                  navigate('/auth?redirect=/customer-favorites');
+                }
+              }}
             >
               <Heart className="h-5 w-5" />
             </Button>
@@ -190,13 +196,19 @@ const PublicHeaderContent = () => {
                 >
                   Booking
                 </Link>
-                <Link 
-                  to="/customer-favorites" 
-                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMenuOpen(false)}
+                <button 
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                    if (isAuthenticated) {
+                      navigate('/customer-favorites');
+                    } else {
+                      navigate('/auth?redirect=/customer-favorites');
+                    }
+                  }}
                 >
                   Favorites
-                </Link>
+                </button>
                 <Link 
                   to="/about" 
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"

@@ -27,8 +27,8 @@ const AuthRouter = () => {
     }
   }
 
-  // No authentication or incomplete setup - redirect to auth page
-  return <Navigate to="/auth" replace />;
+  // Unauthenticated users - redirect to public home instead of forcing auth
+  return <Navigate to="/home" replace />;
 };
 
 export default AuthRouter;

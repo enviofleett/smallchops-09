@@ -23,8 +23,8 @@ const Index = () => {
       return; // Stay on root - will show customer portal content
     }
 
-    // If no one is authenticated, go to auth page
-    navigate('/auth');
+    // If no one is authenticated, redirect to public home
+    navigate('/home');
   }, [isAuthenticated, isLoading, userType, user, customerAccount, navigate]);
 
   if (isLoading) {

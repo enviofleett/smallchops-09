@@ -5267,10 +5267,6 @@ export type Database = {
         }
         Returns: boolean
       }
-      check_otp_rate_limit: {
-        Args: { p_email: string; p_purpose: string }
-        Returns: boolean
-      }
       check_paystack_production_readiness: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -5298,10 +5294,6 @@ export type Database = {
       cleanup_expired_admin_invitations: {
         Args: Record<PropertyKey, never>
         Returns: number
-      }
-      cleanup_expired_otps: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
       }
       cleanup_expired_rate_limits: {
         Args: Record<PropertyKey, never>

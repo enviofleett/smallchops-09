@@ -132,66 +132,14 @@ const PublicHome = () => {
         </div>
       </section>
 
-      {/* Featured Products Showcase */}
-      <section className="bg-gradient-to-r from-orange-300 to-red-400 py-16">
+      {/* Wings & Things Image */}
+      <section className="py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
-            {/* Samosa */}
-            <Card className="bg-white rounded-lg shadow-lg overflow-hidden transform rotate-2 hover:rotate-0 transition-transform">
-              <CardContent className="p-0">
-                <div className="bg-gray-200 h-48 flex items-center justify-center">
-                  <div className="w-16 h-16 bg-gray-400 rounded"></div>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Samosa</h3>
-                  <div className="flex items-center space-x-1 mb-4">
-                    {renderStars(5)}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Button 
-                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg"
-                      onClick={() => handleAddToCart({
-                        id: 'samosa',
-                        name: 'Samosa',
-                        price: 5000
-                      })}
-                    >
-                      Add to Cart
-                    </Button>
-                    <span className="text-xl font-bold text-gray-900">₦5,000</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Wings & Things */}
-            <Card className="bg-white rounded-lg shadow-lg overflow-hidden transform -rotate-2 hover:rotate-0 transition-transform">
-              <CardContent className="p-0">
-                <div className="bg-gray-200 h-48 flex items-center justify-center">
-                  <div className="w-16 h-16 bg-gray-400 rounded"></div>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Wings & Things</h3>
-                  <div className="flex items-center space-x-1 mb-4">
-                    {renderStars(5)}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Button 
-                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg"
-                      onClick={() => handleAddToCart({
-                        id: 'wings-things',
-                        name: 'Wings & Things',
-                        price: 15000
-                      })}
-                    >
-                      Add to Cart
-                    </Button>
-                    <span className="text-xl font-bold text-gray-900">₦15,000</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <img 
+            alt="Wings & Things" 
+            className="w-full h-38 object-cover rounded-md mb-3"
+            src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/product-images/1754132195844-images_1_.jpeg"
+          />
         </div>
       </section>
 

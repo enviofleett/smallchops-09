@@ -50,5 +50,57 @@ export const EmailQueueProcessor = () => {
       setIsProcessing(false);
     }
   };
-  return;
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Mail className="w-5 h-5" />
+          Email Queue Processor
+        </CardTitle>
+        <CardDescription>
+          Process queued emails and monitor email system health
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="text-sm">
+            <span className="font-medium">Queued Emails: </span>
+            <span className="text-muted-foreground">
+              {queueStats?.queued ?? 'Loading...'}
+            </span>
+          </div>
+          <Button
+            onClick={fetchQueueStats}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className="w-4 h-4" />
+            Refresh
+          </Button>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Button
+            onClick={() => processQueue('enhanced-email-processor', 'Enhanced Email Processor')}
+            disabled={isProcessing}
+            className="flex items-center gap-2"
+          >
+            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            Process Enhanced Queue
+          </Button>
+          
+          <Button
+            onClick={() => processQueue('instant-email-processor', 'Instant Email Processor')}
+            disabled={isProcessing}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+            Process Instant Queue
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
 };

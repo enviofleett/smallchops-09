@@ -142,10 +142,10 @@ const PublicHome = () => {
             <div className="flex md:flex-wrap gap-15 lg:gap-35 md:justify-center cursor-grab active:cursor-grabbing">
               {/* Samosa Product Card */}
               <div className="flex-shrink-0 bg-white rounded-2xl shadow-lg px-6 py-4 min-w-[75%] md:min-w-[auto] relative">
-                <div className="absolute -top-3 -left-32 w-27 h-27 rounded-xl transform -rotate-[7deg] shadow-md">
+                <div className="absolute -top-3 -left-32 w-14 h-14 rounded-xl transform -rotate-[7deg] shadow-md">
                   <img 
                     alt="Samosa" 
-                     className="w-full h-27 object-cover rounded-md mb-3"
+                    className="w-full h-14 object-cover rounded-md mb-3"
                     src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/product-images/product-1754133371152-phb7rayxvkn.jpg"
                   />
                 </div>
@@ -169,10 +169,10 @@ const PublicHome = () => {
 
               {/* Wings & Things Product Card */}
               <div className="flex-shrink-0 bg-white rounded-2xl shadow-lg px-6 py-4 min-w-[75%] md:min-w-[auto] relative">
-                <div className="absolute -top-3 -left-32 w-27 h-27 rounded-xl transform -rotate-[7deg] shadow-md">
+                <div className="absolute -top-3 -left-32 w-14 h-14 rounded-xl transform -rotate-[7deg] shadow-md">
                   <img 
                     alt="Wings & Things" 
-                    className="w-full h-27 object-cover rounded-md mb-3"
+                    className="w-full h-14 object-cover rounded-md mb-3"
                     src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/product-images/1754132195844-images_1_.jpeg"
                   />
                 </div>
@@ -196,10 +196,10 @@ const PublicHome = () => {
 
               {/* Spring Rolls Product Card */}
               <div className="flex-shrink-0 bg-white rounded-2xl shadow-lg px-6 py-4 min-w-[75%] md:min-w-[auto] relative">
-                <div className="absolute -top-3 -left-32 w-27 h-27 rounded-xl transform -rotate-[7deg] shadow-md">
+                <div className="absolute -top-3 -left-32 w-14 h-14 rounded-xl transform -rotate-[7deg] shadow-md">
                   <img 
                     alt="Spring Rolls" 
-                    className="w-full h-27 object-cover rounded-md mb-3"
+                    className="w-full h-14 object-cover rounded-md mb-3"
                     src="/lovable-uploads/8dfaab0f-8bc9-434a-ba8b-158885d43565.png"
                   />
                 </div>

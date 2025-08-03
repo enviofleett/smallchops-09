@@ -118,19 +118,11 @@ const PublicHome = () => {
                   </div>
                   <h3 className="text-xl font-bold text-gray-900">The Budget Baller</h3>
                 </div>
-                <div className="space-y-3 text-sm text-gray-800">
-                  <div className="flex justify-between items-center pb-2 border-b border-dotted border-gray-300">
-                    <span className="font-medium">5 Samosa</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-2 border-b border-dotted border-gray-300">
-                    <span className="font-medium">5 Spring Rolls</span>
-                  </div>
-                  <div className="flex justify-between items-center pb-2 border-b border-dotted border-gray-300">
-                    <span className="font-medium">5 Stick Meat</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="font-medium">20 Poff-Poff</span>
-                  </div>
+                <div className="space-y-3">
+                  <span className="text-sm text-gray-600 text-center lg:text-left block pb-1 border-b border-dotted border-red-400">5 Samosa</span>
+                  <span className="text-sm text-gray-600 text-center lg:text-left block pb-1 border-b border-dotted border-red-400">5 Spring Rolls</span>
+                  <span className="text-sm text-gray-600 text-center lg:text-left block pb-1 border-b border-dotted border-red-400">5 Stick Meat</span>
+                  <span className="text-sm text-gray-600 text-center lg:text-left block pb-1 border-b border-dotted border-red-400">20 Poff-Poff</span>
                 </div>
               </div>
             </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, User, Star, Facebook, Instagram, Twitter, Linkedin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,6 +13,7 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 
 const PublicHome = () => {
+  const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -267,7 +269,7 @@ const PublicHome = () => {
                     {categories.map((category) => (
                       <button
                         key={category.id}
-                        onClick={() => window.location.href = `/category/${category.id}`}
+                        onClick={() => navigate(`/category/${category.id}`)}
                         className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
                           activeCategory === category.id 
                             ? 'bg-red-600 text-white' 
@@ -316,7 +318,7 @@ const PublicHome = () => {
                           />
                         </div>
                         <div className="p-4">
-                          <h3 className="font-bold text-gray-900 mb-2 cursor-pointer hover:text-red-600 transition-colors" onClick={() => window.location.href = `/product/${product.id}`}>
+                          <h3 className="font-bold text-gray-900 mb-2 cursor-pointer hover:text-red-600 transition-colors" onClick={() => navigate(`/product/${product.id}`)}>
                             {product.name || "The Budget Baller"}
                           </h3>
                           <div className="flex items-center space-x-1 mb-2">
@@ -341,7 +343,7 @@ const PublicHome = () => {
                                 size="sm" 
                                 variant="outline"
                                 className="rounded-full px-2"
-                                onClick={() => window.location.href = `/product/${product.id}`}
+                                onClick={() => navigate(`/product/${product.id}`)}
                               >
                                 View
                               </Button>

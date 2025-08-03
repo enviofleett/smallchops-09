@@ -83,139 +83,177 @@ const CategoryProducts = () => {
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold mb-4">{currentCategory?.name || 'Products'}</h1>
-          {currentCategory?.description && (
-            <p className="text-muted-foreground mb-6">{currentCategory.description}</p>
-          )}
-          
-          {/* Search */}
-          <div className="max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-              <Input
-                placeholder="Search products..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Products Grid */}
-        {isLoadingProducts ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <CardContent className="p-0">
-                  <div className="aspect-square bg-muted rounded-t-lg"></div>
-                  <div className="p-4 space-y-2">
-                    <div className="h-4 bg-muted rounded"></div>
-                    <div className="h-3 bg-muted rounded w-2/3"></div>
-                    <div className="h-6 bg-muted rounded w-1/2"></div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : filteredProducts.length === 0 ? (
-          <div className="text-center py-12">
-            <h3 className="text-xl font-semibold mb-2">No products found</h3>
-            <p className="text-muted-foreground mb-4">
-              {searchTerm ? 'Try adjusting your search terms.' : 'This category has no products yet.'}
-            </p>
-            <Button onClick={() => navigate('/')}>
-              Browse All Products
-            </Button>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 mb-8">
-              {currentProducts.map((product) => (
-                <Card 
-                  key={product.id} 
-                  className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                  onClick={() => navigate(`/product/${product.id}`)}
-                >
-                  <div className="aspect-square overflow-hidden relative">
-                    <img
-                      src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
-                      alt={product.name}
-                      className="w-full h-full object-cover hover:scale-105 transition-transform"
-                    />
-                    {(product.discount_percentage || 0) > 0 && (
-                      <div className="absolute top-2 left-2">
-                        <DiscountBadge 
-                          discountPercentage={product.discount_percentage || 0}
-                          size="sm"
-                        />
-                      </div>
-                    )}
-                  </div>
-                  <CardContent className="p-4">
-                    <h3 className="font-semibold mb-2 line-clamp-2">{product.name}</h3>
-                    <div className="flex items-center space-x-1 mb-2">
-                      {renderStars(4)} {/* Using static rating for now */}
-                      <span className="text-sm text-muted-foreground">(0)</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <PriceDisplay
-                        originalPrice={product.price}
-                        discountedPrice={product.discounted_price}
-                        hasDiscount={(product.discount_percentage || 0) > 0}
-                        size="sm"
-                      />
-                      <Button 
-                        size="sm" 
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleAddToCart(product);
-                        }}
-                      >
-                        Add to Cart
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="flex justify-center items-center space-x-2">
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                  disabled={currentPage <= 1}
-                >
-                  Previous
-                </Button>
-                
-                {Array.from({ length: totalPages }, (_, i) => (
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          {/* Left Sidebar - Categories */}
+          <div className="lg:col-span-1">
+            <Card className="bg-white sticky top-4">
+              <CardContent className="p-6">
+                <h3 className="text-xl font-bold text-red-600 mb-4">Categories</h3>
+                <div className="space-y-2">
                   <Button
-                    key={i + 1}
-                    variant={currentPage === i + 1 ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setCurrentPage(i + 1)}
-                    className="w-10 h-10"
+                    variant="ghost"
+                    onClick={() => navigate('/')}
+                    className="w-full justify-start px-4 py-2 hover:bg-gray-100 text-gray-700"
                   >
-                    {i + 1}
+                    All Products
                   </Button>
+                  {categories.map((category) => (
+                    <Button
+                      key={category.id}
+                      variant="ghost"
+                      onClick={() => navigate(`/category/${category.id}`)}
+                      className={`w-full justify-start px-4 py-2 transition-colors ${
+                        categoryId === category.id 
+                          ? 'bg-red-600 text-white hover:bg-red-700' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      {category.name}
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Right Side - Products */}
+          <div className="lg:col-span-3">
+            {/* Header */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold mb-4">{currentCategory?.name || 'Products'}</h1>
+              {currentCategory?.description && (
+                <p className="text-muted-foreground mb-6">{currentCategory.description}</p>
+              )}
+              
+              {/* Search */}
+              <div className="max-w-md">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Input
+                    placeholder="Search products..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Products Grid */}
+            {isLoadingProducts ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Card key={i} className="animate-pulse">
+                    <CardContent className="p-0">
+                      <div className="aspect-square bg-muted rounded-t-lg"></div>
+                      <div className="p-4 space-y-2">
+                        <div className="h-4 bg-muted rounded"></div>
+                        <div className="h-3 bg-muted rounded w-2/3"></div>
+                        <div className="h-6 bg-muted rounded w-1/2"></div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 ))}
-                
-                <Button
-                  variant="outline"
-                  onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                  disabled={currentPage >= totalPages}
-                >
-                  Next
+              </div>
+            ) : filteredProducts.length === 0 ? (
+              <div className="text-center py-12">
+                <h3 className="text-xl font-semibold mb-2">No products found</h3>
+                <p className="text-muted-foreground mb-4">
+                  {searchTerm ? 'Try adjusting your search terms.' : 'This category has no products yet.'}
+                </p>
+                <Button onClick={() => navigate('/')}>
+                  Browse All Products
                 </Button>
               </div>
+            ) : (
+              <>
+                <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-6 mb-8">
+                  {currentProducts.map((product) => (
+                    <Card 
+                      key={product.id} 
+                      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                      onClick={() => navigate(`/product/${product.id}`)}
+                    >
+                      <div className="aspect-square overflow-hidden relative">
+                        <img
+                          src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
+                          alt={product.name}
+                          className="w-full h-full object-cover hover:scale-105 transition-transform"
+                          loading="lazy"
+                        />
+                        {(product.discount_percentage || 0) > 0 && (
+                          <div className="absolute top-2 left-2">
+                            <DiscountBadge 
+                              discountPercentage={product.discount_percentage || 0}
+                              size="sm"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <CardContent className="p-4">
+                        <h3 className="font-semibold mb-2 line-clamp-2">{product.name}</h3>
+                        <div className="flex items-center space-x-1 mb-2">
+                          {renderStars(4)} {/* Using static rating for now */}
+                          <span className="text-sm text-muted-foreground">(0)</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <PriceDisplay
+                            originalPrice={product.price}
+                            discountedPrice={product.discounted_price}
+                            hasDiscount={(product.discount_percentage || 0) > 0}
+                            size="sm"
+                          />
+                          <Button 
+                            size="sm" 
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleAddToCart(product);
+                            }}
+                          >
+                            Add to Cart
+                          </Button>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+
+                {/* Pagination */}
+                {totalPages > 1 && (
+                  <div className="flex justify-center items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                      disabled={currentPage <= 1}
+                    >
+                      Previous
+                    </Button>
+                    
+                    {Array.from({ length: totalPages }, (_, i) => (
+                      <Button
+                        key={i + 1}
+                        variant={currentPage === i + 1 ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setCurrentPage(i + 1)}
+                        className="w-10 h-10"
+                      >
+                        {i + 1}
+                      </Button>
+                    ))}
+                    
+                    <Button
+                      variant="outline"
+                      onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                      disabled={currentPage >= totalPages}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                )}
+              </>
             )}
-          </>
-        )}
+          </div>
+        </div>
       </div>
 
       <PublicFooter />

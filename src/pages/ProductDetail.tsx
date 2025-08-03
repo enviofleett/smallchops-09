@@ -220,7 +220,7 @@ const ProductDetail = () => {
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
             <Link to="/" className="hover:text-primary">Home</Link>
             <ChevronRight className="h-4 w-4" />
-            <Link to="/" className="hover:text-primary">{product.categories?.name || 'Products'}</Link>
+            <Link to={`/category/${product.categories?.id}`} className="hover:text-primary">{product.categories?.name || 'Products'}</Link>
             <ChevronRight className="h-4 w-4" />
             <span className="text-foreground">{product.name}</span>
           </nav>

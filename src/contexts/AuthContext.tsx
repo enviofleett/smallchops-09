@@ -105,16 +105,31 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         .from('profiles')
         .select(`*`)
         .eq('id', userId)
-        .single();
+        .maybeSingle();
       
       if (error) {
         console.error('Error fetching profile:', error);
-        return null;
+        // Create a basic profile for new users instead of returning null
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        return {
+          id: userId,
+          name: authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'User',
+          role: 'admin',
+          avatar_url: null,
+          email: authUser?.email || '',
+        };
       }
 
       if (!data) {
-        console.log('No profile found for user:', userId);
-        return null;
+        console.log('No profile found for user, creating fallback:', userId);
+        const { data: { user: authUser } } = await supabase.auth.getUser();
+        return {
+          id: userId,
+          name: authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'User',
+          role: 'admin',
+          avatar_url: null,
+          email: authUser?.email || '',
+        };
       }
 
       const { data: { user: authUser } } = await supabase.auth.getUser();

@@ -29,6 +29,8 @@ import {
 import { Navigate, useNavigate } from 'react-router-dom';
 import { PersonalInfoEditor } from '@/components/customer/PersonalInfoEditor';
 import { AddressManager } from '@/components/customer/AddressManager';
+import { EnhancedOrdersSection } from '@/components/customer/EnhancedOrdersSection';
+import { DeliveryTrackingModal } from '@/components/customer/DeliveryTrackingModal';
 import { useCustomerProfile, useProfileCompletion } from '@/hooks/useCustomerProfile';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 
@@ -43,6 +45,8 @@ export default function CustomerProfile() {
   const { data: settings } = useBusinessSettings();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<ProfileSection>('orders');
+  const [trackingOrderId, setTrackingOrderId] = useState<string | null>(null);
+  const [trackingOrderNumber, setTrackingOrderNumber] = useState<string>('');
 
   if (authLoading || profileLoading) {
     return (
@@ -80,7 +84,20 @@ export default function CustomerProfile() {
   const renderContent = () => {
     switch (activeSection) {
       case 'orders':
-        return <OrdersSection orders={ordersData?.orders || []} isLoading={ordersLoading} />;
+        return <EnhancedOrdersSection 
+          orders={ordersData?.orders || []} 
+          isLoading={ordersLoading}
+          onViewDetails={(orderId) => console.log('View order:', orderId)}
+          onReorder={(order) => console.log('Reorder:', order)}
+          onTrackDelivery={(orderId) => {
+            const order = ordersData?.orders.find(o => o.id === orderId);
+            if (order) {
+              setTrackingOrderId(orderId);
+              setTrackingOrderNumber(order.order_number);
+            }
+          }}
+          onDownloadReceipt={(orderId) => console.log('Download receipt:', orderId)}
+        />;
       case 'wishlist':
         return <WishlistSection favorites={favorites} isLoading={favoritesLoading} />;
       case 'payment':
@@ -185,6 +202,19 @@ export default function CustomerProfile() {
           </ScrollArea>
         </div>
       </div>
+
+      {/* Delivery Tracking Modal */}
+      {trackingOrderId && (
+        <DeliveryTrackingModal
+          isOpen={!!trackingOrderId}
+          onClose={() => {
+            setTrackingOrderId(null);
+            setTrackingOrderNumber('');
+          }}
+          orderId={trackingOrderId}
+          orderNumber={trackingOrderNumber}
+        />
+      )}
     </div>
   );
 }

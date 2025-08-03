@@ -60,7 +60,17 @@ export const getCustomerOrderHistory = async (
 
   let query = supabase
     .from('orders')
-    .select('*, order_items (*)', { count: 'exact' })
+    .select(`
+      *,
+      order_items (
+        *,
+        products (
+          name,
+          image_url,
+          description
+        )
+      )
+    `, { count: 'exact' })
     .eq('customer_email', customerEmail);
 
   if (status !== 'all') {

@@ -3,19 +3,16 @@ import { useCustomerAuth } from './useCustomerAuth';
 import { getCustomerOrderHistory } from '@/api/purchaseHistory';
 
 export const useCustomerOrders = () => {
-  const { customerAccount, isAuthenticated } = useCustomerAuth();
+  const { customerAccount, isAuthenticated, user } = useCustomerAuth();
 
   return useQuery({
-    queryKey: ['customer-orders', customerAccount?.id],
+    queryKey: ['customer-orders', user?.email],
     queryFn: async () => {
-      if (!customerAccount?.id) return { orders: [], count: 0 };
+      if (!user?.email) return { orders: [], count: 0 };
       
-      // For now, we'll use email since the API expects it
-      // In a production app, you'd want to have the customer email in the customerAccount
-      const email = customerAccount.id; // This would need to be the actual email
-      return await getCustomerOrderHistory(email, { page: 1, pageSize: 20 });
+      return await getCustomerOrderHistory(user.email, { page: 1, pageSize: 20 });
     },
-    enabled: isAuthenticated && !!customerAccount?.id,
+    enabled: isAuthenticated && !!user?.email,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
 };

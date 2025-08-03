@@ -13,7 +13,7 @@ import { Separator } from '@/components/ui/separator';
 import { Camera, Mail, Phone, Calendar, User, Save, Loader2 } from 'lucide-react';
 import { useCustomerProfile } from '@/hooks/useCustomerProfile';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { AvatarUploadModal } from './AvatarUploadModal';
 
 const profileSchema = z.object({
   name: z.string().min(2, 'Name must be at least 2 characters'),
@@ -27,7 +27,7 @@ type ProfileFormData = z.infer<typeof profileSchema>;
 export function PersonalInfoEditor() {
   const { customerAccount, user } = useCustomerAuth();
   const { profile, updateProfile, isUpdating } = useCustomerProfile();
-  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [showAvatarModal, setShowAvatarModal] = useState(false);
 
   const form = useForm<ProfileFormData>({
     resolver: zodResolver(profileSchema),
@@ -45,13 +45,11 @@ export function PersonalInfoEditor() {
       date_of_birth: data.date_of_birth || null,
     };
 
-    // Handle avatar upload if there's a new file
-    if (avatarFile) {
-      // In a real implementation, you'd upload to storage first
-      // For now, we'll just proceed without the avatar update
-    }
-
     updateProfile(updates);
+  };
+
+  const handleAvatarUpdate = (avatarUrl: string) => {
+    updateProfile({ avatar_url: avatarUrl });
   };
 
   return (
@@ -74,7 +72,12 @@ export function PersonalInfoEditor() {
                 </AvatarFallback>
               </Avatar>
               <div className="absolute -bottom-2 -right-2">
-                <Button size="sm" variant="outline" className="w-8 h-8 rounded-full p-0">
+                <Button 
+                  size="sm" 
+                  variant="outline" 
+                  className="w-8 h-8 rounded-full p-0"
+                  onClick={() => setShowAvatarModal(true)}
+                >
                   <Camera className="w-4 h-4" />
                 </Button>
               </div>
@@ -186,6 +189,14 @@ export function PersonalInfoEditor() {
           </form>
         </CardContent>
       </Card>
+
+      {/* Avatar Upload Modal */}
+      <AvatarUploadModal
+        isOpen={showAvatarModal}
+        onClose={() => setShowAvatarModal(false)}
+        onAvatarUpdate={handleAvatarUpdate}
+        currentAvatar={profile?.avatar_url}
+      />
     </div>
   );
 }

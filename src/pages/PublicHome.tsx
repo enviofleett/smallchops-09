@@ -341,7 +341,7 @@ const PublicHome = () => {
                           />
                         </div>
                         <div className="p-4">
-                          <h3 className="font-bold text-gray-900 mb-2">
+                          <h3 className="font-bold text-gray-900 mb-2 cursor-pointer hover:text-red-600 transition-colors" onClick={() => window.location.href = `/product/${product.id}`}>
                             {product.name || "The Budget Baller"}
                           </h3>
                           <div className="flex items-center space-x-1 mb-2">
@@ -354,13 +354,23 @@ const PublicHome = () => {
                             <span className="text-xl font-bold text-red-600">
                               ₦{product.price?.toLocaleString() || "9,450"}
                             </span>
-                            <Button 
-                              size="sm" 
-                              className="bg-red-600 hover:bg-red-700 text-white rounded-full px-4"
-                              onClick={() => handleAddToCart(product)}
-                            >
-                              Add to Cart
-                            </Button>
+                            <div className="flex gap-1">
+                              <Button 
+                                size="sm" 
+                                className="bg-red-600 hover:bg-red-700 text-white rounded-full px-3"
+                                onClick={() => handleAddToCart(product)}
+                              >
+                                Add to Cart
+                              </Button>
+                              <Button 
+                                size="sm" 
+                                variant="outline"
+                                className="rounded-full px-2"
+                                onClick={() => window.location.href = `/product/${product.id}`}
+                              >
+                                View
+                              </Button>
+                            </div>
                           </div>
                         </div>
                       </CardContent>

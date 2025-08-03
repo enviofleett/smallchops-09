@@ -15,6 +15,7 @@ import { PaymentSettings } from "./pages/PaymentSettings";
 import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
 import PublicHome from "./pages/PublicHome";
+import ProductDetail from "./pages/ProductDetail";
 import Promotions from "./pages/Promotions";
 import DeliveryPickup from "./pages/DeliveryPickup";
 import AuditLogs from "./pages/AuditLogs";
@@ -49,6 +50,7 @@ const App = () => (
             <Routes>
               {/* Public routes */}
               <Route path="/" element={<PublicHome />} />
+              <Route path="/product/:id" element={<ProductDetail />} />
               
               {/* Authentication routes */}
               <Route path="/login" element={<SplitScreenLoginPage />} />

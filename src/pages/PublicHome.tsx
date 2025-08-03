@@ -135,36 +135,9 @@ const PublicHome = () => {
       {/* Products Section */}
       <section className="bg-white py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
-            {/* Left Sidebar - Categories - Hidden on mobile */}
-            <div className="hidden lg:block lg:col-span-1">
-              <Card className="bg-white sticky top-4">
-                <CardContent className="p-6">
-                  <h3 className="text-xl font-bold text-red-600 mb-4">Categories</h3>
-                  <div className="space-y-2">
-                    <Button
-                      variant="ghost"
-                      className="w-full justify-start px-4 py-2 bg-red-600 text-white hover:bg-red-700"
-                    >
-                      All Products
-                    </Button>
-                    {categories.map((category) => (
-                      <Button
-                        key={category.id}
-                        variant="ghost"
-                        onClick={() => navigate(`/category/${category.id}`)}
-                        className="w-full justify-start px-4 py-2 hover:bg-gray-100 text-gray-700"
-                      >
-                        {category.name}
-                      </Button>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-
+          <div>
             {/* Mobile Categories - Horizontal scroll */}
-            <div className="lg:hidden col-span-full mb-6">
+            <div className="lg:hidden mb-6">
               <h3 className="text-lg font-bold text-red-600 mb-3 px-2">Categories</h3>
               <div className="flex space-x-3 overflow-x-auto pb-3 px-2">
                 <button className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium bg-red-600 text-white">
@@ -182,8 +155,8 @@ const PublicHome = () => {
               </div>
             </div>
 
-            {/* Right Side - Products */}
-            <div className="col-span-full lg:col-span-3">
+            {/* Products Section */}
+            <div>
               {/* Header */}
               <div className="mb-6 sm:mb-8">
                 <h1 className="text-2xl sm:text-3xl font-bold mb-4">All Products</h1>

@@ -7,93 +7,102 @@ export const PublicFooter = () => {
   const { data: settings } = useBusinessSettings();
 
   return (
-    <footer className="bg-muted/50 border-t mt-16">
-      <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Logo and About */}
-          <div className="space-y-4">
+    <footer className="bg-gray-900 text-white py-16">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+          {/* Address */}
+          <div>
+            <h3 className="text-lg font-bold mb-4 text-white">Address</h3>
+            <div className="space-y-2 text-gray-300">
+              <div className="font-medium">Headquarters:</div>
+              <div>No.31, Kubwa Road,</div>
+              <div>3rd Avenue.</div>
+              <div>Abuja.</div>
+            </div>
+          </div>
+
+          {/* Services */}
+          <div>
+            <h3 className="text-lg font-bold mb-4 text-white">Services</h3>
+            <div className="space-y-2">
+              <Link to="/" className="block text-gray-300 hover:text-white transition-colors">Home</Link>
+              <Link to="/products" className="block text-gray-300 hover:text-white transition-colors">Shop</Link>
+              <Link to="/blog" className="block text-gray-300 hover:text-white transition-colors">Blog</Link>
+            </div>
+          </div>
+
+          {/* Company */}
+          <div>
+            <h3 className="text-lg font-bold mb-4 text-white">Company</h3>
+            <div className="space-y-2">
+              <Link to="/about" className="block text-gray-300 hover:text-white transition-colors">About us</Link>
+              <Link to="/blog" className="block text-gray-300 hover:text-white transition-colors">Blog</Link>
+              <Link to="/dispatch-partner" className="block text-gray-300 hover:text-white transition-colors">Dispatch Partner</Link>
+            </div>
+          </div>
+
+          {/* Contact Us */}
+          <div>
+            <h3 className="text-lg font-bold mb-4 text-white">Contact Us</h3>
+            <div className="space-y-2 text-gray-300">
+              <div>+234 807 3011 100</div>
+              <div>+234 908 8388 886</div>
+              <div>support@starters.co</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Section */}
+        <div className="border-t border-gray-800 pt-8">
+          <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
+            {/* Logo and Tagline */}
             <div className="flex items-center space-x-3">
               <img
                 src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png"
                 alt="Starters Logo"
-                className="h-12 w-auto"
+                className="h-8 w-auto"
               />
+              <span className="text-gray-400 text-sm">SMALL CHOPS</span>
             </div>
-            <p className="text-muted-foreground text-sm">
-              {settings?.tagline || 'Delicious snacks and treats delivered fresh to your doorstep.'}
-            </p>
-            <div className="flex space-x-4">
+
+            {/* Social Media Icons */}
+            <div className="flex items-center space-x-4">
               {settings?.facebook_url && (
                 <Link 
                   to={settings.facebook_url} 
-                  className="text-muted-foreground hover:text-primary transition-colors"
+                  className="text-gray-400 hover:text-white transition-colors"
                   target="_blank"
                 >
-                  <Facebook className="h-5 w-5" />
+                  <Facebook className="w-5 h-5" />
                 </Link>
               )}
               {settings?.twitter_url && (
                 <Link 
                   to={settings.twitter_url} 
-                  className="text-muted-foreground hover:text-primary transition-colors"
+                  className="text-gray-400 hover:text-white transition-colors"
                   target="_blank"
                 >
-                  <Twitter className="h-5 w-5" />
+                  <Twitter className="w-5 h-5" />
                 </Link>
               )}
               {settings?.instagram_url && (
                 <Link 
                   to={settings.instagram_url} 
-                  className="text-muted-foreground hover:text-primary transition-colors"
+                  className="text-gray-400 hover:text-white transition-colors"
                   target="_blank"
                 >
-                  <Instagram className="h-5 w-5" />
+                  <Instagram className="w-5 h-5" />
                 </Link>
               )}
             </div>
           </div>
-
-          {/* Quick Links */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-4">Quick Links</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/" className="text-muted-foreground hover:text-primary transition-colors">
-                  Home
-                </Link>
-              </li>
-              <li>
-                <Link to="/products" className="text-muted-foreground hover:text-primary transition-colors">
-                  Shop
-                </Link>
-              </li>
-              <li>
-                <Link to="/about" className="text-muted-foreground hover:text-primary transition-colors">
-                  About Us
-                </Link>
-              </li>
-              <li>
-                <Link to="/contact" className="text-muted-foreground hover:text-primary transition-colors">
-                  Contact
-                </Link>
-              </li>
-            </ul>
-          </div>
         </div>
 
-        {/* Bottom Bar */}
-        <div className="border-t border-border mt-8 pt-8 flex flex-col md:flex-row justify-between items-center">
-          <p className="text-muted-foreground text-sm">
+        {/* Copyright */}
+        <div className="text-center pt-8">
+          <p className="text-gray-400 text-sm">
             © {new Date().getFullYear()} {settings?.name || 'Starters'}. All rights reserved.
           </p>
-          <div className="flex space-x-6 mt-4 md:mt-0">
-            <Link to="/terms" className="text-muted-foreground hover:text-primary text-sm transition-colors">
-              Terms of Service
-            </Link>
-            <Link to="/privacy" className="text-muted-foreground hover:text-primary text-sm transition-colors">
-              Privacy Policy
-            </Link>
-          </div>
         </div>
       </div>
     </footer>

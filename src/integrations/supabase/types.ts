@@ -5958,7 +5958,7 @@ export type Database = {
       }
       detect_abandoned_carts: {
         Args: Record<PropertyKey, never>
-        Returns: number
+        Returns: undefined
       }
       detect_orphaned_customer_records: {
         Args: Record<PropertyKey, never>

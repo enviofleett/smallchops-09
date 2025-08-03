@@ -44,6 +44,9 @@ const PublicHome = () => {
   const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
 
   const handleAddToCart = (product: any) => {
+    console.log('🏠 handleAddToCart called with product:', product);
+    console.log('🏠 About to call addItem...');
+    
     addItem({
       id: product.id,
       name: product.name,
@@ -53,6 +56,8 @@ const PublicHome = () => {
       vat_rate: 7.5, // Default VAT rate
       image_url: product.image_url,
     });
+    
+    console.log('🏠 addItem called successfully');
     
     toast({
       title: "Added to cart",

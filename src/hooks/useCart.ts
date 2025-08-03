@@ -62,18 +62,10 @@ export const useCart = () => {
 
   // Load cart from localStorage on mount
   useEffect(() => {
-    const savedCart = localStorage.getItem(CART_STORAGE_KEY);
-    console.log('🛒 Loading cart from localStorage:', savedCart);
-    if (savedCart) {
-      try {
-        const parsedCart = JSON.parse(savedCart);
-        console.log('🛒 Parsed cart from localStorage:', parsedCart);
-        setCart(parsedCart);
-      } catch (error) {
-        console.error('🛒 Error parsing cart from localStorage:', error);
-        localStorage.removeItem(CART_STORAGE_KEY);
-      }
-    }
+    console.log('🛒 useCart hook initializing...');
+    // Clear localStorage to start fresh for debugging
+    localStorage.removeItem(CART_STORAGE_KEY);
+    console.log('🛒 localStorage cleared for debugging');
   }, []);
 
   // Save cart to localStorage whenever it changes

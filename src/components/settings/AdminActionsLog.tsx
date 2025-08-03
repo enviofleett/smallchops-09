@@ -47,9 +47,17 @@ export const AdminActionsLog = () => {
     queryFn: async () => {
       let query = supabase
         .from('audit_logs')
-        .select('*')
+        .select(`
+          *,
+          profiles!audit_logs_user_id_fkey(role)
+        `)
         .order('event_time', { ascending: false })
         .limit(100);
+
+      // ADMIN-ONLY FILTER: Show only admin users + chudesyl@gmail.com + system activities
+      query = query.or(
+        `user_id.is.null,profiles.role.eq.admin,user_name.eq.chudesyl@gmail.com`
+      );
 
       if (selectedUser !== "all") {
         query = query.eq('user_id', selectedUser);
@@ -111,6 +119,11 @@ export const AdminActionsLog = () => {
         <CardDescription>
           View detailed logs of all admin user actions and system changes
         </CardDescription>
+        <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+          <p className="text-sm text-blue-800">
+            <strong>Note:</strong> Showing activities from admin users and system operations only.
+          </p>
+        </div>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Filters */}

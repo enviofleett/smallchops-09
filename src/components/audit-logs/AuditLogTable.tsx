@@ -49,11 +49,19 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
 
       let query = supabase
         .from("audit_logs")
-        .select("*")
+        .select(`
+          *,
+          profiles!audit_logs_user_id_fkey(role)
+        `)
         .order("event_time", { ascending: false })
         .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
-      // Filters
+      // ADMIN-ONLY FILTER: Show only admin users + chudesyl@gmail.com + system activities
+      query = query.or(
+        `user_id.is.null,profiles.role.eq.admin,user_name.eq.chudesyl@gmail.com`
+      );
+
+      // Additional filters
       if (filters.category) query = query.eq("category", filters.category);
       if (filters.user) query = query.ilike("user_name", `%${filters.user}%`);
       if (filters.dateFrom) query = query.gte("event_time", filters.dateFrom);
@@ -166,10 +174,16 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
   );
 
   return (
-    <ResponsiveTable
-      className="relative border rounded-xl overflow-x-auto bg-white"
-      mobileComponent={mobileComponent}
-    >
+    <div>
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-sm text-blue-800">
+          <strong>Note:</strong> Showing activities from admin users and system operations only.
+        </p>
+      </div>
+      <ResponsiveTable
+        className="relative border rounded-xl overflow-x-auto bg-white"
+        mobileComponent={mobileComponent}
+      >
       <Table>
         <TableHeader>
           <TableRow>
@@ -244,7 +258,8 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
           Next
         </button>
       </div>
-    </ResponsiveTable>
+      </ResponsiveTable>
+    </div>
   );
 };
 

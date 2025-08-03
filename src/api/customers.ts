@@ -274,7 +274,7 @@ export const deleteCustomer = async (customerId: string) => {
 export const getCustomerAnalytics = async (dateRange: DateRange): Promise<CustomerAnalytics> => {
   const { from, to } = dateRange;
 
-  // Fetch registered customers
+  // Fetch registered customers - avoid direct auth.users access
   const { data: registeredCustomers, error: registeredError } = await supabase
     .from('customer_accounts')
     .select(`
@@ -287,7 +287,7 @@ export const getCustomerAnalytics = async (dateRange: DateRange): Promise<Custom
 
   if (registeredError) throw new Error(registeredError.message);
 
-  // Create a map to store user emails - we'll get them from orders
+  // Create a map to store user emails from orders instead of auth.users
   const userEmailMap = new Map<string, string>();
 
   // Fetch ALL orders to get guest customers and order data

@@ -26,8 +26,8 @@ const PublicFooterContent = () => {
             <div className="space-y-2 text-gray-300">
               <div className="font-medium">Headquarters:</div>
               <div>346 Adeoye Ogunlana St, lifecamp, Abuja</div>
-              <div>3rd Avenue.</div>
-              <div>Abuja.</div>
+              
+              
             </div>
           </div>
 
@@ -36,7 +36,7 @@ const PublicFooterContent = () => {
             <h3 className="text-lg font-bold mb-4 text-white">Services</h3>
             <div className="space-y-2">
               <Link to="/" className="block text-gray-300 hover:text-white transition-colors">Home</Link>
-              <Link to="/products" className="block text-gray-300 hover:text-white transition-colors">Shop</Link>
+              
               <Link to="/blog" className="block text-gray-300 hover:text-white transition-colors">Blog</Link>
             </div>
           </div>
@@ -47,7 +47,7 @@ const PublicFooterContent = () => {
             <div className="space-y-2">
               <Link to="/about" className="block text-gray-300 hover:text-white transition-colors">About us</Link>
               <Link to="/blog" className="block text-gray-300 hover:text-white transition-colors">Blog</Link>
-              <Link to="/dispatch-partner" className="block text-gray-300 hover:text-white transition-colors">Dispatch Partner</Link>
+              
             </div>
           </div>
 

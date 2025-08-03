@@ -10,7 +10,7 @@ interface CheckoutRequest {
   customer_email: string;
   customer_name: string;
   customer_phone: string;
-  delivery_address: {
+  delivery_address?: {
     address_line_1: string;
     address_line_2?: string;
     city: string;
@@ -28,6 +28,8 @@ interface CheckoutRequest {
   delivery_fee?: number;
   delivery_zone_id?: string;
   payment_method: 'paystack' | 'bank_transfer' | 'cash_on_delivery';
+  guest_session_id?: string;
+  order_type?: 'delivery' | 'pickup';
 }
 
 serve(async (req) => {
@@ -53,7 +55,9 @@ serve(async (req) => {
       total_amount, 
       delivery_fee = 0, 
       delivery_zone_id,
-      payment_method 
+      payment_method,
+      guest_session_id,
+      order_type = 'delivery'
     }: CheckoutRequest = await req.json();
 
     console.log('Processing checkout for:', customer_email);
@@ -84,18 +88,26 @@ serve(async (req) => {
       );
     }
 
-    // 2. Create order with items
+    // 2. Create order with items (and handle guest session)
+    const orderData: any = {
+      p_customer_email: customer_email,
+      p_customer_name: customer_name,
+      p_customer_phone: customer_phone,
+      p_delivery_address: delivery_address,
+      p_order_items: order_items,
+      p_total_amount: total_amount,
+      p_delivery_fee: delivery_fee,
+      p_delivery_zone_id: delivery_zone_id,
+      p_order_type: order_type
+    };
+
+    // Add guest session ID if provided
+    if (guest_session_id) {
+      orderData.p_guest_session_id = guest_session_id;
+    }
+
     const { data: orderResult, error: orderError } = await supabaseAdmin
-      .rpc('create_order_with_items', {
-        p_customer_email: customer_email,
-        p_customer_name: customer_name,
-        p_customer_phone: customer_phone,
-        p_delivery_address: delivery_address,
-        p_order_items: order_items,
-        p_total_amount: total_amount,
-        p_delivery_fee: delivery_fee,
-        p_delivery_zone_id: delivery_zone_id
-      });
+      .rpc('create_order_with_items', orderData);
 
     if (orderError) {
       throw new Error(`Order creation error: ${orderError.message}`);

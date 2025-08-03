@@ -4,6 +4,8 @@ import { calculateAdvancedOrderDiscount, CartPromotion } from '@/lib/discountCal
 import { calculateCartVATSummary } from '@/lib/vatCalculations';
 import { validatePromotionCode } from '@/api/productsWithDiscounts';
 import { usePromotions } from './usePromotions';
+import { useGuestSession } from './useGuestSession';
+import { useCustomerAuth } from './useCustomerAuth';
 
 export interface CartItem {
   id: string;
@@ -45,6 +47,8 @@ export interface Cart {
 
 export const useCart = () => {
   const { data: promotions = [] } = usePromotions();
+  const { guestSession, generateGuestSession } = useGuestSession();
+  const { customerAccount } = useCustomerAuth();
   const [cart, setCart] = useState<Cart>({
     items: [],
     summary: {
@@ -64,6 +68,18 @@ export const useCart = () => {
 
   // Initialize cart tracking
   const { trackCart } = useCartTracking(cart);
+
+  // Initialize guest session when cart is first used
+  useEffect(() => {
+    const initializeGuestSession = async () => {
+      if (!customerAccount && !guestSession && cart.items.length > 0) {
+        console.log('🛒 Initializing guest session for cart...');
+        await generateGuestSession();
+      }
+    };
+
+    initializeGuestSession();
+  }, [cart.items.length, customerAccount, guestSession, generateGuestSession]);
 
   // Load cart from localStorage on mount
   useEffect(() => {

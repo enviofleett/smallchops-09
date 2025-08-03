@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
-import { CheckoutFlow } from '@/components/checkout/CheckoutFlow';
+import { EnhancedCheckoutFlow } from '@/components/checkout/EnhancedCheckoutFlow';
 
 export const CheckoutButton: React.FC = () => {
   const { cart } = useCart();
@@ -23,7 +23,7 @@ export const CheckoutButton: React.FC = () => {
         Checkout ({cart.itemCount})
       </Button>
 
-      <CheckoutFlow
+      <EnhancedCheckoutFlow
         isOpen={showCheckout}
         onClose={() => setShowCheckout(false)}
       />

@@ -181,6 +181,97 @@ const PublicHome = () => {
         </div>
       </section>
 
+      {/* Featured Products Showcase */}
+      <section className="bg-orange-400 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {/* The Grill & Chill Box */}
+            <Card className="bg-white rounded-lg shadow-lg overflow-hidden">
+              <CardContent className="p-0">
+                <div className="bg-gray-200 h-48 flex items-center justify-center">
+                  <div className="w-16 h-16 bg-gray-400 rounded"></div>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">The Grill & Chill Box</h3>
+                  <div className="flex items-center space-x-1 mb-4">
+                    {renderStars(5)}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Button 
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg"
+                      onClick={() => handleAddToCart({
+                        id: 'grill-chill-box',
+                        name: 'The Grill & Chill Box',
+                        price: 10000
+                      })}
+                    >
+                      Add to Cart
+                    </Button>
+                    <span className="text-xl font-bold text-gray-900">₦10,000</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Odogwu Box */}
+            <Card className="bg-white rounded-lg shadow-lg overflow-hidden">
+              <CardContent className="p-0">
+                <div className="bg-gray-200 h-48 flex items-center justify-center">
+                  <div className="w-16 h-16 bg-gray-400 rounded"></div>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Odogwu Box</h3>
+                  <div className="flex items-center space-x-1 mb-4">
+                    {renderStars(5)}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Button 
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg"
+                      onClick={() => handleAddToCart({
+                        id: 'odogwu-box',
+                        name: 'Odogwu Box',
+                        price: 10000
+                      })}
+                    >
+                      Add to Cart
+                    </Button>
+                    <span className="text-xl font-bold text-gray-900">₦10,000</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Big Chop Energy */}
+            <Card className="bg-white rounded-lg shadow-lg overflow-hidden">
+              <CardContent className="p-0">
+                <div className="bg-gray-200 h-48 flex items-center justify-center">
+                  <div className="w-16 h-16 bg-gray-400 rounded"></div>
+                </div>
+                <div className="p-6">
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Big Chop Energy</h3>
+                  <div className="flex items-center space-x-1 mb-4">
+                    {renderStars(5)}
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <Button 
+                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg"
+                      onClick={() => handleAddToCart({
+                        id: 'big-chop-energy',
+                        name: 'Big Chop Energy',
+                        price: 10000
+                      })}
+                    >
+                      Add to Cart
+                    </Button>
+                    <span className="text-xl font-bold text-gray-900">₦10,000</span>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Products Section */}
       <section className="bg-gray-50 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

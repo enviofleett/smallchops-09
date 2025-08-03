@@ -119,7 +119,8 @@ export default function AuthCallback() {
 
   const handlePhoneSkip = () => {
     setShowPhoneModal(false);
-    navigate('/customer-portal');
+    const redirectPath = handlePostLoginRedirect('customer');
+    navigate(redirectPath);
   };
 
   if (isLoading) {

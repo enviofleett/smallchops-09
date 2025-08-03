@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import AuthLayout from '@/components/auth/AuthLayout';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, Loader2, Mail } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
+import { handlePostLoginRedirect } from '@/utils/redirect';
+import { Loader2, CheckCircle, XCircle, AlertCircle, Mail } from 'lucide-react';
 
 const EmailVerificationPage = () => {
   const [searchParams] = useSearchParams();
@@ -43,9 +44,10 @@ const EmailVerificationPage = () => {
           description: "Your account has been successfully verified.",
         });
 
-        // Redirect after a short delay
+        // Redirect after a short delay using proper redirect handling
         setTimeout(() => {
-          navigate('/customer-portal');
+          const redirectPath = handlePostLoginRedirect('customer');
+          navigate(redirectPath);
         }, 3000);
       } catch (error) {
         console.error('Verification error:', error);
@@ -114,7 +116,10 @@ const EmailVerificationPage = () => {
                 Your account has been successfully verified. You'll be redirected to your dashboard shortly.
               </p>
             </div>
-            <Button onClick={() => navigate('/customer-portal')} className="w-full">
+            <Button onClick={() => {
+              const redirectPath = handlePostLoginRedirect('customer');
+              navigate(redirectPath);
+            }} className="w-full">
               Continue to Dashboard
             </Button>
           </div>
@@ -165,13 +170,17 @@ const EmailVerificationPage = () => {
   };
 
   return (
-    <AuthLayout 
-      title="Email Verification" 
-      subtitle="Confirming your account"
-      showLogo={false}
-    >
-      {renderContent()}
-    </AuthLayout>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <CardTitle>Email Verification</CardTitle>
+          <CardDescription>Confirming your account</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {renderContent()}
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 

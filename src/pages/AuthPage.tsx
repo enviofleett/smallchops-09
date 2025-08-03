@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
+import { handlePostLoginRedirect } from '@/utils/redirect';
 import AuthLayout from '@/components/auth/AuthLayout';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import AuthFormValidation from '@/components/auth/AuthFormValidation';
@@ -48,7 +49,8 @@ const AuthPage = () => {
   // Auto-redirect if already authenticated
   useEffect(() => {
     if (customerAccount) {
-      navigate('/customer-portal');
+      const redirectPath = handlePostLoginRedirect('customer');
+      navigate(redirectPath);
     }
   }, [customerAccount, navigate]);
 

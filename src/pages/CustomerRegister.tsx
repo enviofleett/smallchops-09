@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { handlePostLoginRedirect } from '@/utils/redirect';
 import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
-import { useRegistrationDebug } from '@/services/registrationDebugService';
-
-import { Eye, EyeOff, Loader2, ArrowLeft, CheckCircle, Mail, User, Phone, Lock } from 'lucide-react';
-import { Link, useNavigate } from 'react-router-dom';
+import { User, Mail, Phone, Lock, Eye, EyeOff, Loader2, ArrowLeft, CheckCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import startersLogo from '@/assets/starters-logo.png';
 import AuthFormValidation from '@/components/auth/AuthFormValidation';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
@@ -22,7 +23,6 @@ const CustomerRegister = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
   const { register, signUpWithGoogle } = useCustomerDirectAuth();
-  const { logDebug } = useRegistrationDebug();
   
 
   const [formData, setFormData] = useState({
@@ -113,13 +113,6 @@ const CustomerRegister = () => {
 
     setIsLoading(true);
 
-    // Log registration attempt for monitoring
-    await logDebug('Customer registration started', 'info', {
-      email: formData.email,
-      hasPhone: !!formData.phone,
-      timestamp: new Date().toISOString()
-    });
-
     try {
       // Create account using customer direct auth
       const result = await register({
@@ -132,12 +125,6 @@ const CustomerRegister = () => {
       if (!result.success) {
         throw new Error(result.error || 'Registration failed');
       }
-
-      // Log successful registration
-      await logDebug('Customer registration successful', 'info', {
-        email: formData.email,
-        timestamp: new Date().toISOString()
-      });
 
       toast({
         title: "Registration successful!",
@@ -153,17 +140,11 @@ const CustomerRegister = () => {
         confirmPassword: '',
       });
 
-      // Redirect to customer portal
-      navigate('/customer-portal');
+      // Redirect using proper redirect handling
+      const redirectPath = handlePostLoginRedirect('customer');
+      navigate(redirectPath);
     } catch (error: any) {
       console.error('Registration error:', error);
-      
-      // Log registration failure
-      await logDebug('Customer registration failed', 'error', {
-        email: formData.email,
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
       
       toast({
         title: "Registration failed",

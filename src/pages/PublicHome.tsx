@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
 import { getCategories } from '@/api/categories';
 import { useCart } from '@/hooks/useCart';
@@ -71,10 +72,11 @@ const PublicHome = () => {
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
             <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">S</span>
-              </div>
-              <span className="text-xl font-bold text-gray-900">STARTERS</span>
+              <img
+                src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png"
+                alt="Starters Logo"
+                className="h-10 w-auto"
+              />
             </div>
 
             {/* Navigation Menu */}
@@ -485,6 +487,9 @@ const PublicHome = () => {
           </div>
         </div>
       </footer>
+
+      {/* Enhanced Footer */}
+      <PublicFooter />
     </div>
   );
 };

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useCustomerFavorites } from '@/hooks/useCustomerFavorites';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import { FavoriteProductGrid } from '@/components/favorites/FavoriteProductGrid';
 import { FavoritesHeader } from '@/components/favorites/FavoritesHeader';
 import { FavoritesEmptyState } from '@/components/favorites/FavoritesEmptyState';
@@ -31,72 +33,88 @@ const CustomerFavorites = () => {
 
   if (!customerAccount) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardContent className="p-6 text-center">
-            <h2 className="text-xl font-semibold mb-2">Please log in</h2>
-            <p className="text-muted-foreground">You need to be logged in to view your favorites.</p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex flex-col">
+        <PublicHeader />
+        <div className="flex-1 flex items-center justify-center">
+          <Card className="w-full max-w-md">
+            <CardContent className="p-6 text-center">
+              <h2 className="text-xl font-semibold mb-2">Please log in</h2>
+              <p className="text-muted-foreground">You need to be logged in to view your favorites.</p>
+            </CardContent>
+          </Card>
+        </div>
+        <PublicFooter />
       </div>
     );
   }
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="space-y-6">
-          <Skeleton className="h-12 w-64" />
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={i} className="h-80" />
-            ))}
+      <div className="min-h-screen flex flex-col">
+        <PublicHeader />
+        <div className="flex-1">
+          <div className="container mx-auto px-4 py-8">
+            <div className="space-y-6">
+              <Skeleton className="h-12 w-64" />
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-80" />
+                ))}
+              </div>
+            </div>
           </div>
         </div>
+        <PublicFooter />
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="space-y-6">
-        <FavoritesHeader
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          selectedCategory={selectedCategory}
-          onCategoryChange={setSelectedCategory}
-          categories={categories}
-          viewMode={viewMode}
-          onViewModeChange={setViewMode}
-          favoritesCount={favorites.length}
-          onShowNotificationSettings={() => setShowNotificationSettings(true)}
-        />
+    <div className="min-h-screen flex flex-col">
+      <PublicHeader />
+      <div className="flex-1">
+        <div className="container mx-auto px-4 py-8">
+          <div className="space-y-6">
+            <FavoritesHeader
+              searchQuery={searchQuery}
+              onSearchChange={setSearchQuery}
+              selectedCategory={selectedCategory}
+              onCategoryChange={setSelectedCategory}
+              categories={categories}
+              viewMode={viewMode}
+              onViewModeChange={setViewMode}
+              favoritesCount={favorites.length}
+              onShowNotificationSettings={() => setShowNotificationSettings(true)}
+            />
 
-        {showNotificationSettings && (
-          <NotificationPreferences
-            customerId={customerAccount.id}
-            onClose={() => setShowNotificationSettings(false)}
-          />
-        )}
+            {showNotificationSettings && (
+              <NotificationPreferences
+                customerId={customerAccount.id}
+                onClose={() => setShowNotificationSettings(false)}
+              />
+            )}
 
-        {filteredFavorites.length === 0 ? (
-          <FavoritesEmptyState 
-            hasNoFavorites={favorites.length === 0}
-            hasNoFilteredResults={favorites.length > 0 && filteredFavorites.length === 0}
-            onClearFilters={() => {
-              setSearchQuery('');
-              setSelectedCategory('all');
-            }}
-          />
-        ) : (
-          <FavoriteProductGrid
-            favorites={filteredFavorites}
-            viewMode={viewMode}
-            onRemoveFromFavorites={(productId) => removeFromFavorites({ customerId: customerAccount.id, productId })}
-            isRemoving={isRemovingFavorite}
-          />
-        )}
+            {filteredFavorites.length === 0 ? (
+              <FavoritesEmptyState 
+                hasNoFavorites={favorites.length === 0}
+                hasNoFilteredResults={favorites.length > 0 && filteredFavorites.length === 0}
+                onClearFilters={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('all');
+                }}
+              />
+            ) : (
+              <FavoriteProductGrid
+                favorites={filteredFavorites}
+                viewMode={viewMode}
+                onRemoveFromFavorites={(productId) => removeFromFavorites({ customerId: customerAccount.id, productId })}
+                isRemoving={isRemovingFavorite}
+              />
+            )}
+          </div>
+        </div>
       </div>
+      <PublicFooter />
     </div>
   );
 };

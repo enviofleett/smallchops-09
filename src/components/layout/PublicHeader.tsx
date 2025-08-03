@@ -22,7 +22,7 @@ export const PublicHeader = () => {
           {/* Logo */}
           <Link to="/" className="flex items-center space-x-2">
             <img
-              src="/lovable-uploads/d12bf821-fae2-4372-a35c-69998d00a17a.png"
+              src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png"
               alt="Starters Logo"
               className="h-10 w-auto"
             />

@@ -4,11 +4,13 @@ import { Search, ShoppingCart, User, Menu, X, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import { useAuthStatus } from '@/hooks/useAuthStatus';
 
 export const PublicHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { getItemCount } = useCart();
   const { data: settings } = useBusinessSettings();
+  const { isAuthenticated } = useAuthStatus();
   const navigate = useNavigate();
 
   const handleCartClick = () => {
@@ -75,7 +77,7 @@ export const PublicHeader = () => {
               variant="ghost"
               size="icon"
               className="hidden md:flex"
-              onClick={() => navigate('/favorites')}
+              onClick={() => navigate('/customer-favorites')}
             >
               <Heart className="h-5 w-5" />
             </Button>
@@ -99,7 +101,13 @@ export const PublicHeader = () => {
             <Button
               variant="ghost"
               size="icon"
-              onClick={() => navigate('/auth')}
+              onClick={() => {
+                if (isAuthenticated) {
+                  navigate('/customer-profile');
+                } else {
+                  navigate('/auth');
+                }
+              }}
             >
               <User className="h-5 w-5" />
             </Button>
@@ -147,7 +155,7 @@ export const PublicHeader = () => {
                   Shop
                 </Link>
                 <Link 
-                  to="/favorites" 
+                  to="/customer-favorites" 
                   className="text-foreground hover:text-primary transition-colors py-2"
                   onClick={() => setIsMenuOpen(false)}
                 >

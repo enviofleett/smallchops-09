@@ -16,7 +16,7 @@ const AuthLayout = ({ children, title, subtitle, showLogo = true }: AuthLayoutPr
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/40 z-10" />
         <img 
-          src="/lovable-uploads/5a98043f-97e3-4c4f-945c-ad96e2351156.png"
+          src="/lovable-uploads/c25fd79f-d9c7-466d-9189-55f68cc44b83.png"
           alt="Delicious family meal"
           className="w-full h-full object-cover"
         />
@@ -31,7 +31,7 @@ const AuthLayout = ({ children, title, subtitle, showLogo = true }: AuthLayoutPr
               />
             </div>
             <h1 className="text-4xl font-bold leading-tight">Delicious Bites, Big Smiles</h1>
-            <p className="text-xl opacity-90">Experience the joy of great food with your loved ones</p>
+            <p className="text-xl opacity-90">Crispy, savory small chops, freshly made and delivered fast.</p>
           </div>
         </div>
       </div>

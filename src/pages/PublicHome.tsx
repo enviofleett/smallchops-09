@@ -1,14 +1,45 @@
-import { useState } from 'react';
-import { Search, ShoppingCart, User, Star, Facebook, Instagram, Twitter } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { Search, ShoppingCart, User, Star, Facebook, Instagram, Twitter, Linkedin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
+import { getCategories } from '@/api/categories';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 
 const PublicHome = () => {
+  const [activeCategory, setActiveCategory] = useState('all');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [currentPage, setCurrentPage] = useState(1);
+  const itemsPerPage = 9;
+
   const { addItem } = useCart();
   const { toast } = useToast();
+
+  // Fetch products with discounts
+  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
+    queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
+    queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
+  });
+
+  // Fetch categories
+  const { data: categories = [] } = useQuery({
+    queryKey: ['categories'],
+    queryFn: getCategories,
+  });
+
+  // Filter products based on search
+  const filteredProducts = products.filter(product => 
+    product.name.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  // Pagination
+  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
 
   const handleAddToCart = (product: any) => {
     addItem({
@@ -32,41 +63,15 @@ const PublicHome = () => {
     ));
   };
 
-  const featuredProducts = [
-    {
-      id: 'grill-chill-box',
-      name: 'The Grill & Chill Box',
-      price: 10000,
-      image: 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=400&h=300&fit=crop',
-      rating: 5
-    },
-    {
-      id: 'odogwu-box',
-      name: 'Odogwu Box',
-      price: 10000,
-      image: 'https://images.unsplash.com/photo-1501286353178-1ec881214838?w=400&h=300&fit=crop',
-      rating: 5
-    },
-    {
-      id: 'big-chop-energy',
-      name: 'Big Chop Energy',
-      price: 10000,
-      image: 'https://images.unsplash.com/photo-1465146344425-f00d5f5c8f07?w=400&h=300&fit=crop',
-      rating: 5
-    }
-  ];
-
   return (
     <div className="min-h-screen bg-white">
       {/* Navigation Header */}
       <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
-            {/* Circular Logo */}
+            {/* Logo */}
             <div className="flex items-center">
-              <div className="w-10 h-10 bg-red-600 rounded-full flex items-center justify-center">
-                <span className="text-white font-bold text-lg">S</span>
-              </div>
+              <img src="/lovable-uploads/38d91221-666e-459c-bef5-919b5455e55b.png" alt="Starters" className="h-10 w-auto" />
             </div>
 
             {/* Navigation Menu */}
@@ -84,28 +89,31 @@ const PublicHome = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
                   placeholder="Search for products..."
-                  className="pl-10 border-gray-300 rounded-lg"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 border-gray-300"
                 />
               </div>
             </div>
 
             {/* Cart and Profile */}
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2">
-                <ShoppingCart className="w-5 h-5 text-gray-700" />
-                <span className="text-gray-700 font-medium">Cart</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <User className="w-5 h-5 text-gray-700" />
-                <span className="text-gray-700 font-medium">Jideyemi</span>
-              </div>
+            <div className="flex items-center space-x-4">
+              <Button variant="ghost" size="sm" className="relative">
+                <ShoppingCart className="w-5 h-5" />
+                <Badge className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+                  0
+                </Badge>
+              </Button>
+              <Button variant="ghost" size="sm">
+                <User className="w-5 h-5" />
+              </Button>
             </div>
           </div>
         </div>
       </header>
 
       {/* Hero Section */}
-      <section className="bg-white py-16 relative">
+      <section className="bg-white py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             {/* Left Side - Hero Content */}
@@ -124,99 +132,43 @@ const PublicHome = () => {
               </div>
             </div>
 
-            {/* Right Side - Hero Image */}
-            <div className="relative">
-              <img 
-                src="https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=600&h=400&fit=crop" 
-                alt="Delicious Samosas and Small Chops" 
-                className="w-full h-96 object-cover rounded-2xl"
-              />
-              
-              {/* Floating Budget Baller Card */}
-              <div className="absolute -bottom-8 -left-8 lg:-left-16">
-                <Card className="w-72 bg-white shadow-2xl border-0">
-                  <CardContent className="p-6">
-                    <div className="space-y-4">
-                      <div className="relative">
-                        <img 
-                          src="https://images.unsplash.com/photo-1501286353178-1ec881214838?w=300&h=200&fit=crop" 
-                          alt="The Budget Baller" 
-                          className="w-full h-32 object-cover rounded-lg"
-                        />
-                      </div>
-                      <div>
-                        <h3 className="text-lg font-bold text-gray-900">The Budget Baller</h3>
-                        <div className="mt-2 space-y-1 text-sm text-gray-600">
-                          <div>• 5 Samosa</div>
-                          <div>• 5 Spring Rolls</div>
-                          <div>• 5 Stick Meat</div>
-                          <div>• 20 Poff-Poff</div>
-                        </div>
-                        <div className="mt-4 flex items-center justify-between">
-                          <div className="text-xl font-bold text-red-600">₦9,450</div>
-                          <div className="flex items-center space-x-1">
-                            {renderStars(5)}
-                            <span className="text-sm text-gray-500">(124)</span>
-                          </div>
-                        </div>
-                        <Button 
-                          className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white rounded-full"
-                          onClick={() => handleAddToCart({
-                            id: 'budget-baller',
-                            name: 'The Budget Baller',
-                            price: 9450
-                          })}
-                        >
-                          Add to Cart
-                        </Button>
-                      </div>
+            {/* Right Side - Product Card */}
+            <div className="flex justify-center">
+              <Card className="w-80 bg-white border-2 border-gray-200 shadow-lg">
+                <CardContent className="p-6">
+                  <div className="space-y-4">
+                    <div className="relative">
+                      <img 
+                        src="/public/hero-family.jpg" 
+                        alt="The Budget Baller" 
+                        className="w-full h-48 object-cover rounded-lg"
+                      />
+                      <Badge className="absolute top-2 right-2 bg-red-600 text-white">
+                        Popular
+                      </Badge>
                     </div>
-                  </CardContent>
-                </Card>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Products Section with Orange Background */}
-      <section className="py-20" style={{ backgroundColor: '#FF6B35' }}>
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-white mb-4">Featured Products</h2>
-            <p className="text-white/90 text-lg">Our most popular small chop combinations</p>
-          </div>
-
-          {/* Products Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {featuredProducts.map((product) => (
-              <Card key={product.id} className="bg-white hover:shadow-xl transition-all duration-300 border-0 rounded-2xl overflow-hidden">
-                <CardContent className="p-0">
-                  <div className="relative">
-                    <img 
-                      src={product.image} 
-                      alt={product.name}
-                      className="w-full h-56 object-cover"
-                    />
-                  </div>
-                  <div className="p-6">
-                    <h3 className="text-xl font-bold text-gray-900 mb-3">
-                      {product.name}
-                    </h3>
-                    <div className="flex items-center space-x-1 mb-4">
-                      {renderStars(product.rating)}
-                      <span className="text-sm text-gray-500 ml-2">
-                        ({Math.floor(Math.random() * 50) + 80})
-                      </span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-2xl font-bold text-red-600">
-                        ₦{product.price.toLocaleString()}
-                      </span>
+                    <div>
+                      <h3 className="text-xl font-bold text-gray-900">The Budget Baller</h3>
+                      <div className="mt-2 space-y-1 text-sm text-gray-600">
+                        <div>• 5 Samosa</div>
+                        <div>• 5 Spring Rolls</div>
+                        <div>• 5 Stick Meat</div>
+                        <div>• 20 Poff-Poff</div>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between">
+                        <div className="text-2xl font-bold text-red-600">₦9,450</div>
+                        <div className="flex items-center space-x-1">
+                          {renderStars(5)}
+                          <span className="text-sm text-gray-500">(124)</span>
+                        </div>
+                      </div>
                       <Button 
-                        size="lg" 
-                        className="bg-red-600 hover:bg-red-700 text-white rounded-full px-6 py-3 font-semibold"
-                        onClick={() => handleAddToCart(product)}
+                        className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white rounded-full"
+                        onClick={() => handleAddToCart({
+                          id: 'budget-baller',
+                          name: 'The Budget Baller',
+                          price: 9450
+                        })}
                       >
                         Add to Cart
                       </Button>
@@ -224,7 +176,166 @@ const PublicHome = () => {
                   </div>
                 </CardContent>
               </Card>
-            ))}
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Products Section */}
+      <section className="bg-gray-50 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+            {/* Left Sidebar - Categories */}
+            <div className="lg:col-span-1">
+              <Card className="bg-white">
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-bold text-red-600 mb-4">Categories</h3>
+                  <div className="space-y-2">
+                    <button
+                      onClick={() => setActiveCategory('all')}
+                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                        activeCategory === 'all' 
+                          ? 'bg-red-600 text-white' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      All
+                    </button>
+                    <button
+                      onClick={() => setActiveCategory('platters')}
+                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                        activeCategory === 'platters' 
+                          ? 'bg-red-600 text-white' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      Platters
+                    </button>
+                    <button
+                      onClick={() => setActiveCategory('packs')}
+                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                        activeCategory === 'packs' 
+                          ? 'bg-red-600 text-white' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      Packs
+                    </button>
+                    <button
+                      onClick={() => setActiveCategory('lunchboxes')}
+                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                        activeCategory === 'lunchboxes' 
+                          ? 'bg-red-600 text-white' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      Lunchboxes
+                    </button>
+                    <button
+                      onClick={() => setActiveCategory('customization')}
+                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                        activeCategory === 'customization' 
+                          ? 'bg-red-600 text-white' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      Customization
+                    </button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Right Side - Products Grid */}
+            <div className="lg:col-span-3">
+              <div className="mb-6">
+                <h2 className="text-2xl font-bold text-gray-900">Products</h2>
+              </div>
+
+              {/* Products Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
+                {isLoadingProducts ? (
+                  // Loading skeleton
+                  Array.from({ length: 9 }).map((_, i) => (
+                    <Card key={i} className="animate-pulse">
+                      <CardContent className="p-0">
+                        <div className="aspect-square bg-gray-200 rounded-t-lg"></div>
+                        <div className="p-4 space-y-2">
+                          <div className="h-4 bg-gray-200 rounded"></div>
+                          <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                          <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  currentProducts.map((product, index) => (
+                    <Card key={product.id || index} className="bg-white hover:shadow-lg transition-shadow">
+                      <CardContent className="p-0">
+                        <div className="relative">
+                          <img 
+                            src={product.image_url || "/public/hero-family.jpg"} 
+                            alt={product.name || "The Budget Baller"}
+                            className="w-full h-48 object-cover rounded-t-lg"
+                          />
+                        </div>
+                        <div className="p-4">
+                          <h3 className="font-bold text-gray-900 mb-2">
+                            {product.name || "The Budget Baller"}
+                          </h3>
+                          <div className="flex items-center space-x-1 mb-2">
+                            {renderStars(Math.floor(Math.random() * 2) + 4)}
+                            <span className="text-sm text-gray-500">
+                              ({Math.floor(Math.random() * 100) + 20})
+                            </span>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-xl font-bold text-red-600">
+                              ₦{product.price?.toLocaleString() || "9,450"}
+                            </span>
+                            <Button 
+                              size="sm" 
+                              className="bg-red-600 hover:bg-red-700 text-white rounded-full px-4"
+                              onClick={() => handleAddToCart(product)}
+                            >
+                              Add to Cart
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+
+              {/* Pagination */}
+              <div className="flex justify-center items-center space-x-2">
+                {Array.from({ length: totalPages || 4 }, (_, i) => (
+                  <Button
+                    key={i + 1}
+                    variant={currentPage === i + 1 ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setCurrentPage(i + 1)}
+                    className={`w-10 h-10 rounded-full ${
+                      currentPage === i + 1 
+                        ? 'bg-red-600 hover:bg-red-700 text-white' 
+                        : 'border-gray-300 text-gray-700 hover:bg-gray-50'
+                    }`}
+                  >
+                    {i + 1}
+                  </Button>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-10 h-10 rounded-full border-gray-300 text-gray-700 hover:bg-gray-50"
+                  onClick={() => setCurrentPage(Math.min(currentPage + 1, totalPages || 4))}
+                  disabled={currentPage >= (totalPages || 4)}
+                >
+                  &gt;
+                </Button>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -280,9 +391,7 @@ const PublicHome = () => {
             <div className="flex flex-col md:flex-row items-center justify-between space-y-4 md:space-y-0">
               {/* Logo and Tagline */}
               <div className="flex items-center space-x-3">
-                <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
-                  <span className="text-white font-bold">S</span>
-                </div>
+                <img src="/lovable-uploads/38d91221-666e-459c-bef5-919b5455e55b.png" alt="Starters" className="h-8 w-auto" />
                 <span className="text-gray-400 text-sm">SMALL CHOPS</span>
               </div>
 
@@ -296,6 +405,9 @@ const PublicHome = () => {
                 </a>
                 <a href="#" className="text-gray-400 hover:text-white transition-colors">
                   <Twitter className="w-5 h-5" />
+                </a>
+                <a href="#" className="text-gray-400 hover:text-white transition-colors">
+                  <Linkedin className="w-5 h-5" />
                 </a>
               </div>
             </div>

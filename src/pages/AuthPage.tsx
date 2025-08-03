@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-import { useOTPAuth } from '@/hooks/useOTPAuth';
 import { useToast } from '@/hooks/use-toast';
 import AuthLayout from '@/components/auth/AuthLayout';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
@@ -10,32 +9,24 @@ import AuthFormValidation from '@/components/auth/AuthFormValidation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { OTPInput } from '@/components/auth/OTPInput';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader2 } from 'lucide-react';
 
-type AuthMode = 'admin' | 'customer';
-type AuthView = 'login' | 'register' | 'forgot-password' | 'otp-verification';
+type AuthView = 'login' | 'register' | 'forgot-password';
 
 const AuthPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Auth hooks
-  const { login: adminLogin, signUp: adminSignUp, signUpWithGoogle, resetPassword, isLoading: adminLoading } = useAuth();
-  const { customerAccount, isLoading: customerLoading } = useCustomerAuth();
-  const { sendOTP, verifyRegistrationOTP, loginWithOTP, completeOTPLogin, isLoading: otpLoading } = useOTPAuth();
+  // Auth hooks - customer only
+  const { login, register, signUpWithGoogle, isLoading } = useCustomerDirectAuth();
+  const { customerAccount } = useCustomerAuth();
 
   // State
-  const [mode, setMode] = useState<AuthMode>('customer');
   const [view, setView] = useState<AuthView>('login');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [otpEmail, setOtpEmail] = useState('');
-  const [otpPurpose, setOtpPurpose] = useState<'login' | 'registration'>('login');
   const [showValidation, setShowValidation] = useState(false);
-  const [tempRegistrationData, setTempRegistrationData] = useState<any>(null);
 
   const [formData, setFormData] = useState({
     email: '',
@@ -45,16 +36,9 @@ const AuthPage = () => {
     phone: ''
   });
 
-  const isLoading = adminLoading || customerLoading || otpLoading;
-
   // Initialize from URL params
   useEffect(() => {
-    const modeParam = searchParams.get('mode');
     const viewParam = searchParams.get('view');
-    
-    if (modeParam === 'admin' || modeParam === 'customer') {
-      setMode(modeParam);
-    }
     
     if (viewParam === 'register' || viewParam === 'forgot-password') {
       setView(viewParam);
@@ -87,12 +71,12 @@ const AuthPage = () => {
         return false;
       }
       
-      if (mode === 'customer' && !formData.phone.trim()) {
+      if (!formData.phone.trim()) {
         toast({ title: "Phone required", description: "Phone number is required for customer registration.", variant: "destructive" });
         return false;
       }
       
-      if (mode === 'customer' && formData.phone.length !== 11) {
+      if (formData.phone.length !== 11) {
         toast({ title: "Invalid phone", description: "Please enter a valid 11-digit Nigerian phone number.", variant: "destructive" });
         return false;
       }
@@ -113,25 +97,10 @@ const AuthPage = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    try {
-      if (mode === 'admin') {
-        await adminLogin({ email: formData.email, password: formData.password });
-        navigate('/');
-      } else {
-        // Customer login - use OTP flow
-        const result = await loginWithOTP(formData.email);
-        if (result.success) {
-          setOtpEmail(formData.email);
-          setOtpPurpose('login');
-          setView('otp-verification');
-        }
-      }
-    } catch (error: any) {
-      toast({
-        title: "Login failed",
-        description: error.message || "Please check your credentials and try again.",
-        variant: "destructive"
-      });
+    const result = await login(formData.email, formData.password);
+    
+    if (result.success && result.redirect) {
+      navigate(result.redirect);
     }
   };
 
@@ -140,112 +109,39 @@ const AuthPage = () => {
     
     if (!validateForm()) return;
 
-    try {
-      if (mode === 'admin') {
-        await adminSignUp({
-          email: formData.email,
-          password: formData.password,
-          name: formData.name
-        });
+    const result = await register({
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+      phone: formData.phone
+    });
+
+    if (result.success) {
+      if (result.requiresEmailVerification) {
         toast({
           title: "Registration successful!",
-          description: "Please check your email for verification.",
+          description: "Please check your email to verify your account.",
         });
         setView('login');
-      } else {
-        // Customer registration - start OTP flow
-        const result = await sendOTP(formData.email, 'registration', formData.name);
-        if (result.success) {
-          setTempRegistrationData(formData);
-          setOtpEmail(formData.email);
-          setOtpPurpose('registration');
-          setView('otp-verification');
-        }
+      } else if (result.redirect) {
+        navigate(result.redirect);
       }
-    } catch (error: any) {
-      toast({
-        title: "Registration failed",
-        description: error.message || "Please try again.",
-        variant: "destructive"
-      });
     }
   };
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    try {
-      await resetPassword(formData.email);
-      toast({
-        title: "Reset email sent",
-        description: "Please check your email for password reset instructions.",
-      });
-      setView('login');
-    } catch (error: any) {
-      toast({
-        title: "Reset failed",
-        description: error.message || "Please try again.",
-        variant: "destructive"
-      });
-    }
+    toast({
+      title: "Feature coming soon",
+      description: "Password reset will be available soon. Please contact support for assistance.",
+    });
   };
 
-  const handleOTPVerification = async (code: string) => {
-    try {
-      if (otpPurpose === 'login') {
-        const result = await completeOTPLogin(otpEmail, code);
-        if (result.success) {
-          navigate('/customer-portal');
-        } else {
-          toast({
-            title: "Verification failed",
-            description: "Invalid or expired code. Please try again.",
-            variant: "destructive"
-          });
-        }
-      } else if (otpPurpose === 'registration') {
-        const result = await verifyRegistrationOTP(otpEmail, code);
-        if (result.success) {
-          // Complete customer registration
-          await adminSignUp({
-            email: formData.email,
-            password: formData.password,
-            name: formData.name,
-            phone: formData.phone
-          });
-          
-          toast({
-            title: "Registration successful!",
-            description: "Welcome! Your account has been created.",
-          });
-          
-          // Navigate to customer portal
-          navigate('/customer-portal');
-        } else {
-          toast({
-            title: "Verification failed",
-            description: "Invalid or expired code. Please try again.",
-            variant: "destructive"
-          });
-        }
-      }
-    } catch (error: any) {
-      toast({
-        title: "Verification failed",
-        description: error.message || "Please try again.",
-        variant: "destructive"
-      });
-    }
+  const handleGoogleAuth = async () => {
+    await signUpWithGoogle();
   };
 
-  const renderModeSelector = () => (
-    <Tabs value={mode} onValueChange={(value) => setMode(value as AuthMode)} className="mb-6">
-      <TabsList className="grid w-full grid-cols-2">
-        <TabsTrigger value="customer">Customer</TabsTrigger>
-        <TabsTrigger value="admin">Admin</TabsTrigger>
-      </TabsList>
-    </Tabs>
-  );
 
   const renderLoginForm = () => (
     <form onSubmit={handleLogin} className="space-y-4">
@@ -266,38 +162,36 @@ const AuthPage = () => {
         </div>
       </div>
 
-      {mode === 'admin' && (
-        <div className="space-y-2">
-          <Label htmlFor="password">Password</Label>
-          <div className="relative">
-            <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="password"
-              type={showPassword ? 'text' : 'password'}
-              value={formData.password}
-              onChange={(e) => handleInputChange('password', e.target.value)}
-              placeholder="Enter your password"
-              className="pl-10 pr-10"
-              required
-              disabled={isLoading}
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-              onClick={() => setShowPassword(!showPassword)}
-              disabled={isLoading}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </Button>
-          </div>
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            value={formData.password}
+            onChange={(e) => handleInputChange('password', e.target.value)}
+            placeholder="Enter your password"
+            className="pl-10 pr-10"
+            required
+            disabled={isLoading}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+            onClick={() => setShowPassword(!showPassword)}
+            disabled={isLoading}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
         </div>
-      )}
+      </div>
 
       <Button type="submit" className="w-full" disabled={isLoading}>
         {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {mode === 'customer' ? 'Send Login Code' : 'Sign In'}
+        Sign In
       </Button>
 
       <div className="relative">
@@ -310,9 +204,9 @@ const AuthPage = () => {
       </div>
 
       <GoogleAuthButton 
-        onGoogleAuth={mode === 'customer' ? signUpWithGoogle : async () => {}} 
+        onGoogleAuth={handleGoogleAuth} 
         isLoading={isLoading} 
-        text={mode === 'customer' ? "Continue with Google" : "Google Auth (Admin)"}
+        text="Continue with Google"
       />
 
       <div className="flex justify-between text-sm">
@@ -371,28 +265,26 @@ const AuthPage = () => {
         </div>
       </div>
 
-      {mode === 'customer' && (
-        <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
-          <div className="relative">
-            <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-            <Input
-              id="phone"
-              type="tel"
-              value={formData.phone}
-              onChange={(e) => handleInputChange('phone', e.target.value)}
-              placeholder="09120020048"
-              className="pl-10"
-              required
-              disabled={isLoading}
-              maxLength={11}
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Enter your Nigerian phone number
-          </p>
+      <div className="space-y-2">
+        <Label htmlFor="phone">Phone Number</Label>
+        <div className="relative">
+          <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="phone"
+            type="tel"
+            value={formData.phone}
+            onChange={(e) => handleInputChange('phone', e.target.value)}
+            placeholder="09120020048"
+            className="pl-10"
+            required
+            disabled={isLoading}
+            maxLength={11}
+          />
         </div>
-      )}
+        <p className="text-xs text-muted-foreground">
+          Enter your Nigerian phone number
+        </p>
+      </div>
 
       <div className="space-y-2">
         <Label htmlFor="password">Password</Label>
@@ -473,9 +365,9 @@ const AuthPage = () => {
       </div>
 
       <GoogleAuthButton 
-        onGoogleAuth={mode === 'customer' ? signUpWithGoogle : async () => {}} 
+        onGoogleAuth={handleGoogleAuth} 
         isLoading={isLoading} 
-        text={mode === 'customer' ? "Sign up with Google" : "Google Auth (Admin)"}
+        text="Sign up with Google"
       />
 
       <div className="text-center">

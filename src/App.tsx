@@ -54,12 +54,15 @@ const App = () => (
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/category/:categoryId" element={<CategoryProducts />} />
               
-              {/* Authentication routes */}
-              <Route path="/login" element={<SplitScreenLoginPage />} />
+              {/* Authentication routes - customer only */}
+              <Route path="/login" element={<AuthPage />} />
               <Route path="/auth" element={<AuthPage />} />
               <Route path="/auth/callback" element={<AuthCallback />} />
               <Route path="/auth/verify" element={<EmailVerificationPage />} />
               <Route path="/auth/reset" element={<PasswordResetPage />} />
+              
+              {/* Admin login route */}
+              <Route path="/admin/login" element={<SplitScreenLoginPage />} />
               
               {/* Customer routes */}
               <Route path="/customer-portal" element={<CustomerPortal />} />

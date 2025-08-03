@@ -100,8 +100,8 @@ const PublicHome = () => {
             <div className="flex justify-center">
               <div className="w-80 h-80 lg:w-96 lg:h-96">
                 <img 
-                  src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png" 
-                  alt="Delicious fried pastries" 
+                  src="/lovable-uploads/8dfaab0f-8bc9-434a-ba8b-158885d43565.png" 
+                  alt="Delicious meat pies" 
                   className="w-full h-full object-cover rounded-2xl shadow-xl"
                 />
               </div>

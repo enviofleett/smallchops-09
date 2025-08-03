@@ -15,6 +15,7 @@ interface CommunicationEvent {
   email_type: string
   status: string
   variables: Record<string, any>
+  template_variables: Record<string, any>
   retry_count: number
   created_at: string
   error_message?: string
@@ -271,52 +272,35 @@ async function processOrderEmail(supabase: any, event: CommunicationEvent): Prom
 
 async function processWelcomeEmail(supabase: any, event: CommunicationEvent): Promise<boolean> {
   try {
-    // Get business settings with fallbacks for dynamic URL resolution
-    const { data: businessSettings } = await supabase
-      .from('business_settings')
-      .select('*')
-      .order('updated_at', { ascending: false })
-      .limit(1)
-      .maybeSingle()
+    console.log(`Processing welcome email for: ${event.recipient_email}`);
 
-    // Dynamic URL resolution from business settings
-    const siteUrl = businessSettings?.site_url || 
-                   businessSettings?.website_url || 
-                   'https://oknnklksdiqaifhxaccs.supabase.co'
-
-    // Enhance variables with business info and dynamic URL
-    const enhancedVariables = {
-      ...event.variables,
-      supportEmail: businessSettings?.email || businessSettings?.admin_notification_email || 'support@yourbusiness.com',
-      websiteUrl: siteUrl,
-      companyName: businessSettings?.name || 'Starters',
-      siteUrl
-    }
-
+    // Call SMTP function with CORRECT format and fields
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
       body: {
-        templateId: event.template_id || event.template_key || 'welcome_customer',
+        // Correctly pass the `template_key` as `templateId`
+        templateId: event.template_key,
         recipient: {
           email: event.recipient_email,
-          name: enhancedVariables?.customerName || 'Valued Customer'
+          // Correctly map the `customerName` from the variables
+          name: event.template_variables?.customerName || 'Valued Customer',
         },
-        variables: enhancedVariables,
-        emailType: event.email_type,
-        priority: 'normal'
+        // Correctly pass the `template_variables` object directly
+        variables: event.template_variables,
+        emailType: 'transactional',
       }
-    })
+    });
 
     if (error) {
-      console.error('SMTP function error for welcome email:', error)
-      return false
+      console.error('SMTP function error:', error);
+      return false;
     }
 
-    console.log('Welcome email sent successfully:', data)
-    return true
+    console.log('Welcome email sent successfully:', data);
+    return true;
 
   } catch (error) {
-    console.error('Error processing welcome email:', error)
-    return false
+    console.error('Error processing welcome email:', error);
+    return false;
   }
 }
 

@@ -6,6 +6,43 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Function to send OTP email directly using SMTP sender
+async function sendOTPEmail(supabase: any, email: string, otp: string, type: 'login' | 'registration' | 'password_reset') {
+  try {
+    // Determine the correct template key based on the email type
+    const templateKey = type === 'password_reset' ? 'password_reset_otp' : type === 'login' ? 'login_otp' : 'registration_otp';
+
+    // Directly invoke the SMTP sender function with the correct payload
+    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+      body: {
+        templateId: templateKey,
+        recipient: {
+          email: email,
+          name: 'Valued Customer',
+        },
+        variables: {
+          otpCode: otp,
+          customerEmail: email,
+          companyName: 'Starters',
+          expiryMinutes: '10'
+        },
+        emailType: 'transactional',
+      }
+    });
+
+    if (error) {
+      console.error('OTP email send error:', error);
+      return false;
+    }
+
+    console.log('OTP email sent successfully:', data);
+    return true;
+  } catch (error) {
+    console.error('Error sending OTP email:', error);
+    return false;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
@@ -13,7 +50,7 @@ serve(async (req) => {
   }
 
   try {
-    const { email } = await req.json();
+    const { email, type = 'login' } = await req.json();
 
     if (!email) {
       return new Response(
@@ -33,12 +70,12 @@ serve(async (req) => {
     );
 
     // Check rate limit using database function
-    const { data, error } = await supabaseAdmin.rpc('check_otp_rate_limit', {
+    const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc('check_otp_rate_limit', {
       p_email: email
     });
 
-    if (error) {
-      console.error('Rate limit check error:', error);
+    if (rateLimitError) {
+      console.error('Rate limit check error:', rateLimitError);
       return new Response(
         JSON.stringify({ error: "Rate limit check failed" }),
         { 
@@ -48,53 +85,56 @@ serve(async (req) => {
       );
     }
 
-    // If rate limit check passes, queue OTP email
-    if (data?.allowed) {
+    // If rate limit check passes, generate and send OTP immediately
+    if (rateLimitData?.allowed) {
       // Generate OTP code
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       
-      // Queue OTP email with proper format
-      const { error: emailError } = await supabaseAdmin
-        .from('communication_events')
+      // Store OTP in database for verification
+      const { error: otpInsertError } = await supabaseAdmin
+        .from('otp_codes')
         .insert({
-          event_type: 'login_otp',
-          recipient_email: email,
-          status: 'queued',
-          template_key: 'login_otp',
-          template_variables: {
-            otpCode: otpCode,
-            email: email
-          },
-          priority: 'high'
+          email: email,
+          otp_code: otpCode,
+          otp_type: type,
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minutes from now
         });
 
-      if (emailError) {
-        console.error('Error queuing OTP email:', emailError);
-      } else {
-        console.log('OTP email queued successfully for:', email);
-        
-        // Trigger immediate processing
-        try {
-          await supabaseAdmin.functions.invoke('instant-email-processor');
-        } catch (processingError) {
-          console.error('Error triggering email processing:', processingError);
-        }
+      if (otpInsertError) {
+        console.error('Error storing OTP:', otpInsertError);
+        return new Response(
+          JSON.stringify({ error: "Failed to generate OTP" }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
       }
-    }
 
-    if (error) {
-      console.error('Rate limit check error:', error);
-      return new Response(
-        JSON.stringify({ error: "Rate limit check failed" }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
+      // Send OTP email immediately
+      const emailSent = await sendOTPEmail(supabaseAdmin, email, otpCode, type);
+      
+      if (!emailSent) {
+        console.error('Failed to send OTP email');
+        return new Response(
+          JSON.stringify({ error: "Failed to send OTP email" }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, "Content-Type": "application/json" } 
+          }
+        );
+      }
+
+      console.log('OTP generated and sent successfully for:', email);
     }
 
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify({
+        allowed: rateLimitData?.allowed || false,
+        remaining: rateLimitData?.remaining || 0,
+        resetTime: rateLimitData?.resetTime,
+        message: rateLimitData?.allowed ? 'OTP sent successfully' : 'Rate limit exceeded'
+      }),
       { 
         status: 200, 
         headers: { ...corsHeaders, "Content-Type": "application/json" } 

@@ -3114,6 +3114,45 @@ export type Database = {
           },
         ]
       }
+      otp_codes: {
+        Row: {
+          attempts: number
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          is_used: boolean
+          max_attempts: number
+          otp_code: string
+          otp_type: string
+          used_at: string | null
+        }
+        Insert: {
+          attempts?: number
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          is_used?: boolean
+          max_attempts?: number
+          otp_code: string
+          otp_type: string
+          used_at?: string | null
+        }
+        Update: {
+          attempts?: number
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          is_used?: boolean
+          max_attempts?: number
+          otp_code?: string
+          otp_type?: string
+          used_at?: string | null
+        }
+        Relationships: []
+      }
       otp_rate_limits: {
         Row: {
           attempt_count: number | null
@@ -5332,6 +5371,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      cleanup_expired_otp_codes: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       cleanup_expired_rate_limits: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -5774,6 +5817,10 @@ export type Database = {
       validate_admin_permission: {
         Args: { required_permission?: string }
         Returns: boolean
+      }
+      validate_otp_code: {
+        Args: { p_email: string; p_otp_code: string; p_otp_type: string }
+        Returns: Json
       }
       validate_paystack_webhook_ip: {
         Args: { request_ip: unknown }

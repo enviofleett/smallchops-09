@@ -70,15 +70,17 @@ const PublicHome = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             {/* Logo */}
-            <div className="flex items-center">
-              <img src="/lovable-uploads/38d91221-666e-459c-bef5-919b5455e55b.png" alt="Starters" className="h-10 w-auto" />
+            <div className="flex items-center space-x-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center">
+                <span className="text-white font-bold text-lg">S</span>
+              </div>
+              <span className="text-xl font-bold text-gray-900">STARTERS</span>
             </div>
 
             {/* Navigation Menu */}
             <nav className="hidden md:flex items-center space-x-8">
               <a href="#" className="text-red-600 font-medium">Home</a>
               <a href="#" className="text-gray-700 hover:text-red-600">Shop</a>
-              <a href="#" className="text-gray-700 hover:text-red-600">Booking</a>
               <a href="#" className="text-gray-700 hover:text-red-600">Blog</a>
               <a href="#" className="text-gray-700 hover:text-red-600">About Us</a>
             </nav>
@@ -88,25 +90,29 @@ const PublicHome = () => {
               <div className="relative w-full">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
-                  placeholder="Search for products..."
+                  placeholder="Search"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-gray-300"
+                  className="pl-10 border-gray-300 bg-gray-50 rounded-full"
                 />
               </div>
             </div>
 
             {/* Cart and Profile */}
-            <div className="flex items-center space-x-4">
-              <Button variant="ghost" size="sm" className="relative">
-                <ShoppingCart className="w-5 h-5" />
-                <Badge className="absolute -top-2 -right-2 bg-red-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+            <div className="flex items-center space-x-6">
+              <div className="flex items-center space-x-2">
+                <ShoppingCart className="w-5 h-5 text-red-600" />
+                <span className="text-gray-700 font-medium">Cart</span>
+                <div className="w-6 h-6 bg-red-600 text-white text-xs rounded-full flex items-center justify-center">
                   0
-                </Badge>
-              </Button>
-              <Button variant="ghost" size="sm">
-                <User className="w-5 h-5" />
-              </Button>
+                </div>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-white" />
+                </div>
+                <span className="text-gray-700 font-medium">Jideyemi</span>
+              </div>
             </div>
           </div>
         </div>
@@ -124,7 +130,7 @@ const PublicHome = () => {
                   Big Smiles
                 </h1>
                 <p className="text-xl text-gray-600">
-                  Crispy, savory small chops, freshly made and delivered fast
+                  Crispy, savory small chops, freshly made and delivered fast.
                 </p>
                 <Button className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg rounded-full">
                   Order Now & Enjoy!
@@ -132,67 +138,59 @@ const PublicHome = () => {
               </div>
             </div>
 
-            {/* Right Side - Product Card */}
-            <div className="flex justify-center">
-              <Card className="w-80 bg-white border-2 border-gray-200 shadow-lg">
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <div className="relative">
-                      <img 
-                        src="/public/hero-family.jpg" 
-                        alt="The Budget Baller" 
-                        className="w-full h-48 object-cover rounded-lg"
-                      />
-                      <Badge className="absolute top-2 right-2 bg-red-600 text-white">
-                        Popular
-                      </Badge>
-                    </div>
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-900">The Budget Baller</h3>
-                      <div className="mt-2 space-y-1 text-sm text-gray-600">
-                        <div>• 5 Samosa</div>
-                        <div>• 5 Spring Rolls</div>
-                        <div>• 5 Stick Meat</div>
-                        <div>• 20 Poff-Poff</div>
-                      </div>
-                      <div className="mt-4 flex items-center justify-between">
-                        <div className="text-2xl font-bold text-red-600">₦9,450</div>
-                        <div className="flex items-center space-x-1">
-                          {renderStars(5)}
-                          <span className="text-sm text-gray-500">(124)</span>
-                        </div>
-                      </div>
-                      <Button 
-                        className="w-full mt-4 bg-red-600 hover:bg-red-700 text-white rounded-full"
-                        onClick={() => handleAddToCart({
-                          id: 'budget-baller',
-                          name: 'The Budget Baller',
-                          price: 9450
-                        })}
-                      >
-                        Add to Cart
-                      </Button>
-                    </div>
+            {/* Right Side - Hero Image with Floating Card */}
+            <div className="relative flex justify-center">
+              {/* Hero Food Image */}
+              <div className="w-96 h-96">
+                <img 
+                  src="/public/hero-family.jpg" 
+                  alt="Delicious samosas" 
+                  className="w-full h-full object-cover rounded-2xl"
+                />
+              </div>
+              
+              {/* Floating Budget Baller Card */}
+              <div className="absolute top-4 -right-8 w-72 bg-orange-100 p-4 rounded-lg shadow-lg">
+                <div className="flex items-center space-x-2 mb-3">
+                  <div className="w-3 h-3 bg-red-600 rounded-full"></div>
+                  <h3 className="text-lg font-bold text-gray-900">The Budget Baller</h3>
+                </div>
+                <div className="space-y-2 text-sm text-gray-700">
+                  <div className="flex justify-between items-center border-b border-dotted border-gray-400 pb-1">
+                    <span>5 Samosa</span>
+                    <span className="text-gray-500">.....</span>
                   </div>
-                </CardContent>
-              </Card>
+                  <div className="flex justify-between items-center border-b border-dotted border-gray-400 pb-1">
+                    <span>5 Spring Rolls</span>
+                    <span className="text-gray-500">.....</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b border-dotted border-gray-400 pb-1">
+                    <span>5 Stick Meat</span>
+                    <span className="text-gray-500">.....</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span>20 Poff-Poff</span>
+                    <span className="text-gray-500">.....</span>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
       {/* Featured Products Showcase */}
-      <section className="bg-orange-400 py-16">
+      <section className="bg-gradient-to-r from-orange-300 to-red-400 py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {/* The Grill & Chill Box */}
-            <Card className="bg-white rounded-lg shadow-lg overflow-hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-4xl mx-auto">
+            {/* Samosa */}
+            <Card className="bg-white rounded-lg shadow-lg overflow-hidden transform rotate-2 hover:rotate-0 transition-transform">
               <CardContent className="p-0">
                 <div className="bg-gray-200 h-48 flex items-center justify-center">
                   <div className="w-16 h-16 bg-gray-400 rounded"></div>
                 </div>
                 <div className="p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">The Grill & Chill Box</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Samosa</h3>
                   <div className="flex items-center space-x-1 mb-4">
                     {renderStars(5)}
                   </div>
@@ -200,27 +198,27 @@ const PublicHome = () => {
                     <Button 
                       className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg"
                       onClick={() => handleAddToCart({
-                        id: 'grill-chill-box',
-                        name: 'The Grill & Chill Box',
-                        price: 10000
+                        id: 'samosa',
+                        name: 'Samosa',
+                        price: 5000
                       })}
                     >
                       Add to Cart
                     </Button>
-                    <span className="text-xl font-bold text-gray-900">₦10,000</span>
+                    <span className="text-xl font-bold text-gray-900">₦5,000</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Odogwu Box */}
-            <Card className="bg-white rounded-lg shadow-lg overflow-hidden">
+            {/* Wings & Things */}
+            <Card className="bg-white rounded-lg shadow-lg overflow-hidden transform -rotate-2 hover:rotate-0 transition-transform">
               <CardContent className="p-0">
                 <div className="bg-gray-200 h-48 flex items-center justify-center">
                   <div className="w-16 h-16 bg-gray-400 rounded"></div>
                 </div>
                 <div className="p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Odogwu Box</h3>
+                  <h3 className="text-lg font-bold text-gray-900 mb-3">Wings & Things</h3>
                   <div className="flex items-center space-x-1 mb-4">
                     {renderStars(5)}
                   </div>
@@ -228,42 +226,14 @@ const PublicHome = () => {
                     <Button 
                       className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg"
                       onClick={() => handleAddToCart({
-                        id: 'odogwu-box',
-                        name: 'Odogwu Box',
-                        price: 10000
+                        id: 'wings-things',
+                        name: 'Wings & Things',
+                        price: 15000
                       })}
                     >
                       Add to Cart
                     </Button>
-                    <span className="text-xl font-bold text-gray-900">₦10,000</span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Big Chop Energy */}
-            <Card className="bg-white rounded-lg shadow-lg overflow-hidden">
-              <CardContent className="p-0">
-                <div className="bg-gray-200 h-48 flex items-center justify-center">
-                  <div className="w-16 h-16 bg-gray-400 rounded"></div>
-                </div>
-                <div className="p-6">
-                  <h3 className="text-lg font-bold text-gray-900 mb-3">Big Chop Energy</h3>
-                  <div className="flex items-center space-x-1 mb-4">
-                    {renderStars(5)}
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <Button 
-                      className="bg-red-600 hover:bg-red-700 text-white px-6 py-2 rounded-lg"
-                      onClick={() => handleAddToCart({
-                        id: 'big-chop-energy',
-                        name: 'Big Chop Energy',
-                        price: 10000
-                      })}
-                    >
-                      Add to Cart
-                    </Button>
-                    <span className="text-xl font-bold text-gray-900">₦10,000</span>
+                    <span className="text-xl font-bold text-gray-900">₦15,000</span>
                   </div>
                 </div>
               </CardContent>

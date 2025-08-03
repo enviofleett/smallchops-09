@@ -784,6 +784,7 @@ export type Database = {
           abandoned_at: string | null
           cart_data: Json
           checkout_started_at: string | null
+          converted_to_customer_id: string | null
           created_at: string | null
           customer_email: string | null
           customer_id: string | null
@@ -800,6 +801,7 @@ export type Database = {
           abandoned_at?: string | null
           cart_data?: Json
           checkout_started_at?: string | null
+          converted_to_customer_id?: string | null
           created_at?: string | null
           customer_email?: string | null
           customer_id?: string | null
@@ -816,6 +818,7 @@ export type Database = {
           abandoned_at?: string | null
           cart_data?: Json
           checkout_started_at?: string | null
+          converted_to_customer_id?: string | null
           created_at?: string | null
           customer_email?: string | null
           customer_id?: string | null
@@ -829,6 +832,13 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "cart_sessions_converted_to_customer_id_fkey"
+            columns: ["converted_to_customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "cart_sessions_customer_id_fkey"
             columns: ["customer_id"]
@@ -3249,6 +3259,7 @@ export type Database = {
           delivery_time_slot_id: string | null
           delivery_zone_id: string | null
           discount_amount: number | null
+          guest_session_id: string | null
           id: string
           order_number: string
           order_time: string
@@ -3283,6 +3294,7 @@ export type Database = {
           delivery_time_slot_id?: string | null
           delivery_zone_id?: string | null
           discount_amount?: number | null
+          guest_session_id?: string | null
           id?: string
           order_number: string
           order_time?: string
@@ -3317,6 +3329,7 @@ export type Database = {
           delivery_time_slot_id?: string | null
           delivery_zone_id?: string | null
           discount_amount?: number | null
+          guest_session_id?: string | null
           id?: string
           order_number?: string
           order_time?: string
@@ -5905,6 +5918,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      cleanup_old_guest_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       confirm_payment_atomic: {
         Args: {
           p_reference: string
@@ -5912,6 +5929,10 @@ export type Database = {
           p_paystack_data: Json
           p_confirmed_at: string
         }
+        Returns: Json
+      }
+      convert_guest_cart_to_customer: {
+        Args: { p_guest_session_id: string; p_customer_id: string }
         Returns: Json
       }
       create_admin_session: {
@@ -5982,6 +6003,10 @@ export type Database = {
       fix_user_linking: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      generate_guest_session_id: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       generate_order_number: {
         Args: Record<PropertyKey, never>

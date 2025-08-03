@@ -34,6 +34,7 @@ import CustomerRegister from "./pages/CustomerRegister";
 import CustomerProfile from "./pages/CustomerProfile";
 import AuthPage from "./pages/AuthPage";
 import AuthRouter from "./components/auth/AuthRouter";
+import Cart from "./pages/Cart";
 
 import AuthCallback from "./pages/AuthCallback";
 import EmailVerificationPage from "./pages/EmailVerificationPage";
@@ -55,6 +56,7 @@ const App = () => (
               
               {/* Public home page for browsing products */}
               <Route path="/home" element={<PublicHome />} />
+              <Route path="/cart" element={<Cart />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/category/:categoryId" element={<CategoryProducts />} />
               

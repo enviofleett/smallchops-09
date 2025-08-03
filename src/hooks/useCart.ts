@@ -13,6 +13,7 @@ export interface CartItem {
   discount_amount?: number;
   quantity: number;
   vat_rate?: number;
+  image_url?: string;
   customizations?: Record<string, any>;
   special_instructions?: string;
 }
@@ -145,6 +146,7 @@ export const useCart = () => {
     original_price?: number;
     discount_amount?: number;
     vat_rate?: number;
+    image_url?: string;
     customizations?: Record<string, any>;
     special_instructions?: string;
   }, quantity = 1) => {
@@ -157,6 +159,7 @@ export const useCart = () => {
       discount_amount: product.discount_amount,
       quantity,
       vat_rate: product.vat_rate || 7.5,
+      image_url: product.image_url,
       customizations: product.customizations,
       special_instructions: product.special_instructions
     };

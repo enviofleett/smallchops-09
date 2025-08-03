@@ -1,0 +1,83 @@
+import React from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { ArrowLeft } from 'lucide-react';
+import { useCart } from '@/hooks/useCart';
+import { CartItemRow } from '@/components/cart/CartItemRow';
+import { CartSummary } from '@/components/cart/CartSummary';
+import { CheckoutButton } from '@/components/ui/checkout-button';
+
+export default function Cart() {
+  const navigate = useNavigate();
+  const { cart, updateQuantity, removeItem } = useCart();
+
+  const handleBackClick = () => {
+    navigate('/home');
+  };
+
+  return (
+    <div className="min-h-screen bg-background">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        {/* Header */}
+        <div className="flex items-center gap-4 mb-6">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={handleBackClick}
+            className="flex items-center gap-2"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            Back
+          </Button>
+          <h1 className="text-2xl font-bold">Cart</h1>
+        </div>
+
+        {cart.items.length === 0 ? (
+          <div className="text-center py-12">
+            <h2 className="text-xl font-semibold mb-2">Your cart is empty</h2>
+            <p className="text-muted-foreground mb-6">Add some items to get started</p>
+            <Button onClick={handleBackClick}>
+              Continue Shopping
+            </Button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Cart Items - Left Side */}
+            <div className="lg:col-span-2">
+              <div className="bg-card rounded-lg border">
+                <div className="p-6 border-b">
+                  <h2 className="text-lg font-semibold">
+                    Cart ({cart.itemCount} {cart.itemCount === 1 ? 'item' : 'items'})
+                  </h2>
+                </div>
+                <div className="divide-y">
+                  {cart.items.map((item) => (
+                    <div key={item.id} className="p-6">
+                      <CartItemRow
+                        item={item}
+                        onUpdateQuantity={updateQuantity}
+                        onRemove={removeItem}
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Cart Summary - Right Side */}
+            <div className="lg:col-span-1">
+              <CartSummary cart={cart} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Floating Checkout Button for Mobile */}
+      {cart.items.length > 0 && (
+        <div className="lg:hidden">
+          <CheckoutButton />
+        </div>
+      )}
+    </div>
+  );
+}

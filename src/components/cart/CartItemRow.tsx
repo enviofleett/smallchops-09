@@ -1,4 +1,5 @@
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { CartItem } from '@/hooks/useCart';
 import { PriceDisplay } from '@/components/ui/price-display';
@@ -17,13 +18,22 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
   const savings = originalLineTotal - lineTotal;
 
   return (
-    <div className="flex items-center gap-4 py-4 border-b border-border">
+    <div className="flex items-start gap-4">
+      {/* Product Image */}
+      <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+        <img 
+          src={item.image_url || '/placeholder.svg'} 
+          alt={item.product_name}
+          className="w-full h-full object-cover"
+        />
+      </div>
+
       {/* Product Info */}
       <div className="flex-1 min-w-0">
-        <h4 className="font-medium text-sm truncate">{item.product_name}</h4>
+        <h4 className="font-medium text-base mb-1">{item.product_name}</h4>
         
         {/* Price Display */}
-        <div className="mt-1">
+        <div className="mb-2">
           <PriceDisplay
             originalPrice={item.original_price || item.price}
             discountedPrice={hasDiscount ? item.price : undefined}
@@ -31,6 +41,11 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
             size="sm"
           />
         </div>
+
+        {/* Stock Status */}
+        <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+          In Stock
+        </Badge>
         
         {/* Customizations */}
         {item.customizations && Object.keys(item.customizations).length > 0 && (
@@ -51,60 +66,63 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
         )}
       </div>
       
-      {/* Quantity Controls */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0"
-          onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-          disabled={item.quantity <= 1}
-        >
-          <Minus className="h-3 w-3" />
-        </Button>
-        
-        <span className="w-8 text-center text-sm font-medium">
-          {item.quantity}
-        </span>
-        
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-8 w-8 p-0"
-          onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-        >
-          <Plus className="h-3 w-3" />
-        </Button>
-      </div>
-      
-      {/* Line Total */}
-      <div className="text-right min-w-[80px]">
-        <div className="font-medium text-sm">
-          {formatCurrency(lineTotal)}
+      {/* Right Side - Quantity, Price, Remove */}
+      <div className="flex items-center gap-6">
+        {/* Quantity Controls */}
+        <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+            disabled={item.quantity <= 1}
+          >
+            <Minus className="h-3 w-3" />
+          </Button>
+          
+          <span className="w-8 text-center text-sm font-medium">
+            {item.quantity}
+          </span>
+          
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 w-8 p-0"
+            onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+          >
+            <Plus className="h-3 w-3" />
+          </Button>
         </div>
         
-        {hasDiscount && savings > 0 && (
-          <div className="text-xs text-green-600">
-            Save {formatCurrency(savings)}
+        {/* Line Total */}
+        <div className="text-right min-w-[80px]">
+          <div className="font-semibold text-base">
+            {formatCurrency(lineTotal)}
           </div>
-        )}
+          
+          {hasDiscount && savings > 0 && (
+            <div className="text-xs text-green-600">
+              Save {formatCurrency(savings)}
+            </div>
+          )}
+          
+          {hasDiscount && (
+            <div className="text-xs text-muted-foreground line-through">
+              {formatCurrency(originalLineTotal)}
+            </div>
+          )}
+        </div>
         
-        {hasDiscount && (
-          <div className="text-xs text-muted-foreground line-through">
-            {formatCurrency(originalLineTotal)}
-          </div>
-        )}
+        {/* Remove Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+          onClick={() => onRemove(item.id)}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </div>
-      
-      {/* Remove Button */}
-      <Button
-        variant="ghost"
-        size="sm"
-        className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-        onClick={() => onRemove(item.id)}
-      >
-        <Trash2 className="h-3 w-3" />
-      </Button>
     </div>
   );
 }

@@ -14,7 +14,7 @@ export const PublicHeader = () => {
   const navigate = useNavigate();
 
   const handleCartClick = () => {
-    navigate('/checkout');
+    navigate('/cart');
   };
 
   return (

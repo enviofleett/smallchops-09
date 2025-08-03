@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { handlePostLoginRedirect } from '@/utils/redirect';
 
 interface RegistrationData {
   name: string;
@@ -36,7 +37,8 @@ export const useCustomerDirectAuth = () => {
         description: "You have been successfully logged in.",
       });
 
-      return { success: true, user: data.user, redirect: '/customer-portal' };
+      const redirectPath = handlePostLoginRedirect('customer');
+      return { success: true, user: data.user, redirect: redirectPath };
     } catch (error: any) {
       toast({
         title: "Login failed",

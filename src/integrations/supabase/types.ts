@@ -5338,6 +5338,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_missing_customer_account: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       customer_purchased_product: {
         Args: { customer_uuid: string; product_uuid: string }
         Returns: boolean

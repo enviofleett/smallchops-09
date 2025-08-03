@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { handlePostLoginRedirect } from '@/utils/redirect';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
 import { PhoneCollectionModal } from '@/components/auth/PhoneCollectionModal';
@@ -46,7 +47,8 @@ export default function AuthCallback() {
               title: "Welcome back!",
               description: "You have been successfully signed in.",
             });
-            navigate('/dashboard');
+            const redirectPath = handlePostLoginRedirect('admin');
+            navigate(redirectPath);
             return;
           }
 
@@ -74,7 +76,8 @@ export default function AuthCallback() {
             title: "Welcome!",
             description: "You have been successfully authenticated.",
           });
-          navigate('/customer-portal');
+          const redirectPath = handlePostLoginRedirect('customer');
+          navigate(redirectPath);
         } else {
           navigate('/auth');
         }
@@ -108,8 +111,9 @@ export default function AuthCallback() {
         description: "Your phone number has been saved successfully.",
       });
       
-      // Navigate to customer portal
-      navigate('/customer-portal');
+      // Navigate with proper redirect handling
+      const redirectPath = handlePostLoginRedirect('customer');
+      navigate(redirectPath);
     }
   };
 

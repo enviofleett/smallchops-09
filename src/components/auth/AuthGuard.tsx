@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { storeRedirectUrl } from '@/utils/redirect';
 
 interface AuthGuardProps {
   children: React.ReactNode;
@@ -19,6 +20,21 @@ const AuthGuard = ({
   const { customerAccount, isAuthenticated: isCustomerAuth, isLoading: customerLoading } = useCustomerAuth();
 
   const isLoading = adminLoading || customerLoading;
+
+  // Store the current URL for redirect after login
+  useEffect(() => {
+    const shouldStoreRedirect = 
+      !isLoading && 
+      !isAdminAuth && 
+      !isCustomerAuth && 
+      location.pathname !== '/auth' && 
+      location.pathname !== '/';
+    
+    if (shouldStoreRedirect) {
+      const fullPath = location.pathname + location.search + location.hash;
+      storeRedirectUrl(fullPath);
+    }
+  }, [isLoading, isAdminAuth, isCustomerAuth, location]);
 
   if (isLoading) {
     return (

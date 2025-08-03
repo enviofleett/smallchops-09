@@ -180,12 +180,51 @@ export const useCustomerAuth = () => {
           .single();
         
         if (error) {
-          // If customer account doesn't exist yet (common for new registrations), retry with exponential backoff
-          if (error.code === 'PGRST116' && attempt < maxRetries - 1) {
-            const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
-            console.log(`Customer account not found yet, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
-            await new Promise(resolve => setTimeout(resolve, delay));
-            continue;
+          // If customer account doesn't exist yet, try to create it
+          if (error.code === 'PGRST116') {
+            console.log(`Customer account not found for user ${userId}, attempting to create...`);
+            
+            try {
+              const { data: createResult, error: createError } = await supabase.rpc(
+                'create_missing_customer_account',
+                { p_user_id: userId }
+              );
+
+              if (createError) {
+                console.error('Error creating customer account:', createError);
+                if (attempt < maxRetries - 1) {
+                  const delay = Math.pow(2, attempt) * 1000;
+                  console.log(`Retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
+                  await new Promise(resolve => setTimeout(resolve, delay));
+                  continue;
+                }
+                return null;
+              }
+
+              if (createResult && typeof createResult === 'object' && 'success' in createResult && createResult.success) {
+                console.log('✅ Customer account created successfully');
+                // Retry fetching the account
+                const { data: newData, error: newError } = await supabase
+                  .from('customer_accounts')
+                  .select('*')
+                  .eq('user_id', userId)
+                  .single();
+                
+                if (!newError && newData) {
+                  return newData;
+                }
+              }
+            } catch (createErr) {
+              console.error('Failed to create customer account:', createErr);
+            }
+            
+            // If creation failed and we have retries left
+            if (attempt < maxRetries - 1) {
+              const delay = Math.pow(2, attempt) * 1000;
+              console.log(`Account creation failed, retrying in ${delay}ms... (attempt ${attempt + 1}/${maxRetries})`);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              continue;
+            }
           }
           
           console.error('Error fetching customer account:', error);

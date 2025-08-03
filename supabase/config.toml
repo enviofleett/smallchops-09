@@ -30,3 +30,9 @@ verify_jwt = false
 
 [functions.smtp-email-sender]
 verify_jwt = false
+
+[functions.smtp-health-monitor]
+verify_jwt = false
+
+[functions.production-email-processor]
+verify_jwt = false

@@ -4683,6 +4683,42 @@ export type Database = {
         }
         Relationships: []
       }
+      smtp_health_logs: {
+        Row: {
+          connection_status: string
+          created_at: string | null
+          error_message: string | null
+          host: string
+          id: string
+          port: number
+          provider_name: string
+          response_time_ms: number | null
+          test_type: string | null
+        }
+        Insert: {
+          connection_status: string
+          created_at?: string | null
+          error_message?: string | null
+          host: string
+          id?: string
+          port: number
+          provider_name: string
+          response_time_ms?: number | null
+          test_type?: string | null
+        }
+        Update: {
+          connection_status?: string
+          created_at?: string | null
+          error_message?: string | null
+          host?: string
+          id?: string
+          port?: number
+          provider_name?: string
+          response_time_ms?: number | null
+          test_type?: string | null
+        }
+        Relationships: []
+      }
       smtp_health_metrics: {
         Row: {
           alert_sent: boolean | null

@@ -277,9 +277,9 @@ export const EmailQueueProcessor = () => {
         {/* Processing Actions */}
         <div className="space-y-3">
           <h4 className="text-sm font-medium">Queue Processing</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             <Button
-              onClick={() => processQueue('enhanced-email-processor', 'Enhanced Email Processor')}
+              onClick={() => processQueue('production-email-processor', 'Production Email Processor')}
               disabled={isProcessing || isTesting}
               className="justify-start"
               size="sm"
@@ -289,7 +289,22 @@ export const EmailQueueProcessor = () => {
               ) : (
                 <Play className="h-4 w-4 mr-2" />
               )}
-              Process Queue (Enhanced)
+              Process (Production)
+            </Button>
+            
+            <Button
+              onClick={() => processQueue('enhanced-email-processor', 'Enhanced Email Processor')}
+              disabled={isProcessing || isTesting}
+              variant="outline"
+              className="justify-start"
+              size="sm"
+            >
+              {isProcessing ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Play className="h-4 w-4 mr-2" />
+              )}
+              Process (Enhanced)
             </Button>
             
             <Button
@@ -304,7 +319,7 @@ export const EmailQueueProcessor = () => {
               ) : (
                 <Play className="h-4 w-4 mr-2" />
               )}
-              Process Queue (Instant)
+              Process (Instant)
             </Button>
           </div>
         </div>

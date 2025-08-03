@@ -106,49 +106,66 @@ export const useSMTPSettings = () => {
   // Test SMTP connection with enhanced error handling
   const testConnectionMutation = useMutation({
     mutationFn: async (testEmail: string) => {
-      // Try enhanced SMTP sender first, fallback to regular
-      let lastError: Error | null = null;
-      
-      for (const sender of ['enhanced-smtp-sender', 'smtp-email-sender']) {
+      try {
+        // Use the standardized template-based approach
+        const { data, error } = await supabase.functions.invoke('enhanced-smtp-sender', {
+          body: {
+            templateId: 'smtp_test',
+            recipient: {
+              email: testEmail,
+              name: 'Test User'
+            },
+            variables: {
+              test_time: new Date().toLocaleString(),
+              smtp_host: 'Current SMTP Configuration',
+              business_name: 'Starters Small Chops'
+            },
+            emailType: 'transactional'
+          }
+        });
+
+        if (error) {
+          throw new Error(error.message || 'Failed to send test email');
+        }
+
+        console.log('Test email sent successfully via enhanced-smtp-sender');
+        return data;
+      } catch (enhancedError) {
+        console.warn('Enhanced SMTP sender failed, trying fallback:', enhancedError);
+        
+        // Fallback to direct email approach if template fails
         try {
-          const { data, error } = await supabase.functions.invoke(sender, {
+          const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
             body: {
               to: testEmail,
-              subject: 'SMTP Connection Test - Enhanced',
+              subject: 'SMTP Test - Connection Successful',
               html: `
                 <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h2 style="color: #3b82f6;">✅ SMTP Connection Test Successful!</h2>
-                  <p>Congratulations! Your SMTP configuration is working correctly.</p>
+                  <h2 style="color: #22c55e;">✅ SMTP Connection Test Successful!</h2>
+                  <p>Your SMTP configuration is working correctly.</p>
                   <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                    <h3 style="margin-top: 0;">Connection Details:</h3>
-                    <p><strong>Email Sender:</strong> ${sender}</p>
+                    <h3>Connection Details:</h3>
                     <p><strong>Test Time:</strong> ${new Date().toLocaleString()}</p>
                     <p><strong>Status:</strong> <span style="color: #22c55e;">Connected Successfully</span></p>
                   </div>
                   <p style="color: #64748b;">You can now send emails reliably to your customers.</p>
                 </div>
               `,
-              text: `SMTP Connection Test Successful! Your email configuration is working correctly. Test completed at ${new Date().toLocaleString()} using ${sender}.`,
+              text: `SMTP Connection Test Successful! Your email configuration is working correctly. Test completed at ${new Date().toLocaleString()}.`,
               emailType: 'transactional'
             }
           });
 
           if (error) {
-            lastError = new Error(error.message || `Failed to send test email via ${sender}`);
-            console.warn(`${sender} failed:`, error.message);
-            continue;
+            throw new Error(error.message || 'Fallback email sender also failed');
           }
 
-          console.log(`Test email sent successfully via ${sender}`);
-          return { ...data, sender };
-        } catch (senderError) {
-          lastError = senderError as Error;
-          console.warn(`${sender} failed:`, senderError);
-          continue;
+          console.log('Test email sent successfully via smtp-email-sender fallback');
+          return data;
+        } catch (fallbackError) {
+          throw new Error(`All email senders failed. Enhanced error: ${enhancedError.message}, Fallback error: ${fallbackError.message}`);
         }
       }
-      
-      throw lastError || new Error('All email senders failed');
     },
     onSuccess: () => {
       toast({

@@ -196,135 +196,129 @@ const SplitScreenLoginPage = () => {
               </p>
             </div>
 
-          {/* Forms */}
-          {view === 'login' ? (
-            <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            {/* Forms */}
+            {view === 'login' ? (
+              <form onSubmit={loginForm.handleSubmit(handleLogin)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-medium">Email address</Label>
                   <Input
                     id="email"
                     type="email"
                     placeholder="Enter your email"
-                    className="pl-10"
+                    className="h-11"
                     {...loginForm.register('email')}
                     disabled={isLoading}
                   />
+                  {loginForm.formState.errors.email && (
+                    <p className="text-sm text-destructive">{loginForm.formState.errors.email.message}</p>
+                  )}
                 </div>
-                {loginForm.formState.errors.email && (
-                  <p className="text-sm text-destructive">{loginForm.formState.errors.email.message}</p>
-                )}
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Enter your password"
-                    className="pl-10 pr-10"
-                    {...loginForm.register('password')}
-                    disabled={isLoading}
-                  />
-                  <Button
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Enter your password"
+                      className="h-11 pr-10"
+                      {...loginForm.register('password')}
+                      disabled={isLoading}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  {loginForm.formState.errors.password && (
+                    <p className="text-sm text-destructive">{loginForm.formState.errors.password.message}</p>
+                  )}
+                </div>
+
+                <div className="text-right">
+                  <button
                     type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={isLoading}
+                    className="text-sm text-primary hover:underline"
                   >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
+                    Forgot Password?
+                  </button>
                 </div>
-                {loginForm.formState.errors.password && (
-                  <p className="text-sm text-destructive">{loginForm.formState.errors.password.message}</p>
-                )}
-              </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Sign In
-              </Button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-                </div>
-              </div>
-
-              <GoogleAuthButton 
-                onGoogleAuth={async () => {
-                  await handleGoogleAuth();
-                }} 
-                isLoading={isLoading} 
-                text="Continue with Google"
-                mode="login"
-              />
-
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => setView('register')}
-                  className="text-sm text-primary hover:underline"
+                <Button 
+                  type="submit" 
+                  className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-medium" 
+                  disabled={isLoading}
                 >
-                  Don't have an account? Sign up
-                </button>
-              </div>
-            </form>
-          ) : (
-            <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Login
+                </Button>
+
+                <GoogleAuthButton 
+                  onGoogleAuth={async () => {
+                    await handleGoogleAuth();
+                  }} 
+                  isLoading={isLoading} 
+                  text="Login with Google"
+                  variant="outline"
+                  mode="login"
+                />
+
+                <div className="text-center">
+                  <span className="text-sm text-muted-foreground">Are you new here? </span>
+                  <button
+                    type="button"
+                    onClick={() => setView('register')}
+                    className="text-sm text-primary hover:underline font-medium"
+                  >
+                    Create Account
+                  </button>
+                </div>
+              </form>
+            ) : (
+              <form onSubmit={registerForm.handleSubmit(handleRegister)} className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name" className="text-sm font-medium">Full Name</Label>
                   <Input
                     id="name"
                     type="text"
                     placeholder="Enter your full name"
-                    className="pl-10"
+                    className="h-11"
                     {...registerForm.register('name')}
                     disabled={isLoading}
                   />
+                  {registerForm.formState.errors.name && (
+                    <p className="text-sm text-destructive">{registerForm.formState.errors.name.message}</p>
+                  )}
                 </div>
-                {registerForm.formState.errors.name && (
-                  <p className="text-sm text-destructive">{registerForm.formState.errors.name.message}</p>
-                )}
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <div className="space-y-2">
+                  <Label htmlFor="email" className="text-sm font-medium">Email address</Label>
                   <Input
                     id="email"
                     type="email"
                     placeholder="Enter your email"
-                    className="pl-10"
+                    className="h-11"
                     {...registerForm.register('email')}
                     disabled={isLoading}
                   />
+                  {registerForm.formState.errors.email && (
+                    <p className="text-sm text-destructive">{registerForm.formState.errors.email.message}</p>
+                  )}
                 </div>
-                {registerForm.formState.errors.email && (
-                  <p className="text-sm text-destructive">{registerForm.formState.errors.email.message}</p>
-                )}
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="phone">Phone Number</Label>
-                <div className="relative">
-                  <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <div className="space-y-2">
+                  <Label htmlFor="phone" className="text-sm font-medium">Phone Number</Label>
                   <Input
                     id="phone"
                     type="tel"
                     placeholder="09120020048"
-                    className="pl-10"
+                    className="h-11"
                     {...registerForm.register('phone', {
                       onChange: (e) => {
                         e.target.value = formatPhoneNumber(e.target.value);
@@ -333,105 +327,100 @@ const SplitScreenLoginPage = () => {
                     disabled={isLoading}
                     maxLength={11}
                   />
+                  <p className="text-xs text-muted-foreground">
+                    Enter your Nigerian phone number
+                  </p>
+                  {registerForm.formState.errors.phone && (
+                    <p className="text-sm text-destructive">{registerForm.formState.errors.phone.message}</p>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground">
-                  Enter your Nigerian phone number
-                </p>
-                {registerForm.formState.errors.phone && (
-                  <p className="text-sm text-destructive">{registerForm.formState.errors.phone.message}</p>
-                )}
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="Create a password"
-                    className="pl-10 pr-10"
-                    {...registerForm.register('password')}
-                    disabled={isLoading}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowPassword(!showPassword)}
-                    disabled={isLoading}
-                  >
-                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="password" className="text-sm font-medium">Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="Create a password"
+                      className="h-11 pr-10"
+                      {...registerForm.register('password')}
+                      disabled={isLoading}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowPassword(!showPassword)}
+                      disabled={isLoading}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  {registerForm.formState.errors.password && (
+                    <p className="text-sm text-destructive">{registerForm.formState.errors.password.message}</p>
+                  )}
                 </div>
-                {registerForm.formState.errors.password && (
-                  <p className="text-sm text-destructive">{registerForm.formState.errors.password.message}</p>
-                )}
-              </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="confirmPassword"
-                    type={showConfirmPassword ? 'text' : 'password'}
-                    placeholder="Confirm your password"
-                    className="pl-10 pr-10"
-                    {...registerForm.register('confirmPassword')}
-                    disabled={isLoading}
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    disabled={isLoading}
-                  >
-                    {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
+                <div className="space-y-2">
+                  <Label htmlFor="confirmPassword" className="text-sm font-medium">Confirm Password</Label>
+                  <div className="relative">
+                    <Input
+                      id="confirmPassword"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      placeholder="Confirm your password"
+                      className="h-11 pr-10"
+                      {...registerForm.register('confirmPassword')}
+                      disabled={isLoading}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      disabled={isLoading}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
+                  {registerForm.formState.errors.confirmPassword && (
+                    <p className="text-sm text-destructive">{registerForm.formState.errors.confirmPassword.message}</p>
+                  )}
                 </div>
-                {registerForm.formState.errors.confirmPassword && (
-                  <p className="text-sm text-destructive">{registerForm.formState.errors.confirmPassword.message}</p>
-                )}
-              </div>
 
-              <Button type="submit" className="w-full" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Account
-              </Button>
-
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <span className="w-full border-t" />
-                </div>
-                <div className="relative flex justify-center text-xs uppercase">
-                  <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
-                </div>
-              </div>
-
-              <GoogleAuthButton 
-                onGoogleAuth={async () => {
-                  await handleGoogleAuth();
-                }} 
-                isLoading={isLoading} 
-                text="Sign up with Google"
-                mode="register"
-              />
-
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => setView('login')}
-                  className="text-sm text-primary hover:underline"
+                <Button 
+                  type="submit" 
+                  className="w-full h-11 bg-red-600 hover:bg-red-700 text-white font-medium" 
+                  disabled={isLoading}
                 >
-                  Already have an account? Sign in
-                </button>
-              </div>
-            </form>
-          )}
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Create Account
+                </Button>
+
+                <GoogleAuthButton 
+                  onGoogleAuth={async () => {
+                    await handleGoogleAuth();
+                  }} 
+                  isLoading={isLoading} 
+                  text="Sign up with Google"
+                  variant="outline"
+                  mode="register"
+                />
+
+                <div className="text-center">
+                  <span className="text-sm text-muted-foreground">Already have an account? </span>
+                  <button
+                    type="button"
+                    onClick={() => setView('login')}
+                    className="text-sm text-primary hover:underline font-medium"
+                  >
+                    Sign in
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         </div>
       </div>
     </div>

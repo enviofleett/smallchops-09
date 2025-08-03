@@ -665,27 +665,47 @@ const LoginForm = () => {
   const handleLogin = async () => {
     const result = await login(email, password);
     if (result.success) {
-      setOtpSent(true);
+      // Successful login, redirect to customer portal
+      window.location.href = '/customer-portal';
     }
   };
 
-  const handleVerifyOTP = async (code: string) => {
-    const result = await completeOTPLogin(email, code);
-    if (result.success && result.loginVerified) {
-      // Redirect to dashboard or update auth state
-      window.location.href = '/dashboard';
+  const handleLogin = async () => {
+    const result = await login(email, password);
+    if (result.success) {
+      // Successful login, redirect to customer portal
+      window.location.href = '/customer-portal';
     }
   };
 
-  return otpSent ? (
-    <OTPInput
-      email={email}
-      purpose="login"
-      onVerified={handleVerifyOTP}
-      onBack={() => setOtpSent(false)}
-    />
-  ) : (
-    <LoginForm onSubmit={handleSendOTP} />
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium mb-2">Email</label>
+        <input 
+          type="email" 
+          value={email} 
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full p-2 border rounded"
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-2">Password</label>
+        <input 
+          type="password" 
+          value={password} 
+          onChange={(e) => setPassword(e.target.value)}
+          className="w-full p-2 border rounded"
+        />
+      </div>
+      <button 
+        onClick={handleLogin} 
+        disabled={isLoading}
+        className="w-full bg-blue-500 text-white p-2 rounded hover:bg-blue-600"
+      >
+        {isLoading ? 'Logging in...' : 'Login'}
+      </button>
+    </div>
   );
 };`}</pre>
                           </div>

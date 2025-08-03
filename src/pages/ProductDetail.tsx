@@ -20,27 +20,11 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
-import { publicAPI } from '@/api/public';
+import { getProductWithDiscounts, getProductsWithDiscounts } from '@/api/productsWithDiscounts';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { StarRating } from '@/components/ui/star-rating';
 import { FavoriteButton } from '@/components/ui/favorite-button';
-
-interface Product {
-  id: string;
-  name: string;
-  description: string;
-  price: number;
-  image_url: string;
-  features?: string[];
-  categories: {
-    id: string;
-    name: string;
-  };
-  discounted_price?: number;
-  discount_percentage?: number;
-  stock_quantity: number;
-  preparation_time?: number;
-}
+import { ProductWithDiscount } from '@/lib/discountCalculations';
 
 interface Review {
   id: string;
@@ -57,8 +41,8 @@ const ProductDetail = () => {
   const { addItem } = useCart();
   const { toast } = useToast();
 
-  const [product, setProduct] = useState<Product | null>(null);
-  const [relatedProducts, setRelatedProducts] = useState<Product[]>([]);
+  const [product, setProduct] = useState<ProductWithDiscount | null>(null);
+  const [relatedProducts, setRelatedProducts] = useState<ProductWithDiscount[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [quantity, setQuantity] = useState(1);
   const [selectedState, setSelectedState] = useState('');
@@ -68,27 +52,36 @@ const ProductDetail = () => {
   const [isFavorite, setIsFavorite] = useState(false);
 
   useEffect(() => {
+    console.log('ProductDetail component mounted, ID from params:', id);
     if (id) {
       fetchProductDetails();
+    } else {
+      console.error('No product ID provided in URL');
+      setLoading(false);
     }
   }, [id]);
 
   const fetchProductDetails = async () => {
     try {
       setLoading(true);
-      // Fetch product details
-      const productResponse = await fetch(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/get-public-products`);
-      const allProducts = await productResponse.json();
-      const foundProduct = allProducts.find((p: Product) => p.id === id);
+      console.log('Fetching product with ID:', id);
       
-      if (foundProduct) {
-        setProduct(foundProduct);
+      // Fetch individual product with discounts
+      const productData = await getProductWithDiscounts(id!);
+      console.log('Product data received:', productData);
+      
+      if (productData) {
+        setProduct(productData);
         
         // Fetch related products from same category
+        const allProducts = await getProductsWithDiscounts(productData.category_id);
         const related = allProducts
-          .filter((p: Product) => p.categories.id === foundProduct.categories.id && p.id !== id)
+          .filter((p: ProductWithDiscount) => p.id !== id)
           .slice(0, 3);
         setRelatedProducts(related);
+        console.log('Related products:', related);
+      } else {
+        console.log('No product found with ID:', id);
       }
 
       // Mock reviews data
@@ -180,7 +173,7 @@ const ProductDetail = () => {
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
             <Link to="/" className="hover:text-primary">Home</Link>
             <ChevronRight className="h-4 w-4" />
-            <Link to="/" className="hover:text-primary">{product.categories.name}</Link>
+            <Link to="/" className="hover:text-primary">{product.categories?.name || 'Products'}</Link>
             <ChevronRight className="h-4 w-4" />
             <span className="text-foreground">{product.name}</span>
           </nav>
@@ -212,7 +205,7 @@ const ProductDetail = () => {
             </div>
 
             {/* Hot Deals Banner */}
-            {product.discount_percentage && (
+            {product.discount_percentage && product.discount_percentage > 0 && (
               <div className="bg-gradient-to-r from-red-500 to-orange-500 text-white px-4 py-2 rounded-lg inline-block">
                 <span className="font-bold">🔥 Hot Deals - {product.discount_percentage}% OFF</span>
               </div>
@@ -223,7 +216,7 @@ const ProductDetail = () => {
               <PriceDisplay
                 originalPrice={product.price}
                 discountedPrice={product.discounted_price}
-                hasDiscount={!!product.discount_percentage}
+                hasDiscount={(product.discount_percentage || 0) > 0}
                 showSavings={true}
                 size="lg"
               />
@@ -435,12 +428,12 @@ const ProductDetail = () => {
                   <CardContent className="p-4">
                     <h4 className="font-semibold mb-2">{relatedProduct.name}</h4>
                     <div className="flex items-center justify-between">
-                      <PriceDisplay
-                        originalPrice={relatedProduct.price}
-                        discountedPrice={relatedProduct.discounted_price}
-                        hasDiscount={!!relatedProduct.discount_percentage}
-                        size="sm"
-                      />
+                    <PriceDisplay
+                      originalPrice={relatedProduct.price}
+                      discountedPrice={relatedProduct.discounted_price}
+                      hasDiscount={(relatedProduct.discount_percentage || 0) > 0}
+                      size="sm"
+                    />
                       <Button 
                         size="sm" 
                         className="bg-red-500 hover:bg-red-600 text-white"

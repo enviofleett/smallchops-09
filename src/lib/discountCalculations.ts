@@ -24,6 +24,9 @@ export interface ProductWithDiscount {
     id: string;
     name: string;
   };
+  features?: string[];
+  stock_quantity?: number;
+  preparation_time?: number;
   // BOGO specific fields
   is_bogo_eligible?: boolean;
   bogo_free_quantity?: number;
@@ -138,6 +141,9 @@ export function calculateProductDiscount(
     image_url: product.image_url,
     category_id: product.category_id,
     categories: product.categories,
+    features: product.features,
+    stock_quantity: product.stock_quantity,
+    preparation_time: product.preparation_time,
   };
 }
 

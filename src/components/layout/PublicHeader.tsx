@@ -22,7 +22,7 @@ export const PublicHeader = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
+          <Link to="/home" className="flex items-center space-x-2">
             <img
               src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png"
               alt="Starters Logo"
@@ -33,7 +33,7 @@ export const PublicHeader = () => {
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
             <Link 
-              to="/" 
+              to="/home" 
               className="text-foreground hover:text-primary transition-colors"
             >
               Home
@@ -43,6 +43,12 @@ export const PublicHeader = () => {
               className="text-foreground hover:text-primary transition-colors"
             >
               Shop
+            </Link>
+            <Link 
+              to="/booking" 
+              className="text-foreground hover:text-primary transition-colors"
+            >
+              Booking
             </Link>
             <Link 
               to="/about" 
@@ -148,7 +154,7 @@ export const PublicHeader = () => {
               {/* Mobile Navigation */}
               <nav className="flex flex-col space-y-1 px-4">
                 <Link 
-                  to="/" 
+                  to="/home" 
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >
@@ -160,6 +166,13 @@ export const PublicHeader = () => {
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Shop
+                </Link>
+                <Link 
+                  to="/booking" 
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Booking
                 </Link>
                 <Link 
                   to="/customer-favorites" 

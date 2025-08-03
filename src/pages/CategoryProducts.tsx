@@ -51,7 +51,16 @@ const CategoryProducts = () => {
   const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
 
   const handleAddToCart = (product: any) => {
-    addItem(product, 1);
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: product.discounted_price || product.price,
+      original_price: product.price,
+      discount_amount: product.discount_amount,
+      vat_rate: product.vat_rate || 7.5,
+      image_url: product.image_url,
+    });
+    
     toast({
       title: "Added to cart",
       description: `${product.name} has been added to your cart.`,

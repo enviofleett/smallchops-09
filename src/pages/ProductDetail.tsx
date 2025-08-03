@@ -111,7 +111,16 @@ const ProductDetail = () => {
   const handleAddToCart = () => {
     if (!product) return;
     
-    addItem(product, quantity);
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: product.discounted_price || product.price,
+      original_price: product.price,
+      discount_amount: product.discount_amount,
+      vat_rate: 7.5, // Default VAT rate
+      image_url: product.image_url,
+    }, quantity);
+    
     toast({
       title: "Added to Cart",
       description: `${quantity} ${product.name} added to cart`,
@@ -492,7 +501,15 @@ const ProductDetail = () => {
                         size="sm" 
                         onClick={(e) => {
                           e.stopPropagation();
-                          addItem(relatedProduct, 1);
+                          addItem({
+                            id: relatedProduct.id,
+                            name: relatedProduct.name,
+                            price: relatedProduct.discounted_price || relatedProduct.price,
+                            original_price: relatedProduct.price,
+                            discount_amount: relatedProduct.discount_amount,
+                            vat_rate: 7.5,
+                            image_url: relatedProduct.image_url,
+                          });
                         }}
                       >
                         Add to Cart

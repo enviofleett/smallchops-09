@@ -62,15 +62,20 @@ export const useCart = () => {
 
   // Load cart from localStorage on mount
   useEffect(() => {
-    console.log('🛒 useCart hook initializing...');
-    // Clear localStorage to start fresh for debugging
-    localStorage.removeItem(CART_STORAGE_KEY);
-    console.log('🛒 localStorage cleared for debugging');
+    const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+    if (savedCart) {
+      try {
+        const parsedCart = JSON.parse(savedCart);
+        setCart(parsedCart);
+      } catch (error) {
+        console.error('Error parsing cart from localStorage:', error);
+        localStorage.removeItem(CART_STORAGE_KEY);
+      }
+    }
   }, []);
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    console.log('🛒 Saving cart to localStorage:', cart);
     localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
   }, [cart]);
 
@@ -142,31 +147,37 @@ export const useCart = () => {
     customizations?: Record<string, any>;
     special_instructions?: string;
   }, quantity = 1) => {
-    console.log('🛒 Adding item to cart:', product);
-    console.log('🛒 Current cart before adding:', cart);
+    // Check if product already exists in cart
+    const existingItemIndex = cart.items.findIndex(item => item.product_id === product.id);
     
-    const newItem: CartItem = {
-      id: `${product.id}_${Date.now()}`, // Unique cart item ID
-      product_id: product.id,
-      product_name: product.name,
-      price: product.price,
-      original_price: product.original_price,
-      discount_amount: product.discount_amount,
-      quantity,
-      vat_rate: product.vat_rate || 7.5,
-      image_url: product.image_url,
-      customizations: product.customizations,
-      special_instructions: product.special_instructions
-    };
-
-    console.log('🛒 New item created:', newItem);
-
-    const updatedItems = [...cart.items, newItem];
-    console.log('🛒 Updated items array:', updatedItems);
+    let updatedItems: CartItem[];
+    
+    if (existingItemIndex >= 0) {
+      // Product exists, update quantity
+      updatedItems = cart.items.map((item, index) => 
+        index === existingItemIndex 
+          ? { ...item, quantity: item.quantity + quantity }
+          : item
+      );
+    } else {
+      // New product, add to cart
+      const newItem: CartItem = {
+        id: `${product.id}_${Date.now()}`,
+        product_id: product.id,
+        product_name: product.name,
+        price: product.price,
+        original_price: product.original_price,
+        discount_amount: product.discount_amount,
+        quantity,
+        vat_rate: product.vat_rate || 7.5,
+        image_url: product.image_url,
+        customizations: product.customizations,
+        special_instructions: product.special_instructions
+      };
+      updatedItems = [...cart.items, newItem];
+    }
     
     const newCart = calculateCartSummary(updatedItems, cart.summary.delivery_fee, cart.promotion_code);
-    console.log('🛒 New cart after calculation:', newCart);
-    
     setCart(newCart);
   };
 

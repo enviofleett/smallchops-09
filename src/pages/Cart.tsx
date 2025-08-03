@@ -13,10 +13,6 @@ export default function Cart() {
   const navigate = useNavigate();
   const { cart, updateQuantity, removeItem } = useCart();
 
-  console.log('🛒 Cart page rendered with cart:', cart);
-  console.log('🛒 Cart items:', cart.items);
-  console.log('🛒 Cart item count:', cart.itemCount);
-
   const handleBackClick = () => {
     navigate('/home');
   };
@@ -48,13 +44,6 @@ export default function Cart() {
             <Button onClick={handleBackClick}>
               Continue Shopping
             </Button>
-            {/* Debug info for troubleshooting */}
-            <div className="mt-4 p-4 bg-muted rounded-lg text-left">
-              <p className="text-sm font-mono">Debug Info:</p>
-              <p className="text-xs">Items count: {cart.items.length}</p>
-              <p className="text-xs">Item count property: {cart.itemCount}</p>
-              <p className="text-xs">LocalStorage: {localStorage.getItem('restaurant_cart') ? 'Has data' : 'Empty'}</p>
-            </div>
           </div>
         ) : (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">

@@ -111,10 +111,20 @@ export function CartSummary({ cart }: CartSummaryProps) {
 
           <Separator />
 
-          {/* Order Summary */}
+          {/* Order Summary with VAT Breakdown */}
           <div className="space-y-3">
             <div className="flex justify-between text-sm">
-              <span>Sub Total</span>
+              <span>Sub Total (excl. VAT)</span>
+              <span>{formatCurrency(cart.summary.subtotal_cost)}</span>
+            </div>
+
+            <div className="flex justify-between text-sm text-muted-foreground">
+              <span>VAT (7.5%)</span>
+              <span>{formatCurrency(cart.summary.total_vat)}</span>
+            </div>
+
+            <div className="flex justify-between text-sm font-medium">
+              <span>Sub Total (incl. VAT)</span>
               <span>{formatCurrency(cart.summary.subtotal)}</span>
             </div>
 
@@ -141,9 +151,24 @@ export function CartSummary({ cart }: CartSummaryProps) {
 
             <Separator />
 
-            <div className="flex justify-between font-semibold">
+            <div className="flex justify-between font-semibold text-lg">
               <span>Total</span>
               <span>{formatCurrency(cart.summary.total_amount)}</span>
+            </div>
+
+            {/* Tax Summary Box */}
+            <div className="mt-4 p-3 bg-muted/30 rounded-lg">
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">Tax Breakdown</h4>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span>Items VAT:</span>
+                  <span>{formatCurrency(cart.summary.total_vat)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>Total VAT Inclusive:</span>
+                  <span className="font-medium">{formatCurrency(cart.summary.total_vat)}</span>
+                </div>
+              </div>
             </div>
           </div>
 

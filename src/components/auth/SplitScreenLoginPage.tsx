@@ -1,15 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useUnifiedAuth } from '@/hooks/useUnifiedAuth';
+import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
+import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card } from '@/components/ui/card';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
-import { OTPInput } from '@/components/auth/OTPInput';
 import { Eye, EyeOff, ArrowLeft, Loader2 } from 'lucide-react';
 import startersLogo from '@/assets/starters-logo.png';
 
@@ -32,7 +31,7 @@ const registerSchema = z.object({
 
 type LoginForm = z.infer<typeof loginSchema>;
 type RegisterForm = z.infer<typeof registerSchema>;
-type AuthView = 'login' | 'register' | 'otp-verification';
+type AuthView = 'login' | 'register';
 
 const SplitScreenLoginPage = () => {
   const navigate = useNavigate();
@@ -40,19 +39,9 @@ const SplitScreenLoginPage = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Unified auth hook
-  const {
-    isLoading,
-    isOTPRequired,
-    otpEmail,
-    otpPurpose,
-    customerAccount,
-    login,
-    register,
-    completeOTPVerification,
-    handleGoogleAuth,
-    cancelOTP
-  } = useUnifiedAuth();
+  // Authentication hooks
+  const { isLoading, login, register, signUpWithGoogle } = useCustomerDirectAuth();
+  const { customerAccount } = useCustomerAuth();
 
   // Forms
   const loginForm = useForm<LoginForm>({
@@ -72,17 +61,10 @@ const SplitScreenLoginPage = () => {
     }
   }, [customerAccount, navigate]);
 
-  // Handle OTP requirement
-  useEffect(() => {
-    if (isOTPRequired) {
-      setView('otp-verification');
-    }
-  }, [isOTPRequired]);
-
   const handleLogin = async (data: LoginForm) => {
-    const result = await login(data.email, data.password, 'customer');
+    const result = await login(data.email, data.password);
     
-    if (result.success && 'redirect' in result && result.redirect) {
+    if (result.success && result.redirect) {
       navigate(result.redirect);
     }
   };
@@ -93,26 +75,21 @@ const SplitScreenLoginPage = () => {
       email: data.email,
       password: data.password,
       phone: data.phone
-    }, 'customer');
+    });
 
-    if (result.success && 'requiresOTP' in result && result.requiresOTP) {
-      // Will be handled by useEffect
-    }
-  };
-
-  const handleOTPVerification = async (result: { success: boolean; code?: string }) => {
-    if (result.success && result.code) {
-      const verificationResult = await completeOTPVerification(result.code);
-      
-      if (verificationResult.success && 'redirect' in verificationResult && verificationResult.redirect) {
-        navigate(verificationResult.redirect);
+    if (result.success) {
+      if (result.requiresEmailVerification) {
+        // Show success message, stay on current page
+        registerForm.reset();
+      } else {
+        navigate('/customer-portal');
       }
     }
   };
 
-  const handleBackFromOTP = () => {
-    cancelOTP();
-    setView(otpPurpose === 'registration' ? 'register' : 'login');
+  const handleGoogleAuth = async () => {
+    await signUpWithGoogle();
+    // Redirect will be handled by the OAuth flow
   };
 
   const formatPhoneNumber = (value: string) => {
@@ -120,30 +97,14 @@ const SplitScreenLoginPage = () => {
     return digits.slice(0, 11);
   };
 
-  if (view === 'otp-verification') {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md p-8">
-          <OTPInput 
-            email={otpEmail}
-            purpose={otpPurpose || 'login'}
-            customerName={otpPurpose === 'registration' ? registerForm.getValues('name') : undefined}
-            onVerified={handleOTPVerification}
-            onBack={handleBackFromOTP}
-          />
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-background flex flex-col lg:flex-row">
-      {/* Left Side - Hero Image */}
-      <div className="lg:flex-1 relative overflow-hidden h-64 lg:h-screen">
+      {/* Left Side - Hero Image (50%) */}
+      <div className="w-full lg:w-1/2 relative overflow-hidden h-64 lg:h-screen">
         <div 
           className="w-full h-full bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url('/hero-family.jpg')`
+            backgroundImage: `url('/lovable-uploads/38d91221-666e-459c-bef5-919b5455e55b.png')`
           }}
         />
         <div className="absolute inset-0 bg-black/50" />
@@ -161,8 +122,8 @@ const SplitScreenLoginPage = () => {
         </div>
       </div>
 
-      {/* Right Side - Auth Forms */}
-      <div className="flex-1 lg:max-w-md xl:max-w-lg flex flex-col">
+      {/* Right Side - Auth Forms (50%) */}
+      <div className="w-full lg:w-1/2 flex flex-col">
         {/* Top Bar with Back Arrow and Logo */}
         <div className="flex justify-between items-center p-6 lg:p-8">
           <Button 
@@ -260,9 +221,7 @@ const SplitScreenLoginPage = () => {
                 </Button>
 
                 <GoogleAuthButton 
-                  onGoogleAuth={async () => {
-                    await handleGoogleAuth();
-                  }} 
+                  onGoogleAuth={handleGoogleAuth} 
                   isLoading={isLoading} 
                   text="Login with Google"
                   variant="outline"
@@ -399,9 +358,7 @@ const SplitScreenLoginPage = () => {
                 </Button>
 
                 <GoogleAuthButton 
-                  onGoogleAuth={async () => {
-                    await handleGoogleAuth();
-                  }} 
+                  onGoogleAuth={handleGoogleAuth} 
                   isLoading={isLoading} 
                   text="Sign up with Google"
                   variant="outline"

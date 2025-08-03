@@ -3111,6 +3111,36 @@ export type Database = {
           },
         ]
       }
+      otp_rate_limits: {
+        Row: {
+          attempt_count: number | null
+          created_at: string | null
+          email: string
+          id: string
+          is_blocked: boolean | null
+          last_attempt: string | null
+          window_start: string | null
+        }
+        Insert: {
+          attempt_count?: number | null
+          created_at?: string | null
+          email: string
+          id?: string
+          is_blocked?: boolean | null
+          last_attempt?: string | null
+          window_start?: string | null
+        }
+        Update: {
+          attempt_count?: number | null
+          created_at?: string | null
+          email?: string
+          id?: string
+          is_blocked?: boolean | null
+          last_attempt?: string | null
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       payment_audit_log: {
         Row: {
           action: string
@@ -5266,6 +5296,10 @@ export type Database = {
           p_limit_per_hour?: number
         }
         Returns: boolean
+      }
+      check_otp_rate_limit: {
+        Args: { p_email: string }
+        Returns: Json
       }
       check_paystack_production_readiness: {
         Args: Record<PropertyKey, never>

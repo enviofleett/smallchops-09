@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { handlePostLoginRedirect } from '@/utils/redirect';
@@ -9,6 +9,7 @@ import { PhoneCollectionModal } from '@/components/auth/PhoneCollectionModal';
 
 export default function AuthCallback() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   const [showPhoneModal, setShowPhoneModal] = useState(false);
@@ -17,6 +18,7 @@ export default function AuthCallback() {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
+        const type = searchParams.get('type');
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -72,9 +74,17 @@ export default function AuthCallback() {
           }
 
           // Regular redirect for users with complete profiles
+          let successMessage = "You have been successfully authenticated.";
+          
+          if (type === 'recovery') {
+            successMessage = "Password reset successful. You are now logged in.";
+          } else if (user.email_confirmed_at) {
+            successMessage = "Email verified successfully. Welcome to our platform!";
+          }
+          
           toast({
             title: "Welcome!",
-            description: "You have been successfully authenticated.",
+            description: successMessage,
           });
           const redirectPath = handlePostLoginRedirect('customer');
           navigate(redirectPath);
@@ -95,7 +105,7 @@ export default function AuthCallback() {
     };
 
     handleAuthCallback();
-  }, [navigate, toast]);
+  }, [navigate, toast, searchParams]);
 
   const handlePhoneSubmit = async (phone: string) => {
     const { data } = await supabase.auth.getUser();

@@ -10,6 +10,13 @@ interface RegistrationData {
   phone?: string;
 }
 
+interface RateLimitResponse {
+  allowed: boolean;
+  reason?: string;
+  retry_after_seconds?: number;
+  attempts_remaining?: number;
+}
+
 export const useCustomerDirectAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -55,14 +62,38 @@ export const useCustomerDirectAuth = () => {
     try {
       setIsLoading(true);
       
-      // Use signInWithOtp for registration with OTP verification
-      const { data: authData, error: authError } = await supabase.auth.signInWithOtp({
+      // Check OTP rate limit first
+      const { data: rateLimitCheck, error: rateLimitError } = await supabase.rpc('check_otp_rate_limit', {
+        p_email: data.email
+      });
+
+      if (rateLimitError) {
+        console.error('Rate limit check error:', rateLimitError);
+      }
+
+      if (rateLimitCheck && !(rateLimitCheck as unknown as RateLimitResponse).allowed) {
+        const rateLimit = rateLimitCheck as unknown as RateLimitResponse;
+        const message = rateLimit.reason === 'rate_limited' 
+          ? `Too many attempts. Please try again in ${Math.ceil((rateLimit.retry_after_seconds || 300) / 60)} minutes.`
+          : `Account temporarily blocked. Please try again in ${Math.ceil((rateLimit.retry_after_seconds || 300) / 60)} minutes.`;
+        
+        toast({
+          title: "Rate limit exceeded",
+          description: message,
+          variant: "destructive"
+        });
+        return { success: false, error: message };
+      }
+
+      // Use secure signUp with password (not signInWithOtp)
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: data.email,
+        password: data.password,
         options: {
+          emailRedirectTo: `${window.location.origin}/auth-callback`,
           data: {
             name: data.name,
-            phone: data.phone,
-            password: data.password // Store temporarily for OTP verification
+            phone: data.phone
           }
         }
       });
@@ -78,12 +109,13 @@ export const useCustomerDirectAuth = () => {
 
       toast({
         title: "Verification Required",
-        description: "A one-time password has been sent to your email. Please check your inbox.",
+        description: "A verification link has been sent to your email. Please check your inbox.",
       });
 
       return { 
         success: true, 
-        requiresOtpVerification: true 
+        requiresEmailVerification: true,
+        email: data.email
       };
     } catch (error: any) {
       toast({
@@ -97,50 +129,59 @@ export const useCustomerDirectAuth = () => {
     }
   };
 
-  const verifyOtp = async (email: string, token: string, password?: string) => {
+  const resendOtp = async (email: string) => {
     try {
       setIsLoading(true);
+      
+      // Check rate limit
+      const { data: rateLimitCheck, error: rateLimitError } = await supabase.rpc('check_otp_rate_limit', {
+        p_email: email
+      });
 
-      const { data, error } = await supabase.auth.verifyOtp({
-        email,
-        token,
-        type: 'email',
+      if (rateLimitError) {
+        console.error('Rate limit check error:', rateLimitError);
+      }
+
+      if (rateLimitCheck && !(rateLimitCheck as unknown as RateLimitResponse).allowed) {
+        const rateLimit = rateLimitCheck as unknown as RateLimitResponse;
+        const message = rateLimit.reason === 'rate_limited' 
+          ? `Too many attempts. Please try again in ${Math.ceil((rateLimit.retry_after_seconds || 300) / 60)} minutes.`
+          : `Account temporarily blocked. Please try again in ${Math.ceil((rateLimit.retry_after_seconds || 300) / 60)} minutes.`;
+        
+        toast({
+          title: "Rate limit exceeded",
+          description: message,
+          variant: "destructive"
+        });
+        return { success: false, error: message };
+      }
+
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth-callback`
+        }
       });
 
       if (error) {
         toast({
-          title: "Verification failed",
+          title: "Resend failed",
           description: error.message,
           variant: "destructive"
         });
         return { success: false, error: error.message };
       }
 
-      // If this is a new registration with password, update the user's password
-      if (password && data.user) {
-        const { error: passwordError } = await supabase.auth.updateUser({
-          password: password
-        });
-
-        if (passwordError) {
-          console.error('Password update error:', passwordError);
-          // Don't fail verification for password update errors
-        }
-      }
-
       toast({
-        title: "Verification successful!",
-        description: "You have been successfully logged in.",
+        title: "Email sent",
+        description: "A new verification email has been sent to your inbox.",
       });
 
-      return { 
-        success: true, 
-        user: data.user, 
-        redirect: handlePostLoginRedirect('customer') 
-      };
+      return { success: true };
     } catch (error: any) {
       toast({
-        title: "Verification failed",
+        title: "Resend failed",
         description: error.message || "An unexpected error occurred.",
         variant: "destructive"
       });
@@ -187,7 +228,7 @@ export const useCustomerDirectAuth = () => {
     isLoading,
     login,
     register,
-    verifyOtp,
+    resendOtp,
     signUpWithGoogle
   };
 };

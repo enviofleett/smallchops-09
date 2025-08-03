@@ -113,51 +113,22 @@ export default function CustomerProfile() {
     );
   }
 
-  const renderContent = React.useCallback(() => {
-    try {
-      switch (activeSection) {
-        case 'orders':
-          return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="Orders" />}>
-              <OrdersSection />
-            </ErrorBoundary>
-          );
-        case 'wishlist':
-          return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="Wishlist" />}>
-              <WishlistSection />
-            </ErrorBoundary>
-          );
-        case 'payment':
-          return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="Payment Methods" />}>
-              <PaymentSection />
-            </ErrorBoundary>
-          );
-        case 'address':
-          return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="Addresses" />}>
-              <AddressManager />
-            </ErrorBoundary>
-          );
-        case 'help':
-          return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="Help" />}>
-              <HelpSection settings={settings} />
-            </ErrorBoundary>
-          );
-        default:
-          return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="Orders" />}>
-              <OrdersSection />
-            </ErrorBoundary>
-          );
-      }
-    } catch (error) {
-      console.error('Content rendering error:', error);
-      return <SectionErrorFallback section={activeSection} />;
+  const renderContent = () => {
+    switch (activeSection) {
+      case 'orders':
+        return <OrdersSection />;
+      case 'wishlist':
+        return <WishlistSection />;
+      case 'payment':
+        return <PaymentSection />;
+      case 'address':
+        return <AddressManager />;
+      case 'help':
+        return <HelpSection settings={settings} />;
+      default:
+        return <OrdersSection />;
     }
-  }, [activeSection, settings]);
+  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -206,9 +177,9 @@ export default function CustomerProfile() {
 
           {/* Main Content */}
           <div className="flex-1">
-            <Suspense fallback={<ContentSkeleton />}>
+            <ErrorBoundary fallback={<SectionErrorFallback section={activeSection} />}>
               {renderContent()}
-            </Suspense>
+            </ErrorBoundary>
           </div>
         </div>
       </div>

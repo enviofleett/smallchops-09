@@ -5905,6 +5905,14 @@ export type Database = {
         Args: { required_permission?: string }
         Returns: boolean
       }
+      validate_order_data: {
+        Args: {
+          p_customer_email: string
+          p_order_items: Json
+          p_total_amount: number
+        }
+        Returns: Json
+      }
       validate_otp_code: {
         Args: { p_email: string; p_otp_code: string; p_otp_type: string }
         Returns: Json

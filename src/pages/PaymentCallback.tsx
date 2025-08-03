@@ -1,274 +1,209 @@
-import React, { useEffect, useState } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import { CheckCircle, XCircle, Loader2, AlertTriangle } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { usePayment } from '@/hooks/usePayment';
-import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { useEffect, useState } from "react";
+import { useSearchParams, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
 
-type PaymentStatus = 'verifying' | 'success' | 'failed' | 'cancelled' | 'error';
+type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
-interface PaymentData {
-  status: string;
-  amount: number;
-  reference: string;
-  gateway_response: string;
-  channel: string;
-  paid_at: string;
-  authorization?: {
-    authorization_code: string;
-    card_type: string;
-    last4: string;
-    exp_month: string;
-    exp_year: string;
-    bank: string;
-  };
+interface PaymentResult {
+  success: boolean;
+  order_id?: string;
+  order_number?: string;
+  amount?: number;
+  message?: string;
+  error?: string;
 }
 
-const PaymentCallback: React.FC = () => {
+export default function PaymentCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const [status, setStatus] = useState<PaymentStatus>('verifying');
-  const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
-  const [countdown, setCountdown] = useState(5);
-  const { verifyPayment } = usePayment();
-  const { handleError } = useErrorHandler();
+  const [result, setResult] = useState<PaymentResult | null>(null);
+
+  const reference = searchParams.get('reference');
+  const trxref = searchParams.get('trxref');
 
   useEffect(() => {
-    const reference = searchParams.get('reference');
-    const trxref = searchParams.get('trxref'); // Alternative parameter name
-    const paymentRef = reference || trxref;
-
-    if (paymentRef) {
-      verifyTransaction(paymentRef);
-    } else {
+    if (!reference && !trxref) {
       setStatus('error');
+      setResult({
+        success: false,
+        error: 'No payment reference found',
+        message: 'Invalid payment callback URL'
+      });
+      return;
     }
-  }, [searchParams]);
 
-  useEffect(() => {
-    if (status === 'success' && countdown > 0) {
-      const timer = setTimeout(() => {
-        setCountdown(prev => prev - 1);
-      }, 1000);
-      return () => clearTimeout(timer);
-    } else if (status === 'success' && countdown === 0) {
-      navigate('/orders');
-    }
-  }, [status, countdown, navigate]);
+    verifyPayment(reference || trxref!);
+  }, [reference, trxref]);
 
-  const verifyTransaction = async (reference: string) => {
+  const verifyPayment = async (paymentReference: string) => {
     try {
-      setStatus('verifying');
-      const verification = await verifyPayment(reference);
-      setPaymentData(verification);
-      
-      switch (verification.status) {
-        case 'success':
-          setStatus('success');
-          break;
-        case 'failed':
-          setStatus('failed');
-          break;
-        case 'abandoned':
-        case 'cancelled':
-          setStatus('cancelled');
-          break;
-        default:
-          setStatus('error');
+      console.log('Verifying payment:', paymentReference);
+
+      const { data, error } = await supabase.functions.invoke('paystack-verify', {
+        body: { reference: paymentReference }
+      });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      if (data.success) {
+        setStatus('success');
+        setResult({
+          success: true,
+          order_id: data.order_id,
+          order_number: data.order_number,
+          amount: data.amount,
+          message: 'Payment verified successfully'
+        });
+      } else {
+        setStatus('failed');
+        setResult({
+          success: false,
+          error: data.error,
+          message: data.message || 'Payment verification failed'
+        });
       }
     } catch (error) {
-      console.error('Verification error:', error);
-      handleError(error, 'verifying payment');
+      console.error('Payment verification error:', error);
       setStatus('error');
+      setResult({
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+        message: 'Failed to verify payment'
+      });
     }
   };
 
-  const formatAmount = (amount: number) => {
-    return `₦${(amount / 100).toLocaleString()}`;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-NG', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const getStatusConfig = () => {
+  const getStatusIcon = () => {
     switch (status) {
       case 'verifying':
-        return {
-          icon: <Loader2 className="h-16 w-16 animate-spin text-primary" />,
-          title: 'Verifying Payment',
-          message: 'Please wait while we confirm your payment...',
-          color: 'text-primary'
-        };
+        return <Clock className="h-16 w-16 text-blue-500 animate-spin" />;
       case 'success':
-        return {
-          icon: <CheckCircle className="h-16 w-16 text-green-500" />,
-          title: 'Payment Successful!',
-          message: `Your payment has been processed successfully.`,
-          color: 'text-green-600'
-        };
+        return <CheckCircle className="h-16 w-16 text-green-500" />;
       case 'failed':
-        return {
-          icon: <XCircle className="h-16 w-16 text-red-500" />,
-          title: 'Payment Failed',
-          message: paymentData?.gateway_response || 'Your payment could not be processed.',
-          color: 'text-red-600'
-        };
-      case 'cancelled':
-        return {
-          icon: <AlertTriangle className="h-16 w-16 text-yellow-500" />,
-          title: 'Payment Cancelled',
-          message: 'You cancelled the payment process.',
-          color: 'text-yellow-600'
-        };
-      default:
-        return {
-          icon: <XCircle className="h-16 w-16 text-red-500" />,
-          title: 'Error',
-          message: 'Something went wrong while processing your payment.',
-          color: 'text-red-600'
-        };
+        return <XCircle className="h-16 w-16 text-red-500" />;
+      case 'error':
+        return <AlertTriangle className="h-16 w-16 text-orange-500" />;
     }
   };
 
-  const config = getStatusConfig();
+  const getStatusTitle = () => {
+    switch (status) {
+      case 'verifying':
+        return 'Verifying Payment...';
+      case 'success':
+        return 'Payment Successful!';
+      case 'failed':
+        return 'Payment Failed';
+      case 'error':
+        return 'Verification Error';
+    }
+  };
+
+  const getStatusMessage = () => {
+    if (result?.message) return result.message;
+    
+    switch (status) {
+      case 'verifying':
+        return 'Please wait while we verify your payment...';
+      case 'success':
+        return 'Your order has been confirmed and will be processed shortly.';
+      case 'failed':
+        return 'Your payment was not successful. Please try again.';
+      case 'error':
+        return 'There was an error verifying your payment. Please contact support.';
+    }
+  };
+
+  const handleContinue = () => {
+    if (status === 'success') {
+      navigate('/customer-portal?tab=orders');
+    } else {
+      navigate('/cart');
+    }
+  };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-muted/30 p-4">
-      <Card className="max-w-md w-full">
-        <CardContent className="p-8 text-center space-y-6">
-          {/* Status Icon */}
-          <div className="flex justify-center">
-            {config.icon}
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center pb-4">
+          <div className="flex justify-center mb-4">
+            {getStatusIcon()}
           </div>
-
-          {/* Title */}
-          <h2 className={`text-2xl font-bold ${config.color}`}>
-            {config.title}
-          </h2>
-
-          {/* Message */}
-          <p className="text-muted-foreground">
-            {config.message}
-          </p>
-
-          {/* Payment Details */}
-          {paymentData && status !== 'verifying' && (
-            <div className="space-y-4 pt-4 border-t">
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Amount:</span>
-                  <span className="font-semibold">
-                    {formatAmount(paymentData.amount)}
-                  </span>
-                </div>
-                
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Reference:</span>
-                  <span className="text-xs font-mono">
-                    {paymentData.reference}
-                  </span>
-                </div>
-
-                {paymentData.channel && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Method:</span>
-                    <Badge variant="secondary" className="capitalize">
-                      {paymentData.channel}
-                    </Badge>
-                  </div>
-                )}
-
-                {paymentData.paid_at && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Paid At:</span>
-                    <span className="text-sm">
-                      {formatDate(paymentData.paid_at)}
-                    </span>
-                  </div>
-                )}
-
-                {paymentData.authorization && (
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Card:</span>
-                    <span className="text-sm">
-                      {paymentData.authorization.card_type} •••• {paymentData.authorization.last4}
-                    </span>
-                  </div>
-                )}
-              </div>
+          <CardTitle className="text-2xl">{getStatusTitle()}</CardTitle>
+          <CardDescription className="text-center">
+            {getStatusMessage()}
+          </CardDescription>
+        </CardHeader>
+        
+        <CardContent className="space-y-4">
+          {status === 'verifying' && (
+            <div className="space-y-3">
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
             </div>
           )}
 
-          {/* Action Buttons */}
-          <div className="space-y-3 pt-4">
-            {status === 'success' && (
-              <>
-                <p className="text-sm text-muted-foreground">
-                  Redirecting to your orders in {countdown} seconds...
-                </p>
-                <Button 
-                  className="w-full" 
-                  onClick={() => navigate('/orders')}
-                >
-                  View Orders
-                </Button>
-              </>
-            )}
+          {result && status !== 'verifying' && (
+            <div className="space-y-3 text-sm">
+              {result.order_number && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Order Number:</span>
+                  <span className="font-medium">{result.order_number}</span>
+                </div>
+              )}
+              
+              {result.amount && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Amount:</span>
+                  <span className="font-medium">₦{result.amount.toLocaleString()}</span>
+                </div>
+              )}
 
-            {(status === 'failed' || status === 'cancelled' || status === 'error') && (
-              <div className="space-y-2">
-                <Button 
-                  className="w-full" 
-                  onClick={() => navigate('/cart')}
-                >
-                  Try Again
-                </Button>
-                <Button 
-                  variant="outline" 
-                  className="w-full" 
-                  onClick={() => navigate('/orders')}
-                >
-                  View Orders
-                </Button>
-              </div>
-            )}
+              {reference && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Reference:</span>
+                  <span className="font-mono text-xs">{reference}</span>
+                </div>
+              )}
+            </div>
+          )}
 
-            {status === 'verifying' && (
-              <Button 
-                variant="outline" 
-                className="w-full" 
+          <div className="pt-4 space-y-2">
+            <Button
+              onClick={handleContinue}
+              className="w-full"
+              disabled={status === 'verifying'}
+              variant={status === 'success' ? 'default' : 'outline'}
+            >
+              {status === 'success' ? 'View Orders' : 'Back to Cart'}
+            </Button>
+            
+            {status !== 'verifying' && status !== 'success' && (
+              <Button
                 onClick={() => navigate('/')}
+                variant="ghost"
+                className="w-full"
               >
-                Go Home
+                Return to Home
               </Button>
             )}
           </div>
 
-          {/* Support Link */}
-          {status !== 'success' && status !== 'verifying' && (
-            <div className="pt-4 border-t">
-              <p className="text-xs text-muted-foreground">
-                Need help? Contact our{' '}
-                <a href="/support" className="text-primary hover:underline">
-                  support team
-                </a>
-              </p>
+          {(status === 'failed' || status === 'error') && (
+            <div className="text-center text-sm text-muted-foreground">
+              <p>Need help? Contact our support team</p>
             </div>
           )}
         </CardContent>
       </Card>
     </div>
   );
-};
-
-export default PaymentCallback;
-export { PaymentCallback };
+}

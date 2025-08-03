@@ -16,7 +16,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DeliveryZoneSelector } from '@/components/delivery/DeliveryZoneSelector';
+import { DeliveryZoneDropdown } from '@/components/delivery/DeliveryZoneDropdown';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { getProductWithDiscounts, getProductsWithDiscounts } from '@/api/productsWithDiscounts';
@@ -284,7 +284,7 @@ const ProductDetail = () => {
 
               {/* Shipping Zone Selection - Moved under Add to Cart */}
               <div className="border-t pt-4">
-                <DeliveryZoneSelector
+                <DeliveryZoneDropdown
                   selectedZoneId={selectedZoneId}
                   onZoneSelect={handleZoneSelect}
                   orderSubtotal={quantity * (product.discounted_price || product.price)}

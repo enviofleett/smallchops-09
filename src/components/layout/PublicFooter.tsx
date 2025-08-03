@@ -9,7 +9,7 @@ export const PublicFooter = () => {
   return (
     <footer className="bg-muted/50 border-t mt-16">
       <div className="container mx-auto px-4 py-12">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {/* Logo and About */}
           <div className="space-y-4">
             <div className="flex items-center space-x-3">
@@ -78,58 +78,6 @@ export const PublicFooter = () => {
                 </Link>
               </li>
             </ul>
-          </div>
-
-          {/* Customer Service */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-4">Customer Service</h3>
-            <ul className="space-y-2">
-              <li>
-                <Link to="/delivery" className="text-muted-foreground hover:text-primary transition-colors">
-                  Delivery Info
-                </Link>
-              </li>
-              <li>
-                <Link to="/returns" className="text-muted-foreground hover:text-primary transition-colors">
-                  Returns & Exchanges
-                </Link>
-              </li>
-              <li>
-                <Link to="/faq" className="text-muted-foreground hover:text-primary transition-colors">
-                  FAQ
-                </Link>
-              </li>
-              <li>
-                <Link to="/privacy" className="text-muted-foreground hover:text-primary transition-colors">
-                  Privacy Policy
-                </Link>
-              </li>
-            </ul>
-          </div>
-
-          {/* Contact Info */}
-          <div>
-            <h3 className="font-semibold text-foreground mb-4">Contact Info</h3>
-            <div className="space-y-3">
-              {settings?.email && (
-                <div className="flex items-center space-x-2 text-muted-foreground">
-                  <Mail className="h-4 w-4" />
-                  <span className="text-sm">{settings.email}</span>
-                </div>
-              )}
-              {settings?.phone && (
-                <div className="flex items-center space-x-2 text-muted-foreground">
-                  <Phone className="h-4 w-4" />
-                  <span className="text-sm">{settings.phone}</span>
-                </div>
-              )}
-              {settings?.address && (
-                <div className="flex items-start space-x-2 text-muted-foreground">
-                  <MapPin className="h-4 w-4 mt-0.5" />
-                  <span className="text-sm">{settings.address}</span>
-                </div>
-              )}
-            </div>
           </div>
         </div>
 

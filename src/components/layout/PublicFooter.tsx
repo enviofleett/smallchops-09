@@ -2,9 +2,22 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Facebook, Twitter, Instagram, Mail, Phone, MapPin } from 'lucide-react';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
+import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 
 export const PublicFooter = () => {
-  const { data: settings } = useBusinessSettings();
+  return (
+    <ProductionErrorBoundary context="PublicFooter" showErrorDetails={false}>
+      <PublicFooterContent />
+    </ProductionErrorBoundary>
+  );
+};
+
+const PublicFooterContent = () => {
+  const { data: settings, error } = useBusinessSettings();
+
+  // Graceful degradation
+  const businessName = settings?.name || 'Starters';
+  const logoUrl = settings?.logo_url || "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
 
   return (
     <footer className="bg-gray-900 text-white py-16">
@@ -58,11 +71,14 @@ export const PublicFooter = () => {
             {/* Logo and Tagline */}
             <div className="flex items-center space-x-3">
               <img
-                src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png"
-                alt="Starters Logo"
+                src={logoUrl}
+                alt={`${businessName} Logo`}
                 className="h-8 w-auto"
+                onError={(e) => {
+                  e.currentTarget.src = "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
+                }}
               />
-              <span className="text-gray-400 text-sm">SMALL CHOPS</span>
+              <span className="text-gray-400 text-sm">{settings?.tagline || 'SMALL CHOPS'}</span>
             </div>
 
             {/* Social Media Icons */}
@@ -101,7 +117,7 @@ export const PublicFooter = () => {
         {/* Copyright */}
         <div className="text-center pt-8">
           <p className="text-gray-400 text-sm">
-            © {new Date().getFullYear()} {settings?.name || 'Starters'}. All rights reserved.
+            © {new Date().getFullYear()} {businessName}. All rights reserved.
           </p>
         </div>
       </div>

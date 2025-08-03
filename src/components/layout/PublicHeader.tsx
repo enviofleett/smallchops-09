@@ -5,17 +5,30 @@ import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 
 export const PublicHeader = () => {
+  return (
+    <ProductionErrorBoundary context="PublicHeader" showErrorDetails={false}>
+      <PublicHeaderContent />
+    </ProductionErrorBoundary>
+  );
+};
+
+const PublicHeaderContent = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { getItemCount } = useCart();
-  const { data: settings } = useBusinessSettings();
+  const { data: settings, error } = useBusinessSettings();
   const { isAuthenticated, customerAccount, isLoading } = useCustomerAuth();
   const navigate = useNavigate();
 
   const handleCartClick = () => {
     navigate('/cart');
   };
+
+  // Graceful degradation for logo and business name
+  const logoUrl = settings?.logo_url || "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
+  const businessName = settings?.name || "Starters";
 
   return (
     <header className="bg-background border-b border-border sticky top-0 z-50">
@@ -24,9 +37,12 @@ export const PublicHeader = () => {
           {/* Logo */}
           <Link to="/home" className="flex items-center space-x-2">
             <img
-              src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png"
-              alt="Starters Logo"
+              src={logoUrl}
+              alt={`${businessName} Logo`}
               className="h-10 w-auto"
+              onError={(e) => {
+                e.currentTarget.src = "/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png";
+              }}
             />
           </Link>
 

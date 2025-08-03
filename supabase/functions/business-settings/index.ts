@@ -57,47 +57,39 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // FIXED AUTH - Consistent validation  
-    const authHeader = req.headers.get('authorization'); // lowercase only
-    console.log('Auth header present:', !!authHeader);
-    
-    if (!authHeader?.startsWith('Bearer ')) {
-      throw new Error('Authentication required');
-    }
-    
-    const token = authHeader.substring(7); // More secure than replace
-    const { data: user, error: authError } = await supabaseClient.auth.getUser(token);
-
-    if (authError) {
-      console.error('Auth error:', authError);
-      throw new Error(`Authentication failed: ${authError.message}`);
-    }
-
-    if (!user.user) {
-      throw new Error('User not found');
-    }
-
-    console.log('User authenticated:', user.user.id);
-
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('role')
-      .eq('id', user.user.id)
-      .single();
-
-    if (profileError) {
-      console.error('Profile error:', profileError);
-      throw new Error(`Failed to get user profile: ${profileError.message}`);
-    }
-
-    console.log('User role:', profile?.role);
-
-    if (profile?.role !== 'admin') {
-      throw new Error('Admin access required');
-    }
-
+    // Handle GET requests for business settings (admin access required for modifications)
     if (req.method === 'GET') {
+      // For GET requests, check if admin authentication is provided
+      const authHeader = req.headers.get('authorization');
+      console.log('Auth header present:', !!authHeader);
+      
+      if (authHeader?.startsWith('Bearer ')) {
+        // Admin user - validate authentication
+        const token = authHeader.substring(7);
+        const { data: user, error: authError } = await supabaseClient.auth.getUser(token);
+
+        if (!authError && user.user) {
+          console.log('User authenticated:', user.user.id);
+
+          // Check if user is admin
+          const { data: profile, error: profileError } = await supabaseClient
+            .from('profiles')
+            .select('role')
+            .eq('id', user.user.id)
+            .single();
+
+          if (!profileError && profile?.role === 'admin') {
+            console.log('Admin user confirmed, proceeding with full access');
+          } else {
+            console.log('Non-admin user, using public access');
+          }
+        } else {
+          console.log('Authentication failed, using public access');
+        }
+      } else {
+        console.log('No authentication provided, using public access');
+      }
+
       console.log('Fetching business settings...');
       
       // Get all business settings and take the most recent one
@@ -121,8 +113,46 @@ serve(async (req) => {
       )
     }
 
-    // Handle POST (functions.invoke defaults to POST)
+    // Handle POST (functions.invoke defaults to POST) - Admin authentication required
     if (req.method === 'POST') {
+      // POST requests require admin authentication
+      const authHeader = req.headers.get('authorization');
+      
+      if (!authHeader?.startsWith('Bearer ')) {
+        throw new Error('Authentication required for modifications');
+      }
+      
+      const token = authHeader.substring(7);
+      const { data: user, error: authError } = await supabaseClient.auth.getUser(token);
+
+      if (authError) {
+        console.error('Auth error:', authError);
+        throw new Error(`Authentication failed: ${authError.message}`);
+      }
+
+      if (!user.user) {
+        throw new Error('User not found');
+      }
+
+      console.log('User authenticated for POST:', user.user.id);
+
+      // Check if user is admin
+      const { data: profile, error: profileError } = await supabaseClient
+        .from('profiles')
+        .select('role')
+        .eq('id', user.user.id)
+        .single();
+
+      if (profileError) {
+        console.error('Profile error:', profileError);
+        throw new Error(`Failed to get user profile: ${profileError.message}`);
+      }
+
+      console.log('User role:', profile?.role);
+
+      if (profile?.role !== 'admin') {
+        throw new Error('Admin access required for modifications');
+      }
       console.log('Processing POST request for business settings');
       
       let reqBody;

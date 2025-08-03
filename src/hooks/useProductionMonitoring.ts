@@ -1,82 +1,89 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface MonitoringHook {
-  recordHealthMetric: (name: string, value: number, type?: string, severity?: string) => Promise<void>;
-  recordPerformanceMetric: (endpoint: string, method: string, responseTime: number, statusCode: number, error?: any) => Promise<void>;
+  recordHealthMetric: (name: string, value: number, type: string, severity?: string) => Promise<void>;
+  recordPerformanceMetric: (endpoint: string, method: string, responseTime: number, statusCode?: number, error?: string) => Promise<void>;
   createSecurityAlert: (type: string, severity: string, title: string, description: string) => Promise<void>;
   cleanupOldData: () => Promise<void>;
   isRecording: boolean;
 }
 
 export const useProductionMonitoring = (): MonitoringHook => {
-  const [isRecording, setIsRecording] = useState(false);
   const { toast } = useToast();
+  const isRecording = process.env.NODE_ENV === 'production';
 
-  const recordHealthMetric = async (
+  const recordHealthMetric = useCallback(async (
     name: string, 
     value: number, 
-    type: string = 'gauge', 
+    type: string, 
     severity: string = 'info'
   ) => {
+    if (!isRecording) return;
+    
     try {
-      setIsRecording(true);
-      
-      const { error } = await supabase.rpc('record_health_metric', {
-        p_metric_name: name,
-        p_metric_value: value,
-        p_metric_type: type,
-        p_severity: severity,
-        p_tags: {}
-      });
+      const { error } = await supabase
+        .from('business_analytics')
+        .insert({
+          metric_name: `health_${name}`,
+          metric_value: value,
+          period_start: new Date().toISOString(),
+          period_end: new Date().toISOString(),
+          dimensions: {
+            type,
+            severity,
+            component: 'frontend'
+          }
+        });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to record health metric:', error);
+      }
 
-      // If it's a critical metric, show a toast
+      // Show toast for critical health metrics
       if (severity === 'critical') {
         toast({
-          title: "Critical System Metric",
+          title: "System Health Alert",
           description: `${name}: ${value}`,
           variant: "destructive"
         });
       }
-
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error recording health metric:', error);
-    } finally {
-      setIsRecording(false);
     }
-  };
+  }, [isRecording, toast]);
 
-  const recordPerformanceMetric = async (
+  const recordPerformanceMetric = useCallback(async (
     endpoint: string,
     method: string,
     responseTime: number,
-    statusCode: number,
-    error?: any
+    statusCode?: number,
+    error?: string
   ) => {
+    if (!isRecording) return;
+    
     try {
-      setIsRecording(true);
+      const { error: insertError } = await supabase
+        .from('api_metrics')
+        .insert({
+          endpoint,
+          metric_type: 'response_time',
+          metric_value: responseTime,
+          dimensions: {
+            method,
+            status_code: statusCode,
+            error: error || null,
+            user_agent: navigator.userAgent,
+            timestamp: new Date().toISOString()
+          }
+        });
 
-      const { error: recordError } = await supabase.rpc('record_performance_metric', {
-        p_endpoint: endpoint,
-        p_method: method,
-        p_response_time_ms: responseTime,
-        p_status_code: statusCode,
-        p_user_id: null,
-        p_ip_address: null,
-        p_user_agent: navigator.userAgent,
-        p_request_size_bytes: null,
-        p_response_size_bytes: null,
-        p_database_query_time_ms: null,
-        p_cache_hit: false,
-        p_error_details: error ? { error: error.message, stack: error.stack } : null
-      });
+      if (insertError) {
+        console.error('Failed to record performance metric:', insertError);
+      }
 
-      if (recordError) throw recordError;
-
-      // Show toast for slow responses
+      // Alert for slow API responses
       if (responseTime > 3000) {
         toast({
           title: "Slow API Response",
@@ -84,123 +91,140 @@ export const useProductionMonitoring = (): MonitoringHook => {
           variant: "destructive"
         });
       }
-
-    } catch (err: any) {
-      console.error('Error recording performance metric:', err);
-    } finally {
-      setIsRecording(false);
+    } catch (error) {
+      console.error('Error recording performance metric:', error);
     }
-  };
+  }, [isRecording, toast]);
 
-  const createSecurityAlert = async (
+  const createSecurityAlert = useCallback(async (
     type: string,
     severity: string,
     title: string,
     description: string
   ) => {
+    if (!isRecording) return;
+    
     try {
-      setIsRecording(true);
-
       const { error } = await supabase
-        .from('security_alerts')
+        .from('security_incidents')
         .insert({
-          alert_type: type,
-          severity: severity,
-          title: title,
-          description: description,
-          detection_method: 'manual',
-          status: 'open'
+          type,
+          severity,
+          request_data: {
+            title,
+            description,
+            source: 'frontend',
+            metadata: {
+              user_agent: navigator.userAgent,
+              url: window.location.href,
+              timestamp: new Date().toISOString()
+            }
+          }
         });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Failed to create security alert:', error);
+        return;
+      }
 
       toast({
         title: "Security Alert Created",
         description: title,
-        variant: severity === 'critical' || severity === 'high' ? "destructive" : "default"
+        variant: severity === 'high' || severity === 'critical' ? "destructive" : "default"
       });
-
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error creating security alert:', error);
       toast({
-        title: "Error creating security alert",
-        description: error.message,
+        title: "Failed to Create Security Alert",
+        description: "Please contact support if this persists",
         variant: "destructive"
       });
-    } finally {
-      setIsRecording(false);
     }
-  };
+  }, [isRecording, toast]);
 
-  const cleanupOldData = async () => {
+  const cleanupOldData = useCallback(async () => {
+    if (!isRecording) return;
+    
     try {
-      setIsRecording(true);
+      // Cleanup old metrics manually since we don't have the RPC function
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-      const { error } = await supabase.rpc('cleanup_monitoring_data');
-
-      if (error) throw error;
+      await Promise.all([
+        supabase
+          .from('api_metrics')
+          .delete()
+          .lt('timestamp', thirtyDaysAgo.toISOString()),
+        supabase
+          .from('business_analytics')
+          .delete()
+          .lt('created_at', thirtyDaysAgo.toISOString())
+      ]);
 
       toast({
-        title: "Data cleanup completed",
-        description: "Old monitoring data has been cleaned up successfully"
+        title: "Data Cleanup Successful",
+        description: "Old monitoring data has been cleaned up",
+        variant: "default"
       });
-
-    } catch (error: any) {
-      console.error('Error cleaning up data:', error);
+    } catch (error) {
+      console.error('Error during data cleanup:', error);
       toast({
-        title: "Error cleaning up data",
-        description: error.message,
+        title: "Cleanup Error",
+        description: "An error occurred during data cleanup",
         variant: "destructive"
       });
-    } finally {
-      setIsRecording(false);
     }
-  };
+  }, [isRecording, toast]);
 
-  // Auto-record page performance metrics
+  // Auto-record page load performance
   useEffect(() => {
+    if (!isRecording) return;
+    
     const recordPageLoad = () => {
-      if (performance.timing) {
-        const pageLoadTime = performance.timing.loadEventEnd - performance.timing.navigationStart;
-        if (pageLoadTime > 0) {
-          recordPerformanceMetric('page_load', 'GET', pageLoadTime, 200);
+      const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
+      if (navigation) {
+        const loadTime = navigation.loadEventEnd - navigation.loadEventStart;
+        if (loadTime > 0) {
+          recordPerformanceMetric(
+            window.location.pathname,
+            'GET',
+            loadTime,
+            200,
+            undefined
+          );
         }
       }
     };
 
-    // Record page load time when component mounts
     if (document.readyState === 'complete') {
       recordPageLoad();
     } else {
       window.addEventListener('load', recordPageLoad);
       return () => window.removeEventListener('load', recordPageLoad);
     }
-  }, []);
+  }, [isRecording, recordPerformanceMetric]);
 
-  // Auto-record system health metrics periodically
+  // Auto-record system health metrics
   useEffect(() => {
-    const interval = setInterval(async () => {
-      // Record memory usage if available
-      if ((performance as any).memory) {
+    if (!isRecording) return;
+    
+    const recordSystemHealth = () => {
+      // Memory usage
+      if ('memory' in performance) {
         const memory = (performance as any).memory;
-        const memoryUsagePercent = (memory.usedJSHeapSize / memory.totalJSHeapSize) * 100;
-        
-        await recordHealthMetric(
-          'memory_usage_percent', 
-          Math.round(memoryUsagePercent),
-          'gauge',
-          memoryUsagePercent > 90 ? 'critical' : memoryUsagePercent > 75 ? 'warning' : 'info'
-        );
+        const memoryUsagePercent = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
+        recordHealthMetric('memory_usage', memoryUsagePercent, 'system');
       }
+      
+      // Connection status
+      recordHealthMetric('connection_status', navigator.onLine ? 1 : 0, 'network');
+    };
 
-      // Record connection status
-      const isOnline = navigator.onLine;
-      await recordHealthMetric('connection_status', isOnline ? 1 : 0, 'gauge', isOnline ? 'info' : 'critical');
-
-    }, 60000); // Every minute
-
+    recordSystemHealth();
+    const interval = setInterval(recordSystemHealth, 60000); // Every minute
+    
     return () => clearInterval(interval);
-  }, []);
+  }, [isRecording, recordHealthMetric]);
 
   return {
     recordHealthMetric,

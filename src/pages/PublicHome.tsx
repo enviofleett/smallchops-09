@@ -253,7 +253,7 @@ const PublicHome = () => {
               <Card className="bg-white">
                 <CardContent className="p-6">
                   <h3 className="text-xl font-bold text-red-600 mb-4">Categories</h3>
-                  <div className="space-y-2">
+                   <div className="space-y-2">
                     <button
                       onClick={() => setActiveCategory('all')}
                       className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
@@ -264,46 +264,19 @@ const PublicHome = () => {
                     >
                       All
                     </button>
-                    <button
-                      onClick={() => setActiveCategory('platters')}
-                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                        activeCategory === 'platters' 
-                          ? 'bg-red-600 text-white' 
-                          : 'hover:bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      Platters
-                    </button>
-                    <button
-                      onClick={() => setActiveCategory('packs')}
-                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                        activeCategory === 'packs' 
-                          ? 'bg-red-600 text-white' 
-                          : 'hover:bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      Packs
-                    </button>
-                    <button
-                      onClick={() => setActiveCategory('lunchboxes')}
-                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                        activeCategory === 'lunchboxes' 
-                          ? 'bg-red-600 text-white' 
-                          : 'hover:bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      Lunchboxes
-                    </button>
-                    <button
-                      onClick={() => setActiveCategory('customization')}
-                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
-                        activeCategory === 'customization' 
-                          ? 'bg-red-600 text-white' 
-                          : 'hover:bg-gray-100 text-gray-700'
-                      }`}
-                    >
-                      Customization
-                    </button>
+                    {categories.map((category) => (
+                      <button
+                        key={category.id}
+                        onClick={() => window.location.href = `/category/${category.id}`}
+                        className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                          activeCategory === category.id 
+                            ? 'bg-red-600 text-white' 
+                            : 'hover:bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {category.name}
+                      </button>
+                    ))}
                   </div>
                 </CardContent>
               </Card>

@@ -16,6 +16,7 @@ import NotFound from "./pages/NotFound";
 import Index from "./pages/Index";
 import PublicHome from "./pages/PublicHome";
 import ProductDetail from "./pages/ProductDetail";
+import CategoryProducts from "./pages/CategoryProducts";
 import Promotions from "./pages/Promotions";
 import DeliveryPickup from "./pages/DeliveryPickup";
 import AuditLogs from "./pages/AuditLogs";
@@ -51,6 +52,7 @@ const App = () => (
               {/* Public routes */}
               <Route path="/" element={<PublicHome />} />
               <Route path="/product/:id" element={<ProductDetail />} />
+              <Route path="/category/:categoryId" element={<CategoryProducts />} />
               
               {/* Authentication routes */}
               <Route path="/login" element={<SplitScreenLoginPage />} />

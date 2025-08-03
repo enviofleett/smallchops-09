@@ -458,11 +458,12 @@ const ProductDetail = () => {
             <h3 className="text-2xl font-bold mb-6">You might also like</h3>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
               {relatedProducts.map((relatedProduct) => (
-                <Card key={relatedProduct.id} className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-                  <div 
-                    className="aspect-square overflow-hidden"
-                    onClick={() => navigate(`/product/${relatedProduct.id}`)}
-                  >
+                <Card 
+                  key={relatedProduct.id} 
+                  className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                  onClick={() => navigate(`/product/${relatedProduct.id}`)}
+                >
+                  <div className="aspect-square overflow-hidden">
                     <img
                       src={relatedProduct.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
                       alt={relatedProduct.name}
@@ -489,7 +490,10 @@ const ProductDetail = () => {
                       </div>
                       <Button 
                         size="sm" 
-                        onClick={() => addItem(relatedProduct, 1)}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          addItem(relatedProduct, 1);
+                        }}
                       >
                         Add to Cart
                       </Button>

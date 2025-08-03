@@ -63,21 +63,24 @@ export const useCart = () => {
   // Load cart from localStorage on mount
   useEffect(() => {
     const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+    console.log('🛒 Loading cart from localStorage:', savedCart);
     if (savedCart) {
       try {
         const parsedCart = JSON.parse(savedCart);
-        setCart(calculateCartSummary(parsedCart.items || []));
+        console.log('🛒 Parsed cart from localStorage:', parsedCart);
+        setCart(parsedCart);
       } catch (error) {
-        console.error('Error loading cart from storage:', error);
-        clearCart();
+        console.error('🛒 Error parsing cart from localStorage:', error);
+        localStorage.removeItem(CART_STORAGE_KEY);
       }
     }
   }, []);
 
   // Save cart to localStorage whenever it changes
   useEffect(() => {
-    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify({ items: cart.items }));
-  }, [cart.items]);
+    console.log('🛒 Saving cart to localStorage:', cart);
+    localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+  }, [cart]);
 
   const calculateCartSummary = (
     items: CartItem[], 
@@ -119,10 +122,7 @@ export const useCart = () => {
     const total_amount = subtotal + finalDeliveryFee - promotionResult.total_discount;
 
     return {
-      items: promotionResult.updated_cart_items.map(updatedItem => {
-        const originalItem = items.find(item => item.product_id === updatedItem.product_id);
-        return originalItem ? { ...originalItem, ...updatedItem } : originalItem;
-      }).filter(Boolean) as CartItem[],
+      items: items, // Use original items, don't replace with promotion result items
       summary: {
         subtotal: Math.round(subtotal * 100) / 100,
         subtotal_cost: Math.round(vatSummary.subtotal_cost * 100) / 100,
@@ -150,6 +150,9 @@ export const useCart = () => {
     customizations?: Record<string, any>;
     special_instructions?: string;
   }, quantity = 1) => {
+    console.log('🛒 Adding item to cart:', product);
+    console.log('🛒 Current cart before adding:', cart);
+    
     const newItem: CartItem = {
       id: `${product.id}_${Date.now()}`, // Unique cart item ID
       product_id: product.id,
@@ -164,8 +167,15 @@ export const useCart = () => {
       special_instructions: product.special_instructions
     };
 
+    console.log('🛒 New item created:', newItem);
+
     const updatedItems = [...cart.items, newItem];
-    setCart(calculateCartSummary(updatedItems, cart.summary.delivery_fee, cart.promotion_code));
+    console.log('🛒 Updated items array:', updatedItems);
+    
+    const newCart = calculateCartSummary(updatedItems, cart.summary.delivery_fee, cart.promotion_code);
+    console.log('🛒 New cart after calculation:', newCart);
+    
+    setCart(newCart);
   };
 
   const removeItem = (cartItemId: string) => {

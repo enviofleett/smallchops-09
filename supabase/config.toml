@@ -14,8 +14,8 @@ site_url = "https://preview--smallchops-09.lovable.app"
 additional_redirect_urls = ["https://preview--smallchops-09.lovable.app", "http://localhost:3000"]
 jwt_expiry = 3600
 enable_signup = true
-enable_email_confirmations = false
-enable_email_autoconfirm = true
+enable_email_confirmations = true
+enable_email_autoconfirm = false
 enable_phone_confirmations = false
 enable_phone_autoconfirm = false
 

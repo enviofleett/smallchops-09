@@ -32,9 +32,9 @@ export const getDefaultRedirectPath = (userType: 'admin' | 'customer' | 'unknown
     case 'admin':
       return '/dashboard';
     case 'customer':
-      return '/';
+      return '/home';
     default:
-      return '/';
+      return '/home';
   }
 };
 

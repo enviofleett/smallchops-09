@@ -60,27 +60,31 @@ export const useCustomerAuth = () => {
           if (!mounted) return;
           
           if (session?.user) {
-            // Set basic auth state first
-            setAuthState(prev => ({ 
-              ...prev, 
-              user: session.user, 
-              session, 
-              isLoading: true,
-              error: null
-            }));
-
-            // Load customer account
-            const customerAccount = await loadCustomerAccount(session.user.id);
-            
-            if (mounted) {
-              setAuthState(prev => ({
-                ...prev,
-                customerAccount,
-                isLoading: false,
-                isAuthenticated: !!customerAccount,
-                error: customerAccount ? null : 'Customer account not found'
+            // Use setTimeout to prevent potential Supabase deadlocks
+            setTimeout(async () => {
+              if (!mounted) return;
+              
+              setAuthState(prev => ({ 
+                ...prev, 
+                user: session.user, 
+                session, 
+                isLoading: true,
+                error: null
               }));
-            }
+
+              // Load customer account
+              const customerAccount = await loadCustomerAccount(session.user.id);
+              
+              if (mounted) {
+                setAuthState(prev => ({
+                  ...prev,
+                  customerAccount,
+                  isLoading: false,
+                  isAuthenticated: !!customerAccount,
+                  error: customerAccount ? null : 'Customer account not found'
+                }));
+              }
+            }, 0);
           } else {
             setAuthState({
               user: null,

@@ -55,15 +55,14 @@ export const useCustomerDirectAuth = () => {
     try {
       setIsLoading(true);
       
-      // Create Supabase user
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Use signInWithOtp for registration with OTP verification
+      const { data: authData, error: authError } = await supabase.auth.signInWithOtp({
         email: data.email,
-        password: data.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/`,
           data: {
             name: data.name,
-            phone: data.phone
+            phone: data.phone,
+            password: data.password // Store temporarily for OTP verification
           }
         }
       });
@@ -77,42 +76,71 @@ export const useCustomerDirectAuth = () => {
         return { success: false, error: authError.message };
       }
 
-      if (!authData.user) {
-        toast({
-          title: "Registration failed",
-          description: "Failed to create user account.",
-          variant: "destructive"
-        });
-        return { success: false, error: "Failed to create user account" };
-      }
-
-      // Create customer account record
-      const { error: customerError } = await supabase
-        .from('customer_accounts')
-        .insert({
-          user_id: authData.user.id,
-          name: data.name,
-          phone: data.phone
-        });
-
-      if (customerError) {
-        console.error('Customer account creation error:', customerError);
-        // Don't show this error to user as the main account was created
-      }
-
       toast({
-        title: "Registration successful!",
-        description: "Please check your email to verify your account.",
+        title: "Verification Required",
+        description: "A one-time password has been sent to your email. Please check your inbox.",
       });
 
       return { 
         success: true, 
-        user: authData.user,
-        requiresEmailVerification: true 
+        requiresOtpVerification: true 
       };
     } catch (error: any) {
       toast({
         title: "Registration failed",
+        description: error.message || "An unexpected error occurred.",
+        variant: "destructive"
+      });
+      return { success: false, error: error.message };
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const verifyOtp = async (email: string, token: string, password?: string) => {
+    try {
+      setIsLoading(true);
+
+      const { data, error } = await supabase.auth.verifyOtp({
+        email,
+        token,
+        type: 'email',
+      });
+
+      if (error) {
+        toast({
+          title: "Verification failed",
+          description: error.message,
+          variant: "destructive"
+        });
+        return { success: false, error: error.message };
+      }
+
+      // If this is a new registration with password, update the user's password
+      if (password && data.user) {
+        const { error: passwordError } = await supabase.auth.updateUser({
+          password: password
+        });
+
+        if (passwordError) {
+          console.error('Password update error:', passwordError);
+          // Don't fail verification for password update errors
+        }
+      }
+
+      toast({
+        title: "Verification successful!",
+        description: "You have been successfully logged in.",
+      });
+
+      return { 
+        success: true, 
+        user: data.user, 
+        redirect: handlePostLoginRedirect('customer') 
+      };
+    } catch (error: any) {
+      toast({
+        title: "Verification failed",
         description: error.message || "An unexpected error occurred.",
         variant: "destructive"
       });
@@ -129,7 +157,7 @@ export const useCustomerDirectAuth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/`
+          redirectTo: `${window.location.origin}/auth-callback`
         }
       });
 
@@ -159,6 +187,7 @@ export const useCustomerDirectAuth = () => {
     isLoading,
     login,
     register,
+    verifyOtp,
     signUpWithGoogle
   };
 };

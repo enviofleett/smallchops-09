@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader2 } from 'lucide-react';
 
-type AuthView = 'login' | 'register' | 'forgot-password';
+type AuthView = 'login' | 'register' | 'forgot-password' | 'verify-otp';
 
 const AuthPage = () => {
   const [searchParams] = useSearchParams();
@@ -20,8 +20,7 @@ const AuthPage = () => {
   const { toast } = useToast();
   
   // Auth hooks - customer only
-  const { login, register, signUpWithGoogle, isLoading } = useCustomerDirectAuth();
-  const { customerAccount } = useCustomerAuth();
+  const { login, register, verifyOtp, signUpWithGoogle, isLoading } = useCustomerDirectAuth();
 
   // State
   const [view, setView] = useState<AuthView>('login');
@@ -34,8 +33,15 @@ const AuthPage = () => {
     password: '',
     confirmPassword: '',
     name: '',
-    phone: ''
+    phone: '',
+    otp: ''
   });
+
+  // Store registration data for OTP verification
+  const [registrationData, setRegistrationData] = useState<{
+    email: string;
+    password: string;
+  } | null>(null);
 
   // Initialize from URL params
   useEffect(() => {
@@ -46,13 +52,7 @@ const AuthPage = () => {
     }
   }, [searchParams]);
 
-  // Auto-redirect if already authenticated
-  useEffect(() => {
-    if (customerAccount) {
-      const redirectPath = handlePostLoginRedirect('customer');
-      navigate(redirectPath);
-    }
-  }, [customerAccount, navigate]);
+  // Removed auto-redirect logic - handled by AuthRouter
 
   const handleInputChange = (field: string, value: string) => {
     if (field === 'phone') {
@@ -118,16 +118,46 @@ const AuthPage = () => {
       phone: formData.phone
     });
 
-    if (result.success) {
-      if ('requiresEmailVerification' in result && result.requiresEmailVerification) {
-        toast({
-          title: "Registration successful!",
-          description: "Please check your email to verify your account.",
-        });
-        setView('login');
-      } else if ('redirect' in result && result.redirect) {
-        navigate(result.redirect);
-      }
+    if (result.success && 'requiresOtpVerification' in result) {
+      // Store registration data for OTP verification
+      setRegistrationData({
+        email: formData.email,
+        password: formData.password
+      });
+      setView('verify-otp');
+    }
+  };
+
+  const handleVerifyOtp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!formData.otp) {
+      toast({ 
+        title: "OTP Required", 
+        description: "Please enter the OTP sent to your email.", 
+        variant: "destructive" 
+      });
+      return;
+    }
+
+    if (!registrationData) {
+      toast({ 
+        title: "Error", 
+        description: "Registration data not found. Please try again.", 
+        variant: "destructive" 
+      });
+      setView('register');
+      return;
+    }
+
+    const result = await verifyOtp(
+      registrationData.email, 
+      formData.otp, 
+      registrationData.password
+    );
+    
+    if (result.success && result.redirect) {
+      navigate(result.redirect);
     }
   };
 
@@ -420,22 +450,77 @@ const AuthPage = () => {
     </form>
   );
 
+
+  const renderVerifyOtpForm = () => (
+    <form onSubmit={handleVerifyOtp} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="otp">One-Time Password</Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="otp"
+            type="text"
+            value={formData.otp}
+            onChange={(e) => handleInputChange('otp', e.target.value)}
+            placeholder="Enter 6-digit OTP"
+            className="pl-10"
+            required
+            disabled={isLoading}
+            maxLength={6}
+          />
+        </div>
+        <p className="text-xs text-muted-foreground">
+          Enter the 6-digit code sent to {registrationData?.email}
+        </p>
+      </div>
+
+      <Button type="submit" className="w-full" disabled={isLoading}>
+        {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Verify & Complete Registration
+      </Button>
+
+      <div className="text-center">
+        <button
+          type="button"
+          onClick={() => {
+            setView('register');
+            setRegistrationData(null);
+            setFormData(prev => ({ ...prev, otp: '' }));
+          }}
+          className="text-sm text-primary hover:underline flex items-center justify-center space-x-1"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          <span>Back to registration</span>
+        </button>
+      </div>
+    </form>
+  );
+
   const getTitle = () => {
-    return view === 'login' ? 'Welcome back' : view === 'register' ? 'Create account' : 'Reset password';
+    switch (view) {
+      case 'login': return 'Welcome back';
+      case 'register': return 'Create account';
+      case 'verify-otp': return 'Verify your email';
+      case 'forgot-password': return 'Reset password';
+      default: return 'Welcome';
+    }
   };
 
   const getSubtitle = () => {
-    return view === 'login' 
-      ? 'Sign in to your customer account' 
-      : view === 'register' 
-      ? 'Create your customer account'
-      : 'Enter your email to reset your password';
+    switch (view) {
+      case 'login': return 'Sign in to your customer account';
+      case 'register': return 'Create your customer account';
+      case 'verify-otp': return 'Enter the verification code sent to your email';
+      case 'forgot-password': return 'Enter your email to reset your password';
+      default: return '';
+    }
   };
 
   return (
     <AuthLayout title={getTitle()} subtitle={getSubtitle()}>
       {view === 'login' && renderLoginForm()}
       {view === 'register' && renderRegisterForm()}
+      {view === 'verify-otp' && renderVerifyOtpForm()}
       {view === 'forgot-password' && renderForgotPasswordForm()}
     </AuthLayout>
   );

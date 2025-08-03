@@ -133,9 +133,8 @@ const PublicHome = () => {
       </section>
 
       {/* Top Products Section */}
-      <section className="py-16 px-4 md:px-6 bg-gradient-to-br from-orange-300 to-orange-400">
-        <div className="max-w-7xl mx-auto">
-          <h2 className="text-3xl font-bold text-white mb-8 text-center">Top Products</h2>
+      <section className="bg-gradient-to-br from-orange-300 to-orange-400 py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         </div>
       </section>
 

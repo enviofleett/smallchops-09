@@ -5969,6 +5969,21 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      create_order_with_items: {
+        Args: {
+          p_customer_name: string
+          p_customer_email: string
+          p_customer_phone: string
+          p_delivery_address: string
+          p_delivery_zone_id: string
+          p_payment_method: string
+          p_order_items: Json
+          p_total_amount: number
+          p_guest_session_id?: string
+          p_order_type?: string
+        }
+        Returns: Json
+      }
       customer_purchased_product: {
         Args: { customer_uuid: string; product_uuid: string }
         Returns: boolean

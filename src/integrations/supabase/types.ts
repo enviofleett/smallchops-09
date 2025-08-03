@@ -776,6 +776,57 @@ export type Database = {
         }
         Relationships: []
       }
+      catering_bookings: {
+        Row: {
+          additional_details: string | null
+          admin_notes: string | null
+          created_at: string
+          email: string
+          event_date: string
+          full_name: string
+          id: string
+          number_of_guests: number
+          phone_number: string
+          quote_amount: number | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          additional_details?: string | null
+          admin_notes?: string | null
+          created_at?: string
+          email: string
+          event_date: string
+          full_name: string
+          id?: string
+          number_of_guests: number
+          phone_number: string
+          quote_amount?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          additional_details?: string | null
+          admin_notes?: string | null
+          created_at?: string
+          email?: string
+          event_date?: string
+          full_name?: string
+          id?: string
+          number_of_guests?: number
+          phone_number?: string
+          quote_amount?: number | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       communication_events: {
         Row: {
           created_at: string

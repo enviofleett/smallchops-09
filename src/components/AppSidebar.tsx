@@ -8,6 +8,7 @@ import {
   User, 
   Truck, 
   Trophy,
+  Calendar,
   BarChart3, 
   FileSearch, 
   Settings
@@ -55,6 +56,11 @@ const management = [
     icon: User,
     label: 'Customers',
     path: '/customers'
+  },
+  {
+    icon: Calendar,
+    label: 'Catering Bookings',
+    path: '/bookings'
   },
   {
     icon: Truck,

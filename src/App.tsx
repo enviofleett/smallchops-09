@@ -18,6 +18,7 @@ import PublicHome from "./pages/PublicHome";
 import ProductDetail from "./pages/ProductDetail";
 import CategoryProducts from "./pages/CategoryProducts";
 import Promotions from "./pages/Promotions";
+import BookingManagement from "./pages/BookingManagement";
 import DeliveryPickup from "./pages/DeliveryPickup";
 import AuditLogs from "./pages/AuditLogs";
 import Settings from "./pages/Settings";
@@ -102,6 +103,7 @@ const App = () => (
                 <Route path="/delivery-pickup" element={<EnhancedErrorBoundary context="Delivery"><DeliveryPickup /></EnhancedErrorBoundary>} />
                 <Route path="/reports" element={<EnhancedErrorBoundary context="Reports"><Reports /></EnhancedErrorBoundary>} />
                 <Route path="/promotions" element={<EnhancedErrorBoundary context="Promotions"><Promotions /></EnhancedErrorBoundary>} />
+                <Route path="/bookings" element={<EnhancedErrorBoundary context="Catering Bookings"><BookingManagement /></EnhancedErrorBoundary>} />
                 <Route path="/audit-logs" element={<EnhancedErrorBoundary context="Audit Logs"><AuditLogs /></EnhancedErrorBoundary>} />
                 <Route path="/settings" element={<EnhancedErrorBoundary context="Settings"><Settings /></EnhancedErrorBoundary>} />
                 <Route path="/payment-settings" element={<EnhancedErrorBoundary context="Payment Settings"><PaymentSettings /></EnhancedErrorBoundary>} />

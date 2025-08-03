@@ -104,7 +104,7 @@ const SplitScreenLoginPage = () => {
         <div 
           className="w-full h-full bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url('/lovable-uploads/38d91221-666e-459c-bef5-919b5455e55b.png')`
+            backgroundImage: `url('/lovable-uploads/ca54738e-b06c-4be3-b6b8-472cb8602f3b.png')`
           }}
         />
         <div className="absolute inset-0 bg-black/50" />
@@ -124,8 +124,8 @@ const SplitScreenLoginPage = () => {
 
       {/* Right Side - Auth Forms (50%) */}
       <div className="w-full lg:w-1/2 flex flex-col">
-        {/* Top Bar with Back Arrow and Logo */}
-        <div className="flex justify-between items-center p-6 lg:p-8">
+        {/* Top Bar with Back Arrow Only */}
+        <div className="flex justify-start items-center p-6 lg:p-8">
           <Button 
             variant="ghost" 
             size="sm" 
@@ -134,18 +134,22 @@ const SplitScreenLoginPage = () => {
           >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <img 
-            src={startersLogo} 
-            alt="Starters" 
-            className="h-8 w-auto object-contain"
-          />
         </div>
 
         {/* Auth Content */}
         <div className="flex-1 flex items-center justify-center px-6 lg:px-8 pb-8">
           <div className="w-full max-w-sm space-y-6">
+            {/* Centered Logo */}
+            <div className="flex justify-center mb-4">
+              <img 
+                src={startersLogo} 
+                alt="Starters" 
+                className="h-12 w-auto object-contain"
+              />
+            </div>
+            
             {/* Auth Header */}
-            <div className="text-left space-y-2">
+            <div className="text-center space-y-2">
               <h2 className="text-2xl font-bold tracking-tight">
                 {view === 'login' ? 'Welcome Back' : 'Create Account'}
               </h2>

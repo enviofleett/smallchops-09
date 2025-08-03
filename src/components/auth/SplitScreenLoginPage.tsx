@@ -104,7 +104,7 @@ const SplitScreenLoginPage = () => {
         <div 
           className="w-full h-full bg-cover bg-center bg-no-repeat"
           style={{
-            backgroundImage: `url('/lovable-uploads/ca54738e-b06c-4be3-b6b8-472cb8602f3b.png')`
+            backgroundImage: `url('/lovable-uploads/38d91221-666e-459c-bef5-919b5455e55b.png')`
           }}
         />
         <div className="absolute inset-0 bg-black/50" />

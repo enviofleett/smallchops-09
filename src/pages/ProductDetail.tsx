@@ -14,10 +14,9 @@ import {
   Share
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { DeliveryZoneSelector } from '@/components/delivery/DeliveryZoneSelector';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { getProductWithDiscounts, getProductsWithDiscounts } from '@/api/productsWithDiscounts';
@@ -45,9 +44,8 @@ const ProductDetail = () => {
   const [relatedProducts, setRelatedProducts] = useState<ProductWithDiscount[]>([]);
   const [reviews, setReviews] = useState<Review[]>([]);
   const [quantity, setQuantity] = useState(1);
-  const [selectedState, setSelectedState] = useState('');
-  const [selectedCity, setSelectedCity] = useState('');
-  const [address, setAddress] = useState('');
+  const [selectedZoneId, setSelectedZoneId] = useState<string>('');
+  const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [isFavorite, setIsFavorite] = useState(false);
 
@@ -124,6 +122,11 @@ const ProductDetail = () => {
       title: "Added to Cart",
       description: `${quantity} ${product.name} added to cart`,
     });
+  };
+
+  const handleZoneSelect = (zoneId: string, fee: number) => {
+    setSelectedZoneId(zoneId);
+    setDeliveryFee(fee);
   };
 
   const handleShare = (platform: string) => {
@@ -279,42 +282,13 @@ const ProductDetail = () => {
                 />
               </div>
 
-              {/* Delivery Location Selection - Moved under Add to Cart */}
-              <div className="space-y-4 border-t pt-4">
-                <h3 className="text-sm font-semibold flex items-center">
-                  <MapPin className="h-4 w-4 mr-2 text-red-500" />
-                  Select Delivery Location
-                </h3>
-                <div className="grid md:grid-cols-3 gap-3">
-                  <Select value={selectedState} onValueChange={setSelectedState}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Select State" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="lagos">Lagos</SelectItem>
-                      <SelectItem value="abuja">Abuja</SelectItem>
-                      <SelectItem value="ogun">Ogun</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Select value={selectedCity} onValueChange={setSelectedCity}>
-                    <SelectTrigger className="h-9">
-                      <SelectValue placeholder="Select City" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="ikeja">Ikeja</SelectItem>
-                      <SelectItem value="lekki">Lekki</SelectItem>
-                      <SelectItem value="victoria-island">Victoria Island</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  
-                  <Input 
-                    placeholder="Enter full address"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
-                    className="h-9"
-                  />
-                </div>
+              {/* Shipping Zone Selection - Moved under Add to Cart */}
+              <div className="border-t pt-4">
+                <DeliveryZoneSelector
+                  selectedZoneId={selectedZoneId}
+                  onZoneSelect={handleZoneSelect}
+                  orderSubtotal={quantity * (product.discounted_price || product.price)}
+                />
               </div>
             </div>
 

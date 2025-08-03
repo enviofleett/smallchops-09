@@ -29,7 +29,17 @@ export const EmailQueueProcessor = () => {
         .from('communication_events')
         .select('status, retry_count, error_message');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw error;
+      }
+
+      if (!data) {
+        console.log('No communication events found');
+        setQueueStats({ queued: 0, processing: 0, sent: 0, failed: 0, total: 0 });
+        setLastRefresh(new Date());
+        return;
+      }
 
       // Calculate statistics
       const stats = data.reduce((acc, event) => {

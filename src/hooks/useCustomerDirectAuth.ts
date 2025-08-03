@@ -60,7 +60,7 @@ export const useCustomerDirectAuth = () => {
         email: data.email,
         password: data.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/customer-portal`,
+          emailRedirectTo: `${window.location.origin}/`,
           data: {
             name: data.name,
             phone: data.phone
@@ -129,7 +129,7 @@ export const useCustomerDirectAuth = () => {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/customer-portal`
+          redirectTo: `${window.location.origin}/`
         }
       });
 

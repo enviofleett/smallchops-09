@@ -1,10 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
-import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { usePasswordReset } from '@/hooks/usePasswordReset';
 import { useToast } from '@/hooks/use-toast';
-import { handlePostLoginRedirect } from '@/utils/redirect';
 import AuthLayout from '@/components/auth/AuthLayout';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import AuthFormValidation from '@/components/auth/AuthFormValidation';
@@ -20,8 +18,8 @@ const AuthPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  // Auth hooks - customer only
-  const { login, register, resendOtp, signUpWithGoogle, isLoading } = useCustomerDirectAuth();
+  // Auth hooks - unified
+  const { login, signUp, resendOtp, signUpWithGoogle, isLoading } = useAuth();
   const { sendPasswordReset, isLoading: isPasswordResetLoading } = usePasswordReset();
 
   // State
@@ -101,7 +99,7 @@ const AuthPage = () => {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    const result = await login(formData.email, formData.password);
+    const result = await login({ email: formData.email, password: formData.password });
     
     if (result.success && 'redirect' in result && result.redirect) {
       navigate(result.redirect);
@@ -113,7 +111,7 @@ const AuthPage = () => {
     
     if (!validateForm()) return;
 
-    const result = await register({
+    const result = await signUp({
       name: formData.name,
       email: formData.email,
       password: formData.password,

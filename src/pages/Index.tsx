@@ -2,35 +2,30 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-import { handlePostLoginRedirect } from '@/utils/redirect';
 import Dashboard from './Dashboard';
 import CustomerPortal from './CustomerPortal';
 
 const Index = () => {
-  const { isAuthenticated: isAdminAuth, isLoading: adminLoading, user: adminUser } = useAuth();
-  const { isAuthenticated: isCustomerAuth, isLoading: customerLoading, customerAccount } = useCustomerAuth();
+  const { isAuthenticated, isLoading, userType, user, customerAccount } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Wait for both auth systems to load
-    if (adminLoading || customerLoading) return;
+    // Wait for auth to load
+    if (isLoading) return;
 
     // If admin is authenticated, show dashboard
-    if (isAdminAuth && adminUser) {
+    if (isAuthenticated && userType === 'admin' && user) {
       return; // Stay on dashboard
     }
 
     // If customer is authenticated, stay on root page (will show customer portal)
-    if (isCustomerAuth && customerAccount) {
+    if (isAuthenticated && userType === 'customer' && customerAccount) {
       return; // Stay on root - will show customer portal content
     }
 
     // If no one is authenticated, go to auth page
     navigate('/auth');
-  }, [isAdminAuth, isCustomerAuth, adminLoading, customerLoading, adminUser, customerAccount, navigate]);
-
-  const isLoading = adminLoading || customerLoading;
+  }, [isAuthenticated, isLoading, userType, user, customerAccount, navigate]);
 
   if (isLoading) {
     return (
@@ -44,12 +39,12 @@ const Index = () => {
   }
 
   // Show admin dashboard if admin is authenticated
-  if (isAdminAuth && adminUser) {
+  if (isAuthenticated && userType === 'admin' && user) {
     return <Dashboard />;
   }
 
   // Show customer portal if customer is authenticated
-  if (isCustomerAuth && customerAccount) {
+  if (isAuthenticated && userType === 'customer' && customerAccount) {
     return <CustomerPortal />;
   }
 

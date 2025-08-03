@@ -1,14 +1,10 @@
 import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { handlePostLoginRedirect } from '@/utils/redirect';
 
 const AuthRouter = () => {
-  const { isAuthenticated: isAdminAuth, isLoading: adminLoading, user: adminUser } = useAuth();
-  const { isAuthenticated: isCustomerAuth, isLoading: customerLoading, customerAccount } = useCustomerAuth();
-
-  const isLoading = adminLoading || customerLoading;
+  const { isAuthenticated, isLoading, userType, user, customerAccount } = useAuth();
 
   if (isLoading) {
     return (
@@ -18,19 +14,20 @@ const AuthRouter = () => {
     );
   }
 
-  // Admin user - redirect to dashboard
-  if (isAdminAuth && adminUser) {
-    const redirectPath = handlePostLoginRedirect('admin');
-    return <Navigate to={redirectPath} replace />;
+  // Authenticated user - redirect based on type
+  if (isAuthenticated) {
+    if (userType === 'admin' && user) {
+      const redirectPath = handlePostLoginRedirect('admin');
+      return <Navigate to={redirectPath} replace />;
+    }
+    
+    if (userType === 'customer' && customerAccount) {
+      const redirectPath = handlePostLoginRedirect('customer');
+      return <Navigate to={redirectPath} replace />;
+    }
   }
 
-  // Customer user - redirect to their last page or home
-  if (isCustomerAuth && customerAccount) {
-    const redirectPath = handlePostLoginRedirect('customer');
-    return <Navigate to={redirectPath} replace />;
-  }
-
-  // No authentication - redirect to auth page
+  // No authentication or incomplete setup - redirect to auth page
   return <Navigate to="/auth" replace />;
 };
 

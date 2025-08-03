@@ -73,11 +73,11 @@ const PublicHome = () => {
   };
 
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-white">
       <PublicHeader />
 
       {/* Hero Section */}
-      <section className="bg-gradient-to-br from-orange-50 to-red-50 py-8 sm:py-12 lg:py-16">
+      <section className="bg-white py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 lg:gap-12 items-center">
             {/* Column 1 - Hero Content */}
@@ -135,7 +135,7 @@ const PublicHome = () => {
       </section>
 
       {/* Products Section */}
-      <section className="bg-gray-50 py-8 sm:py-12 lg:py-16">
+      <section className="bg-white py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
             {/* Left Sidebar - Categories - Hidden on mobile */}

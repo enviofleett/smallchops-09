@@ -77,7 +77,7 @@ const CategoryProducts = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-white">
       <PublicHeader />
       
       {/* Breadcrumb */}

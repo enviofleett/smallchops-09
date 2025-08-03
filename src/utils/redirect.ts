@@ -32,7 +32,7 @@ export const getDefaultRedirectPath = (userType: 'admin' | 'customer' | 'unknown
     case 'admin':
       return '/dashboard';
     case 'customer':
-      return '/customer-portal';
+      return '/';
     default:
       return '/';
   }

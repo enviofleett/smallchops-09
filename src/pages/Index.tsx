@@ -5,6 +5,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { handlePostLoginRedirect } from '@/utils/redirect';
 import Dashboard from './Dashboard';
+import CustomerPortal from './CustomerPortal';
 
 const Index = () => {
   const { isAuthenticated: isAdminAuth, isLoading: adminLoading, user: adminUser } = useAuth();
@@ -20,11 +21,9 @@ const Index = () => {
       return; // Stay on dashboard
     }
 
-    // If customer is authenticated, redirect to customer portal
+    // If customer is authenticated, stay on root page (will show customer portal)
     if (isCustomerAuth && customerAccount) {
-      const redirectPath = handlePostLoginRedirect('customer');
-      navigate(redirectPath);
-      return;
+      return; // Stay on root - will show customer portal content
     }
 
     // If no one is authenticated, go to auth page
@@ -41,9 +40,14 @@ const Index = () => {
     );
   }
 
-  // Only show admin dashboard if admin is authenticated
+  // Show admin dashboard if admin is authenticated
   if (isAdminAuth && adminUser) {
     return <Dashboard />;
+  }
+
+  // Show customer portal if customer is authenticated
+  if (isCustomerAuth && customerAccount) {
+    return <CustomerPortal />;
   }
 
   // Redirect will happen in useEffect

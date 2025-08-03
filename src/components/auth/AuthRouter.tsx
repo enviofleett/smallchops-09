@@ -24,7 +24,7 @@ const AuthRouter = () => {
     return <Navigate to={redirectPath} replace />;
   }
 
-  // Customer user - redirect to their last page or customer portal
+  // Customer user - redirect to their last page or home
   if (isCustomerAuth && customerAccount) {
     const redirectPath = handlePostLoginRedirect('customer');
     return <Navigate to={redirectPath} replace />;

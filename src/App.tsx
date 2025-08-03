@@ -70,7 +70,7 @@ const App = () => (
               <Route path="/register" element={<Navigate to="/auth?view=register" replace />} />
               
               {/* Customer routes */}
-              <Route path="/customer-portal" element={<CustomerPortal />} />
+              <Route path="/customer-portal" element={<Navigate to="/" replace />} />
               <Route path="/customer-profile" element={<CustomerProfile />} />
               <Route path="/customer-favorites" element={<CustomerFavorites />} />
               <Route path="/purchase-history" element={<PurchaseHistory />} />

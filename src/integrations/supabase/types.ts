@@ -1011,6 +1011,7 @@ export type Database = {
           bio: string | null
           created_at: string
           date_of_birth: string | null
+          email: string | null
           email_verified: boolean | null
           id: string
           name: string
@@ -1025,6 +1026,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           date_of_birth?: string | null
+          email?: string | null
           email_verified?: boolean | null
           id?: string
           name: string
@@ -1039,6 +1041,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           date_of_birth?: string | null
+          email?: string | null
           email_verified?: boolean | null
           id?: string
           name?: string

@@ -132,14 +132,96 @@ const PublicHome = () => {
         </div>
       </section>
 
-      {/* Wings & Things Image */}
+      {/* Top Products Section */}
       <section className="py-8">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <img 
-            alt="Wings & Things" 
-            className="w-full h-38 object-cover rounded-md mb-3"
-            src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/product-images/1754132195844-images_1_.jpeg"
-          />
+          <div 
+            className="bg-cover bg-center overflow-x-auto scrollbar-hide px-15 lg:px-20 py-12 rounded-2xl mb-7 lg:mb-14"
+            style={{ backgroundImage: "url('/images/top-product-bg.png')" }}
+          >
+            <div className="flex md:flex-wrap gap-15 lg:gap-35 md:justify-center cursor-grab active:cursor-grabbing">
+              {/* Samosa Product Card */}
+              <div className="flex-shrink-0 bg-white rounded-2xl shadow-lg px-6 py-4 min-w-[75%] md:min-w-[auto] relative">
+                <div className="absolute -top-3 -left-18 w-38 h-38 rounded-xl transform -rotate-[7deg] shadow-md">
+                  <img 
+                    alt="Samosa" 
+                    className="w-full h-38 object-cover rounded-md mb-3"
+                    src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/product-images/product-1754133371152-phb7rayxvkn.jpg"
+                  />
+                </div>
+                <div className="pl-16">
+                  <h3 className="font-bold text-xs">Samosa</h3>
+                  <div className="flex space-x-1 my-2">
+                    {[...Array(5)].map((_, i) => (
+                      <svg key={i} className="w-3 h-3 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                      </svg>
+                    ))}
+                  </div>
+                  <div className="flex mt-6 items-center justify-between">
+                    <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                      Add to Cart
+                    </button>
+                    <span className="font-bold text-xs">₦2,000</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Wings & Things Product Card */}
+              <div className="flex-shrink-0 bg-white rounded-2xl shadow-lg px-6 py-4 min-w-[75%] md:min-w-[auto] relative">
+                <div className="absolute -top-3 -left-18 w-38 h-38 rounded-xl transform -rotate-[7deg] shadow-md">
+                  <img 
+                    alt="Wings & Things" 
+                    className="w-full h-38 object-cover rounded-md mb-3"
+                    src="https://oknnklksdiqaifhxaccs.supabase.co/storage/v1/object/public/product-images/1754132195844-images_1_.jpeg"
+                  />
+                </div>
+                <div className="pl-16">
+                  <h3 className="font-bold text-xs">Wings & Things</h3>
+                  <div className="flex space-x-1 my-2">
+                    {[...Array(5)].map((_, i) => (
+                      <svg key={i} className="w-3 h-3 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                      </svg>
+                    ))}
+                  </div>
+                  <div className="flex mt-6 items-center justify-between">
+                    <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                      Add to Cart
+                    </button>
+                    <span className="font-bold text-xs">₦5,500</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Spring Rolls Product Card */}
+              <div className="flex-shrink-0 bg-white rounded-2xl shadow-lg px-6 py-4 min-w-[75%] md:min-w-[auto] relative">
+                <div className="absolute -top-3 -left-18 w-38 h-38 rounded-xl transform -rotate-[7deg] shadow-md">
+                  <img 
+                    alt="Spring Rolls" 
+                    className="w-full h-38 object-cover rounded-md mb-3"
+                    src="/lovable-uploads/8dfaab0f-8bc9-434a-ba8b-158885d43565.png"
+                  />
+                </div>
+                <div className="pl-16">
+                  <h3 className="font-bold text-xs">Spring Rolls</h3>
+                  <div className="flex space-x-1 my-2">
+                    {[...Array(5)].map((_, i) => (
+                      <svg key={i} className="w-3 h-3 text-yellow-400 fill-current" viewBox="0 0 20 20">
+                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z"/>
+                      </svg>
+                    ))}
+                  </div>
+                  <div className="flex mt-6 items-center justify-between">
+                    <button className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm">
+                      Add to Cart
+                    </button>
+                    <span className="font-bold text-xs">₦3,000</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 

@@ -5,9 +5,11 @@ import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { PublicSidebar } from './PublicSidebar';
 
 export const PublicHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const { getItemCount } = useCart();
   const { data: settings } = useBusinessSettings();
   const { isAuthenticated, customerAccount, isLoading } = useCustomerAuth();
@@ -18,17 +20,30 @@ export const PublicHeader = () => {
   };
 
   return (
-    <header className="bg-background border-b border-border sticky top-0 z-50">
-      <div className="container mx-auto px-4">
-        <div className="flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link to="/" className="flex items-center space-x-2">
-            <img
-              src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png"
-              alt="Starters Logo"
-              className="h-10 w-auto"
-            />
-          </Link>
+    <>
+      <PublicSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      
+      <header className="bg-background border-b border-border sticky top-0 z-50">
+        <div className="container mx-auto px-4">
+          <div className="flex items-center justify-between h-16">
+            {/* Menu Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsSidebarOpen(true)}
+              className="mr-3"
+            >
+              <Menu className="h-5 w-5" />
+            </Button>
+
+            {/* Logo */}
+            <Link to="/" className="flex items-center space-x-2">
+              <img
+                src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png"
+                alt="Starters Logo"
+                className="h-10 w-auto"
+              />
+            </Link>
 
           {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center space-x-6">
@@ -186,7 +201,8 @@ export const PublicHeader = () => {
             </div>
           </div>
         )}
-      </div>
-    </header>
+        </div>
+      </header>
+    </>
   );
 };

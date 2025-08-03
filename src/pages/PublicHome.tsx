@@ -1,11 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, User, Star, Facebook, Instagram, Twitter, Linkedin } from 'lucide-react';
+import { Star } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
 import { getCategories } from '@/api/categories';
@@ -68,59 +67,7 @@ const PublicHome = () => {
 
   return (
     <div className="min-h-screen">
-      {/* Navigation Header */}
-      <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center justify-between h-16">
-            {/* Logo */}
-            <div className="flex items-center space-x-3">
-              <img
-                src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png"
-                alt="Starters Logo"
-                className="h-10 w-auto"
-              />
-            </div>
-
-            {/* Navigation Menu */}
-            <nav className="hidden md:flex items-center space-x-8">
-              <a href="#" className="text-red-600 font-medium">Home</a>
-              <a href="#" className="text-gray-700 hover:text-red-600">Shop</a>
-              <a href="#" className="text-gray-700 hover:text-red-600">Blog</a>
-              <a href="#" className="text-gray-700 hover:text-red-600">About Us</a>
-            </nav>
-
-            {/* Search Bar */}
-            <div className="hidden md:flex items-center flex-1 max-w-md mx-8">
-              <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 border-gray-300 bg-gray-50 rounded-full"
-                />
-              </div>
-            </div>
-
-            {/* Cart and Profile */}
-            <div className="flex items-center space-x-6">
-              <div className="flex items-center space-x-2">
-                <ShoppingCart className="w-5 h-5 text-red-600" />
-                <span className="text-gray-700 font-medium">Cart</span>
-                <div className="w-6 h-6 bg-red-600 text-white text-xs rounded-full flex items-center justify-center">
-                  0
-                </div>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
-                  <User className="w-4 h-4 text-white" />
-                </div>
-                <span className="text-gray-700 font-medium">Jideyemi</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </header>
+      <PublicHeader />
 
       {/* Hero Section */}
       <section className="bg-white py-16">

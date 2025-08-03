@@ -4,13 +4,13 @@ import { Search, ShoppingCart, User, Menu, X, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
-import { useAuthStatus } from '@/hooks/useAuthStatus';
+import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 
 export const PublicHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { getItemCount } = useCart();
   const { data: settings } = useBusinessSettings();
-  const { isAuthenticated } = useAuthStatus();
+  const { isAuthenticated, customerAccount, isLoading } = useCustomerAuth();
   const navigate = useNavigate();
 
   const handleCartClick = () => {
@@ -98,19 +98,26 @@ export const PublicHeader = () => {
             </Button>
 
             {/* User Account */}
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => {
-                if (isAuthenticated) {
-                  navigate('/customer-profile');
-                } else {
-                  navigate('/auth');
-                }
-              }}
-            >
-              <User className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => {
+                  if (isAuthenticated) {
+                    navigate('/customer-profile');
+                  } else {
+                    navigate('/auth');
+                  }
+                }}
+              >
+                <User className="h-5 w-5" />
+              </Button>
+              {isAuthenticated && customerAccount && !isLoading && (
+                <span className="hidden sm:block text-sm font-medium text-foreground">
+                  {customerAccount.name ? customerAccount.name.split(' ')[0] : 'Customer'}
+                </span>
+              )}
+            </div>
 
             {/* Mobile Menu Toggle */}
             <Button

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Search, Bell, User, LogOut, Menu } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
@@ -14,6 +15,7 @@ const TopNav = () => {
   } = useBusinessSettings();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const isMobile = useIsMobile();
+  const navigate = useNavigate();
   const handleLogout = async () => {
     await logout();
     setShowUserMenu(false);
@@ -66,7 +68,13 @@ const TopNav = () => {
 
             {showUserMenu && (
               <div className="absolute right-0 mt-2 w-44 md:w-48 bg-popover rounded-lg shadow-lg border border-border py-2 z-50">
-                <button className="w-full px-4 py-2 text-left text-popover-foreground hover:bg-accent flex items-center gap-2">
+                <button 
+                  onClick={() => {
+                    navigate('/settings');
+                    setShowUserMenu(false);
+                  }}
+                  className="w-full px-4 py-2 text-left text-popover-foreground hover:bg-accent flex items-center gap-2"
+                >
                   <User className="h-4 w-4" />
                   <span>Profile</span>
                 </button>

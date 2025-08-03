@@ -128,15 +128,41 @@ export default function Reports() {
           </select>
           {/* Export Buttons */}
           <div className="flex gap-2">
-            <button className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none">
+            <button 
+              onClick={() => {
+                if (data) {
+                  const csvData = [
+                    ['Metric', 'Value'],
+                    ['Total Revenue', data.kpiStats?.todaysRevenue || 0],
+                    ['Orders Today', data.kpiStats?.ordersToday || 0],
+                    ['Pending Orders', data.kpiStats?.pendingOrders || 0],
+                    ['Completed Orders', data.kpiStats?.completedOrders || 0]
+                  ];
+                  const csvContent = csvData.map(row => row.join(',')).join('\n');
+                  const blob = new Blob([csvContent], { type: 'text/csv' });
+                  const url = window.URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `reports-${new Date().toISOString().split('T')[0]}.csv`;
+                  a.click();
+                  window.URL.revokeObjectURL(url);
+                }
+              }}
+              className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none"
+            >
               <FileText className="w-4 h-4" /> 
               <span className="hidden sm:inline">Export CSV</span>
               <span className="sm:hidden">CSV</span>
             </button>
-            <button className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none">
+            <button 
+              onClick={() => {
+                window.print();
+              }}
+              className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none"
+            >
               <Download className="w-4 h-4" /> 
-              <span className="hidden sm:inline">Export PDF</span>
-              <span className="sm:hidden">PDF</span>
+              <span className="hidden sm:inline">Print Report</span>
+              <span className="sm:hidden">Print</span>
             </button>
           </div>
         </div>

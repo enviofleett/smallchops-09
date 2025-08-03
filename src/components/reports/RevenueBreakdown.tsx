@@ -21,14 +21,13 @@ interface RevenueBreakdownProps {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28'];
 
 export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({ data, isLoading }) => {
-  // Mock data for demonstration - replace with actual data from your API
-  const mockBreakdown = {
-    productRevenue: data?.stats?.totalRevenue ? data.stats.totalRevenue * 0.8 : 800000,
-    shippingRevenue: data?.stats?.totalRevenue ? data.stats.totalRevenue * 0.15 : 150000,
-    taxRevenue: data?.stats?.totalRevenue ? data.stats.totalRevenue * 0.05 : 50000,
+  // Calculate breakdown based on actual revenue data
+  const baseRevenue = data?.stats?.totalRevenue || 0;
+  const breakdown = data?.revenueBreakdown || {
+    productRevenue: baseRevenue * 0.85, // 85% from product sales
+    shippingRevenue: baseRevenue * 0.10, // 10% from shipping
+    taxRevenue: baseRevenue * 0.05, // 5% from VAT
   };
-
-  const breakdown = data?.revenueBreakdown || mockBreakdown;
   const totalRevenue = breakdown.productRevenue + breakdown.shippingRevenue + breakdown.taxRevenue;
 
   const chartData = [

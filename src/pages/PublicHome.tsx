@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Star, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
@@ -15,20 +16,21 @@ import { DiscountBadge } from '@/components/ui/discount-badge';
 
 const PublicHome = () => {
   const navigate = useNavigate();
+  const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
-  const itemsPerPage = 12;
+  const itemsPerPage = 9;
 
   const { addItem } = useCart();
   const { toast } = useToast();
 
-  // Fetch all products with discounts
+  // Fetch products with discounts
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
-    queryKey: ['products-with-discounts'],
-    queryFn: () => getProductsWithDiscounts(),
+    queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
+    queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
   });
 
-  // Fetch categories for sidebar
+  // Fetch categories
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
@@ -135,19 +137,64 @@ const PublicHome = () => {
       {/* Products Section */}
       <section className="bg-white py-8 sm:py-12 lg:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div>
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
+            {/* Left Sidebar - Categories - Hidden on mobile */}
+            <div className="hidden lg:block lg:col-span-1">
+              <Card className="bg-white sticky top-4">
+                <CardContent className="p-6">
+                  <h3 className="text-xl font-bold text-red-600 mb-4">Categories</h3>
+                   <div className="space-y-2">
+                    <button
+                      onClick={() => setActiveCategory('all')}
+                      className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                        activeCategory === 'all' 
+                          ? 'bg-red-600 text-white' 
+                          : 'hover:bg-gray-100 text-gray-700'
+                      }`}
+                    >
+                      All
+                    </button>
+                    {categories.map((category) => (
+                      <button
+                        key={category.id}
+                        onClick={() => navigate(`/category/${category.id}`)}
+                        className={`w-full text-left px-4 py-2 rounded-lg transition-colors ${
+                          activeCategory === category.id 
+                            ? 'bg-red-600 text-white' 
+                            : 'hover:bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {category.name}
+                      </button>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
             {/* Mobile Categories - Horizontal scroll */}
-            <div className="lg:hidden mb-6">
+            <div className="lg:hidden col-span-full mb-6">
               <h3 className="text-lg font-bold text-red-600 mb-3 px-2">Categories</h3>
               <div className="flex space-x-3 overflow-x-auto pb-3 px-2">
-                <button className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium bg-red-600 text-white">
-                  All Products
+                <button
+                  onClick={() => setActiveCategory('all')}
+                  className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                    activeCategory === 'all' 
+                      ? 'bg-red-600 text-white' 
+                      : 'bg-white text-gray-700 border border-gray-200'
+                  }`}
+                >
+                  All
                 </button>
                 {categories.map((category) => (
                   <button
                     key={category.id}
                     onClick={() => navigate(`/category/${category.id}`)}
-                    className="flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium bg-white text-gray-700 border border-gray-200"
+                    className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+                      activeCategory === category.id 
+                        ? 'bg-red-600 text-white' 
+                        : 'bg-white text-gray-700 border border-gray-200'
+                    }`}
                   >
                     {category.name}
                   </button>
@@ -155,28 +202,22 @@ const PublicHome = () => {
               </div>
             </div>
 
-            {/* Products Section */}
-            <div>
-              {/* Header */}
-              <div className="mb-6 sm:mb-8">
-                <h1 className="text-2xl sm:text-3xl font-bold mb-4">All Products</h1>
-                
-                {/* Search */}
-                <div className="max-w-md mx-auto lg:mx-0">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                    <input
-                      type="text"
-                      placeholder="Search for your favorite snacks..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="w-full pl-10 pr-4 py-3 border border-gray-200 rounded-full focus:outline-none focus:ring-2 focus:ring-red-500 focus:border-transparent text-base"
-                    />
-                  </div>
+            {/* Right Side - Products */}
+            <div className="col-span-full lg:col-span-3">
+              {/* Search Bar - Mobile optimized */}
+              <div className="mb-6">
+                <div className="relative max-w-md mx-auto lg:mx-0">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <Input
+                    placeholder="Search products..."
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    className="pl-10 py-3 text-base"
+                  />
                 </div>
               </div>
 
-              {/* Products Grid */}
+              {/* Loading State */}
               {isLoadingProducts ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                   {Array.from({ length: 6 }).map((_, i) => (
@@ -195,12 +236,13 @@ const PublicHome = () => {
               ) : filteredProducts.length === 0 ? (
                 <div className="text-center py-8 sm:py-12">
                   <h3 className="text-lg sm:text-xl font-semibold mb-2">No products found</h3>
-                  <p className="text-gray-500 mb-4 px-4">
+                  <p className="text-gray-600 mb-4 px-4">
                     {searchTerm ? 'Try adjusting your search terms.' : 'No products available yet.'}
                   </p>
                 </div>
               ) : (
                 <>
+                  {/* Products Grid - Mobile optimized */}
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-8">
                     {currentProducts.map((product) => (
                       <Card 
@@ -253,7 +295,7 @@ const PublicHome = () => {
                     ))}
                   </div>
 
-                  {/* Pagination */}
+                  {/* Pagination - Mobile optimized */}
                   {totalPages > 1 && (
                     <div className="flex justify-center items-center space-x-2 flex-wrap gap-2">
                       <Button

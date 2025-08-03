@@ -4022,6 +4022,45 @@ export type Database = {
         }
         Relationships: []
       }
+      production_readiness_audit: {
+        Row: {
+          audit_date: string | null
+          completed_fixes: Json | null
+          critical_issues: number | null
+          id: string
+          info_issues: number | null
+          metadata: Json | null
+          recommendations: string[] | null
+          security_score: number | null
+          status: string | null
+          warning_issues: number | null
+        }
+        Insert: {
+          audit_date?: string | null
+          completed_fixes?: Json | null
+          critical_issues?: number | null
+          id?: string
+          info_issues?: number | null
+          metadata?: Json | null
+          recommendations?: string[] | null
+          security_score?: number | null
+          status?: string | null
+          warning_issues?: number | null
+        }
+        Update: {
+          audit_date?: string | null
+          completed_fixes?: Json | null
+          critical_issues?: number | null
+          id?: string
+          info_issues?: number | null
+          metadata?: Json | null
+          recommendations?: string[] | null
+          security_score?: number | null
+          status?: string | null
+          warning_issues?: number | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           allergen_info: string[] | null

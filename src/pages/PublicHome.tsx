@@ -109,14 +109,16 @@ const PublicHome = () => {
             
             {/* Column 3 - Budget Baller Card */}
             <div className="flex justify-center lg:justify-start">
-              <div className="w-full max-w-sm bg-orange-50 p-6 rounded-2xl shadow-lg border border-orange-100">
-                <div className="flex items-center space-x-3 mb-4">
-                  <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                      <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
-                    </svg>
+              <div className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-lg">
+                <div className="flex items-center justify-center mb-4">
+                  <div className="bg-gradient-to-r from-amber-200 to-orange-200 px-8 py-3 rounded-full flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
+                      <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                        <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-bold text-gray-900">The Budget Baller</h3>
                   </div>
-                  <h3 className="text-xl font-bold text-gray-900">The Budget Baller</h3>
                 </div>
                 <div className="space-y-3">
                   <span className="text-sm text-gray-600 text-center lg:text-left block pb-1 border-b border-dotted border-red-400">5 Samosa</span>

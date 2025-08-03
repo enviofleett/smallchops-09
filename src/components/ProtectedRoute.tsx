@@ -3,7 +3,6 @@ import React from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { useHasPermission } from '@/hooks/usePermissions';
-import LoginPage from './auth/LoginPage';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -30,7 +29,7 @@ const ProtectedRoute = ({
   }
 
   if (!isAuthenticated) {
-    return <LoginPage />;
+    return <Navigate to="/login" replace />;
   }
 
   // Check role-based access (legacy)

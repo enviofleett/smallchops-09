@@ -70,58 +70,66 @@ const PublicHome = () => {
       <PublicHeader />
 
       {/* Hero Section */}
-      <section className="bg-white py-16">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            {/* Left Side - Hero Content */}
+      <section className="bg-white py-16 relative overflow-hidden">
+        {/* Background accent lines */}
+        <div className="absolute inset-0 opacity-5">
+          <div className="absolute left-1/4 top-0 w-px h-full bg-green-400"></div>
+          <div className="absolute left-2/4 top-0 w-px h-full bg-green-400"></div>
+          <div className="absolute left-3/4 top-0 w-px h-full bg-green-400"></div>
+        </div>
+        
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 items-center">
+            {/* Column 1 - Hero Content */}
             <div className="space-y-6">
               <div className="space-y-4">
-                <h1 className="text-5xl font-bold text-gray-900 leading-tight">
+                <h1 className="text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
                   Delicious Bites,<br />
                   Big Smiles
                 </h1>
-                <p className="text-xl text-gray-600">
+                <p className="text-lg lg:text-xl text-gray-600">
                   Crispy, savory small chops, freshly made and delivered fast.
                 </p>
-                <Button className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg rounded-full">
+                <Button className="bg-red-600 hover:bg-red-700 text-white px-8 py-3 text-lg rounded-full shadow-lg">
                   Order Now & Enjoy!
                 </Button>
               </div>
             </div>
 
-            {/* Right Side - Hero Image with Floating Card */}
-            <div className="relative flex justify-center">
-              {/* Hero Food Image */}
-              <div className="w-96 h-96">
+            {/* Column 2 - Hero Image */}
+            <div className="flex justify-center">
+              <div className="w-80 h-80 lg:w-96 lg:h-96">
                 <img 
-                  src="/public/hero-family.jpg" 
-                  alt="Delicious samosas" 
-                  className="w-full h-full object-cover rounded-2xl"
+                  src="/lovable-uploads/e95a4052-3128-4494-b416-9d153cf30c5c.png" 
+                  alt="Delicious fried pastries" 
+                  className="w-full h-full object-cover rounded-2xl shadow-xl"
                 />
               </div>
-              
-              {/* Floating Budget Baller Card */}
-              <div className="absolute top-4 -right-8 w-72 bg-orange-100 p-4 rounded-lg shadow-lg">
-                <div className="flex items-center space-x-2 mb-3">
-                  <div className="w-3 h-3 bg-red-600 rounded-full"></div>
-                  <h3 className="text-lg font-bold text-gray-900">The Budget Baller</h3>
+            </div>
+            
+            {/* Column 3 - Budget Baller Card */}
+            <div className="flex justify-center lg:justify-start">
+              <div className="w-full max-w-sm bg-orange-50 p-6 rounded-2xl shadow-lg border border-orange-100">
+                <div className="flex items-center space-x-3 mb-4">
+                  <div className="w-8 h-8 bg-red-600 rounded-full flex items-center justify-center">
+                    <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-xl font-bold text-gray-900">The Budget Baller</h3>
                 </div>
-                <div className="space-y-2 text-sm text-gray-700">
-                  <div className="flex justify-between items-center border-b border-dotted border-gray-400 pb-1">
-                    <span>5 Samosa</span>
-                    <span className="text-gray-500">.....</span>
+                <div className="space-y-3 text-sm text-gray-800">
+                  <div className="flex justify-between items-center pb-2 border-b border-dotted border-gray-300">
+                    <span className="font-medium">5 Samosa</span>
                   </div>
-                  <div className="flex justify-between items-center border-b border-dotted border-gray-400 pb-1">
-                    <span>5 Spring Rolls</span>
-                    <span className="text-gray-500">.....</span>
+                  <div className="flex justify-between items-center pb-2 border-b border-dotted border-gray-300">
+                    <span className="font-medium">5 Spring Rolls</span>
                   </div>
-                  <div className="flex justify-between items-center border-b border-dotted border-gray-400 pb-1">
-                    <span>5 Stick Meat</span>
-                    <span className="text-gray-500">.....</span>
+                  <div className="flex justify-between items-center pb-2 border-b border-dotted border-gray-300">
+                    <span className="font-medium">5 Stick Meat</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span>20 Poff-Poff</span>
-                    <span className="text-gray-500">.....</span>
+                    <span className="font-medium">20 Poff-Poff</span>
                   </div>
                 </div>
               </div>

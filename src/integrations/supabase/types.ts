@@ -201,6 +201,48 @@ export type Database = {
           },
         ]
       }
+      admin_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          ip_address: unknown | null
+          is_active: boolean
+          last_activity: string
+          session_token: string
+          terminated_at: string | null
+          termination_reason: string | null
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean
+          last_activity?: string
+          session_token: string
+          terminated_at?: string | null
+          termination_reason?: string | null
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          ip_address?: unknown | null
+          is_active?: boolean
+          last_activity?: string
+          session_token?: string
+          terminated_at?: string | null
+          termination_reason?: string | null
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       api_metrics: {
         Row: {
           dimensions: Json | null
@@ -3708,6 +3750,57 @@ export type Database = {
           },
         ]
       }
+      performance_analytics: {
+        Row: {
+          cache_hit: boolean | null
+          database_query_time_ms: number | null
+          endpoint: string
+          error_details: Json | null
+          id: string
+          ip_address: unknown | null
+          method: string
+          recorded_at: string
+          request_size_bytes: number | null
+          response_size_bytes: number | null
+          response_time_ms: number
+          status_code: number
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          cache_hit?: boolean | null
+          database_query_time_ms?: number | null
+          endpoint: string
+          error_details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          method: string
+          recorded_at?: string
+          request_size_bytes?: number | null
+          response_size_bytes?: number | null
+          response_time_ms: number
+          status_code: number
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          cache_hit?: boolean | null
+          database_query_time_ms?: number | null
+          endpoint?: string
+          error_details?: Json | null
+          id?: string
+          ip_address?: unknown | null
+          method?: string
+          recorded_at?: string
+          request_size_bytes?: number | null
+          response_size_bytes?: number | null
+          response_time_ms?: number
+          status_code?: number
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       pickup_points: {
         Row: {
           address: string
@@ -4563,6 +4656,63 @@ export type Database = {
         }
         Relationships: []
       }
+      security_alerts: {
+        Row: {
+          affected_resource: string | null
+          alert_type: string
+          assigned_to: string | null
+          created_at: string
+          description: string | null
+          detection_method: string | null
+          id: string
+          raw_data: Json | null
+          resolution_notes: string | null
+          resolved_at: string | null
+          severity: string
+          source_ip: unknown | null
+          status: string
+          title: string
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          affected_resource?: string | null
+          alert_type: string
+          assigned_to?: string | null
+          created_at?: string
+          description?: string | null
+          detection_method?: string | null
+          id?: string
+          raw_data?: Json | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          severity: string
+          source_ip?: unknown | null
+          status?: string
+          title: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          affected_resource?: string | null
+          alert_type?: string
+          assigned_to?: string | null
+          created_at?: string
+          description?: string | null
+          detection_method?: string | null
+          id?: string
+          raw_data?: Json | null
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          severity?: string
+          source_ip?: unknown | null
+          status?: string
+          title?: string
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       security_incidents: {
         Row: {
           created_at: string | null
@@ -5004,6 +5154,36 @@ export type Database = {
           total_bounced?: number | null
           total_complaints?: number | null
           total_sent?: number | null
+        }
+        Relationships: []
+      }
+      system_health_metrics: {
+        Row: {
+          id: string
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at: string
+          severity: string | null
+          tags: Json | null
+        }
+        Insert: {
+          id?: string
+          metric_name: string
+          metric_type: string
+          metric_value: number
+          recorded_at?: string
+          severity?: string | null
+          tags?: Json | null
+        }
+        Update: {
+          id?: string
+          metric_name?: string
+          metric_type?: string
+          metric_value?: number
+          recorded_at?: string
+          severity?: string | null
+          tags?: Json | null
         }
         Relationships: []
       }
@@ -5466,6 +5646,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      cleanup_monitoring_data: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       cleanup_old_communication_events: {
         Args: Record<PropertyKey, never>
         Returns: undefined
@@ -5482,6 +5666,14 @@ export type Database = {
           p_confirmed_at: string
         }
         Returns: Json
+      }
+      create_admin_session: {
+        Args: {
+          p_user_id: string
+          p_ip_address?: unknown
+          p_user_agent?: string
+        }
+        Returns: string
       }
       create_customer_with_validation: {
         Args: {
@@ -5530,6 +5722,10 @@ export type Database = {
       }
       diagnose_registration_issues: {
         Args: { p_email: string }
+        Returns: Json
+      }
+      enhanced_security_check: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       fix_user_linking: {
@@ -5829,6 +6025,16 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      record_health_metric: {
+        Args: {
+          p_metric_name: string
+          p_metric_value: number
+          p_metric_type?: string
+          p_tags?: Json
+          p_severity?: string
+        }
+        Returns: string
+      }
       record_payment_metric: {
         Args: {
           p_metric_name: string
@@ -5837,6 +6043,23 @@ export type Database = {
           p_metadata?: Json
         }
         Returns: undefined
+      }
+      record_performance_metric: {
+        Args: {
+          p_endpoint: string
+          p_method: string
+          p_response_time_ms: number
+          p_status_code: number
+          p_user_id?: string
+          p_ip_address?: unknown
+          p_user_agent?: string
+          p_request_size_bytes?: number
+          p_response_size_bytes?: number
+          p_database_query_time_ms?: number
+          p_cache_hit?: boolean
+          p_error_details?: Json
+        }
+        Returns: string
       }
       record_smtp_health_metric: {
         Args: {
@@ -5904,6 +6127,10 @@ export type Database = {
       validate_admin_permission: {
         Args: { required_permission?: string }
         Returns: boolean
+      }
+      validate_admin_session: {
+        Args: { p_session_token: string; p_ip_address?: unknown }
+        Returns: Json
       }
       validate_order_data: {
         Args: {

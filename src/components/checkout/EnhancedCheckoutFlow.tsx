@@ -63,7 +63,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
 }) => {
   const { cart, clearCart } = useCart();
   const { profile: customerAccount } = useCustomerProfile();
-  const { isAuthenticated, customerAccount: authCustomerAccount } = useAuth();
+  const { isAuthenticated, customerAccount: authCustomerAccount, session } = useAuth();
   const { guestSession, generateGuestSession } = useGuestSession();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -71,7 +71,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
   const [checkoutStep, setCheckoutStep] = useState<'choice' | 'details'>('choice');
 
   const [formData, setFormData] = useState<CheckoutData>({
-    customer_email: authCustomerAccount?.email || '',
+    customer_email: session?.user?.email || '',
     customer_name: authCustomerAccount?.name || customerAccount?.name || '',
     customer_phone: authCustomerAccount?.phone || customerAccount?.phone || '',
     delivery_address: {
@@ -114,17 +114,17 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     }
   }, [isAuthenticated, checkoutStep]);
 
-  // Auto-populate form data when customer account is available
+  // Auto-populate form data when session or customer account is available
   React.useEffect(() => {
-    if (authCustomerAccount) {
+    if (session?.user || authCustomerAccount) {
       setFormData(prev => ({
         ...prev,
-        customer_email: authCustomerAccount.email || prev.customer_email,
-        customer_name: authCustomerAccount.name || prev.customer_name,
-        customer_phone: authCustomerAccount.phone || prev.customer_phone,
+        customer_email: session?.user?.email || prev.customer_email,
+        customer_name: authCustomerAccount?.name || customerAccount?.name || prev.customer_name,
+        customer_phone: authCustomerAccount?.phone || customerAccount?.phone || prev.customer_phone,
       }));
     }
-  }, [authCustomerAccount]);
+  }, [session, authCustomerAccount, customerAccount]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -316,7 +316,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
                   Contact Information
                   {isAuthenticated && (
                     <span className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                      Signed in as {authCustomerAccount?.name}
+                      Signed in as {authCustomerAccount?.name || session?.user?.email}
                     </span>
                   )}
                 </h3>

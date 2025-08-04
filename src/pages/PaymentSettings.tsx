@@ -19,6 +19,7 @@ import { PaystackProductionDashboard } from '@/components/payments/PaystackProdu
 import { LiveKeysConfiguration } from '@/components/payments/LiveKeysConfiguration';
 import { PaystackTestingSuite } from '@/components/payments/PaystackTestingSuite';
 import { ProductionMonitoring } from '@/components/payments/ProductionMonitoring';
+import { WebhookMonitoringDashboard } from '@/components/payments/WebhookMonitoringDashboard';
 import { AlertCircle, CheckCircle, Copy, ExternalLink, Lock, UserX } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useHasPermission } from '@/hooks/usePermissions';
@@ -341,6 +342,7 @@ export const PaymentSettings: React.FC = () => {
 
         <TabsContent value="monitoring" className="space-y-6">
           <ProductionMonitoring />
+          <WebhookMonitoringDashboard />
         </TabsContent>
 
           <TabsContent value="configuration" className="space-y-6">

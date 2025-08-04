@@ -1,13 +1,13 @@
-// CRITICAL SECURITY: Consolidated Secure Paystack Webhook Handler
-// This replaces all existing webhook handlers with enhanced security
+// PRODUCTION-READY PAYSTACK WEBHOOK HANDLER
+// Enhanced security, monitoring, and error handling for live transactions
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// Updated Paystack IPs (2025) - Enhanced security
+// Official Paystack IP addresses (updated 2025)
 const PAYSTACK_IPS = [
   '52.31.139.75',
-  '52.49.173.169',
+  '52.49.173.169', 
   '52.214.14.220',
   '54.154.89.105',
   '54.154.151.138',
@@ -15,12 +15,13 @@ const PAYSTACK_IPS = [
 ];
 
 const corsHeaders = {
-  'Access-Control-Allow-Origin': 'https://paystack.co',
+  'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'content-type, x-paystack-signature',
-  'Access-Control-Allow-Methods': 'POST',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Content-Security-Policy': "default-src 'none'",
   'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY'
+  'X-Frame-Options': 'DENY',
+  'X-XSS-Protection': '1; mode=block'
 };
 
 interface PaystackWebhookPayload {
@@ -55,6 +56,12 @@ const supabase = createClient(
 
 async function verifyWebhookSignature(payload: string, signature: string, secret: string): Promise<boolean> {
   try {
+    // Validate inputs
+    if (!payload || !signature || !secret) {
+      console.error('[WEBHOOK] Missing required parameters for signature verification');
+      return false;
+    }
+
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
@@ -69,9 +76,22 @@ async function verifyWebhookSignature(payload: string, signature: string, secret
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
     
-    return computedSignature === signature;
+    // Timing-safe comparison to prevent timing attacks
+    if (computedSignature.length !== signature.length) {
+      return false;
+    }
+    
+    let result = 0;
+    for (let i = 0; i < computedSignature.length; i++) {
+      result |= computedSignature.charCodeAt(i) ^ signature.charCodeAt(i);
+    }
+    
+    const isValid = result === 0;
+    console.log(`[WEBHOOK] Signature verification: ${isValid ? 'VALID' : 'INVALID'}`);
+    
+    return isValid;
   } catch (error) {
-    console.error('Signature verification error:', error);
+    console.error('[WEBHOOK] Signature verification error:', error);
     return false;
   }
 }
@@ -337,6 +357,8 @@ serve(async (req) => {
         event_data: eventData,
         signature: signature,
         processed: false,
+        source_ip: clientIP,
+        user_agent: req.headers.get('user-agent') || 'unknown',
         created_at: new Date().toISOString()
       })
       .select()
@@ -344,6 +366,12 @@ serve(async (req) => {
 
     if (logError) {
       console.error('[WEBHOOK] Failed to log event:', logError);
+      await logSecurityIncident(
+        'webhook_logging_failure',
+        'Failed to log webhook event to audit trail',
+        'high',
+        { event_id: eventId, error: logError.message }
+      );
       throw logError;
     }
 

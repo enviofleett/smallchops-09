@@ -284,8 +284,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       if (data.user) {
-        // Determine redirect based on user type
-        const redirectPath = userType === 'admin' ? '/dashboard' : '/home';
+        // Load user data to determine correct redirect
+        await loadUserData(data.user);
+        
+        // Check if user is admin by checking profiles table
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        
+        const redirectPath = profile ? '/dashboard' : '/home';
         return { success: true, redirect: redirectPath };
       }
 

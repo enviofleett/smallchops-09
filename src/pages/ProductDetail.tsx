@@ -19,7 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { DeliveryZoneDropdown } from '@/components/delivery/DeliveryZoneDropdown';
+
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { ProductRatingsSummary } from '@/components/reviews/ProductRatingsSummary';
@@ -135,6 +135,7 @@ const ProductDetail = () => {
   const handleShare = (platform: string) => {
     const url = window.location.href;
     const text = `Check out this amazing ${product?.name}!`;
+    const imageUrl = product?.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop';
     
     switch (platform) {
       case 'telegram':
@@ -144,11 +145,15 @@ const ProductDetail = () => {
         window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, '_blank');
         break;
       case 'whatsapp':
-        window.open(`https://wa.me/?text=${text} ${url}`, '_blank');
+        // For WhatsApp, we include both text, image reference, and URL
+        const whatsappText = `${text}\n\n🖼️ Product Image: ${imageUrl}\n\n${url}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(whatsappText)}`, '_blank');
         break;
       default:
-        navigator.clipboard.writeText(url);
-        toast({ title: "Link copied to clipboard!" });
+        // For other platforms, copy URL and image URL to clipboard
+        const clipboardText = `${text}\n\nProduct Link: ${url}\nImage: ${imageUrl}`;
+        navigator.clipboard.writeText(clipboardText);
+        toast({ title: "Link and image URL copied to clipboard!" });
     }
   };
 
@@ -354,13 +359,15 @@ const ProductDetail = () => {
                 />
               </div>
 
-              {/* Shipping Zone Selection - Moved under Add to Cart */}
+              {/* Support Information */}
               <div className="border-t pt-4">
-                <DeliveryZoneDropdown
-                  selectedZoneId={selectedZoneId}
-                  onZoneSelect={handleZoneSelect}
-                  orderSubtotal={quantity * (product.discounted_price || product.price)}
-                />
+                <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
+                  <Phone className="h-5 w-5 text-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Need help placing this order?</p>
+                    <p className="text-sm text-muted-foreground">Please call us on <span className="font-medium text-foreground">080XXXXXXXXX</span></p>
+                  </div>
+                </div>
               </div>
             </div>
 

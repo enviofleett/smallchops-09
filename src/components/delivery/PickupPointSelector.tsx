@@ -94,143 +94,71 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {pickupPoints.length === 0 ? (
-            <Card
-              className={`cursor-pointer transition-all ${
-                selectedPointId === 'default'
-                  ? 'ring-2 ring-primary border-primary'
-                  : 'hover:border-primary/50'
-              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-              onClick={() => !disabled && onSelect({
-                id: 'default',
-                name: 'Starters Store',
-                address: '2B Close Off 11Crescent Kado Estate, Kado',
-                contact_phone: '0807 301 1100',
-                operating_hours: {
-                  monday: { open: '09:00', close: '18:00' },
-                  tuesday: { open: '09:00', close: '18:00' },
-                  wednesday: { open: '09:00', close: '18:00' },
-                  thursday: { open: '09:00', close: '18:00' },
-                  friday: { open: '09:00', close: '18:00' },
-                  saturday: { open: '09:00', close: '18:00' },
-                  sunday: { open: '09:00', close: '18:00' }
-                },
-                instructions: null,
-                is_active: true,
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              } as PickupPoint)}
-            >
-              <CardContent className="p-4">
-                <div className="flex justify-between items-start mb-2">
-                  <h3 className="font-semibold">Starters Store</h3>
-                  <div className="flex gap-2">
-                    {isCurrentlyOpen(null) ? (
-                      <Badge variant="default" className="bg-green-100 text-green-800">
-                        Open
-                      </Badge>
-                    ) : (
-                      <Badge variant="secondary">
-                        Closed
-                      </Badge>
-                    )}
-                    {selectedPointId === 'default' && (
-                      <Badge variant="default">
-                        Selected
-                      </Badge>
-                    )}
-                  </div>
+          <Card
+            className={`cursor-pointer transition-all ${
+              selectedPointId === 'default'
+                ? 'ring-2 ring-primary border-primary'
+                : 'hover:border-primary/50'
+            } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            onClick={() => !disabled && onSelect({
+              id: 'default',
+              name: 'Main Store',
+              address: '2B Close Off 11Crescent Kado Estate, Kado',
+              contact_phone: '0807 301 1100',
+              operating_hours: {
+                monday: { open: '09:00', close: '18:00' },
+                tuesday: { open: '09:00', close: '18:00' },
+                wednesday: { open: '09:00', close: '18:00' },
+                thursday: { open: '09:00', close: '18:00' },
+                friday: { open: '09:00', close: '18:00' },
+                saturday: { open: '09:00', close: '18:00' },
+                sunday: { open: '09:00', close: '18:00' }
+              },
+              instructions: null,
+              is_active: true,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString()
+            } as PickupPoint)}
+          >
+            <CardContent className="p-4">
+              <div className="flex justify-between items-start mb-2">
+                <h3 className="font-semibold">Main Store</h3>
+                <div className="flex gap-2">
+                  {isCurrentlyOpen(null) ? (
+                    <Badge variant="default" className="bg-green-100 text-green-800">
+                      Open
+                    </Badge>
+                  ) : (
+                    <Badge variant="secondary">
+                      Closed
+                    </Badge>
+                  )}
+                  {selectedPointId === 'default' && (
+                    <Badge variant="default">
+                      Selected
+                    </Badge>
+                  )}
+                </div>
+              </div>
+              
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <div className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  <span>2B Close Off 11Crescent Kado Estate, Kado</span>
                 </div>
                 
-                <div className="space-y-2 text-sm text-muted-foreground">
-                  <div className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    <span>2B Close Off 11Crescent Kado Estate, Kado</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    <span>0807 301 1100</span>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4" />
-                    <span>Open ⋅ Closes 6 pm</span>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <Phone className="h-4 w-4" />
+                  <span>0807 301 1100</span>
                 </div>
-              </CardContent>
-            </Card>
-          ) : (
-            pickupPoints.map((point) => (
-              <Card
-                key={point.id}
-                className={`cursor-pointer transition-all ${
-                  selectedPointId === point.id
-                    ? 'ring-2 ring-primary border-primary'
-                    : 'hover:border-primary/50'
-                } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
-                onClick={() => !disabled && onSelect(point)}
-              >
-                <CardContent className="p-4">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-semibold">{point.name}</h3>
-                    <div className="flex gap-2">
-                      {isCurrentlyOpen(point.operating_hours) ? (
-                        <Badge variant="default" className="bg-green-100 text-green-800">
-                          Open
-                        </Badge>
-                      ) : (
-                        <Badge variant="secondary">
-                          Closed
-                        </Badge>
-                      )}
-                      {selectedPointId === point.id && (
-                        <Badge variant="default">
-                          Selected
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  
-                  <div className="space-y-2 text-sm text-muted-foreground">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4" />
-                      <span>{point.address}</span>
-                    </div>
-                    
-                    {point.contact_phone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4" />
-                        <span>{point.contact_phone}</span>
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center gap-2">
-                      <Clock className="h-4 w-4" />
-                      <span>{formatOperatingHours(point.operating_hours)}</span>
-                    </div>
-                    
-                    {point.instructions && (
-                      <div className="mt-2 p-2 bg-muted rounded text-xs">
-                        <strong>Instructions:</strong> {point.instructions}
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ))
-          )}
-          
-          {selectedPointId && (
-            <Button
-              variant="outline"
-              onClick={() => onSelect(null)}
-              disabled={disabled}
-              className="w-full"
-            >
-              Clear Selection
-            </Button>
-          )}
+                
+                <div className="flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  <span>Open ⋅ Closes 6 pm</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </CardContent>
     </Card>

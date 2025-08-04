@@ -403,7 +403,7 @@ const ProductDetail = () => {
                   <Phone className="h-5 w-5 text-primary flex-shrink-0" />
                   <div>
                     <p className="text-sm font-medium text-foreground">Need help placing this order?</p>
-                    <p className="text-sm text-muted-foreground">Please call us on <span className="font-medium text-foreground">080XXXXXXXXX</span></p>
+                    <p className="text-sm text-muted-foreground">Please call us on <span className="font-medium text-foreground">0807 301 1100</span></p>
                   </div>
                 </div>
               </div>

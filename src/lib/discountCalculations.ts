@@ -81,16 +81,20 @@ export function calculateProductDiscount(
     }
     
     // Check if promotion applies to this product
+    // FIXED: Only apply promotion if it specifically targets this product or category
+    // Empty arrays should NOT mean "apply to all products"
     const appliesToProduct = 
-      !promotion.applicable_products || 
-      promotion.applicable_products.length === 0 || 
+      promotion.applicable_products && 
+      promotion.applicable_products.length > 0 && 
       promotion.applicable_products.includes(product.id);
     
     const appliesToCategory = 
-      !promotion.applicable_categories || 
-      promotion.applicable_categories.length === 0 || 
-      (product.category_id && promotion.applicable_categories.includes(product.category_id));
+      promotion.applicable_categories && 
+      promotion.applicable_categories.length > 0 && 
+      product.category_id && 
+      promotion.applicable_categories.includes(product.category_id);
     
+    // Promotion must specifically target either this product or its category
     if (!appliesToProduct && !appliesToCategory) continue;
     
     let discountAmount = 0;
@@ -300,11 +304,15 @@ function calculateBogoDiscount(
 
   for (const item of cartItems) {
     // Check if item is eligible for this BOGO promotion
+    // FIXED: Same fix as above - only apply if specifically targeted
     const isEligible = 
-      !promotion.applicable_products ||
-      promotion.applicable_products.length === 0 ||
-      promotion.applicable_products.includes(item.product_id) ||
-      (item.category_id && promotion.applicable_categories?.includes(item.category_id));
+      (promotion.applicable_products && 
+       promotion.applicable_products.length > 0 && 
+       promotion.applicable_products.includes(item.product_id)) ||
+      (promotion.applicable_categories && 
+       promotion.applicable_categories.length > 0 && 
+       item.category_id && 
+       promotion.applicable_categories.includes(item.category_id));
 
     if (isEligible && item.quantity >= 2) {
       // Simple BOGO logic: for every 2 items, get 1 free

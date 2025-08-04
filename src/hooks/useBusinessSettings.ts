@@ -20,6 +20,7 @@ export interface BusinessSettings {
   twitter_url?: string;
   linkedin_url?: string;
   youtube_url?: string;
+  working_hours?: string;
   seo_title?: string;
   seo_description?: string;
   seo_keywords?: string;

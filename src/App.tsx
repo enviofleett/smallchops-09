@@ -40,6 +40,7 @@ import AuthRouter from "./components/auth/AuthRouter";
 import Cart from "./pages/Cart";
 import Booking from "./pages/Booking";
 import PublicProducts from "./pages/PublicProducts";
+import Contact from "./pages/Contact";
 
 import AuthCallback from "./pages/AuthCallback";
 import EmailVerificationPage from "./pages/EmailVerificationPage";
@@ -64,6 +65,7 @@ const App = () => (
               <Route path="/products" element={<PublicProducts />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/booking" element={<Booking />} />
+              <Route path="/contact" element={<Contact />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/category/:categoryId" element={<CategoryProducts />} />
               

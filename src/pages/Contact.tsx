@@ -5,13 +5,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
-
 const Contact = () => {
-  const { data: settings, isLoading } = useBusinessSettings();
-
+  const {
+    data: settings,
+    isLoading
+  } = useBusinessSettings();
   if (isLoading) {
-    return (
-      <div className="min-h-screen bg-white">
+    return <div className="min-h-screen bg-white">
         <PublicHeader />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="animate-pulse">
@@ -23,12 +23,9 @@ const Contact = () => {
           </div>
         </div>
         <PublicFooter />
-      </div>
-    );
+      </div>;
   }
-
-  return (
-    <div className="min-h-screen bg-white">
+  return <div className="min-h-screen bg-white">
       <PublicHeader />
       
       {/* Hero Section */}
@@ -105,9 +102,7 @@ const Contact = () => {
                       </div>
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Email</h3>
-                        <p className="text-gray-600">
-                          {settings?.email || 'hello@starters.com'}
-                        </p>
+                        
                         <p className="text-sm text-gray-500 mt-1">
                           Send us an email anytime
                         </p>
@@ -126,13 +121,9 @@ const Contact = () => {
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Business Hours</h3>
                         <div className="text-gray-600 space-y-1">
-                          {settings?.working_hours ? (
-                            <p>{settings.working_hours}</p>
-                          ) : (
-                            <>
+                          {settings?.working_hours ? <p>{settings.working_hours}</p> : <>
                               <p>Open ⋅ Closes 6 pm</p>
-                            </>
-                          )}
+                            </>}
                         </div>
                       </div>
                     </div>
@@ -154,25 +145,13 @@ const Contact = () => {
                         <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
                           Name
                         </label>
-                        <input
-                          type="text"
-                          id="name"
-                          name="name"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
-                          placeholder="Your name"
-                        />
+                        <input type="text" id="name" name="name" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500" placeholder="Your name" />
                       </div>
                       <div>
                         <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
                           Phone
                         </label>
-                        <input
-                          type="tel"
-                          id="phone"
-                          name="phone"
-                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
-                          placeholder="Your phone number"
-                        />
+                        <input type="tel" id="phone" name="phone" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500" placeholder="Your phone number" />
                       </div>
                     </div>
                     
@@ -180,24 +159,14 @@ const Contact = () => {
                       <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                         Email
                       </label>
-                      <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
-                        placeholder="your.email@example.com"
-                      />
+                      <input type="email" id="email" name="email" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500" placeholder="your.email@example.com" />
                     </div>
                     
                     <div>
                       <label htmlFor="subject" className="block text-sm font-medium text-gray-700 mb-2">
                         Subject
                       </label>
-                      <select
-                        id="subject"
-                        name="subject"
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
-                      >
+                      <select id="subject" name="subject" className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500">
                         <option value="">Select a subject</option>
                         <option value="order">Place an Order</option>
                         <option value="catering">Catering Services</option>
@@ -211,19 +180,10 @@ const Contact = () => {
                       <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
                         Message
                       </label>
-                      <textarea
-                        id="message"
-                        name="message"
-                        rows={5}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500"
-                        placeholder="Tell us how we can help you..."
-                      ></textarea>
+                      <textarea id="message" name="message" rows={5} className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-red-500 focus:border-red-500" placeholder="Tell us how we can help you..."></textarea>
                     </div>
                     
-                    <button
-                      type="submit"
-                      className="w-full bg-red-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-red-700 transition-colors"
-                    >
+                    <button type="submit" className="w-full bg-red-600 text-white py-3 px-6 rounded-lg font-semibold hover:bg-red-700 transition-colors">
                       Send Message
                     </button>
                   </form>
@@ -243,56 +203,26 @@ const Contact = () => {
           </p>
           
           <div className="flex justify-center space-x-6">
-            {settings?.facebook_url && (
-              <a
-                href={settings.facebook_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors"
-              >
+            {settings?.facebook_url && <a href={settings.facebook_url} target="_blank" rel="noopener noreferrer" className="p-3 bg-blue-600 text-white rounded-full hover:bg-blue-700 transition-colors">
                 <Facebook className="h-6 w-6" />
-              </a>
-            )}
+              </a>}
             
-            {settings?.instagram_url && (
-              <a
-                href={settings.instagram_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 bg-pink-600 text-white rounded-full hover:bg-pink-700 transition-colors"
-              >
+            {settings?.instagram_url && <a href={settings.instagram_url} target="_blank" rel="noopener noreferrer" className="p-3 bg-pink-600 text-white rounded-full hover:bg-pink-700 transition-colors">
                 <Instagram className="h-6 w-6" />
-              </a>
-            )}
+              </a>}
             
-            {settings?.twitter_url && (
-              <a
-                href={settings.twitter_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 bg-blue-400 text-white rounded-full hover:bg-blue-500 transition-colors"
-              >
+            {settings?.twitter_url && <a href={settings.twitter_url} target="_blank" rel="noopener noreferrer" className="p-3 bg-blue-400 text-white rounded-full hover:bg-blue-500 transition-colors">
                 <Twitter className="h-6 w-6" />
-              </a>
-            )}
+              </a>}
             
-            {settings?.linkedin_url && (
-              <a
-                href={settings.linkedin_url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="p-3 bg-blue-800 text-white rounded-full hover:bg-blue-900 transition-colors"
-              >
+            {settings?.linkedin_url && <a href={settings.linkedin_url} target="_blank" rel="noopener noreferrer" className="p-3 bg-blue-800 text-white rounded-full hover:bg-blue-900 transition-colors">
                 <Linkedin className="h-6 w-6" />
-              </a>
-            )}
+              </a>}
           </div>
         </div>
       </section>
 
       <PublicFooter />
-    </div>
-  );
+    </div>;
 };
-
 export default Contact;

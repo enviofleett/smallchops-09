@@ -14,17 +14,17 @@ const AuthLayout = ({
   showLogo = true
 }: AuthLayoutProps) => {
   return <div className="min-h-screen bg-white flex flex-col lg:flex-row">
-      {/* Image Section - Top on mobile, Left on desktop */}
-      <div className="w-full h-48 sm:h-64 lg:h-screen lg:w-1/2 relative overflow-hidden">
+      {/* Image Section - Hidden on mobile, Left side on desktop */}
+      <div className="hidden lg:block lg:w-1/2 lg:h-screen relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-primary/20 to-primary/40 z-10" />
         <img src="/lovable-uploads/c25fd79f-d9c7-466d-9189-55f68cc44b83.png" alt="Delicious family meal" className="w-full h-full object-cover" />
-        <div className="absolute inset-0 z-20 flex flex-col justify-center items-center text-white p-4 lg:p-12">
+        <div className="absolute inset-0 z-20 flex flex-col justify-center items-center text-white p-12">
           
         </div>
       </div>
 
-      {/* Form Section - Bottom on mobile, Right on desktop */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 lg:p-8 flex-1">
+      {/* Form Section - Full width on mobile, Right side on desktop */}
+      <div className="w-full lg:w-1/2 flex items-center justify-center p-4 sm:p-6 lg:p-8 min-h-screen lg:min-h-0">
         <div className="w-full max-w-md space-y-6 lg:space-y-8">
           {showLogo && <div className="text-center">
               <div className="w-16 h-16 lg:w-20 lg:h-20 rounded-full mx-auto mb-4 lg:mb-6 flex items-center justify-center overflow-hidden bg-primary/10">

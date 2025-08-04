@@ -17,7 +17,7 @@ import { EnvironmentSwitcher } from '@/components/environment/EnvironmentSwitche
 import { PaymentErrorTracker } from '@/components/admin/PaymentErrorTracker';
 import { PaystackProductionDashboard } from '@/components/payments/PaystackProductionDashboard';
 import { LiveKeysConfiguration } from '@/components/payments/LiveKeysConfiguration';
-import { ProductionTestingSuite } from '@/components/payments/ProductionTestingSuite';
+import { PaystackTestingSuite } from '@/components/payments/PaystackTestingSuite';
 import { ProductionMonitoring } from '@/components/payments/ProductionMonitoring';
 import { AlertCircle, CheckCircle, Copy, ExternalLink, Lock, UserX } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -336,7 +336,7 @@ export const PaymentSettings: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="testing" className="space-y-6">
-          <ProductionTestingSuite />
+          <PaystackTestingSuite />
         </TabsContent>
 
         <TabsContent value="monitoring" className="space-y-6">

@@ -91,7 +91,10 @@ const PublicHome = () => {
                   Crispy, savory small chops, freshly made and delivered fast.
                 </p>
                 <div className="pt-2">
-                  <Button className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg w-full sm:w-auto">
+                  <Button 
+                    onClick={() => navigate('/categories')}
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg w-full sm:w-auto"
+                  >
                     Order Now & Enjoy!
                   </Button>
                 </div>

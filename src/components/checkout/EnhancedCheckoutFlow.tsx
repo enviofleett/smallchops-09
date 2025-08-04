@@ -114,6 +114,18 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     }
   }, [isAuthenticated, checkoutStep]);
 
+  // Auto-populate form data when customer account is available
+  React.useEffect(() => {
+    if (authCustomerAccount) {
+      setFormData(prev => ({
+        ...prev,
+        customer_email: authCustomerAccount.email || prev.customer_email,
+        customer_name: authCustomerAccount.name || prev.customer_name,
+        customer_phone: authCustomerAccount.phone || prev.customer_phone,
+      }));
+    }
+  }, [authCustomerAccount]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);

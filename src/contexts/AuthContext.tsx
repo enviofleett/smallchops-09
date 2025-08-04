@@ -176,12 +176,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           setUserType('admin');
         }
       } else {
-        // Create customer account
+        // Create customer account with enhanced Google profile data
+        const customerName = authUser.user_metadata?.full_name || 
+                           authUser.user_metadata?.name || 
+                           `${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() ||
+                           authUser.email?.split('@')[0] || 'Customer';
+                           
         const { data: newCustomer } = await supabase
           .from('customer_accounts')
           .insert({
             user_id: authUser.id,
-            name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Customer',
+            name: customerName,
             phone: authUser.user_metadata?.phone,
             email: authUser.email
           })

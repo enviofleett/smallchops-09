@@ -26,8 +26,8 @@ const About = () => {
         {/* Banner Image */}
         <div className="absolute inset-0 -z-10">
           <img
-            src="https://images.unsplash.com/photo-1519389950473-47ba0277781c"
-            alt="Team collaboration"
+            src="https://images.unsplash.com/photo-1555939594-58d7cb561ad1?ixlib=rb-4.0.3"
+            alt="Delicious finger foods and appetizers"
             className="w-full h-full object-cover opacity-10"
           />
         </div>
@@ -57,8 +57,8 @@ const About = () => {
               </div>
               <div>
                 <img
-                  src="https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b"
-                  alt="Professional food preparation"
+                  src="https://images.unsplash.com/photo-1541014741259-de529411b96a?ixlib=rb-4.0.3"
+                  alt="Fresh homemade spring rolls and finger foods"
                   className="w-full rounded-lg shadow-lg"
                 />
               </div>
@@ -125,8 +125,8 @@ const About = () => {
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div>
                 <img
-                  src="https://images.unsplash.com/photo-1487058792275-0ad4aaf24ca7"
-                  alt="Technology and innovation"
+                  src="https://images.unsplash.com/photo-1567620905732-2d1ec7ab7445?ixlib=rb-4.0.3"
+                  alt="Variety of small chops and finger foods for catering"
                   className="w-full rounded-lg shadow-lg"
                 />
               </div>

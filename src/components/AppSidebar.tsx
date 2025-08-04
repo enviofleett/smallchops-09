@@ -47,7 +47,7 @@ const coreOperations = [
   {
     icon: Package,
     label: 'Products',
-    path: '/products'
+    path: '/admin/products'
   }
 ];
 

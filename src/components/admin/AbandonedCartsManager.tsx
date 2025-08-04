@@ -6,8 +6,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { getAbandonedCarts, getTimeAgo, type CartSession, type AbandonedCartFilters } from '@/api/cartSessions';
-import { ShoppingCart, Mail, Phone, Clock, DollarSign } from 'lucide-react';
+import { ShoppingCart, Mail, Phone, Clock, DollarSign, User, Eye } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
+import { CustomerDetailsModal } from '@/components/customers/CustomerDetailsModal';
+import { supabase } from '@/integrations/supabase/client';
 
 const AbandonedCartsManager = () => {
   const [filters, setFilters] = useState<AbandonedCartFilters>({
@@ -16,6 +18,8 @@ const AbandonedCartsManager = () => {
     page: 1,
     pageSize: 20
   });
+  const [selectedCustomer, setSelectedCustomer] = useState<any>(null);
+  const [isCustomerModalOpen, setIsCustomerModalOpen] = useState(false);
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['abandoned-carts', filters],
@@ -40,6 +44,51 @@ const AbandonedCartsManager = () => {
 
   const getCartValue = (cart: CartSession) => {
     return cart.total_value || 0;
+  };
+
+  const handleViewCustomer = async (cart: CartSession) => {
+    if (!cart.customer_email) return;
+    
+    try {
+      // Fetch customer details from the customers table with order statistics
+      const { data: customerData } = await supabase
+        .from('customers')
+        .select(`
+          *,
+          orders:orders(count),
+          total_spent:orders(total_amount)
+        `)
+        .eq('email', cart.customer_email)
+        .single();
+      
+      if (customerData) {
+        // Calculate total spent
+        const totalSpent = customerData.total_spent?.reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0) || 0;
+        const totalOrders = customerData.orders?.[0]?.count || 0;
+        
+        setSelectedCustomer({
+          ...customerData,
+          totalSpent,
+          totalOrders,
+          cart_session: cart
+        });
+        setIsCustomerModalOpen(true);
+      }
+    } catch (error) {
+      console.error('Error fetching customer details:', error);
+      // Fallback with basic info
+      setSelectedCustomer({
+        id: cart.session_id,
+        name: cart.customer_email?.split('@')[0] || 'Customer',
+        email: cart.customer_email || '',
+        phone: cart.customer_phone || '',
+        totalSpent: cart.total_value || 0,
+        totalOrders: 0,
+        created_at: cart.created_at || new Date().toISOString(),
+        cart_session: cart
+      });
+      setIsCustomerModalOpen(true);
+    }
   };
 
   if (isLoading) {
@@ -157,30 +206,58 @@ const AbandonedCartsManager = () => {
                     </div>
 
                     <div className="flex gap-2">
+                      {cart.customer_email && (
+                        <Button 
+                          size="sm" 
+                          variant="outline"
+                          onClick={() => handleViewCustomer(cart)}
+                        >
+                          <User className="h-4 w-4 mr-1" />
+                          View Customer
+                        </Button>
+                      )}
                       <Button size="sm" variant="outline">
                         <Mail className="h-4 w-4 mr-1" />
                         Email
                       </Button>
-                      <Button size="sm" variant="outline">
-                        View Cart
-                      </Button>
                     </div>
                   </div>
 
-                  {/* Cart Items Preview */}
+                  {/* Enhanced Cart Items Preview */}
                   {cart.cart_data && Array.isArray(cart.cart_data) && cart.cart_data.length > 0 && (
-                    <div className="text-xs text-muted-foreground border-t pt-2">
-                      <p className="font-medium mb-1">Cart Items:</p>
-                      <div className="flex flex-wrap gap-1">
-                        {cart.cart_data.slice(0, 3).map((item: any, index: number) => (
-                          <span key={index} className="bg-muted px-2 py-1 rounded">
-                            {item.name || item.title || 'Product'} (x{item.quantity || 1})
-                          </span>
-                        ))}
-                        {cart.cart_data.length > 3 && (
-                          <span className="bg-muted px-2 py-1 rounded">
-                            +{cart.cart_data.length - 3} more
-                          </span>
+                    <div className="text-xs text-muted-foreground border-t pt-3 mt-3">
+                      <p className="font-medium mb-2 text-sm">Cart Items:</p>
+                      <div className="space-y-2">
+                        {cart.cart_data.slice(0, 4).map((item: any, index: number) => {
+                          const itemPrice = item.price || item.unit_price || 0;
+                          const quantity = item.quantity || 1;
+                          const total = itemPrice * quantity;
+                          
+                          return (
+                            <div key={index} className="flex justify-between items-center p-2 bg-muted/50 rounded text-xs">
+                              <div className="flex-1">
+                                <span className="font-medium">{item.name || item.title || 'Product'}</span>
+                                {item.image_url && (
+                                  <div className="w-8 h-8 mt-1 rounded overflow-hidden inline-block mr-2">
+                                    <img 
+                                      src={item.image_url} 
+                                      alt={item.name} 
+                                      className="w-full h-full object-cover"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <div>Qty: {quantity}</div>
+                                <div className="font-medium">{formatCurrency(total)}</div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                        {cart.cart_data.length > 4 && (
+                          <div className="text-center py-1 text-muted-foreground">
+                            +{cart.cart_data.length - 4} more items
+                          </div>
                         )}
                       </div>
                     </div>
@@ -218,6 +295,15 @@ const AbandonedCartsManager = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Customer Details Modal */}
+      {selectedCustomer && (
+        <CustomerDetailsModal
+          open={isCustomerModalOpen}
+          onOpenChange={setIsCustomerModalOpen}
+          customer={selectedCustomer}
+        />
+      )}
     </div>
   );
 };

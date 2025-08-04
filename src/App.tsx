@@ -39,6 +39,7 @@ import AdminAuth from "./pages/admin/AdminAuth";
 import AuthRouter from "./components/auth/AuthRouter";
 import Cart from "./pages/Cart";
 import Booking from "./pages/Booking";
+import PublicProducts from "./pages/PublicProducts";
 
 import AuthCallback from "./pages/AuthCallback";
 import EmailVerificationPage from "./pages/EmailVerificationPage";
@@ -60,6 +61,7 @@ const App = () => (
               
               {/* Public home page for browsing products */}
               <Route path="/home" element={<PublicHome />} />
+              <Route path="/products" element={<PublicProducts />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/booking" element={<Booking />} />
               <Route path="/product/:id" element={<ProductDetail />} />

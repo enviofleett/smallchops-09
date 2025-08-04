@@ -45,9 +45,12 @@ serve(async (req) => {
     );
 
     // Get client IP for audit logging
-    const clientIP = req.headers.get('x-forwarded-for') || 
-                     req.headers.get('x-real-ip') || 
-                     '127.0.0.1';
+    // Handle comma-separated IPs from proxies/load balancers by taking the first one
+    const forwarded = req.headers.get('x-forwarded-for');
+    const realIP = req.headers.get('x-real-ip');
+    const clientIP = forwarded 
+      ? forwarded.split(',')[0].trim() 
+      : realIP || '127.0.0.1';
 
     // Verify OTP using database function
     const { data: verificationResult, error: verificationError } = await supabaseAdmin.rpc(

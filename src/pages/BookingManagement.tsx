@@ -8,10 +8,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Calendar, Users, Phone, Mail, MessageSquare, DollarSign, Eye } from 'lucide-react';
+import { Calendar, Users, Phone, Mail, MessageSquare, Eye } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { formatCurrency } from '@/lib/discountCalculations';
 
 interface CateringBooking {
   id: string;
@@ -304,10 +305,9 @@ const BookingManagement = () => {
                   </TableCell>
                   <TableCell>
                     {booking.quote_amount ? (
-                      <div className="flex items-center gap-1">
-                        <DollarSign className="h-4 w-4" />
-                        {booking.quote_amount.toLocaleString()}
-                      </div>
+                      <span className="font-medium">
+                        {formatCurrency(booking.quote_amount)}
+                      </span>
                     ) : (
                       <span className="text-muted-foreground">-</span>
                     )}
@@ -384,10 +384,10 @@ const BookingManagement = () => {
                 </div>
 
                 <div>
-                  <Label>Quote Amount (Optional)</Label>
+                  <Label>Quote Amount (₦)</Label>
                   <Input
                     type="number"
-                    placeholder="Enter quote amount"
+                    placeholder="Enter quote amount in Naira"
                     value={updateData.quote_amount}
                     onChange={(e) => setUpdateData(prev => ({ ...prev, quote_amount: e.target.value }))}
                   />

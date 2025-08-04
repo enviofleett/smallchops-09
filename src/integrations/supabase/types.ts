@@ -5900,7 +5900,7 @@ export type Database = {
       }
       cleanup_expired_otp_codes: {
         Args: Record<PropertyKey, never>
-        Returns: undefined
+        Returns: number
       }
       cleanup_expired_rate_limits: {
         Args: Record<PropertyKey, never>

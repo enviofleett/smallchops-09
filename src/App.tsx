@@ -42,6 +42,7 @@ import Booking from "./pages/Booking";
 import PublicProducts from "./pages/PublicProducts";
 import Contact from "./pages/Contact";
 import About from "./pages/About";
+import PaystackTest from "./pages/PaystackTest";
 
 import AuthCallback from "./pages/AuthCallback";
 import EmailVerificationPage from "./pages/EmailVerificationPage";
@@ -68,6 +69,7 @@ const App = () => (
               <Route path="/booking" element={<Booking />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
+              <Route path="/paystack-test" element={<PaystackTest />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/category/:categoryId" element={<CategoryProducts />} />
               

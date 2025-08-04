@@ -135,28 +135,11 @@ export default function AuthCallback() {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 to-secondary/5 p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="flex items-center justify-center gap-2">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Processing Authentication
-            </CardTitle>
-            <CardDescription>
-              Please wait while we complete your sign in...
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="text-center">
-            <div className="space-y-4">
-              <div className="flex justify-center">
-                <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                This should only take a moment.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="flex flex-col items-center gap-4">
+          <CheckCircle className="h-12 w-12 text-primary animate-pulse" />
+          <p className="text-lg font-medium">Signing you in...</p>
+        </div>
       </div>
     );
   }

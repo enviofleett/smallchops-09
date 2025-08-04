@@ -229,7 +229,7 @@ export const useCart = () => {
       }
       
       console.log('🛒 Updated items:', updatedItems);
-      const newCart = calculateCartSummary(updatedItems, cart.summary.delivery_fee, cart.promotion_code);
+      const newCart = calculateCartSummary(updatedItems, 0, cart.promotion_code); // No delivery fee in cart
       console.log('🛒 New cart calculated:', newCart);
       setCart(newCart);
       console.log('🛒 Cart state updated successfully');
@@ -240,7 +240,7 @@ export const useCart = () => {
 
   const removeItem = (cartItemId: string) => {
     const updatedItems = cart.items.filter(item => item.id !== cartItemId);
-    setCart(calculateCartSummary(updatedItems, cart.summary.delivery_fee, cart.promotion_code));
+    setCart(calculateCartSummary(updatedItems, 0, cart.promotion_code)); // No delivery fee in cart
   };
 
   const updateQuantity = (cartItemId: string, quantity: number) => {
@@ -252,7 +252,7 @@ export const useCart = () => {
     const updatedItems = cart.items.map(item =>
       item.id === cartItemId ? { ...item, quantity } : item
     );
-    setCart(calculateCartSummary(updatedItems, cart.summary.delivery_fee, cart.promotion_code));
+    setCart(calculateCartSummary(updatedItems, 0, cart.promotion_code)); // No delivery fee in cart
   };
 
   const clearCart = () => {
@@ -283,7 +283,7 @@ export const useCart = () => {
       const validation = await validatePromotionCode(code, cart.summary.subtotal);
       
       if (validation.valid) {
-        setCart(calculateCartSummary(cart.items, cart.summary.delivery_fee, code));
+        setCart(calculateCartSummary(cart.items, 0, code)); // No delivery fee in cart
         return { success: true, message: 'Promotion code applied successfully!' };
       } else {
         return { success: false, message: validation.error || 'Invalid promotion code' };
@@ -294,7 +294,7 @@ export const useCart = () => {
   };
 
   const removePromotionCode = () => {
-    setCart(calculateCartSummary(cart.items, cart.summary.delivery_fee));
+    setCart(calculateCartSummary(cart.items, 0)); // No delivery fee in cart
   };
 
   const getCartTotal = () => cart.summary.total_amount;

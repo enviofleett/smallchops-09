@@ -190,40 +190,6 @@ serve(async (req) => {
           provider_response: paystackResponse.data
         })
         .eq('id', paymentData.id);
-
-    } else if (payment_method === 'bank_transfer') {
-      // For bank transfer, provide bank details
-      const { data: bankDetails } = await supabaseAdmin
-        .from('business_settings')
-        .select('bank_details')
-        .single();
-
-      paymentResult = {
-        payment_method: 'bank_transfer',
-        bank_details: bankDetails?.bank_details || {
-          bank_name: 'Please contact support for bank details',
-          account_number: '',
-          account_name: ''
-        },
-        payment_instructions: `Please transfer ₦${total_amount.toLocaleString()} to the provided bank account and send proof of payment.`
-      };
-
-    } else if (payment_method === 'cash_on_delivery') {
-      // Update order status for COD
-      await supabaseAdmin
-        .rpc('update_order_status', {
-          p_order_id: orderId,
-          p_new_status: 'confirmed'
-        });
-
-      const codMessage = fulfillment_type === 'pickup' 
-        ? 'Order confirmed. Please prepare cash for pickup at the store.'
-        : 'Order confirmed. Please prepare cash for delivery.';
-
-      paymentResult = {
-        payment_method: 'cash_on_delivery',
-        message: codMessage
-      };
     }
 
     // 4. Log successful checkout

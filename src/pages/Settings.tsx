@@ -16,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { DeliveryZoneDevTools } from "@/components/settings/DeliveryZoneDevTools";
 import { AuthenticationEndpointsTab } from "@/components/settings/AuthenticationEndpointsTab";
 import { BuyingLogicEndpointsTab } from "@/components/settings/BuyingLogicEndpointsTab";
+import { PickupPointsManager } from "@/components/admin/PickupPointsManager";
 import RegistrationHealth from "./RegistrationHealth";
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
@@ -142,17 +143,30 @@ const Settings = () => {
         </TabsContent>
 
         <TabsContent value="payments" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Payment Settings</CardTitle>
-              <CardDescription>
-                Configure payment providers and processing options
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <PaymentSettingsTab />
-            </CardContent>
-          </Card>
+          <Tabs defaultValue="payment-providers" className="space-y-6">
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="payment-providers">Payment Providers</TabsTrigger>
+              <TabsTrigger value="pickup-points">Pickup Points</TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="payment-providers">
+              <Card>
+                <CardHeader>
+                  <CardTitle>Payment Settings</CardTitle>
+                  <CardDescription>
+                    Configure payment providers and processing options
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <PaymentSettingsTab />
+                </CardContent>
+              </Card>
+            </TabsContent>
+            
+            <TabsContent value="pickup-points">
+              <PickupPointsManager />
+            </TabsContent>
+          </Tabs>
         </TabsContent>
 
 

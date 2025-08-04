@@ -129,14 +129,6 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         }
       }
 
-      if (!formData.payment_method) {
-        toast({
-          title: "Payment Method Required",
-          description: "Please select a payment method.",
-          variant: "destructive",
-        });
-        return;
-      }
 
       // Process checkout through edge function
       const checkoutData = {
@@ -155,7 +147,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         total_amount: total,
         delivery_fee: formData.fulfillment_type === 'delivery' ? deliveryFee : 0,
         delivery_zone_id: formData.fulfillment_type === 'delivery' ? formData.delivery_zone_id : undefined,
-        payment_method: formData.payment_method
+        payment_method: 'paystack'
       };
 
       console.log('Processing checkout:', checkoutData);
@@ -177,14 +169,11 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         return;
       }
 
-      // Handle different payment methods
-      if (formData.payment_method === 'paystack' && data.payment?.payment_url) {
-        // Redirect to Paystack for payment
+      // Redirect to Paystack for payment
+      if (data.payment?.payment_url) {
         window.location.href = data.payment.payment_url;
         return;
       }
-
-      // For other payment methods or successful COD orders
       clearCart();
       toast({
         title: "Order Placed Successfully!",
@@ -461,51 +450,19 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
 
             {/* Payment Method */}
             <div className="space-y-4">
-              <h3 className="font-semibold text-lg">Payment Method</h3>
-              <RadioGroup
-                value={formData.payment_method}
-                onValueChange={(value) => setFormData({ ...formData, payment_method: value })}
-                className="grid grid-cols-1 gap-4"
-              >
-                <Card className="cursor-pointer hover:border-primary transition-colors">
-                  <CardContent className="flex items-center space-x-3 p-4">
-                    <RadioGroupItem value="paystack" id="paystack" />
-                    <CreditCard className="h-5 w-5 text-primary" />
-                    <div className="flex-1">
-                      <Label htmlFor="paystack" className="text-sm font-medium cursor-pointer">
-                        Card Payment
-                      </Label>
-                      <p className="text-xs text-muted-foreground">Pay securely with your debit/credit card</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="cursor-pointer hover:border-primary transition-colors">
-                  <CardContent className="flex items-center space-x-3 p-4">
-                    <RadioGroupItem value="bank_transfer" id="bank_transfer" />
-                    <Banknote className="h-5 w-5 text-primary" />
-                    <div className="flex-1">
-                      <Label htmlFor="bank_transfer" className="text-sm font-medium cursor-pointer">
-                        Bank Transfer
-                      </Label>
-                      <p className="text-xs text-muted-foreground">Transfer to our bank account</p>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card className="cursor-pointer hover:border-primary transition-colors">
-                  <CardContent className="flex items-center space-x-3 p-4">
-                    <RadioGroupItem value="cash_on_delivery" id="cash_on_delivery" />
-                    <Truck className="h-5 w-5 text-primary" />
-                    <div className="flex-1">
-                      <Label htmlFor="cash_on_delivery" className="text-sm font-medium cursor-pointer">
-                        Cash on Delivery
-                      </Label>
-                      <p className="text-xs text-muted-foreground">Pay when your order arrives</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              </RadioGroup>
+              <h3 className="font-semibold text-lg flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Payment Method
+              </h3>
+              <Card className="border-primary bg-primary/5">
+                <CardContent className="flex items-center space-x-3 p-4">
+                  <CreditCard className="h-5 w-5 text-primary" />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium">Secure Card Payment</div>
+                    <p className="text-xs text-muted-foreground">Pay securely with your debit/credit card via Paystack</p>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
 
             {/* Action Buttons */}

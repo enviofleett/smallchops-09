@@ -31,10 +31,12 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
   const fetchZones = async () => {
     try {
       setLoading(true);
+      console.log('🚚 Fetching delivery zones...');
       const data = await getDeliveryZonesWithFees();
+      console.log('🚚 Delivery zones fetched:', data);
       setZones(data);
     } catch (error) {
-      console.error('Error fetching zones:', error);
+      console.error('🚚 Error fetching zones:', error);
       toast.error('Failed to load delivery zones');
     } finally {
       setLoading(false);

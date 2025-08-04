@@ -191,12 +191,15 @@ export function CartSummary({ cart }: CartSummaryProps) {
 
           {/* Checkout Button */}
           <Button 
-            onClick={() => setShowCheckout(true)} 
+            onClick={() => {
+              console.log('Checkout button clicked, opening checkout flow');
+              setShowCheckout(true);
+            }} 
             className="w-full"
             size="lg"
             disabled={cart.items.length === 0}
           >
-            Checkout {formatCurrency(cart.summary.total_amount)}
+            Proceed to Checkout {formatCurrency(cart.summary.total_amount)}
           </Button>
         </CardContent>
       </Card>

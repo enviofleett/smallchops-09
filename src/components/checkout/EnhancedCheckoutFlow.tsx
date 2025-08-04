@@ -178,6 +178,8 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     }
   };
 
+  console.log('🔄 EnhancedCheckoutFlow render - isOpen:', isOpen, 'cart items:', cart?.items?.length);
+
   if (!isOpen) return null;
 
   return (

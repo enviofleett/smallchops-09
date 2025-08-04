@@ -72,18 +72,29 @@ export interface CustomerAnalytics {
 
 // Profile Management
 export const getCustomerProfile = async (): Promise<CustomerProfile | null> => {
-  const { data, error } = await supabase
-    .from('customer_accounts')
-    .select('*')
-    .eq('user_id', (await supabase.auth.getUser()).data.user?.id)
-    .single();
+  try {
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    
+    if (authError || !user) {
+      return null; // Guest user, return null
+    }
 
-  if (error) {
-    if (error.code === 'PGRST116') return null;
-    throw new Error(error.message);
+    const { data, error } = await supabase
+      .from('customer_accounts')
+      .select('*')
+      .eq('user_id', user.id)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') return null;
+      throw new Error(error.message);
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Error getting customer profile:', error);
+    return null;
   }
-
-  return data;
 };
 
 export const updateCustomerProfile = async (updates: Partial<CustomerProfile>): Promise<CustomerProfile> => {

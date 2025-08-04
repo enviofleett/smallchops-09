@@ -57,10 +57,9 @@ const Settings = () => {
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
         <div className="overflow-x-auto pb-2">
-          <TabsList className="grid w-full min-w-[480px] grid-cols-4 lg:grid-cols-6 lg:min-w-0">
+          <TabsList className="grid w-full min-w-[480px] grid-cols-3 lg:grid-cols-4 lg:min-w-0">
             <TabsTrigger value="communications" className="text-xs sm:text-sm">Comms</TabsTrigger>
             <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>
-            <TabsTrigger value="customer-registration" className="text-xs sm:text-sm">Customer</TabsTrigger>
             {isAdmin && <TabsTrigger value="admin" className="text-xs sm:text-sm">Admin</TabsTrigger>}
             {isAdmin && <TabsTrigger value="developer" className="text-xs sm:text-sm">Dev</TabsTrigger>}
           </TabsList>
@@ -68,9 +67,8 @@ const Settings = () => {
 
         <TabsContent value="communications" className="space-y-6">
           <Tabs defaultValue="branding" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="branding">Branding</TabsTrigger>
-              <TabsTrigger value="email">Email</TabsTrigger>
               <TabsTrigger value="content">Content</TabsTrigger>
               <TabsTrigger value="email-processing">Queue</TabsTrigger>
             </TabsList>
@@ -81,47 +79,6 @@ const Settings = () => {
                   <BrandingTab />
                 </CardContent>
               </Card>
-            </TabsContent>
-            
-            <TabsContent value="email">
-              <Tabs defaultValue="communications" className="space-y-6">
-                <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="communications">Settings</TabsTrigger>
-                  <TabsTrigger value="processing">Processing</TabsTrigger>
-                  <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
-                  <TabsTrigger value="analytics">Analytics</TabsTrigger>
-                </TabsList>
-                
-                <TabsContent value="communications">
-                  <Card>
-                    <CardContent>
-                      <CommunicationsTab />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                
-                <TabsContent value="processing">
-                  <Card>
-                    <CardHeader>
-                      <CardTitle>Email Processing & Queue Management</CardTitle>
-                      <CardDescription>
-                        Process queued emails and manage email queue
-                      </CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <EmailProcessingTab />
-                    </CardContent>
-                  </Card>
-                </TabsContent>
-                
-                <TabsContent value="monitoring">
-                  <EmailDeliveryMonitor />
-                </TabsContent>
-                
-                <TabsContent value="analytics">
-                  <EmailHealthDashboard />
-                </TabsContent>
-              </Tabs>
             </TabsContent>
             
             <TabsContent value="content">
@@ -172,116 +129,6 @@ const Settings = () => {
         </TabsContent>
 
 
-        <TabsContent value="customer-registration" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Customer Registration Requirements</CardTitle>
-              <CardDescription>
-                Manage customer registration validation rules and requirements
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-4">
-                <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
-                  <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-2">📋 Registration Requirements</h3>
-                  <div className="space-y-2 text-sm text-blue-800 dark:text-blue-200">
-                    <div className="flex items-center space-x-2">
-                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      <span><strong>Phone Number:</strong> Required field for all new customer registrations</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      <span><strong>Validation:</strong> Minimum 10 digits, alphanumeric characters allowed</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                      <span><strong>Database:</strong> Phone field is set as NOT NULL in customer_accounts table</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
-                  <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-2">⚠️ Registration Process</h3>
-                  <div className="space-y-2 text-sm text-amber-800 dark:text-amber-200">
-                    <p><strong>Frontend Validation:</strong> The customer registration form validates phone numbers client-side before submission.</p>
-                    <p><strong>Server Validation:</strong> Database triggers ensure phone numbers are provided during user registration.</p>
-                    <p><strong>Error Handling:</strong> Clear error messages guide customers to provide valid phone numbers.</p>
-                  </div>
-                </div>
-
-                <div className="border rounded-lg p-4">
-                  <h3 className="font-semibold mb-3">💻 Technical Implementation</h3>
-                  <div className="space-y-3">
-                    <div>
-                      <h4 className="font-medium text-sm mb-2">Database Constraints</h4>
-                      <div className="bg-muted p-3 rounded text-xs">
-                        <pre>{`-- customer_accounts table constraints
-ALTER TABLE customer_accounts 
-ALTER COLUMN phone SET NOT NULL;
-
--- Validation trigger
-CREATE FUNCTION handle_new_customer_auth()
-RETURNS trigger AS $$
-BEGIN
-  IF NEW.raw_user_meta_data->>'phone' IS NULL THEN
-    RAISE EXCEPTION 'Phone number is required';
-  END IF;
-  -- Insert customer account with required phone
-END;`}</pre>
-                      </div>
-                    </div>
-
-                    <div>
-                      <h4 className="font-medium text-sm mb-2">Frontend Validation</h4>
-                      <div className="bg-muted p-3 rounded text-xs">
-                        <pre>{`// Customer registration form validation
-if (!signupData.phone || signupData.phone.trim().length < 10) {
-  toast({
-    title: "Phone number required",
-    description: "Please enter a valid phone number with at least 10 digits.",
-    variant: "destructive",
-  });
-  return;
-}`}</pre>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
-                  <h3 className="font-semibold text-green-900 dark:text-green-100 mb-2">✅ Contact Information Display</h3>
-                  <div className="space-y-2 text-sm text-green-800 dark:text-green-200">
-                    <p><strong>Customer Table:</strong> Both email and phone number are displayed in the contact column for easy reference.</p>
-                    <p><strong>Customer Details:</strong> Full contact information is available in customer detail views.</p>
-                    <p><strong>Data Integrity:</strong> All registered customers now have complete contact information for better customer service.</p>
-                  </div>
-                </div>
-
-                <div className="border-t pt-4">
-                  <h3 className="font-semibold mb-3">📞 Benefits of Required Phone Numbers</h3>
-                  <ul className="space-y-2 text-sm">
-                    <li className="flex items-start space-x-2">
-                      <span className="w-2 h-2 bg-blue-500 rounded-full mt-2"></span>
-                      <span><strong>Better Customer Support:</strong> Multiple contact methods for customer service</span>
-                    </li>
-                    <li className="flex items-start space-x-2">
-                      <span className="w-2 h-2 bg-blue-500 rounded-full mt-2"></span>
-                      <span><strong>Order Communications:</strong> SMS notifications for order updates and delivery</span>
-                    </li>
-                    <li className="flex items-start space-x-2">
-                      <span className="w-2 h-2 bg-blue-500 rounded-full mt-2"></span>
-                      <span><strong>Account Recovery:</strong> Additional verification method for password resets</span>
-                    </li>
-                    <li className="flex items-start space-x-2">
-                      <span className="w-2 h-2 bg-blue-500 rounded-full mt-2"></span>
-                      <span><strong>Fraud Prevention:</strong> Better customer verification and security</span>
-                    </li>
-                  </ul>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
 
         {isAdmin && <TabsContent value="admin" className="space-y-6">
             <AdminUserControl />
@@ -290,9 +137,10 @@ if (!signupData.phone || signupData.phone.trim().length < 10) {
 
         {isAdmin && <TabsContent value="developer" className="space-y-6">
             <Tabs defaultValue="auth-endpoints" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className="grid w-full grid-cols-6">
                 <TabsTrigger value="auth-endpoints">Auth API</TabsTrigger>
                 <TabsTrigger value="buying-logic">Buying Logic</TabsTrigger>
+                <TabsTrigger value="email">Email</TabsTrigger>
                 <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
                 <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
                 <TabsTrigger value="production-readiness">Production</TabsTrigger>
@@ -304,6 +152,47 @@ if (!signupData.phone || signupData.phone.trim().length < 10) {
               
               <TabsContent value="buying-logic">
                 <BuyingLogicEndpointsTab />
+              </TabsContent>
+              
+              <TabsContent value="email">
+                <Tabs defaultValue="communications" className="space-y-6">
+                  <TabsList className="grid w-full grid-cols-4">
+                    <TabsTrigger value="communications">Settings</TabsTrigger>
+                    <TabsTrigger value="processing">Processing</TabsTrigger>
+                    <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+                    <TabsTrigger value="analytics">Analytics</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="communications">
+                    <Card>
+                      <CardContent>
+                        <CommunicationsTab />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="processing">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Email Processing & Queue Management</CardTitle>
+                        <CardDescription>
+                          Process queued emails and manage email queue
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <EmailProcessingTab />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+                  
+                  <TabsContent value="monitoring">
+                    <EmailDeliveryMonitor />
+                  </TabsContent>
+                  
+                  <TabsContent value="analytics">
+                    <EmailHealthDashboard />
+                  </TabsContent>
+                </Tabs>
               </TabsContent>
               
               <TabsContent value="oauth">

@@ -1,481 +1,308 @@
 import React, { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import { CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { 
-  CheckCircle, 
-  XCircle, 
-  AlertTriangle, 
-  Shield, 
-  Database,
-  Zap,
-  Globe,
-  Settings,
-  RefreshCw
-} from 'lucide-react';
+import { toast } from 'sonner';
 
-interface ReadinessCheck {
-  id: string;
+interface CheckResult {
   name: string;
-  description: string;
-  status: 'pass' | 'fail' | 'warning' | 'checking';
-  details?: string;
-  score: number;
-  category: string;
+  status: 'pass' | 'fail' | 'warning';
+  message: string;
+  critical: boolean;
 }
 
-export const ProductionReadinessChecker = () => {
-  const [checks, setChecks] = useState<ReadinessCheck[]>([]);
-  const [isRunning, setIsRunning] = useState(false);
-  const [overallScore, setOverallScore] = useState(0);
-  const { toast } = useToast();
+interface ProductionReadiness {
+  score: number;
+  checks: CheckResult[];
+  canDeploy: boolean;
+}
 
-  const runReadinessChecks = async () => {
-    setIsRunning(true);
-    const newChecks: ReadinessCheck[] = [];
+export const ProductionReadinessChecker: React.FC = () => {
+  const [loading, setLoading] = useState(false);
+  const [readiness, setReadiness] = useState<ProductionReadiness | null>(null);
 
+  const performChecks = async () => {
+    setLoading(true);
     try {
-      // 1. Database Security Check
-      newChecks.push({
-        id: 'db_security',
-        name: 'Database Security',
-        description: 'RLS policies and security functions',
-        status: 'checking',
-        category: 'security',
-        score: 0
-      });
+      const checks: CheckResult[] = [];
 
-      // Check if critical tables exist by trying to query them
-      const criticalTables = ['profiles', 'customer_accounts', 'orders', 'payment_transactions'];
-      const tableChecks = await Promise.allSettled(
-        criticalTables.map(async (tableName) => {
-          const { error } = await supabase.from(tableName as any).select('id').limit(1);
-          return { tableName, exists: !error };
-        })
-      );
-
-      let securityScore = 100;
-      let securityDetails: string[] = [];
-
-      // Process table check results
-      tableChecks.forEach((result, index) => {
-        if (result.status === 'fulfilled') {
-          if (result.value.exists) {
-            securityDetails.push(`✓ ${result.value.tableName} table exists`);
-          } else {
-            securityScore -= 20;
-            securityDetails.push(`✗ ${result.value.tableName} table missing or inaccessible`);
-          }
-        } else {
-          securityScore -= 20;
-          securityDetails.push(`✗ ${criticalTables[index]} table missing or inaccessible`);
-        }
-      });
-
-      newChecks[newChecks.length - 1] = {
-        ...newChecks[newChecks.length - 1],
-        status: securityScore >= 80 ? 'pass' : securityScore >= 60 ? 'warning' : 'fail',
-        score: securityScore,
-        details: securityDetails.join(', ')
-      };
-
-      // 2. Authentication Configuration
-      newChecks.push({
-        id: 'auth_config',
-        name: 'Authentication Setup',
-        description: 'Auth providers and security settings',
-        status: 'checking',
-        category: 'security',
-        score: 0
-      });
-
-      // Check auth configuration
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      let authScore = user ? 80 : 20; // Basic check if auth is working
+      // 1. Payment Configuration Check
+      const { data: paymentConfig } = await supabase.rpc('get_active_paystack_config');
+      const configData = Array.isArray(paymentConfig) ? paymentConfig[0] : paymentConfig;
       
-      newChecks[newChecks.length - 1] = {
-        ...newChecks[newChecks.length - 1],
-        status: authScore >= 70 ? 'pass' : 'warning',
-        score: authScore,
-        details: user ? 'Authentication working' : 'Authentication may need configuration'
-      };
+      if (configData?.public_key && configData?.secret_key) {
+        checks.push({
+          name: 'Payment Configuration',
+          status: configData.test_mode ? 'warning' : 'pass',
+          message: configData.test_mode 
+            ? 'Using test keys - switch to live keys for production'
+            : 'Live payment keys configured',
+          critical: true
+        });
+      } else {
+        checks.push({
+          name: 'Payment Configuration',
+          status: 'fail',
+          message: 'Payment configuration incomplete',
+          critical: true
+        });
+      }
 
-      // 3. Business Settings
-      newChecks.push({
-        id: 'business_config',
-        name: 'Business Configuration',
-        description: 'Business settings and branding',
-        status: 'checking',
-        category: 'configuration',
-        score: 0
-      });
+      // 2. Webhook Configuration Check
+      const { data: envConfig } = await supabase
+        .from('environment_config')
+        .select('webhook_url, is_live_mode')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
 
-      const { data: businessSettings, error: businessError } = await supabase
+      if (envConfig?.webhook_url) {
+        checks.push({
+          name: 'Webhook Configuration',
+          status: envConfig.webhook_url.includes('localhost') ? 'warning' : 'pass',
+          message: envConfig.webhook_url.includes('localhost')
+            ? 'Webhook URL points to localhost - update for production'
+            : 'Production webhook URL configured',
+          critical: true
+        });
+      } else {
+        checks.push({
+          name: 'Webhook Configuration',
+          status: 'fail',
+          message: 'Webhook URL not configured',
+          critical: true
+        });
+      }
+
+      // 3. Business Settings Check
+      const { data: businessSettings } = await supabase
         .from('business_settings')
-        .select('*')
+        .select('name, email, logo_url, seo_title, seo_description')
         .limit(1)
         .single();
 
-      let businessScore = 0;
-      let businessDetails: string[] = [];
+      if (businessSettings) {
+        const hasBasicInfo = businessSettings.name && businessSettings.email;
+        const hasBranding = businessSettings.logo_url;
+        const hasSEO = businessSettings.seo_title && businessSettings.seo_description;
 
-      if (!businessError && businessSettings) {
-        if (businessSettings.name && businessSettings.name !== 'Your Business Name') {
-          businessScore += 25;
-          businessDetails.push('✓ Business name configured');
-        } else {
-          businessDetails.push('✗ Business name needs setup');
-        }
+        checks.push({
+          name: 'Business Information',
+          status: hasBasicInfo ? 'pass' : 'fail',
+          message: hasBasicInfo ? 'Business details configured' : 'Missing business name or email',
+          critical: false
+        });
 
-        if (businessSettings.email) {
-          businessScore += 25;
-          businessDetails.push('✓ Business email configured');
-        } else {
-          businessDetails.push('✗ Business email missing');
-        }
+        checks.push({
+          name: 'Branding Assets',
+          status: hasBranding ? 'pass' : 'warning',
+          message: hasBranding ? 'Logo configured' : 'Logo not uploaded',
+          critical: false
+        });
 
-        if (businessSettings.logo_url) {
-          businessScore += 25;
-          businessDetails.push('✓ Logo uploaded');
-        } else {
-          businessDetails.push('✗ Logo not uploaded');
-        }
-
-        if (businessSettings.primary_color !== '#3b82f6') {
-          businessScore += 25;
-          businessDetails.push('✓ Custom branding colors');
-        } else {
-          businessDetails.push('✗ Using default colors');
-        }
-      } else {
-        businessDetails.push('✗ Business settings not configured');
+        checks.push({
+          name: 'SEO Configuration',
+          status: hasSEO ? 'pass' : 'warning',
+          message: hasSEO ? 'SEO metadata configured' : 'SEO title/description missing',
+          critical: false
+        });
       }
 
-      newChecks[newChecks.length - 1] = {
-        ...newChecks[newChecks.length - 1],
-        status: businessScore >= 75 ? 'pass' : businessScore >= 50 ? 'warning' : 'fail',
-        score: businessScore,
-        details: businessDetails.join(', ')
-      };
+      // 4. Security Check
+      const { data: securityIncidents } = await supabase
+        .from('security_incidents')
+        .select('severity')
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .eq('severity', 'critical');
 
-      // 4. Payment Integration
-      newChecks.push({
-        id: 'payment_config',
-        name: 'Payment System',
-        description: 'Payment gateway configuration',
-        status: 'checking',
-        category: 'integration',
-        score: 0
+      checks.push({
+        name: 'Security Status',
+        status: (securityIncidents?.length || 0) > 0 ? 'warning' : 'pass',
+        message: (securityIncidents?.length || 0) > 0 
+          ? `${securityIncidents?.length} critical security incidents in last 24h`
+          : 'No critical security incidents',
+        critical: true
       });
 
-      const { data: paymentConfig, error: paymentError } = await supabase
-        .from('payment_integrations')
-        .select('*')
-        .eq('provider', 'paystack')
-        .limit(1)
-        .single();
-
-      let paymentScore = 0;
-      let paymentDetails: string[] = [];
-
-      if (!paymentError && paymentConfig) {
-        if (paymentConfig.connection_status === 'connected') {
-          paymentScore += 50;
-          paymentDetails.push('✓ Payment gateway connected');
-        } else {
-          paymentDetails.push('✗ Payment gateway not connected');
-        }
-
-        if (paymentConfig.public_key && paymentConfig.secret_key) {
-          paymentScore += 30;
-          paymentDetails.push('✓ API keys configured');
-        } else {
-          paymentDetails.push('✗ API keys missing');
-        }
-
-        if (paymentConfig.webhook_secret) {
-          paymentScore += 20;
-          paymentDetails.push('✓ Webhook configured');
-        } else {
-          paymentDetails.push('✗ Webhook needs setup');
-        }
-      } else {
-        paymentDetails.push('✗ Payment integration not configured');
+      // 5. Database Health Check
+      try {
+        await supabase.from('products').select('id').limit(1);
+        checks.push({
+          name: 'Database Connection',
+          status: 'pass',
+          message: 'Database accessible',
+          critical: true
+        });
+      } catch (error) {
+        checks.push({
+          name: 'Database Connection',
+          status: 'fail',
+          message: 'Database connection failed',
+          critical: true
+        });
       }
 
-      newChecks[newChecks.length - 1] = {
-        ...newChecks[newChecks.length - 1],
-        status: paymentScore >= 80 ? 'pass' : paymentScore >= 50 ? 'warning' : 'fail',
-        score: paymentScore,
-        details: paymentDetails.join(', ')
-      };
+      // Calculate score and deployment readiness
+      const totalChecks = checks.length;
+      const passedChecks = checks.filter(c => c.status === 'pass').length;
+      const failedCritical = checks.filter(c => c.status === 'fail' && c.critical).length;
+      
+      const score = Math.round((passedChecks / totalChecks) * 100);
+      const canDeploy = failedCritical === 0;
 
-      // 5. Email System
-      newChecks.push({
-        id: 'email_config',
-        name: 'Email System',
-        description: 'Email service configuration',
-        status: 'checking',
-        category: 'communication',
-        score: 0
+      setReadiness({
+        score,
+        checks,
+        canDeploy
       });
 
-      const { data: emailConfig, error: emailError } = await supabase
-        .from('communication_settings')
-        .select('*')
-        .limit(1)
-        .single();
-
-      let emailScore = 0;
-      let emailDetails: string[] = [];
-
-      if (!emailError && emailConfig) {
-        if (emailConfig.sender_email) {
-          emailScore += 40;
-          emailDetails.push('✓ Sender email configured');
-        } else {
-          emailDetails.push('✗ Sender email missing');
-        }
-
-        if (emailConfig.email_provider) {
-          emailScore += 40;
-          emailDetails.push(`✓ Email provider: ${emailConfig.email_provider}`);
-        } else {
-          emailDetails.push('✗ Email provider not set');
-        }
-
-        if (emailConfig.use_smtp && emailConfig.smtp_host) {
-          emailScore += 20;
-          emailDetails.push('✓ SMTP configured');
-        } else {
-          emailDetails.push('○ SMTP not configured (using default)');
-        }
-      } else {
-        emailDetails.push('✗ Email system not configured');
-      }
-
-      newChecks[newChecks.length - 1] = {
-        ...newChecks[newChecks.length - 1],
-        status: emailScore >= 70 ? 'pass' : emailScore >= 40 ? 'warning' : 'fail',
-        score: emailScore,
-        details: emailDetails.join(', ')
-      };
-
-      // 6. Content Management
-      newChecks.push({
-        id: 'content_ready',
-        name: 'Content Readiness',
-        description: 'Products, categories, and content',
-        status: 'checking',
-        category: 'content',
-        score: 0
-      });
-
-      // Check products and categories
-      const [
-        { count: productCount },
-        { count: categoryCount }
-      ] = await Promise.all([
-        supabase.from('products').select('*', { count: 'exact', head: true }),
-        supabase.from('categories').select('*', { count: 'exact', head: true })
-      ]);
-
-      let contentScore = 0;
-      let contentDetails: string[] = [];
-
-      if (categoryCount && categoryCount > 0) {
-        contentScore += 30;
-        contentDetails.push(`✓ ${categoryCount} categories created`);
-      } else {
-        contentDetails.push('✗ No categories created');
-      }
-
-      if (productCount && productCount >= 3) {
-        contentScore += 50;
-        contentDetails.push(`✓ ${productCount} products added`);
-      } else if (productCount && productCount > 0) {
-        contentScore += 25;
-        contentDetails.push(`○ Only ${productCount} products (recommend 3+)`);
-      } else {
-        contentDetails.push('✗ No products added');
-      }
-
-      contentScore += 20; // Base score for having the tables
-
-      newChecks[newChecks.length - 1] = {
-        ...newChecks[newChecks.length - 1],
-        status: contentScore >= 80 ? 'pass' : contentScore >= 50 ? 'warning' : 'fail',
-        score: contentScore,
-        details: contentDetails.join(', ')
-      };
-
-      // Calculate overall score
-      const totalScore = newChecks.reduce((sum, check) => sum + check.score, 0);
-      const avgScore = Math.round(totalScore / newChecks.length);
-      setOverallScore(avgScore);
-
-      setChecks(newChecks);
-
-      toast({
-        title: "Production readiness check completed",
-        description: `Overall score: ${avgScore}/100`,
-        variant: avgScore >= 80 ? "default" : "destructive"
-      });
-
-    } catch (error: any) {
-      console.error('Error running readiness checks:', error);
-      toast({
-        title: "Error running readiness checks",
-        description: error.message,
-        variant: "destructive"
-      });
+    } catch (error) {
+      console.error('Production readiness check failed:', error);
+      toast.error('Failed to perform readiness checks');
     } finally {
-      setIsRunning(false);
+      setLoading(false);
     }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'pass': return <CheckCircle className="h-5 w-5 text-green-500" />;
-      case 'warning': return <AlertTriangle className="h-5 w-5 text-yellow-500" />;
-      case 'fail': return <XCircle className="h-5 w-5 text-red-500" />;
-      case 'checking': return <RefreshCw className="h-5 w-5 text-blue-500 animate-spin" />;
-      default: return null;
-    }
-  };
-
-  const getCategoryIcon = (category: string) => {
-    switch (category) {
-      case 'security': return <Shield className="h-4 w-4" />;
-      case 'configuration': return <Settings className="h-4 w-4" />;
-      case 'integration': return <Zap className="h-4 w-4" />;
-      case 'communication': return <Globe className="h-4 w-4" />;
-      case 'content': return <Database className="h-4 w-4" />;
-      default: return <Settings className="h-4 w-4" />;
-    }
-  };
-
-  const getOverallStatus = () => {
-    if (overallScore >= 90) return { status: 'excellent', color: 'green', message: 'Ready for production!' };
-    if (overallScore >= 80) return { status: 'good', color: 'blue', message: 'Almost ready - minor issues to address' };
-    if (overallScore >= 60) return { status: 'fair', color: 'yellow', message: 'Needs improvement before production' };
-    return { status: 'poor', color: 'red', message: 'Not ready for production' };
   };
 
   useEffect(() => {
-    runReadinessChecks();
+    performChecks();
   }, []);
 
-  const overall = getOverallStatus();
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'pass':
+        return <CheckCircle className="h-5 w-5 text-green-500" />;
+      case 'fail':
+        return <XCircle className="h-5 w-5 text-red-500" />;
+      case 'warning':
+        return <AlertCircle className="h-5 w-5 text-yellow-500" />;
+      default:
+        return null;
+    }
+  };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold">Production Readiness</h2>
-          <p className="text-muted-foreground">Comprehensive system readiness assessment</p>
-        </div>
-        <Button onClick={runReadinessChecks} disabled={isRunning}>
-          <RefreshCw className={`h-4 w-4 mr-2 ${isRunning ? 'animate-spin' : ''}`} />
-          Run Checks
-        </Button>
-      </div>
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'pass':
+        return 'bg-green-100 text-green-800';
+      case 'fail':
+        return 'bg-red-100 text-red-800';
+      case 'warning':
+        return 'bg-yellow-100 text-yellow-800';
+      default:
+        return 'bg-gray-100 text-gray-800';
+    }
+  };
 
-      {/* Overall Score */}
+  if (!readiness) {
+    return (
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            Overall Readiness Score
-            <Badge variant={overall.color === 'green' ? 'default' : 'destructive'}>
-              {overall.status.toUpperCase()}
-            </Badge>
+            <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
+            Production Readiness Check
           </CardTitle>
-          <CardDescription>{overall.message}</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-sm font-medium">Score</span>
-              <span className="text-2xl font-bold">{overallScore}/100</span>
-            </div>
-            <Progress value={overallScore} className="w-full" />
+          <div className="text-center py-6">
+            {loading ? 'Performing checks...' : 'Loading...'}
           </div>
         </CardContent>
       </Card>
+    );
+  }
 
-      {/* Detailed Checks */}
-      <div className="grid gap-4">
-        {checks.map((check) => (
-          <Card key={check.id}>
-            <CardContent className="pt-6">
-              <div className="flex items-start justify-between">
-                <div className="flex items-start gap-3">
-                  <div className="flex items-center gap-2">
-                    {getCategoryIcon(check.category)}
-                    {getStatusIcon(check.status)}
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="font-medium">{check.name}</h3>
-                      <Badge variant="outline">{check.category}</Badge>
-                    </div>
-                    <p className="text-sm text-muted-foreground">{check.description}</p>
-                    {check.details && (
-                      <p className="text-xs text-muted-foreground">{check.details}</p>
-                    )}
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center justify-between">
+          <span>Production Readiness</span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={performChecks}
+            disabled={loading}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-6">
+          {/* Overall Score */}
+          <div className="text-center">
+            <div className="text-3xl font-bold mb-2">{readiness.score}%</div>
+            <Progress value={readiness.score} className="w-full" />
+            <div className="mt-2">
+              <Badge 
+                variant={readiness.canDeploy ? "default" : "destructive"}
+                className="text-sm"
+              >
+                {readiness.canDeploy ? 'Ready for Production' : 'Not Ready for Production'}
+              </Badge>
+            </div>
+          </div>
+
+          {/* Individual Checks */}
+          <div className="space-y-3">
+            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
+              System Checks
+            </h3>
+            {readiness.checks.map((check, index) => (
+              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                <div className="flex items-center gap-3">
+                  {getStatusIcon(check.status)}
+                  <div>
+                    <div className="font-medium">{check.name}</div>
+                    <div className="text-sm text-muted-foreground">{check.message}</div>
                   </div>
                 </div>
-                <div className="text-right">
-                  <div className="text-lg font-bold">{check.score}/100</div>
-                  <Progress value={check.score} className="w-20" />
+                <div className="flex items-center gap-2">
+                  {check.critical && (
+                    <Badge variant="secondary" className="text-xs">
+                      Critical
+                    </Badge>
+                  )}
+                  <Badge className={`text-xs ${getStatusColor(check.status)}`}>
+                    {check.status.toUpperCase()}
+                  </Badge>
                 </div>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      {/* Recommendations */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recommendations</CardTitle>
-          <CardDescription>Actions to improve production readiness</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-3">
-            {checks.filter(c => c.status === 'fail').length > 0 && (
-              <Alert>
-                <XCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Critical Issues:</strong> Address all failed checks before deploying to production.
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {checks.filter(c => c.status === 'warning').length > 0 && (
-              <Alert>
-                <AlertTriangle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Warnings:</strong> Review and improve warning items for optimal performance.
-                </AlertDescription>
-              </Alert>
-            )}
-            
-            {overallScore >= 90 && (
-              <Alert>
-                <CheckCircle className="h-4 w-4" />
-                <AlertDescription>
-                  <strong>Excellent!</strong> Your system is ready for production deployment.
-                </AlertDescription>
-              </Alert>
-            )}
+            ))}
           </div>
-        </CardContent>
-      </Card>
-    </div>
+
+          {/* Deployment Guidance */}
+          {!readiness.canDeploy && (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-red-800 font-medium mb-2">
+                <XCircle className="h-4 w-4" />
+                Critical Issues Found
+              </div>
+              <p className="text-red-700 text-sm">
+                Please resolve all critical failures before deploying to production. 
+                These issues could prevent your application from functioning correctly.
+              </p>
+            </div>
+          )}
+
+          {readiness.canDeploy && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+              <div className="flex items-center gap-2 text-green-800 font-medium mb-2">
+                <CheckCircle className="h-4 w-4" />
+                Ready for Production
+              </div>
+              <p className="text-green-700 text-sm">
+                Your application passes all critical checks and is ready for production deployment.
+                Consider addressing any warnings for optimal performance.
+              </p>
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
   );
 };

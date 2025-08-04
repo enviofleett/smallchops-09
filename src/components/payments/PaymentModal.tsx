@@ -11,6 +11,8 @@ import { usePayment, type PaymentProvider } from '@/hooks/usePayment';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PaystackButton } from './PaystackButton';
+import { PaymentsAPI } from '@/api/payments';
 
 interface PaymentModalProps {
   isOpen: boolean;
@@ -151,6 +153,33 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
       console.error('Payment error:', error);
       toast.error('Payment failed. Please try again.');
     }
+  };
+
+  const handlePaystackSuccess = async (reference: string, transaction: any) => {
+    try {
+      // Verify payment on the backend
+      const verification = await PaymentsAPI.verifyPayment(reference);
+      
+      if (verification.success && verification.data?.status === 'success') {
+        toast.success('Payment completed successfully!');
+        onSuccess({
+          status: 'success',
+          reference,
+          transaction: verification.data
+        });
+        onClose();
+      } else {
+        throw new Error('Payment verification failed');
+      }
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      toast.error('Payment verification failed. Please contact support.');
+    }
+  };
+
+  const handlePaystackError = (error: string) => {
+    console.error('Paystack payment error:', error);
+    toast.error(`Payment failed: ${error}`);
   };
 
   const getAvailableMethodsForProvider = () => {
@@ -300,13 +329,30 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             </div>
           )}
 
-          <Button
-            className="w-full"
-            onClick={handlePayment}
-            disabled={loading}
-          >
-            {loading ? 'Processing...' : `Pay ${formatCurrency(orderData.total)}`}
-          </Button>
+          {selectedProvider === 'paystack' && paymentMethod === 'new_card' ? (
+            <PaystackButton
+              email={orderData.customer_email}
+              amount={orderData.total}
+              orderId={orderData.id}
+              customerName={orderData.customer_name}
+              customerPhone={orderData.customer_phone}
+              onSuccess={handlePaystackSuccess}
+              onError={handlePaystackError}
+              onClose={() => setLoading(false)}
+              className="w-full"
+              disabled={loading}
+            >
+              {loading ? 'Processing...' : `Pay ${formatCurrency(orderData.total)}`}
+            </PaystackButton>
+          ) : (
+            <Button
+              className="w-full"
+              onClick={handlePayment}
+              disabled={loading}
+            >
+              {loading ? 'Processing...' : `Pay ${formatCurrency(orderData.total)}`}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

@@ -8,12 +8,11 @@ import { CartSummary } from '@/components/cart/CartSummary';
 import { CheckoutButton } from '@/components/ui/checkout-button';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
-import { DeliveryZoneSelector } from '@/components/delivery/DeliveryZoneSelector';
+
 
 export default function Cart() {
   const navigate = useNavigate();
-  const { cart, updateQuantity, removeItem, updateDeliveryFee } = useCart();
-  const [selectedZoneId, setSelectedZoneId] = useState<string>('');
+  const { cart, updateQuantity, removeItem } = useCart();
 
   // Debug logging for production troubleshooting
   console.log('🛒 Cart Page - Current cart state:', cart);
@@ -37,10 +36,6 @@ export default function Cart() {
     navigate('/home');
   };
 
-  const handleZoneSelect = (zoneId: string, deliveryFee: number) => {
-    setSelectedZoneId(zoneId);
-    updateDeliveryFee(deliveryFee);
-  };
 
   return (
     <div className="min-h-screen bg-background">
@@ -93,14 +88,6 @@ export default function Cart() {
                 </div>
               </div>
 
-              {/* Delivery Zone Selection */}
-              <div className="mt-6">
-                <DeliveryZoneSelector
-                  selectedZoneId={selectedZoneId}
-                  onZoneSelect={handleZoneSelect}
-                  orderSubtotal={cart.summary.subtotal}
-                />
-              </div>
             </div>
 
             {/* Cart Summary - Right Side */}

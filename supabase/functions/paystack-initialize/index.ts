@@ -102,15 +102,20 @@ serve(async (req) => {
     const { email, amount, currency = 'NGN', reference, callback_url, metadata = {}, orderId } = body;
 
     // Get Paystack configuration
-    const { data: config } = await supabaseClient
+    const { data: config, error: configError } = await supabaseClient
       .from('payment_integrations')
       .select('*')
       .eq('provider', 'paystack')
       .eq('connection_status', 'connected')
       .single();
 
-    if (!config) {
-      throw new Error('Paystack not configured');
+    if (configError || !config) {
+      console.error('Paystack configuration error:', configError);
+      throw new Error('Paystack not configured properly');
+    }
+
+    if (!config.secret_key) {
+      throw new Error('Paystack secret key not configured');
     }
 
     // Validate amount using PaymentValidator

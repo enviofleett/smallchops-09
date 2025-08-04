@@ -104,9 +104,17 @@ serve(async (req) => {
       p_delivery_zone_id: fulfillment_type === 'delivery' ? delivery_zone_id : null
     };
 
-    // Add guest session ID if provided
-    if (guest_session_id) {
-      orderData.p_guest_session_id = guest_session_id;
+    // Add guest session ID if provided (ensure it's valid UUID format or null)
+    if (guest_session_id && guest_session_id.trim()) {
+      // Validate UUID format or generate a temporary ID
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      if (uuidRegex.test(guest_session_id)) {
+        orderData.p_guest_session_id = guest_session_id;
+      } else {
+        // Generate a temporary guest session ID
+        orderData.p_guest_session_id = crypto.randomUUID();
+        console.log('Generated temporary guest session ID:', orderData.p_guest_session_id);
+      }
     }
 
     const { data: orderResult, error: orderError } = await supabaseAdmin

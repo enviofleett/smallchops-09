@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Truck, ChevronDown, Check } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
+import { MapPin, Truck, ChevronDown, Check, Search } from 'lucide-react';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { getDeliveryZonesWithFees, DeliveryZoneWithFee } from '@/api/delivery';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
@@ -89,6 +91,8 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
     );
   }
 
+  const [open, setOpen] = useState(false);
+
   return (
     <div className="space-y-3">
       <h3 className="text-sm font-semibold flex items-center">
@@ -96,10 +100,15 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
         Select Delivery Zone *
       </h3>
       
-      <Select value={selectedZoneId} onValueChange={handleZoneSelect}>
-        <SelectTrigger className="w-full h-auto min-h-[44px] bg-background border-border hover:border-primary/50 transition-colors">
-          <SelectValue placeholder="Choose your delivery area">
-            {selectedZone && (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className="w-full h-auto min-h-[44px] justify-between bg-background border-border hover:border-primary/50 transition-colors"
+          >
+            {selectedZone ? (
               <div className="flex items-center justify-between w-full py-1">
                 <div className="flex items-center gap-2">
                   <MapPin className="h-4 w-4 text-primary" />
@@ -117,71 +126,82 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
                   )}
                 </div>
               </div>
+            ) : (
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Search className="h-4 w-4" />
+                <span>Search and select delivery zone...</span>
+              </div>
             )}
-          </SelectValue>
-        </SelectTrigger>
+            <ChevronDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
         
-        <SelectContent 
-          className="w-full max-w-md bg-background border-border shadow-lg z-[100]"
-          position="popper"
-          sideOffset={4}
-        >
-          {zones.map((zone) => {
-            const deliveryFee = calculateDeliveryFee(zone);
-            const isFreeDelivery = deliveryFee === 0 && zone.delivery_fees?.min_order_for_free_delivery;
-            const isSelected = selectedZoneId === zone.id;
-            
-            return (
-              <SelectItem 
-                key={zone.id} 
-                value={zone.id}
-                className={cn(
-                  "cursor-pointer p-3 border-b last:border-b-0 hover:bg-muted/50 focus:bg-muted/50",
-                  "data-[highlighted]:bg-muted/50 data-[state=checked]:bg-primary/5"
-                )}
-              >
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex-1 space-y-1">
-                    <div className="flex items-center gap-2">
-                      <MapPin className="h-4 w-4 text-primary" />
-                      <span className="font-medium">{zone.name}</span>
-                      {isSelected && <Check className="h-4 w-4 text-primary" />}
-                    </div>
-                    
-                    {zone.description && (
-                      <p className="text-sm text-muted-foreground">
-                        {zone.description}
-                      </p>
-                    )}
-                    
-                    {zone.delivery_fees?.min_order_for_free_delivery && (
-                      <p className="text-xs text-muted-foreground">
-                        Free delivery on orders above ₦{zone.delivery_fees.min_order_for_free_delivery.toFixed(2)}
-                      </p>
-                    )}
-                  </div>
+        <PopoverContent className="w-full p-0 z-[100]" align="start">
+          <Command>
+            <CommandInput placeholder="Search delivery zones..." className="h-9" />
+            <CommandEmpty>No delivery zone found.</CommandEmpty>
+            <CommandGroup>
+              <CommandList className="max-h-[200px] overflow-y-auto">
+                {zones.map((zone) => {
+                  const deliveryFee = calculateDeliveryFee(zone);
+                  const isFreeDelivery = deliveryFee === 0 && zone.delivery_fees?.min_order_for_free_delivery;
+                  const isSelected = selectedZoneId === zone.id;
                   
-                  <div className="ml-3">
-                    {deliveryFee === 0 ? (
-                      <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-                        {isFreeDelivery ? 'FREE' : 'No Charge'}
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-primary border-primary/30">
-                        ₦{deliveryFee.toFixed(2)}
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </SelectItem>
-            );
-          })}
-        </SelectContent>
-      </Select>
+                  return (
+                    <CommandItem
+                      key={zone.id}
+                      value={zone.name + " " + (zone.description || "")}
+                      onSelect={() => {
+                        handleZoneSelect(zone.id);
+                        setOpen(false);
+                      }}
+                      className="cursor-pointer p-3 border-b last:border-b-0"
+                    >
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex-1 space-y-1">
+                          <div className="flex items-center gap-2">
+                            <MapPin className="h-4 w-4 text-primary" />
+                            <span className="font-medium">{zone.name}</span>
+                            {isSelected && <Check className="h-4 w-4 text-primary" />}
+                          </div>
+                          
+                          {zone.description && (
+                            <p className="text-sm text-muted-foreground">
+                              {zone.description}
+                            </p>
+                          )}
+                          
+                          {zone.delivery_fees?.min_order_for_free_delivery && (
+                            <p className="text-xs text-muted-foreground">
+                              Free delivery on orders above ₦{zone.delivery_fees.min_order_for_free_delivery.toFixed(2)}
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="ml-3">
+                          {deliveryFee === 0 ? (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
+                              {isFreeDelivery ? 'FREE' : 'No Charge'}
+                            </Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-primary border-primary/30">
+                              ₦{deliveryFee.toFixed(2)}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                    </CommandItem>
+                  );
+                })}
+              </CommandList>
+            </CommandGroup>
+          </Command>
+        </PopoverContent>
+      </Popover>
 
-      {selectedZone?.delivery_fees?.min_order_for_free_delivery && (
+      {selectedZone?.delivery_fees?.min_order_for_free_delivery && orderSubtotal < selectedZone.delivery_fees.min_order_for_free_delivery && (
         <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-md">
-          💡 Tip: Add ₦{Math.max(0, selectedZone.delivery_fees.min_order_for_free_delivery - orderSubtotal).toFixed(2)} more to qualify for free delivery!
+          💡 Tip: Add ₦{(selectedZone.delivery_fees.min_order_for_free_delivery - orderSubtotal).toFixed(2)} more to qualify for free delivery!
         </div>
       )}
     </div>

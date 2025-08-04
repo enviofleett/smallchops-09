@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { useCustomerProfile } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
 import { Mail, Phone, MapPin, CreditCard, Banknote, Truck } from "lucide-react";
-import { DeliveryZoneSelector } from "@/components/delivery/DeliveryZoneSelector";
+import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import {
   Select,
   SelectContent,
@@ -351,8 +351,8 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
                 </div>
               </div>
 
-              {/* Delivery Zone Selector */}
-              <DeliveryZoneSelector
+              {/* Delivery Zone Dropdown */}
+              <DeliveryZoneDropdown
                 selectedZoneId={formData.delivery_zone_id}
                 onZoneSelect={(zoneId, fee) => {
                   setFormData({ ...formData, delivery_zone_id: zoneId });

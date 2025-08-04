@@ -1,6 +1,6 @@
 
-import React, { useCallback, useState, useEffect } from 'react';
-import { Upload, X, ImageIcon, Loader2 } from 'lucide-react';
+import React, { useCallback, useState, useEffect, useRef } from 'react';
+import { Upload, X, ImageIcon, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { resizeImage } from '@/lib/imageProcessing';
@@ -17,15 +17,107 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
   const [preview, setPreview] = useState<string | null>(value || null);
   const [error, setError] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
+  const previewUrlRef = useRef<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Generate unique ID for the file input
   const inputId = React.useId();
 
+  // Cleanup function for object URLs
+  const cleanupPreviewUrl = useCallback(() => {
+    if (previewUrlRef.current && previewUrlRef.current.startsWith('blob:')) {
+      URL.revokeObjectURL(previewUrlRef.current);
+      previewUrlRef.current = null;
+    }
+  }, []);
+
   // Sync preview with external value changes
   useEffect(() => {
     console.log("ImageUpload: External value changed to:", value);
-    setPreview(value || null);
-  }, [value]);
+    
+    // Cleanup previous URL before setting new one
+    cleanupPreviewUrl();
+    
+    if (value && typeof value === 'string') {
+      setPreview(value);
+    } else {
+      setPreview(null);
+    }
+
+    // Cleanup function
+    return cleanupPreviewUrl;
+  }, [value, cleanupPreviewUrl]);
+
+  const validateFile = useCallback((file: File): string | null => {
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      return 'Please select an image file (JPEG, PNG, WebP, etc.)';
+    }
+    
+    // Check specific supported formats
+    const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
+    if (!supportedTypes.includes(file.type.toLowerCase())) {
+      return 'Unsupported image format. Please use JPEG, PNG, WebP, or GIF.';
+    }
+    
+    // Validate file size (10MB max)
+    if (file.size > 10 * 1024 * 1024) {
+      return 'Image size must be less than 10MB';
+    }
+
+    // Validate file size minimum (1KB)
+    if (file.size < 1024) {
+      return 'Image file appears to be corrupted or too small';
+    }
+
+    return null;
+  }, []);
+
+  const processImageWithRetry = useCallback(async (file: File, attempt: number = 1): Promise<File> => {
+    const maxRetries = 3;
+    
+    try {
+      console.log(`ImageUpload: Processing attempt ${attempt}/${maxRetries}`, { 
+        name: file.name, 
+        size: file.size, 
+        type: file.type 
+      });
+
+      // Resize image to 1000x1000px
+      const resizedBlob = await resizeImage(file, {
+        targetWidth: 1000,
+        targetHeight: 1000,
+        quality: 0.9,
+        format: 'jpeg'
+      });
+
+      // Create a new File from the resized blob
+      const resizedFile = new File([resizedBlob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
+        type: 'image/jpeg',
+        lastModified: Date.now(),
+      });
+
+      console.log('ImageUpload: Image processing completed', { 
+        originalSize: file.size,
+        resizedSize: resizedFile.size,
+        compressionRatio: (file.size / resizedFile.size).toFixed(2)
+      });
+
+      return resizedFile;
+    } catch (error) {
+      console.error(`ImageUpload: Processing attempt ${attempt} failed:`, error);
+      
+      if (attempt < maxRetries) {
+        // Wait before retry (exponential backoff)
+        const delay = Math.pow(2, attempt - 1) * 1000;
+        await new Promise(resolve => setTimeout(resolve, delay));
+        return processImageWithRetry(file, attempt + 1);
+      }
+      
+      throw error;
+    }
+  }, []);
 
   const handleFileChange = useCallback(async (file: File | null) => {
     setError(null);
@@ -33,15 +125,10 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
     console.log("ImageUpload: handleFileChange called with file:", file?.name, file?.size, file?.type);
     
     if (file) {
-      // Validate file type
-      if (!file.type.startsWith('image/')) {
-        setError('Please select a valid image file (PNG, JPG, WebP)');
-        return;
-      }
-
-      // Validate file size (10MB max for processing)
-      if (file.size > 10 * 1024 * 1024) {
-        setError('File size must be less than 10MB');
+      // Validate file
+      const validationError = validateFile(file);
+      if (validationError) {
+        setError(validationError);
         return;
       }
 
@@ -49,53 +136,39 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
         setIsProcessing(true);
         console.log("ImageUpload: Processing image to 1000x1000px");
         
-        // Resize image to 1000x1000px
-        const resizedBlob = await resizeImage(file, {
-          targetWidth: 1000,
-          targetHeight: 1000,
-          quality: 0.9,
-          format: 'jpeg'
-        });
+        // Process image with retry logic
+        const processedFile = await processImageWithRetry(file);
         
-        // Create File object from blob
-        const resizedFile = new File([resizedBlob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
-          type: 'image/jpeg',
-          lastModified: Date.now(),
-        });
-        
-        console.log("ImageUpload: Image processed successfully", {
-          originalSize: file.size,
-          newSize: resizedFile.size,
-          dimensions: '1000x1000px'
-        });
-        
-        // Create preview URL
-        const previewUrl = URL.createObjectURL(resizedBlob);
-        console.log("ImageUpload: Created preview URL:", previewUrl);
-        
-        // Set preview and clear processing state
-        setPreview(previewUrl);
-        setIsProcessing(false);
-        
-        // Pass the resized file to parent
-        onChange(resizedFile);
-        
-        // Clean up previous preview URL if it exists
-        return () => {
-          URL.revokeObjectURL(previewUrl);
-        };
+        // Create preview URL with error handling
+        try {
+          cleanupPreviewUrl(); // Clean up previous URL
+          const previewUrl = URL.createObjectURL(processedFile);
+          previewUrlRef.current = previewUrl;
+          setPreview(previewUrl);
+          onChange(processedFile);
+          setRetryCount(0); // Reset retry count on success
+        } catch (previewError) {
+          console.error('ImageUpload: Failed to create preview URL:', previewError);
+          // Still pass the file even if preview fails
+          onChange(processedFile);
+          setError('Image processed successfully but preview unavailable');
+        }
       } catch (error) {
         console.error("ImageUpload: Error processing image:", error);
-        setError(error instanceof Error ? error.message : 'Failed to process image');
+        const errorMessage = error instanceof Error ? error.message : 'Failed to process image';
+        setError(errorMessage);
+        setRetryCount(prev => prev + 1);
+      } finally {
         setIsProcessing(false);
-        setPreview(null);
       }
     } else {
+      cleanupPreviewUrl();
       setPreview(null);
+      setRetryCount(0);
       console.log("ImageUpload: File removed, clearing preview");
       onChange(file);
     }
-  }, [onChange]);
+  }, [onChange, validateFile, processImageWithRetry, cleanupPreviewUrl]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -130,8 +203,26 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
 
   const removeImage = useCallback(() => {
     console.log("ImageUpload: Removing image");
+    cleanupPreviewUrl();
+    setError(null);
+    setRetryCount(0);
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+    
     handleFileChange(null);
-  }, [handleFileChange]);
+  }, [handleFileChange, cleanupPreviewUrl]);
+
+  const retryUpload = useCallback(() => {
+    setError(null);
+    setRetryCount(0);
+    // Reset the file input to allow re-selection of the same file
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  }, []);
 
   return (
     <div className={cn("space-y-2", className)}>
@@ -142,15 +233,13 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
               src={preview}
               alt="Preview"
               className="w-full h-48 object-cover rounded-lg border"
-              onError={(e) => {
-                console.error("ImageUpload: Failed to load preview image:", preview);
-                console.error("ImageUpload: Image error event:", e);
-                setError("Failed to load image preview");
-                setPreview(null); // Clear the preview to avoid showing broken image
-              }}
               onLoad={() => {
                 console.log("ImageUpload: Preview image loaded successfully");
-                setError(null); // Clear any previous error when image loads successfully
+                setError(null); // Clear any previous errors on successful load
+              }}
+              onError={(e) => {
+                console.error("ImageUpload: Preview image failed to load:", preview, e);
+                setError("Failed to display image preview - the image may be corrupted");
               }}
             />
             {isProcessing && (
@@ -206,33 +295,53 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
             Images will be automatically resized to 1000×1000px
           </p>
           <input
+            ref={fileInputRef}
             id={inputId}
             type="file"
             className="hidden"
-            accept="image/*"
+            accept="image/jpeg,image/jpg,image/png,image/webp,image/gif"
             onChange={handleFileInput}
-            disabled={disabled}
+            disabled={disabled || isProcessing}
           />
         </div>
       )}
       
       {error && (
-        <div className="space-y-2">
-          <p className="text-sm text-red-600">{error}</p>
-          {error.includes("Failed to load image") && (
+        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+          <div className="flex items-start gap-2 text-sm text-destructive">
+            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
+            <div className="flex-1">
+              <p className="font-medium">Upload Error</p>
+              <p className="text-xs opacity-90 mt-1">{error}</p>
+              {retryCount > 0 && (
+                <p className="text-xs opacity-75 mt-1">
+                  Attempts: {retryCount}/3
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="flex gap-2 mt-3">
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => {
-                setError(null);
-                setPreview(null);
-                console.log("ImageUpload: Error cleared, resetting component");
-              }}
+              onClick={retryUpload}
+              className="inline-flex items-center gap-1"
             >
+              <RotateCcw className="h-3 w-3" />
               Try Again
             </Button>
-          )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={removeImage}
+              className="inline-flex items-center gap-1"
+            >
+              <X className="h-3 w-3" />
+              Clear
+            </Button>
+          </div>
         </div>
       )}
     </div>

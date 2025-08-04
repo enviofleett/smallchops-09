@@ -21,23 +21,54 @@ export const resizeImage = async (
   const { targetWidth, targetHeight, quality = 0.85, format = 'jpeg' } = options;
 
   return new Promise((resolve, reject) => {
+    // Validate inputs
+    if (!file || !(file instanceof File)) {
+      reject(new Error('Invalid file provided'));
+      return;
+    }
+
+    if (targetWidth <= 0 || targetHeight <= 0) {
+      reject(new Error('Invalid target dimensions'));
+      return;
+    }
+
+    if (quality < 0 || quality > 1) {
+      reject(new Error('Quality must be between 0 and 1'));
+      return;
+    }
+
     const img = new Image();
+    let objectUrl: string | null = null;
     
+    // Cleanup function
+    const cleanup = () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
+      }
+    };
+
     img.onload = () => {
       try {
         console.log("resizeImage: Image loaded successfully", { 
           originalWidth: img.width, 
           originalHeight: img.height,
           targetWidth,
-          targetHeight 
+          targetHeight,
+          fileSize: file.size,
+          fileType: file.type
         });
+
+        // Validate image dimensions
+        if (img.width === 0 || img.height === 0) {
+          throw new Error('Invalid image dimensions - image may be corrupted');
+        }
         
         const canvas = document.createElement('canvas');
-        const ctx = canvas.getContext('2d');
+        const ctx = canvas.getContext('2d', { alpha: format === 'png' });
         
         if (!ctx) {
-          reject(new Error('Failed to get canvas context - canvas not supported'));
-          return;
+          throw new Error('Canvas not supported in this browser');
         }
 
         // Set canvas dimensions to target size
@@ -64,9 +95,15 @@ export const resizeImage = async (
           sourceY = (img.height - sourceHeight) / 2;
         }
 
-        // Enable high-quality rendering
+        // Configure high-quality rendering
         ctx.imageSmoothingEnabled = true;
         ctx.imageSmoothingQuality = 'high';
+
+        // Fill background for JPEG format
+        if (format === 'jpeg') {
+          ctx.fillStyle = '#FFFFFF';
+          ctx.fillRect(0, 0, targetWidth, targetHeight);
+        }
 
         // Draw resized image
         ctx.drawImage(
@@ -77,37 +114,51 @@ export const resizeImage = async (
 
         console.log("resizeImage: Canvas drawing completed, converting to blob");
 
-        // Convert to blob
+        // Convert to blob with timeout
+        const blobTimeout = setTimeout(() => {
+          cleanup();
+          reject(new Error('Image conversion timed out'));
+        }, 10000); // 10 second timeout
+
         canvas.toBlob(
           (blob) => {
+            clearTimeout(blobTimeout);
+            cleanup();
+            
             if (blob) {
               console.log("resizeImage: Blob created successfully", { 
-                size: blob.size,
-                type: blob.type
+                originalSize: file.size,
+                processedSize: blob.size,
+                type: blob.type,
+                compressionRatio: (file.size / blob.size).toFixed(2)
               });
               resolve(blob);
             } else {
-              reject(new Error('Failed to create image blob - conversion failed'));
+              reject(new Error('Failed to create image blob - browser may not support this format'));
             }
           },
           `image/${format}`,
           quality
         );
       } catch (error) {
+        cleanup();
         console.error("resizeImage: Error during processing:", error);
         reject(new Error(`Image processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
       }
     };
 
     img.onerror = (event) => {
+      cleanup();
       console.error("resizeImage: Failed to load image for processing:", event);
-      reject(new Error('Failed to load image - file may be corrupted or invalid'));
+      reject(new Error('Failed to load image - file may be corrupted or invalid format'));
     };
     
     try {
-      img.src = URL.createObjectURL(file);
+      objectUrl = URL.createObjectURL(file);
+      img.src = objectUrl;
       console.log("resizeImage: Created object URL for image processing");
     } catch (error) {
+      cleanup();
       console.error("resizeImage: Failed to create object URL:", error);
       reject(new Error('Failed to process file - invalid image data'));
     }

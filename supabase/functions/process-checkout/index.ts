@@ -63,6 +63,10 @@ serve(async (req) => {
     }: CheckoutRequest = await req.json();
 
     console.log('Processing checkout for:', customer_email, 'fulfillment type:', fulfillment_type);
+    console.log('Order items:', order_items.map(item => ({ 
+      product_id: item.product_id, 
+      quantity: item.quantity 
+    })));
 
     // 1. Validate order data
     const { data: validationResult, error: validationError } = await supabaseAdmin
@@ -73,6 +77,7 @@ serve(async (req) => {
       });
 
     if (validationError) {
+      console.error('Validation error details:', validationError);
       throw new Error(`Validation error: ${validationError.message}`);
     }
 
@@ -121,6 +126,8 @@ serve(async (req) => {
       .rpc('create_order_with_items', orderData);
 
     if (orderError) {
+      console.error('Order creation error details:', orderError);
+      console.error('Order data that failed:', orderData);
       throw new Error(`Order creation error: ${orderError.message}`);
     }
 

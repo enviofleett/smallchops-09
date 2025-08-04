@@ -179,7 +179,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : undefined,
         pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : undefined,
         order_items: items.map(item => ({
-          product_id: item.id,
+          product_id: item.product_id,
           quantity: item.quantity,
           unit_price: item.price,
           total_price: item.price * item.quantity

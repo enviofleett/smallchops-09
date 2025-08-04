@@ -55,7 +55,7 @@ const PublicHeaderContent = () => {
               Home
             </Link>
             <Link 
-              to="/categories" 
+              to="/home" 
               className="text-foreground hover:text-primary transition-colors"
             >
               Shop
@@ -183,7 +183,7 @@ const PublicHeaderContent = () => {
                   Home
                 </Link>
                 <Link 
-                  to="/categories" 
+                  to="/home" 
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
                   onClick={() => setIsMenuOpen(false)}
                 >

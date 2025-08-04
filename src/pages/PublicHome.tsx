@@ -92,7 +92,7 @@ const PublicHome = () => {
                 </p>
                 <div className="pt-2">
                   <Button 
-                    onClick={() => navigate('/categories')}
+                    onClick={() => navigate('/home')}
                     className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg w-full sm:w-auto"
                   >
                     Order Now & Enjoy!

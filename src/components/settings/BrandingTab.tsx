@@ -103,11 +103,7 @@ export const BrandingTab = () => {
         data: result,
         error
       } = await supabase.functions.invoke('business-settings', {
-        body: cleanData,
-        // Don't double-stringify, Supabase client handles this
-        headers: {
-          'Content-Type': 'application/json'
-        }
+        body: cleanData
       });
       if (error) {
         console.error('Supabase function error:', error);

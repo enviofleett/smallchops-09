@@ -135,19 +135,7 @@ export function CartSummary({ cart }: CartSummaryProps) {
               </div>
             )}
 
-            <div className="flex justify-between text-sm">
-              <span>Delivery</span>
-              <span className={cart.summary.delivery_discount > 0 ? 'line-through text-muted-foreground' : ''}>
-                {cart.summary.delivery_fee > 0 ? formatCurrency(cart.summary.delivery_fee) : 'Free'}
-              </span>
-            </div>
-
-            {cart.summary.delivery_discount > 0 && (
-              <div className="flex justify-between text-sm text-green-600">
-                <span>Delivery Discount</span>
-                <span>-{formatCurrency(cart.summary.delivery_discount)}</span>
-              </div>
-            )}
+            {/* Delivery costs are calculated at checkout - removed from cart summary */}
 
             <Separator />
 

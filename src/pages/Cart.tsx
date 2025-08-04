@@ -66,18 +66,18 @@ export default function Cart() {
             </Button>
           </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8">
             {/* Cart Items - Left Side */}
             <div className="lg:col-span-2">
               <div className="bg-card rounded-lg border">
-                <div className="p-6 border-b">
+                <div className="p-4 sm:p-6 border-b">
                   <h2 className="text-lg font-semibold">
                     Cart ({cart.itemCount} {cart.itemCount === 1 ? 'item' : 'items'})
                   </h2>
                 </div>
                 <div className="divide-y">
                   {cart.items.map((item) => (
-                    <div key={item.id} className="p-6">
+                    <div key={item.id} className="p-4 sm:p-6">
                       <CartItemRow
                         item={item}
                         onUpdateQuantity={updateQuantity}

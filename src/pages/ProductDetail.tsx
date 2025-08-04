@@ -32,7 +32,7 @@ import { PriceDisplay } from '@/components/ui/price-display';
 import { StarRating } from '@/components/ui/star-rating';
 import { FavoriteButton } from '@/components/ui/favorite-button';
 import { DiscountBadge } from '@/components/ui/discount-badge';
-import { ProductWithDiscount } from '@/lib/discountCalculations';
+import { ProductWithDiscount, formatCurrency } from '@/lib/discountCalculations';
 
 // Remove the mock Review interface since we're using the real one from API
 
@@ -70,6 +70,48 @@ const ProductDetail = () => {
       setLoading(false);
     }
   }, [id]);
+
+  useEffect(() => {
+    // Update page meta tags for social sharing
+    if (product) {
+      document.title = `${product.name} - Starters`;
+      
+      // Update Open Graph meta tags
+      const updateMetaTag = (property: string, content: string) => {
+        let meta = document.querySelector(`meta[property="${property}"]`);
+        if (!meta) {
+          meta = document.createElement('meta');
+          meta.setAttribute('property', property);
+          document.head.appendChild(meta);
+        }
+        meta.setAttribute('content', content);
+      };
+      
+      const updateTwitterMetaTag = (name: string, content: string) => {
+        let meta = document.querySelector(`meta[name="${name}"]`);
+        if (!meta) {
+          meta = document.createElement('meta');
+          meta.setAttribute('name', name);
+          document.head.appendChild(meta);
+        }
+        meta.setAttribute('content', content);
+      };
+      
+      const productImageUrl = product.image_url || '/lovable-uploads/4b7e8feb-69d6-41e6-bf51-31bc57291f4a.png';
+      const productDescription = `${product.name} - ${formatCurrency(product.discounted_price || product.price)}`;
+      
+      updateMetaTag('og:title', product.name);
+      updateMetaTag('og:description', productDescription);
+      updateMetaTag('og:image', productImageUrl);
+      updateMetaTag('og:url', window.location.href);
+      updateMetaTag('og:type', 'product');
+      
+      updateTwitterMetaTag('twitter:title', product.name);
+      updateTwitterMetaTag('twitter:description', productDescription);
+      updateTwitterMetaTag('twitter:image', productImageUrl);
+      updateTwitterMetaTag('twitter:card', 'summary_large_image');
+    }
+  }, [product]);
 
   const fetchProductDetails = async () => {
     try {
@@ -135,7 +177,6 @@ const ProductDetail = () => {
   const handleShare = (platform: string) => {
     const url = window.location.href;
     const text = `Check out this amazing ${product?.name}!`;
-    const imageUrl = product?.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop';
     
     switch (platform) {
       case 'telegram':
@@ -145,15 +186,12 @@ const ProductDetail = () => {
         window.open(`https://twitter.com/intent/tweet?url=${url}&text=${text}`, '_blank');
         break;
       case 'whatsapp':
-        // For WhatsApp, we include both text, image reference, and URL
-        const whatsappText = `${text}\n\n🖼️ Product Image: ${imageUrl}\n\n${url}`;
-        window.open(`https://wa.me/?text=${encodeURIComponent(whatsappText)}`, '_blank');
+        // WhatsApp will now use the Open Graph meta tags we set to show product image
+        window.open(`https://wa.me/?text=${encodeURIComponent(`${text} ${url}`)}`, '_blank');
         break;
       default:
-        // For other platforms, copy URL and image URL to clipboard
-        const clipboardText = `${text}\n\nProduct Link: ${url}\nImage: ${imageUrl}`;
-        navigator.clipboard.writeText(clipboardText);
-        toast({ title: "Link and image URL copied to clipboard!" });
+        navigator.clipboard.writeText(url);
+        toast({ title: "Link copied to clipboard!" });
     }
   };
 

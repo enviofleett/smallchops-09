@@ -20,7 +20,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
   return (
     <div className="flex items-start gap-4">
       {/* Product Image */}
-      <div className="w-16 h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
+      <div className="w-20 h-20 sm:w-16 sm:h-16 bg-muted rounded-lg overflow-hidden flex-shrink-0">
         <img 
           src={item.image_url || '/placeholder.svg'} 
           alt={item.product_name}
@@ -29,8 +29,8 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
       </div>
 
       {/* Product Info */}
-      <div className="flex-1 min-w-0">
-        <h4 className="font-medium text-base mb-1">{item.product_name}</h4>
+      <div className="flex-1 min-w-0 pr-2">
+        <h4 className="font-medium text-base sm:text-sm mb-1 leading-tight">{item.product_name}</h4>
         
         {/* Price Display */}
         <div className="mb-2">
@@ -67,35 +67,9 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
       </div>
       
       {/* Right Side - Quantity, Price, Remove */}
-      <div className="flex items-center gap-6">
-        {/* Quantity Controls */}
-        <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-            disabled={item.quantity <= 1}
-          >
-            <Minus className="h-3 w-3" />
-          </Button>
-          
-          <span className="w-8 text-center text-sm font-medium">
-            {item.quantity}
-          </span>
-          
-          <Button
-            variant="outline"
-            size="sm"
-            className="h-8 w-8 p-0"
-            onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-          >
-            <Plus className="h-3 w-3" />
-          </Button>
-        </div>
-        
-        {/* Line Total */}
-        <div className="text-right min-w-[80px]">
+      <div className="flex flex-col sm:flex-row items-end sm:items-center gap-3 sm:gap-6">
+        {/* Mobile Layout: Price First */}
+        <div className="sm:hidden text-right">
           <div className="font-semibold text-base">
             {formatCurrency(lineTotal)}
           </div>
@@ -112,16 +86,64 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
             </div>
           )}
         </div>
-        
-        {/* Remove Button */}
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
-          onClick={() => onRemove(item.id)}
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+
+        {/* Quantity Controls and Actions */}
+        <div className="flex items-center gap-3 sm:gap-6">
+          {/* Quantity Controls */}
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
+              disabled={item.quantity <= 1}
+            >
+              <Minus className="h-3 w-3" />
+            </Button>
+            
+            <span className="w-8 text-center text-sm font-medium">
+              {item.quantity}
+            </span>
+            
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0"
+              onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
+            >
+              <Plus className="h-3 w-3" />
+            </Button>
+          </div>
+          
+          {/* Desktop Layout: Price */}
+          <div className="hidden sm:block text-right min-w-[80px]">
+            <div className="font-semibold text-base">
+              {formatCurrency(lineTotal)}
+            </div>
+            
+            {hasDiscount && savings > 0 && (
+              <div className="text-xs text-green-600">
+                Save {formatCurrency(savings)}
+              </div>
+            )}
+            
+            {hasDiscount && (
+              <div className="text-xs text-muted-foreground line-through">
+                {formatCurrency(originalLineTotal)}
+              </div>
+            )}
+          </div>
+          
+          {/* Remove Button */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive"
+            onClick={() => onRemove(item.id)}
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
     </div>
   );

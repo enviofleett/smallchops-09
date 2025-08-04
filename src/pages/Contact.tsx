@@ -69,7 +69,7 @@ const Contact = () => {
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Our Location</h3>
                         <p className="text-gray-600">
-                          {settings?.address || 'Lagos, Nigeria'}
+                          {settings?.address || '2B Close Off 11Crescent Kado Estate, Kado'}
                         </p>
                       </div>
                     </div>
@@ -86,7 +86,7 @@ const Contact = () => {
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Phone</h3>
                         <p className="text-gray-600">
-                          {settings?.phone || '+234 XXX XXX XXXX'}
+                          {settings?.phone || '0807 301 1100'}
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
                           Call us for orders and inquiries
@@ -130,9 +130,7 @@ const Contact = () => {
                             <p>{settings.working_hours}</p>
                           ) : (
                             <>
-                              <p>Monday - Friday: 9:00 AM - 8:00 PM</p>
-                              <p>Saturday: 10:00 AM - 6:00 PM</p>
-                              <p>Sunday: 12:00 PM - 5:00 PM</p>
+                              <p>Open ⋅ Closes 6 pm</p>
                             </>
                           )}
                         </div>

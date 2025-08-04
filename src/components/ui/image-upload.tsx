@@ -30,7 +30,7 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
   const handleFileChange = useCallback(async (file: File | null) => {
     setError(null);
     setIsProcessing(false);
-    console.log("ImageUpload: handleFileChange called with file:", file?.name, file?.size);
+    console.log("ImageUpload: handleFileChange called with file:", file?.name, file?.size, file?.type);
     
     if (file) {
       // Validate file type
@@ -58,7 +58,7 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
         });
         
         // Create File object from blob
-        const resizedFile = new File([resizedBlob], file.name, {
+        const resizedFile = new File([resizedBlob], file.name.replace(/\.[^/.]+$/, ".jpg"), {
           type: 'image/jpeg',
           lastModified: Date.now(),
         });
@@ -69,21 +69,26 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
           dimensions: '1000x1000px'
         });
         
-        // Create preview
-        const reader = new FileReader();
-        reader.onload = () => {
-          const result = reader.result as string;
-          setPreview(result);
-          setIsProcessing(false);
-        };
-        reader.readAsDataURL(resizedFile);
+        // Create preview URL
+        const previewUrl = URL.createObjectURL(resizedBlob);
+        console.log("ImageUpload: Created preview URL:", previewUrl);
+        
+        // Set preview and clear processing state
+        setPreview(previewUrl);
+        setIsProcessing(false);
         
         // Pass the resized file to parent
         onChange(resizedFile);
+        
+        // Clean up previous preview URL if it exists
+        return () => {
+          URL.revokeObjectURL(previewUrl);
+        };
       } catch (error) {
         console.error("ImageUpload: Error processing image:", error);
         setError(error instanceof Error ? error.message : 'Failed to process image');
         setIsProcessing(false);
+        setPreview(null);
       }
     } else {
       setPreview(null);
@@ -139,7 +144,13 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
               className="w-full h-48 object-cover rounded-lg border"
               onError={(e) => {
                 console.error("ImageUpload: Failed to load preview image:", preview);
+                console.error("ImageUpload: Image error event:", e);
                 setError("Failed to load image preview");
+                setPreview(null); // Clear the preview to avoid showing broken image
+              }}
+              onLoad={() => {
+                console.log("ImageUpload: Preview image loaded successfully");
+                setError(null); // Clear any previous error when image loads successfully
               }}
             />
             {isProcessing && (
@@ -206,7 +217,23 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
       )}
       
       {error && (
-        <p className="text-sm text-red-600 mt-2">{error}</p>
+        <div className="space-y-2">
+          <p className="text-sm text-red-600">{error}</p>
+          {error.includes("Failed to load image") && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                setError(null);
+                setPreview(null);
+                console.log("ImageUpload: Error cleared, resetting component");
+              }}
+            >
+              Try Again
+            </Button>
+          )}
+        </div>
       )}
     </div>
   );

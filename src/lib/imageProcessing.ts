@@ -22,13 +22,21 @@ export const resizeImage = async (
 
   return new Promise((resolve, reject) => {
     const img = new Image();
+    
     img.onload = () => {
       try {
+        console.log("resizeImage: Image loaded successfully", { 
+          originalWidth: img.width, 
+          originalHeight: img.height,
+          targetWidth,
+          targetHeight 
+        });
+        
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         
         if (!ctx) {
-          reject(new Error('Failed to get canvas context'));
+          reject(new Error('Failed to get canvas context - canvas not supported'));
           return;
         }
 
@@ -67,25 +75,42 @@ export const resizeImage = async (
           0, 0, targetWidth, targetHeight
         );
 
+        console.log("resizeImage: Canvas drawing completed, converting to blob");
+
         // Convert to blob
         canvas.toBlob(
           (blob) => {
             if (blob) {
+              console.log("resizeImage: Blob created successfully", { 
+                size: blob.size,
+                type: blob.type
+              });
               resolve(blob);
             } else {
-              reject(new Error('Failed to create blob'));
+              reject(new Error('Failed to create image blob - conversion failed'));
             }
           },
           `image/${format}`,
           quality
         );
       } catch (error) {
-        reject(error);
+        console.error("resizeImage: Error during processing:", error);
+        reject(new Error(`Image processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`));
       }
     };
 
-    img.onerror = () => reject(new Error('Failed to load image'));
-    img.src = URL.createObjectURL(file);
+    img.onerror = (event) => {
+      console.error("resizeImage: Failed to load image for processing:", event);
+      reject(new Error('Failed to load image - file may be corrupted or invalid'));
+    };
+    
+    try {
+      img.src = URL.createObjectURL(file);
+      console.log("resizeImage: Created object URL for image processing");
+    } catch (error) {
+      console.error("resizeImage: Failed to create object URL:", error);
+      reject(new Error('Failed to process file - invalid image data'));
+    }
   });
 };
 

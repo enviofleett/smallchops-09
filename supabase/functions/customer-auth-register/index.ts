@@ -20,9 +20,42 @@ interface RateLimitResponse {
   remaining?: number;
 }
 
-// Function to send OTP email
+// Enhanced function to send OTP email with fallback
 async function sendOTPEmail(supabase: any, email: string, otp: string, name: string) {
+  console.log('=== Sending OTP Email ===');
+  console.log('Email:', email);
+  console.log('Name:', name);
+  console.log('OTP Code:', otp);
+
   try {
+    // Try enhanced email processor first
+    const { data: enhancedResult, error: enhancedError } = await supabase.functions.invoke('enhanced-email-processor', {
+      body: {
+        templateId: 'customer_registration_otp',
+        recipient: {
+          email: email,
+          name: name
+        },
+        variables: {
+          otpCode: otp,
+          customerName: name,
+          customerEmail: email,
+          companyName: 'Starters',
+          expiryMinutes: '10'
+        },
+        emailType: 'transactional',
+        priority: 'high'
+      }
+    });
+
+    if (!enhancedError && enhancedResult?.success) {
+      console.log('✅ OTP email sent via enhanced processor');
+      return true;
+    }
+
+    console.warn('Enhanced email processor failed, trying fallback:', enhancedError);
+
+    // Fallback to direct SMTP sender
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
       body: {
         templateId: 'customer_registration_otp',
@@ -42,13 +75,15 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, name: str
     });
 
     if (error) {
-      console.error('OTP email send error:', error);
+      console.error('❌ Direct SMTP sender also failed:', error);
       return false;
     }
 
+    console.log('✅ OTP email sent via direct SMTP sender');
     return true;
+
   } catch (error) {
-    console.error('Error sending OTP email:', error);
+    console.error('❌ Critical error sending OTP email:', error);
     return false;
   }
 }

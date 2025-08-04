@@ -5863,7 +5863,7 @@ export type Database = {
         Returns: boolean
       }
       check_otp_rate_limit: {
-        Args: { p_email: string }
+        Args: { p_email: string } | { p_email: string; p_ip_address?: unknown }
         Returns: Json
       }
       check_paystack_production_readiness: {
@@ -6195,7 +6195,7 @@ export type Database = {
       }
       increment_rate_limit_counter: {
         Args: { p_identifier: string; p_identifier_type?: string }
-        Returns: undefined
+        Returns: Json
       }
       is_admin: {
         Args: Record<PropertyKey, never>

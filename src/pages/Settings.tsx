@@ -17,6 +17,8 @@ import { DeliveryZoneDevTools } from "@/components/settings/DeliveryZoneDevTools
 import { AuthenticationEndpointsTab } from "@/components/settings/AuthenticationEndpointsTab";
 import { BuyingLogicEndpointsTab } from "@/components/settings/BuyingLogicEndpointsTab";
 import { PickupPointsManager } from "@/components/admin/PickupPointsManager";
+import { ProductionHealthMonitor } from "@/components/admin/ProductionHealthMonitor";
+import { ProductionReadinessStatus } from "@/components/admin/ProductionReadinessStatus";
 import RegistrationHealth from "./RegistrationHealth";
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
@@ -288,11 +290,12 @@ if (!signupData.phone || signupData.phone.trim().length < 10) {
 
         {isAdmin && <TabsContent value="developer" className="space-y-6">
             <Tabs defaultValue="auth-endpoints" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="auth-endpoints">Auth API</TabsTrigger>
                 <TabsTrigger value="buying-logic">Buying Logic</TabsTrigger>
                 <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
                 <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
+                <TabsTrigger value="production-readiness">Production</TabsTrigger>
               </TabsList>
               
               <TabsContent value="auth-endpoints">
@@ -1537,6 +1540,13 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                     <RegistrationHealth />
                   </CardContent>
                 </Card>
+              </TabsContent>
+
+              <TabsContent value="production-readiness">
+                <div className="space-y-6">
+                  <ProductionReadinessStatus />
+                  <ProductionHealthMonitor />
+                </div>
               </TabsContent>
             </Tabs>
           </TabsContent>}

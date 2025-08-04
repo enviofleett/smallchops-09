@@ -270,192 +270,93 @@ export const deleteCustomer = async (customerId: string) => {
   return data;
 };
 
-// Updated getCustomerAnalytics to show ALL customers (both registered and guest)
+// Updated getCustomerAnalytics to use new database functions
 export const getCustomerAnalytics = async (dateRange: DateRange): Promise<CustomerAnalytics> => {
   const { from, to } = dateRange;
 
-  // Fetch registered customers - avoid direct auth.users access
-  const { data: registeredCustomers, error: registeredError } = await supabase
-    .from('customer_accounts')
-    .select(`
-      id,
-      user_id,
-      name,
-      phone,
-      created_at
-    `);
+  try {
+    // Use the new safe analytics function
+    const { data: analyticsResult, error: analyticsError } = await supabase
+      .rpc('get_customer_analytics_safe', {
+        p_start_date: from.toISOString(),
+        p_end_date: to.toISOString()
+      });
 
-  if (registeredError) throw new Error(registeredError.message);
-
-  // Create a map to store user emails from orders instead of auth.users
-  const userEmailMap = new Map<string, string>();
-
-  // Fetch ALL orders to get guest customers and order data
-  const { data: allOrders, error: ordersError } = await supabase
-    .from('orders')
-    .select(`
-      id,
-      customer_id,
-      customer_name,
-      customer_phone,
-      customer_email,
-      total_amount,
-      order_time,
-      status
-    `)
-    .neq('status', 'cancelled');
-
-  if (ordersError) throw new Error(ordersError.message);
-
-  // Create customer buckets
-  const bucket: Record<string, {
-    id: string;
-    name: string;
-    email: string;
-    phone?: string;
-    totalOrders: number;
-    totalSpent: number;
-    lastOrderDate: string;
-    status: 'VIP' | 'Active' | 'Inactive' | 'Registered';
-    isGuest: boolean;
-  }> = {};
-
-  // First, collect emails from orders for registered customers
-  allOrders?.forEach(order => {
-    if (order.customer_id && order.customer_email) {
-      userEmailMap.set(order.customer_id, order.customer_email);
+    if (analyticsError) {
+      console.error('Analytics function error:', analyticsError);
+      throw new Error(`Failed to get analytics: ${analyticsError.message}`);
     }
-  });
 
-  // Add registered customers to bucket
-  registeredCustomers?.forEach(customer => {
-    const customerKey = `reg:${customer.id}`;
-    const email = userEmailMap.get(customer.id) || '';
-    
-    // Fix name vs email issue - if name looks like email, extract name from email
-    let displayName = customer.name;
-    if (customer.name && customer.name.includes('@')) {
-      // Extract name from email (part before @)
-      displayName = customer.name.split('@')[0].replace(/[._]/g, ' ');
-      displayName = displayName.charAt(0).toUpperCase() + displayName.slice(1);
+    // Get all customers for display
+    const { data: customersResult, error: customersError } = await supabase
+      .rpc('get_all_customers_display');
+
+    if (customersError) {
+      console.error('Customers function error:', customersError);
+      throw new Error(`Failed to get customers: ${customersError.message}`);
     }
-    
-    bucket[customerKey] = {
-      id: customer.id,
-      name: displayName || (email ? email.split('@')[0] : 'Unknown User'),
-      email: email,
-      phone: customer.phone || '',
-      totalOrders: 0,
-      totalSpent: 0,
-      lastOrderDate: customer.created_at,
-      status: 'Registered', // Default status for authenticated users
-      isGuest: false,
-    };
-  });
 
-  // Process orders and add guest customers
-  allOrders?.forEach(order => {
-    let customerKey = '';
+    // Parse the results
+    const analytics = analyticsResult as any;
+    const allCustomers: Customer[] = (customersResult as any[]) || [];
+
+    // Get email statuses for all customers
+    const emailStatuses = await getCustomerEmailStatuses(allCustomers.map(c => c.email).filter(email => email));
     
-    if (order.customer_id) {
-      // Registered customer order
-      customerKey = `reg:${order.customer_id}`;
-    } else {
-      // Guest customer order
-      customerKey = `guest:${order.customer_name}|${order.customer_email || ''}|${order.customer_phone || ''}`;
-      
-      // Add guest customer if not already in bucket
-      if (!bucket[customerKey]) {
-        bucket[customerKey] = {
-          id: `guest-${order.customer_name?.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
-          name: order.customer_name || 'Unknown',
-          email: order.customer_email || '',
-          phone: order.customer_phone || '',
-          totalOrders: 0,
-          totalSpent: 0,
-          lastOrderDate: order.order_time,
-          status: 'Inactive',
-          isGuest: true,
-        };
+    // Add email status to customers
+    allCustomers.forEach(customer => {
+      const emailStatus = emailStatuses[customer.email];
+      if (emailStatus) {
+        customer.emailStatus = emailStatus.status;
+        customer.emailSentAt = emailStatus.sentAt;
+        customer.emailLastAttempt = emailStatus.lastAttempt;
+      } else {
+        customer.emailStatus = 'none';
       }
-    }
+    });
 
-    // Update order data for both registered and guest customers
-    if (bucket[customerKey]) {
-      bucket[customerKey].totalOrders += 1;
-      bucket[customerKey].totalSpent += Number(order.total_amount);
-      
-      // Update last order date if this order is more recent
-      if (new Date(order.order_time) > new Date(bucket[customerKey].lastOrderDate)) {
-        bucket[customerKey].lastOrderDate = order.order_time;
-      }
-    }
-  });
-
-  // Compute customer status based on spending and orders
-  Object.values(bucket).forEach(c => {
-    if (c.totalSpent > 5000) {
-      c.status = 'VIP';
-    } else if (c.totalOrders > 1) {
-      c.status = 'Active';
-    } else if (c.totalOrders === 1) {
-      c.status = 'Active';
-    } else if (!c.isGuest) {
-      // Authenticated users with no orders stay as "Registered"
-      c.status = 'Registered';
-    } else {
-      // Guest customers with no orders are "Inactive"
-      c.status = 'Inactive';
-    }
-  });
-
-  const customers: Customer[] = Object.values(bucket);
-
-  // Get email statuses for all customers
-  const emailStatuses = await getCustomerEmailStatuses(customers.map(c => c.email).filter(email => email));
-  
-  // Add email status to customers
-  customers.forEach(customer => {
-    const emailStatus = emailStatuses[customer.email];
-    if (emailStatus) {
-      customer.emailStatus = emailStatus.status;
-      customer.emailSentAt = emailStatus.sentAt;
-      customer.emailLastAttempt = emailStatus.lastAttempt;
-    } else {
-      customer.emailStatus = 'none';
-    }
-  });
-
-  // Calculate metrics
-  const totalCustomers = customers.length;
-  const activeCustomers = customers.filter(c => c.status === 'Active' || c.status === 'VIP').length;
-  const guestCustomers = customers.filter(c => c.isGuest).length;
-  const authenticatedCustomers = customers.filter(c => !c.isGuest).length;
-  const totalRevenue = customers.reduce((sum, c) => sum + c.totalSpent, 0);
-  const totalOrders = customers.reduce((sum, c) => sum + c.totalOrders, 0);
-  const repeatCustomers = customers.filter(c => c.totalOrders > 1);
-
-  return {
-    metrics: {
-      totalCustomers,
-      activeCustomers,
-      avgOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
-      repeatCustomerRate: totalCustomers > 0 ? (repeatCustomers.length / totalCustomers) * 100 : 0,
-      guestCustomers,
-      authenticatedCustomers
-    },
-    topCustomersByOrders: customers
+    // Calculate additional data for analysis
+    const topCustomersByOrders = allCustomers
       .filter(c => c.totalOrders > 0)
       .sort((a, b) => b.totalOrders - a.totalOrders)
-      .slice(0, 10),
-    topCustomersBySpending: customers
+      .slice(0, 10);
+    
+    const topCustomersBySpending = allCustomers
       .filter(c => c.totalSpent > 0)
       .sort((a, b) => b.totalSpent - a.totalSpent)
-      .slice(0, 10),
-    repeatCustomers: repeatCustomers
+      .slice(0, 10);
+    
+    const repeatCustomers = allCustomers
+      .filter(c => c.totalOrders > 1)
       .sort((a, b) => b.totalOrders - a.totalOrders)
-      .slice(0, 10),
-    allCustomers: customers,
-    customerTrends: [], // for future use
-  };
+      .slice(0, 10);
+
+    return {
+      metrics: analytics.metrics,
+      topCustomersByOrders,
+      topCustomersBySpending,
+      repeatCustomers,
+      allCustomers,
+      customerTrends: [], // for future use
+    };
+
+  } catch (error: any) {
+    console.error('Customer analytics error:', error);
+    // Return safe fallback data
+    return {
+      metrics: {
+        totalCustomers: 0,
+        activeCustomers: 0,
+        avgOrderValue: 0,
+        repeatCustomerRate: 0,
+        guestCustomers: 0,
+        authenticatedCustomers: 0
+      },
+      topCustomersByOrders: [],
+      topCustomersBySpending: [],
+      repeatCustomers: [],
+      allCustomers: [],
+      customerTrends: []
+    };
+  }
 };

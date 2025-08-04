@@ -39,11 +39,11 @@ serve(async (req) => {
     let totalRevenue = 0;
 
     try {
-      // Get total stats with individual error handling
+      // Get total stats with individual error handling - use safe customer counting
       const [productsResult, ordersResult, customersResult] = await Promise.allSettled([
         supabase.from('products').select('id', { count: 'exact', head: true }),
-        supabase.from('orders').select('id, total_amount', { count: 'exact' }),
-        supabase.from('customers').select('id', { count: 'exact', head: true })
+        supabase.from('orders').select('id, total_amount', { count: 'exact' }).neq('status', 'cancelled'),
+        supabase.from('customer_accounts').select('id', { count: 'exact', head: true })
       ]);
 
       // Handle products count
@@ -63,12 +63,22 @@ serve(async (req) => {
         console.error("Orders query failed:", ordersResult.status === 'fulfilled' ? ordersResult.value.error : ordersResult.reason);
       }
 
-      // Handle customers count
+      // Handle customer accounts count (authenticated users only)
       if (customersResult.status === 'fulfilled' && !customersResult.value.error) {
-        totalCustomers = customersResult.value.count || 0;
-        console.log(`Customers count: ${totalCustomers}`);
+        const authenticatedCustomers = customersResult.value.count || 0;
+        
+        // Add guest customers from orders
+        const { data: guestOrdersData } = await supabase
+          .from('orders')
+          .select('customer_email')
+          .is('customer_id', null)
+          .not('customer_email', 'is', null);
+        
+        const guestCustomersCount = new Set(guestOrdersData?.map(o => o.customer_email) || []).size;
+        totalCustomers = authenticatedCustomers + guestCustomersCount;
+        console.log(`Customers count: ${totalCustomers} (${authenticatedCustomers} authenticated + ${guestCustomersCount} guests)`);
       } else {
-        console.error("Customers query failed:", customersResult.status === 'fulfilled' ? customersResult.value.error : customersResult.reason);
+        console.error("Customer accounts query failed:", customersResult.status === 'fulfilled' ? customersResult.value.error : customersResult.reason);
       }
     } catch (statsError) {
       console.error("Error fetching basic stats:", statsError);

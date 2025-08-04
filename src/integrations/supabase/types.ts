@@ -6061,6 +6061,10 @@ export type Database = {
           success_rate: number
         }[]
       }
+      get_all_customers_display: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_all_customers_for_analytics: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -6074,6 +6078,10 @@ export type Database = {
       }
       get_best_smtp_provider: {
         Args: Record<PropertyKey, never>
+        Returns: Json
+      }
+      get_customer_analytics_safe: {
+        Args: { p_start_date?: string; p_end_date?: string }
         Returns: Json
       }
       get_dashboard_data: {

@@ -10,6 +10,7 @@ interface CheckoutRequest {
   customer_email: string;
   customer_name: string;
   customer_phone: string;
+  fulfillment_type: 'delivery' | 'pickup';
   delivery_address?: {
     address_line_1: string;
     address_line_2?: string;
@@ -18,6 +19,7 @@ interface CheckoutRequest {
     postal_code: string;
     landmark?: string;
   };
+  pickup_point_id?: string;
   order_items: Array<{
     product_id: string;
     quantity: number;
@@ -29,7 +31,6 @@ interface CheckoutRequest {
   delivery_zone_id?: string;
   payment_method: 'paystack' | 'bank_transfer' | 'cash_on_delivery';
   guest_session_id?: string;
-  order_type?: 'delivery' | 'pickup';
 }
 
 serve(async (req) => {
@@ -50,17 +51,18 @@ serve(async (req) => {
       customer_email, 
       customer_name, 
       customer_phone, 
+      fulfillment_type,
       delivery_address, 
+      pickup_point_id,
       order_items, 
       total_amount, 
       delivery_fee = 0, 
       delivery_zone_id,
       payment_method,
-      guest_session_id,
-      order_type = 'delivery'
+      guest_session_id
     }: CheckoutRequest = await req.json();
 
-    console.log('Processing checkout for:', customer_email);
+    console.log('Processing checkout for:', customer_email, 'fulfillment type:', fulfillment_type);
 
     // 1. Validate order data
     const { data: validationResult, error: validationError } = await supabaseAdmin
@@ -93,12 +95,13 @@ serve(async (req) => {
       p_customer_email: customer_email,
       p_customer_name: customer_name,
       p_customer_phone: customer_phone,
-      p_delivery_address: delivery_address,
+      p_fulfillment_type: fulfillment_type,
+      p_delivery_address: fulfillment_type === 'delivery' ? delivery_address : null,
+      p_pickup_point_id: fulfillment_type === 'pickup' ? pickup_point_id : null,
       p_order_items: order_items,
       p_total_amount: total_amount,
-      p_delivery_fee: delivery_fee,
-      p_delivery_zone_id: delivery_zone_id,
-      p_order_type: order_type
+      p_delivery_fee: fulfillment_type === 'delivery' ? delivery_fee : 0,
+      p_delivery_zone_id: fulfillment_type === 'delivery' ? delivery_zone_id : null
     };
 
     // Add guest session ID if provided
@@ -213,9 +216,13 @@ serve(async (req) => {
           p_new_status: 'confirmed'
         });
 
+      const codMessage = fulfillment_type === 'pickup' 
+        ? 'Order confirmed. Please prepare cash for pickup at the store.'
+        : 'Order confirmed. Please prepare cash for delivery.';
+
       paymentResult = {
         payment_method: 'cash_on_delivery',
-        message: 'Order confirmed. Please prepare cash for delivery.'
+        message: codMessage
       };
     }
 
@@ -233,7 +240,9 @@ serve(async (req) => {
           order_number: orderNumber,
           customer_email: customer_email,
           total_amount: total_amount,
-          payment_method: payment_method
+          payment_method: payment_method,
+          fulfillment_type: fulfillment_type,
+          pickup_point_id: pickup_point_id
         }
       });
 

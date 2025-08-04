@@ -10,6 +10,7 @@ import { useCustomerProfile } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
 import { Mail, Phone, MapPin, CreditCard, Banknote, Truck } from "lucide-react";
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
+import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import {
   Select,
   SelectContent,
@@ -43,6 +44,8 @@ interface CheckoutData {
   delivery_address: DeliveryAddress;
   payment_method: string;
   delivery_zone_id?: string;
+  fulfillment_type: 'delivery' | 'pickup';
+  pickup_point_id?: string;
 }
 
 interface EnhancedCheckoutFlowProps {
@@ -73,11 +76,14 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
       landmark: ''
     },
     payment_method: '',
-    delivery_zone_id: ''
+    delivery_zone_id: '',
+    fulfillment_type: 'delivery',
+    pickup_point_id: ''
   });
 
   const items = cart?.items || [];
-  const total = (cart?.summary?.total_amount || 0) + deliveryFee;
+  const currentDeliveryFee = formData.fulfillment_type === 'pickup' ? 0 : deliveryFee;
+  const total = (cart?.summary?.total_amount || 0) + currentDeliveryFee;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -94,13 +100,33 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         return;
       }
 
-      if (!formData.delivery_address.address_line_1 || !formData.delivery_address.city) {
-        toast({
-          title: "Missing Address",
-          description: "Please provide a complete delivery address.",
-          variant: "destructive",
-        });
-        return;
+      // Validate address/pickup based on fulfillment type
+      if (formData.fulfillment_type === 'delivery') {
+        if (!formData.delivery_address.address_line_1 || !formData.delivery_address.city) {
+          toast({
+            title: "Missing Address",
+            description: "Please provide a complete delivery address.",
+            variant: "destructive",
+          });
+          return;
+        }
+        if (!formData.delivery_zone_id) {
+          toast({
+            title: "Missing Delivery Zone",
+            description: "Please select a delivery zone.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else if (formData.fulfillment_type === 'pickup') {
+        if (!formData.pickup_point_id) {
+          toast({
+            title: "Missing Pickup Point",
+            description: "Please select a pickup location.",
+            variant: "destructive",
+          });
+          return;
+        }
       }
 
       if (!formData.payment_method) {
@@ -117,7 +143,9 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         customer_email: formData.customer_email,
         customer_name: formData.customer_name,
         customer_phone: formData.customer_phone,
-        delivery_address: formData.delivery_address,
+        fulfillment_type: formData.fulfillment_type,
+        delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : undefined,
+        pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : undefined,
         order_items: items.map(item => ({
           product_id: item.id,
           quantity: item.quantity,
@@ -125,8 +153,8 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
           total_price: item.price * item.quantity
         })),
         total_amount: total,
-        delivery_fee: deliveryFee,
-        delivery_zone_id: formData.delivery_zone_id,
+        delivery_fee: formData.fulfillment_type === 'delivery' ? deliveryFee : 0,
+        delivery_zone_id: formData.fulfillment_type === 'delivery' ? formData.delivery_zone_id : undefined,
         payment_method: formData.payment_method
       };
 
@@ -210,10 +238,16 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
                   <span>Subtotal:</span>
                   <span>₦{(cart?.summary?.subtotal || 0).toLocaleString()}</span>
                 </div>
-                {deliveryFee > 0 && (
+                {formData.fulfillment_type === 'delivery' && deliveryFee > 0 && (
                   <div className="flex justify-between">
                     <span>Delivery Fee:</span>
                     <span>₦{deliveryFee.toLocaleString()}</span>
+                  </div>
+                )}
+                {formData.fulfillment_type === 'pickup' && (
+                  <div className="flex justify-between text-green-600">
+                    <span>Pickup (No delivery fee):</span>
+                    <span>FREE</span>
                   </div>
                 )}
                 <div className="flex justify-between font-semibold text-lg pt-2 border-t">
@@ -272,12 +306,57 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
               </div>
             </div>
 
-            {/* Delivery Address */}
+            {/* Fulfillment Options */}
             <div className="space-y-4">
               <h3 className="font-semibold text-lg flex items-center gap-2">
-                <MapPin className="h-5 w-5" />
-                Delivery Address
+                <Truck className="h-5 w-5" />
+                Fulfillment Options
               </h3>
+              <RadioGroup
+                value={formData.fulfillment_type}
+                onValueChange={(value: 'delivery' | 'pickup') => {
+                  setFormData({ ...formData, fulfillment_type: value });
+                  if (value === 'pickup') {
+                    setDeliveryFee(0);
+                  }
+                }}
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
+                <Card className="cursor-pointer hover:border-primary transition-colors">
+                  <CardContent className="flex items-center space-x-3 p-4">
+                    <RadioGroupItem value="delivery" id="delivery" />
+                    <Truck className="h-5 w-5 text-primary" />
+                    <div className="flex-1">
+                      <Label htmlFor="delivery" className="text-sm font-medium cursor-pointer">
+                        Home Delivery
+                      </Label>
+                      <p className="text-xs text-muted-foreground">Get your order delivered to your address</p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card className="cursor-pointer hover:border-primary transition-colors">
+                  <CardContent className="flex items-center space-x-3 p-4">
+                    <RadioGroupItem value="pickup" id="pickup" />
+                    <MapPin className="h-5 w-5 text-primary" />
+                    <div className="flex-1">
+                      <Label htmlFor="pickup" className="text-sm font-medium cursor-pointer">
+                        Store Pickup
+                      </Label>
+                      <p className="text-xs text-muted-foreground">Pick up your order from our store location</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </RadioGroup>
+            </div>
+
+            {/* Delivery Address (only show for delivery) */}
+            {formData.fulfillment_type === 'delivery' && (
+              <div className="space-y-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Delivery Address
+                </h3>
               <div className="grid grid-cols-1 gap-4">
                 <div>
                   <Label htmlFor="address_line_1">Street Address *</Label>
@@ -353,16 +432,32 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
                 </div>
               </div>
 
-              {/* Delivery Zone Dropdown */}
-              <DeliveryZoneDropdown
-                selectedZoneId={formData.delivery_zone_id}
-                onZoneSelect={(zoneId, fee) => {
-                  setFormData({ ...formData, delivery_zone_id: zoneId });
-                  setDeliveryFee(fee);
-                }}
-                orderSubtotal={cart?.summary?.subtotal || 0}
-              />
-            </div>
+                {/* Delivery Zone Dropdown */}
+                <DeliveryZoneDropdown
+                  selectedZoneId={formData.delivery_zone_id}
+                  onZoneSelect={(zoneId, fee) => {
+                    setFormData({ ...formData, delivery_zone_id: zoneId });
+                    setDeliveryFee(fee);
+                  }}
+                  orderSubtotal={cart?.summary?.subtotal || 0}
+                />
+              </div>
+            )}
+
+            {/* Pickup Point Selection (only show for pickup) */}
+            {formData.fulfillment_type === 'pickup' && (
+              <div className="space-y-4">
+                <PickupPointSelector
+                  selectedPointId={formData.pickup_point_id}
+                  onSelect={(pickupPoint) => {
+                    setFormData({ 
+                      ...formData, 
+                      pickup_point_id: pickupPoint?.id || '' 
+                    });
+                  }}
+                />
+              </div>
+            )}
 
             {/* Payment Method */}
             <div className="space-y-4">

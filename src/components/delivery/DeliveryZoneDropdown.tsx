@@ -22,6 +22,7 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
 }) => {
   const [zones, setZones] = useState<DeliveryZoneWithFee[]>([]);
   const [loading, setLoading] = useState(true);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     fetchZones();
@@ -91,7 +92,6 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
     );
   }
 
-  const [open, setOpen] = useState(false);
 
   return (
     <div className="space-y-3">

@@ -54,31 +54,63 @@ const PaystackTest = () => {
 
   const testEmailSystem = async () => {
     try {
-      // Test welcome email function
-      const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+      // Test using the standardized email function with template
+      const { data, error } = await supabase.functions.invoke('send-email-standardized', {
         body: {
-          to: testCustomer.email,
-          template_key: 'test_email',
-          template_variables: {
-            customer_name: testCustomer.name,
-            test_message: 'This is a test email from your Paystack integration test.'
+          templateId: 'customer_welcome',
+          recipient: testCustomer.email,
+          variables: {
+            customerName: testCustomer.name,
+            customerEmail: testCustomer.email,
+            companyName: 'Your Store',
+            siteUrl: window.location.origin,
+            unsubscribeUrl: `${window.location.origin}/unsubscribe`
           }
         }
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Email error details:', error);
+        throw error;
+      }
 
+      console.log('Email sent successfully:', data);
       toast({
         title: "Email Test Sent",
-        description: `Test email sent to ${testCustomer.email}`,
+        description: `Welcome email sent to ${testCustomer.email}`,
       });
     } catch (error) {
       console.error('Email test error:', error);
-      toast({
-        title: "Email Test Failed",
-        description: "Could not send test email. Check console for details.",
-        variant: "destructive"
-      });
+      
+      // Fallback: Try direct SMTP function
+      try {
+        const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+          body: {
+            to: testCustomer.email,
+            subject: 'Test Email from Your Store',
+            html: `
+              <h1>Test Email</h1>
+              <p>Hello ${testCustomer.name},</p>
+              <p>This is a test email from your Paystack integration test.</p>
+              <p>If you receive this, your email system is working correctly!</p>
+            `
+          }
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: "Email Test Sent (Fallback)",
+          description: `Direct SMTP test email sent to ${testCustomer.email}`,
+        });
+      } catch (fallbackError) {
+        console.error('Fallback email test error:', fallbackError);
+        toast({
+          title: "Email Test Failed",
+          description: "Both template and direct email tests failed. Check console for details.",
+          variant: "destructive"
+        });
+      }
     }
   };
 

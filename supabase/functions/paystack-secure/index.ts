@@ -13,13 +13,18 @@ serve(async (req) => {
   }
 
   try {
+    console.log('🔄 Paystack secure function called');
+    
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { persistSession: false } }
     );
 
-    const { action, ...requestData } = await req.json();
+    const requestBody = await req.json();
+    console.log('📨 Request payload:', JSON.stringify(requestBody));
+    
+    const { action, ...requestData } = requestBody;
 
     if (action === 'initialize') {
       return await initializePayment(supabaseClient, requestData);
@@ -69,12 +74,15 @@ async function initializePayment(supabaseClient: any, requestData: any) {
     }
 
     // Get Paystack configuration
+    console.log('🔍 Fetching Paystack configuration...');
     const { data: config, error: configError } = await supabaseClient
       .from('payment_integrations')
       .select('*')
       .eq('provider', 'paystack')
       .eq('connection_status', 'connected')
       .single();
+
+    console.log('⚙️ Config result:', { config: config ? 'found' : 'not found', error: configError });
 
     if (configError || !config) {
       console.error('Paystack configuration error:', configError);

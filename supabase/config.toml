@@ -36,3 +36,9 @@ verify_jwt = false
 
 [functions.production-email-processor]
 verify_jwt = false
+
+[functions.paystack-secure]
+verify_jwt = false
+
+[functions.process-checkout]
+verify_jwt = false

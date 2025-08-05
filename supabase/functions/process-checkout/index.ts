@@ -140,10 +140,10 @@ serve(async (req) => {
       const { data: paymentTransaction, error: paymentError } = await supabaseClient
         .from('payment_transactions')
         .insert({
-          order_id: orderId,
+          order_id: orderResult.order_id,
           customer_email: checkoutData.customer_email,
           customer_name: checkoutData.customer_name,
-          amount: subtotal,
+          amount: orderResult.subtotal,
           currency: 'NGN',
           payment_method: 'paystack',
           status: 'pending',
@@ -161,16 +161,20 @@ serve(async (req) => {
         );
       }
 
-      // Use paystack-secure function instead of direct API call
+      console.log('💾 Payment transaction created:', paymentTransaction.id);
+
+      // Use paystack-secure function to initialize payment
+      console.log('🚀 Initializing Paystack payment...');
       const { data: paystackData, error: paystackError } = await supabaseClient.functions.invoke('paystack-secure', {
         body: {
           action: 'initialize',
           email: checkoutData.customer_email,
-          amount: subtotal * 100, // Convert to kobo
+          amount: orderResult.subtotal * 100, // Convert to kobo
           reference: paymentReference,
           channels: ['card', 'bank', 'ussd', 'mobile_money'],
           metadata: {
-            order_id: orderId,
+            order_id: orderResult.order_id,
+            order_number: orderResult.order_number,
             customer_name: checkoutData.customer_name,
             customer_email: checkoutData.customer_email
           }
@@ -178,19 +182,29 @@ serve(async (req) => {
       });
 
       if (paystackError || !paystackData?.status) {
-        console.error('Paystack initialization failed:', paystackError || paystackData);
+        console.error('❌ Paystack initialization failed:', paystackError || paystackData);
         return new Response(
-          JSON.stringify({ error: 'Payment initialization failed' }),
+          JSON.stringify({ 
+            success: false,
+            error: 'Payment initialization failed',
+            details: paystackError?.message || 'Unknown error'
+          }),
           { status: 500, headers: corsHeaders }
         );
       }
 
+      console.log('✅ Paystack initialization successful');
+
       return new Response(
         JSON.stringify({
           success: true,
-          order_id: orderId,
-          payment_url: paystackData.data.authorization_url,
-          reference: paymentReference
+          order_id: orderResult.order_id,
+          order_number: orderResult.order_number,
+          payment: {
+            payment_url: paystackData.data.authorization_url,
+            reference: paymentReference,
+            message: 'Redirecting to payment gateway...'
+          }
         }),
         { status: 200, headers: corsHeaders }
       );

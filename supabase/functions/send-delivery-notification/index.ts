@@ -109,7 +109,7 @@ const handler = async (req: Request): Promise<Response> => {
       try {
         if (channel === 'email') {
           // Send email using existing email service
-          const { data: emailResult, error: emailError } = await supabase.functions.invoke('send-email', {
+          const { data: emailResult, error: emailError } = await supabase.functions.invoke('smtp-email-sender', {
             body: {
               to: request.recipient,
               subject: processedSubject,

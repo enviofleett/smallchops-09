@@ -130,20 +130,15 @@ async function performHealthCheck(supabase: any) {
   try {
     const { data: emailConfig } = await supabase
       .from('communication_settings')
-      .select('sender_email, mailersend_domain_verified')
+      .select('sender_email, smtp_host, smtp_port, smtp_user')
       .single();
     
-    const mailersendToken = Deno.env.get('MAILERSEND_API_TOKEN');
-    
-    if (!mailersendToken) {
-      checks.email = { status: 'error', message: 'MailerSend API token not configured' };
-      overallHealthy = false;
-    } else if (!emailConfig?.sender_email) {
+    if (!emailConfig?.sender_email) {
       checks.email = { status: 'warning', message: 'Sender email not configured' };
-    } else if (!emailConfig?.mailersend_domain_verified) {
-      checks.email = { status: 'warning', message: 'Email domain not verified' };
+    } else if (!emailConfig?.smtp_host || !emailConfig?.smtp_port || !emailConfig?.smtp_user) {
+      checks.email = { status: 'warning', message: 'SMTP configuration incomplete' };
     } else {
-      checks.email = { status: 'healthy', message: 'Email system configured and verified' };
+      checks.email = { status: 'healthy', message: 'SMTP email system configured' };
     }
   } catch (error) {
     checks.email = { status: 'error', message: 'Failed to check email configuration' };

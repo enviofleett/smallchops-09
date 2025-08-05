@@ -152,7 +152,7 @@ class PublicAPIService {
     html?: string;
     text?: string;
   }) {
-    const response = await supabase.functions.invoke('send-email', {
+    const response = await supabase.functions.invoke('smtp-email-sender', {
       body: emailData
     });
 

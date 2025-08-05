@@ -267,11 +267,11 @@ serve(async (req) => {
           });
         }
 
-        // Call the send-email function using Supabase client
+        // Call the smtp-email-sender function using Supabase client
         try {
-          console.log('Calling send-email function...');
+          console.log('Calling smtp-email-sender function...');
           
-          const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('send-email', {
+          const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('smtp-email-sender', {
             body: {
               to: settings.sender_email, // Send test email to sender
               subject: 'SMTP Test Email - Connection Successful',
@@ -287,10 +287,10 @@ serve(async (req) => {
           });
           
           if (emailError) {
-            console.error('Send-email function failed:', emailError);
+            console.error('SMTP email sender function failed:', emailError);
             return new Response(JSON.stringify({
               success: false,
-              error: `Email test failed: ${emailError.message || 'Unknown error from send-email function'}`
+              error: `Email test failed: ${emailError.message || 'Unknown error from smtp-email-sender function'}`
             }), {
               status: 400,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }

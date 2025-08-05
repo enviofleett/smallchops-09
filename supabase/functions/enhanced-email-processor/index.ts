@@ -122,35 +122,54 @@ serve(async (req: Request) => {
           continue; // Skip to next email
         }
 
-        // Try production SMTP sender first, then fallback to direct SMTP
+        // Enhanced email processing with template support
         let sendResult, sendError;
         
+        // First try using template-based approach with smtp-email-sender
+        console.log(`Attempting template-based email for ${email.recipient_email} with template: ${email.template_key || email.event_type}`);
+        
         ({ data: sendResult, error: sendError } = await supabase.functions.invoke(
-          'production-smtp-sender',
+          'smtp-email-sender',
           {
             body: {
-              to: email.recipient_email,
-              subject: email.payload?.subject || 'Message from Starters',
-              html: email.payload?.html || email.payload?.content || '',
-              template_variables: email.template_variables || email.variables || {},
-              event_id: email.id,
-              priority: email.priority || 'normal'
+              templateId: email.template_key || email.event_type,
+              recipient: {
+                email: email.recipient_email,
+                name: email.template_variables?.customerName || email.variables?.customerName || 'Valued Customer'
+              },
+              variables: {
+                ...email.template_variables,
+                ...email.variables,
+                // Ensure standard variables are always available
+                companyName: 'Starters',
+                supportEmail: 'support@starters.com',
+                websiteUrl: 'https://starters.com'
+              },
+              emailType: 'transactional'
             }
           }
         ));
 
-        // If production sender fails, try direct SMTP as fallback
+        // If template-based fails, try production SMTP sender as fallback
         if (sendError || !sendResult?.success) {
-          console.log(`Production sender failed, trying direct SMTP for ${email.recipient_email}`);
+          console.log(`Template sender failed, trying production SMTP for ${email.recipient_email}`);
           
           ({ data: sendResult, error: sendError } = await supabase.functions.invoke(
-            'smtp-email-sender',
+            'production-smtp-sender',
             {
               body: {
-                recipient_email: email.recipient_email,
-                template_key: email.template_key || email.event_type,
-                variables: email.template_variables || email.variables || {},
-                event_id: email.id
+                to: email.recipient_email,
+                subject: email.payload?.subject || `Update from ${email.template_variables?.companyName || 'Starters'}`,
+                html: email.payload?.html || email.payload?.content || `
+                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+                    <h2>Hello ${email.template_variables?.customerName || 'Valued Customer'}!</h2>
+                    <p>Thank you for your interest in our services.</p>
+                    <p>Best regards,<br>${email.template_variables?.companyName || 'Starters'} Team</p>
+                  </div>
+                `,
+                template_variables: email.template_variables || email.variables || {},
+                event_id: email.id,
+                priority: email.priority || 'normal'
               }
             }
           ));

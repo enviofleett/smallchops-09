@@ -165,51 +165,90 @@ serve(async (req) => {
           })
           .eq('id', transaction.order_id);
 
-        // Queue payment confirmation email
+        // Queue order confirmation emails using correct template keys
         const orderData = transaction.order;
         if (orderData?.customer_email) {
-          console.log('Queuing payment confirmation email for:', orderData.customer_email);
+          console.log('Queuing order confirmation emails for:', orderData.customer_email);
           
-          // Insert payment confirmation email into communication_events
+          // Get business settings for admin email and branding
+          const { data: businessSettings } = await supabaseClient
+            .from('business_settings')
+            .select('admin_notification_email, email, name')
+            .limit(1)
+            .single();
+
+          const adminEmail = businessSettings?.admin_notification_email || businessSettings?.email || 'admin@starters.com';
+          const businessName = businessSettings?.name || 'Starters';
+
+          const emailEvents = [
+            // Customer order confirmation email
+            {
+              event_type: 'order_confirmation',
+              recipient_email: orderData.customer_email,
+              order_id: transaction.order_id,
+              status: 'queued',
+              template_key: 'order_confirmation_clean',
+              template_variables: {
+                customerName: orderData.customer_name || 'Valued Customer',
+                orderId: orderData.order_number || transaction.order_id,
+                orderDate: new Date().toLocaleDateString(),
+                orderTotal: `₦${(data.amount / 100).toLocaleString()}`,
+                orderItems: `Payment Amount: ₦${(data.amount / 100).toLocaleString()}`,
+                deliveryAddress: 'As specified in your order',
+                companyName: businessName,
+                supportEmail: businessSettings?.email || 'support@starters.com'
+              },
+              priority: 'high'
+            },
+            // Admin order notification
+            {
+              event_type: 'admin_new_order',
+              recipient_email: adminEmail,
+              order_id: transaction.order_id,
+              status: 'queued',
+              template_key: 'admin_new_order',
+              template_variables: {
+                orderNumber: orderData.order_number || transaction.order_id,
+                customerName: orderData.customer_name || 'Customer',
+                customerEmail: orderData.customer_email,
+                orderTotal: `₦${(data.amount / 100).toLocaleString()}`,
+                orderDate: new Date().toLocaleDateString(),
+                itemsCount: 1,
+                orderId: transaction.order_id,
+                adminDashboardLink: 'https://yourdomain.com/admin/orders'
+              },
+              priority: 'high'
+            }
+          ];
+
           const { error: emailInsertError } = await supabaseClient
             .from('communication_events')
-            .insert({
-              event_type: 'payment_confirmation',
-              recipient_email: orderData.customer_email,
-              status: 'queued',
-              priority: 'high',
-              order_id: transaction.order_id,
-              payload: {
-                order_id: transaction.order_id,
-                order_number: orderData.order_number,
-                amount: data.amount / 100, // Convert from kobo
-                payment_reference: reference,
-                customer_name: orderData.customer_name,
-                customer_email: orderData.customer_email
-              },
-              template_variables: {
-                customer_name: orderData.customer_name,
-                order_number: orderData.order_number,
-                amount: (data.amount / 100).toLocaleString(),
-                payment_reference: reference
-              },
-              retry_count: 0
-            });
+            .insert(emailEvents);
 
           if (emailInsertError) {
-            console.error('Failed to queue payment confirmation email:', emailInsertError);
+            console.error('Failed to queue order confirmation emails:', emailInsertError);
           } else {
-            console.log('Payment confirmation email queued successfully');
+            console.log(`Queued ${emailEvents.length} order confirmation emails successfully`);
             
-            // Trigger email processor immediately
+            // Trigger multiple email processors for immediate processing
             try {
               console.log('Triggering enhanced email processor...');
-              await supabaseClient.functions.invoke('enhanced-email-processor', {
-                body: { priority: 'high', event_type: 'payment_confirmation' }
-              });
+              await supabaseClient.functions.invoke('enhanced-email-processor');
               console.log('Enhanced email processor triggered successfully');
+              
+              // Also trigger instant processor for high priority
+              await supabaseClient.functions.invoke('instant-email-processor');
+              console.log('Instant email processor triggered successfully');
             } catch (emailError) {
-              console.error('Failed to trigger enhanced email processor:', emailError);
+              console.error('Failed to trigger email processors:', emailError);
+              
+              // Fallback to production processor
+              try {
+                await supabaseClient.functions.invoke('production-email-processor');
+                console.log('Production email processor triggered as fallback');
+              } catch (fallbackError) {
+                console.error('All email processors failed:', fallbackError);
+              }
             }
           }
         }

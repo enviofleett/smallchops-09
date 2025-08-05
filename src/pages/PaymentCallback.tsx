@@ -59,21 +59,24 @@ export default function PaymentCallback() {
         throw new Error(error.message);
       }
 
-      if (data.success) {
+      console.log('PaymentCallback - Verification response:', data);
+
+      // Check the actual response structure from paystack-verify
+      if (data.status && data.data?.status === 'success') {
         setStatus('success');
         setResult({
           success: true,
-          order_id: data.order_id,
-          order_number: data.order_number,
-          amount: data.amount,
+          order_id: data.data.metadata?.order_id,
+          order_number: data.data.metadata?.order_number,
+          amount: data.data.amount / 100, // Convert from kobo to naira
           message: 'Payment verified successfully'
         });
       } else {
         setStatus('failed');
         setResult({
           success: false,
-          error: data.error,
-          message: data.message || 'Payment verification failed'
+          error: data.error || data.data?.gateway_response,
+          message: data.message || data.data?.gateway_response || 'Payment verification failed'
         });
       }
     } catch (error) {

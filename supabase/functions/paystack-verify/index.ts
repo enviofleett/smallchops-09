@@ -142,7 +142,16 @@ serve(async (req) => {
     if (data.status === 'success') {
       const { data: transaction } = await supabaseClient
         .from('payment_transactions')
-        .select('order_id, order:orders!inner(customer_email)')
+        .select(`
+          order_id, 
+          order:orders!inner(
+            id, 
+            customer_email, 
+            customer_name, 
+            order_number, 
+            total_amount
+          )
+        `)
         .eq('provider_reference', reference)
         .single();
 
@@ -157,24 +166,32 @@ serve(async (req) => {
           .eq('id', transaction.order_id);
 
         // Queue payment confirmation email
-        const customerEmail = transaction.order?.customer_email;
-        if (customerEmail) {
-          console.log('Queuing payment confirmation email for:', customerEmail);
+        const orderData = transaction.order;
+        if (orderData?.customer_email) {
+          console.log('Queuing payment confirmation email for:', orderData.customer_email);
           
           // Insert payment confirmation email into communication_events
           const { error: emailInsertError } = await supabaseClient
             .from('communication_events')
             .insert({
               event_type: 'payment_confirmation',
-              recipient_email: customerEmail,
+              recipient_email: orderData.customer_email,
               status: 'queued',
               priority: 'high',
-              template_data: {
+              order_id: transaction.order_id,
+              payload: {
                 order_id: transaction.order_id,
-                order_number: data.metadata?.order_number,
+                order_number: orderData.order_number,
                 amount: data.amount / 100, // Convert from kobo
                 payment_reference: reference,
-                customer_name: data.metadata?.customer_name
+                customer_name: orderData.customer_name,
+                customer_email: orderData.customer_email
+              },
+              template_variables: {
+                customer_name: orderData.customer_name,
+                order_number: orderData.order_number,
+                amount: (data.amount / 100).toLocaleString(),
+                payment_reference: reference
               },
               retry_count: 0
             });
@@ -183,20 +200,27 @@ serve(async (req) => {
             console.error('Failed to queue payment confirmation email:', emailInsertError);
           } else {
             console.log('Payment confirmation email queued successfully');
+            
+            // Trigger email processor immediately
+            try {
+              console.log('Triggering enhanced email processor...');
+              await supabaseClient.functions.invoke('enhanced-email-processor', {
+                body: { priority: 'high', event_type: 'payment_confirmation' }
+              });
+              console.log('Enhanced email processor triggered successfully');
+            } catch (emailError) {
+              console.error('Failed to trigger enhanced email processor:', emailError);
+            }
           }
         }
 
-        // Trigger email processing for payment confirmation emails
-        try {
-          console.log('Triggering email processor for payment confirmation...');
-          await supabaseClient.functions.invoke('enhanced-email-processor', {
-            body: { priority: 'high', event_type: 'payment_confirmation' }
-          });
-          console.log('Email processor triggered successfully after payment verification');
-        } catch (emailError) {
-          console.error('Failed to trigger email processor after payment:', emailError);
-          // Don't fail the verification for email errors
-        }
+        // Store order data for response
+        data.metadata = {
+          ...data.metadata,
+          order_id: transaction.order_id,
+          order_number: orderData.order_number,
+          customer_name: orderData.customer_name
+        };
       }
     }
 

@@ -6052,20 +6052,7 @@ export type Database = {
               p_customer_phone: string
               p_order_items: Json
               p_total_amount: number
-              p_fulfillment_type?: string
-              p_delivery_address?: Json
-              p_pickup_point_id?: string
-              p_delivery_fee?: number
-              p_delivery_zone_id?: string
-              p_guest_session_id?: string
-            }
-          | {
-              p_customer_email: string
-              p_customer_name: string
-              p_customer_phone?: string
-              p_order_items?: Json
-              p_total_amount?: number
-              p_fulfillment_type?: string
+              p_fulfillment_type: string
               p_delivery_address?: Json
               p_pickup_point_id?: string
               p_delivery_fee?: number

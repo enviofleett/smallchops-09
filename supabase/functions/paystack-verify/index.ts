@@ -187,16 +187,27 @@ serve(async (req) => {
               recipient_email: orderData.customer_email,
               order_id: transaction.order_id,
               status: 'queued',
-              template_key: 'order_confirmation_clean',
-              template_variables: {
-                customerName: orderData.customer_name || 'Valued Customer',
-                orderId: orderData.order_number || transaction.order_id,
-                orderDate: new Date().toLocaleDateString(),
-                orderTotal: `₦${(data.amount / 100).toLocaleString()}`,
-                orderItems: `Payment Amount: ₦${(data.amount / 100).toLocaleString()}`,
-                deliveryAddress: 'As specified in your order',
-                companyName: businessName,
-                supportEmail: businessSettings?.email || 'support@starters.com'
+              template_key: 'order_confirmation',
+              variables: {
+                customer_name: orderData.customer_name || 'Valued Customer',
+                order_id: transaction.order_id,
+                total_amount: `₦${(data.amount / 100).toLocaleString()}`,
+                business_name: businessName
+              },
+              priority: 'high'
+            },
+            // Payment confirmation email (separate from order confirmation)
+            {
+              event_type: 'payment_confirmation',
+              recipient_email: orderData.customer_email,
+              order_id: transaction.order_id,
+              status: 'queued',
+              template_key: 'payment_confirmation',
+              variables: {
+                customer_name: orderData.customer_name || 'Valued Customer',
+                order_id: transaction.order_id,
+                amount: `₦${(data.amount / 100).toLocaleString()}`,
+                payment_reference: reference
               },
               priority: 'high'
             },
@@ -206,16 +217,13 @@ serve(async (req) => {
               recipient_email: adminEmail,
               order_id: transaction.order_id,
               status: 'queued',
-              template_key: 'admin_new_order',
-              template_variables: {
-                orderNumber: orderData.order_number || transaction.order_id,
-                customerName: orderData.customer_name || 'Customer',
-                customerEmail: orderData.customer_email,
-                orderTotal: `₦${(data.amount / 100).toLocaleString()}`,
-                orderDate: new Date().toLocaleDateString(),
-                itemsCount: 1,
-                orderId: transaction.order_id,
-                adminDashboardLink: 'https://yourdomain.com/admin/orders'
+              template_key: 'admin_order_notification',
+              variables: {
+                order_id: transaction.order_id,
+                customer_name: orderData.customer_name || 'Customer',
+                customer_email: orderData.customer_email,
+                total_amount: `₦${(data.amount / 100).toLocaleString()}`,
+                item_count: 1
               },
               priority: 'high'
             }

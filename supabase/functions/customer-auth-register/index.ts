@@ -28,14 +28,13 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, name: str
   console.log('OTP Code:', otp);
 
   try {
-    // Try enhanced email processor first
-    const { data: enhancedResult, error: enhancedError } = await supabase.functions.invoke('enhanced-email-processor', {
-      body: {
-        templateId: 'customer_registration_otp',
-        recipient: {
-          email: email,
-          name: name
-        },
+    // Create OTP email using standardized communication events
+    const { data: emailEvent, error: emailError } = await supabase
+      .from('communication_events')
+      .insert({
+        event_type: 'customer_registration_otp',
+        recipient_email: email,
+        template_key: 'customer_registration_otp',
         variables: {
           otpCode: otp,
           customerName: name,
@@ -43,8 +42,23 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, name: str
           companyName: 'Starters',
           expiryMinutes: '10'
         },
-        emailType: 'transactional',
-        priority: 'high'
+        priority: 'high',
+        status: 'queued'
+      })
+      .select()
+      .single();
+    
+    if (emailError) {
+      console.error('Error creating OTP email event:', emailError);
+      throw new Error('Failed to queue OTP email');
+    }
+
+    // Trigger enhanced email processor for immediate processing
+    const { data: enhancedResult, error: enhancedError } = await supabase.functions.invoke('enhanced-email-processor', {
+      body: {
+        priority: 'high',
+        event_types: ['customer_registration_otp'],
+        immediate: true
       }
     });
 

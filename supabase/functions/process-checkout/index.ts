@@ -128,8 +128,9 @@ serve(async (req) => {
         p_customer_name: customer_name || '',
         p_order_items: formattedOrderItems,
         p_customer_phone: customer_phone || '',
-        p_delivery_address: deliveryAddressJsonb,
         p_fulfillment_type: fulfillment_type,
+        p_delivery_address: deliveryAddressJsonb,
+        p_guest_session_id: null,
         p_payment_method: payment_method
       };
 

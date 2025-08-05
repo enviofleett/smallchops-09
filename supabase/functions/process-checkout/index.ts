@@ -344,7 +344,7 @@ serve(async (req) => {
           amount: Math.round(total_amount * 100), // Convert to kobo and ensure integer
           currency: 'NGN',
           reference: paymentReference,
-          callback_url: `${req.headers.get('origin')}/payment-callback`,
+          callback_url: `${req.headers.get('origin')}/payment/callback`,
           metadata: {
             order_id: orderId,
             order_number: orderNumber,
@@ -439,6 +439,18 @@ serve(async (req) => {
           pickup_point_id: pickup_point_id
         }
       });
+
+    // 5. Trigger email processing for order confirmation
+    try {
+      console.log('Triggering email processor for queued emails...');
+      await supabaseAdmin.functions.invoke('enhanced-email-processor', {
+        body: { priority: 'high' }
+      });
+      console.log('Email processor triggered successfully');
+    } catch (emailError) {
+      console.error('Failed to trigger email processor:', emailError);
+      // Don't fail the checkout for email errors, just log
+    }
 
     console.log('Checkout process completed successfully');
 

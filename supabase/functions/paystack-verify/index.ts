@@ -142,7 +142,7 @@ serve(async (req) => {
     if (data.status === 'success') {
       const { data: transaction } = await supabaseClient
         .from('payment_transactions')
-        .select('order_id')
+        .select('order_id, order:orders!inner(customer_email)')
         .eq('provider_reference', reference)
         .single();
 
@@ -155,6 +155,18 @@ serve(async (req) => {
             updated_at: new Date()
           })
           .eq('id', transaction.order_id);
+
+        // Trigger email processing for payment confirmation emails
+        try {
+          console.log('Triggering email processor for payment confirmation...');
+          await supabaseClient.functions.invoke('enhanced-email-processor', {
+            body: { priority: 'high' }
+          });
+          console.log('Email processor triggered successfully after payment verification');
+        } catch (emailError) {
+          console.error('Failed to trigger email processor after payment:', emailError);
+          // Don't fail the verification for email errors
+        }
       }
     }
 

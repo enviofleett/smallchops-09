@@ -38,7 +38,7 @@ export const useCustomerOrders = () => {
               product_id,
               product_name,
               quantity,
-              price_per_item,
+              unit_price,
               products (
                 name,
                 image_url
@@ -66,7 +66,7 @@ export const useCustomerOrders = () => {
                 product_id,
                 product_name,
                 quantity,
-                price_per_item,
+                unit_price,
                 products (
                   name,
                   image_url

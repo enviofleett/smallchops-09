@@ -5,6 +5,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useCart } from "@/hooks/useCart";
+import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
@@ -20,6 +22,8 @@ interface PaymentResult {
 export default function PaymentCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { clearCart } = useCart();
+  const { clearCartAfterPayment, clearCheckoutState } = useOrderProcessing();
   const [status, setStatus] = useState<PaymentStatus>('verifying');
   const [result, setResult] = useState<PaymentResult | null>(null);
 
@@ -64,13 +68,19 @@ export default function PaymentCallback() {
       // Check the actual response structure from paystack-verify
       if (data.status && data.data?.status === 'success') {
         setStatus('success');
+        const orderNumber = data.data.metadata?.order_number;
         setResult({
           success: true,
           order_id: data.data.metadata?.order_id,
-          order_number: data.data.metadata?.order_number,
+          order_number: orderNumber,
           amount: data.data.amount / 100, // Convert from kobo to naira
           message: 'Payment verified successfully'
         });
+        
+        // Enhanced cart clearing after successful payment
+        console.log('🛒 Processing successful payment - clearing cart and cleanup');
+        await clearCartAfterPayment(orderNumber);
+        clearCheckoutState();
       } else {
         setStatus('failed');
         setResult({

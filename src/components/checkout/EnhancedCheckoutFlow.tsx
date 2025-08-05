@@ -15,6 +15,7 @@ import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
 import { storeRedirectUrl } from "@/utils/redirect";
+import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import {
   Select,
   SelectContent,
@@ -65,6 +66,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
   const { profile: customerAccount } = useCustomerProfile();
   const { isAuthenticated, customerAccount: authCustomerAccount, session } = useAuth();
   const { guestSession, generateGuestSession } = useGuestSession();
+  const { markCheckoutInProgress } = useOrderProcessing();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState(0);
@@ -212,6 +214,17 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
 
       // Redirect to Paystack for payment
       if (data.payment?.payment_url) {
+        // Mark checkout as in progress and clear cart before redirecting
+        console.log('🛒 Preparing for payment redirect...');
+        
+        if (data.payment?.reference) {
+          markCheckoutInProgress(data.payment.reference);
+        }
+        
+        // Clear cart before redirecting to prevent duplicate orders
+        console.log('🛒 Clearing cart before payment redirect');
+        clearCart();
+        
         window.location.href = data.payment.payment_url;
         return;
       }

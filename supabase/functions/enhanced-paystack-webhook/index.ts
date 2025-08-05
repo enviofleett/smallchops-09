@@ -56,65 +56,59 @@ serve(async (req) => {
         })
         .eq('id', transaction.order_id);
 
-      // Send order confirmation email
+      // Send payment confirmation email using templates
       const order = transaction.orders;
       if (order) {
         try {
-          await supabaseAdmin.functions.invoke('smtp-email-sender', {
+          await supabaseAdmin.functions.invoke('production-smtp-sender', {
             body: {
               to: order.customer_email,
-              subject: `Payment Confirmed - Order ${order.order_number}`,
-              html: `
-                <h1>Payment Confirmed!</h1>
-                <p>Hello ${order.customer_name},</p>
-                <p>Your payment for order <strong>${order.order_number}</strong> has been successfully processed.</p>
-                <div style="background: #e8f5e8; padding: 15px; margin: 20px 0; border-radius: 5px; border: 1px solid #4caf50;">
-                  <h3>✅ Payment Details:</h3>
-                  <p><strong>Amount Paid:</strong> ₦${(data.amount / 100).toLocaleString()}</p>
-                  <p><strong>Transaction Reference:</strong> ${data.reference}</p>
-                  <p><strong>Payment Method:</strong> ${data.channel}</p>
-                </div>
-                <div style="background: #f5f5f5; padding: 15px; margin: 20px 0; border-radius: 5px;">
-                  <h3>Order Details:</h3>
-                  <p><strong>Order Number:</strong> ${order.order_number}</p>
-                  <p><strong>Total Amount:</strong> ₦${order.total_amount.toLocaleString()}</p>
-                  <p><strong>Fulfillment:</strong> ${order.order_type === 'delivery' ? 'Home Delivery' : 'Store Pickup'}</p>
-                  <p><strong>Status:</strong> Processing</p>
-                </div>
-                <p>Your order is now being processed. We will send you updates as it progresses.</p>
-                <p>Thank you for your purchase!</p>
-              `,
-              text: `Payment Confirmed - Order ${order.order_number}\n\nYour payment of ₦${(data.amount / 100).toLocaleString()} has been confirmed. Transaction reference: ${data.reference}`
+              template_key: 'payment_confirmation',
+              variables: {
+                customer_name: order.customer_name,
+                customer_email: order.customer_email,
+                order_number: order.order_number,
+                order_total: `₦${order.total_amount.toLocaleString()}`,
+                payment_reference: data.reference,
+                order_date: new Date().toLocaleDateString(),
+                store_name: 'Your Store',
+                store_url: 'https://your-store.com',
+                support_email: 'support@your-store.com',
+                payment_amount: `₦${(data.amount / 100).toLocaleString()}`,
+                payment_method: data.channel
+              },
+              priority: 'high'
             }
           });
-          console.log('Payment confirmation email sent to:', order.customer_email);
+          console.log('Payment confirmation email sent via template to:', order.customer_email);
         } catch (emailError) {
           console.error('Failed to send payment confirmation email:', emailError);
         }
 
-        // Send admin notification
+        // Send admin notification using templates
         try {
-          await supabaseAdmin.functions.invoke('smtp-email-sender', {
+          await supabaseAdmin.functions.invoke('production-smtp-sender', {
             body: {
               to: 'admin@your-store.com',
-              subject: `New Order Received - ${order.order_number}`,
-              html: `
-                <h1>New Order Alert!</h1>
-                <p>A new order has been received and payment confirmed.</p>
-                <div style="background: #f0f8ff; padding: 15px; margin: 20px 0; border-radius: 5px; border: 1px solid #007bff;">
-                  <h3>Order Information:</h3>
-                  <p><strong>Order Number:</strong> ${order.order_number}</p>
-                  <p><strong>Customer:</strong> ${order.customer_name} (${order.customer_email})</p>
-                  <p><strong>Amount:</strong> ₦${order.total_amount.toLocaleString()}</p>
-                  <p><strong>Payment Reference:</strong> ${data.reference}</p>
-                  <p><strong>Fulfillment Type:</strong> ${order.order_type}</p>
-                </div>
-                <p>Please process this order promptly.</p>
-              `,
-              text: `New Order: ${order.order_number} from ${order.customer_name} for ₦${order.total_amount.toLocaleString()}`
+              template_key: 'admin_new_order',
+              variables: {
+                customer_name: order.customer_name,
+                customer_email: order.customer_email,
+                order_number: order.order_number,
+                order_total: `₦${order.total_amount.toLocaleString()}`,
+                payment_reference: data.reference,
+                order_date: new Date().toLocaleDateString(),
+                store_name: 'Your Store',
+                store_url: 'https://your-store.com',
+                support_email: 'support@your-store.com',
+                fulfillment_type: order.order_type,
+                payment_amount: `₦${(data.amount / 100).toLocaleString()}`,
+                payment_method: data.channel
+              },
+              priority: 'high'
             }
           });
-          console.log('Admin notification sent for order:', order.order_number);
+          console.log('Admin notification sent via template for order:', order.order_number);
         } catch (adminEmailError) {
           console.error('Failed to send admin notification:', adminEmailError);
         }

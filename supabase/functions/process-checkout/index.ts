@@ -207,31 +207,30 @@ serve(async (req) => {
         .eq('id', paymentData.id);
     }
 
-    // 4. Send order confirmation email
+    // 4. Send order confirmation email using template service
     if (payment_method !== 'paystack') {
-      // For non-Paystack payments, send email immediately
+      // For non-Paystack payments, send email immediately using templates
       try {
-        await supabaseAdmin.functions.invoke('smtp-email-sender', {
+        await supabaseAdmin.functions.invoke('production-smtp-sender', {
           body: {
             to: customer_email,
-            subject: `Order Confirmation - ${orderNumber}`,
-            html: `
-              <h1>Order Confirmation</h1>
-              <p>Hello ${customer_name},</p>
-              <p>Thank you for your order! Your order <strong>${orderNumber}</strong> has been confirmed.</p>
-              <div style="background: #f5f5f5; padding: 15px; margin: 20px 0; border-radius: 5px;">
-                <h3>Order Details:</h3>
-                <p><strong>Order Number:</strong> ${orderNumber}</p>
-                <p><strong>Total Amount:</strong> ₦${total_amount.toLocaleString()}</p>
-                <p><strong>Fulfillment:</strong> ${fulfillment_type === 'delivery' ? 'Home Delivery' : 'Store Pickup'}</p>
-              </div>
-              <p>We will send you updates as your order progresses.</p>
-              <p>Thank you for choosing us!</p>
-            `,
-            text: `Order Confirmation - ${orderNumber}\n\nHello ${customer_name}, your order ${orderNumber} for ₦${total_amount.toLocaleString()} has been confirmed.`
+            template_key: 'order_confirmation',
+            variables: {
+              customer_name: customer_name,
+              customer_email: customer_email,
+              order_number: orderNumber,
+              order_total: `₦${total_amount.toLocaleString()}`,
+              order_date: new Date().toLocaleDateString(),
+              store_name: 'Your Store',
+              store_url: 'https://your-store.com',
+              support_email: 'support@your-store.com',
+              delivery_address: fulfillment_type === 'delivery' ? JSON.stringify(delivery_address) : '',
+              order_items: order_items.map(item => `${item.quantity}x ${item.product_id}`).join(', ')
+            },
+            priority: 'high'
           }
         });
-        console.log('Order confirmation email sent to:', customer_email);
+        console.log('Order confirmation email sent via template to:', customer_email);
       } catch (emailError) {
         console.error('Failed to send order confirmation email:', emailError);
         // Don't fail the checkout for email issues

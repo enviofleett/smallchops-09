@@ -59,7 +59,10 @@ export const useWebSocketConnection = (config: WebSocketConfig) => {
   };
 
   const handleError = (error: Event) => {
-    console.warn(`WebSocket connection error for ${url}:`, error);
+    // Only log WebSocket errors if they're not development connection issues
+    if (!url.includes('localhost:8098') && !url.includes('127.0.0.1:8098')) {
+      console.warn(`WebSocket connection error for ${url}:`, error);
+    }
     setIsConnected(false);
     onError?.(error);
   };
@@ -78,7 +81,10 @@ export const useWebSocketConnection = (config: WebSocketConfig) => {
         connect();
       }, delay);
     } else if (retryCount >= maxRetries) {
-      console.warn(`WebSocket connection failed after ${maxRetries} retries for ${url}`);
+      // Only log retry failures for non-development URLs
+      if (!url.includes('localhost:8098') && !url.includes('127.0.0.1:8098')) {
+        console.warn(`WebSocket connection failed after ${maxRetries} retries for ${url}`);
+      }
     }
   };
 
@@ -97,7 +103,10 @@ export const useWebSocketConnection = (config: WebSocketConfig) => {
       websocketRef.current.addEventListener('error', handleError);
       websocketRef.current.addEventListener('close', handleClose);
     } catch (error) {
-      console.warn(`Failed to create WebSocket connection to ${url}:`, error);
+      // Only log connection creation errors for non-development URLs
+      if (!url.includes('localhost:8098') && !url.includes('127.0.0.1:8098')) {
+        console.warn(`Failed to create WebSocket connection to ${url}:`, error);
+      }
       handleClose();
     }
   };

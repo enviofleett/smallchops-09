@@ -143,7 +143,7 @@ serve(async (req) => {
           order_id: orderResult.order_id,
           customer_email: checkoutData.customer_email,
           customer_name: checkoutData.customer_name,
-          amount: orderResult.subtotal,
+          amount: checkoutData.total_amount || orderResult.subtotal, // Use total amount including delivery fee
           currency: 'NGN',
           payment_method: 'paystack',
           status: 'pending',
@@ -169,7 +169,7 @@ serve(async (req) => {
         body: {
           action: 'initialize',
           email: checkoutData.customer_email,
-          amount: orderResult.subtotal * 100, // Convert to kobo
+          amount: checkoutData.total_amount * 100, // Convert to kobo - use total amount including delivery fee
           reference: paymentReference,
           channels: ['card', 'bank', 'ussd', 'mobile_money'],
           metadata: {

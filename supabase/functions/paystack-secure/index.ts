@@ -89,9 +89,14 @@ async function initializePayment(supabaseClient: any, requestData: any) {
       throw new Error('Paystack not configured properly');
     }
 
-    if (!config.secret_key) {
+    // Use test or live secret key based on environment
+    const secretKey = config.test_mode ? config.secret_key : (config.live_secret_key || config.secret_key);
+    
+    if (!secretKey) {
       throw new Error('Paystack secret key not configured');
     }
+
+    console.log('🔑 Using secret key type:', config.test_mode ? 'test' : 'live');
 
     // Generate reference if not provided
     const transactionRef = reference || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -102,7 +107,7 @@ async function initializePayment(supabaseClient: any, requestData: any) {
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.secret_key}`,
+        'Authorization': `Bearer ${secretKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -175,13 +180,20 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
       throw new Error('Paystack not configured properly');
     }
 
+    // Use test or live secret key based on environment
+    const secretKey = config.test_mode ? config.secret_key : (config.live_secret_key || config.secret_key);
+    
+    if (!secretKey) {
+      throw new Error('Paystack secret key not configured');
+    }
+
     console.log('Verifying Paystack payment:', reference);
 
     // Verify payment with Paystack
     const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${config.secret_key}`,
+        'Authorization': `Bearer ${secretKey}`,
         'Content-Type': 'application/json',
       }
     });

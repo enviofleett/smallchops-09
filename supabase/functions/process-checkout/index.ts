@@ -93,70 +93,106 @@ serve(async (req) => {
     // 2. Skip validation for now and proceed to order creation
     console.log('Products validated, proceeding to order creation...');
 
-    // 3. Create order with items (and handle guest session)
-    const orderData: any = {
-      p_customer_email: customer_email,
-      p_customer_name: customer_name,
-      p_customer_phone: customer_phone,
-      p_fulfillment_type: fulfillment_type,
-      p_delivery_address: fulfillment_type === 'delivery' ? JSON.stringify(delivery_address) : null,
-      p_pickup_point_id: fulfillment_type === 'pickup' ? pickup_point_id : null,
-      p_order_items: order_items,
-      p_total_amount: total_amount,
-      p_delivery_fee: fulfillment_type === 'delivery' ? delivery_fee : 0,
-      p_delivery_zone_id: fulfillment_type === 'delivery' ? delivery_zone_id : null
-    };
-
-    console.log('Order data prepared:', {
-      fulfillment_type,
-      items_count: order_items.length,
-      total_amount,
-      delivery_fee,
-      has_delivery_address: !!delivery_address,
-      has_pickup_point: !!pickup_point_id,
-      has_delivery_zone: !!delivery_zone_id
-    });
-
-    // Add guest session ID if provided (ensure it's valid UUID format or null)
-    if (guest_session_id && guest_session_id.trim()) {
-      // Validate UUID format or generate a temporary ID
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-      if (uuidRegex.test(guest_session_id)) {
-        orderData.p_guest_session_id = guest_session_id;
-      } else {
-        // Generate a temporary guest session ID
-        orderData.p_guest_session_id = crypto.randomUUID();
-        console.log('Generated temporary guest session ID:', orderData.p_guest_session_id);
-      }
-    }
-
-    const { data: orderResult, error: orderError } = await supabaseAdmin
-      .rpc('create_order_with_items', orderData);
-
-    if (orderError) {
-      console.error('Order creation error details:', orderError);
-      console.error('Order data that failed:', orderData);
-      throw new Error(`Order creation error: ${orderError.message}`);
-    }
-
-    if (!orderResult.success) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: orderResult.error,
-          message: orderResult.message
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    // 3. Create order with enhanced error handling
+    try {
+      console.log('Preparing order data for database function...');
+      
+      // Ensure delivery address is properly formatted as JSONB
+      let deliveryAddressJsonb = null;
+      if (fulfillment_type === 'delivery' && delivery_address) {
+        try {
+          deliveryAddressJsonb = delivery_address;
+          console.log('Delivery address prepared:', deliveryAddressJsonb);
+        } catch (err) {
+          console.error('Failed to prepare delivery address:', err);
+          throw new Error('Invalid delivery address format');
         }
-      );
+      }
+
+      // Ensure order items are in correct format for database function
+      const formattedOrderItems = order_items.map(item => ({
+        product_id: item.product_id,
+        quantity: item.quantity,
+        unit_price: item.unit_price,
+        total_price: item.total_price
+      }));
+
+      console.log('Formatted order items:', formattedOrderItems);
+
+      const orderParams = {
+        p_customer_email: customer_email || '',
+        p_customer_name: customer_name || '',
+        p_customer_phone: customer_phone || '',
+        p_order_items: formattedOrderItems,
+        p_total_amount: Number(total_amount),
+        p_fulfillment_type: fulfillment_type,
+        p_delivery_address: deliveryAddressJsonb,
+        p_pickup_point_id: fulfillment_type === 'pickup' ? pickup_point_id : null,
+        p_delivery_fee: fulfillment_type === 'delivery' ? Number(delivery_fee || 0) : 0,
+        p_delivery_zone_id: fulfillment_type === 'delivery' ? delivery_zone_id : null
+      };
+
+      console.log('Final order parameters:', {
+        ...orderParams,
+        p_order_items: `[${orderParams.p_order_items.length} items]`
+      });
+
+      // Add guest session ID if provided (ensure it's valid UUID format or null)
+      if (guest_session_id && guest_session_id.trim()) {
+        // Validate UUID format or generate a temporary ID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(guest_session_id)) {
+          orderParams.p_guest_session_id = guest_session_id;
+        } else {
+          // Generate a temporary guest session ID
+          orderParams.p_guest_session_id = crypto.randomUUID();
+          console.log('Generated temporary guest session ID:', orderParams.p_guest_session_id);
+        }
+      }
+
+      console.log('Calling create_order_with_items with parameters...');
+      const { data: orderResult, error: orderError } = await supabaseAdmin
+        .rpc('create_order_with_items', orderParams);
+
+      if (orderError) {
+        console.error('Order creation error details:', {
+          code: orderError.code,
+          message: orderError.message,
+          details: orderError.details,
+          hint: orderError.hint
+        });
+        console.error('Order parameters that failed:', orderParams);
+        throw new Error(`Database function error: ${orderError.message} (Code: ${orderError.code})`);
+      }
+
+      if (!orderResult || !orderResult.success) {
+        console.error('Order function returned failure:', orderResult);
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: orderResult?.error || 'unknown_error',
+            message: orderResult?.message || 'Order creation failed'
+          }),
+          { 
+            status: 400, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+
+      const orderId = orderResult.order_id;
+      const orderNumber = orderResult.order_number;
+
+      console.log('Order created successfully:', orderId, 'Number:', orderNumber);
+
+    } catch (dbError) {
+      console.error('Database operation failed:', {
+        error: dbError,
+        message: dbError.message,
+        stack: dbError.stack
+      });
+      throw new Error(`Order creation failed: ${dbError.message}`);
     }
-
-    const orderId = orderResult.order_id;
-    const orderNumber = orderResult.order_number;
-
-    console.log('Order created successfully:', orderId);
 
     // 3. Handle payment processing based on method
     let paymentResult = null;

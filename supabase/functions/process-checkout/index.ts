@@ -203,6 +203,16 @@ serve(async (req) => {
     let paymentResult = null;
     
     if (payment_method === 'paystack') {
+      console.log('=== PAYMENT TRANSACTION DATA DEBUG ===');
+      console.log('Order ID:', orderId);
+      console.log('Customer Email:', customer_email);
+      console.log('Amount:', total_amount);
+      console.log('Currency: NGN');
+      console.log('Payment Method: paystack');
+      console.log('Transaction Type: charge');
+      console.log('Status: pending');
+      console.log('=== END DEBUG ===');
+
       // Create payment transaction record
       const { data: paymentData, error: paymentError } = await supabaseAdmin
         .from('payment_transactions')
@@ -211,7 +221,7 @@ serve(async (req) => {
           amount: total_amount,
           currency: 'NGN',
           payment_method: 'paystack',
-          transaction_type: 'purchase',
+          transaction_type: 'charge',
           status: 'pending'
         })
         .select()

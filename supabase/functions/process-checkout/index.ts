@@ -126,14 +126,11 @@ serve(async (req) => {
       const orderParams = {
         p_customer_email: customer_email || '',
         p_customer_name: customer_name || '',
-        p_customer_phone: customer_phone || '',
         p_order_items: formattedOrderItems,
-        p_total_amount: Number(total_amount),
-        p_fulfillment_type: fulfillment_type,
+        p_customer_phone: customer_phone || '',
         p_delivery_address: deliveryAddressJsonb,
-        p_pickup_point_id: fulfillment_type === 'pickup' ? pickup_point_id : null,
-        p_delivery_fee: fulfillment_type === 'delivery' ? Number(delivery_fee || 0) : 0,
-        p_delivery_zone_id: fulfillment_type === 'delivery' ? delivery_zone_id : null
+        p_fulfillment_type: fulfillment_type,
+        p_payment_method: payment_method
       };
 
       console.log('Final order parameters:', {

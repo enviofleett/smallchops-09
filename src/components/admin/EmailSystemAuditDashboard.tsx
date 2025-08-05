@@ -381,15 +381,16 @@ export const EmailSystemAuditDashboard = () => {
       const { data: orderResult, error: orderError } = await supabase.rpc('create_order_with_items', {
         p_customer_email: testOrderEmail,
         p_customer_name: 'Test Customer',
-        p_customer_phone: '+2348012345678',
         p_order_items: JSON.stringify([{
           product_id: '00000000-0000-0000-0000-000000000001',
           quantity: 1,
           unit_price: 1500,
           total_price: 1500
         }]),
-        p_total_amount: 1500,
-        p_fulfillment_type: 'delivery'
+        p_customer_phone: '+2348012345678',
+        p_delivery_address: null,
+        p_fulfillment_type: 'delivery',
+        p_payment_method: 'paystack'
       });
 
       const orderData = orderResult as any;

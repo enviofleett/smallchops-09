@@ -7,6 +7,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { emailTemplateService, EmailVariables } from '@/services/EmailTemplateService';
 import { useEmailDeliveryTracking } from '@/hooks/useEmailDeliveryTracking';
+import { WebSocketStabilityMonitor } from './WebSocketStabilityMonitor';
+import { EmailSystemStatusOverview } from './EmailSystemStatusOverview';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   TestTube, 
@@ -399,6 +401,7 @@ export const ComprehensiveEmailTestDashboard = () => {
 
   return (
     <div className="space-y-6">
+      <EmailSystemStatusOverview />
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
@@ -492,6 +495,7 @@ export const ComprehensiveEmailTestDashboard = () => {
         </TabsList>
 
         <TabsContent value="individual" className="space-y-4">
+          <WebSocketStabilityMonitor />
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <Button variant="outline" onClick={testTemplateSystem} disabled={isRunningTests}>
               <Mail className="h-4 w-4 mr-2" />

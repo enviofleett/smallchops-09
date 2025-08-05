@@ -16,8 +16,20 @@ export const useCustomerOrders = () => {
       try {
         console.log('🔍 Fetching orders for customer:', customerAccount?.id, customerAccount?.email);
         
-        // First try to get orders by customer_id
-        const { data: ordersData, error } = await supabase
+        if (!customerAccount?.id) {
+          console.log('🔍 No customer account ID found');
+          return { orders: [], count: 0 };
+        }
+
+        // Try multiple approaches to find orders for this customer:
+        // 1. Direct customer_id match with customer_accounts
+        // 2. Email match (fallback for legacy data)
+        // 3. Check if customer_id in orders refers to legacy customers table
+        
+        let allOrders: any[] = [];
+        
+        // Approach 1: Try customer_id = customer_accounts.id
+        const { data: directOrders, error: directError } = await supabase
           .from('orders')
           .select(`
             *,
@@ -36,17 +48,16 @@ export const useCustomerOrders = () => {
           .eq('customer_id', customerAccount.id)
           .order('order_time', { ascending: false });
 
-        if (error) {
-          console.error('Error fetching orders by customer_id:', error);
-          return { orders: [], count: 0 };
+        if (directError) {
+          console.error('Error in direct orders query:', directError);
+        } else {
+          console.log('🔍 Direct orders found:', directOrders?.length || 0);
+          allOrders.push(...(directOrders || []));
         }
-        
-        console.log('🔍 Orders by customer_id:', ordersData?.length || 0);
 
-        // If no orders found by customer_id, try customer_email fallback
-        let finalOrders = ordersData || [];
-        if (!finalOrders.length && customerAccount.email) {
-          const { data: emailOrders } = await supabase
+        // Approach 2: Try email match if we have customer email and no direct orders found
+        if (allOrders.length === 0 && customerAccount.email) {
+          const { data: emailOrders, error: emailError } = await supabase
             .from('orders')
             .select(`
               *,
@@ -64,13 +75,20 @@ export const useCustomerOrders = () => {
             `)
             .eq('customer_email', customerAccount.email)
             .order('order_time', { ascending: false });
-          
-          finalOrders = emailOrders || [];
+
+          if (emailError) {
+            console.error('Error in email orders query:', emailError);
+          } else {
+            console.log('🔍 Email-based orders found:', emailOrders?.length || 0);
+            allOrders.push(...(emailOrders || []));
+          }
         }
+
+        console.log('🔍 Total orders found:', allOrders.length);
         
         return {
-          orders: finalOrders,
-          count: finalOrders.length
+          orders: allOrders,
+          count: allOrders.length
         };
       } catch (error) {
         console.error('Error fetching orders:', error);

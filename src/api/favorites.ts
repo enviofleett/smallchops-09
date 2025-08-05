@@ -14,6 +14,8 @@ export interface FavoriteProduct extends ProductWithCategory {
 }
 
 export const addProductToFavorites = async (customerId: string, productId: string): Promise<CustomerFavorite> => {
+  console.log('🔍 Adding to favorites:', { customerId, productId });
+  
   const { data, error } = await supabase
     .from('customer_favorites')
     .insert({
@@ -22,6 +24,8 @@ export const addProductToFavorites = async (customerId: string, productId: strin
     })
     .select()
     .single();
+
+  console.log('🔍 Add favorite result:', { data, error });
 
   if (error) {
     if (error.code === '23505') { // Unique constraint violation
@@ -44,6 +48,8 @@ export const removeProductFromFavorites = async (customerId: string, productId: 
 };
 
 export const getCustomerFavorites = async (customerId: string): Promise<FavoriteProduct[]> => {
+  console.log('🔍 Getting favorites for customer:', customerId);
+  
   const { data, error } = await supabase
     .from('customer_favorites')
     .select(`
@@ -61,6 +67,8 @@ export const getCustomerFavorites = async (customerId: string): Promise<Favorite
     .order('created_at', { ascending: false });
 
   if (error) throw new Error(error.message);
+  
+  console.log('🔍 Favorites data returned:', data?.length || 0);
   
   return data?.map(favorite => ({
     ...favorite.products,

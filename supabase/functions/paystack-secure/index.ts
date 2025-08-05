@@ -103,6 +103,18 @@ async function initializePayment(supabaseClient: any, requestData: any) {
 
     console.log('Initializing Paystack payment:', { email, amount, reference: transactionRef });
 
+    // Prepare Paystack payload according to API spec
+    const paystackPayload = {
+      email,
+      amount: amount.toString(), // Paystack requires amount as STRING in kobo
+      currency: 'NGN',
+      reference: transactionRef,
+      channels: channels || ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
+      metadata: metadata || {}
+    };
+
+    console.log('🚀 Sending to Paystack:', JSON.stringify(paystackPayload, null, 2));
+
     // Initialize payment with Paystack
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
@@ -110,20 +122,22 @@ async function initializePayment(supabaseClient: any, requestData: any) {
         'Authorization': `Bearer ${secretKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        email,
-        amount,
-        currency: 'NGN',
-        reference: transactionRef,
-        channels: channels || ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
-        metadata: metadata || {}
-      })
+      body: JSON.stringify(paystackPayload)
     });
 
+    console.log('📡 Paystack response status:', paystackResponse.status);
+    
+    if (!paystackResponse.ok) {
+      const errorText = await paystackResponse.text();
+      console.error('❌ Paystack HTTP error:', paystackResponse.status, errorText);
+      throw new Error(`Paystack API error (${paystackResponse.status}): ${errorText}`);
+    }
+
     const paystackData = await paystackResponse.json();
+    console.log('📦 Paystack response data:', JSON.stringify(paystackData, null, 2));
 
     if (!paystackData.status) {
-      console.error('Paystack initialization failed:', paystackData);
+      console.error('❌ Paystack initialization failed:', paystackData);
       throw new Error(paystackData.message || 'Failed to initialize payment');
     }
 

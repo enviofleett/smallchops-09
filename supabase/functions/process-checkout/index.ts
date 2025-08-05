@@ -172,29 +172,52 @@ serve(async (req) => {
 
       // Use paystack-secure function to initialize payment
       console.log('🚀 Initializing Paystack payment...');
+      
+      // Ensure we have a valid total amount
+      const paymentAmount = checkoutData.total_amount || orderResult.subtotal || subtotal;
+      if (!paymentAmount || paymentAmount <= 0) {
+        console.error('❌ Invalid payment amount:', paymentAmount);
+        return new Response(
+          JSON.stringify({ error: 'Invalid payment amount' }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+
+      console.log('💰 Payment amount (NGN):', paymentAmount, '→ Kobo:', paymentAmount * 100);
+
       const { data: paystackData, error: paystackError } = await supabaseClient.functions.invoke('paystack-secure', {
         body: {
           action: 'initialize',
           email: checkoutData.customer_email,
-          amount: checkoutData.total_amount * 100, // Convert to kobo - use total amount including delivery fee
+          amount: Math.round(paymentAmount * 100), // Convert to kobo and ensure integer
           reference: paymentReference,
           channels: ['card', 'bank', 'ussd', 'mobile_money'],
           metadata: {
             order_id: orderResult.order_id,
             order_number: orderResult.order_number,
             customer_name: checkoutData.customer_name,
-            customer_email: checkoutData.customer_email
+            customer_email: checkoutData.customer_email,
+            total_amount: paymentAmount
           }
         }
       });
 
       if (paystackError || !paystackData?.status) {
-        console.error('❌ Paystack initialization failed:', paystackError || paystackData);
+        console.error('❌ Paystack initialization failed:');
+        console.error('- Error:', JSON.stringify(paystackError, null, 2));
+        console.error('- Data:', JSON.stringify(paystackData, null, 2));
+        
         return new Response(
           JSON.stringify({ 
             success: false,
             error: 'Payment initialization failed',
-            details: paystackError?.message || 'Unknown error'
+            details: paystackError?.message || paystackData?.error || 'Unknown payment gateway error',
+            debug: {
+              paystackError: paystackError,
+              paystackData: paystackData,
+              amount: paymentAmount,
+              amountInKobo: Math.round(paymentAmount * 100)
+            }
           }),
           { status: 500, headers: corsHeaders }
         );

@@ -23,26 +23,20 @@ export const EnhancedEmailProcessor = () => {
 
   const fetchQueueStats = async () => {
     try {
+      // Use the communication_events table directly instead of email_processing_queue
       const { data, error } = await supabase
-        .from('email_processing_queue')
-        .select('status, priority');
+        .from('communication_events')
+        .select('status, priority, event_type');
 
       if (error) throw error;
 
       const stats = {
-        queued: 0,
-        processing: 0,
-        completed: 0,
-        failed: 0,
-        high_priority: 0,
+        queued: data.filter(item => item.status === 'queued').length,
+        processing: data.filter(item => item.status === 'processing').length,
+        completed: data.filter(item => item.status === 'sent').length,
+        failed: data.filter(item => item.status === 'failed').length,
+        high_priority: data.filter(item => item.priority === 'high').length,
       };
-
-      data.forEach((item) => {
-        stats[item.status as keyof typeof stats]++;
-        if (item.priority === 'high') {
-          stats.high_priority++;
-        }
-      });
 
       setQueueStats(stats);
     } catch (error: any) {
@@ -55,8 +49,11 @@ export const EnhancedEmailProcessor = () => {
   const processQueue = async () => {
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
-        body: { priority: 'all' }
+      const { data, error } = await supabase.functions.invoke('admin-email-processor', {
+        body: { 
+          action: 'process_queue',
+          priority: 'all' 
+        }
       });
 
       if (error) throw error;
@@ -83,8 +80,11 @@ export const EnhancedEmailProcessor = () => {
   const processHighPriority = async () => {
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
-        body: { priority: 'high' }
+      const { data, error } = await supabase.functions.invoke('admin-email-processor', {
+        body: { 
+          action: 'process_queue',
+          priority: 'high' 
+        }
       });
 
       if (error) throw error;

@@ -245,13 +245,64 @@ serve(async (req) => {
         throw new Error(`Invalid amount: ${numericAmount} (type: ${typeof numericAmount})`);
       }
 
-      // Create payment transaction record with validated data
-      console.log('Attempting payment transaction insert...');
-      const { data: paymentData, error: paymentError } = await supabaseAdmin
-        .from('payment_transactions')
-        .insert(insertData)
-        .select()
-        .single();
+      // STEP 1: Try minimal insert first to isolate the issue
+      console.log('=== STEP 1: Testing minimal insert ===');
+      const { data: minimalTest, error: minimalError } = await supabaseAdmin
+        .rpc('minimal_payment_test_insert', {
+          p_order_id: validOrderId,
+          p_amount: numericAmount
+        });
+      
+      console.log('Minimal test result:', minimalTest);
+      if (minimalError) {
+        console.error('Minimal insert failed:', minimalError);
+      }
+
+      // STEP 2: Try debug function with full validation
+      console.log('=== STEP 2: Testing with debug function ===');
+      const { data: debugResult, error: debugError } = await supabaseAdmin
+        .rpc('debug_payment_transaction_insert', {
+          p_order_id: validOrderId,
+          p_customer_email: cleanEmail,
+          p_amount: numericAmount,
+          p_currency: 'NGN',
+          p_payment_method: 'paystack',
+          p_transaction_type: 'charge',
+          p_status: 'pending'
+        });
+
+      console.log('Debug function result:', debugResult);
+      if (debugError) {
+        console.error('Debug function error:', debugError);
+      }
+
+      // STEP 3: If debug function succeeded, we know the data is valid
+      let paymentData = null;
+      let paymentError = null;
+
+      if (debugResult?.success) {
+        console.log('Debug function succeeded, attempting regular insert...');
+        const insertResult = await supabaseAdmin
+          .from('payment_transactions')
+          .insert(insertData)
+          .select()
+          .single();
+        
+        paymentData = insertResult.data;
+        paymentError = insertResult.error;
+      } else {
+        // If debug function failed, use its detailed error message
+        const errorDetails = debugResult || { error: 'unknown', message: 'Debug function failed' };
+        console.error('=== DETAILED CONSTRAINT VIOLATION ANALYSIS ===');
+        console.error('Error type:', errorDetails.error);
+        console.error('Field causing issue:', errorDetails.field || 'unknown');
+        console.error('Error message:', errorDetails.message);
+        console.error('SQL state:', errorDetails.sqlstate);
+        console.error('SQL error:', errorDetails.sqlerrm);
+        console.error('=== END ANALYSIS ===');
+        
+        throw new Error(`Payment validation failed: ${errorDetails.message} (Field: ${errorDetails.field || 'unknown'})`);
+      }
 
       if (paymentError) {
         console.error('Payment transaction creation error:', paymentError);

@@ -6002,6 +6002,18 @@ export type Database = {
         Args: { customer_uuid: string; product_uuid: string }
         Returns: boolean
       }
+      debug_payment_transaction_insert: {
+        Args: {
+          p_order_id: string
+          p_customer_email: string
+          p_amount: number
+          p_currency?: string
+          p_payment_method?: string
+          p_transaction_type?: string
+          p_status?: string
+        }
+        Returns: Json
+      }
       delete_customer_cascade: {
         Args: { p_customer_id: string }
         Returns: Json
@@ -6342,6 +6354,10 @@ export type Database = {
           p_details?: Json
         }
         Returns: string
+      }
+      minimal_payment_test_insert: {
+        Args: { p_order_id: string; p_amount: number }
+        Returns: Json
       }
       process_email_queue_manual: {
         Args: { batch_size?: number }

@@ -309,39 +309,85 @@ serve(async (req) => {
         throw new Error(`Payment setup error: ${paymentError.message}`);
       }
 
-      // Initialize Paystack payment
-      const paystackResponse = await supabaseAdmin.functions.invoke('paystack-initialize', {
-        body: {
+      // Initialize Paystack payment directly
+      console.log('=== PAYSTACK INITIALIZATION ===');
+      
+      // Get Paystack configuration
+      const { data: paystackConfig, error: configError } = await supabaseAdmin
+        .from('payment_integrations')
+        .select('secret_key, public_key')
+        .eq('provider', 'paystack')
+        .eq('is_active', true)
+        .single();
+
+      if (configError || !paystackConfig || !paystackConfig.secret_key) {
+        console.error('Paystack config error:', configError);
+        throw new Error('Paystack not configured properly');
+      }
+
+      console.log('Paystack config found, initializing payment...');
+      console.log('Amount for Paystack (in kobo):', total_amount * 100);
+      console.log('Customer email:', customer_email);
+
+      // Generate unique reference
+      const paymentReference = `checkout_${orderId}_${Date.now()}`;
+      
+      // Initialize payment with Paystack API directly
+      const paystackApiResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${paystackConfig.secret_key}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
           email: customer_email,
-          amount: total_amount * 100, // Convert to kobo
-          order_id: orderId,
+          amount: Math.round(total_amount * 100), // Convert to kobo and ensure integer
+          currency: 'NGN',
+          reference: paymentReference,
           callback_url: `${req.headers.get('origin')}/payment-callback`,
           metadata: {
+            order_id: orderId,
             order_number: orderNumber,
             customer_name: customer_name,
             payment_transaction_id: paymentData.id
-          }
-        }
+          },
+          channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer']
+        })
       });
 
-      if (paystackResponse.error) {
-        throw new Error(`Paystack initialization error: ${paystackResponse.error.message}`);
+      console.log('Paystack API response status:', paystackApiResponse.status);
+      
+      if (!paystackApiResponse.ok) {
+        const errorText = await paystackApiResponse.text();
+        console.error('Paystack API error response:', errorText);
+        throw new Error(`Paystack API error (${paystackApiResponse.status}): ${errorText}`);
+      }
+
+      const paystackData = await paystackApiResponse.json();
+      console.log('Paystack response data:', paystackData);
+
+      if (!paystackData.status) {
+        console.error('Paystack initialization failed:', paystackData);
+        throw new Error(paystackData.message || 'Failed to initialize payment with Paystack');
       }
 
       paymentResult = {
-        payment_url: paystackResponse.data.authorization_url,
-        payment_reference: paystackResponse.data.reference,
+        payment_url: paystackData.data.authorization_url,
+        payment_reference: paystackData.data.reference,
         payment_method: 'paystack'
       };
 
-      // Update payment transaction with reference
+      // Update payment transaction with Paystack reference
       await supabaseAdmin
         .from('payment_transactions')
         .update({ 
-          provider_reference: paystackResponse.data.reference,
-          provider_response: paystackResponse.data
+          provider_reference: paystackData.data.reference,
+          provider_response: paystackData,
+          status: 'initialized'
         })
         .eq('id', paymentData.id);
+        
+      console.log('=== PAYSTACK INITIALIZATION COMPLETE ===');
     }
 
     // 4. Send order confirmation email using template service

@@ -156,11 +156,41 @@ serve(async (req) => {
           })
           .eq('id', transaction.order_id);
 
+        // Queue payment confirmation email
+        const customerEmail = transaction.order?.customer_email;
+        if (customerEmail) {
+          console.log('Queuing payment confirmation email for:', customerEmail);
+          
+          // Insert payment confirmation email into communication_events
+          const { error: emailInsertError } = await supabaseClient
+            .from('communication_events')
+            .insert({
+              event_type: 'payment_confirmation',
+              recipient_email: customerEmail,
+              status: 'queued',
+              priority: 'high',
+              template_data: {
+                order_id: transaction.order_id,
+                order_number: data.metadata?.order_number,
+                amount: data.amount / 100, // Convert from kobo
+                payment_reference: reference,
+                customer_name: data.metadata?.customer_name
+              },
+              retry_count: 0
+            });
+
+          if (emailInsertError) {
+            console.error('Failed to queue payment confirmation email:', emailInsertError);
+          } else {
+            console.log('Payment confirmation email queued successfully');
+          }
+        }
+
         // Trigger email processing for payment confirmation emails
         try {
           console.log('Triggering email processor for payment confirmation...');
           await supabaseClient.functions.invoke('enhanced-email-processor', {
-            body: { priority: 'high' }
+            body: { priority: 'high', event_type: 'payment_confirmation' }
           });
           console.log('Email processor triggered successfully after payment verification');
         } catch (emailError) {

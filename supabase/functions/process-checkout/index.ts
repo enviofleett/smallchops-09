@@ -344,7 +344,7 @@ serve(async (req) => {
           amount: Math.round(total_amount * 100), // Convert to kobo and ensure integer
           currency: 'NGN',
           reference: paymentReference,
-          callback_url: `${req.headers.get('origin')}/payment/callback`,
+          callback_url: `${req.headers.get('origin')}/payment/callback?reference=${paymentReference}`,
           metadata: {
             order_id: orderId,
             order_number: orderNumber,

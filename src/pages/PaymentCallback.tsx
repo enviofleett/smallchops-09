@@ -25,14 +25,21 @@ export default function PaymentCallback() {
 
   const reference = searchParams.get('reference');
   const trxref = searchParams.get('trxref');
+  const paymentStatus = searchParams.get('status'); // Paystack also sends status
 
   useEffect(() => {
+    // Debug: Log all URL parameters
+    console.log('PaymentCallback - All URL params:', Object.fromEntries(searchParams.entries()));
+    console.log('PaymentCallback - reference:', reference);
+    console.log('PaymentCallback - trxref:', trxref);
+    
     if (!reference && !trxref) {
+      console.error('PaymentCallback - No payment reference found in URL');
       setStatus('error');
       setResult({
         success: false,
         error: 'No payment reference found',
-        message: 'Invalid payment callback URL'
+        message: 'Invalid payment callback URL - missing reference parameter'
       });
       return;
     }

@@ -6,6 +6,7 @@ import { ProductionEmailDashboard } from './ProductionEmailDashboard';
 import { EnhancedEmailProcessor } from '../admin/EnhancedEmailProcessor';
 import { EmailTemplateManager } from '../admin/EmailTemplateManager';
 import { EmailDeliveryDashboard } from '../admin/EmailDeliveryDashboard';
+import { ComprehensiveEmailTestDashboard } from '../admin/ComprehensiveEmailTestDashboard';
 
 export const EmailSystemTab = () => {
   return (
@@ -17,8 +18,9 @@ export const EmailSystemTab = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="templates" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+      <Tabs defaultValue="testing" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="testing">Testing</TabsTrigger>
           <TabsTrigger value="templates">Templates</TabsTrigger>
           <TabsTrigger value="delivery">Delivery</TabsTrigger>
           <TabsTrigger value="enhanced">Processing</TabsTrigger>
@@ -26,6 +28,10 @@ export const EmailSystemTab = () => {
           <TabsTrigger value="smtp">SMTP</TabsTrigger>
           <TabsTrigger value="dashboard">Production</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="testing" className="space-y-6">
+          <ComprehensiveEmailTestDashboard />
+        </TabsContent>
 
         <TabsContent value="templates" className="space-y-6">
           <EmailTemplateManager />

@@ -99,30 +99,6 @@ export const HeroCarousel = ({
           }
         }}
       />
-      
-      {/* Indicators */}
-      {imagesToShow.length > 1 && (
-        <div className="flex justify-center mt-4 gap-2">
-          {imagesToShow.map((_, index) => (
-            <button
-              key={index}
-              onClick={() => {
-                setIsVisible(false);
-                setTimeout(() => {
-                  setCurrentIndex(index);
-                  setIsVisible(true);
-                }, 250);
-              }}
-              className={`w-2 h-2 rounded-full transition-colors duration-300 ${
-                index === currentIndex 
-                  ? 'bg-red-600' 
-                  : 'bg-gray-300 hover:bg-gray-400'
-              }`}
-              aria-label={`Show image ${index + 1}`}
-            />
-          ))}
-        </div>
-      )}
     </div>
   );
 };

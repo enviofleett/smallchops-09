@@ -299,7 +299,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           .eq('id', data.user.id)
           .maybeSingle();
         
-        const redirectPath = profile ? '/dashboard' : '/home';
+        const redirectPath = profile ? '/dashboard' : '/';
         return { success: true, redirect: redirectPath };
       }
 

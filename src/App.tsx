@@ -59,11 +59,11 @@ const App = () => (
         <AuthProvider>
           <BrowserRouter>
             <Routes>
-              {/* Root route - intelligent authentication routing */}
-              <Route path="/" element={<AuthRouter />} />
+              {/* Customer store at root */}
+              <Route path="/" element={<PublicHome />} />
               
-              {/* Public home page for browsing products */}
-              <Route path="/home" element={<PublicHome />} />
+              {/* Redirect legacy /home to root */}
+              <Route path="/home" element={<Navigate to="/" replace />} />
               <Route path="/products" element={<PublicProducts />} />
               <Route path="/cart" element={<Cart />} />
               <Route path="/booking" element={<Booking />} />

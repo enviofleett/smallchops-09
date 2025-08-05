@@ -187,7 +187,7 @@ const AdminAuth = () => {
           <div className="mt-8 pt-6 border-t text-center">
             <button
               type="button"
-              onClick={() => navigate('/home')}
+              onClick={() => navigate('/')}
               className="text-sm text-muted-foreground hover:text-primary transition-colors"
             >
               ← Back to website

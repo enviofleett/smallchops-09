@@ -27,8 +27,8 @@ const AuthRouter = () => {
     }
   }
 
-  // Unauthenticated users - redirect to public home instead of forcing auth
-  return <Navigate to="/home" replace />;
+  // Unauthenticated users - redirect to public store at root
+  return <Navigate to="/" replace />;
 };
 
 export default AuthRouter;

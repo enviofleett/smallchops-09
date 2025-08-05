@@ -24,7 +24,7 @@ const Index = () => {
     }
 
     // If no one is authenticated, redirect to public home
-    navigate('/home');
+    navigate('/');
   }, [isAuthenticated, isLoading, userType, user, customerAccount, navigate]);
 
   if (isLoading) {

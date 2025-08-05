@@ -33,7 +33,7 @@ export default function Cart() {
   }
 
   const handleBackClick = () => {
-    navigate('/home');
+    navigate('/');
   };
 
 

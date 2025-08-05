@@ -238,7 +238,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
       if (isAuthenticated) {
         navigate("/customer-portal?tab=orders");
       } else {
-        navigate("/home");
+        navigate("/");
       }
 
     } catch (error) {

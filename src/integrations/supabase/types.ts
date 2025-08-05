@@ -6446,6 +6446,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      process_stuck_emails: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
       record_health_metric: {
         Args: {
           p_metric_name: string

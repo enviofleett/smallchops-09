@@ -50,30 +50,34 @@ const AbandonedCartsManager = () => {
     if (!cart.customer_email) return;
     
     try {
-      // Fetch customer details from the customers table with order statistics
-      const { data: customerData } = await supabase
-        .from('customers')
-        .select(`
-          *,
-          orders:orders(count),
-          total_spent:orders(total_amount)
-        `)
-        .eq('email', cart.customer_email)
-        .single();
-      
-      if (customerData) {
-        // Calculate total spent
-        const totalSpent = customerData.total_spent?.reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0) || 0;
-        const totalOrders = customerData.orders?.[0]?.count || 0;
+      // Fetch customer details and order statistics
+      const { data: ordersData } = await supabase
+        .from('orders')
+        .select('total_amount')
+        .eq('customer_email', cart.customer_email);
         
-        setSelectedCustomer({
-          ...customerData,
-          totalSpent,
-          totalOrders,
-          cart_session: cart
-        });
-        setIsCustomerModalOpen(true);
-      }
+      const totalSpent = ordersData?.reduce((sum: number, order: any) => sum + Number(order.total_amount || 0), 0) || 0;
+      const totalOrders = ordersData?.length || 0;
+      
+      // Check if customer account exists
+      const { data: customerAccount } = await supabase
+        .from('customer_accounts')
+        .select('*')
+        .eq('email', cart.customer_email)
+        .maybeSingle();
+      
+      const customerData = customerAccount || {
+        email: cart.customer_email,
+        name: cart.customer_email?.split('@')[0] || 'Guest Customer'
+      };
+        
+      setSelectedCustomer({
+        ...customerData,
+        totalSpent,
+        totalOrders,
+        cart_session: cart
+      });
+      setIsCustomerModalOpen(true);
     } catch (error) {
       console.error('Error fetching customer details:', error);
       // Fallback with basic info

@@ -56,15 +56,47 @@ export default function AuthCallback() {
 
           // For customer users (including OAuth), check if phone number is needed
           if (user.app_metadata?.provider === 'google') {
-            // Wait for customer account to be created by trigger
-            await new Promise(resolve => setTimeout(resolve, 3000));
+            // Poll for customer account creation with exponential backoff
+            const maxAttempts = 10;
+            let attempt = 0;
+            let customerAccount = null;
             
-            // Check if customer account exists and has phone
-            const { data: customerAccount } = await supabase
-              .from('customer_accounts')
-              .select('phone')
-              .eq('user_id', user.id)
-              .single();
+            while (attempt < maxAttempts && !customerAccount) {
+              const { data } = await supabase
+                .from('customer_accounts')
+                .select('phone, id')
+                .eq('user_id', user.id)
+                .maybeSingle();
+              
+              if (data) {
+                customerAccount = data;
+                break;
+              }
+              
+              // Exponential backoff: 100ms, 200ms, 400ms, 800ms, etc.
+              const delay = Math.min(100 * Math.pow(2, attempt), 2000);
+              await new Promise(resolve => setTimeout(resolve, delay));
+              attempt++;
+            }
+            
+            // If no account found after polling, create it manually as fallback
+            if (!customerAccount) {
+              console.log('Creating customer account manually for OAuth user');
+              const { data: newAccount, error: createError } = await supabase
+                .from('customer_accounts')
+                .insert({
+                  user_id: user.id,
+                  name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0],
+                  email_verified: true,
+                  profile_completion_percentage: 60
+                })
+                .select('phone, id')
+                .single();
+              
+              if (!createError && newAccount) {
+                customerAccount = newAccount;
+              }
+            }
             
             if (customerAccount && !customerAccount.phone) {
               setShowPhoneModal(true);

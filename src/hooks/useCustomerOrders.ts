@@ -83,7 +83,7 @@ export const useCustomerOrders = () => {
           }
         }
 
-        console.log('🔍 Total orders found:', allOrders.length);
+        console.log(`✅ Total orders found: ${allOrders.length} for customer account ID: ${customerAccount?.id} or email: ${userEmail}`);
         
         return {
           orders: allOrders,

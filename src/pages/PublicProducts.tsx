@@ -15,7 +15,7 @@ import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
 import { FavoriteButton } from '@/components/ui/favorite-button';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-import { useCustomerFavorites } from '@/hooks/useCustomerFavorites';
+import { useCustomerFavorites, useFavoritesByProducts } from '@/hooks/useCustomerFavorites';
 
 const PublicProducts = () => {
   const navigate = useNavigate();
@@ -27,17 +27,24 @@ const PublicProducts = () => {
   const { addItem } = useCart();
   const { toast } = useToast();
   const { customerAccount } = useCustomerAuth();
-  const { 
-    favorites, 
-    addToFavorites, 
-    removeFromFavorites 
-  } = useCustomerFavorites(customerAccount?.id || '');
-
+  
   // Fetch products with discounts
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
     queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
   });
+
+  const { 
+    favorites, 
+    addToFavorites, 
+    removeFromFavorites 
+  } = useCustomerFavorites(customerAccount?.id || '');
+  
+  // Get favorites status for current products
+  const { data: favoritesByProducts = {} } = useFavoritesByProducts(
+    customerAccount?.id, 
+    products?.map(p => p.id) || []
+  );
 
   // Fetch categories
   const { data: categories = [] } = useQuery({
@@ -84,7 +91,7 @@ const PublicProducts = () => {
     }
 
     try {
-      const isFavorite = favorites.some(fav => fav.id === productId);
+      const isFavorite = favoritesByProducts[productId] || false;
       if (isFavorite) {
         await removeFromFavorites({ customerId: customerAccount.id, productId });
         toast({
@@ -290,7 +297,7 @@ const PublicProducts = () => {
                           <div className="flex items-start justify-between mb-1 sm:mb-2">
                             <h3 className="font-semibold line-clamp-2 text-sm sm:text-base flex-1">{product.name}</h3>
                             <FavoriteButton
-                              isFavorite={favorites.some(fav => fav.id === product.id)}
+                              isFavorite={favoritesByProducts[product.id] || false}
                               onToggle={() => handleToggleFavorite(product.id)}
                               size="sm"
                               className="ml-2"

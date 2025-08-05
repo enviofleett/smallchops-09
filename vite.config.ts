@@ -3,16 +3,14 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 
-// Enhanced config with WebSocket handling and error suppression
+// https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
   server: {
-    host: mode === "development" ? "::" : "localhost",
+    host: "::",
     port: 8080,
-    hmr: mode === "development" ? {
-      port: 8081,
+    hmr: {
       overlay: false,
-      clientErrorOverlay: false
-    } : false,
+    },
   },
   plugins: [
     react(),

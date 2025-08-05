@@ -117,16 +117,22 @@ serve(async (req) => {
     if (checkoutData.payment_method === 'paystack') {
       console.log('Processing Paystack payment for amount:', subtotal);
       
+      // Generate unique reference for payment transaction
+      const paymentReference = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
       // Insert payment transaction record
       const { data: paymentTransaction, error: paymentError } = await supabaseClient
         .from('payment_transactions')
         .insert({
           order_id: orderId,
           customer_email: checkoutData.customer_email,
+          customer_name: checkoutData.customer_name,
           amount: subtotal,
           currency: 'NGN',
           payment_method: 'paystack',
-          status: 'pending'
+          status: 'pending',
+          provider_reference: paymentReference,
+          transaction_type: 'charge'
         })
         .select()
         .single();
@@ -139,25 +145,24 @@ serve(async (req) => {
         );
       }
 
-      // Initialize Paystack payment
-      const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${Deno.env.get('PAYSTACK_SECRET_KEY')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      // Use paystack-secure function instead of direct API call
+      const { data: paystackData, error: paystackError } = await supabaseClient.functions.invoke('paystack-secure', {
+        body: {
+          action: 'initialize',
           email: checkoutData.customer_email,
           amount: subtotal * 100, // Convert to kobo
-          reference: paymentTransaction.id,
-          callback_url: `${Deno.env.get('SITE_URL')}/payment-callback`,
-        }),
+          reference: paymentReference,
+          channels: ['card', 'bank', 'ussd', 'mobile_money'],
+          metadata: {
+            order_id: orderId,
+            customer_name: checkoutData.customer_name,
+            customer_email: checkoutData.customer_email
+          }
+        }
       });
 
-      const paystackData = await paystackResponse.json();
-
-      if (!paystackResponse.ok) {
-        console.error('Paystack initialization failed:', paystackData);
+      if (paystackError || !paystackData?.status) {
+        console.error('Paystack initialization failed:', paystackError || paystackData);
         return new Response(
           JSON.stringify({ error: 'Payment initialization failed' }),
           { status: 500, headers: corsHeaders }
@@ -169,7 +174,7 @@ serve(async (req) => {
           success: true,
           order_id: orderId,
           payment_url: paystackData.data.authorization_url,
-          reference: paymentTransaction.id
+          reference: paymentReference
         }),
         { status: 200, headers: corsHeaders }
       );

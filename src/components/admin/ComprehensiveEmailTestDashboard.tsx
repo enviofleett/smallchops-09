@@ -166,7 +166,7 @@ export const ComprehensiveEmailTestDashboard = () => {
       const { data: orderData, error: orderError } = await supabase.rpc('create_order_with_items', {
         p_customer_email: testEmail,
         p_customer_name: 'Test Customer',
-        p_order_items: JSON.stringify([{
+        p_items: JSON.stringify([{
           product_id: '00000000-0000-0000-0000-000000000001', // Assuming a test product exists
           quantity: 1,
           unit_price: 1000,

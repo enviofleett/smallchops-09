@@ -3922,6 +3922,7 @@ export type Database = {
           created_at: string | null
           currency: string | null
           customer_email: string | null
+          customer_name: string | null
           customer_phone: string | null
           exp_month: string | null
           exp_year: string | null
@@ -3950,6 +3951,7 @@ export type Database = {
           created_at?: string | null
           currency?: string | null
           customer_email?: string | null
+          customer_name?: string | null
           customer_phone?: string | null
           exp_month?: string | null
           exp_year?: string | null
@@ -3978,6 +3980,7 @@ export type Database = {
           created_at?: string | null
           currency?: string | null
           customer_email?: string | null
+          customer_name?: string | null
           customer_phone?: string | null
           exp_month?: string | null
           exp_year?: string | null
@@ -6050,17 +6053,7 @@ export type Database = {
           | {
               p_customer_email: string
               p_customer_name: string
-              p_order_items: Json
-              p_customer_phone?: string
-              p_fulfillment_type?: Database["public"]["Enums"]["order_type"]
-              p_delivery_address?: Json
-              p_guest_session_id?: string
-              p_payment_method?: string
-            }
-          | {
-              p_customer_email: string
-              p_customer_name: string
-              p_order_items: Json
+              p_items: Json
               p_customer_phone?: string
               p_fulfillment_type?: string
               p_delivery_address?: Json

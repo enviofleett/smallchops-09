@@ -6046,6 +6046,7 @@ export type Database = {
       }
       create_order_with_items: {
         Args:
+          | { p_customer_email: string; p_customer_name: string; p_items: Json }
           | {
               p_customer_email: string
               p_customer_name: string

@@ -6203,6 +6203,10 @@ export type Database = {
           delivery_rate: number
         }[]
       }
+      get_order_linking_stats: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_public_delivery_zones: {
         Args: Record<PropertyKey, never>
         Returns: {

@@ -58,7 +58,10 @@ const PaystackTest = () => {
       const { data, error } = await supabase.functions.invoke('send-email-standardized', {
         body: {
           templateId: 'customer_welcome',
-          recipient: testCustomer.email,
+          recipient: {
+            email: testCustomer.email,
+            name: testCustomer.name
+          },
           variables: {
             customerName: testCustomer.name,
             customerEmail: testCustomer.email,

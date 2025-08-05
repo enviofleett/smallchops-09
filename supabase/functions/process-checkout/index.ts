@@ -203,27 +203,53 @@ serve(async (req) => {
     let paymentResult = null;
     
     if (payment_method === 'paystack') {
-      console.log('=== PAYMENT TRANSACTION DATA DEBUG ===');
-      console.log('Order ID:', orderId);
-      console.log('Customer Email:', customer_email);
-      console.log('Amount:', total_amount);
-      console.log('Currency: NGN');
-      console.log('Payment Method: paystack');
-      console.log('Transaction Type: charge');
-      console.log('Status: pending');
-      console.log('=== END DEBUG ===');
+      // Comprehensive data validation and conversion
+      const numericAmount = Number(total_amount);
+      const validOrderId = orderId?.toString?.() || orderId;
+      const cleanEmail = customer_email?.toLowerCase?.()?.trim?.() || customer_email;
+      
+      console.log('=== COMPREHENSIVE PAYMENT TRANSACTION DEBUG ===');
+      console.log('Raw total_amount:', total_amount, 'Type:', typeof total_amount);
+      console.log('Converted numericAmount:', numericAmount, 'Type:', typeof numericAmount);
+      console.log('Is amount valid number?', !isNaN(numericAmount) && numericAmount > 0);
+      console.log('Order ID:', validOrderId, 'Type:', typeof validOrderId);
+      console.log('Order ID length:', validOrderId?.length);
+      console.log('Customer Email:', cleanEmail, 'Type:', typeof cleanEmail);
+      console.log('Email format valid?', /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail));
+      console.log('=== FINAL INSERT DATA ===');
+      
+      const insertData = {
+        order_id: validOrderId,
+        customer_email: cleanEmail,
+        amount: numericAmount,
+        currency: 'NGN',
+        payment_method: 'paystack',
+        transaction_type: 'charge',
+        status: 'pending'
+      };
+      
+      console.log('Insert data object:', JSON.stringify(insertData, null, 2));
+      Object.entries(insertData).forEach(([key, value]) => {
+        console.log(`${key}: ${value} (type: ${typeof value}, length: ${value?.length || 'N/A'})`);
+      });
+      console.log('=== END COMPREHENSIVE DEBUG ===');
 
-      // Create payment transaction record
+      // Validate data before insert
+      if (!validOrderId || typeof validOrderId !== 'string') {
+        throw new Error(`Invalid order_id: ${validOrderId} (type: ${typeof validOrderId})`);
+      }
+      if (!cleanEmail || typeof cleanEmail !== 'string' || !cleanEmail.includes('@')) {
+        throw new Error(`Invalid customer_email: ${cleanEmail} (type: ${typeof cleanEmail})`);
+      }
+      if (isNaN(numericAmount) || numericAmount <= 0) {
+        throw new Error(`Invalid amount: ${numericAmount} (type: ${typeof numericAmount})`);
+      }
+
+      // Create payment transaction record with validated data
+      console.log('Attempting payment transaction insert...');
       const { data: paymentData, error: paymentError } = await supabaseAdmin
         .from('payment_transactions')
-        .insert({
-          order_id: orderId,
-          amount: total_amount,
-          currency: 'NGN',
-          payment_method: 'paystack',
-          transaction_type: 'charge',
-          status: 'pending'
-        })
+        .insert(insertData)
         .select()
         .single();
 

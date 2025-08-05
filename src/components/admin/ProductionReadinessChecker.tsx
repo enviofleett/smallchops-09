@@ -1,307 +1,253 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Progress } from '@/components/ui/progress';
 import { CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { useToast } from '@/hooks/use-toast';
 
 interface CheckResult {
   name: string;
   status: 'pass' | 'fail' | 'warning';
   message: string;
-  critical: boolean;
+  details?: string;
 }
 
-interface ProductionReadiness {
-  score: number;
-  checks: CheckResult[];
-  canDeploy: boolean;
-}
+export const ProductionReadinessChecker = () => {
+  const [results, setResults] = useState<CheckResult[]>([]);
+  const [isChecking, setIsChecking] = useState(false);
+  const { toast } = useToast();
 
-export const ProductionReadinessChecker: React.FC = () => {
-  const [loading, setLoading] = useState(false);
-  const [readiness, setReadiness] = useState<ProductionReadiness | null>(null);
+  const runProductionChecks = async () => {
+    setIsChecking(true);
+    const checkResults: CheckResult[] = [];
 
-  const performChecks = async () => {
-    setLoading(true);
     try {
-      const checks: CheckResult[] = [];
-
-      // 1. Payment Configuration Check
-      const { data: paymentConfig } = await supabase.rpc('get_active_paystack_config');
-      const configData = Array.isArray(paymentConfig) ? paymentConfig[0] : paymentConfig;
-      
-      if (configData?.public_key && configData?.secret_key) {
-        checks.push({
-          name: 'Payment Configuration',
-          status: configData.test_mode ? 'warning' : 'pass',
-          message: configData.test_mode 
-            ? 'Using test keys - switch to live keys for production'
-            : 'Live payment keys configured',
-          critical: true
-        });
-      } else {
-        checks.push({
-          name: 'Payment Configuration',
-          status: 'fail',
-          message: 'Payment configuration incomplete',
-          critical: true
-        });
-      }
-
-      // 2. Webhook Configuration Check
-      const { data: envConfig } = await supabase
-        .from('environment_config')
-        .select('webhook_url, is_live_mode')
-        .order('created_at', { ascending: false })
+      // Check SMTP Configuration
+      const { data: smtpSettings } = await supabase
+        .from('communication_settings')
+        .select('*')
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (envConfig?.webhook_url) {
-        checks.push({
-          name: 'Webhook Configuration',
-          status: envConfig.webhook_url.includes('localhost') ? 'warning' : 'pass',
-          message: envConfig.webhook_url.includes('localhost')
-            ? 'Webhook URL points to localhost - update for production'
-            : 'Production webhook URL configured',
-          critical: true
+      if (!smtpSettings || !smtpSettings.smtp_host) {
+        checkResults.push({
+          name: 'SMTP Configuration',
+          status: 'fail',
+          message: 'SMTP settings not configured',
+          details: 'Configure SMTP settings in Settings > Email System'
         });
       } else {
-        checks.push({
-          name: 'Webhook Configuration',
-          status: 'fail',
-          message: 'Webhook URL not configured',
-          critical: true
+        checkResults.push({
+          name: 'SMTP Configuration',
+          status: 'pass',
+          message: 'SMTP settings configured'
         });
       }
 
-      // 3. Business Settings Check
+      // Check Email Queue Processing
+      const { data: queuedEmails } = await supabase
+        .from('communication_events')
+        .select('status')
+        .eq('status', 'queued')
+        .limit(1);
+
+      if (queuedEmails && queuedEmails.length > 10) {
+        checkResults.push({
+          name: 'Email Queue',
+          status: 'warning',
+          message: 'Large queue backlog detected',
+          details: 'Consider processing the queue manually'
+        });
+      } else {
+        checkResults.push({
+          name: 'Email Queue',
+          status: 'pass',
+          message: 'Email queue is healthy'
+        });
+      }
+
+      // Check for Template Key Mapping
+      const { data: nullTemplateEvents } = await supabase
+        .from('communication_events')
+        .select('id')
+        .is('template_key', null)
+        .limit(1);
+
+      if (nullTemplateEvents && nullTemplateEvents.length > 0) {
+        checkResults.push({
+          name: 'Template Key Mapping',
+          status: 'fail',
+          message: 'Events with null template keys found',
+          details: 'Run data migration to fix template key mapping'
+        });
+      } else {
+        checkResults.push({
+          name: 'Template Key Mapping',
+          status: 'pass',
+          message: 'All events have proper template keys'
+        });
+      }
+
+      // Test SMTP Connection
+      try {
+        const { data: testResult, error } = await supabase.functions.invoke('smtp-health-monitor');
+        
+        if (error || !testResult?.healthy) {
+          checkResults.push({
+            name: 'SMTP Connection',
+            status: 'fail',
+            message: 'SMTP connection test failed',
+            details: testResult?.error || error?.message
+          });
+        } else {
+          checkResults.push({
+            name: 'SMTP Connection',
+            status: 'pass',
+            message: 'SMTP connection healthy'
+          });
+        }
+      } catch (error) {
+        checkResults.push({
+          name: 'SMTP Connection',
+          status: 'warning',
+          message: 'Could not test SMTP connection',
+          details: 'Check manually or verify edge function deployment'
+        });
+      }
+
+      // Check Business Settings
       const { data: businessSettings } = await supabase
         .from('business_settings')
-        .select('name, email, logo_url, seo_title, seo_description')
+        .select('*')
         .limit(1)
-        .single();
+        .maybeSingle();
 
-      if (businessSettings) {
-        const hasBasicInfo = businessSettings.name && businessSettings.email;
-        const hasBranding = businessSettings.logo_url;
-        const hasSEO = businessSettings.seo_title && businessSettings.seo_description;
-
-        checks.push({
-          name: 'Business Information',
-          status: hasBasicInfo ? 'pass' : 'fail',
-          message: hasBasicInfo ? 'Business details configured' : 'Missing business name or email',
-          critical: false
+      if (!businessSettings?.name) {
+        checkResults.push({
+          name: 'Business Configuration',
+          status: 'warning',
+          message: 'Business name not configured',
+          details: 'Set business name in Settings for better email templates'
         });
-
-        checks.push({
-          name: 'Branding Assets',
-          status: hasBranding ? 'pass' : 'warning',
-          message: hasBranding ? 'Logo configured' : 'Logo not uploaded',
-          critical: false
-        });
-
-        checks.push({
-          name: 'SEO Configuration',
-          status: hasSEO ? 'pass' : 'warning',
-          message: hasSEO ? 'SEO metadata configured' : 'SEO title/description missing',
-          critical: false
-        });
-      }
-
-      // 4. Security Check
-      const { data: securityIncidents } = await supabase
-        .from('security_incidents')
-        .select('severity')
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .eq('severity', 'critical');
-
-      checks.push({
-        name: 'Security Status',
-        status: (securityIncidents?.length || 0) > 0 ? 'warning' : 'pass',
-        message: (securityIncidents?.length || 0) > 0 
-          ? `${securityIncidents?.length} critical security incidents in last 24h`
-          : 'No critical security incidents',
-        critical: true
-      });
-
-      // 5. Database Health Check
-      try {
-        await supabase.from('products').select('id').limit(1);
-        checks.push({
-          name: 'Database Connection',
+      } else {
+        checkResults.push({
+          name: 'Business Configuration',
           status: 'pass',
-          message: 'Database accessible',
-          critical: true
-        });
-      } catch (error) {
-        checks.push({
-          name: 'Database Connection',
-          status: 'fail',
-          message: 'Database connection failed',
-          critical: true
+          message: 'Business settings configured'
         });
       }
 
-      // Calculate score and deployment readiness
-      const totalChecks = checks.length;
-      const passedChecks = checks.filter(c => c.status === 'pass').length;
-      const failedCritical = checks.filter(c => c.status === 'fail' && c.critical).length;
-      
-      const score = Math.round((passedChecks / totalChecks) * 100);
-      const canDeploy = failedCritical === 0;
+      setResults(checkResults);
 
-      setReadiness({
-        score,
-        checks,
-        canDeploy
-      });
+      const failed = checkResults.filter(r => r.status === 'fail').length;
+      const warnings = checkResults.filter(r => r.status === 'warning').length;
+
+      if (failed === 0 && warnings === 0) {
+        toast({
+          title: '🚀 Production Ready!',
+          description: 'All checks passed. System is ready for deployment.',
+        });
+      } else if (failed === 0) {
+        toast({
+          title: '⚠️ Minor Issues',
+          description: `${warnings} warning(s) found. System can be deployed with caution.`,
+        });
+      } else {
+        toast({
+          title: '❌ Critical Issues',
+          description: `${failed} critical issue(s) must be fixed before deployment.`,
+          variant: 'destructive',
+        });
+      }
 
     } catch (error) {
-      console.error('Production readiness check failed:', error);
-      toast.error('Failed to perform readiness checks');
+      toast({
+        title: 'Check Failed',
+        description: 'Failed to run production readiness checks',
+        variant: 'destructive',
+      });
     } finally {
-      setLoading(false);
+      setIsChecking(false);
     }
   };
 
-  useEffect(() => {
-    performChecks();
-  }, []);
-
-  const getStatusIcon = (status: string) => {
+  const getStatusIcon = (status: CheckResult['status']) => {
     switch (status) {
       case 'pass':
-        return <CheckCircle className="h-5 w-5 text-green-500" />;
+        return <CheckCircle className="h-4 w-4 text-green-500" />;
       case 'fail':
-        return <XCircle className="h-5 w-5 text-red-500" />;
+        return <XCircle className="h-4 w-4 text-red-500" />;
       case 'warning':
-        return <AlertCircle className="h-5 w-5 text-yellow-500" />;
-      default:
-        return null;
+        return <AlertCircle className="h-4 w-4 text-yellow-500" />;
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'pass':
-        return 'bg-green-100 text-green-800';
-      case 'fail':
-        return 'bg-red-100 text-red-800';
-      case 'warning':
-        return 'bg-yellow-100 text-yellow-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
+  const getStatusBadge = (status: CheckResult['status']) => {
+    const variants = {
+      pass: 'default',
+      fail: 'destructive',
+      warning: 'secondary'
+    } as const;
 
-  if (!readiness) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <RefreshCw className={`h-5 w-5 ${loading ? 'animate-spin' : ''}`} />
-            Production Readiness Check
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-6">
-            {loading ? 'Performing checks...' : 'Loading...'}
-          </div>
-        </CardContent>
-      </Card>
+      <Badge variant={variants[status]}>
+        {status.toUpperCase()}
+      </Badge>
     );
-  }
+  };
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
-          <span>Production Readiness</span>
-          <Button
-            variant="outline"
+          Production Readiness Checker
+          <Button 
+            onClick={runProductionChecks} 
+            disabled={isChecking}
             size="sm"
-            onClick={performChecks}
-            disabled={loading}
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            {isChecking ? (
+              <RefreshCw className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              'Run Checks'
+            )}
           </Button>
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-6">
-          {/* Overall Score */}
-          <div className="text-center">
-            <div className="text-3xl font-bold mb-2">{readiness.score}%</div>
-            <Progress value={readiness.score} className="w-full" />
-            <div className="mt-2">
-              <Badge 
-                variant={readiness.canDeploy ? "default" : "destructive"}
-                className="text-sm"
-              >
-                {readiness.canDeploy ? 'Ready for Production' : 'Not Ready for Production'}
-              </Badge>
-            </div>
-          </div>
-
-          {/* Individual Checks */}
+        {results.length === 0 ? (
+          <p className="text-muted-foreground">
+            Click "Run Checks" to verify production readiness
+          </p>
+        ) : (
           <div className="space-y-3">
-            <h3 className="font-semibold text-sm text-muted-foreground uppercase tracking-wider">
-              System Checks
-            </h3>
-            {readiness.checks.map((check, index) => (
-              <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-3">
-                  {getStatusIcon(check.status)}
+            {results.map((result, index) => (
+              <div key={index} className="flex items-start justify-between p-3 border rounded-lg">
+                <div className="flex items-start space-x-3">
+                  {getStatusIcon(result.status)}
                   <div>
-                    <div className="font-medium">{check.name}</div>
-                    <div className="text-sm text-muted-foreground">{check.message}</div>
+                    <div className="font-medium">{result.name}</div>
+                    <div className="text-sm text-muted-foreground">{result.message}</div>
+                    {result.details && (
+                      <div className="text-xs text-muted-foreground mt-1">{result.details}</div>
+                    )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  {check.critical && (
-                    <Badge variant="secondary" className="text-xs">
-                      Critical
-                    </Badge>
-                  )}
-                  <Badge className={`text-xs ${getStatusColor(check.status)}`}>
-                    {check.status.toUpperCase()}
-                  </Badge>
-                </div>
+                {getStatusBadge(result.status)}
               </div>
             ))}
+            
+            <div className="mt-4 p-4 bg-muted rounded-lg">
+              <div className="text-sm font-medium mb-2">Summary</div>
+              <div className="text-sm text-muted-foreground">
+                {results.filter(r => r.status === 'pass').length} passed, 
+                {results.filter(r => r.status === 'warning').length} warnings, 
+                {results.filter(r => r.status === 'fail').length} failed
+              </div>
+            </div>
           </div>
-
-          {/* Deployment Guidance */}
-          {!readiness.canDeploy && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-red-800 font-medium mb-2">
-                <XCircle className="h-4 w-4" />
-                Critical Issues Found
-              </div>
-              <p className="text-red-700 text-sm">
-                Please resolve all critical failures before deploying to production. 
-                These issues could prevent your application from functioning correctly.
-              </p>
-            </div>
-          )}
-
-          {readiness.canDeploy && (
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-              <div className="flex items-center gap-2 text-green-800 font-medium mb-2">
-                <CheckCircle className="h-4 w-4" />
-                Ready for Production
-              </div>
-              <p className="text-green-700 text-sm">
-                Your application passes all critical checks and is ready for production deployment.
-                Consider addressing any warnings for optimal performance.
-              </p>
-            </div>
-          )}
-        </div>
+        )}
       </CardContent>
     </Card>
   );

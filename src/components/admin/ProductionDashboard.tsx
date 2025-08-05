@@ -6,6 +6,8 @@ import { RealTimeEmailProcessor } from '@/components/settings/RealTimeEmailProce
 import { EmailDeliveryMonitor } from '@/components/settings/EmailDeliveryMonitor';
 import { EmailProcessingTab } from '@/components/settings/EmailProcessingTab';
 import { EmailHealthDashboard } from '@/components/admin/EmailHealthDashboard';
+import { ProductionReadinessChecker } from '@/components/admin/ProductionReadinessChecker';
+import { EmailFlowTester } from '@/components/admin/EmailFlowTester';
 import { Shield, Zap, BarChart3, Settings } from 'lucide-react';
 
 export const ProductionDashboard: React.FC = () => {
@@ -40,6 +42,11 @@ export const ProductionDashboard: React.FC = () => {
 
         <TabsContent value="health" className="space-y-6">
           <ProductionReadinessMonitor />
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <ProductionReadinessChecker />
+            <EmailFlowTester />
+          </div>
         </TabsContent>
 
         <TabsContent value="processing" className="space-y-6">

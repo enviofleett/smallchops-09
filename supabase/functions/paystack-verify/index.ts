@@ -230,24 +230,51 @@ serve(async (req) => {
           } else {
             console.log(`Queued ${emailEvents.length} order confirmation emails successfully`);
             
-            // Trigger multiple email processors for immediate processing
+            // Trigger multiple email processors for immediate processing with high priority
             try {
-              console.log('Triggering enhanced email processor...');
-              await supabaseClient.functions.invoke('enhanced-email-processor');
-              console.log('Enhanced email processor triggered successfully');
+              console.log('Triggering enhanced email processor for high priority emails...');
+              const enhancedResult = await supabaseClient.functions.invoke('enhanced-email-processor', {
+                body: { priority: 'high' }
+              });
+              console.log('Enhanced email processor result:', enhancedResult);
               
-              // Also trigger instant processor for high priority
-              await supabaseClient.functions.invoke('instant-email-processor');
-              console.log('Instant email processor triggered successfully');
+              // Also trigger instant processor specifically for order confirmations
+              console.log('Triggering instant email processor...');
+              const instantResult = await supabaseClient.functions.invoke('instant-email-processor', {
+                body: { priority: 'high' }
+              });
+              console.log('Instant email processor result:', instantResult);
+              
+              // For production reliability, also trigger production processor
+              console.log('Triggering production email processor...');
+              const productionResult = await supabaseClient.functions.invoke('production-email-processor', {
+                body: { priority: 'high' }
+              });
+              console.log('Production email processor result:', productionResult);
+              
             } catch (emailError) {
               console.error('Failed to trigger email processors:', emailError);
               
-              // Fallback to production processor
+              // Critical fallback - try email automation trigger
               try {
-                await supabaseClient.functions.invoke('production-email-processor');
-                console.log('Production email processor triggered as fallback');
+                console.log('Using email automation trigger as critical fallback...');
+                await supabaseClient.functions.invoke('email-automation-trigger', {
+                  body: {
+                    trigger_type: 'order_confirmation',
+                    customer_email: orderData.customer_email,
+                    customer_name: orderData.customer_name,
+                    order_data: {
+                      order_id: transaction.order_id,
+                      order_number: orderData.order_number,
+                      total_amount: data.amount / 100,
+                      payment_date: new Date().toISOString()
+                    },
+                    immediate_processing: true
+                  }
+                });
+                console.log('Email automation trigger executed successfully');
               } catch (fallbackError) {
-                console.error('All email processors failed:', fallbackError);
+                console.error('Critical: All email processors failed:', fallbackError);
               }
             }
           }

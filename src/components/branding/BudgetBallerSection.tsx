@@ -58,16 +58,13 @@ export const BudgetBallerSection = ({
 
   return (
     <div className={className}>
-      <div 
-        className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg"
-        style={{ 
-          background: `linear-gradient(135deg, ${content.background_color || '#f59e0b'}, ${content.background_color || '#f59e0b'}dd)`
-        }}
-      >
+      <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-lg">
         <div className="flex items-center justify-center mb-4">
           <div 
             className="px-4 sm:px-8 py-2 sm:py-3 rounded-full flex items-center space-x-2 sm:space-x-3"
-            style={{ backgroundColor: 'rgba(255, 255, 255, 0.2)' }}
+            style={{ 
+              background: `linear-gradient(135deg, ${content.background_color || '#f59e0b'}, ${content.background_color || '#f59e0b'}dd)`
+            }}
           >
             <div className="w-6 h-6 sm:w-8 sm:h-8 bg-red-600 rounded-full flex items-center justify-center">
               <svg className="w-3 h-3 sm:w-4 sm:h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
@@ -84,10 +81,7 @@ export const BudgetBallerSection = ({
         </div>
         
         {content.description && (
-          <p 
-            className="text-center text-sm mb-4"
-            style={{ color: content.text_color || '#1f2937' }}
-          >
+          <p className="text-center text-sm mb-4 text-gray-700">
             {content.description}
           </p>
         )}
@@ -96,11 +90,7 @@ export const BudgetBallerSection = ({
           {includedItems.map((item, index) => (
             <span 
               key={index}
-              className="text-sm text-center block pb-1 border-b border-dotted border-opacity-30"
-              style={{ 
-                color: content.text_color || '#1f2937',
-                borderColor: content.text_color || '#1f2937'
-              }}
+              className="text-sm text-center block pb-1 border-b border-dotted border-gray-400 text-gray-700"
             >
               {item.name}
             </span>

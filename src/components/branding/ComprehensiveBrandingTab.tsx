@@ -13,6 +13,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { EnhancedLogoUpload } from './EnhancedLogoUpload';
 import { BrandingAnalytics } from './BrandingAnalytics';
+import { HeroImagesManager } from './HeroImagesManager';
+import { BudgetBallerManager } from './BudgetBallerManager';
 import { 
   Palette, 
   FileImage, 
@@ -223,7 +225,7 @@ export const ComprehensiveBrandingTab = () => {
       </div>
 
       <Tabs defaultValue="identity" className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="identity" className="flex items-center gap-2">
             <FileImage className="h-4 w-4" />
             Brand Identity
@@ -231,6 +233,10 @@ export const ComprehensiveBrandingTab = () => {
           <TabsTrigger value="colors" className="flex items-center gap-2">
             <Palette className="h-4 w-4" />
             Colors & Assets
+          </TabsTrigger>
+          <TabsTrigger value="hero" className="flex items-center gap-2">
+            <FileImage className="h-4 w-4" />
+            Hero Content
           </TabsTrigger>
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <BarChart3 className="h-4 w-4" />
@@ -480,7 +486,14 @@ export const ComprehensiveBrandingTab = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="analytics">
+            <TabsContent value="hero" className="space-y-6">
+              <div className="grid gap-6">
+                <HeroImagesManager />
+                <BudgetBallerManager />
+              </div>
+            </TabsContent>
+
+            <TabsContent value="analytics" className="space-y-6">
               <BrandingAnalytics />
             </TabsContent>
 

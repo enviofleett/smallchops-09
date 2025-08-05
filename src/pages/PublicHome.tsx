@@ -13,6 +13,8 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
+import { HeroCarousel } from '@/components/branding/HeroCarousel';
+import { BudgetBallerSection } from '@/components/branding/BudgetBallerSection';
 
 const PublicHome = () => {
   const navigate = useNavigate();
@@ -101,37 +103,18 @@ const PublicHome = () => {
               </div>
             </div>
 
-            {/* Column 2 - Hero Image */}
+            {/* Column 2 - Hero Carousel */}
             <div className="flex justify-center order-1 lg:order-2">
-              <div className="w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96">
-                <img 
-                  src="/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png" 
-                  alt="Delicious snacks and treats" 
-                  className="w-full h-full object-cover rounded-2xl"
-                />
-              </div>
+              <HeroCarousel 
+                className="w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96"
+                fallbackImage="/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png"
+                fallbackAlt="Delicious snacks and treats"
+              />
             </div>
             
             {/* Column 3 - Budget Baller Card */}
             <div className="flex justify-center lg:justify-start order-3">
-              <div className="w-full max-w-sm bg-white p-4 sm:p-6 rounded-2xl shadow-lg">
-                <div className="flex items-center justify-center mb-4">
-                  <div className="bg-gradient-to-r from-amber-200 to-orange-200 px-4 sm:px-8 py-2 sm:py-3 rounded-full flex items-center space-x-2 sm:space-x-3">
-                    <div className="w-6 h-6 sm:w-8 sm:h-8 bg-red-600 rounded-full flex items-center justify-center">
-                      <svg className="w-3 h-3 sm:w-4 sm:h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M3 1a1 1 0 000 2h1.22l.305 1.222a.997.997 0 00.01.042l1.358 5.43-.893.892C3.74 11.846 4.632 14 6.414 14H15a1 1 0 000-2H6.414l1-1H14a1 1 0 00.894-.553l3-6A1 1 0 0017 3H6.28l-.31-1.243A1 1 0 005 1H3zM16 16.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zM6.5 18a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"/>
-                      </svg>
-                    </div>
-                    <h3 className="text-base sm:text-xl font-bold text-gray-900">The Budget Baller</h3>
-                  </div>
-                </div>
-                <div className="space-y-2 sm:space-y-3">
-                  <span className="text-sm text-gray-600 text-center block pb-1 border-b border-dotted border-red-400">5 Samosa</span>
-                  <span className="text-sm text-gray-600 text-center block pb-1 border-b border-dotted border-red-400">5 Spring Rolls</span>
-                  <span className="text-sm text-gray-600 text-center block pb-1 border-b border-dotted border-red-400">5 Stick Meat</span>
-                  <span className="text-sm text-gray-600 text-center block pb-1 border-b border-dotted border-red-400">20 Poff-Poff</span>
-                </div>
-              </div>
+              <BudgetBallerSection className="w-full max-w-sm" />
             </div>
           </div>
         </div>

@@ -14,6 +14,8 @@ export const useCustomerOrders = () => {
       }
       
       try {
+        console.log('🔍 Fetching orders for customer:', customerAccount?.id, customerAccount?.email);
+        
         // First try to get orders by customer_id
         const { data: ordersData, error } = await supabase
           .from('orders')
@@ -38,6 +40,8 @@ export const useCustomerOrders = () => {
           console.error('Error fetching orders by customer_id:', error);
           return { orders: [], count: 0 };
         }
+        
+        console.log('🔍 Orders by customer_id:', ordersData?.length || 0);
 
         // If no orders found by customer_id, try customer_email fallback
         let finalOrders = ordersData || [];

@@ -81,6 +81,8 @@ const PublicProducts = () => {
   };
 
   const handleToggleFavorite = async (productId: string) => {
+    console.log('🔍 Toggle favorite clicked:', { productId, customerAccount: customerAccount?.id });
+    
     if (!customerAccount?.id) {
       toast({
         title: "Sign in required",

@@ -9,7 +9,10 @@ export const useCustomerFavorites = (customerId?: string) => {
   // Get all customer favorites
   const favoritesQuery = useQuery({
     queryKey: ['customer-favorites', customerId],
-    queryFn: () => customerId ? getCustomerFavorites(customerId) : Promise.resolve([]),
+    queryFn: () => {
+      console.log('🔍 Fetching favorites for customer:', customerId);
+      return customerId ? getCustomerFavorites(customerId) : Promise.resolve([]);
+    },
     enabled: !!customerId,
   });
 

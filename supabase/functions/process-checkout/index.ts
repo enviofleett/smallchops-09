@@ -18,6 +18,7 @@ interface CheckoutRequest {
   }>;
   total_amount?: number;
   delivery_fee?: number;
+  delivery_zone_id?: string;
   fulfillment_type: 'delivery' | 'pickup';
   delivery_address?: {
     address_line_1: string;
@@ -87,10 +88,13 @@ serve(async (req) => {
       p_fulfillment_type: checkoutData.fulfillment_type,
       p_delivery_address: checkoutData.delivery_address || null,
       p_guest_session_id: checkoutData.guest_session_id || '',
-      p_payment_method: checkoutData.payment_method
+      p_payment_method: checkoutData.payment_method,
+      p_delivery_zone_id: checkoutData.delivery_zone_id || null,
+      p_delivery_fee: checkoutData.delivery_fee || 0,
+      p_total_amount: checkoutData.total_amount || 0
     });
 
-    // Create order using the 8-parameter RPC function
+    // Create order using the enhanced RPC function with all parameters
     const { data: orderResult, error: orderError } = await supabaseClient
       .rpc('create_order_with_items', {
         p_customer_email: checkoutData.customer_email,
@@ -100,7 +104,10 @@ serve(async (req) => {
         p_fulfillment_type: checkoutData.fulfillment_type,
         p_delivery_address: checkoutData.delivery_address || null,
         p_guest_session_id: checkoutData.guest_session_id || '',
-        p_payment_method: checkoutData.payment_method
+        p_payment_method: checkoutData.payment_method,
+        p_delivery_zone_id: checkoutData.delivery_zone_id || null,
+        p_delivery_fee: checkoutData.delivery_fee || 0,
+        p_total_amount: checkoutData.total_amount || 0
       });
 
     if (orderError) {

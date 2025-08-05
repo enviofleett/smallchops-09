@@ -207,7 +207,38 @@ serve(async (req) => {
         .eq('id', paymentData.id);
     }
 
-    // 4. Log successful checkout
+    // 4. Send order confirmation email
+    if (payment_method !== 'paystack') {
+      // For non-Paystack payments, send email immediately
+      try {
+        await supabaseAdmin.functions.invoke('smtp-email-sender', {
+          body: {
+            to: customer_email,
+            subject: `Order Confirmation - ${orderNumber}`,
+            html: `
+              <h1>Order Confirmation</h1>
+              <p>Hello ${customer_name},</p>
+              <p>Thank you for your order! Your order <strong>${orderNumber}</strong> has been confirmed.</p>
+              <div style="background: #f5f5f5; padding: 15px; margin: 20px 0; border-radius: 5px;">
+                <h3>Order Details:</h3>
+                <p><strong>Order Number:</strong> ${orderNumber}</p>
+                <p><strong>Total Amount:</strong> ₦${total_amount.toLocaleString()}</p>
+                <p><strong>Fulfillment:</strong> ${fulfillment_type === 'delivery' ? 'Home Delivery' : 'Store Pickup'}</p>
+              </div>
+              <p>We will send you updates as your order progresses.</p>
+              <p>Thank you for choosing us!</p>
+            `,
+            text: `Order Confirmation - ${orderNumber}\n\nHello ${customer_name}, your order ${orderNumber} for ₦${total_amount.toLocaleString()} has been confirmed.`
+          }
+        });
+        console.log('Order confirmation email sent to:', customer_email);
+      } catch (emailError) {
+        console.error('Failed to send order confirmation email:', emailError);
+        // Don't fail the checkout for email issues
+      }
+    }
+
+    // 5. Log successful checkout
     await supabaseAdmin
       .from('audit_logs')
       .insert({

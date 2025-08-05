@@ -4,6 +4,7 @@ import { SMTPSettingsTab } from './SMTPSettingsTab';
 import { EmailSystemMonitor } from '../admin/EmailSystemMonitor';
 import { ProductionEmailDashboard } from './ProductionEmailDashboard';
 import { EnhancedEmailProcessor } from '../admin/EnhancedEmailProcessor';
+import { EmailTemplateManager } from '../admin/EmailTemplateManager';
 
 export const EmailSystemTab = () => {
   return (
@@ -15,13 +16,18 @@ export const EmailSystemTab = () => {
         </p>
       </div>
 
-      <Tabs defaultValue="enhanced" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
+      <Tabs defaultValue="templates" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-5">
+          <TabsTrigger value="templates">Email Templates</TabsTrigger>
           <TabsTrigger value="enhanced">Enhanced Processing</TabsTrigger>
           <TabsTrigger value="monitor">System Monitor</TabsTrigger>
           <TabsTrigger value="smtp">SMTP Settings</TabsTrigger>
           <TabsTrigger value="dashboard">Production Dashboard</TabsTrigger>
         </TabsList>
+
+        <TabsContent value="templates" className="space-y-6">
+          <EmailTemplateManager />
+        </TabsContent>
 
         <TabsContent value="enhanced" className="space-y-6">
           <EnhancedEmailProcessor />

@@ -211,6 +211,7 @@ serve(async (req) => {
           amount: total_amount,
           currency: 'NGN',
           payment_method: 'paystack',
+          transaction_type: 'purchase',
           status: 'pending'
         })
         .select()

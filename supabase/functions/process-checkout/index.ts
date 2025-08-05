@@ -93,6 +93,10 @@ serve(async (req) => {
     // 2. Skip validation for now and proceed to order creation
     console.log('Products validated, proceeding to order creation...');
 
+    // Initialize order variables at function scope
+    let orderId = null;
+    let orderNumber = null;
+
     // 3. Create order with enhanced error handling
     try {
       console.log('Preparing order data for database function...');
@@ -180,8 +184,9 @@ serve(async (req) => {
         );
       }
 
-      const orderId = orderResult.order_id;
-      const orderNumber = orderResult.order_number;
+      // Assign order variables within the try block
+      orderId = orderResult.order_id;
+      orderNumber = orderResult.order_number;
 
       console.log('Order created successfully:', orderId, 'Number:', orderNumber);
 

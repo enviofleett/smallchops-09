@@ -9,10 +9,15 @@ const corsHeaders = {
 interface CheckoutRequest {
   customer_email: string;
   customer_name: string;
+  customer_phone?: string;
   order_items: Array<{
     product_id: string;
     quantity: number;
+    unit_price?: number;
+    total_price?: number;
   }>;
+  total_amount?: number;
+  delivery_fee?: number;
   fulfillment_type: 'delivery' | 'pickup';
   delivery_address?: {
     address_line_1: string;
@@ -25,6 +30,7 @@ interface CheckoutRequest {
     delivery_instructions?: string;
   };
   pickup_point_id?: string;
+  guest_session_id?: string;
   payment_method: 'bank_transfer' | 'cash_on_delivery' | 'paystack';
 }
 
@@ -76,15 +82,25 @@ serve(async (req) => {
     console.log('Calling create_order_with_items with:', {
       p_customer_email: checkoutData.customer_email,
       p_customer_name: checkoutData.customer_name,
-      p_items: checkoutData.order_items
+      p_items: checkoutData.order_items,
+      p_customer_phone: checkoutData.customer_phone || '',
+      p_fulfillment_type: checkoutData.fulfillment_type,
+      p_delivery_address: checkoutData.delivery_address || null,
+      p_guest_session_id: checkoutData.guest_session_id || '',
+      p_payment_method: checkoutData.payment_method
     });
 
-    // Create order using the simplified RPC function
+    // Create order using the 8-parameter RPC function
     const { data: orderResult, error: orderError } = await supabaseClient
       .rpc('create_order_with_items', {
         p_customer_email: checkoutData.customer_email,
         p_customer_name: checkoutData.customer_name,
-        p_items: JSON.stringify(checkoutData.order_items) // Serialize to JSON string for jsonb parameter
+        p_items: checkoutData.order_items,
+        p_customer_phone: checkoutData.customer_phone || '',
+        p_fulfillment_type: checkoutData.fulfillment_type,
+        p_delivery_address: checkoutData.delivery_address || null,
+        p_guest_session_id: checkoutData.guest_session_id || '',
+        p_payment_method: checkoutData.payment_method
       });
 
     if (orderError) {

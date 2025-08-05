@@ -413,7 +413,7 @@ const testSMTPConnection = async () => {
                         Enable SMTP Email
                       </FormLabel>
                       <FormDescription>
-                        Use custom SMTP server instead of or alongside MailerSend.
+                        Use your own SMTP server for sending emails.
                       </FormDescription>
                     </div>
                     <FormControl>
@@ -441,13 +441,11 @@ const testSMTPConnection = async () => {
                             </SelectTrigger>
                           </FormControl>
                           <SelectContent>
-                            <SelectItem value="mailersend">MailerSend Only</SelectItem>
-                            <SelectItem value="smtp">SMTP Only</SelectItem>
-                            <SelectItem value="both">Both (SMTP as Primary)</SelectItem>
+                            <SelectItem value="smtp">SMTP</SelectItem>
                           </SelectContent>
                         </Select>
                         <FormDescription>
-                          Choose how to handle email sending: SMTP only, MailerSend only, or both with SMTP as primary.
+                          Email sending is configured to use your SMTP server for reliable delivery.
                         </FormDescription>
                         <FormMessage />
                       </FormItem>

@@ -261,17 +261,21 @@ serve(async (req) => {
 
           if (error) throw error;
 
-          // Send real-time notification to customer
-          await supabase.functions.invoke('send-email-standardized', {
+          // Send real-time notification to customer via SMTP
+          await supabase.functions.invoke('smtp-email-sender', {
             body: {
-              to: tracking.order_id, // This should be resolved to customer email
-              template: 'delivery_update',
+              templateId: 'delivery_update',
+              recipient: {
+                email: tracking.order_id, // This should be resolved to customer email
+                name: 'Customer'
+              },
               variables: {
                 orderNumber: tracking.order_id,
                 status,
                 estimatedArrival,
                 trackingUrl: `https://yourapp.com/track/${orderId}`
-              }
+              },
+              emailType: 'transactional'
             }
           });
 

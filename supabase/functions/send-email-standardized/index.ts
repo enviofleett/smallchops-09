@@ -147,65 +147,31 @@ Deno.serve(async (req) => {
       recipientName: recipient.name || standardizedVariables.customerName || 'Valued Customer'
     }
 
-    // 7. Send email via MailerSend
-    const emailPayload = {
-      from: {
-        email: senderEmail,
-        name: senderName
-      },
-      to: [recipient],
-      template_id: templateId,
-      variables: [
-        {
-          email: recipient.email,
-          substitutions: Object.entries(finalVariables).map(([key, value]) => ({
-            var: key,
-            value: String(value || '')
-          }))
-        }
-      ]
-    }
-
-    console.log(`Sending email via MailerSend API...`)
+    // 8. Send email via SMTP using existing smtp-email-sender function
+    console.log(`Sending email via SMTP...`)
     
-    const mailersendResponse = await fetch('https://api.mailersend.com/v1/email', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('MAILERSEND_API_TOKEN')}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(emailPayload)
+    const smtpResponse = await supabase.functions.invoke('smtp-email-sender', {
+      body: {
+        templateId,
+        recipient,
+        variables: finalVariables,
+        emailType
+      }
     })
 
-    const result = await mailersendResponse.json()
-
-    if (!mailersendResponse.ok) {
-      console.error('MailerSend API error:', result)
-      
-      // Categorize errors for better handling
-      let errorCategory = 'unknown'
-      let retryable = false
-      
-      if (mailersendResponse.status === 429) {
-        errorCategory = 'rate_limit'
-        retryable = true
-      } else if (mailersendResponse.status >= 500) {
-        errorCategory = 'server_error'
-        retryable = true
-      } else if (mailersendResponse.status === 401 || mailersendResponse.status === 403) {
-        errorCategory = 'authentication'
-        retryable = false
-      } else if (mailersendResponse.status === 400) {
-        errorCategory = 'validation'
-        retryable = false
-      }
-      
-      throw new Error(`MailerSend ${errorCategory} error (${mailersendResponse.status}): ${result.message || 'Unknown error'}`)
+    if (smtpResponse.error) {
+      console.error('SMTP sender error:', smtpResponse.error)
+      throw new Error(`SMTP sending failed: ${smtpResponse.error.message || 'Unknown error'}`)
     }
 
-    console.log(`Email sent successfully - Message ID: ${result.message_id}`)
+    const result = smtpResponse.data
+    if (!result.success) {
+      throw new Error(`SMTP sending failed: ${result.error || 'Unknown error'}`)
+    }
 
-    // 8. Log the email event
+    console.log(`Email sent successfully via SMTP - Message ID: ${result.messageId}`)
+
+    // 9. Log the email event
     await supabase
       .from('communication_events')
       .insert({
@@ -213,7 +179,7 @@ Deno.serve(async (req) => {
         template_id: templateId,
         email_type: emailType,
         status: 'sent',
-        external_id: result.message_id,
+        external_id: result.messageId,
         variables: finalVariables,
         sent_at: new Date().toISOString(),
         created_at: new Date().toISOString()
@@ -221,8 +187,9 @@ Deno.serve(async (req) => {
 
     return new Response(JSON.stringify({
       success: true,
-      messageId: result.message_id,
-      status: 'sent'
+      messageId: result.messageId,
+      status: 'sent',
+      method: 'smtp'
     }), {
       headers: { 'Content-Type': 'application/json', ...corsHeaders }
     })

@@ -235,19 +235,8 @@ serve(async (req) => {
       if (reqBody?.action === 'test_email_connection') {
         console.log('Testing email connection...');
 
-        // Get MailerSend API token from environment
-        const mailersendToken = Deno.env.get('MAILERSEND_API_TOKEN');
-        
-        if (!mailersendToken) {
-          console.error('MailerSend API token not configured');
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'MailerSend API token not configured in Supabase secrets. Please add MAILERSEND_API_TOKEN to your edge function secrets.'
-          }), {
-            status: 400,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          });
-        }
+        // Test email connection using SMTP
+        console.log('Testing SMTP email connection...');
 
         // Get current communication settings
         const { data: settings, error: settingsError } = await supabaseClient
@@ -285,12 +274,12 @@ serve(async (req) => {
           const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('send-email', {
             body: {
               to: settings.sender_email, // Send test email to sender
-              subject: 'MailerSend Test Email - Connection Successful',
+              subject: 'SMTP Test Email - Connection Successful',
               html: `
                 <h2>Test Email Successful!</h2>
-                <p>Your MailerSend configuration is working correctly.</p>
+                <p>Your SMTP configuration is working correctly.</p>
                 <p>Sender: ${settings.smtp_user || settings.sender_email}</p>
-                <p>Domain: ${settings.mailersend_domain || 'Default domain'}</p>
+                <p>Host: ${settings.smtp_host || 'SMTP Server'}</p>
                 <p>Time: ${new Date().toISOString()}</p>
               `,
               order_id: null // Optional field for test emails
@@ -333,7 +322,7 @@ serve(async (req) => {
           console.error('Email test error:', error);
           return new Response(JSON.stringify({
             success: false,
-            error: `Failed to communicate with send-email function: ${error.message}. Please check that your MailerSend API token is configured in Supabase Edge Function secrets.`
+            error: `Failed to communicate with SMTP email function: ${error.message}. Please check that your SMTP configuration is correct.`
           }), {
             status: 500,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }

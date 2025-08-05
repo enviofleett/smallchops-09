@@ -108,7 +108,7 @@ export const useSMTPSettings = () => {
     mutationFn: async (testEmail: string) => {
       try {
         // Use the standardized template-based approach
-        const { data, error } = await supabase.functions.invoke('enhanced-smtp-sender', {
+        const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
           body: {
             templateId: 'smtp_test',
             recipient: {
@@ -128,10 +128,10 @@ export const useSMTPSettings = () => {
           throw new Error(error.message || 'Failed to send test email');
         }
 
-        console.log('Test email sent successfully via enhanced-smtp-sender');
+        console.log('Test email sent successfully via smtp-email-sender');
         return data;
       } catch (enhancedError) {
-        console.warn('Enhanced SMTP sender failed, trying fallback:', enhancedError);
+        console.warn('SMTP sender failed, trying fallback:', enhancedError);
         
         // Fallback to direct email approach if template fails
         try {
@@ -163,7 +163,7 @@ export const useSMTPSettings = () => {
           console.log('Test email sent successfully via smtp-email-sender fallback');
           return data;
         } catch (fallbackError) {
-          throw new Error(`All email senders failed. Enhanced error: ${enhancedError.message}, Fallback error: ${fallbackError.message}`);
+          throw new Error(`All email senders failed. SMTP error: ${enhancedError.message}, Fallback error: ${fallbackError.message}`);
         }
       }
     },

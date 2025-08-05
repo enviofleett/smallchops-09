@@ -1400,7 +1400,7 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                         <ul className="text-sm mt-2 space-y-1">
                           <li>• Public APIs: No authentication required</li>
                           <li>• Payment APIs: Stripe rate limits apply</li>
-                          <li>• Email APIs: MailerSend limits apply</li>
+                          <li>• Email APIs: SMTP rate limits apply</li>
                           <li>• Real-time updates via Supabase realtime</li>
                         </ul>
                       </div>

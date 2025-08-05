@@ -55,7 +55,7 @@ const PaystackTest = () => {
   const testEmailSystem = async () => {
     try {
       // Test welcome email function
-      const { data, error } = await supabase.functions.invoke('send-email-standardized', {
+      const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
         body: {
           to: testCustomer.email,
           template_key: 'test_email',

@@ -44,7 +44,7 @@ export const EmailDeliveryDashboard = () => {
           Email Delivery Logs
         </CardTitle>
         <CardDescription>
-          Recent email delivery status and logs from both SMTP and MailerSend providers.
+          Recent email delivery status and logs from SMTP provider.
         </CardDescription>
       </CardHeader>
       <CardContent>

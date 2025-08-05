@@ -17,7 +17,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 
 const smtpSchema = z.object({
   use_smtp: z.boolean().default(false),
-  email_provider: z.enum(['mailersend', 'smtp', 'both']).default('mailersend'),
+  email_provider: z.enum(['smtp']).default('smtp'),
   smtp_host: z.string().min(1, 'SMTP host is required').optional().or(z.literal('')),
   smtp_port: z.number().min(1).max(65535).default(587),
   smtp_user: z.string().min(1, 'SMTP username is required').optional().or(z.literal('')),
@@ -131,7 +131,7 @@ export const SMTPSettingsTab = () => {
     resolver: zodResolver(smtpSchema),
     defaultValues: {
       use_smtp: false,
-      email_provider: 'mailersend',
+      email_provider: 'smtp',
       smtp_host: '',
       smtp_port: 587,
       smtp_user: '',
@@ -162,7 +162,7 @@ export const SMTPSettingsTab = () => {
       if (data) {
         form.reset({
           use_smtp: (data as any).use_smtp || false,
-          email_provider: (data as any).email_provider || 'mailersend',
+          email_provider: (data as any).email_provider || 'smtp',
           smtp_host: data.smtp_host || '',
           smtp_port: data.smtp_port || 587,
           smtp_user: data.smtp_user || '',

@@ -779,6 +779,48 @@ export type Database = {
         }
         Relationships: []
       }
+      cart_abandonment_tracking: {
+        Row: {
+          abandoned_at: string | null
+          cart_data: Json
+          created_at: string | null
+          customer_email: string | null
+          customer_id: string | null
+          id: string
+          is_abandoned: boolean | null
+          recovered_at: string | null
+          recovery_email_sent_at: string | null
+          session_id: string
+          total_value: number | null
+        }
+        Insert: {
+          abandoned_at?: string | null
+          cart_data?: Json
+          created_at?: string | null
+          customer_email?: string | null
+          customer_id?: string | null
+          id?: string
+          is_abandoned?: boolean | null
+          recovered_at?: string | null
+          recovery_email_sent_at?: string | null
+          session_id: string
+          total_value?: number | null
+        }
+        Update: {
+          abandoned_at?: string | null
+          cart_data?: Json
+          created_at?: string | null
+          customer_email?: string | null
+          customer_id?: string | null
+          id?: string
+          is_abandoned?: boolean | null
+          recovered_at?: string | null
+          recovery_email_sent_at?: string | null
+          session_id?: string
+          total_value?: number | null
+        }
+        Relationships: []
+      }
       cart_sessions: {
         Row: {
           abandoned_at: string | null
@@ -2321,6 +2363,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      email_automation_config: {
+        Row: {
+          automation_type: string
+          conditions: Json | null
+          created_at: string | null
+          id: string
+          is_enabled: boolean | null
+          template_key: string
+          trigger_delay_minutes: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          automation_type: string
+          conditions?: Json | null
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          template_key: string
+          trigger_delay_minutes?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          automation_type?: string
+          conditions?: Json | null
+          created_at?: string | null
+          id?: string
+          is_enabled?: boolean | null
+          template_key?: string
+          trigger_delay_minutes?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       email_bounce_tracking: {
         Row: {

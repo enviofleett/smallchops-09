@@ -104,13 +104,14 @@ async function initializePayment(supabaseClient: any, requestData: any) {
     console.log('Initializing Paystack payment:', { email, amount, reference: transactionRef });
 
     // Prepare Paystack payload according to API spec
+    // CRITICAL: Paystack expects metadata as STRINGIFIED JSON, not a plain object
     const paystackPayload = {
       email,
-      amount: amount.toString(), // Paystack requires amount as STRING in kobo
+      amount: Math.round(amount).toString(), // Paystack requires amount as STRING in kobo (integers only)
       currency: 'NGN',
       reference: transactionRef,
       channels: channels || ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
-      metadata: metadata || {}
+      metadata: JSON.stringify(metadata || {}) // MUST be stringified JSON
     };
 
     console.log('🚀 Sending to Paystack:', JSON.stringify(paystackPayload, null, 2));
@@ -130,7 +131,17 @@ async function initializePayment(supabaseClient: any, requestData: any) {
     if (!paystackResponse.ok) {
       const errorText = await paystackResponse.text();
       console.error('❌ Paystack HTTP error:', paystackResponse.status, errorText);
-      throw new Error(`Paystack API error (${paystackResponse.status}): ${errorText}`);
+      
+      // Parse the error response if possible
+      let errorDetails = errorText;
+      try {
+        const errorJson = JSON.parse(errorText);
+        errorDetails = errorJson.message || errorJson.error || errorText;
+      } catch (e) {
+        // Use raw text if JSON parsing fails
+      }
+      
+      throw new Error(`Paystack API error (${paystackResponse.status}): ${errorDetails}`);
     }
 
     const paystackData = await paystackResponse.json();
@@ -211,6 +222,12 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
         'Content-Type': 'application/json',
       }
     });
+
+    if (!paystackResponse.ok) {
+      const errorText = await paystackResponse.text();
+      console.error('❌ Paystack verification HTTP error:', paystackResponse.status, errorText);
+      throw new Error(`Paystack verification failed (${paystackResponse.status}): ${errorText}`);
+    }
 
     const paystackData = await paystackResponse.json();
 

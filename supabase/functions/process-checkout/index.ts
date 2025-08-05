@@ -197,7 +197,19 @@ serve(async (req) => {
             order_number: orderResult.order_number,
             customer_name: checkoutData.customer_name,
             customer_email: checkoutData.customer_email,
-            total_amount: paymentAmount
+            total_amount: paymentAmount,
+            custom_fields: [
+              {
+                display_name: "Order ID",
+                variable_name: "order_id", 
+                value: orderResult.order_id
+              },
+              {
+                display_name: "Order Number",
+                variable_name: "order_number",
+                value: orderResult.order_number
+              }
+            ]
           }
         }
       });

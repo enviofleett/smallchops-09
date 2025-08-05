@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCart } from "@/hooks/useCart";
+import { useCustomerOrders } from "@/hooks/useCustomerOrders";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
@@ -23,6 +24,7 @@ export default function PaymentCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { clearCart } = useCart();
+  const { refetch: refetchOrders } = useCustomerOrders();
   const { clearCartAfterPayment, clearCheckoutState } = useOrderProcessing();
   const [status, setStatus] = useState<PaymentStatus>('verifying');
   const [result, setResult] = useState<PaymentResult | null>(null);
@@ -77,10 +79,18 @@ export default function PaymentCallback() {
           message: 'Payment verified successfully'
         });
         
-        // Enhanced cart clearing after successful payment
-        console.log('🛒 Processing successful payment - clearing cart and cleanup');
+        // Enhanced cart clearing and order refresh after successful payment
+        console.log('🛒 Processing successful payment - clearing cart and refreshing orders');
         await clearCartAfterPayment(orderNumber);
         clearCheckoutState();
+        
+        // Refresh orders to show the new order immediately
+        if (refetchOrders) {
+          setTimeout(() => {
+            refetchOrders();
+            console.log('🔄 Orders refreshed after payment success');
+          }, 1000); // Small delay to ensure database is updated
+        }
       } else {
         setStatus('failed');
         setResult({

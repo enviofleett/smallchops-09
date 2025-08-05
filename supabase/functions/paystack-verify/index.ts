@@ -156,6 +156,7 @@ serve(async (req) => {
         .single();
 
       if (transaction?.order_id) {
+        // Update order status
         await supabaseClient
           .from('orders')
           .update({ 
@@ -164,6 +165,21 @@ serve(async (req) => {
             updated_at: new Date()
           })
           .eq('id', transaction.order_id);
+
+        // Link order to customer account if user is authenticated
+        const orderData = transaction.order;
+        if (orderData?.customer_email) {
+          try {
+            await supabaseClient.rpc('link_order_to_customer_account', {
+              p_order_id: transaction.order_id,
+              p_customer_email: orderData.customer_email
+            });
+            console.log('Order linked to customer account:', orderData.customer_email);
+          } catch (linkError) {
+            console.error('Failed to link order to customer account:', linkError);
+            // Don't fail the payment verification if linking fails
+          }
+        }
 
         // Queue order confirmation emails using correct template keys
         const orderData = transaction.order;

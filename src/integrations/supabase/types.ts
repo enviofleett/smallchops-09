@@ -6304,6 +6304,10 @@ export type Database = {
         Args: { p_email: string; p_user_id: string }
         Returns: undefined
       }
+      link_order_to_customer_account: {
+        Args: { p_order_id: string; p_customer_email: string }
+        Returns: undefined
+      }
       log_admin_action: {
         Args: {
           action_type: string

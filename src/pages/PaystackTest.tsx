@@ -26,7 +26,7 @@ const PaystackTest = () => {
   // Test data for quick testing
   const testCustomer = {
     name: 'John Test Customer',
-    email: 'test@example.com',
+    email: 'chudesyl@gmail.com',
     phone: '+234 801 234 5678'
   };
 

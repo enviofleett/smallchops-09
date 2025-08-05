@@ -256,6 +256,7 @@ export const useCart = () => {
   };
 
   const clearCart = () => {
+    console.log('🛒 Clearing cart and all related data...');
     setCart({
       items: [],
       summary: {
@@ -272,6 +273,9 @@ export const useCart = () => {
       itemCount: 0
     });
     localStorage.removeItem(CART_STORAGE_KEY);
+    localStorage.removeItem('guest_session');
+    localStorage.removeItem('cart_abandonment_tracking');
+    console.log('🛒 Cart and shopping data cleared successfully');
   };
 
   const updateDeliveryFee = (deliveryFee: number) => {

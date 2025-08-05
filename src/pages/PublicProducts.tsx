@@ -13,6 +13,9 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
+import { FavoriteButton } from '@/components/ui/favorite-button';
+import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { useCustomerFavorites } from '@/hooks/useCustomerFavorites';
 
 const PublicProducts = () => {
   const navigate = useNavigate();
@@ -23,6 +26,12 @@ const PublicProducts = () => {
 
   const { addItem } = useCart();
   const { toast } = useToast();
+  const { customerAccount } = useCustomerAuth();
+  const { 
+    favorites, 
+    addToFavorites, 
+    removeFromFavorites 
+  } = useCustomerFavorites(customerAccount?.id || '');
 
   // Fetch products with discounts
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
@@ -62,6 +71,40 @@ const PublicProducts = () => {
       title: "Added to cart",
       description: `${product.name} has been added to your cart.`,
     });
+  };
+
+  const handleToggleFavorite = async (productId: string) => {
+    if (!customerAccount?.id) {
+      toast({
+        title: "Sign in required",
+        description: "Please sign in to save favorites.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const isFavorite = favorites.some(fav => fav.id === productId);
+      if (isFavorite) {
+        await removeFromFavorites({ customerId: customerAccount.id, productId });
+        toast({
+          title: "Removed from favorites",
+          description: "Product removed from your wishlist.",
+        });
+      } else {
+        await addToFavorites({ customerId: customerAccount.id, productId });
+        toast({
+          title: "Added to favorites",
+          description: "Product added to your wishlist.",
+        });
+      }
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update favorites. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const renderStars = (rating: number) => {
@@ -244,7 +287,15 @@ const PublicProducts = () => {
                           )}
                         </div>
                         <CardContent className="p-2 sm:p-3 lg:p-4">
-                          <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
+                          <div className="flex items-start justify-between mb-1 sm:mb-2">
+                            <h3 className="font-semibold line-clamp-2 text-sm sm:text-base flex-1">{product.name}</h3>
+                            <FavoriteButton
+                              isFavorite={favorites.some(fav => fav.id === product.id)}
+                              onToggle={() => handleToggleFavorite(product.id)}
+                              size="sm"
+                              className="ml-2"
+                            />
+                          </div>
                           <div className="flex items-center space-x-1 mb-1 sm:mb-2">
                             {renderStars(4)}
                             <span className="text-xs text-gray-500">(0)</span>

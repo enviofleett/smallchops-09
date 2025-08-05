@@ -8,6 +8,7 @@ interface CustomerAccount {
   name: string;
   phone?: string;
   date_of_birth?: string;
+  email?: string;
 }
 
 interface CustomerAuthState {
@@ -172,6 +173,21 @@ export const useCustomerAuth = () => {
   };
 
   const logout = async () => {
+    // Clear cart and shopping data before signing out
+    localStorage.removeItem('restaurant_cart');
+    localStorage.removeItem('guest_session');
+    localStorage.removeItem('cart_abandonment_tracking');
+    
+    // Clear React Query cache (if available)
+    try {
+      const queryClient = (window as any)?.queryClient;
+      if (queryClient && typeof queryClient.clear === 'function') {
+        queryClient.clear();
+      }
+    } catch (error) {
+      console.log('Query client not available for clearing');
+    }
+    
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
   };

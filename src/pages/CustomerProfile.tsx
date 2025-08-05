@@ -27,6 +27,8 @@ import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { AddressManager } from '@/components/customer/AddressManager';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { EnhancedOrdersSection } from '@/components/customer/EnhancedOrdersSection';
+import { EnhancedWishlistSection } from '@/components/customer/EnhancedWishlistSection';
 
 type ProfileSection = 'orders' | 'wishlist' | 'payment' | 'address' | 'help';
 
@@ -116,9 +118,9 @@ export default function CustomerProfile() {
   const renderContent = () => {
     switch (activeSection) {
       case 'orders':
-        return <OrdersSection />;
+        return <EnhancedOrdersSection />;
       case 'wishlist':
-        return <WishlistSection />;
+        return <EnhancedWishlistSection />;
       case 'payment':
         return <PaymentSection />;
       case 'address':
@@ -126,7 +128,7 @@ export default function CustomerProfile() {
       case 'help':
         return <HelpSection settings={settings} />;
       default:
-        return <OrdersSection />;
+        return <EnhancedOrdersSection />;
     }
   };
 

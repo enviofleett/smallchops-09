@@ -315,9 +315,9 @@ serve(async (req) => {
       // Get Paystack configuration
       const { data: paystackConfig, error: configError } = await supabaseAdmin
         .from('payment_integrations')
-        .select('secret_key, public_key')
+        .select('secret_key, public_key, test_mode')
         .eq('provider', 'paystack')
-        .eq('is_active', true)
+        .not('secret_key', 'is', null)
         .single();
 
       if (configError || !paystackConfig || !paystackConfig.secret_key) {

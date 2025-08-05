@@ -97,6 +97,7 @@ const App = () => (
               <Route path="/payment/callback" element={<PaymentCallback />} />
               <Route path="/payment/success" element={<PaymentCallback />} />
               <Route path="/payment/failed" element={<PaymentCallback />} />
+              <Route path="/payment-callback" element={<Navigate to="/payment/callback" replace />} />
               
               {/* Misc routes */}
               <Route path="/unsubscribe" element={<Unsubscribe />} />

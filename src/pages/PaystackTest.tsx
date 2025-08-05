@@ -54,66 +54,48 @@ const PaystackTest = () => {
 
   const testEmailSystem = async () => {
     try {
-      // Test using the standardized email function with template
-      const { data, error } = await supabase.functions.invoke('send-email-standardized', {
+      // Test the new native SMTP function
+      const { data, error } = await supabase.functions.invoke('native-smtp-sender', {
         body: {
-          templateId: 'customer_welcome',
-          recipient: {
-            email: testCustomer.email,
-            name: testCustomer.name
-          },
-          variables: {
-            customerName: testCustomer.name,
-            customerEmail: testCustomer.email,
-            companyName: 'Your Store',
-            siteUrl: window.location.origin,
-            unsubscribeUrl: `${window.location.origin}/unsubscribe`
-          }
+          to: testCustomer.email,
+          subject: 'Test Email - Order Confirmation (Native SMTP)',
+          html: `
+            <h1>Test Order Confirmation</h1>
+            <p>Hello ${testCustomer.name},</p>
+            <p>This is a test email using the new native SMTP sender to verify the email system is working.</p>
+            <p>Order: TEST-ORDER-001</p>
+            <div style="margin: 20px 0; padding: 15px; background-color: #f5f5f5; border-left: 4px solid #007bff;">
+              <strong>Native SMTP Features:</strong>
+              <ul>
+                <li>Direct SMTP connection</li>
+                <li>Enhanced error handling</li>
+                <li>TLS/SSL support</li>
+                <li>RFC 2822 compliant messages</li>
+              </ul>
+            </div>
+            <p>Best regards,<br>Your Store Team</p>
+          `,
+          text: `Hello ${testCustomer.name}, this is a test order confirmation for order TEST-ORDER-001 using the new native SMTP sender. If you receive this, your email system is working correctly!`
         }
       });
 
       if (error) {
-        console.error('Email error details:', error);
+        console.error('Native SMTP error details:', error);
         throw error;
       }
 
-      console.log('Email sent successfully:', data);
+      console.log('Native SMTP email sent successfully:', data);
       toast({
-        title: "Email Test Sent",
-        description: `Welcome email sent to ${testCustomer.email}`,
+        title: "Native SMTP Test Successful",
+        description: `Test email sent to ${testCustomer.email} using native SMTP`,
       });
     } catch (error) {
-      console.error('Email test error:', error);
-      
-      // Fallback: Try direct SMTP function
-      try {
-        const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
-          body: {
-            to: testCustomer.email,
-            subject: 'Test Email from Your Store',
-            html: `
-              <h1>Test Email</h1>
-              <p>Hello ${testCustomer.name},</p>
-              <p>This is a test email from your Paystack integration test.</p>
-              <p>If you receive this, your email system is working correctly!</p>
-            `
-          }
-        });
-
-        if (error) throw error;
-
-        toast({
-          title: "Email Test Sent (Fallback)",
-          description: `Direct SMTP test email sent to ${testCustomer.email}`,
-        });
-      } catch (fallbackError) {
-        console.error('Fallback email test error:', fallbackError);
-        toast({
-          title: "Email Test Failed",
-          description: "Both template and direct email tests failed. Check console for details.",
-          variant: "destructive"
-        });
-      }
+      console.error('Native SMTP email test failed:', error);
+      toast({
+        title: "Native SMTP Test Failed",
+        description: error instanceof Error ? error.message : "Unknown error occurred",
+        variant: "destructive",
+      });
     }
   };
 

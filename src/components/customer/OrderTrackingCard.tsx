@@ -125,7 +125,7 @@ export function OrderTrackingCard({
         <div className="flex flex-col sm:flex-row sm:items-start justify-between mb-6 gap-4">
           <div className="space-y-1">
             <div className="flex items-center gap-3">
-              <h3 className="text-lg font-semibold">Order {order.order_number}</h3>
+              <h3 className="text-lg font-semibold">Order #{order.order_number}</h3>
               <Badge variant={getStatusColor(order.status)}>
                 {order.status.replace('_', ' ').toUpperCase()}
               </Badge>

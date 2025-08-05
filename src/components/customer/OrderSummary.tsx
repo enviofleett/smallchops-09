@@ -79,12 +79,12 @@ export function OrderSummary({ detailed = false }: OrderSummaryProps) {
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
                         {getStatusIcon(order.status)}
-                        <div>
-                          <h4 className="font-medium">Order #{order.order_number}</h4>
-                          <p className="text-sm text-muted-foreground">
-                            {format(new Date(order.order_time), 'PPP')}
-                          </p>
-                        </div>
+                  <div>
+                    <h4 className="font-medium">Order ID: {order.order_number}</h4>
+                    <p className="text-sm text-muted-foreground">
+                      {format(new Date(order.order_time), 'PPP')}
+                    </p>
+                  </div>
                       </div>
                       <div className="text-right">
                         <p className="font-medium">{formatCurrency(order.total_amount)}</p>
@@ -168,12 +168,12 @@ export function OrderSummary({ detailed = false }: OrderSummaryProps) {
               <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
                 <div className="flex items-center gap-3">
                   {getStatusIcon(order.status)}
-                  <div>
-                    <p className="font-medium">#{order.order_number}</p>
-                    <p className="text-sm text-muted-foreground">
-                      {format(new Date(order.order_time), 'MMM d, yyyy')}
-                    </p>
-                  </div>
+                <div>
+                  <p className="font-medium">Order ID: {order.order_number}</p>
+                  <p className="text-sm text-muted-foreground">
+                    {format(new Date(order.order_time), 'MMM d, yyyy')}
+                  </p>
+                </div>
                 </div>
                 <div className="text-right">
                   <p className="font-medium">{formatCurrency(order.total_amount)}</p>

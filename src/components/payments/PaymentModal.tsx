@@ -210,7 +210,7 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           {/* Order Summary */}
           <div className="text-center p-4 bg-muted rounded-lg">
             <p className="text-2xl font-bold">{formatCurrency(orderData.total)}</p>
-            <p className="text-sm text-muted-foreground">Order #{orderData.id.slice(0, 8)}</p>
+            <p className="text-sm text-muted-foreground">Order ID: {orderData.id}</p>
           </div>
 
           {/* Payment Provider Selection */}

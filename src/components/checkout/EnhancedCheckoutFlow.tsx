@@ -218,7 +218,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
       clearCart();
       toast({
         title: "Order Placed Successfully!",
-        description: `Order ${data.order_number} has been created. ${data.payment?.message || 'You will receive a confirmation email shortly.'}`,
+        description: `Order ID: ${data.order_number} has been created. ${data.payment?.message || 'You will receive a confirmation email shortly.'}`,
       });
 
       // Navigate based on authentication status
@@ -265,7 +265,14 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         <CardContent>
           {/* Order Summary */}
           <div className="space-y-4 mb-6">
-            <h3 className="font-semibold text-lg">Order Summary</h3>
+            <div className="flex items-center justify-between">
+              <h3 className="font-semibold text-lg">Order Summary</h3>
+              {checkoutStep === 'details' && (
+                <span className="text-sm text-muted-foreground">
+                  Order will be assigned an ID upon placement
+                </span>
+              )}
+            </div>
             <div className="bg-muted/50 p-4 rounded-lg space-y-2">
               {items.map((item) => (
                 <div key={item.id} className="flex justify-between text-sm">

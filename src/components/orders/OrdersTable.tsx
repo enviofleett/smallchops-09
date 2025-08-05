@@ -72,7 +72,7 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                 onCheckedChange={(checked) => onSelectOrder(order.id, checked as boolean)}
               />
               <div>
-                <p className="font-medium text-blue-600">{order.order_number}</p>
+                <p className="font-medium text-blue-600">Order ID: {order.order_number}</p>
                 <p className="text-sm text-gray-600">{order.customer_name}</p>
               </div>
             </div>
@@ -183,7 +183,7 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                   />
                 </td>
                 <td className="py-4 px-6">
-                  <span className="font-medium text-blue-600">{order.order_number}</span>
+                  <span className="font-medium text-blue-600">Order ID: {order.order_number}</span>
                 </td>
                 <td className="py-4 px-6">
                   <div>

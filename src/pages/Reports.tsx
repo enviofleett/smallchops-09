@@ -57,7 +57,15 @@ export default function Reports() {
     ? [
         {
           label: "Today's Revenue",
-          value: data.stats?.totalRevenue !== undefined ? `₦${Number(data.stats.totalRevenue).toLocaleString()}` : "-",
+          value: data.stats?.totalRevenue !== undefined ? 
+            (data.stats.totalRevenue === 0 ? "₦0" : 
+              new Intl.NumberFormat('en-NG', { 
+                style: 'currency', 
+                currency: 'NGN',
+                minimumFractionDigits: 0,
+                maximumFractionDigits: 0 
+              }).format(data.stats.totalRevenue)
+            ) : "-",
           sub: "",
           icon: (
             <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">

@@ -110,14 +110,14 @@ const Dashboard = () => {
           <div className="bg-card p-4 md:p-6 rounded-xl shadow-sm border border-border">
             <h3 className="text-base md:text-lg font-semibold text-card-foreground mb-4">Revenue Overview</h3>
             <div className="min-h-[200px] md:min-h-[250px]">
-              <RevenueChart data={data?.revenueTrends} />
+              <RevenueChart data={data?.revenueTrends} isLoading={isLoading} />
             </div>
           </div>
           
           <div className="bg-card p-4 md:p-6 rounded-xl shadow-sm border border-border">
             <h3 className="text-base md:text-lg font-semibold text-card-foreground mb-4">Orders This Week</h3>
             <div className="min-h-[200px] md:min-h-[250px]">
-              <OrdersChart data={data?.orderTrends} />
+              <OrdersChart data={data?.orderTrends} isLoading={isLoading} />
             </div>
           </div>
         </div>

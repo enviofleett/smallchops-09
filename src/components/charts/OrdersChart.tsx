@@ -9,6 +9,8 @@ interface OrdersChartProps {
 }
 
 const OrdersChart = ({ data, isLoading }: OrdersChartProps) => {
+  console.log('OrdersChart - received data:', data);
+  
   const chartData = data && Array.isArray(data) && data.length > 0 
     ? data.map(item => ({
         name: item.day || item.name || 'Day',

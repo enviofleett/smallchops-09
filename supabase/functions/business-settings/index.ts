@@ -468,10 +468,7 @@ serve(async (req) => {
       console.log('Settings operation successful');
 
       return new Response(
-        JSON.stringify({ 
-          success: true,
-          data: result 
-        }),
+        JSON.stringify({ data: result }),
         { 
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

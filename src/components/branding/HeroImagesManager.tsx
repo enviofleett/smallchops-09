@@ -221,7 +221,6 @@ export const HeroImagesManager = () => {
                           <ImageUpload
                             value={field.value}
                             onChange={field.onChange}
-                            uploadMode="url"
                           />
                         </FormControl>
                         <FormMessage />

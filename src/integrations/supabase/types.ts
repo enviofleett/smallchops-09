@@ -5987,10 +5987,6 @@ export type Database = {
         Args: { email_address: string; email_type?: string }
         Returns: boolean
       }
-      check_admin_creation_rate_limit: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       check_admin_invitation_rate_limit: {
         Args: { user_id_param: string }
         Returns: boolean

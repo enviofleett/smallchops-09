@@ -133,6 +133,13 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     [cart?.summary?.total_amount, currentDeliveryFee]
   );
 
+  // Clear payment state when component mounts or step changes
+  useEffect(() => {
+    if (checkoutStep !== 'payment') {
+      setPaymentData(null);
+    }
+  }, [checkoutStep]);
+
   const handleContinueAsGuest = useCallback(async () => {
     if (!guestSession) {
       await generateGuestSession();
@@ -165,9 +172,22 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Clear any previous payment state
+    setIsSubmitting(false);
+    setPaymentData(null);
+    
+    // Add a small delay to ensure cleanup
+    await new Promise(resolve => setTimeout(resolve, 100));
+    
     setIsSubmitting(true);
 
     try {
+      // Generate a unique reference for this checkout attempt
+      const uniqueReference = `checkout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      console.log('🚀 Processing checkout with unique reference:', uniqueReference);
+
       const sanitizedData = {
         customer_email: formData.customer_email?.trim(),
         customer_name: formData.customer_name?.trim(),
@@ -185,10 +205,11 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         delivery_fee: formData.fulfillment_type === 'delivery' ? deliveryFee : 0,
         delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id ? formData.delivery_zone_id : null,
         payment_method: 'paystack',
-        guest_session_id: !isAuthenticated ? guestSession?.sessionId : null
+        guest_session_id: !isAuthenticated ? guestSession?.sessionId : null,
+        payment_reference: uniqueReference // Add unique reference
       };
 
-      console.log('🚀 Processing checkout with clean data...');
+      console.log('🚀 Processing checkout with clean data and unique reference...');
 
       const { data, error } = await supabase.functions.invoke('process-checkout', {
         body: sanitizedData

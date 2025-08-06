@@ -25,6 +25,15 @@ export const PaymentErrorHandler: React.FC<PaymentErrorHandlerProps> = ({
       };
     }
 
+    if (error.includes('Duplicate Transaction Reference')) {
+      return {
+        title: "Payment Reference Issue",
+        description: "This payment was already attempted. We'll generate a new reference and try again.",
+        showRetry: true,
+        showFallback: true
+      };
+    }
+
     if (error.includes('network') || error.includes('connection')) {
       return {
         title: "Connection Problem",

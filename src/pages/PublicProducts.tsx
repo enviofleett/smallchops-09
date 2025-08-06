@@ -14,8 +14,10 @@ import { useToast } from '@/hooks/use-toast';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
 import { FavoriteButton } from '@/components/ui/favorite-button';
+import { StarRating } from '@/components/ui/star-rating';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useCustomerFavorites, useFavoritesByProducts } from '@/hooks/useCustomerFavorites';
+import { useProductRatingSummary } from '@/hooks/useProductReviews';
 
 const PublicProducts = () => {
   const navigate = useNavigate();
@@ -116,13 +118,24 @@ const PublicProducts = () => {
     }
   };
 
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star 
-        key={i} 
-        className={`w-4 h-4 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
-      />
-    ));
+  const ProductRatingDisplay = ({ productId }: { productId: string }) => {
+    const { data: ratingSummary } = useProductRatingSummary(productId);
+    
+    if (!ratingSummary || ratingSummary.total_reviews === 0) {
+      return (
+        <div className="flex items-center space-x-1">
+          <StarRating rating={0} size="sm" />
+          <span className="text-xs text-gray-500">(0)</span>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="flex items-center space-x-1">
+        <StarRating rating={ratingSummary.average_rating} size="sm" />
+        <span className="text-xs text-gray-500">({ratingSummary.total_reviews})</span>
+      </div>
+    );
   };
 
   return (
@@ -305,9 +318,8 @@ const PublicProducts = () => {
                               className="ml-2"
                             />
                           </div>
-                          <div className="flex items-center space-x-1 mb-1 sm:mb-2">
-                            {renderStars(4)}
-                            <span className="text-xs text-gray-500">(0)</span>
+                          <div className="mb-1 sm:mb-2">
+                            <ProductRatingDisplay productId={product.id} />
                           </div>
                           <div className="flex items-center justify-between">
                             <PriceDisplay

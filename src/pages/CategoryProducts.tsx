@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Search, Star } from 'lucide-react';
+import { ChevronRight, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -13,6 +13,8 @@ import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
 import { getCategories } from '@/api/categories';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
+import { StarRating } from '@/components/ui/star-rating';
+import { useProductRatingSummary } from '@/hooks/useProductReviews';
 
 const CategoryProducts = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
@@ -67,13 +69,24 @@ const CategoryProducts = () => {
     });
   };
 
-  const renderStars = (rating: number) => {
-    return Array.from({ length: 5 }, (_, i) => (
-      <Star 
-        key={i} 
-        className={`w-4 h-4 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
-      />
-    ));
+  const ProductRatingDisplay = ({ productId }: { productId: string }) => {
+    const { data: ratingSummary } = useProductRatingSummary(productId);
+    
+    if (!ratingSummary || ratingSummary.total_reviews === 0) {
+      return (
+        <div className="flex items-center space-x-1">
+          <StarRating rating={0} size="sm" />
+          <span className="text-xs text-muted-foreground">(0)</span>
+        </div>
+      );
+    }
+    
+    return (
+      <div className="flex items-center space-x-1">
+        <StarRating rating={ratingSummary.average_rating} size="sm" />
+        <span className="text-xs text-muted-foreground">({ratingSummary.total_reviews})</span>
+      </div>
+    );
   };
 
   return (
@@ -227,9 +240,8 @@ const CategoryProducts = () => {
                       </div>
                       <CardContent className="p-2 sm:p-3 lg:p-4">
                         <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
-                        <div className="flex items-center space-x-1 mb-1 sm:mb-2">
-                          {renderStars(4)} {/* Using static rating for now */}
-                          <span className="text-xs text-muted-foreground">(0)</span>
+                        <div className="mb-1 sm:mb-2">
+                          <ProductRatingDisplay productId={product.id} />
                         </div>
                         <div className="flex items-center justify-between">
                           <PriceDisplay

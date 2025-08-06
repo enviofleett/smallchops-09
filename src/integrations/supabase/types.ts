@@ -3302,6 +3302,7 @@ export type Database = {
         Row: {
           cost_price: number | null
           customizations: Json | null
+          discount_amount: number | null
           id: string
           order_id: string
           product_id: string
@@ -3316,6 +3317,7 @@ export type Database = {
         Insert: {
           cost_price?: number | null
           customizations?: Json | null
+          discount_amount?: number | null
           id?: string
           order_id: string
           product_id: string
@@ -3330,6 +3332,7 @@ export type Database = {
         Update: {
           cost_price?: number | null
           customizations?: Json | null
+          discount_amount?: number | null
           id?: string
           order_id?: string
           product_id?: string
@@ -6130,30 +6133,19 @@ export type Database = {
         Returns: Json
       }
       create_order_with_items: {
-        Args:
-          | {
-              p_customer_email: string
-              p_customer_name: string
-              p_items: Json
-              p_customer_phone?: string
-              p_fulfillment_type?: string
-              p_delivery_address?: Json
-              p_guest_session_id?: string
-              p_payment_method?: string
-            }
-          | {
-              p_customer_email: string
-              p_customer_name: string
-              p_items: Json
-              p_customer_phone?: string
-              p_fulfillment_type?: string
-              p_delivery_address?: Json
-              p_guest_session_id?: string
-              p_payment_method?: string
-              p_delivery_zone_id?: string
-              p_delivery_fee?: number
-              p_total_amount?: number
-            }
+        Args: {
+          p_customer_email: string
+          p_customer_name: string
+          p_items: Json
+          p_customer_phone?: string
+          p_fulfillment_type?: string
+          p_delivery_address?: Json
+          p_guest_session_id?: string
+          p_payment_method?: string
+          p_delivery_zone_id?: string
+          p_delivery_fee?: number
+          p_total_amount?: number
+        }
         Returns: Json
       }
       customer_purchased_product: {

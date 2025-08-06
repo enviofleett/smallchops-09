@@ -50,8 +50,22 @@ export default defineConfig(({ mode }) => ({
   },
   // Optimize dependencies
   optimizeDeps: {
-    include: ['react', 'react-dom', 'react-router-dom', '@tanstack/react-query'],
-    exclude: ['@supabase/supabase-js']
+    include: [
+      'react', 
+      'react-dom', 
+      'react-router-dom', 
+      '@tanstack/react-query',
+      '@supabase/supabase-js',
+      '@supabase/postgrest-js',
+      '@supabase/storage-js',
+      '@supabase/realtime-js'
+    ],
+    esbuildOptions: {
+      target: 'esnext'
+    }
+  },
+  ssr: {
+    noExternal: ['@supabase/supabase-js']
   },
   define: {
     __DEV__: mode === "development",

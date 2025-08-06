@@ -62,7 +62,7 @@ const CategoryProductsContent = () => {
     if (isCustomizationCategory) {
       // For customization category, use the context to add to builder
       customizationContext.addItem(product);
-      setShowCustomizationBuilder(true);
+      setShowCustomizationBuilder(true); // Auto-show when item is added
     } else {
       // For regular categories, add directly to cart
       addItem({
@@ -354,17 +354,11 @@ const CategoryProductsContent = () => {
         </div>
       </div>
 
-      {/* Customization Order Builder - Shows for customization category */}
+      {/* Customization Order Builder - Shows when items added or manually opened */}
       {isCustomizationCategory && (
         <CustomizationOrderBuilder
-          isOpen={true}
-          onClose={() => {
-            if (!customizationContext.isEmpty) {
-              // Don't allow closing if items exist, just minimize
-              return;
-            }
-            setShowCustomizationBuilder(false);
-          }}
+          isOpen={showCustomizationBuilder}
+          onClose={() => setShowCustomizationBuilder(false)}
         />
       )}
 

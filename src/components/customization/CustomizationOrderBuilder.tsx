@@ -84,29 +84,26 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
 
   return (
     <>
-      {/* Desktop compact floating sidebar - fixed height to avoid footer */}
-      <div className="hidden lg:block lg:fixed lg:right-4 lg:top-24 lg:w-72 lg:bg-white lg:border lg:shadow-xl lg:z-40 lg:rounded-lg lg:overflow-hidden lg:max-h-[calc(100vh-180px)]">
-        <div className="h-full flex flex-col max-h-[calc(100vh-180px)]">
+      {/* Desktop compact floating sidebar - fixed size, no scrolling */}
+      <div className="hidden lg:block lg:fixed lg:right-4 lg:top-24 lg:w-72 lg:h-[500px] lg:bg-white lg:border lg:shadow-xl lg:z-40 lg:rounded-lg lg:overflow-hidden">
+        <div className="h-full flex flex-col">
           <div className="flex items-center justify-between p-3 border-b bg-gradient-to-r from-primary/5 to-primary/10 rounded-t-lg">
             <h2 className="text-base font-semibold text-primary">Custom Order</h2>
-            {isEmpty ? (
-              <div className="h-6 w-6"></div>
-            ) : (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClose}
-                className="h-6 w-6 p-0 hover:bg-primary/10"
-              >
-                <X className="h-3 w-3" />
-              </Button>
-            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-6 w-6 p-0 hover:bg-primary/10"
+              title="Close custom order"
+            >
+              <X className="h-3 w-3" />
+            </Button>
           </div>
           
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-h-[calc(100vh-280px)]">
-            <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent max-h-[400px]">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="flex-1 p-3 overflow-hidden">
               {isEmpty ? (
-                <div className="text-center py-6 text-muted-foreground">
+                <div className="text-center py-6 text-muted-foreground h-full flex flex-col justify-center">
                   <ShoppingCart className="mx-auto h-8 w-8 mb-2 opacity-40" />
                   <h3 className="text-sm font-medium mb-1">Empty order</h3>
                   <p className="text-xs">Add items to customize</p>
@@ -121,7 +118,7 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
                       </AlertDescription>
                     </Alert>
                   </div>
-                  <div className="space-y-2">
+                  <div className="space-y-2 max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-muted">
                     {items.map((item) => (
                       <div key={item.id} className="flex items-start space-x-2 p-2 border rounded-md bg-white hover:bg-muted/20 transition-colors">
                         <img
@@ -183,9 +180,9 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
               )}
             </div>
 
-            {/* Desktop Footer - Compact sticky bottom */}
+            {/* Desktop Footer - Fixed at bottom, no scroll */}
             {!isEmpty && (
-              <div className="border-t bg-gradient-to-r from-muted/10 to-muted/20 p-3 space-y-3 rounded-b-lg">
+              <div className="border-t bg-gradient-to-r from-muted/10 to-muted/20 p-3 space-y-2 rounded-b-lg flex-shrink-0">
                 <div className="space-y-1">
                   <div className="flex justify-between items-center text-xs">
                     <span className="text-muted-foreground">Items ({bundle.itemCount})</span>
@@ -223,13 +220,13 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
         </div>
       </div>
 
-      {/* Mobile bottom sheet - constrained height */}
+      {/* Mobile bottom sheet - fixed height, no scrolling to footer */}
       <div className="lg:hidden fixed inset-0 z-50 bg-black/50 animate-fade-in" onClick={onClose}>
         <div
-          className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl max-h-[75vh] transform transition-transform animate-slide-in-bottom"
+          className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl h-[70vh] transform transition-transform animate-slide-in-bottom"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex flex-col h-full max-h-[75vh]">
+          <div className="flex flex-col h-full">
             {/* Mobile Header */}
             <div className="flex items-center justify-between p-4 border-b bg-muted/5">
               <h2 className="text-lg font-semibold">Custom Order</h2>
@@ -243,10 +240,10 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
               </Button>
             </div>
             
-            {/* Mobile Content - scrollable within bounds */}
-            <div className="flex-1 overflow-y-auto p-4 pb-safe max-h-[50vh]">
+            {/* Mobile Content - fixed height, controlled scrolling */}
+            <div className="flex-1 p-4 pb-safe overflow-hidden">
               {isEmpty ? (
-                <div className="text-center py-12 text-muted-foreground">
+                <div className="text-center py-12 text-muted-foreground h-full flex flex-col justify-center">
                   <ShoppingCart className="mx-auto h-16 w-16 mb-4 opacity-40" />
                   <h3 className="text-lg font-medium mb-2">Your custom order is empty</h3>
                   <p className="text-sm">Start adding items from the customization menu</p>
@@ -260,9 +257,9 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
                         Review and adjust quantities before adding to cart
                       </AlertDescription>
                     </Alert>
-                  </div>
-                  <div className="space-y-3">
-                    {items.map((item) => (
+                    </div>
+                    <div className="space-y-3 max-h-[200px] overflow-y-auto scrollbar-thin">
+                      {items.map((item) => (
                       <div key={item.id} className="flex items-start space-x-3 p-3 border rounded-lg bg-white">
                         <img
                           src={item.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=60&h=60&fit=crop'}
@@ -323,9 +320,9 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
               )}
             </div>
 
-            {/* Mobile Footer - Sticky at bottom */}
-            {!isEmpty && (
-              <div className="border-t bg-muted/10 p-4 pb-safe space-y-4">
+              {/* Mobile Footer - Fixed at bottom */}
+              {!isEmpty && (
+                <div className="border-t bg-muted/10 p-4 pb-safe space-y-3 flex-shrink-0">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Items ({bundle.itemCount})</span>

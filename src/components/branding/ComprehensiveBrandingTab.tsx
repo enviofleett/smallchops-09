@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { EnhancedLogoUpload } from './EnhancedLogoUpload';
 import { HeroImagesManager } from './HeroImagesManager';
+import { BudgetBallerManager } from './BudgetBallerManager';
 import { 
   FileImage, 
   Save,

@@ -160,7 +160,11 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
 
   const initializePayment = useCallback(async () => {
     if (!config || !paystackReady) {
-      console.log('⚠️ Payment not ready:', { config: !!config, paystackReady });
+      toast({
+        title: "Payment Not Ready",
+        description: "Payment gateway is still loading. Please wait...",
+        variant: "destructive",
+      });
       return;
     }
 
@@ -217,7 +221,23 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
         }
       });
 
+      // Add timeout protection for popup
+      const popupTimeout = setTimeout(() => {
+        if (paymentInProgress) {
+          console.log('⏰ Payment popup timeout');
+          setPaymentInProgress(false);
+          toast({
+            title: "Payment Timeout",
+            description: "Payment window took too long to open. Please try again.",
+            variant: "destructive",
+          });
+        }
+      }, 15000); // 15 second timeout
+
       handler.openIframe();
+      
+      // Clear timeout if payment completed quickly
+      setTimeout(() => clearTimeout(popupTimeout), 1000);
 
     } catch (error) {
       setPaymentInProgress(false);
@@ -227,16 +247,21 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize payment';
       if (errorMessage.includes('Duplicate Transaction Reference')) {
         console.log('🔄 Duplicate reference detected, retrying with new reference');
-        // Automatically retry with new reference
+        toast({
+          title: "Retrying Payment",
+          description: "Generating new payment reference...",
+        });
+        
+        // Automatically retry with new reference after delay
         setTimeout(() => {
           initializePayment();
-        }, 1000);
+        }, 1500);
         return;
       }
       
       onError(errorMessage);
     }
-  }, [config, paystackReady, amount, email, orderNumber, onSuccess, onError, onClose, initialReference]);
+  }, [config, paystackReady, amount, email, orderNumber, onSuccess, onError, onClose, initialReference, paymentInProgress]);
 
   const handleFallbackPayment = useCallback(() => {
     console.log('🔄 Using fallback payment method');

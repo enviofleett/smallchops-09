@@ -6203,10 +6203,7 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           public_key: string
-          secret_key: string
-          webhook_secret: string
           test_mode: boolean
-          environment: string
         }[]
       }
       get_admin_invitation_metrics: {

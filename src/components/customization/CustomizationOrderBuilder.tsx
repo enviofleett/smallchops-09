@@ -84,51 +84,51 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
 
   return (
     <>
-      {/* Desktop floating sidebar - smart height */}
-      <div className="hidden lg:block lg:fixed lg:right-4 lg:top-20 lg:bottom-4 lg:w-80 xl:w-96 lg:bg-white lg:border lg:shadow-xl lg:z-40 lg:rounded-lg lg:overflow-hidden">
-        <div className="h-full flex flex-col max-h-[calc(100vh-6rem)]">
-          <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-primary/5 to-primary/10 rounded-t-lg">
-            <h2 className="text-lg font-semibold text-primary">Custom Order</h2>
+      {/* Desktop compact floating sidebar - 50% smaller */}
+      <div className="hidden lg:block lg:fixed lg:right-4 lg:top-24 lg:bottom-20 lg:w-72 lg:bg-white lg:border lg:shadow-xl lg:z-40 lg:rounded-lg lg:overflow-hidden">
+        <div className="h-full flex flex-col max-h-[calc(100vh-11rem)]">
+          <div className="flex items-center justify-between p-3 border-b bg-gradient-to-r from-primary/5 to-primary/10 rounded-t-lg">
+            <h2 className="text-base font-semibold text-primary">Custom Order</h2>
             <Button
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 w-8 p-0 hover:bg-primary/10"
+              className="h-6 w-6 p-0 hover:bg-primary/10"
             >
-              <X className="h-4 w-4" />
+              <X className="h-3 w-3" />
             </Button>
           </div>
           
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+            <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
               {isEmpty ? (
-                <div className="text-center py-12 text-muted-foreground">
-                  <ShoppingCart className="mx-auto h-16 w-16 mb-4 opacity-40" />
-                  <h3 className="text-lg font-medium mb-2">Your custom order is empty</h3>
-                  <p className="text-sm">Start adding items from the customization menu</p>
+                <div className="text-center py-6 text-muted-foreground">
+                  <ShoppingCart className="mx-auto h-8 w-8 mb-2 opacity-40" />
+                  <h3 className="text-sm font-medium mb-1">Empty order</h3>
+                  <p className="text-xs">Add items to customize</p>
                 </div>
               ) : (
                 <>
-                  <div className="mb-4">
-                    <Alert className="border-primary/20 bg-primary/5">
-                      <AlertCircle className="h-4 w-4" />
-                      <AlertDescription className="text-sm">
-                        Review and adjust quantities before adding to cart
+                  <div className="mb-2">
+                    <Alert className="border-primary/20 bg-primary/5 p-2">
+                      <AlertCircle className="h-3 w-3" />
+                      <AlertDescription className="text-xs">
+                        Review quantities before adding to cart
                       </AlertDescription>
                     </Alert>
                   </div>
-                  <div className="space-y-3">
+                  <div className="space-y-2">
                     {items.map((item) => (
-                      <div key={item.id} className="flex items-start space-x-3 p-3 border rounded-lg bg-white hover:bg-muted/20 transition-colors">
+                      <div key={item.id} className="flex items-start space-x-2 p-2 border rounded-md bg-white hover:bg-muted/20 transition-colors">
                         <img
-                          src={item.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=80&h=80&fit=crop'}
+                          src={item.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=40&h=40&fit=crop'}
                           alt={item.name}
-                          className="w-16 h-16 object-cover rounded-md flex-shrink-0"
+                          className="w-8 h-8 object-cover rounded flex-shrink-0"
                           loading="lazy"
                         />
                         <div className="flex-1 min-w-0">
-                          <h4 className="font-medium text-sm mb-1 leading-tight">{item.name}</h4>
-                          <div className="mb-3">
+                          <h4 className="font-medium text-xs mb-1 leading-tight line-clamp-1">{item.name}</h4>
+                          <div className="mb-2">
                             <PriceDisplay
                               originalPrice={item.original_price}
                               discountedPrice={item.price}
@@ -137,38 +137,38 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
                             />
                           </div>
                           <div className="flex items-center justify-between">
-                            <div className="flex items-center space-x-2">
+                            <div className="flex items-center space-x-1">
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => updateQuantity(item.id, item.quantity - 1)}
-                                className="h-7 w-7 p-0 hover:bg-destructive/10"
+                                className="h-5 w-5 p-0 hover:bg-destructive/10"
                                 disabled={item.quantity <= 1}
                                 aria-label={`Decrease quantity of ${item.name}`}
                               >
-                                <Minus className="h-3 w-3" />
+                                <Minus className="h-2 w-2" />
                               </Button>
-                              <span className="text-sm w-8 text-center font-medium bg-muted/50 rounded px-2 py-1">
+                              <span className="text-xs w-6 text-center font-medium bg-muted/50 rounded px-1">
                                 {item.quantity}
                               </span>
                               <Button
                                 variant="outline"
                                 size="sm"
                                 onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                                className="h-7 w-7 p-0 hover:bg-primary/10"
+                                className="h-5 w-5 p-0 hover:bg-primary/10"
                                 aria-label={`Increase quantity of ${item.name}`}
                               >
-                                <Plus className="h-3 w-3" />
+                                <Plus className="h-2 w-2" />
                               </Button>
                             </div>
                             <Button
                               variant="ghost"
                               size="sm"
                               onClick={() => removeItem(item.id)}
-                              className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
+                              className="h-5 w-5 p-0 text-destructive hover:bg-destructive/10"
                               aria-label={`Remove ${item.name} from order`}
                             >
-                              <X className="h-3 w-3" />
+                              <X className="h-2 w-2" />
                             </Button>
                           </div>
                         </div>
@@ -179,30 +179,30 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
               )}
             </div>
 
-            {/* Desktop Footer - Sticky at bottom with enhanced styling */}
+            {/* Desktop Footer - Compact sticky bottom */}
             {!isEmpty && (
-              <div className="border-t bg-gradient-to-r from-muted/10 to-muted/20 p-4 space-y-4 rounded-b-lg">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center text-sm">
+              <div className="border-t bg-gradient-to-r from-muted/10 to-muted/20 p-3 space-y-3 rounded-b-lg">
+                <div className="space-y-1">
+                  <div className="flex justify-between items-center text-xs">
                     <span className="text-muted-foreground">Items ({bundle.itemCount})</span>
                     <span className="font-medium">₦{bundle.totalOriginalAmount.toFixed(2)}</span>
                   </div>
                   {bundle.totalDiscount > 0 && (
-                    <div className="flex justify-between items-center text-sm text-green-600">
+                    <div className="flex justify-between items-center text-xs text-green-600">
                       <span>Discount</span>
                       <span className="font-medium">-₦{bundle.totalDiscount.toFixed(2)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between items-center font-semibold text-lg border-t pt-3 border-muted">
+                  <div className="flex justify-between items-center font-semibold text-sm border-t pt-2 border-muted">
                     <span>Total</span>
                     <span className="text-primary">₦{bundle.totalAmount.toFixed(2)}</span>
                   </div>
                 </div>
                 <Button 
                   onClick={handleAddBundleToCart} 
-                  className="w-full h-11"
+                  className="w-full h-8 text-xs"
                   disabled={isAddingToCart || isEmpty}
-                  size="lg"
+                  size="sm"
                 >
                   {isAddingToCart ? (
                     <>
@@ -210,7 +210,7 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
                       Adding to Cart...
                     </>
                   ) : (
-                    `Add Bundle to Cart (₦${bundle.totalAmount.toFixed(2)})`
+                    `Add Bundle (₦${bundle.totalAmount.toFixed(2)})`
                   )}
                 </Button>
               </div>

@@ -40,7 +40,19 @@ const deleteCategoryBanner = async (bannerUrl: string): Promise<void> => {
 export const getCategories = async (): Promise<Category[]> => {
   const { data, error } = await supabase.from('categories').select('*').order('name');
   if (error) throw new Error(error.message);
-  return data || [];
+  
+  // Move customization category to the end
+  const categories = data || [];
+  const customizationIndex = categories.findIndex(cat => 
+    cat.name.toLowerCase().includes('customization')
+  );
+  
+  if (customizationIndex > -1) {
+    const customizationCategory = categories.splice(customizationIndex, 1)[0];
+    categories.push(customizationCategory);
+  }
+  
+  return categories;
 };
 
 export const getCategory = async (id: string): Promise<Category | null> => {

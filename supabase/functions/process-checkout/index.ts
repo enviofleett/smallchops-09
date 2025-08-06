@@ -38,12 +38,12 @@ const checkoutSchema = {
         address_line_2: { type: "string" },
         city: { type: "string", minLength: 1 },
         state: { type: "string", minLength: 1 },
-        postal_code: { type: "string", minLength: 1 },
-        country: { type: "string", minLength: 1 },
+        postal_code: { type: "string" },
+        country: { type: "string" },
         phone: { type: "string" },
         delivery_instructions: { type: "string" }
       },
-      required: ["address_line_1", "city", "state", "postal_code", "country"]
+      required: ["address_line_1", "city", "state"]
     },
     pickup_point_id: { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
     delivery_zone_id: { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
@@ -227,8 +227,8 @@ interface CheckoutRequest {
     address_line_2?: string;
     city: string;
     state: string;
-    postal_code: string;
-    country: string;
+    postal_code?: string;
+    country?: string;
     phone?: string;
     delivery_instructions?: string;
   };
@@ -369,8 +369,17 @@ serve(async (req) => {
       checkoutData.delivery_fee = FALLBACK_CONFIG.DEFAULT_DELIVERY_FEE;
     }
     
-    if (checkoutData.delivery_address && !checkoutData.delivery_address.country) {
-      checkoutData.delivery_address.country = FALLBACK_CONFIG.DEFAULT_COUNTRY;
+    // Apply smart defaults for delivery address
+    if (checkoutData.delivery_address) {
+      if (!checkoutData.delivery_address.country) {
+        checkoutData.delivery_address.country = FALLBACK_CONFIG.DEFAULT_COUNTRY;
+        console.log(`📍 [${requestId}] Applied default country: ${FALLBACK_CONFIG.DEFAULT_COUNTRY}`);
+      }
+      
+      if (!checkoutData.delivery_address.postal_code) {
+        checkoutData.delivery_address.postal_code = "";
+        console.log(`📍 [${requestId}] Set empty postal_code for delivery address`);
+      }
     }
 
     // Find or create customer account

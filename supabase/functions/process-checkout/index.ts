@@ -90,6 +90,25 @@ serve(async (req) => {
       discount_amount: item.discount_amount || 0
     }));
 
+    // ✅ FIX: Clean guest_session_id format (remove 'guest_' prefix)
+    let cleanGuestSessionId = null;
+    if (checkoutData.guest_session_id) {
+      if (typeof checkoutData.guest_session_id === 'string') {
+        // Remove 'guest_' prefix if present
+        const cleanId = checkoutData.guest_session_id.replace(/^guest_/, '');
+        
+        // Validate UUID format (36 characters with hyphens in correct positions)
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(cleanId)) {
+          cleanGuestSessionId = cleanId;
+        } else {
+          console.log('Invalid UUID format, setting to null:', cleanId);
+        }
+      }
+    }
+
+    console.log('Original guest_session_id:', checkoutData.guest_session_id);
+    console.log('Cleaned guest_session_id:', cleanGuestSessionId);
     console.log('Transformed items:', transformedItems);
     console.log('Items type:', typeof transformedItems);
     console.log('Is array:', Array.isArray(transformedItems));
@@ -101,7 +120,7 @@ serve(async (req) => {
       p_customer_phone: checkoutData.customer_phone || '',
       p_fulfillment_type: checkoutData.fulfillment_type,
       p_delivery_address: checkoutData.delivery_address || null,
-      p_guest_session_id: checkoutData.guest_session_id || '',
+      p_guest_session_id: cleanGuestSessionId, // ✅ Use cleaned UUID
       p_payment_method: checkoutData.payment_method,
       p_delivery_zone_id: checkoutData.delivery_zone_id || null,
       p_delivery_fee: checkoutData.delivery_fee || 0,
@@ -117,7 +136,7 @@ serve(async (req) => {
         p_customer_phone: checkoutData.customer_phone || '',
         p_fulfillment_type: checkoutData.fulfillment_type,
         p_delivery_address: checkoutData.delivery_address || null,
-        p_guest_session_id: checkoutData.guest_session_id || '',
+        p_guest_session_id: cleanGuestSessionId, // ✅ Use cleaned UUID
         p_payment_method: checkoutData.payment_method,
         p_delivery_zone_id: checkoutData.delivery_zone_id || null,
         p_delivery_fee: checkoutData.delivery_fee || 0,

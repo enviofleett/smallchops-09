@@ -17,6 +17,7 @@ import { StarRating } from '@/components/ui/star-rating';
 import { useProductRatingSummary } from '@/hooks/useProductReviews';
 import { CustomizationProvider, useCustomizationContext } from '@/context/CustomizationContext';
 import { CustomizationOrderBuilder } from '@/components/customization/CustomizationOrderBuilder';
+import { ShoppingCart } from 'lucide-react';
 
 const CategoryProductsContent = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
@@ -119,7 +120,7 @@ const CategoryProductsContent = () => {
         </div>
       </div>
 
-      <div className={`container mx-auto px-4 py-6 sm:py-8 transition-all duration-300 ${isCustomizationCategory ? 'lg:pr-4' : ''}`}>
+      <div className={`container mx-auto px-4 py-6 sm:py-8 transition-all duration-300 ${isCustomizationCategory ? 'lg:pr-80' : ''}`}>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
           {/* Left Sidebar - Categories - Hidden on mobile */}
           <div className="hidden lg:block lg:col-span-1">
@@ -189,13 +190,22 @@ const CategoryProductsContent = () => {
                   {currentCategory?.name || 'Products'}
                 </h1>
                 {isCustomizationCategory && (
-                  <Button
-                    variant="outline"
-                    onClick={() => setShowCustomizationBuilder(true)}
-                    className="lg:hidden"
-                  >
-                    View Order ({customizationContext.items.length})
-                  </Button>
+                  <div className="lg:hidden flex items-center justify-between bg-primary/5 p-3 rounded-lg">
+                    <div className="flex items-center space-x-2">
+                      <ShoppingCart className="h-4 w-4 text-primary" />
+                      <span className="text-sm font-medium">Custom Order</span>
+                      <span className="bg-primary text-primary-foreground text-xs px-2 py-1 rounded-full">
+                        {customizationContext.items.length}
+                      </span>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCustomizationBuilder(true)}
+                    >
+                      View Order
+                    </Button>
+                  </div>
                 )}
               </div>
               {currentCategory?.description && (
@@ -250,7 +260,7 @@ const CategoryProductsContent = () => {
               <>
                 <div className={`grid gap-3 sm:gap-4 lg:gap-6 mb-8 ${
                   isCustomizationCategory 
-                    ? 'grid-cols-2 sm:grid-cols-2' 
+                    ? 'grid-cols-2 lg:grid-cols-2' 
                     : 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3'
                 }`}>
                   {currentProducts.map((product) => (
@@ -259,11 +269,13 @@ const CategoryProductsContent = () => {
                       className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                       onClick={() => navigate(`/product/${product.id}`)}
                     >
-                      <div className={`${isCustomizationCategory ? 'aspect-[4/3]' : 'aspect-square'} overflow-hidden relative`}>
-                        <img
-                          src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
-                          alt={product.name}
-                          className="w-full h-full object-cover hover:scale-105 transition-transform"
+                      <div className={`${isCustomizationCategory ? 'aspect-[3/2]' : 'aspect-square'} overflow-hidden relative`}>
+                         <img
+                           src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=200&h=150&fit=crop'}
+                           alt={product.name}
+                           className={`w-full h-full object-cover hover:scale-105 transition-transform ${
+                             isCustomizationCategory ? 'scale-75' : ''
+                           }`}
                           loading="lazy"
                         />
                         {(product.discount_percentage || 0) > 0 && (
@@ -342,11 +354,17 @@ const CategoryProductsContent = () => {
         </div>
       </div>
 
-      {/* Customization Order Builder - Shows automatically for customization category */}
+      {/* Customization Order Builder - Shows for customization category */}
       {isCustomizationCategory && (
         <CustomizationOrderBuilder
-          isOpen={showCustomizationBuilder || !customizationContext.isEmpty}
-          onClose={() => setShowCustomizationBuilder(false)}
+          isOpen={true}
+          onClose={() => {
+            if (!customizationContext.isEmpty) {
+              // Don't allow closing if items exist, just minimize
+              return;
+            }
+            setShowCustomizationBuilder(false);
+          }}
         />
       )}
 

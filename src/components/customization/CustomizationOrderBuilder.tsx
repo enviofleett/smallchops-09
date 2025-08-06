@@ -84,19 +84,23 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
 
   return (
     <>
-      {/* Desktop compact floating sidebar - 50% smaller */}
+      {/* Desktop compact floating sidebar - always visible for customization */}
       <div className="hidden lg:block lg:fixed lg:right-4 lg:top-24 lg:bottom-20 lg:w-72 lg:bg-white lg:border lg:shadow-xl lg:z-40 lg:rounded-lg lg:overflow-hidden">
         <div className="h-full flex flex-col max-h-[calc(100vh-11rem)]">
           <div className="flex items-center justify-between p-3 border-b bg-gradient-to-r from-primary/5 to-primary/10 rounded-t-lg">
             <h2 className="text-base font-semibold text-primary">Custom Order</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-6 w-6 p-0 hover:bg-primary/10"
-            >
-              <X className="h-3 w-3" />
-            </Button>
+            {isEmpty ? (
+              <div className="h-6 w-6"></div>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="h-6 w-6 p-0 hover:bg-primary/10"
+              >
+                <X className="h-3 w-3" />
+              </Button>
+            )}
           </div>
           
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">

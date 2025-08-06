@@ -401,12 +401,14 @@ serve(async (req) => {
     }
 
     // Handle customer account creation based on authentication status
-    let customerId = null;
+    let customer_id = null;  // Fixed variable declaration
+    let customerId = null;   // Keep both for consistency
     let isNewCustomer = false;
 
     if (isGuestCheckout) {
       // 🔧 GUEST CHECKOUT: Skip customer account creation
       console.log('👤 Processing guest checkout, skipping customer account creation');
+      customer_id = null;
       customerId = null;
     } else if (user) {
       // 🔧 AUTHENTICATED USER: Create or get customer account
@@ -420,6 +422,7 @@ serve(async (req) => {
 
         if (existingCustomer) {
           console.log('✅ Found existing customer account:', existingCustomer.id);
+          customer_id = existingCustomer.id;
           customerId = existingCustomer.id;
         } else {
           // Create new customer account for authenticated user
@@ -440,6 +443,7 @@ serve(async (req) => {
           }
 
           console.log('✅ Created new customer account:', newCustomer.id);
+          customer_id = newCustomer.id;
           customerId = newCustomer.id;
           isNewCustomer = true;
         }
@@ -451,6 +455,7 @@ serve(async (req) => {
     } else {
       // Fallback for edge cases - treat as guest
       console.log('👤 No user context and no guest session, treating as guest checkout');
+      customer_id = null;
       customerId = null;
     }
 

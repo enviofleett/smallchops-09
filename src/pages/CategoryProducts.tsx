@@ -23,6 +23,7 @@ const CategoryProductsContent = () => {
   const navigate = useNavigate();
   const { addItem } = useCart();
   const { toast } = useToast();
+  const customizationContext = useCustomizationContext();
   
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
@@ -59,7 +60,6 @@ const CategoryProductsContent = () => {
   const handleAddToCart = (product: any) => {
     if (isCustomizationCategory) {
       // For customization category, use the context to add to builder
-      const customizationContext = useCustomizationContext();
       customizationContext.addItem(product);
       setShowCustomizationBuilder(true);
     } else {
@@ -194,7 +194,7 @@ const CategoryProductsContent = () => {
                     onClick={() => setShowCustomizationBuilder(true)}
                     className="lg:hidden"
                   >
-                    View Order ({useCustomizationContext().items.length})
+                    View Order ({customizationContext.items.length})
                   </Button>
                 )}
               </div>

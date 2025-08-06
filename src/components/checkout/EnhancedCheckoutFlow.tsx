@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -357,91 +356,64 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         body: sanitizedData
       });
 
-      // 🔍 COMPREHENSIVE DEBUG: Log the complete response structure
-      console.log('🔍 Complete Supabase Response Debug:', {
-        fullResponse: { data, error },
-        dataKeys: data ? Object.keys(data) : 'no data',
+      console.log('🔍 Raw response type analysis:', {
         dataType: typeof data,
+        dataIsString: typeof data === 'string',
+        dataLength: typeof data === 'string' ? data.length : 'not string',
         errorType: typeof error,
-        hasError: !!error,
-        dataStringified: JSON.stringify(data, null, 2),
-        errorStringified: JSON.stringify(error, null, 2)
+        hasError: !!error
       });
-
-      // Check for nested response structure
-      if (data && typeof data === 'object') {
-        console.log('🔍 Checking for nested response structures:', {
-          directSuccess: data.success,
-          nestedData: data.data?.success,
-          nestedResult: data.result?.success,
-          nestedResponse: data.response?.success,
-          allDataProperties: Object.keys(data).map(key => ({
-            key,
-            value: data[key],
-            type: typeof data[key]
-          }))
-        });
-      }
 
       if (error) {
         console.error('🔍 Supabase function error:', error);
         throw new Error(error.message);
       }
 
-      // Try multiple ways to access the success value
-      let actualData = data;
-      let successValue;
-
-      // Check if data is wrapped in another structure
-      if (data && !data.success && data.data) {
-        console.log('🔍 Found nested data structure, using data.data');
-        actualData = data.data;
-        successValue = data.data.success;
-      } else if (data && !data.success && data.result) {
-        console.log('🔍 Found nested result structure, using data.result');
-        actualData = data.result;
-        successValue = data.result.success;
-      } else {
-        successValue = data?.success;
+      // Parse JSON string response if needed
+      let parsedData = data;
+      if (typeof data === 'string') {
+        try {
+          console.log('🔍 Parsing JSON string response...');
+          parsedData = JSON.parse(data);
+          console.log('✅ Successfully parsed JSON response');
+        } catch (parseError) {
+          console.error('❌ Failed to parse JSON response:', parseError);
+          throw new Error('Invalid response format from server');
+        }
       }
 
-      console.log('🔍 Final success value analysis:', {
-        originalDataSuccess: data?.success,
-        extractedSuccessValue: successValue,
-        actualDataUsed: actualData,
-        successType: typeof successValue
+      console.log('🔍 Final parsed data analysis:', {
+        originalDataType: typeof data,
+        parsedDataType: typeof parsedData,
+        hasSuccess: 'success' in parsedData,
+        successValue: parsedData.success,
+        hasOrderId: 'order_id' in parsedData,
+        orderId: parsedData.order_id,
+        hasPayment: 'payment' in parsedData,
+        paymentKeys: parsedData.payment ? Object.keys(parsedData.payment) : 'no payment'
       });
 
-      // ✅ ROBUST SUCCESS CHECK with multiple fallbacks
-      const isSuccess = actualData && (
-        successValue === true || 
-        successValue === 'true' || 
-        String(successValue).toLowerCase() === 'true' ||
-        (actualData.order_id && actualData.payment) // Fallback: if we have order_id and payment, it's likely success
-      );
-
-      if (isSuccess) {
+      // Check for success with proper parsed data
+      if (parsedData && parsedData.success === true) {
         console.log('✅ Checkout successful! Order created:', {
-          orderId: actualData.order_id,
-          orderNumber: actualData.order_number,
-          totalAmount: actualData.total_amount,
-          paymentReference: actualData.payment?.reference,
-          successValue: successValue,
-          successType: typeof successValue,
-          dataSource: actualData === data ? 'direct' : 'nested'
+          orderId: parsedData.order_id,
+          orderNumber: parsedData.order_number,
+          totalAmount: parsedData.total_amount,
+          paymentReference: parsedData.payment?.reference,
+          paymentUrl: parsedData.payment?.payment_url
         });
 
         // Process Paystack payment with popup
-        if (actualData.payment?.payment_url && actualData.payment?.reference) {
+        if (parsedData.payment?.payment_url && parsedData.payment?.reference) {
           console.log('🛒 Initializing Paystack popup payment...');
           
           try {
             await processPaystackPayment({
-              reference: actualData.payment.reference,
-              amount: actualData.total_amount,
+              reference: parsedData.payment.reference,
+              amount: parsedData.total_amount,
               email: formData.customer_email,
-              orderNumber: actualData.order_number,
-              paymentUrl: actualData.payment.payment_url
+              orderNumber: parsedData.order_number,
+              paymentUrl: parsedData.payment.payment_url
             });
             
             // Success is handled in the payment callback
@@ -456,7 +428,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
             return;
           }
         } else {
-          console.error('❌ Missing payment data in response:', actualData);
+          console.error('❌ Missing payment data in response:', parsedData);
           toast({
             title: "Payment Error",
             description: "Payment initialization data missing. Please try again.",
@@ -466,19 +438,14 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         }
       } else {
         // Handle actual failures
-        console.error('❌ Checkout failed - detailed analysis:', {
-          originalData: data,
-          actualData: actualData,
-          successValue: successValue,
-          successType: typeof successValue,
-          hasOrderId: !!actualData?.order_id,
-          hasPayment: !!actualData?.payment,
-          message: actualData?.message || data?.message,
-          error: actualData?.error || data?.error
+        console.error('❌ Checkout failed - server response indicates failure:', {
+          parsedData: parsedData,
+          success: parsedData?.success,
+          message: parsedData?.message,
+          error: parsedData?.error
         });
-        console.trace('❌ Checkout failure trace'); // Add trace to debug source
         
-        const errorMessage = actualData?.message || data?.message || actualData?.error || data?.error || "Failed to process checkout";
+        const errorMessage = parsedData?.message || parsedData?.error || "Failed to process checkout";
         toast({
           title: "Checkout Failed",
           description: errorMessage,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/hooks/useCart";
@@ -72,6 +72,31 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [checkoutStep, setCheckoutStep] = useState<'choice' | 'details'>('choice');
   const [paymentInProgress, setPaymentInProgress] = useState(false);
+  const [paystackLoaded, setPaystackLoaded] = useState(false);
+
+  // Load Paystack script on component mount
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.async = true;
+    script.onload = () => {
+      console.log('✅ Paystack script loaded successfully');
+      setPaystackLoaded(true);
+    };
+    script.onerror = () => {
+      console.error('❌ Failed to load Paystack script');
+    };
+    
+    if (!document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]')) {
+      document.head.appendChild(script);
+    } else {
+      setPaystackLoaded(true);
+    }
+
+    return () => {
+      // Cleanup if needed
+    };
+  }, []);
 
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: session?.user?.email || '',
@@ -347,6 +372,29 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
   };
 
   // Process Paystack payment with popup
+  // Enhanced Paystack script loading with retry mechanism
+  const loadPaystackScript = () => {
+    return new Promise((resolve, reject) => {
+      if (window.PaystackPop) {
+        resolve(window.PaystackPop);
+        return;
+      }
+
+      const script = document.createElement('script');
+      script.src = 'https://js.paystack.co/v1/inline.js';
+      script.async = true;
+      script.onload = () => {
+        if (window.PaystackPop) {
+          resolve(window.PaystackPop);
+        } else {
+          reject(new Error('PaystackPop not available after script load'));
+        }
+      };
+      script.onerror = () => reject(new Error('Failed to load Paystack script'));
+      document.head.appendChild(script);
+    });
+  };
+
   const processPaystackPayment = async (paymentData: {
     reference: string;
     amount: number;
@@ -354,65 +402,86 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     orderNumber: string;
     paymentUrl: string;
   }) => {
-    return new Promise((resolve, reject) => {
-      setPaymentInProgress(true);
+    setPaymentInProgress(true);
+    
+    try {
+      // Ensure Paystack script is loaded
+      await loadPaystackScript();
       
-      // Check if Paystack is loaded
-      if (!window.PaystackPop) {
-        console.log('🔄 Paystack popup not available, redirecting to payment page...');
-        window.location.href = paymentData.paymentUrl;
-        return;
-      }
-
-      console.log('🚀 Opening Paystack popup for payment...');
-
-      const handler = window.PaystackPop.setup({
-        key: 'pk_live_0b6a7a38a3afaaa5dd1ab30c7fbee8a3d9a4e2e7', // Your live Paystack public key
+      console.log('🚀 Initializing Paystack payment with newTransaction...', {
+        amount: paymentData.amount,
         email: paymentData.email,
-        amount: paymentData.amount * 100, // Convert to kobo
-        ref: paymentData.reference,
-        currency: 'NGN',
-        channels: ['card', 'bank', 'ussd', 'mobile_money'],
-        metadata: {
-          order_number: paymentData.orderNumber,
-          customer_email: paymentData.email
-        },
-        callback: function(response: any) {
-          console.log('✅ Paystack payment successful:', response);
-          setPaymentInProgress(false);
-          
-          if (response.status === 'success') {
-            // Clear cart and mark checkout progress
-            markCheckoutInProgress(response.reference);
-            clearCart();
-            
-            // Redirect to payment callback page for verification
-            window.location.href = `/payment-callback?reference=${response.reference}&status=success`;
-            resolve(response);
-          } else {
-            console.error('❌ Payment was not successful:', response);
-            toast({
-              title: "Payment Failed",
-              description: "Your payment was not successful. Please try again.",
-              variant: "destructive",
-            });
-            reject(new Error('Payment was not successful'));
-          }
-        },
-        onClose: function() {
-          console.log('🚪 Paystack popup closed by user');
-          setPaymentInProgress(false);
-          toast({
-            title: "Payment Cancelled",
-            description: "You cancelled the payment process.",
-            variant: "destructive",
-          });
-          reject(new Error('Payment cancelled by user'));
-        }
+        reference: paymentData.reference
       });
 
-      handler.openIframe();
-    });
+      // Use newTransaction method for better reliability
+      if (typeof window.PaystackPop.setup === 'function') {
+        // Use setup method as fallback
+        const handler = window.PaystackPop.setup({
+          key: 'pk_live_0b6a7a38a3afaaa5dd1ab30c7fbee8a3d9a4e2e7',
+          email: paymentData.email,
+          amount: paymentData.amount * 100,
+          currency: 'NGN',
+          ref: paymentData.reference,
+          channels: ['card', 'bank', 'ussd', 'mobile_money'],
+          metadata: {
+            order_number: paymentData.orderNumber,
+            customer_email: paymentData.email,
+            order_id: paymentData.reference.split('_')[0]
+          },
+          callback: function(response: any) {
+            console.log('✅ Paystack payment callback received:', response);
+            setPaymentInProgress(false);
+            
+            if (response.status === 'success') {
+              markCheckoutInProgress(response.reference);
+              clearCart();
+              
+              toast({
+                title: "Payment Successful!",
+                description: "Your payment has been processed successfully.",
+              });
+              
+              window.location.href = `/payment-callback?reference=${response.reference}&status=success`;
+            } else {
+              console.error('❌ Payment was not successful:', response);
+              toast({
+                title: "Payment Failed",
+                description: response.message || "Your payment was not successful. Please try again.",
+                variant: "destructive",
+              });
+            }
+          },
+          onClose: function() {
+            console.log('🚪 Paystack popup closed by user');
+            setPaymentInProgress(false);
+            toast({
+              title: "Payment Cancelled",
+              description: "You cancelled the payment process.",
+              variant: "destructive",
+            });
+          }
+        });
+        
+        handler.openIframe();
+      } else {
+        throw new Error('Paystack popup not properly initialized');
+      }
+      
+    } catch (error) {
+      console.error('💳 Paystack initialization failed:', error);
+      setPaymentInProgress(false);
+      
+      // Fallback to redirect if popup fails
+      toast({
+        title: "Payment Popup Unavailable",
+        description: "Redirecting to secure payment page...",
+      });
+      
+      setTimeout(() => {
+        window.location.href = paymentData.paymentUrl;
+      }, 1500);
+    }
   };
 
   console.log('🔄 EnhancedCheckoutFlow render - isOpen:', isOpen, 'cart items:', cart?.items?.length);

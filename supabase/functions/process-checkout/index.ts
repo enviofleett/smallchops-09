@@ -13,8 +13,10 @@ interface CheckoutRequest {
   order_items: Array<{
     product_id: string;
     quantity: number;
+    price?: number;
     unit_price?: number;
     total_price?: number;
+    discount_amount?: number;
   }>;
   total_amount?: number;
   delivery_fee?: number;
@@ -80,10 +82,18 @@ serve(async (req) => {
       }
     }
 
+    // Transform order items to match database function expectations
+    const transformedItems = checkoutData.order_items.map(item => ({
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price || item.price || 0,
+      discount_amount: item.discount_amount || 0
+    }));
+
     console.log('Calling create_order_with_items with:', {
       p_customer_email: checkoutData.customer_email,
       p_customer_name: checkoutData.customer_name,
-      p_items: checkoutData.order_items,
+      p_items: transformedItems,
       p_customer_phone: checkoutData.customer_phone || '',
       p_fulfillment_type: checkoutData.fulfillment_type,
       p_delivery_address: checkoutData.delivery_address || null,
@@ -99,7 +109,7 @@ serve(async (req) => {
       .rpc('create_order_with_items', {
         p_customer_email: checkoutData.customer_email,
         p_customer_name: checkoutData.customer_name,
-        p_items: checkoutData.order_items,
+        p_items: transformedItems,
         p_customer_phone: checkoutData.customer_phone || '',
         p_fulfillment_type: checkoutData.fulfillment_type,
         p_delivery_address: checkoutData.delivery_address || null,

@@ -13,7 +13,7 @@ import CreatePromotionForm from "@/components/promotions/CreatePromotionForm";
 import EditPromotionDialog from "@/components/promotions/EditPromotionDialog";
 import type { Promotion, PromotionStatus } from "@/api/promotions";
 
-import { toast } from "@/hooks/use-toast";
+import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query"; // For the usage counts
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
 
@@ -52,8 +52,9 @@ export default function PromotionsPage() {
   const [isDialogOpen, setDialogOpen] = useState(false);
 
   // Edit promotion dialog state
-  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
+  const { toast } = useToast();
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingPromotion, setEditingPromotion] = useState<Promotion | null>(null);
 
   const { data = [], isLoading, isError } = usePromotions();
   const deleteMutation = useDeletePromotion();

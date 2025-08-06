@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { getPromotions } from "./promotions";
-import { calculateProductDiscount, ProductWithDiscount } from "@/lib/discountCalculations";
+import { calculateProductDiscount, ProductWithDiscount, isPromotionValidForCurrentDay } from "@/lib/discountCalculations";
 
 // Get products with calculated discounts
 export async function getProductsWithDiscounts(categoryId?: string): Promise<ProductWithDiscount[]> {
@@ -74,7 +74,7 @@ export async function getProductWithDiscounts(productId: string): Promise<Produc
   }
 }
 
-// Validate promotion code
+// Validate promotion code - PRODUCTION READY
 export async function validatePromotionCode(
   code: string, 
   orderAmount: number
@@ -102,6 +102,15 @@ export async function validatePromotionCode(
     
     if (validUntil && currentDate > validUntil) {
       return { valid: false, error: "Promotion has expired" };
+    }
+
+    // PRODUCTION CRITICAL: Check if promotion is valid for current day
+    if (!isPromotionValidForCurrentDay(promotion)) {
+      const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+      return { 
+        valid: false, 
+        error: `This promotion is not available on ${currentDay}` 
+      };
     }
     
     // Check minimum order amount
@@ -132,6 +141,9 @@ export async function validatePromotionCode(
         break;
       case 'free_delivery':
         discountAmount = 0; // Handled separately in delivery fee calculation
+        break;
+      case 'buy_one_get_one':
+        discountAmount = 0; // BOGO handled separately in cart logic
         break;
     }
     

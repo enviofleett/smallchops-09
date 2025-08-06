@@ -407,18 +407,7 @@ export function isPromotionValidForCurrentDay(promotion: Promotion): boolean {
     return true;
   }
 
-  const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase(); // Get current day (e.g., 'mon', 'tue')
-  const dayMap: Record<string, string> = {
-    'sun': 'sunday',
-    'mon': 'monday',
-    'tue': 'tuesday',
-    'wed': 'wednesday',
-    'thu': 'thursday',
-    'fri': 'friday',
-    'sat': 'saturday'
-  };
-
-  const fullDayName = dayMap[currentDay] || new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
   
-  return promotion.applicable_days.includes(fullDayName);
+  return promotion.applicable_days.includes(currentDay);
 }

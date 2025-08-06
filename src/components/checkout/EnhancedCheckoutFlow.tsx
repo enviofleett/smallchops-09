@@ -128,75 +128,149 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     }
   }, [session, authCustomerAccount, customerAccount]);
 
+  // UUID validation utility
+  const isValidUUID = (str: string): boolean => {
+    if (!str || typeof str !== 'string') return false;
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
+  };
+
+  // Sanitize pickup point ID
+  const sanitizePickupPointId = (id: string | undefined, fulfillmentType: string): string | null => {
+    if (fulfillmentType !== 'pickup') return null;
+    if (!id || id === '' || id === 'default') return null;
+    return isValidUUID(id) ? id : null;
+  };
+
+  // Sanitize guest session ID
+  const sanitizeGuestSessionId = (guestSession: any): string | null => {
+    if (!guestSession || typeof guestSession !== 'object') return null;
+    const sessionId = guestSession.sessionId;
+    if (!sessionId || typeof sessionId !== 'string') return null;
+    return isValidUUID(sessionId) ? sessionId : null;
+  };
+
+  // Sanitize delivery address
+  const sanitizeDeliveryAddress = (address: DeliveryAddress, fulfillmentType: string): object | null => {
+    if (fulfillmentType !== 'delivery') return null;
+    
+    // Ensure all required fields are present and clean
+    const cleanAddress = {
+      address_line_1: address.address_line_1?.trim() || '',
+      address_line_2: address.address_line_2?.trim() || '',
+      city: address.city?.trim() || '',
+      state: address.state?.trim() || 'Lagos',
+      postal_code: address.postal_code?.trim() || '',
+      landmark: address.landmark?.trim() || ''
+    };
+
+    // Remove empty optional fields
+    if (!cleanAddress.address_line_2) delete cleanAddress.address_line_2;
+    if (!cleanAddress.landmark) delete cleanAddress.landmark;
+    if (!cleanAddress.postal_code) delete cleanAddress.postal_code;
+
+    return cleanAddress;
+  };
+
+  // Sanitize order items for JSONB compatibility
+  const sanitizeOrderItems = (items: any[]): any[] => {
+    return items.map(item => ({
+      product_id: String(item.product_id || ''),
+      quantity: Number(item.quantity || 1),
+      unit_price: Number(item.price || 0),
+      total_price: Number((item.price || 0) * (item.quantity || 1))
+    }));
+  };
+
+  // Comprehensive data validation
+  const validateCheckoutData = (data: any): { isValid: boolean; errors: string[] } => {
+    const errors: string[] = [];
+
+    // Required field validation
+    if (!data.customer_email) errors.push('Email is required');
+    if (!data.customer_name) errors.push('Name is required');
+    if (!data.customer_phone) errors.push('Phone is required');
+
+    // Email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (data.customer_email && !emailRegex.test(data.customer_email)) {
+      errors.push('Invalid email format');
+    }
+
+    // Fulfillment type validation
+    if (data.fulfillment_type === 'delivery') {
+      if (!data.delivery_address?.address_line_1) errors.push('Street address is required for delivery');
+      if (!data.delivery_address?.city) errors.push('City is required for delivery');
+      if (!data.delivery_zone_id) errors.push('Delivery zone is required');
+    } else if (data.fulfillment_type === 'pickup') {
+      if (!data.pickup_point_id) errors.push('Pickup point is required');
+    }
+
+    // Items validation
+    if (!data.order_items || data.order_items.length === 0) {
+      errors.push('No items in order');
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors
+    };
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
     try {
-      // Validate required fields
-      if (!formData.customer_email || !formData.customer_name || !formData.customer_phone) {
+      // Collect raw form data for logging
+      const rawData = {
+        customer_email: formData.customer_email,
+        customer_name: formData.customer_name,
+        customer_phone: formData.customer_phone,
+        fulfillment_type: formData.fulfillment_type,
+        delivery_address: formData.delivery_address,
+        pickup_point_id: formData.pickup_point_id,
+        delivery_zone_id: formData.delivery_zone_id,
+        items: items,
+        guestSession: guestSession
+      };
+
+      console.log('🔍 Raw checkout data:', rawData);
+
+      // Sanitize and clean all data
+      const sanitizedData = {
+        customer_email: formData.customer_email?.trim(),
+        customer_name: formData.customer_name?.trim(),
+        customer_phone: formData.customer_phone?.trim() || null,
+        fulfillment_type: formData.fulfillment_type,
+        delivery_address: sanitizeDeliveryAddress(formData.delivery_address, formData.fulfillment_type),
+        pickup_point_id: sanitizePickupPointId(formData.pickup_point_id, formData.fulfillment_type),
+        order_items: sanitizeOrderItems(items),
+        total_amount: total,
+        delivery_fee: formData.fulfillment_type === 'delivery' ? deliveryFee : 0,
+        delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id && isValidUUID(formData.delivery_zone_id) ? formData.delivery_zone_id : null,
+        payment_method: 'paystack',
+        guest_session_id: !isAuthenticated ? sanitizeGuestSessionId(guestSession) : null
+      };
+
+      console.log('✅ Sanitized checkout data:', sanitizedData);
+
+      // Validate sanitized data
+      const validation = validateCheckoutData(sanitizedData);
+      if (!validation.isValid) {
+        console.error('❌ Validation errors:', validation.errors);
         toast({
-          title: "Missing Information",
-          description: "Please fill in all required customer details.",
+          title: "Validation Error",
+          description: validation.errors[0],
           variant: "destructive",
         });
         return;
       }
 
-      // Validate address/pickup based on fulfillment type
-      if (formData.fulfillment_type === 'delivery') {
-        if (!formData.delivery_address.address_line_1 || !formData.delivery_address.city) {
-          toast({
-            title: "Missing Address",
-            description: "Please provide a complete delivery address.",
-            variant: "destructive",
-          });
-          return;
-        }
-        if (!formData.delivery_zone_id) {
-          toast({
-            title: "Missing Delivery Zone",
-            description: "Please select a delivery zone.",
-            variant: "destructive",
-          });
-          return;
-        }
-      } else if (formData.fulfillment_type === 'pickup') {
-        if (!formData.pickup_point_id) {
-          toast({
-            title: "Missing Pickup Point",
-            description: "Please select a pickup location.",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-
-      // Process checkout through edge function with proper null handling
-      const checkoutData = {
-        customer_email: formData.customer_email,
-        customer_name: formData.customer_name,
-        customer_phone: formData.customer_phone || null,
-        fulfillment_type: formData.fulfillment_type,
-        delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : null,
-        pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : null,
-        order_items: items.map(item => ({
-          product_id: item.product_id,
-          quantity: item.quantity,
-          unit_price: item.price,
-          total_price: item.price * item.quantity
-        })),
-        total_amount: total,
-        delivery_fee: formData.fulfillment_type === 'delivery' ? deliveryFee : 0,
-        delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id ? formData.delivery_zone_id : null,
-        payment_method: 'paystack',
-        guest_session_id: !isAuthenticated && guestSession?.sessionId ? guestSession.sessionId : null
-      };
-
-      console.log('Processing checkout:', checkoutData);
+      console.log('🚀 Processing checkout with clean data...');
 
       const { data, error } = await supabase.functions.invoke('process-checkout', {
-        body: checkoutData
+        body: sanitizedData
       });
 
       if (error) {

@@ -260,7 +260,7 @@ function cleanUUID(value: any): string | null {
   return isValidUUID(cleaned) ? cleaned : null;
 }
 
-// Helper function to find or create customer account
+// Helper function to find or create customer account - now supports guest users
 async function findOrCreateCustomer(
   supabase: any,
   email: string,
@@ -269,47 +269,36 @@ async function findOrCreateCustomer(
 ): Promise<{ customer_id: string; isNew: boolean }> {
   console.log(`🔍 Looking for existing customer: ${email}`);
   
-  // First, try to find existing customer account
-  const { data: existingCustomer, error: findError } = await supabase
-    .from('customer_accounts')
-    .select('id')
-    .eq('email', email)
-    .maybeSingle();
+  try {
+    // Use the new database function that handles guests properly
+    const { data, error } = await supabase.rpc('find_or_create_customer', {
+      p_email: email,
+      p_name: name || email.split('@')[0],
+      p_phone: phone || null,
+      p_is_guest: true  // Mark as guest since this is checkout without auth
+    });
 
-  if (findError) {
-    console.error('❌ Error finding customer:', findError);
-    throw new Error(`Failed to find customer: ${findError.message}`);
+    if (error) {
+      console.error('❌ Error in find_or_create_customer function:', error);
+      throw new Error(`Customer management error: ${error.message}`);
+    }
+
+    if (!data || data.length === 0) {
+      throw new Error('No data returned from customer creation function');
+    }
+
+    const result = data[0];
+    console.log(`✅ Customer result:`, result);
+    
+    return { 
+      customer_id: result.customer_id, 
+      isNew: result.is_new 
+    };
+    
+  } catch (error) {
+    console.error('❌ Failed to find/create customer:', error);
+    throw new Error(`Customer operation failed: ${error.message}`);
   }
-
-  if (existingCustomer) {
-    console.log(`✅ Found existing customer: ${existingCustomer.id}`);
-    return { customer_id: existingCustomer.id, isNew: false };
-  }
-
-  console.log(`👤 Creating new customer account for: ${email}`);
-  
-  // Create new customer account
-  const { data: newCustomer, error: createError } = await supabase
-    .from('customer_accounts')
-    .insert({
-      name,
-      email,
-      phone: phone || null,
-      user_id: crypto.randomUUID(), // Generate temporary user_id for guest
-      email_verified: false,
-      phone_verified: false,
-      profile_completion_percentage: 30
-    })
-    .select('id')
-    .single();
-
-  if (createError) {
-    console.error('❌ Error creating customer:', createError);
-    throw new Error(`Failed to create customer: ${createError.message}`);
-  }
-
-  console.log(`✅ Created new customer: ${newCustomer.id}`);
-  return { customer_id: newCustomer.id, isNew: true };
 }
 
 serve(async (req) => {

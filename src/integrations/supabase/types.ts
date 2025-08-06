@@ -1267,7 +1267,7 @@ export type Database = {
           phone_verified: boolean | null
           profile_completion_percentage: number | null
           updated_at: string
-          user_id: string
+          user_id: string | null
         }
         Insert: {
           avatar_url?: string | null
@@ -1284,7 +1284,7 @@ export type Database = {
           phone_verified?: boolean | null
           profile_completion_percentage?: number | null
           updated_at?: string
-          user_id: string
+          user_id?: string | null
         }
         Update: {
           avatar_url?: string | null
@@ -1301,7 +1301,7 @@ export type Database = {
           phone_verified?: boolean | null
           profile_completion_percentage?: number | null
           updated_at?: string
-          user_id?: string
+          user_id?: string | null
         }
         Relationships: []
       }
@@ -6272,6 +6272,18 @@ export type Database = {
       enhanced_security_check: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      find_or_create_customer: {
+        Args: {
+          p_email: string
+          p_name: string
+          p_phone?: string
+          p_is_guest?: boolean
+        }
+        Returns: {
+          customer_id: string
+          is_new: boolean
+        }[]
       }
       fix_user_linking: {
         Args: Record<PropertyKey, never>

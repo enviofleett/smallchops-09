@@ -6033,6 +6033,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      check_production_security: {
+        Args: Record<PropertyKey, never>
+        Returns: boolean
+      }
       check_rate_limit_with_reputation: {
         Args: { p_identifier: string; p_identifier_type?: string }
         Returns: Json

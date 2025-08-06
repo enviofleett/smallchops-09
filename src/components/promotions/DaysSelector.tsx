@@ -85,7 +85,7 @@ export function DaysSelector({
           {DAYS_OF_WEEK.map((day) => {
             const isSelected = selectedDays.includes(day.value);
             return (
-              <div
+                <div
                 key={day.value}
                 className={`
                   flex items-center gap-2 p-3 rounded-lg border transition-colors
@@ -96,7 +96,13 @@ export function DaysSelector({
                   }
                   ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}
                 `}
-                onClick={() => !disabled && handleDayToggle(day.value, !isSelected)}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  if (!disabled) {
+                    handleDayToggle(day.value, !isSelected);
+                  }
+                }}
               >
                 <Checkbox
                   id={day.value}

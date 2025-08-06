@@ -3409,7 +3409,7 @@ export type Database = {
           customer_id: string | null
           customer_name: string
           customer_phone: string
-          delivery_address: string | null
+          delivery_address: Json | null
           delivery_fee: number | null
           delivery_time: string | null
           delivery_time_slot_id: string | null
@@ -3444,7 +3444,7 @@ export type Database = {
           customer_id?: string | null
           customer_name: string
           customer_phone: string
-          delivery_address?: string | null
+          delivery_address?: Json | null
           delivery_fee?: number | null
           delivery_time?: string | null
           delivery_time_slot_id?: string | null
@@ -3479,7 +3479,7 @@ export type Database = {
           customer_id?: string | null
           customer_name?: string
           customer_phone?: string
-          delivery_address?: string | null
+          delivery_address?: Json | null
           delivery_fee?: number | null
           delivery_time?: string | null
           delivery_time_slot_id?: string | null

@@ -1,14 +1,23 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
+
+# Optimize crawling
+Crawl-delay: 1
+
+# Important pages
+Sitemap: https://oknnklksdiqaifhxaccs.supabase.co/sitemap.xml
+
+# Block admin areas
+Disallow: /admin/
+Disallow: /dashboard/
+Disallow: /api/
+Disallow: /_next/
+Disallow: /static/
+
+# Allow public pages
+Allow: /
+Allow: /products
+Allow: /about
+Allow: /contact
+Allow: /product/*
+Allow: /category/*

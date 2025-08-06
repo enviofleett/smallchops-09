@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import React, { useState, memo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Star, Search } from 'lucide-react';
@@ -15,8 +15,79 @@ import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
 import { HeroCarousel } from '@/components/branding/HeroCarousel';
 import { BudgetBallerSection } from '@/components/branding/BudgetBallerSection';
+import { SEOHead } from '@/components/SEOHead';
+import { useImagePreloader } from '@/hooks/useImagePreloader';
+import { PerformanceMonitor } from '@/utils/performance';
+import { OptimizedImage } from '@/components/OptimizedImage';
+
+// Memoized components for better performance
+const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
+  const renderStars = (rating: number) => {
+    return Array.from({ length: 5 }, (_, i) => (
+      <Star 
+        key={i} 
+        className={`w-4 h-4 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
+      />
+    ));
+  };
+
+  return (
+    <Card 
+      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+      onClick={() => navigate(`/product/${product.id}`)}
+    >
+      <div className="aspect-square overflow-hidden relative">
+        <OptimizedImage
+          src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
+          alt={product.name}
+          width={300}
+          height={300}
+          className="w-full h-full hover:scale-105 transition-transform"
+          sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
+        />
+        {(product.discount_percentage || 0) > 0 && (
+          <div className="absolute top-1 sm:top-2 left-1 sm:left-2">
+            <DiscountBadge 
+              discountPercentage={product.discount_percentage || 0}
+              size="sm"
+            />
+          </div>
+        )}
+      </div>
+      <CardContent className="p-2 sm:p-3 lg:p-4">
+        <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
+        <div className="flex items-center space-x-1 mb-1 sm:mb-2">
+          {renderStars(4)}
+          <span className="text-xs text-gray-500">(0)</span>
+        </div>
+        <div className="flex items-center justify-between">
+          <PriceDisplay
+            originalPrice={product.price}
+            discountedPrice={product.discounted_price}
+            hasDiscount={(product.discount_percentage || 0) > 0}
+            size="sm"
+          />
+          <Button 
+            size="sm" 
+            onClick={(e) => {
+              e.stopPropagation();
+              onAddToCart(product);
+            }}
+            className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
+          >
+            Add
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+});
+
+MemoizedProductCard.displayName = 'MemoizedProductCard';
 
 const PublicHome = () => {
+  PerformanceMonitor.startTiming('PublicHome Render');
+  
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,6 +96,16 @@ const PublicHome = () => {
 
   const { addItem } = useCart();
   const { toast } = useToast();
+
+  // Preload critical images
+  useImagePreloader([
+    'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop',
+    '/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png'
+  ]);
+
+  React.useEffect(() => {
+    PerformanceMonitor.endTiming('PublicHome Render');
+  }, []);
 
   // Fetch products with discounts
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
@@ -65,16 +146,23 @@ const PublicHome = () => {
     });
   };
 
-  const renderStars = (rating: number) => {
+  const renderStars = React.useCallback((rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (
       <Star 
         key={i} 
         className={`w-4 h-4 ${i < rating ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'}`} 
       />
     ));
-  };
+  }, []);
 
   return (
+    <>
+      <SEOHead
+        title="Starters - Premium Food Delivery"
+        description="Order delicious food from Starters. Fresh ingredients, fast delivery, and amazing taste delivered to your door."
+        keywords="food delivery, restaurant, online ordering, fast food, delivery service, starters"
+        type="website"
+      />
     <div className="min-h-screen bg-white">
       <PublicHeader />
 
@@ -231,53 +319,12 @@ const PublicHome = () => {
                   {/* Products Grid - Mobile optimized */}
                   <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-8">
                     {currentProducts.map((product) => (
-                      <Card 
-                        key={product.id} 
-                        className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
-                        onClick={() => navigate(`/product/${product.id}`)}
-                      >
-                        <div className="aspect-square overflow-hidden relative">
-                          <img
-                            src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
-                            alt={product.name}
-                            className="w-full h-full object-cover hover:scale-105 transition-transform"
-                            loading="lazy"
-                          />
-                          {(product.discount_percentage || 0) > 0 && (
-                            <div className="absolute top-1 sm:top-2 left-1 sm:left-2">
-                              <DiscountBadge 
-                                discountPercentage={product.discount_percentage || 0}
-                                size="sm"
-                              />
-                            </div>
-                          )}
-                        </div>
-                        <CardContent className="p-2 sm:p-3 lg:p-4">
-                          <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
-                          <div className="flex items-center space-x-1 mb-1 sm:mb-2">
-                            {renderStars(4)}
-                            <span className="text-xs text-gray-500">(0)</span>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <PriceDisplay
-                              originalPrice={product.price}
-                              discountedPrice={product.discounted_price}
-                              hasDiscount={(product.discount_percentage || 0) > 0}
-                              size="sm"
-                            />
-                            <Button 
-                              size="sm" 
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleAddToCart(product);
-                              }}
-                              className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
-                            >
-                              Add
-                            </Button>
-                          </div>
-                        </CardContent>
-                      </Card>
+                      <MemoizedProductCard
+                        key={product.id}
+                        product={product}
+                        onAddToCart={handleAddToCart}
+                        navigate={navigate}
+                      />
                     ))}
                   </div>
 
@@ -334,6 +381,7 @@ const PublicHome = () => {
       {/* Footer */}
       <PublicFooter />
     </div>
+    </>
   );
 };
 

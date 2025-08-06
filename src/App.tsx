@@ -1,4 +1,4 @@
-import React from "react";
+import React, { Suspense } from "react";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -8,49 +8,76 @@ import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import EnhancedErrorBoundary from "./components/ui/enhanced-error-boundary";
-import Orders from "./pages/Orders";
-import Products from "./pages/Products";
-import Customers from "./pages/Customers";
-import Reports from "./pages/Reports";
-import { PaymentSettings } from "./pages/PaymentSettings";
+import { withLazyLoading, preloadRoute } from "./utils/lazyLoad";
+import { FullPageLoader } from "./components/ui/page-loader";
+import { PerformanceMonitor } from "./utils/performance";
+
+// Immediate load critical components
 import NotFound from "./pages/NotFound";
-import Index from "./pages/Index";
 import PublicHome from "./pages/PublicHome";
-import ProductDetail from "./pages/ProductDetail";
-import CategoryProducts from "./pages/CategoryProducts";
-import Promotions from "./pages/Promotions";
-import BookingManagement from "./pages/BookingManagement";
-import DeliveryPickup from "./pages/DeliveryPickup";
-import AuditLogs from "./pages/AuditLogs";
-import Settings from "./pages/Settings";
-import Categories from "./pages/Categories";
-import CustomerPortal from "./pages/CustomerPortal";
 
+// Lazy load admin components
+const Orders = withLazyLoading(() => import("./pages/Orders"));
+const Products = withLazyLoading(() => import("./pages/Products"));
+const Customers = withLazyLoading(() => import("./pages/Customers"));
+const Reports = withLazyLoading(() => import("./pages/Reports"));
+const PaymentSettings = withLazyLoading(() => import("./pages/PaymentSettings").then(m => ({ default: m.PaymentSettings })));
+const Index = withLazyLoading(() => import("./pages/Index"));
+const ProductDetail = withLazyLoading(() => import("./pages/ProductDetail"));
+const CategoryProducts = withLazyLoading(() => import("./pages/CategoryProducts"));
+const Promotions = withLazyLoading(() => import("./pages/Promotions"));
+const BookingManagement = withLazyLoading(() => import("./pages/BookingManagement"));
+const DeliveryPickup = withLazyLoading(() => import("./pages/DeliveryPickup"));
+const AuditLogs = withLazyLoading(() => import("./pages/AuditLogs"));
+const Settings = withLazyLoading(() => import("./pages/Settings"));
+const Categories = withLazyLoading(() => import("./pages/Categories"));
 
-import CustomerFavorites from "./pages/CustomerFavorites";
-import PurchaseHistory from "./pages/PurchaseHistory";
-import PaymentCallback from "./pages/PaymentCallback";
-import Unsubscribe from "./pages/Unsubscribe";
-import AdminSetup from "./pages/AdminSetup";
-import CustomerRegister from "./pages/CustomerRegister";
-import CustomerProfile from "./pages/CustomerProfile";
-import AuthPage from "./pages/AuthPage";
-import AdminAuth from "./pages/admin/AdminAuth";
-import AuthRouter from "./components/auth/AuthRouter";
-import Cart from "./pages/Cart";
-import Booking from "./pages/Booking";
-import PublicProducts from "./pages/PublicProducts";
-import Contact from "./pages/Contact";
-import About from "./pages/About";
-import PaystackTest from "./pages/PaystackTest";
+// Lazy load customer components
+const CustomerFavorites = withLazyLoading(() => import("./pages/CustomerFavorites"));
+const PurchaseHistory = withLazyLoading(() => import("./pages/PurchaseHistory"));
+const PaymentCallback = withLazyLoading(() => import("./pages/PaymentCallback"));
+const Unsubscribe = withLazyLoading(() => import("./pages/Unsubscribe"));
+const AdminSetup = withLazyLoading(() => import("./pages/AdminSetup"));
+const CustomerRegister = withLazyLoading(() => import("./pages/CustomerRegister"));
+const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfile"));
+const AuthPage = withLazyLoading(() => import("./pages/AuthPage"));
+const AdminAuth = withLazyLoading(() => import("./pages/admin/AdminAuth"));
+const Cart = withLazyLoading(() => import("./pages/Cart"));
+const Booking = withLazyLoading(() => import("./pages/Booking"));
+const PublicProducts = withLazyLoading(() => import("./pages/PublicProducts"));
+const Contact = withLazyLoading(() => import("./pages/Contact"));
+const About = withLazyLoading(() => import("./pages/About"));
+const PaystackTest = withLazyLoading(() => import("./pages/PaystackTest"));
+const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"));
+const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"));
+const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"));
 
-import AuthCallback from "./pages/AuthCallback";
-import EmailVerificationPage from "./pages/EmailVerificationPage";
-import PasswordResetPage from "./pages/PasswordResetPage";
+// Optimized QueryClient with better defaults
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (renamed from cacheTime)
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
-const queryClient = new QueryClient();
+// Preload critical routes
+if (typeof window !== 'undefined') {
+  preloadRoute(() => import("./pages/PublicProducts"));
+  preloadRoute(() => import("./pages/Cart"));
+}
 
-const App = () => (
+const App = () => {
+  PerformanceMonitor.startTiming('App Render');
+  
+  React.useEffect(() => {
+    PerformanceMonitor.endTiming('App Render');
+  }, []);
+
+  return (
   <EnhancedErrorBoundary context="Main Application" showErrorDetails={true}>
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -129,6 +156,7 @@ const App = () => (
       </TooltipProvider>
     </QueryClientProvider>
   </EnhancedErrorBoundary>
-);
+  );
+};
 
 export default App;

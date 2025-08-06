@@ -1,0 +1,61 @@
+// Web Vitals monitoring for production
+export interface WebVitalsMetric {
+  name: 'FCP' | 'LCP' | 'FID' | 'CLS' | 'TTFB' | 'INP';
+  value: number;
+  id: string;
+  delta: number;
+}
+
+export class WebVitals {
+  private static metrics: Map<string, number> = new Map();
+
+  static reportWebVitals(metric: WebVitalsMetric) {
+    // Store metric
+    this.metrics.set(metric.name, metric.value);
+
+    // Log in development
+    if (import.meta.env.DEV) {
+      console.log(`📊 ${metric.name}: ${metric.value}ms`);
+    }
+
+    // Send to analytics in production
+    if (import.meta.env.PROD) {
+      this.sendToAnalytics(metric);
+    }
+  }
+
+  private static sendToAnalytics(metric: WebVitalsMetric) {
+    // Send to your analytics service
+    // Example: Google Analytics 4
+    if (typeof window !== 'undefined' && 'gtag' in window) {
+      const gtag = (window as any).gtag;
+      gtag('event', metric.name, {
+        value: Math.round(metric.name === 'CLS' ? metric.value * 1000 : metric.value),
+        event_category: 'Web Vitals',
+        event_label: metric.id,
+        non_interaction: true,
+      });
+    }
+  }
+
+  static getMetrics() {
+    return Object.fromEntries(this.metrics);
+  }
+}
+
+// Initialize web vitals if available
+export async function initWebVitals() {
+  if (import.meta.env.PROD) {
+    try {
+      const webVitalsModule = await import('web-vitals');
+      
+      if (webVitalsModule.onCLS) webVitalsModule.onCLS(WebVitals.reportWebVitals);
+      if (webVitalsModule.onINP) webVitalsModule.onINP(WebVitals.reportWebVitals); // INP replaces FID
+      if (webVitalsModule.onFCP) webVitalsModule.onFCP(WebVitals.reportWebVitals);
+      if (webVitalsModule.onLCP) webVitalsModule.onLCP(WebVitals.reportWebVitals);
+      if (webVitalsModule.onTTFB) webVitalsModule.onTTFB(WebVitals.reportWebVitals);
+    } catch (error) {
+      console.warn('Web Vitals not available:', error);
+    }
+  }
+}

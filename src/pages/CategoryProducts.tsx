@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { ChevronRight, Search } from 'lucide-react';
+import { ChevronRight, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -15,8 +15,10 @@ import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
 import { StarRating } from '@/components/ui/star-rating';
 import { useProductRatingSummary } from '@/hooks/useProductReviews';
+import { CustomizationProvider, useCustomizationContext } from '@/context/CustomizationContext';
+import { CustomizationOrderBuilder } from '@/components/customization/CustomizationOrderBuilder';
 
-const CategoryProducts = () => {
+const CategoryProductsContent = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
   const navigate = useNavigate();
   const { addItem } = useCart();
@@ -24,6 +26,7 @@ const CategoryProducts = () => {
   
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [showCustomizationBuilder, setShowCustomizationBuilder] = useState(false);
   const itemsPerPage = 12;
 
   // Fetch products for this category
@@ -40,6 +43,7 @@ const CategoryProducts = () => {
   });
 
   const currentCategory = categories.find(cat => cat.id === categoryId);
+  const isCustomizationCategory = currentCategory?.name?.toLowerCase().includes('customization') || false;
 
   // Filter products based on search
   const filteredProducts = products.filter(product => 
@@ -53,20 +57,28 @@ const CategoryProducts = () => {
   const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
 
   const handleAddToCart = (product: any) => {
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.discounted_price || product.price,
-      original_price: product.price,
-      discount_amount: product.discount_amount,
-      vat_rate: product.vat_rate || 7.5,
-      image_url: product.image_url,
-    });
-    
-    toast({
-      title: "Added to cart",
-      description: `${product.name} has been added to your cart.`,
-    });
+    if (isCustomizationCategory) {
+      // For customization category, use the context to add to builder
+      const customizationContext = useCustomizationContext();
+      customizationContext.addItem(product);
+      setShowCustomizationBuilder(true);
+    } else {
+      // For regular categories, add directly to cart
+      addItem({
+        id: product.id,
+        name: product.name,
+        price: product.discounted_price || product.price,
+        original_price: product.price,
+        discount_amount: product.discount_amount,
+        vat_rate: product.vat_rate || 7.5,
+        image_url: product.image_url,
+      });
+      
+      toast({
+        title: "Added to cart",
+        description: `${product.name} has been added to your cart.`,
+      });
+    }
   };
 
   const ProductRatingDisplay = ({ productId }: { productId: string }) => {
@@ -99,12 +111,15 @@ const CategoryProducts = () => {
           <nav className="flex items-center space-x-2 text-sm text-muted-foreground">
             <Link to="/" className="hover:text-primary">Home</Link>
             <ChevronRight className="h-4 w-4" />
-            <span className="text-foreground">{currentCategory?.name || 'Category'}</span>
+            <span className="text-foreground flex items-center">
+              {isCustomizationCategory && <Settings className="h-4 w-4 mr-1" />}
+              {currentCategory?.name || 'Category'}
+            </span>
           </nav>
         </div>
       </div>
 
-      <div className="container mx-auto px-4 py-6 sm:py-8">
+      <div className={`container mx-auto px-4 py-6 sm:py-8 ${isCustomizationCategory ? 'lg:pr-96' : ''}`}>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
           {/* Left Sidebar - Categories - Hidden on mobile */}
           <div className="hidden lg:block lg:col-span-1">
@@ -168,7 +183,21 @@ const CategoryProducts = () => {
           <div className="col-span-full lg:col-span-3">
             {/* Header */}
             <div className="mb-6 sm:mb-8">
-              <h1 className="text-2xl sm:text-3xl font-bold mb-4">{currentCategory?.name || 'Products'}</h1>
+              <div className="flex items-center justify-between mb-4">
+                <h1 className="text-2xl sm:text-3xl font-bold flex items-center">
+                  {isCustomizationCategory && <Settings className="h-6 w-6 mr-2 text-primary" />}
+                  {currentCategory?.name || 'Products'}
+                </h1>
+                {isCustomizationCategory && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowCustomizationBuilder(true)}
+                    className="lg:hidden"
+                  >
+                    View Order ({useCustomizationContext().items.length})
+                  </Button>
+                )}
+              </div>
               {currentCategory?.description && (
                 <p className="text-muted-foreground mb-4 sm:mb-6">{currentCategory.description}</p>
               )}
@@ -189,11 +218,15 @@ const CategoryProducts = () => {
 
             {/* Products Grid */}
             {isLoadingProducts ? (
-              <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+              <div className={`grid gap-3 sm:gap-4 lg:gap-6 ${
+                isCustomizationCategory 
+                  ? 'grid-cols-2 sm:grid-cols-2' 
+                  : 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3'
+              }`}>
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Card key={i} className="animate-pulse">
                     <CardContent className="p-0">
-                      <div className="aspect-square bg-muted rounded-t-lg"></div>
+                      <div className={`${isCustomizationCategory ? 'aspect-[4/3]' : 'aspect-square'} bg-muted rounded-t-lg`}></div>
                       <div className="p-3 sm:p-4 space-y-2">
                         <div className="h-4 bg-muted rounded"></div>
                         <div className="h-3 bg-muted rounded w-2/3"></div>
@@ -215,14 +248,18 @@ const CategoryProducts = () => {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-8">
+                <div className={`grid gap-3 sm:gap-4 lg:gap-6 mb-8 ${
+                  isCustomizationCategory 
+                    ? 'grid-cols-2 sm:grid-cols-2' 
+                    : 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3'
+                }`}>
                   {currentProducts.map((product) => (
                     <Card 
                       key={product.id} 
                       className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                       onClick={() => navigate(`/product/${product.id}`)}
                     >
-                      <div className="aspect-square overflow-hidden relative">
+                      <div className={`${isCustomizationCategory ? 'aspect-[4/3]' : 'aspect-square'} overflow-hidden relative`}>
                         <img
                           src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
                           alt={product.name}
@@ -257,6 +294,7 @@ const CategoryProducts = () => {
                               handleAddToCart(product);
                             }}
                             className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
+                            variant={isCustomizationCategory ? "outline" : "default"}
                           >
                             Add
                           </Button>
@@ -304,8 +342,22 @@ const CategoryProducts = () => {
         </div>
       </div>
 
+      {/* Customization Order Builder */}
+      <CustomizationOrderBuilder
+        isOpen={showCustomizationBuilder}
+        onClose={() => setShowCustomizationBuilder(false)}
+      />
+
       <PublicFooter />
     </div>
+  );
+};
+
+const CategoryProducts = () => {
+  return (
+    <CustomizationProvider>
+      <CategoryProductsContent />
+    </CustomizationProvider>
   );
 };
 

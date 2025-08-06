@@ -313,9 +313,51 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         throw new Error(error.message);
       }
 
-      // CRITICAL FIX: Check for actual success value
-      if (data?.success !== true) {
-        console.error('❌ Checkout failed - backend returned:', data);
+      // ✅ CRITICAL FIX: Correct success check
+      if (data?.success === true) {
+        console.log('✅ Checkout successful! Order created:', {
+          orderId: data.order_id,
+          orderNumber: data.order_number,
+          totalAmount: data.total_amount,
+          paymentReference: data.payment?.reference
+        });
+
+        // Process Paystack payment with popup
+        if (data.payment?.payment_url && data.payment?.reference) {
+          console.log('🛒 Initializing Paystack popup payment...');
+          
+          try {
+            await processPaystackPayment({
+              reference: data.payment.reference,
+              amount: data.total_amount,
+              email: formData.customer_email,
+              orderNumber: data.order_number,
+              paymentUrl: data.payment.payment_url
+            });
+            
+            // Success is handled in the payment callback
+            return;
+          } catch (paymentError) {
+            console.error('🚨 Paystack payment error:', paymentError);
+            toast({
+              title: "Payment Error",
+              description: "Failed to initialize payment. Please try again.",
+              variant: "destructive",
+            });
+            return;
+          }
+        } else {
+          console.error('❌ Missing payment data in response:', data);
+          toast({
+            title: "Payment Error",
+            description: "Payment initialization data missing. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      } else {
+        // Handle actual failures
+        console.error('❌ Checkout failed - backend response:', data);
         const errorMessage = data?.message || data?.error || "Failed to process checkout";
         toast({
           title: "Checkout Failed",
@@ -325,48 +367,8 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         return;
       }
 
-      console.log('✅ Checkout successful, processing payment...');
-
-      // Process Paystack payment with popup
-      if (data.payment?.payment_url && data.payment?.reference) {
-        console.log('🛒 Initializing Paystack popup payment...');
-        
-        try {
-          await processPaystackPayment({
-            reference: data.payment.reference,
-            amount: data.total_amount,
-            email: formData.customer_email,
-            orderNumber: data.order_number,
-            paymentUrl: data.payment.payment_url
-          });
-          
-          // Success is handled in the payment callback
-          return;
-        } catch (paymentError) {
-          console.error('🚨 Paystack payment error:', paymentError);
-          toast({
-            title: "Payment Error",
-            description: "Failed to initialize payment. Please try again.",
-            variant: "destructive",
-          });
-          return;
-        }
-      }
-      clearCart();
-      toast({
-        title: "Order Placed Successfully!",
-        description: `Order ID: ${data.order_number} has been created. ${data.payment?.message || 'You will receive a confirmation email shortly.'}`,
-      });
-
-      // Navigate based on authentication status
-      if (isAuthenticated) {
-        navigate("/customer-portal?tab=orders");
-      } else {
-        navigate("/");
-      }
-
     } catch (error) {
-      console.error('Checkout error:', error);
+      console.error('💥 Checkout error:', error);
       toast({
         title: "Checkout Error",
         description: error instanceof Error ? error.message : "Failed to process checkout. Please try again.",

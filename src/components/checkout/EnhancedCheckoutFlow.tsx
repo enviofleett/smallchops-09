@@ -299,13 +299,14 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         body: sanitizedData
       });
 
-      console.log('💳 Full checkout response:', data);
-      console.log('🔍 Response validation:', { 
-        success: data?.success, 
-        hasPaymentUrl: !!data?.payment?.payment_url,
-        hasReference: !!data?.payment?.reference,
-        totalAmount: data?.total_amount,
-        errorPresent: !!error
+      // 🔍 CRITICAL DEBUG: Check exact response format
+      console.log('🔍 Success value type check:', {
+        success: data?.success,
+        successType: typeof data?.success,
+        isStrictTrue: data?.success === true,
+        isStringTrue: data?.success === 'true',
+        isTruthyTrue: !!data?.success,
+        rawResponse: data
       });
 
       if (error) {
@@ -313,13 +314,17 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         throw new Error(error.message);
       }
 
-      // ✅ CRITICAL FIX: Correct success check
-      if (data?.success === true) {
+      // ✅ CRITICAL FIX: Handle both boolean true and string "true"
+      const isSuccess = data && (data.success === true || data.success === 'true' || String(data.success).toLowerCase() === 'true');
+      
+      if (isSuccess) {
         console.log('✅ Checkout successful! Order created:', {
           orderId: data.order_id,
           orderNumber: data.order_number,
           totalAmount: data.total_amount,
-          paymentReference: data.payment?.reference
+          paymentReference: data.payment?.reference,
+          successValue: data.success,
+          successType: typeof data.success
         });
 
         // Process Paystack payment with popup
@@ -356,8 +361,15 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
           return;
         }
       } else {
-        // Handle actual failures
-        console.error('❌ Checkout failed - backend response:', data);
+        // Handle actual failures - only trigger if success is explicitly false
+        console.error('❌ Checkout failed - backend response:', {
+          success: data?.success,
+          successType: typeof data?.success,
+          message: data?.message,
+          error: data?.error,
+          fullResponse: data
+        });
+        
         const errorMessage = data?.message || data?.error || "Failed to process checkout";
         toast({
           title: "Checkout Failed",

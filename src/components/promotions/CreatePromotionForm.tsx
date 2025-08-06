@@ -161,11 +161,12 @@ export default function CreatePromotionForm({
 
       <Form {...form}>
         <form
-          className="space-y-6"
+          className="space-y-4 md:space-y-6"
           onSubmit={form.handleSubmit(handleSubmit)}
           autoComplete="off"
+          noValidate
         >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
           {/* Name */}
           <FormField
             control={form.control}
@@ -234,7 +235,7 @@ export default function CreatePromotionForm({
             control={form.control}
             name="description"
             render={({ field }) => (
-              <FormItem className="col-span-1 md:col-span-2">
+              <FormItem className="col-span-1 sm:col-span-2">
                 <FormLabel>Description</FormLabel>
                 <FormControl>
                   <Textarea
@@ -251,7 +252,7 @@ export default function CreatePromotionForm({
         </div>
 
         {/* Value and Configuration Fields */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
           {/* Value field - different labels based on type */}
           {watchType !== "free_delivery" && (
             <FormField
@@ -420,7 +421,7 @@ export default function CreatePromotionForm({
         />
 
         {/* Dates */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
           {/* Start Date */}
           <FormField
             control={form.control}

@@ -46,7 +46,7 @@ export function DaysSelector({
 
   return (
     <Card className="border-primary/20">
-      <CardHeader className="pb-3">
+      <CardHeader className="pb-2 md:pb-3 p-3 md:p-6">
         <CardTitle className="flex items-center gap-2 text-base">
           <Calendar className="w-4 h-4" />
           Applicable Days
@@ -60,7 +60,7 @@ export function DaysSelector({
           Select specific days when this promotion is active. Leave empty for all days.
         </p>
       </CardHeader>
-      <CardContent className="space-y-4">
+      <CardContent className="space-y-3 md:space-y-4 p-3 md:p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Checkbox
@@ -81,14 +81,14 @@ export function DaysSelector({
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7 gap-2 md:gap-3">
           {DAYS_OF_WEEK.map((day) => {
             const isSelected = selectedDays.includes(day.value);
             return (
                 <div
                 key={day.value}
                 className={`
-                  flex items-center gap-2 p-3 rounded-lg border transition-colors
+                  flex items-center gap-2 p-2 md:p-3 rounded-lg border transition-colors
                   ${
                     isSelected
                       ? "bg-primary/5 border-primary/30"
@@ -105,17 +105,26 @@ export function DaysSelector({
                 }}
               >
                 <Checkbox
-                  id={day.value}
+                  id={`day-${day.value}`}
                   checked={isSelected}
-                  onCheckedChange={(checked) => handleDayToggle(day.value, !!checked)}
+                  onCheckedChange={(checked) => {
+                    if (!disabled) {
+                      handleDayToggle(day.value, !!checked);
+                    }
+                  }}
                   disabled={disabled}
+                  onClick={(e) => e.stopPropagation()}
                 />
                 <Label
-                  htmlFor={day.value}
+                  htmlFor={`day-${day.value}`}
                   className={`
-                    text-sm cursor-pointer select-none
+                    text-sm select-none pointer-events-none
                     ${disabled ? "cursor-not-allowed" : ""}
                   `}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                  }}
                 >
                   <span className="block font-medium">{day.short}</span>
                   <span className="block text-xs text-muted-foreground hidden sm:block">

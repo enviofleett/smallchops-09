@@ -15,7 +15,8 @@ export async function getProductsWithDiscounts(categoryId?: string): Promise<Pro
           name
         )
       `)
-      .eq("status", "active");
+      .eq("status", "active")
+      .gt("stock_quantity", 0);
     
     if (categoryId) {
       query = query.eq("category_id", categoryId);
@@ -55,6 +56,7 @@ export async function getProductWithDiscounts(productId: string): Promise<Produc
       `)
       .eq("id", productId)
       .eq("status", "active")
+      .gt("stock_quantity", 0)
       .single();
     
     if (productError) throw productError;

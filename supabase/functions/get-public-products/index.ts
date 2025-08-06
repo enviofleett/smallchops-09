@@ -51,7 +51,8 @@ serve(async (req: Request) => {
       categories ( id, name )
       `
     )
-    .eq("status", "active");
+    .eq("status", "active")
+    .gt("stock_quantity", 0);
 
   if (q) {
     query = query.or(

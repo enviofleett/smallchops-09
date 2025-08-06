@@ -258,8 +258,14 @@ export const ProductForm = ({
             <div>
               <Label>Product Image</Label>
               <ImageUpload
-                value={form.watch('image_url')}
-                onChange={setImageFile}
+                value={imageFile ? undefined : form.watch('image_url')}
+                onChange={(file) => {
+                  setImageFile(file);
+                  if (!file) {
+                    // When file is removed, clear the form URL too
+                    form.setValue('image_url', '');
+                  }
+                }}
                 className="mt-2"
               />
             </div>

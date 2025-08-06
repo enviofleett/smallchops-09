@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -100,7 +101,7 @@ if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
   };
 }
 
-const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = ({ 
+const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React.memo(({ 
   isOpen, 
   onClose 
 }) => {
@@ -123,6 +124,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = ({
     }
   }, []);
 
+  // Initialize formData state
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: session?.user?.email || '',
     customer_name: authCustomerAccount?.name || customerAccount?.name || '',
@@ -175,7 +177,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = ({
       // Cleanup if needed
     };
   }, [debugLog]);
-
 
   // Handle authentication choice with useCallback to prevent re-renders
   const handleContinueAsGuest = useCallback(async () => {
@@ -356,45 +357,91 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = ({
         body: sanitizedData
       });
 
-      // 🔍 CRITICAL DEBUG: Check exact response format
-      console.log('🔍 Success value type check:', {
-        success: data?.success,
-        successType: typeof data?.success,
-        isStrictTrue: data?.success === true,
-        isStringTrue: data?.success === 'true',
-        isTruthyTrue: !!data?.success,
-        rawResponse: data
+      // 🔍 COMPREHENSIVE DEBUG: Log the complete response structure
+      console.log('🔍 Complete Supabase Response Debug:', {
+        fullResponse: { data, error },
+        dataKeys: data ? Object.keys(data) : 'no data',
+        dataType: typeof data,
+        errorType: typeof error,
+        hasError: !!error,
+        dataStringified: JSON.stringify(data, null, 2),
+        errorStringified: JSON.stringify(error, null, 2)
       });
+
+      // Check for nested response structure
+      if (data && typeof data === 'object') {
+        console.log('🔍 Checking for nested response structures:', {
+          directSuccess: data.success,
+          nestedData: data.data?.success,
+          nestedResult: data.result?.success,
+          nestedResponse: data.response?.success,
+          allDataProperties: Object.keys(data).map(key => ({
+            key,
+            value: data[key],
+            type: typeof data[key]
+          }))
+        });
+      }
 
       if (error) {
         console.error('🔍 Supabase function error:', error);
         throw new Error(error.message);
       }
 
-      // ✅ CRITICAL FIX: Handle both boolean true and string "true"  
-      const isSuccess = data && (data.success === true || data.success === 'true' || String(data.success).toLowerCase() === 'true');
-      
+      // Try multiple ways to access the success value
+      let actualData = data;
+      let successValue;
+
+      // Check if data is wrapped in another structure
+      if (data && !data.success && data.data) {
+        console.log('🔍 Found nested data structure, using data.data');
+        actualData = data.data;
+        successValue = data.data.success;
+      } else if (data && !data.success && data.result) {
+        console.log('🔍 Found nested result structure, using data.result');
+        actualData = data.result;
+        successValue = data.result.success;
+      } else {
+        successValue = data?.success;
+      }
+
+      console.log('🔍 Final success value analysis:', {
+        originalDataSuccess: data?.success,
+        extractedSuccessValue: successValue,
+        actualDataUsed: actualData,
+        successType: typeof successValue
+      });
+
+      // ✅ ROBUST SUCCESS CHECK with multiple fallbacks
+      const isSuccess = actualData && (
+        successValue === true || 
+        successValue === 'true' || 
+        String(successValue).toLowerCase() === 'true' ||
+        (actualData.order_id && actualData.payment) // Fallback: if we have order_id and payment, it's likely success
+      );
+
       if (isSuccess) {
-        debugLog('✅ Checkout successful! Order created:', {
-          orderId: data.order_id,
-          orderNumber: data.order_number,
-          totalAmount: data.total_amount,
-          paymentReference: data.payment?.reference,
-          successValue: data.success,
-          successType: typeof data.success
+        console.log('✅ Checkout successful! Order created:', {
+          orderId: actualData.order_id,
+          orderNumber: actualData.order_number,
+          totalAmount: actualData.total_amount,
+          paymentReference: actualData.payment?.reference,
+          successValue: successValue,
+          successType: typeof successValue,
+          dataSource: actualData === data ? 'direct' : 'nested'
         });
 
         // Process Paystack payment with popup
-        if (data.payment?.payment_url && data.payment?.reference) {
-          debugLog('🛒 Initializing Paystack popup payment...');
+        if (actualData.payment?.payment_url && actualData.payment?.reference) {
+          console.log('🛒 Initializing Paystack popup payment...');
           
           try {
             await processPaystackPayment({
-              reference: data.payment.reference,
-              amount: data.total_amount,
+              reference: actualData.payment.reference,
+              amount: actualData.total_amount,
               email: formData.customer_email,
-              orderNumber: data.order_number,
-              paymentUrl: data.payment.payment_url
+              orderNumber: actualData.order_number,
+              paymentUrl: actualData.payment.payment_url
             });
             
             // Success is handled in the payment callback
@@ -409,7 +456,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = ({
             return;
           }
         } else {
-          console.error('❌ Missing payment data in response:', data);
+          console.error('❌ Missing payment data in response:', actualData);
           toast({
             title: "Payment Error",
             description: "Payment initialization data missing. Please try again.",
@@ -418,17 +465,20 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = ({
           return;
         }
       } else {
-        // Handle actual failures - only trigger if success is explicitly false
-        console.error('❌ Checkout failed - backend response:', {
-          success: data?.success,
-          successType: typeof data?.success,
-          message: data?.message,
-          error: data?.error,
-          fullResponse: data
+        // Handle actual failures
+        console.error('❌ Checkout failed - detailed analysis:', {
+          originalData: data,
+          actualData: actualData,
+          successValue: successValue,
+          successType: typeof successValue,
+          hasOrderId: !!actualData?.order_id,
+          hasPayment: !!actualData?.payment,
+          message: actualData?.message || data?.message,
+          error: actualData?.error || data?.error
         });
         console.trace('❌ Checkout failure trace'); // Add trace to debug source
         
-        const errorMessage = data?.message || data?.error || "Failed to process checkout";
+        const errorMessage = actualData?.message || data?.message || actualData?.error || data?.error || "Failed to process checkout";
         toast({
           title: "Checkout Failed",
           description: errorMessage,
@@ -897,7 +947,10 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = ({
       </Card>
     </div>
   );
-};
+});
+
+// Set display name for better debugging
+EnhancedCheckoutFlowComponent.displayName = 'EnhancedCheckoutFlowComponent';
 
 // Export both the component and error boundary wrapped version
 export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = (props) => (

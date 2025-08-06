@@ -172,14 +172,14 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         }
       }
 
-      // Process checkout through edge function
+      // Process checkout through edge function with proper null handling
       const checkoutData = {
         customer_email: formData.customer_email,
         customer_name: formData.customer_name,
-        customer_phone: formData.customer_phone,
+        customer_phone: formData.customer_phone || null,
         fulfillment_type: formData.fulfillment_type,
-        delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : undefined,
-        pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : undefined,
+        delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : null,
+        pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : null,
         order_items: items.map(item => ({
           product_id: item.product_id,
           quantity: item.quantity,
@@ -188,9 +188,9 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         })),
         total_amount: total,
         delivery_fee: formData.fulfillment_type === 'delivery' ? deliveryFee : 0,
-        delivery_zone_id: formData.fulfillment_type === 'delivery' ? formData.delivery_zone_id : undefined,
+        delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id ? formData.delivery_zone_id : null,
         payment_method: 'paystack',
-        guest_session_id: !isAuthenticated ? guestSession?.sessionId : undefined
+        guest_session_id: !isAuthenticated && guestSession?.sessionId ? guestSession.sessionId : null
       };
 
       console.log('Processing checkout:', checkoutData);

@@ -90,10 +90,10 @@ serve(async (req) => {
       discount_amount: item.discount_amount || 0
     }));
 
-    // ✅ FIX: Clean guest_session_id format (remove 'guest_' prefix)
+    // Clean up guest_session_id - ensure it's a valid UUID string or null
     let cleanGuestSessionId = null;
-    if (checkoutData.guest_session_id) {
-      if (typeof checkoutData.guest_session_id === 'string') {
+    if (checkoutData.guest_session_id && checkoutData.guest_session_id !== 'null') {
+      if (typeof checkoutData.guest_session_id === 'string' && checkoutData.guest_session_id.trim() !== '') {
         // Remove 'guest_' prefix if present
         const cleanId = checkoutData.guest_session_id.replace(/^guest_/, '');
         
@@ -102,7 +102,21 @@ serve(async (req) => {
         if (uuidRegex.test(cleanId)) {
           cleanGuestSessionId = cleanId;
         } else {
-          console.log('Invalid UUID format, setting to null:', cleanId);
+          console.log('Invalid guest_session_id UUID format, setting to null:', cleanId);
+        }
+      }
+    }
+
+    // Ensure delivery_zone_id is properly formatted as UUID or null
+    let cleanDeliveryZoneId = null;
+    if (checkoutData.delivery_zone_id && checkoutData.delivery_zone_id !== 'null') {
+      if (typeof checkoutData.delivery_zone_id === 'string' && checkoutData.delivery_zone_id.trim() !== '') {
+        // Validate UUID format
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(checkoutData.delivery_zone_id)) {
+          cleanDeliveryZoneId = checkoutData.delivery_zone_id;
+        } else {
+          console.warn('Invalid delivery_zone_id format, setting to null:', checkoutData.delivery_zone_id);
         }
       }
     }
@@ -122,7 +136,7 @@ serve(async (req) => {
       p_delivery_address: checkoutData.delivery_address || null,
       p_guest_session_id: cleanGuestSessionId, // ✅ Use cleaned UUID
       p_payment_method: checkoutData.payment_method,
-      p_delivery_zone_id: checkoutData.delivery_zone_id || null,
+        p_delivery_zone_id: cleanDeliveryZoneId,
       p_delivery_fee: checkoutData.delivery_fee || 0,
       p_total_amount: checkoutData.total_amount || 0
     });
@@ -138,7 +152,7 @@ serve(async (req) => {
         p_delivery_address: checkoutData.delivery_address || null,
         p_guest_session_id: cleanGuestSessionId, // ✅ Use cleaned UUID
         p_payment_method: checkoutData.payment_method,
-        p_delivery_zone_id: checkoutData.delivery_zone_id || null,
+        p_delivery_zone_id: cleanDeliveryZoneId,
         p_delivery_fee: checkoutData.delivery_fee || 0,
         p_total_amount: checkoutData.total_amount || 0
       });

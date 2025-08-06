@@ -11,8 +11,100 @@ interface ImageVariants {
   full: Blob;
 }
 
+interface FileValidationResult {
+  isValid: boolean;
+  error?: string;
+  suggestedAction?: string;
+}
+
 /**
- * Resizes an image to the specified dimensions while maintaining quality
+ * Supported image MIME types
+ */
+const SUPPORTED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/jpg', 
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/svg+xml'
+]);
+
+/**
+ * Maximum file size (10MB)
+ */
+const MAX_FILE_SIZE = 10 * 1024 * 1024;
+
+/**
+ * Validates image file format and properties
+ */
+export const validateImageFile = (file: File): FileValidationResult => {
+  console.log('validateImageFile: Starting validation', { 
+    name: file.name, 
+    type: file.type, 
+    size: file.size 
+  });
+
+  // Check if file exists
+  if (!file || !(file instanceof File)) {
+    return {
+      isValid: false,
+      error: 'No file provided',
+      suggestedAction: 'Please select a valid image file'
+    };
+  }
+
+  // Check file size
+  if (file.size === 0) {
+    return {
+      isValid: false,
+      error: 'File is empty',
+      suggestedAction: 'Please select a different image file'
+    };
+  }
+
+  if (file.size > MAX_FILE_SIZE) {
+    const sizeMB = (file.size / (1024 * 1024)).toFixed(1);
+    return {
+      isValid: false,
+      error: `File size (${sizeMB}MB) exceeds the 10MB limit`,
+      suggestedAction: 'Please compress your image or choose a smaller file'
+    };
+  }
+
+  // Check MIME type
+  if (!SUPPORTED_MIME_TYPES.has(file.type)) {
+    return {
+      isValid: false,
+      error: `Unsupported file format: ${file.type}`,
+      suggestedAction: 'Please use PNG, JPG, WebP, GIF, or SVG format'
+    };
+  }
+
+  // Check file extension matches MIME type
+  const fileName = file.name.toLowerCase();
+  const expectedExtensions = {
+    'image/jpeg': ['.jpg', '.jpeg'],
+    'image/png': ['.png'],
+    'image/webp': ['.webp'],
+    'image/gif': ['.gif'],
+    'image/svg+xml': ['.svg']
+  };
+
+  const validExtensions = expectedExtensions[file.type as keyof typeof expectedExtensions];
+  if (validExtensions && !validExtensions.some(ext => fileName.endsWith(ext))) {
+    return {
+      isValid: false,
+      error: 'File extension does not match file type',
+      suggestedAction: 'Please ensure your file has the correct extension'
+    };
+  }
+
+  console.log('validateImageFile: Validation passed');
+  return { isValid: true };
+};
+
+/**
+ * Resizes an image to the specified dimensions with enhanced error handling
  */
 export const resizeImage = async (
   file: File,
@@ -20,22 +112,22 @@ export const resizeImage = async (
 ): Promise<Blob> => {
   const { targetWidth, targetHeight, quality = 0.85, format = 'jpeg' } = options;
 
+  // Validate file first
+  const validation = validateImageFile(file);
+  if (!validation.isValid) {
+    throw new Error(validation.error + (validation.suggestedAction ? ` - ${validation.suggestedAction}` : ''));
+  }
+
+  // Validate resize options
+  if (targetWidth <= 0 || targetHeight <= 0) {
+    throw new Error('Invalid target dimensions - width and height must be positive numbers');
+  }
+
+  if (quality < 0 || quality > 1) {
+    throw new Error('Quality must be between 0 and 1');
+  }
+
   return new Promise((resolve, reject) => {
-    // Validate inputs
-    if (!file || !(file instanceof File)) {
-      reject(new Error('Invalid file provided'));
-      return;
-    }
-
-    if (targetWidth <= 0 || targetHeight <= 0) {
-      reject(new Error('Invalid target dimensions'));
-      return;
-    }
-
-    if (quality < 0 || quality > 1) {
-      reject(new Error('Quality must be between 0 and 1'));
-      return;
-    }
 
     const img = new Image();
     let objectUrl: string | null = null;
@@ -149,8 +241,31 @@ export const resizeImage = async (
 
     img.onerror = (event) => {
       cleanup();
-      console.error("resizeImage: Failed to load image for processing:", event);
-      reject(new Error('Failed to load image - file may be corrupted or invalid format'));
+      console.error("resizeImage: Failed to load image for processing:", event, {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size
+      });
+      
+      let errorMessage = 'Failed to load image';
+      let suggestion = '';
+      
+      // Provide specific guidance based on file type
+      if (file.type === 'image/svg+xml') {
+        errorMessage = 'SVG processing failed';
+        suggestion = 'SVG files may have compatibility issues. Try converting to PNG or JPG.';
+      } else if (file.size > 5 * 1024 * 1024) {
+        errorMessage = 'Large image failed to load';
+        suggestion = 'Try compressing the image or using a smaller file.';
+      } else if (!SUPPORTED_MIME_TYPES.has(file.type)) {
+        errorMessage = `Unsupported format: ${file.type}`;
+        suggestion = 'Please use PNG, JPG, WebP, GIF, or SVG format.';
+      } else {
+        errorMessage = 'Image file appears to be corrupted or invalid';
+        suggestion = 'Try opening the file in an image editor and re-saving it.';
+      }
+      
+      reject(new Error(`${errorMessage} - ${suggestion}`));
     };
     
     try {
@@ -166,30 +281,125 @@ export const resizeImage = async (
 };
 
 /**
- * Creates multiple image variants for a product image
+ * Creates multiple image variants with fallback processing
  */
 export const createImageVariants = async (file: File): Promise<ImageVariants> => {
-  // Validate file type
-  if (!file.type.startsWith('image/')) {
-    throw new Error('File must be an image');
-  }
+  console.log('createImageVariants: Starting variant creation', {
+    fileName: file.name,
+    fileType: file.type,
+    fileSize: file.size
+  });
 
-  // Validate file size (10MB max)
-  if (file.size > 10 * 1024 * 1024) {
-    throw new Error('File size must be less than 10MB');
+  // Validate file first
+  const validation = validateImageFile(file);
+  if (!validation.isValid) {
+    throw new Error(validation.error + (validation.suggestedAction ? ` - ${validation.suggestedAction}` : ''));
   }
 
   try {
+    // Process variants with enhanced error handling
     const [thumbnail, medium, full] = await Promise.all([
       resizeImage(file, { targetWidth: 200, targetHeight: 200, quality: 0.8 }),
       resizeImage(file, { targetWidth: 500, targetHeight: 500, quality: 0.85 }),
       resizeImage(file, { targetWidth: 1000, targetHeight: 1000, quality: 0.9 })
     ]);
 
+    console.log('createImageVariants: Successfully created all variants');
     return { thumbnail, medium, full };
   } catch (error) {
-    throw new Error(`Failed to process image: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    console.error('createImageVariants: Failed to create variants', error);
+    
+    // If processing fails, try fallback with lower quality/simpler processing
+    try {
+      console.log('createImageVariants: Attempting fallback processing');
+      const fallbackBlob = await createFallbackImage(file);
+      
+      // Use the same blob for all variants as fallback
+      return {
+        thumbnail: fallbackBlob,
+        medium: fallbackBlob,
+        full: fallbackBlob
+      };
+    } catch (fallbackError) {
+      console.error('createImageVariants: Fallback processing also failed', fallbackError);
+      throw new Error(`Image processing failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
   }
+};
+
+/**
+ * Fallback image processing for when standard processing fails
+ */
+export const createFallbackImage = async (file: File): Promise<Blob> => {
+  console.log('createFallbackImage: Attempting simple conversion');
+  
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    let objectUrl: string | null = null;
+    
+    const cleanup = () => {
+      if (objectUrl) {
+        URL.revokeObjectURL(objectUrl);
+        objectUrl = null;
+      }
+    };
+
+    img.onload = () => {
+      try {
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d');
+        
+        if (!ctx) {
+          throw new Error('Canvas not supported');
+        }
+
+        // Simple resize to 1000px max dimension
+        const maxDimension = 1000;
+        let { width, height } = img;
+        
+        if (width > maxDimension || height > maxDimension) {
+          const ratio = Math.min(maxDimension / width, maxDimension / height);
+          width *= ratio;
+          height *= ratio;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        
+        ctx.drawImage(img, 0, 0, width, height);
+        
+        canvas.toBlob(
+          (blob) => {
+            cleanup();
+            if (blob) {
+              console.log('createFallbackImage: Fallback processing successful');
+              resolve(blob);
+            } else {
+              reject(new Error('Fallback conversion failed'));
+            }
+          },
+          'image/jpeg',
+          0.8
+        );
+      } catch (error) {
+        cleanup();
+        reject(error);
+      }
+    };
+
+    img.onerror = () => {
+      cleanup();
+      reject(new Error('Cannot process this image file - it may be corrupted'));
+    };
+    
+    try {
+      objectUrl = URL.createObjectURL(file);
+      img.src = objectUrl;
+    } catch (error) {
+      cleanup();
+      reject(new Error('Failed to read image file'));
+    }
+  });
 };
 
 /**

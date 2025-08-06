@@ -3,7 +3,7 @@ import React, { useCallback, useState, useEffect, useRef } from 'react';
 import { Upload, X, ImageIcon, Loader2, AlertCircle, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { resizeImage } from '@/lib/imageProcessing';
+import { resizeImage, validateImageFile } from '@/lib/imageProcessing';
 
 interface ImageUploadProps {
   value?: string;
@@ -50,41 +50,30 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
   }, [value, cleanupPreviewUrl]);
 
   const validateFile = useCallback((file: File): string | null => {
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      return 'Please select an image file (JPEG, PNG, WebP, etc.)';
+    const validation = validateImageFile(file);
+    if (!validation.isValid) {
+      return validation.error + (validation.suggestedAction ? ` - ${validation.suggestedAction}` : '');
     }
-    
-    // Check specific supported formats
-    const supportedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/gif'];
-    if (!supportedTypes.includes(file.type.toLowerCase())) {
-      return 'Unsupported image format. Please use JPEG, PNG, WebP, or GIF.';
-    }
-    
-    // Validate file size (10MB max)
-    if (file.size > 10 * 1024 * 1024) {
-      return 'Image size must be less than 10MB';
-    }
-
-    // Validate file size minimum (1KB)
-    if (file.size < 1024) {
-      return 'Image file appears to be corrupted or too small';
-    }
-
     return null;
   }, []);
 
   const processImageWithRetry = useCallback(async (file: File, attempt: number = 1): Promise<File> => {
-    const maxRetries = 3;
+    const maxAttempts = 3;
     
     try {
-      console.log(`ImageUpload: Processing attempt ${attempt}/${maxRetries}`, { 
-        name: file.name, 
-        size: file.size, 
-        type: file.type 
+      console.log(`Processing image attempt ${attempt}/${maxAttempts}`, {
+        fileName: file.name,
+        fileType: file.type,
+        fileSize: file.size
       });
-
-      // Resize image to 1000x1000px
+      
+      // Validate file before processing
+      const validation = validateImageFile(file);
+      if (!validation.isValid) {
+        throw new Error(validation.error + (validation.suggestedAction ? ` - ${validation.suggestedAction}` : ''));
+      }
+      
+      // Resize image to max 1000x1000 for better performance
       const resizedBlob = await resizeImage(file, {
         targetWidth: 1000,
         targetHeight: 1000,
@@ -92,30 +81,38 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
         format: 'jpeg'
       });
 
-      // Create a new File from the resized blob
-      const resizedFile = new File([resizedBlob], file.name.replace(/\.[^/.]+$/, '.jpg'), {
-        type: 'image/jpeg',
-        lastModified: Date.now(),
-      });
+      // Convert blob back to file
+      const processedFile = new File(
+        [resizedBlob], 
+        `processed_${file.name.replace(/\.[^/.]+$/, '')}.jpg`,
+        { type: 'image/jpeg' }
+      );
 
-      console.log('ImageUpload: Image processing completed', { 
+      console.log('Image processing successful:', {
         originalSize: file.size,
-        resizedSize: resizedFile.size,
-        compressionRatio: (file.size / resizedFile.size).toFixed(2)
+        processedSize: processedFile.size,
+        reduction: `${(((file.size - processedFile.size) / file.size) * 100).toFixed(1)}%`
       });
 
-      return resizedFile;
+      return processedFile;
     } catch (error) {
-      console.error(`ImageUpload: Processing attempt ${attempt} failed:`, error);
+      console.error(`Image processing attempt ${attempt} failed:`, error);
       
-      if (attempt < maxRetries) {
-        // Wait before retry (exponential backoff)
-        const delay = Math.pow(2, attempt - 1) * 1000;
-        await new Promise(resolve => setTimeout(resolve, delay));
+      // For specific errors, don't retry
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      if (errorMessage.includes('Unsupported file format') || 
+          errorMessage.includes('File size') || 
+          errorMessage.includes('File is empty')) {
+        throw error; // Don't retry validation errors
+      }
+      
+      if (attempt < maxAttempts) {
+        console.log(`Retrying image processing... (${attempt + 1}/${maxAttempts})`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt)); // Exponential backoff
         return processImageWithRetry(file, attempt + 1);
       }
       
-      throw error;
+      throw new Error(`Failed to process image after ${maxAttempts} attempts: ${errorMessage}`);
     }
   }, []);
 

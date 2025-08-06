@@ -84,23 +84,23 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
 
   return (
     <>
-      {/* Desktop sidebar - integrated with page layout */}
-      <div className="hidden lg:block lg:fixed lg:right-0 lg:top-0 lg:h-screen lg:w-80 xl:w-96 lg:bg-white lg:border-l lg:shadow-lg lg:z-40">
-        <div className="h-full flex flex-col">
-          <div className="flex items-center justify-between p-4 border-b bg-muted/10">
-            <h2 className="text-lg font-semibold">Custom Order</h2>
+      {/* Desktop floating sidebar - smart height */}
+      <div className="hidden lg:block lg:fixed lg:right-4 lg:top-20 lg:bottom-4 lg:w-80 xl:w-96 lg:bg-white lg:border lg:shadow-xl lg:z-40 lg:rounded-lg lg:overflow-hidden">
+        <div className="h-full flex flex-col max-h-[calc(100vh-6rem)]">
+          <div className="flex items-center justify-between p-4 border-b bg-gradient-to-r from-primary/5 to-primary/10 rounded-t-lg">
+            <h2 className="text-lg font-semibold text-primary">Custom Order</h2>
             <Button
               variant="ghost"
               size="sm"
               onClick={onClose}
-              className="h-8 w-8 p-0 hover:bg-muted"
+              className="h-8 w-8 p-0 hover:bg-primary/10"
             >
               <X className="h-4 w-4" />
             </Button>
           </div>
           
-          <div className="flex-1 flex flex-col min-h-0">
-            <div className="flex-1 overflow-y-auto p-4">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="flex-1 overflow-y-auto p-4 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
               {isEmpty ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <ShoppingCart className="mx-auto h-16 w-16 mb-4 opacity-40" />
@@ -179,9 +179,9 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
               )}
             </div>
 
-            {/* Desktop Footer - Sticky at bottom */}
+            {/* Desktop Footer - Sticky at bottom with enhanced styling */}
             {!isEmpty && (
-              <div className="border-t bg-muted/10 p-4 space-y-4">
+              <div className="border-t bg-gradient-to-r from-muted/10 to-muted/20 p-4 space-y-4 rounded-b-lg">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-muted-foreground">Items ({bundle.itemCount})</span>

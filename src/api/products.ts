@@ -83,38 +83,55 @@ export const deleteProductImage = async (imageUrl: string): Promise<void> => {
 };
 
 export const getProducts = async (): Promise<ProductWithCategory[]> => {
-  const { data, error } = await supabase
-    .from('products')
-    .select(`
+  try {
+    console.log('Fetching products from database...');
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
         *,
         categories (
-            id,
-            name
+          id,
+          name
         )
-    `)
-    .order('name');
-  if (error) throw new Error(error.message);
-  return data || [];
+      `)
+      .order('created_at', { ascending: false });
+      
+    if (error) {
+      console.error('Products fetch error:', error);
+      throw new Error(`Failed to fetch products: ${error.message}`);
+    }
+    
+    console.log('Products fetched successfully:', data?.length || 0);
+    return data || [];
+  } catch (error) {
+    console.error('Error in getProducts:', error);
+    throw error;
+  }
 };
 
 export const getProduct = async (id: string): Promise<ProductWithCategory | null> => {
+  try {
     const { data, error } = await supabase
-        .from('products')
-        .select(`
-            *,
-            categories (
-                id,
-                name
-            )
-        `)
-        .eq('id', id)
-        .single();
-        
+      .from('products')
+      .select(`
+        *,
+        categories (
+          id,
+          name
+        )
+      `)
+      .eq('id', id)
+      .single();
+      
     if (error) {
       if (error.code === 'PGRST116') return null; // Not found
-      throw new Error(error.message);
+      throw new Error(`Failed to fetch product: ${error.message}`);
     }
     return data;
+  } catch (error) {
+    console.error('Error in getProduct:', error);
+    throw error;
+  }
 };
 
 // Check if SKU already exists

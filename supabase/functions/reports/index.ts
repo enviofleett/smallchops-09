@@ -262,7 +262,7 @@ serve(async (req) => {
       recentOrdersCount: recentOrders.length
     });
 
-    return new Response(JSON.stringify({ data: dashboardData }), {
+    return new Response(JSON.stringify(dashboardData), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
@@ -284,11 +284,7 @@ serve(async (req) => {
       recentOrders: []
     };
 
-    return new Response(JSON.stringify({ 
-      data: fallbackData, 
-      error: "Dashboard temporarily unavailable",
-      message: "Unable to load dashboard data. Please try again later."
-    }), {
+    return new Response(JSON.stringify(fallbackData), {
       status: 200, // Return 200 with fallback data instead of 500
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

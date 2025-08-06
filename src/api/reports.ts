@@ -29,8 +29,17 @@ export async function fetchReportsData(retryCount = 3) {
         dataKeys: data ? Object.keys(data) : []
       });
       
-      // Return the data directly from Supabase function
-      return data || {
+      // Extract nested data if wrapped in 'data' property (fix for edge function format)
+      const extractedData = data?.data || data;
+      
+      console.log('Processed data structure:', {
+        hasStats: !!extractedData?.stats,
+        statsKeys: extractedData?.stats ? Object.keys(extractedData.stats) : [],
+        dataType: typeof extractedData
+      });
+      
+      // Return the properly extracted data with fallback structure
+      return extractedData || {
         stats: { totalProducts: 0, totalOrders: 0, totalCustomers: 0, totalRevenue: 0 },
         revenueTrends: [],
         orderTrends: [],

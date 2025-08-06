@@ -7,6 +7,9 @@ export interface PaystackConfig {
   publicKey: string;
   isTestMode: boolean;
   isValid: boolean;
+  secretKey?: string;
+  webhookSecret?: string;
+  environment?: string;
 }
 
 export const usePaystackConfig = () => {
@@ -46,7 +49,10 @@ export const usePaystackConfig = () => {
       setConfig({
         publicKey: configData.public_key,
         isTestMode: configData.test_mode || false,
-        isValid: true
+        isValid: true,
+        secretKey: configData.secret_key,
+        webhookSecret: configData.webhook_secret,
+        environment: configData.test_mode ? 'test' : 'live'
       });
 
     } catch (err) {

@@ -498,7 +498,11 @@ serve(async (req) => {
       );
     }
 
+    // Map payment method to database enum value
+    const dbPaymentMethod = checkoutData.payment_method === 'paystack' ? 'pending' : checkoutData.payment_method;
+    
     console.log(`🚀 [${requestId}] Calling create_order_with_items function...`);
+    console.log(`💳 [${requestId}] Payment method mapping: ${checkoutData.payment_method} -> ${dbPaymentMethod}`);
 
     // Call the database function with retry logic for transient errors
     let orderId: string | null = null;
@@ -524,11 +528,32 @@ serve(async (req) => {
       orderError = error;
       const errorInfo = categorizeDbError(error);
       console.error(`❌ [${requestId}] Attempt ${attempt} failed:`, error.message);
+      
+      // Log detailed error information for debugging
+      console.error(`❌ [${requestId}] Error details:`, {
+        message: error.message,
+        code: error.code,
+        hint: error.hint,
+        details: error.details,
+        sqlState: error.sqlstate
+      });
 
       if (!errorInfo.shouldRetry || attempt === FALLBACK_CONFIG.RETRY_ATTEMPTS) {
         console.error(`❌ [${requestId}] Database error (${errorInfo.type}):`, errorInfo.userMessage);
+        
+        // Provide more specific error messages for common issues
+        let specificError = errorInfo.userMessage;
+        if (error.message?.includes('payment_method')) {
+          specificError = `Invalid payment method. Supported methods: bank_transfer, cash_on_delivery, paystack`;
+        } else if (error.message?.includes('postal_code')) {
+          specificError = `Missing required postal_code in delivery address`;
+        }
+        
         return new Response(
-          JSON.stringify({ error: errorInfo.userMessage }),
+          JSON.stringify({ 
+            error: specificError,
+            debug_info: error.message 
+          }),
           { status: errorInfo.type === DatabaseErrorType.FOREIGN_KEY_VIOLATION ? 400 : 500, headers: corsHeaders }
         );
       }

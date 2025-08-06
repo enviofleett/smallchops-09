@@ -6364,6 +6364,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_production_health_status: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_public_delivery_zones: {
         Args: Record<PropertyKey, never>
         Returns: {

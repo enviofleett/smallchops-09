@@ -38,6 +38,9 @@ const TAX_RATE = 0.08; // 8% tax rate
 const DELIVERY_FEE = 5.99;
 const FREE_DELIVERY_THRESHOLD = 30;
 
+// Optimize cart operations for production
+const isProduction = !window.location.hostname.includes('localhost');
+
 export interface Cart {
   items: CartItem[];
   summary: OrderSummary;

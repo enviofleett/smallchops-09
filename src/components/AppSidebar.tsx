@@ -32,7 +32,7 @@ const coreOperations = [
   {
     icon: LayoutDashboard,
     label: 'Dashboard',
-    path: '/'
+    path: '/dashboard'
   },
   {
     icon: ShoppingCart,
@@ -100,8 +100,8 @@ export function AppSidebar() {
   const collapsed = state === "collapsed";
 
   const isActive = (path: string) => {
-    if (path === '/') {
-      return location.pathname === '/';
+    if (path === '/dashboard') {
+      return location.pathname === '/dashboard' || location.pathname === '/admin';
     }
     return location.pathname.startsWith(path);
   };
@@ -121,7 +121,7 @@ export function AppSidebar() {
                 tooltip={collapsed ? item.label : undefined}
                 className="w-full justify-start"
               >
-                <NavLink to={item.path} end={item.path === '/'}>
+                <NavLink to={item.path} end={item.path === '/dashboard'}>
                   <item.icon className="w-4 h-4 shrink-0" />
                   {!collapsed && <span className="truncate">{item.label}</span>}
                 </NavLink>

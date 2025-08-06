@@ -12,60 +12,25 @@ export async function fetchReportsData(retryCount = 3) {
     try {
       console.log(`Fetching reports data (attempt ${attempt}/${retryCount})...`);
       
-      // Get the current session for authentication
-      const { data: { session } } = await supabase.auth.getSession();
+      // Use Supabase client to call the function directly instead of raw fetch
+      console.log('Calling reports function via Supabase client...');
       
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      
-      // Add authorization header if user is authenticated
-      if (session?.access_token) {
-        headers.authorization = `Bearer ${session.access_token}`;
-        console.log("Adding authorization header");
-      } else {
-        console.warn("No session found, proceeding without authentication");
-      }
-      
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
-      
-      const res = await fetch("https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/reports", {
-        method: "GET",
-        headers,
-        signal: controller.signal
+      const { data, error } = await supabase.functions.invoke('reports', {
+        method: 'GET'
       });
       
-      clearTimeout(timeoutId);
-      console.log(`Response status (attempt ${attempt}):`, res.status);
-      
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error(`Reports API error (attempt ${attempt}):`, res.status, errorText);
-        
-        // Don't retry on client errors (4xx)
-        if (res.status >= 400 && res.status < 500) {
-          throw new Error(`HTTP ${res.status}: ${errorText || "Client error - not retrying"}`);
-        }
-        
-        throw new Error(`HTTP ${res.status}: ${errorText || "Server error"}`);
+      if (error) {
+        console.error(`Reports function error (attempt ${attempt}):`, error);
+        throw new Error(error.message || 'Reports function failed');
       }
       
-      const json = await res.json();
       console.log(`Reports data received successfully (attempt ${attempt}):`, {
-        hasData: !!json.data,
-        hasError: !!json.error,
-        dataKeys: json.data ? Object.keys(json.data) : []
+        hasData: !!data,
+        dataKeys: data ? Object.keys(data) : []
       });
       
-      // Handle graceful degradation - return partial data even if there's an error message
-      if (json.error && !json.data) {
-        console.error("Reports API returned error:", json.error);
-        throw new Error(json.error);
-      }
-      
-      // Return the data, even if there's a warning/error message
-      return json.data || {
+      // Return the data directly from Supabase function
+      return data || {
         stats: { totalProducts: 0, totalOrders: 0, totalCustomers: 0, totalRevenue: 0 },
         revenueTrends: [],
         orderTrends: [],

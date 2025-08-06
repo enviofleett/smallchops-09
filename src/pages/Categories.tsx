@@ -1,5 +1,6 @@
 import React from 'react';
 import CategoriesManager from '@/components/categories/CategoriesManager';
+import ProductionErrorBoundary from '@/components/ui/production-error-boundary';
 
 const Categories = () => {
   return (
@@ -12,7 +13,9 @@ const Categories = () => {
       </div>
       
       <div className="rounded-lg border border-border bg-card">
-        <CategoriesManager />
+        <ProductionErrorBoundary context="Categories">
+          <CategoriesManager />
+        </ProductionErrorBoundary>
       </div>
     </div>
   );

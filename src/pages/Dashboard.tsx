@@ -62,7 +62,7 @@ const Dashboard = () => {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <DashboardHeader />
         <Button
-          onClick={refresh}
+          onClick={() => refresh(true)}
           variant="outline"
           size="sm"
           className="flex items-center gap-2 self-start sm:self-auto"

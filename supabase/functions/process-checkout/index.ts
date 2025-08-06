@@ -1,432 +1,92 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// JSON Schema for validation
-const checkoutSchema = {
-  type: "object",
-  required: ["customer_email", "customer_name", "order_items", "fulfillment_type", "payment_method"],
-  properties: {
-    customer_email: { type: "string", format: "email" },
-    customer_name: { type: "string", minLength: 1 },
-    customer_phone: { type: "string", pattern: "^[+]?[0-9\\s\\-\\(\\)]{10,20}$" },
-    order_items: {
-      type: "array",
-      minItems: 1,
-      items: {
-        type: "object",
-        required: ["product_id", "quantity"],
-        properties: {
-          product_id: { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
-          quantity: { type: "number", minimum: 1 },
-          price: { type: "number", minimum: 0 },
-          unit_price: { type: "number", minimum: 0 },
-          total_price: { type: "number", minimum: 0 },
-          discount_amount: { type: "number", minimum: 0 }
-        }
-      }
-    },
-    fulfillment_type: { type: "string", enum: ["delivery", "pickup"] },
-    delivery_address: {
-      type: "object",
-      properties: {
-        address_line_1: { type: "string", minLength: 1 },
-        address_line_2: { type: "string" },
-        city: { type: "string", minLength: 1 },
-        state: { type: "string", minLength: 1 },
-        postal_code: { type: "string" },
-        country: { type: "string" },
-        phone: { type: "string" },
-        delivery_instructions: { type: "string" }
-      },
-      required: ["address_line_1", "city", "state"]
-    },
-    pickup_point_id: { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
-    delivery_zone_id: { type: "string", pattern: "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$" },
-    guest_session_id: { type: "string" },
-    payment_method: { type: "string", enum: ["bank_transfer", "cash_on_delivery", "paystack"] },
-    total_amount: { type: "number", minimum: 0 },
-    delivery_fee: { type: "number", minimum: 0 }
-  }
-}
-
-// Simple JSON Schema validator
-function validateSchema(data: any, schema: any): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  
-  // Check required fields
-  if (schema.required) {
-    for (const field of schema.required) {
-      if (!data.hasOwnProperty(field) || data[field] === null || data[field] === undefined) {
-        errors.push(`Missing required field: ${field}`);
-      }
-    }
-  }
-  
-  // Check field types and formats
-  if (schema.properties) {
-    for (const [key, prop] of Object.entries(schema.properties as any)) {
-      if (data[key] !== undefined && data[key] !== null) {
-        if (prop.type === "string" && typeof data[key] !== "string") {
-          errors.push(`Field ${key} must be a string`);
-        } else if (prop.type === "number" && typeof data[key] !== "number") {
-          errors.push(`Field ${key} must be a number`);
-        } else if (prop.type === "array" && !Array.isArray(data[key])) {
-          errors.push(`Field ${key} must be an array`);
-        } else if (prop.format === "email" && typeof data[key] === "string" && !data[key].includes("@")) {
-          errors.push(`Field ${key} must be a valid email`);
-        } else if (prop.pattern && typeof data[key] === "string" && !new RegExp(prop.pattern).test(data[key])) {
-          errors.push(`Field ${key} has invalid format`);
-        } else if (prop.minimum !== undefined && typeof data[key] === "number" && data[key] < prop.minimum) {
-          errors.push(`Field ${key} must be at least ${prop.minimum}`);
-        } else if (prop.minLength !== undefined && typeof data[key] === "string" && data[key].length < prop.minLength) {
-          errors.push(`Field ${key} must be at least ${prop.minLength} characters`);
-        } else if (prop.enum && !prop.enum.includes(data[key])) {
-          errors.push(`Field ${key} must be one of: ${prop.enum.join(", ")}`);
-        }
-        
-        // Validate array items
-        if (prop.type === "array" && prop.items && Array.isArray(data[key])) {
-          for (let i = 0; i < data[key].length; i++) {
-            const itemValidation = validateSchema(data[key][i], prop.items);
-            if (!itemValidation.valid) {
-              errors.push(...itemValidation.errors.map(err => `Item ${i + 1}: ${err}`));
-            }
-          }
-        }
-        
-        // Validate nested objects
-        if (prop.type === "object" && typeof data[key] === "object") {
-          const nestedValidation = validateSchema(data[key], prop);
-          if (!nestedValidation.valid) {
-            errors.push(...nestedValidation.errors.map(err => `${key}.${err}`));
-          }
-        }
-      }
-    }
-  }
-  
-  return { valid: errors.length === 0, errors };
-}
-
-// Database error categorization
-enum DatabaseErrorType {
-  FOREIGN_KEY_VIOLATION = "foreign_key_violation",
-  UNIQUE_VIOLATION = "unique_violation",
-  NOT_NULL_VIOLATION = "not_null_violation",
-  CHECK_VIOLATION = "check_violation",
-  CONNECTION_ERROR = "connection_error",
-  TIMEOUT_ERROR = "timeout_error",
-  UNKNOWN = "unknown"
-}
-
-function categorizeDbError(error: any): { type: DatabaseErrorType; userMessage: string; shouldRetry: boolean } {
-  const errorMessage = error.message?.toLowerCase() || "";
-  const errorCode = error.code;
-  
-  if (errorCode === "23503" || errorMessage.includes("foreign key")) {
-    return {
-      type: DatabaseErrorType.FOREIGN_KEY_VIOLATION,
-      userMessage: "Invalid reference to product, delivery zone, or pickup point",
-      shouldRetry: false
-    };
-  }
-  
-  if (errorCode === "23505" || errorMessage.includes("unique")) {
-    return {
-      type: DatabaseErrorType.UNIQUE_VIOLATION,
-      userMessage: "Duplicate order detected",
-      shouldRetry: true
-    };
-  }
-  
-  if (errorCode === "23502" || errorMessage.includes("not null")) {
-    return {
-      type: DatabaseErrorType.NOT_NULL_VIOLATION,
-      userMessage: "Missing required information",
-      shouldRetry: false
-    };
-  }
-  
-  if (errorCode === "23514" || errorMessage.includes("check constraint")) {
-    return {
-      type: DatabaseErrorType.CHECK_VIOLATION,
-      userMessage: "Invalid data format or values",
-      shouldRetry: false
-    };
-  }
-  
-  if (errorMessage.includes("connection") || errorMessage.includes("timeout")) {
-    return {
-      type: DatabaseErrorType.CONNECTION_ERROR,
-      userMessage: "Database connection issue",
-      shouldRetry: true
-    };
-  }
-  
-  return {
-    type: DatabaseErrorType.UNKNOWN,
-    userMessage: "An unexpected error occurred",
-    shouldRetry: false
-  };
-}
-
-// Fallback values and strategies
-const FALLBACK_CONFIG = {
-  DEFAULT_DELIVERY_FEE: 0,
-  DEFAULT_PAYMENT_METHOD: "cash_on_delivery",
-  DEFAULT_COUNTRY: "Nigeria",
-  RETRY_ATTEMPTS: 3,
-  RETRY_DELAY_MS: 1000
-}
-
-// Rate limiting
-const rateLimitMap = new Map<string, { count: number; lastReset: number }>();
-const RATE_LIMIT_WINDOW = 60000; // 1 minute
-const RATE_LIMIT_MAX_REQUESTS = 10;
-
-function checkRateLimit(identifier: string): boolean {
-  const now = Date.now();
-  const current = rateLimitMap.get(identifier);
-  
-  if (!current || now - current.lastReset > RATE_LIMIT_WINDOW) {
-    rateLimitMap.set(identifier, { count: 1, lastReset: now });
-    return true;
-  }
-  
-  if (current.count >= RATE_LIMIT_MAX_REQUESTS) {
-    return false;
-  }
-  
-  current.count++;
-  return true;
-}
-
-interface CheckoutRequest {
-  customer_email: string;
-  customer_name: string;
-  customer_phone?: string;
-  order_items: Array<{
-    product_id: string;
-    quantity: number;
-    price?: number;
-    unit_price?: number;
-    total_price?: number;
-    discount_amount?: number;
-  }>;
-  total_amount?: number;
-  delivery_fee?: number;
-  delivery_zone_id?: string;
-  fulfillment_type: 'delivery' | 'pickup';
-  delivery_address?: {
-    address_line_1: string;
-    address_line_2?: string;
-    city: string;
-    state: string;
-    postal_code?: string;
-    country?: string;
-    phone?: string;
-    delivery_instructions?: string;
-  };
-  pickup_point_id?: string;
-  guest_session_id?: string;
-  payment_method: 'bank_transfer' | 'cash_on_delivery' | 'paystack';
-}
-
-interface OrderItem {
-  product_id: string;
-  quantity: number;
-  unit_price: number;
-  discount_amount?: number;
-}
-
-// Helper function to validate UUID format
-function isValidUUID(str: string): boolean {
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  return uuidRegex.test(str);
-}
-
-// Helper function to clean and validate UUID
-function cleanUUID(value: any): string | null {
-  if (!value || value === 'null' || value === 'undefined') return null;
-  
-  if (typeof value !== 'string') return null;
-  
-  const cleaned = value.trim().replace(/^guest_/, '');
-  return isValidUUID(cleaned) ? cleaned : null;
-}
-
-// Legacy function - kept for compatibility but no longer used in main flow
-async function findOrCreateCustomer(
-  supabase: any,
-  email: string,
-  name: string,
-  phone?: string
-): Promise<{ customer_id: string; isNew: boolean }> {
-  console.log(`🔍 Looking for existing customer: ${email}`);
-  
-  try {
-    // Use the new database function that handles guests properly
-    const { data, error } = await supabase.rpc('find_or_create_customer', {
-      p_email: email,
-      p_name: name || email.split('@')[0],
-      p_phone: phone || null,
-      p_is_guest: true  // Mark as guest since this is checkout without auth
-    });
-
-    if (error) {
-      console.error('❌ Error in find_or_create_customer function:', error);
-      throw new Error(`Customer management error: ${error.message}`);
-    }
-
-    if (!data || data.length === 0) {
-      throw new Error('No data returned from customer creation function');
-    }
-
-    const result = data[0];
-    console.log(`✅ Customer result:`, result);
-    
-    return { 
-      customer_id: result.customer_id, 
-      isNew: result.is_new 
-    };
-    
-  } catch (error) {
-    console.error('❌ Failed to find/create customer:', error);
-    throw new Error(`Customer operation failed: ${error.message}`);
-  }
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
-  const requestId = crypto.randomUUID();
-  const startTime = Date.now();
-  
   try {
-    // Rate limiting check
-    const clientIP = req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || 'unknown';
-    if (!checkRateLimit(clientIP)) {
-      console.error(`🚫 Rate limit exceeded for IP: ${clientIP}`);
-      return new Response(
-        JSON.stringify({ error: "Too many requests. Please try again later." }),
-        { status: 429, headers: corsHeaders }
-      );
-    }
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseServiceKey)
 
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false
-        }
-      }
-    );
+    // Get request body
+    const requestBody = await req.json()
+    console.log('📥 Received checkout request:', JSON.stringify(requestBody, null, 2))
 
-    // Get user from authorization header if present
-    const authHeader = req.headers.get('authorization');
-    let user = null;
+    // Extract data from request
+    const {
+      customer_email,
+      customer_name,
+      customer_phone,
+      guest_session_id,
+      fulfillment_type,
+      delivery_address,
+      pickup_point_id,
+      delivery_zone_id,
+      order_items,
+      total_amount,
+      delivery_fee,
+      payment_method = 'paystack'
+    } = requestBody
+
+    // Get user from auth header
+    const authHeader = req.headers.get('authorization')
+    let user = null
     
     if (authHeader) {
       try {
-        const token = authHeader.replace('Bearer ', '');
-        const { data: { user: authUser }, error } = await supabaseClient.auth.getUser(token);
+        const token = authHeader.replace('Bearer ', '')
+        const { data: { user: authUser }, error } = await supabase.auth.getUser(token)
         if (!error && authUser) {
-          user = authUser;
-          console.log(`🔐 [${requestId}] Authenticated user: ${user.email}`);
+          user = authUser
+          console.log('✅ Authenticated user found:', user.id)
         }
-      } catch (error) {
-        console.log(`⚠️ [${requestId}] Auth token invalid or expired, proceeding as guest`);
+      } catch (authError) {
+        console.log('⚠️ Auth validation failed, treating as guest:', authError.message)
       }
     }
 
-    const rawData = await req.json();
-    const { customer_email, customer_name, guest_session_id, customer_phone } = rawData;
-    const isGuestCheckout = !user && guest_session_id;
-
-    console.log('🔍 User context analysis:', {
+    // Determine if this is a guest checkout
+    const isGuestCheckout = !user && guest_session_id
+    console.log('👤 User context analysis:', {
       hasUser: !!user,
       userId: user?.id,
       isGuest: isGuestCheckout,
-      guestSessionId: guest_session_id,
-      customerEmail: customer_email
-    });
-    
-    console.log(`📦 [${requestId}] Processing checkout request:`, {
-      customer_email: rawData.customer_email,
-      customer_name: rawData.customer_name,
-      fulfillment_type: rawData.fulfillment_type,
-      items_count: rawData.order_items?.length || 0,
-      payment_method: rawData.payment_method,
-      checkout_type: isGuestCheckout ? 'guest' : 'authenticated'
-    });
+      guestSessionId: guest_session_id
+    })
 
-    // JSON Schema validation
-    const validation = validateSchema(rawData, checkoutSchema);
-    if (!validation.valid) {
-      console.error(`❌ [${requestId}] Schema validation failed:`, validation.errors);
-      return new Response(
-        JSON.stringify({ error: `Validation failed: ${validation.errors.join(", ")}` }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
+    // 🔧 CRITICAL: Initialize customer_id properly
+    let customer_id = null
 
-    const checkoutData: CheckoutRequest = rawData;
-
-    // Apply fallbacks for missing optional data
-    if (!checkoutData.delivery_fee) {
-      checkoutData.delivery_fee = FALLBACK_CONFIG.DEFAULT_DELIVERY_FEE;
-    }
-    
-    // Apply smart defaults for delivery address
-    if (checkoutData.delivery_address) {
-      if (!checkoutData.delivery_address.country) {
-        checkoutData.delivery_address.country = FALLBACK_CONFIG.DEFAULT_COUNTRY;
-        console.log(`📍 [${requestId}] Applied default country: ${FALLBACK_CONFIG.DEFAULT_COUNTRY}`);
-      }
+    if (!isGuestCheckout && user) {
+      console.log('🔍 Processing authenticated user checkout...')
       
-      if (!checkoutData.delivery_address.postal_code) {
-        checkoutData.delivery_address.postal_code = "";
-        console.log(`📍 [${requestId}] Set empty postal_code for delivery address`);
-      }
-    }
-
-    // Handle customer account creation based on authentication status
-    let customer_id = null;  // Fixed variable declaration
-    let customerId = null;   // Keep both for consistency
-    let isNewCustomer = false;
-
-    if (isGuestCheckout) {
-      // 🔧 GUEST CHECKOUT: Skip customer account creation
-      console.log('👤 Processing guest checkout, skipping customer account creation');
-      customer_id = null;
-      customerId = null;
-    } else if (user) {
-      // 🔧 AUTHENTICATED USER: Create or get customer account
+      // Try to find or create customer account for authenticated users
       try {
-        // First, check if customer account already exists
-        const { data: existingCustomer } = await supabaseClient
+        // First check if customer account already exists
+        const { data: existingCustomer, error: lookupError } = await supabase
           .from('customer_accounts')
           .select('id')
           .eq('user_id', user.id)
-          .maybeSingle();
+          .maybeSingle()
 
         if (existingCustomer) {
-          console.log('✅ Found existing customer account:', existingCustomer.id);
-          customer_id = existingCustomer.id;
-          customerId = existingCustomer.id;
+          customer_id = existingCustomer.id
+          console.log('✅ Found existing customer account:', customer_id)
         } else {
-          // Create new customer account for authenticated user
-          const { data: newCustomer, error: customerError } = await supabaseClient
+          console.log('🔧 Creating new customer account...')
+          
+          // Create new customer account
+          const { data: newCustomer, error: createError } = await supabase
             .from('customer_accounts')
             .insert({
               user_id: user.id,
@@ -435,398 +95,281 @@ serve(async (req) => {
               phone: customer_phone
             })
             .select('id')
-            .single();
+            .single()
 
-          if (customerError) {
-            console.error('❌ Error creating customer account:', customerError);
-            throw customerError;
+          if (createError) {
+            console.error('❌ Failed to create customer account:', createError)
+            // Continue as guest-like checkout
+            customer_id = null
+          } else {
+            customer_id = newCustomer.id
+            console.log('✅ Created new customer account:', customer_id)
           }
-
-          console.log('✅ Created new customer account:', newCustomer.id);
-          customer_id = newCustomer.id;
-          customerId = newCustomer.id;
-          isNewCustomer = true;
         }
-      } catch (error) {
-        console.error('❌ Customer account handling failed:', error);
-        // For authenticated users, this is an error
-        throw new Error(`Customer account creation failed: ${error.message}`);
+      } catch (customerError) {
+        console.error('❌ Customer account handling error:', customerError)
+        customer_id = null
       }
     } else {
-      // Fallback for edge cases - treat as guest
-      console.log('👤 No user context and no guest session, treating as guest checkout');
-      customer_id = null;
-      customerId = null;
+      console.log('👤 Processing guest checkout, skipping customer account creation')
+      customer_id = null
     }
 
-    // Transform order items with enhanced fallback pricing
-    const transformedItems: OrderItem[] = await Promise.all(
-      checkoutData.order_items.map(async (item, index) => {
-        let unitPrice = item.unit_price || item.price || 0;
+    // Generate unique order number
+    const orderNumber = `ORD-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${Math.floor(Math.random() * 10000)}`
+    
+    // Calculate subtotal from order items
+    let subtotal = 0
+    const itemsWithPrices = await Promise.all(
+      order_items.map(async (item: any) => {
+        let unitPrice = item.unit_price || item.price || 0
         
-        // Fallback: fetch price from database if not provided
+        // Fetch price from database if not provided
         if (unitPrice <= 0) {
-          console.warn(`⚠️ [${requestId}] Missing price for item ${index + 1}, fetching from database`);
           try {
-            const { data: product } = await supabaseClient
+            const { data: product } = await supabase
               .from('products')
-              .select('price')
+              .select('price, name')
               .eq('id', item.product_id)
-              .single();
+              .single()
             
             if (product) {
-              unitPrice = product.price;
-              console.log(`✅ [${requestId}] Fetched price for item ${index + 1}: ${unitPrice}`);
+              unitPrice = product.price
+              console.log(`✅ Fetched price for ${product.name}: ${unitPrice}`)
             }
           } catch (error) {
-            console.error(`❌ [${requestId}] Failed to fetch price for item ${index + 1}:`, error);
+            console.error(`❌ Failed to fetch price for item ${item.product_id}:`, error)
           }
         }
+        
+        const itemTotal = unitPrice * item.quantity
+        subtotal += itemTotal
         
         return {
-          product_id: item.product_id,
-          quantity: item.quantity,
+          ...item,
           unit_price: unitPrice,
-          discount_amount: item.discount_amount || 0
-        };
+          total_price: itemTotal
+        }
       })
-    );
+    )
 
-    // Clean and validate UUIDs
-    const cleanGuestSessionId = cleanUUID(checkoutData.guest_session_id);
-    const cleanDeliveryZoneId = cleanUUID(checkoutData.delivery_zone_id);
-    const cleanPickupPointId = cleanUUID(checkoutData.pickup_point_id);
-
-    console.log(`🔧 [${requestId}] Transformed parameters:`, {
-      customer_id,
-      fulfillment_type: checkoutData.fulfillment_type,
-      delivery_zone_id: cleanDeliveryZoneId,
-      pickup_point_id: cleanPickupPointId,
-      guest_session_id: cleanGuestSessionId,
-      items_count: transformedItems.length
-    });
-
-    // Enhanced validation with fallbacks
-    if (checkoutData.fulfillment_type === 'pickup') {
-      if (!cleanPickupPointId) {
-        // Fallback: try to find default pickup point
-        console.warn(`⚠️ [${requestId}] No pickup point specified, looking for default`);
-        const { data: defaultPickup } = await supabaseClient
-          .from('pickup_points')
-          .select('id')
-          .eq('is_active', true)
-          .order('created_at', { ascending: true })
-          .limit(1)
-          .maybeSingle();
-        
-        if (defaultPickup) {
-          cleanPickupPointId = defaultPickup.id;
-          console.log(`✅ [${requestId}] Using default pickup point: ${cleanPickupPointId}`);
-        } else {
-          console.error(`❌ [${requestId}] No pickup points available`);
-          return new Response(
-            JSON.stringify({ error: 'No pickup points available' }),
-            { status: 400, headers: corsHeaders }
-          );
-        }
-      } else {
-        // Validate that the specified pickup point exists and is active
-        console.log(`🔍 [${requestId}] Validating pickup point: ${cleanPickupPointId}`);
-        const { data: pickupPoint, error: pickupError } = await supabaseClient
-          .from('pickup_points')
-          .select('id, name, is_active')
-          .eq('id', cleanPickupPointId)
-          .eq('is_active', true)
-          .maybeSingle();
-        
-        if (pickupError) {
-          console.error(`❌ [${requestId}] Error validating pickup point:`, pickupError);
-          return new Response(
-            JSON.stringify({ error: 'Failed to validate pickup point' }),
-            { status: 500, headers: corsHeaders }
-          );
-        }
-        
-        if (!pickupPoint) {
-          console.error(`❌ [${requestId}] Invalid or inactive pickup point: ${cleanPickupPointId}`);
-          return new Response(
-            JSON.stringify({ error: 'Invalid or inactive pickup point' }),
-            { status: 400, headers: corsHeaders }
-          );
-        }
-        
-        console.log(`✅ [${requestId}] Pickup point validated: ${pickupPoint.name}`);
-      }
-    }
-
-    if (checkoutData.fulfillment_type === 'delivery' && !checkoutData.delivery_address) {
-      console.error(`❌ [${requestId}] Delivery address required for delivery orders`);
-      return new Response(
-        JSON.stringify({ error: 'delivery_address is required for delivery orders' }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
-    // Map payment method to database enum value
-    const dbPaymentMethod = checkoutData.payment_method === 'paystack' ? 'pending' : checkoutData.payment_method;
+    // Calculate tax and total
+    const taxAmount = subtotal * 0.075 // 7.5% VAT
+    const deliveryFeeAmount = delivery_fee || 0
+    const calculatedTotal = subtotal + taxAmount + deliveryFeeAmount
     
-    console.log(`🚀 [${requestId}] Calling create_order_with_items function...`);
-    console.log(`💳 [${requestId}] Payment method mapping: ${checkoutData.payment_method} -> ${dbPaymentMethod}`);
+    // Use provided total or calculated total
+    const finalTotal = total_amount || calculatedTotal
+
+    // Prepare order data with proper column mapping
+    const orderData = {
+      customer_id: customer_id, // ✅ Properly initialized
+      customer_email: customer_email,
+      customer_name: customer_name,
+      customer_phone: customer_phone,
+      guest_session_id: isGuestCheckout ? guest_session_id : null,
+      order_number: orderNumber,
+      order_type: fulfillment_type, // Map fulfillment_type to order_type
+      delivery_address: delivery_address,
+      pickup_point_id: pickup_point_id,
+      delivery_zone_id: delivery_zone_id,
+      subtotal: subtotal,
+      tax_amount: taxAmount,
+      delivery_fee: deliveryFeeAmount,
+      total_amount: finalTotal,
+      payment_method: payment_method,
+      payment_status: 'pending',
+      status: 'pending',
+      order_time: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    }
 
     console.log('📦 Creating order with data:', {
-      customerId: customerId,
-      isGuest: isGuestCheckout,
-      hasGuestSession: !!cleanGuestSessionId,
-      customerEmail: checkoutData.customer_email
-    });
+      customer_id: orderData.customer_id,
+      customer_email: orderData.customer_email,
+      order_number: orderData.order_number,
+      total_amount: orderData.total_amount,
+      isGuest: isGuestCheckout
+    })
 
-    // Call the database function with retry logic for transient errors
-    let orderId: string | null = null;
-    let orderError: any = null;
-    
-    for (let attempt = 1; attempt <= FALLBACK_CONFIG.RETRY_ATTEMPTS; attempt++) {
-      const { data, error } = await supabaseClient
-        .rpc('create_order_with_items', {
-          p_customer_id: customerId,
-          p_fulfillment_type: checkoutData.fulfillment_type,
-          p_delivery_address: checkoutData.delivery_address || null,
-          p_pickup_point_id: cleanPickupPointId,
-          p_delivery_zone_id: cleanDeliveryZoneId,
-          p_guest_session_id: cleanGuestSessionId,
-          p_items: transformedItems
-        });
-
-      if (!error) {
-        orderId = data;
-        break;
-      }
-
-      orderError = error;
-      const errorInfo = categorizeDbError(error);
-      console.error(`❌ [${requestId}] Attempt ${attempt} failed:`, error.message);
-      
-      // Log detailed error information for debugging
-      console.error(`❌ [${requestId}] Error details:`, {
-        message: error.message,
-        code: error.code,
-        hint: error.hint,
-        details: error.details,
-        sqlState: error.sqlstate
-      });
-
-      if (!errorInfo.shouldRetry || attempt === FALLBACK_CONFIG.RETRY_ATTEMPTS) {
-        console.error(`❌ [${requestId}] Database error (${errorInfo.type}):`, errorInfo.userMessage);
-        
-        // Provide more specific error messages for common issues
-        let specificError = errorInfo.userMessage;
-        if (error.message?.includes('payment_method')) {
-          specificError = `Invalid payment method. Supported methods: bank_transfer, cash_on_delivery, paystack`;
-        } else if (error.message?.includes('postal_code')) {
-          specificError = `Missing required postal_code in delivery address`;
-        }
-        
-        return new Response(
-          JSON.stringify({ 
-            error: specificError,
-            debug_info: error.message 
-          }),
-          { status: errorInfo.type === DatabaseErrorType.FOREIGN_KEY_VIOLATION ? 400 : 500, headers: corsHeaders }
-        );
-      }
-
-      // Wait before retry
-      await new Promise(resolve => setTimeout(resolve, FALLBACK_CONFIG.RETRY_DELAY_MS * attempt));
-    }
-
-    if (!orderId) {
-      console.error(`❌ [${requestId}] No order ID returned from database function`);
-      return new Response(
-        JSON.stringify({ error: 'Failed to create order' }),
-        { status: 500, headers: corsHeaders }
-      );
-    }
-
-    console.log(`✅ [${requestId}] Order created successfully: ${orderId}`);
-
-    // Get the created order details for response
-    const { data: orderDetails, error: fetchError } = await supabaseClient
+    // Create the order
+    const { data: order, error: orderError } = await supabase
       .from('orders')
-      .select('order_number, total_amount')
-      .eq('id', orderId)
-      .single();
+      .insert(orderData)
+      .select('*')
+      .single()
 
-    if (fetchError) {
-      console.warn('⚠️ Could not fetch order details:', fetchError);
+    if (orderError) {
+      console.error('❌ Order creation failed:', orderError)
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to create order',
+          details: orderError.message
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
     }
 
-    // Handle payment processing
-    if (checkoutData.payment_method === 'paystack') {
-      console.log('💳 Processing Paystack payment...');
-      
-      // Generate unique reference for payment transaction
-      const paymentReference = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      
-      // Insert payment transaction record
-      const { data: paymentTransaction, error: paymentError } = await supabaseClient
-        .from('payment_transactions')
-        .insert({
-          order_id: orderId,
-          customer_email: checkoutData.customer_email,
-          customer_name: checkoutData.customer_name,
-          amount: orderDetails?.total_amount || checkoutData.total_amount || 0,
-          currency: 'NGN',
-          payment_method: 'paystack',
-          status: 'pending',
-          provider_reference: paymentReference,
-          transaction_type: 'charge'
-        })
-        .select()
-        .single();
+    console.log('✅ Order created successfully:', order.id)
 
-      if (paymentError) {
-        console.error('❌ Error creating payment transaction:', paymentError);
-        return new Response(
-          JSON.stringify({ error: 'Failed to create payment transaction' }),
-          { status: 500, headers: corsHeaders }
-        );
-      }
+    // Insert order items into separate table
+    const orderItemsData = itemsWithPrices.map(item => ({
+      order_id: order.id,
+      product_id: item.product_id,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.total_price,
+      discount_amount: item.discount_amount || 0
+    }))
 
-      console.log('💾 Payment transaction created:', paymentTransaction.id);
+    // Get product names for order items
+    const productIds = orderItemsData.map(item => item.product_id)
+    const { data: products } = await supabase
+      .from('products')
+      .select('id, name')
+      .in('id', productIds)
 
-      // Use paystack-secure function to initialize payment
-      const paymentAmount = orderDetails?.total_amount || checkoutData.total_amount || 0;
-      
-      if (!paymentAmount || paymentAmount <= 0) {
-        console.error('❌ Invalid payment amount:', paymentAmount);
-        return new Response(
-          JSON.stringify({ error: 'Invalid payment amount' }),
-          { status: 400, headers: corsHeaders }
-        );
-      }
+    const productNameMap = products?.reduce((acc: any, product: any) => {
+      acc[product.id] = product.name
+      return acc
+    }, {}) || {}
 
-      const { data: paystackData, error: paystackError } = await supabaseClient.functions.invoke('paystack-secure', {
+    // Add product names to order items
+    const orderItemsWithNames = orderItemsData.map(item => ({
+      ...item,
+      product_name: productNameMap[item.product_id] || 'Unknown Product'
+    }))
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItemsWithNames)
+
+    if (itemsError) {
+      console.error('⚠️ Failed to insert order items:', itemsError)
+      // Continue with order creation even if items fail
+    } else {
+      console.log('✅ Order items inserted successfully')
+    }
+
+    // Initialize Paystack payment
+    const paymentReference = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+    
+    // Get Paystack configuration
+    const { data: paystackConfig } = await supabase.rpc('get_active_paystack_config')
+    
+    if (!paystackConfig || paystackConfig.length === 0) {
+      console.error('❌ Paystack configuration not found')
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Payment gateway not configured'
+        }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+    }
+
+    const config = paystackConfig[0]
+    
+    // Initialize Paystack payment via edge function
+    try {
+      const paymentResponse = await supabase.functions.invoke('paystack-secure', {
         body: {
           action: 'initialize',
-          email: checkoutData.customer_email,
-          amount: Math.round(paymentAmount * 100), // Convert to kobo
+          email: customer_email,
+          amount: Math.round(finalTotal * 100), // Convert to kobo
           reference: paymentReference,
-          channels: ['card', 'bank', 'ussd', 'mobile_money'],
           metadata: {
-            order_id: orderId,
-            order_number: orderDetails?.order_number,
-            customer_name: checkoutData.customer_name,
-            customer_email: checkoutData.customer_email,
-            total_amount: paymentAmount
+            order_id: order.id,
+            customer_name: customer_name,
+            order_number: order.order_number
           }
         }
-      });
+      })
 
-      if (paystackError || !paystackData?.status) {
-        console.error('❌ Paystack initialization failed:', paystackError || paystackData);
-        return new Response(
-          JSON.stringify({ 
-            error: 'Payment initialization failed',
-            details: paystackError?.message || paystackData?.error || 'Unknown payment gateway error'
-          }),
-          { status: 500, headers: corsHeaders }
-        );
+      if (paymentResponse.error) {
+        console.error('❌ Paystack initialization failed:', paymentResponse.error)
+        throw new Error('Payment initialization failed')
       }
 
-      console.log(`✅ [${requestId}] Paystack payment initialized`);
+      // Update order with payment reference
+      const { error: updateError } = await supabase
+        .from('orders')
+        .update({ payment_reference: paymentReference })
+        .eq('id', order.id)
 
-      // Performance logging
-      const processingTime = Date.now() - startTime;
-      console.log(`⏱️ [${requestId}] Total processing time: ${processingTime}ms`);
+      if (updateError) {
+        console.error('⚠️ Failed to update payment reference:', updateError)
+      }
 
+      // Return success response with payment URL
+      const response = {
+        success: true,
+        order_id: order.id,
+        order_number: order.order_number,
+        total_amount: order.total_amount,
+        payment: {
+          payment_url: paymentResponse.data.authorization_url,
+          reference: paymentReference,
+          access_code: paymentResponse.data.access_code
+        },
+        message: "Order created and payment initialized successfully"
+      }
+
+      console.log('🎉 Checkout successful:', response)
+
+      return new Response(
+        JSON.stringify(response),
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      )
+      
+    } catch (paymentError) {
+      console.error('❌ Payment initialization error:', paymentError)
+      
+      // Return order created but payment failed
       return new Response(
         JSON.stringify({
           success: true,
-          order_id: orderId,
-          order_number: orderDetails?.order_number,
-          total_amount: checkoutData.total_amount || 0,
+          order_id: order.id,
+          order_number: order.order_number,
+          total_amount: order.total_amount,
           payment: {
-            payment_url: paystackData.data.authorization_url,
-            reference: paymentReference
+            payment_url: null,
+            reference: paymentReference,
+            error: 'Payment initialization failed - please contact support'
           },
-          message: 'Order created and payment initialized successfully'
+          message: "Order created but payment initialization failed"
         }),
-        { status: 200, headers: corsHeaders }
-      );
-    } else {
-      // For other payment methods, trigger order confirmation email
-      await supabaseClient.functions.invoke('enhanced-email-processor', {
-        body: {
-          event_type: 'order_confirmation',
-          recipient_email: checkoutData.customer_email,
-          order_id: orderId,
-          priority: 'high'
+        {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
-      });
+      )
     }
-
-    // Log checkout completion
-    await supabaseClient
-      .from('audit_logs')
-      .insert({
-        action: 'checkout_completed_v2',
-        category: 'Order Management',
-        message: `Checkout completed for order ${orderId}`,
-        new_values: {
-          order_id: orderId,
-          order_number: orderDetails?.order_number,
-          customer_id: customerId,
-          customer_email: checkoutData.customer_email,
-          payment_method: checkoutData.payment_method,
-          total_amount: orderDetails?.total_amount,
-          is_new_customer: isNewCustomer,
-          fulfillment_type: checkoutData.fulfillment_type,
-          checkout_type: isGuestCheckout ? 'guest' : 'authenticated'
-        }
-      });
-
-    // Trigger enhanced email processor for order created event
-    await supabaseClient.functions.invoke('enhanced-email-processor', {
-      body: {
-        event_type: 'order_created',
-        recipient_email: checkoutData.customer_email,
-        order_id: orderId
-      }
-    });
-
-    // Performance logging
-    const processingTime = Date.now() - startTime;
-    console.log(`⏱️ [${requestId}] Total processing time: ${processingTime}ms`);
-
-    return new Response(
-      JSON.stringify({ 
-        success: true,
-        order_id: orderId,
-        order_number: orderDetails?.order_number,
-        total_amount: checkoutData.total_amount || 0,
-        payment: null,
-        message: checkoutData.payment_method === 'paystack' 
-          ? 'Order created and payment initialized successfully' 
-          : 'Order created successfully'
-      }),
-      { status: 200, headers: corsHeaders }
-    );
 
   } catch (error) {
-    const processingTime = Date.now() - startTime;
-    console.error(`💥 [${requestId}] Checkout processing error (${processingTime}ms):`, error);
-    
-    // Log critical errors for monitoring
-    if (error.message?.includes('database') || error.message?.includes('connection')) {
-      console.error(`🚨 [${requestId}] Critical infrastructure error:`, {
-        error: error.message,
-        stack: error.stack,
-        processingTime
-      });
-    }
+    console.error('💥 Edge Function error:', error)
     
     return new Response(
-      JSON.stringify({ error: 'Internal server error occurred' }),
-      { status: 500, headers: corsHeaders }
-    );
+      JSON.stringify({
+        success: false,
+        error: 'Internal server error',
+        details: error.message
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    )
   }
-});
+})

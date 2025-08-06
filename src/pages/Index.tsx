@@ -13,18 +13,22 @@ const Index = () => {
     // Wait for auth to load
     if (isLoading) return;
 
-    // If admin is authenticated, show dashboard
+    // If admin is authenticated, show dashboard (they're already on the right page)
     if (isAuthenticated && userType === 'admin' && user) {
       return; // Stay on dashboard
     }
 
-    // If customer is authenticated, stay on root page (will show customer portal)
+    // If customer is authenticated, redirect to customer portal (public home)
     if (isAuthenticated && userType === 'customer' && customerAccount) {
-      return; // Stay on root - will show customer portal content
+      navigate('/', { replace: true });
+      return;
     }
 
-    // If no one is authenticated, redirect to public home
-    navigate('/');
+    // If no one is authenticated, redirect to auth page
+    if (!isAuthenticated) {
+      navigate('/auth', { replace: true });
+      return;
+    }
   }, [isAuthenticated, isLoading, userType, user, customerAccount, navigate]);
 
   if (isLoading) {
@@ -48,12 +52,12 @@ const Index = () => {
     return <CustomerPortal />;
   }
 
-  // Redirect will happen in useEffect
+  // If we reach here, user needs to authenticate
   return (
     <div className="min-h-screen flex items-center justify-center bg-background">
       <div className="flex flex-col items-center space-y-4">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="text-muted-foreground text-sm">Redirecting...</p>
+        <p className="text-muted-foreground text-sm">Checking authentication...</p>
       </div>
     </div>
   );

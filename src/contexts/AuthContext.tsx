@@ -47,26 +47,25 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   useEffect(() => {
     let mounted = true;
+    let unsubscribe: (() => void) | null = null;
 
     const initializeAuth = async () => {
       try {
-        // Set up auth state listener FIRST
+        // Set up auth state listener with optimized handling
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-          async (event, session) => {
-            logger.debug('Auth state change:', event, session?.user?.id);
-            
+          (event, session) => {
             if (!mounted) return;
             
+            // Only sync state updates here - no async operations
             setSession(session);
             
             if (session?.user) {
-              // Defer profile/account fetch to avoid blocking auth state changes
-              setTimeout(async () => {
+              // Defer async operations to prevent blocking
+              setTimeout(() => {
                 if (mounted) {
-                  await loadUserData(session.user);
-                  if (mounted) {
-                    setIsLoading(false);
-                  }
+                  loadUserData(session.user).finally(() => {
+                    if (mounted) setIsLoading(false);
+                  });
                 }
               }, 0);
             } else {
@@ -78,26 +77,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           }
         );
 
-        // THEN check for existing session
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (!mounted) return;
+        unsubscribe = () => subscription?.unsubscribe();
 
-        if (initialSession?.user) {
-          setSession(initialSession);
-          await loadUserData(initialSession.user);
+        // Check for existing session with timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Session check timeout')), 5000);
+        });
+
+        try {
+          const { data: { session: initialSession } } = await Promise.race([
+            sessionPromise,
+            timeoutPromise
+          ]) as any;
+          
+          if (!mounted) return;
+
+          if (initialSession?.user) {
+            setSession(initialSession);
+            await loadUserData(initialSession.user);
+          }
+        } catch (timeoutError) {
+          logger.warn('Session check timed out, proceeding without session');
         }
         
         if (mounted) {
           setIsLoading(false);
         }
 
-        return () => {
-          mounted = false;
-          subscription?.unsubscribe();
-        };
       } catch (error: any) {
-        logger.error('Auth initialization error:', error, 'AuthContext');
+        logger.error('Auth initialization error:', error);
         if (mounted) {
           setIsLoading(false);
         }
@@ -108,6 +117,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
     return () => {
       mounted = false;
+      unsubscribe?.();
     };
   }, []);
 

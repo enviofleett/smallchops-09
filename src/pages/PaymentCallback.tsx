@@ -80,9 +80,13 @@ export default function PaymentCallback() {
       console.log(`🔍 Verifying payment (attempt ${retryCount + 1}):`, paymentReference);
       setStatus('verifying');
 
-      // Use the correct paystack-verify function
+      // Verify payment with backend - enhanced with order details
+      const orderId = searchParams.get('order_id');
       const { data, error } = await supabase.functions.invoke('paystack-verify', {
-        body: { reference: paymentReference }
+        body: { 
+          reference: paymentReference,
+          order_id: orderId 
+        }
       });
 
       if (error) {
@@ -93,10 +97,37 @@ export default function PaymentCallback() {
         throw new Error(error.message || 'Verification failed');
       }
 
-      console.log('PaymentCallback - Verification response:', data);
+      console.log('✅ Payment verification response:', { data, error });
 
       // Enhanced response handling
-      if (data?.status === true && data?.data) {
+      if (data?.success) {
+        console.log('🎉 Payment verification successful:', data);
+        setStatus('success');
+        setResult({
+          success: true,
+          order_id: data.order_id || orderId,
+          order_number: data.order_number || orderId,
+          amount: data.amount,
+          message: 'Payment verified successfully! Your order has been confirmed.'
+        });
+        
+        // Enhanced cart clearing and order refresh
+        console.log('🛒 Processing successful payment - clearing cart and refreshing orders');
+        await clearCartAfterPayment(data.order_number || orderId);
+        clearCheckoutState();
+        
+        // Refresh orders with retry mechanism
+        if (refetchOrders) {
+          setTimeout(async () => {
+            try {
+              await refetchOrders();
+              console.log('🔄 Orders refreshed after payment success');
+            } catch (refreshError) {
+              console.warn('Failed to refresh orders:', refreshError);
+            }
+          }, 1500);
+        }
+      } else if (data?.status === true && data?.data) {
         const transactionData = data.data;
         
         if (transactionData.status === 'success') {

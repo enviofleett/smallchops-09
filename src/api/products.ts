@@ -5,44 +5,51 @@ import { Product, NewProduct, UpdatedProduct, ProductWithCategory } from '@/type
 const PRODUCT_IMAGE_BUCKET = 'product-images';
 
 /**
- * Uploads an image file to Supabase storage.
- * It generates a unique filename to prevent collisions and returns the public URL.
+ * Uploads an image file using the upload-product-image edge function.
+ * It handles file conversion to base64 and returns the public URL.
  *
  * @param {File} imageFile - The image file to upload.
  * @returns {Promise<string>} The public URL of the uploaded image.
  */
 export const uploadProductImage = async (imageFile: File): Promise<string> => {
-  // Generate a unique filename using a combination of a timestamp and the original filename
-  // This helps prevent naming conflicts in the storage bucket.
-  const fileExtension = imageFile.name.split('.').pop();
-  const filename = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExtension}`;
-
   try {
-    // Perform the upload to the specified bucket and path
-    const { data, error } = await supabase.storage
-      .from(PRODUCT_IMAGE_BUCKET)
-      .upload(filename, imageFile, {
-        cacheControl: '3600', // Set cache control for 1 hour
-        upsert: false, // Do not overwrite existing files
-      });
+    // Convert file to base64
+    const fileData = await new Promise<string>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        // Remove data URL prefix to get just the base64 data
+        const base64Data = result.split(',')[1];
+        resolve(base64Data);
+      };
+      reader.readAsDataURL(imageFile);
+    });
+
+    // Call the upload function
+    const { data, error } = await supabase.functions.invoke('upload-product-image', {
+      body: {
+        file: {
+          name: imageFile.name,
+          type: imageFile.type,
+          size: imageFile.size,
+          data: fileData
+        }
+      }
+    });
 
     if (error) {
-      console.error('Supabase storage upload error:', error);
-      throw new Error(`Failed to upload product image: ${error.message}`);
+      console.error('Upload function error:', error);
+      throw new Error(error.message || 'Upload failed');
     }
 
-    // After a successful upload, get the public URL for the file
-    const { data: publicUrlData } = supabase.storage
-      .from(PRODUCT_IMAGE_BUCKET)
-      .getPublicUrl(filename);
-
-    if (!publicUrlData) {
-      throw new Error('Failed to retrieve public URL for the uploaded image.');
+    if (!data?.success) {
+      throw new Error(data?.error || 'Upload failed');
     }
 
-    return publicUrlData.publicUrl;
+    console.log('Product image uploaded successfully:', data.data.url);
+    return data.data.url;
   } catch (error) {
-    console.error('Error in uploadProductImage:', error);
+    console.error('Product image upload error:', error);
     throw error;
   }
 };

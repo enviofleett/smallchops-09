@@ -14,12 +14,17 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Plus, Edit, Trash2, GripVertical, Eye, EyeOff } from 'lucide-react';
 import { useQueryClient, useQuery, useMutation } from '@tanstack/react-query';
+import { useImageUpload } from '@/hooks/useImageUpload';
 
 const heroImageSchema = z.object({
-  image_url: z.string().min(1, 'Image is required'),
+  image_file: z.instanceof(File).optional(),
+  image_url: z.string().optional(),
   alt_text: z.string().optional(),
   display_order: z.number().min(0),
   is_active: z.boolean().default(true),
+}).refine((data) => data.image_file || data.image_url, {
+  message: "Either upload a file or provide an image URL",
+  path: ["image_file"],
 });
 
 type HeroImageFormData = z.infer<typeof heroImageSchema>;
@@ -38,10 +43,12 @@ export const HeroImagesManager = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingImage, setEditingImage] = useState<HeroImage | null>(null);
   const queryClient = useQueryClient();
+  const { uploadImage, isUploading } = useImageUpload();
 
   const form = useForm<HeroImageFormData>({
     resolver: zodResolver(heroImageSchema),
     defaultValues: {
+      image_file: undefined,
       image_url: '',
       alt_text: '',
       display_order: 0,
@@ -66,12 +73,33 @@ export const HeroImagesManager = () => {
   // Create/Update hero image mutation
   const saveImageMutation = useMutation({
     mutationFn: async (data: HeroImageFormData & { id?: string }) => {
+      let imageUrl = data.image_url;
+
+      // If there's a file to upload, upload it first
+      if (data.image_file) {
+        console.log('Uploading hero image file:', data.image_file.name);
+        const uploadedUrl = await uploadImage(data.image_file, {
+          bucket: 'hero-images',
+          altText: data.alt_text
+        });
+        
+        if (!uploadedUrl) {
+          throw new Error('Failed to upload image');
+        }
+        
+        imageUrl = uploadedUrl;
+      }
+
+      if (!imageUrl) {
+        throw new Error('No image URL available');
+      }
+
       if (data.id) {
         // Update existing
         const { error } = await supabase
           .from('hero_carousel_images')
           .update({
-            image_url: data.image_url,
+            image_url: imageUrl,
             alt_text: data.alt_text,
             display_order: data.display_order,
             is_active: data.is_active,
@@ -84,7 +112,7 @@ export const HeroImagesManager = () => {
         const { error } = await supabase
           .from('hero_carousel_images')
           .insert({
-            image_url: data.image_url,
+            image_url: imageUrl,
             alt_text: data.alt_text,
             display_order: data.display_order,
             is_active: data.is_active,
@@ -147,6 +175,7 @@ export const HeroImagesManager = () => {
   const handleEdit = (image: HeroImage) => {
     setEditingImage(image);
     form.reset({
+      image_file: undefined,
       image_url: image.image_url,
       alt_text: image.alt_text || '',
       display_order: image.display_order,
@@ -192,6 +221,7 @@ export const HeroImagesManager = () => {
                 onClick={() => {
                   setEditingImage(null);
                   form.reset({
+                    image_file: undefined,
                     image_url: '',
                     alt_text: '',
                     display_order: getMaxDisplayOrder(),
@@ -213,14 +243,21 @@ export const HeroImagesManager = () => {
                 <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
                   <FormField
                     control={form.control}
-                    name="image_url"
+                    name="image_file"
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Image</FormLabel>
                         <FormControl>
                           <ImageUpload
-                            value={field.value}
-                            onChange={field.onChange}
+                            value={form.watch('image_url')} // Show existing URL for editing
+                            onChange={(file) => {
+                              field.onChange(file);
+                              // Clear image_url when new file is selected
+                              if (file) {
+                                form.setValue('image_url', '');
+                              }
+                            }}
+                            disabled={isUploading}
                           />
                         </FormControl>
                         <FormMessage />
@@ -285,8 +322,8 @@ export const HeroImagesManager = () => {
                     >
                       Cancel
                     </Button>
-                    <Button type="submit" disabled={saveImageMutation.isPending}>
-                      {saveImageMutation.isPending ? 'Saving...' : (editingImage ? 'Update' : 'Add')}
+                    <Button type="submit" disabled={saveImageMutation.isPending || isUploading}>
+                      {(saveImageMutation.isPending || isUploading) ? 'Saving...' : (editingImage ? 'Update' : 'Add')}
                     </Button>
                   </div>
                 </form>

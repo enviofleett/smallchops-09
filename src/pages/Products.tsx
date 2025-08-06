@@ -97,18 +97,27 @@ const Products = () => {
   };
 
   const handleSubmitProduct = async (data: ProductFormData & { imageFile?: File }) => {
-    // Ensure required fields are present for create/update
-    const safeData = {
-      ...data,
-      name: data.name ?? "",
-      price: data.price ?? 0,
-      stock_quantity: data.stock_quantity ?? 0,
-      status: data.status ?? "draft",
-    };
-    if (selectedProduct) {
-      await updateMutation.mutateAsync({ id: selectedProduct.id, data: safeData });
-    } else {
-      await createMutation.mutateAsync(safeData);
+    try {
+      // Ensure required fields are present for create/update
+      const safeData = {
+        ...data,
+        name: data.name ?? "",
+        price: data.price ?? 0,
+        stock_quantity: data.stock_quantity ?? 0,
+        status: data.status ?? "draft",
+      };
+      
+      if (selectedProduct) {
+        await updateMutation.mutateAsync({ id: selectedProduct.id, data: safeData });
+      } else {
+        await createMutation.mutateAsync(safeData);
+      }
+    } catch (error: any) {
+      // Handle SKU duplicate errors with user-friendly messages
+      if (error.message?.includes('SKU') && error.message?.includes('already exists')) {
+        throw new Error(error.message + ' Try modifying the SKU or leave it blank for auto-generation.');
+      }
+      throw error;
     }
   };
 

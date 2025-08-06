@@ -117,6 +117,34 @@ export const getProduct = async (id: string): Promise<ProductWithCategory | null
     return data;
 };
 
+// Check if SKU already exists
+export const checkSkuExists = async (sku: string, excludeId?: string): Promise<boolean> => {
+  if (!sku) return false;
+  
+  let query = supabase.from('products').select('id').eq('sku', sku);
+  
+  if (excludeId) {
+    query = query.neq('id', excludeId);
+  }
+  
+  const { data } = await query.single();
+  return !!data;
+};
+
+// Generate unique SKU
+const generateUniqueSku = async (baseName: string): Promise<string> => {
+  const baseSlug = baseName.toLowerCase().replace(/[^a-z0-9]/g, '').substring(0, 10);
+  let sku = baseSlug;
+  let counter = 1;
+  
+  while (await checkSkuExists(sku)) {
+    sku = `${baseSlug}${counter}`;
+    counter++;
+  }
+  
+  return sku;
+};
+
 export const createProduct = async (productData: NewProduct & { imageFile?: File }): Promise<Product> => {
     let imageUrl: string | null = null;
 
@@ -127,8 +155,17 @@ export const createProduct = async (productData: NewProduct & { imageFile?: File
         
         const { imageFile, ...productToInsert } = productData;
 
+        // Handle SKU validation and generation
+        let finalSku = productToInsert.sku;
+        if (finalSku && await checkSkuExists(finalSku)) {
+            throw new Error(`SKU "${finalSku}" already exists. Please choose a different SKU.`);
+        } else if (!finalSku) {
+            finalSku = await generateUniqueSku(productToInsert.name);
+        }
+
         const finalProductData = {
             ...productToInsert,
+            sku: finalSku,
             image_url: imageUrl,
         };
 
@@ -139,6 +176,12 @@ export const createProduct = async (productData: NewProduct & { imageFile?: File
             if (imageUrl) {
                 await deleteProductImage(imageUrl);
             }
+            
+            // Provide specific error message for SKU constraint
+            if (error.code === '23505' && error.message.includes('sku')) {
+                throw new Error(`SKU "${finalSku}" already exists. Please choose a different SKU.`);
+            }
+            
             throw new Error(`Failed to create product: ${error.message}`);
         }
         
@@ -157,6 +200,11 @@ export const updateProduct = async (id: string, updates: UpdatedProduct & { imag
     let oldImageUrl: string | null = null;
 
     try {
+        // Handle SKU validation for updates
+        if (updates.sku && await checkSkuExists(updates.sku, id)) {
+            throw new Error(`SKU "${updates.sku}" already exists. Please choose a different SKU.`);
+        }
+
         // Get current product to access old image URL
         if (updates.imageFile) {
             const { data: currentProduct } = await supabase

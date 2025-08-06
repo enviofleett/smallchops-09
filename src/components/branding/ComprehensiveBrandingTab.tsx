@@ -12,14 +12,10 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { EnhancedLogoUpload } from './EnhancedLogoUpload';
-import { BrandingAnalytics } from './BrandingAnalytics';
 import { HeroImagesManager } from './HeroImagesManager';
 import { BudgetBallerManager } from './BudgetBallerManager';
 import { 
-  Palette, 
   FileImage, 
-  BarChart3, 
-  Settings,
   Save,
   Loader2,
   Eye,
@@ -31,14 +27,6 @@ const brandingSchema = z.object({
   tagline: z.string().optional(),
   logo_url: z.string().optional(),
   logo_alt_text: z.string().optional(),
-  logo_dark_url: z.string().optional(),
-  primary_color: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid color format').optional(),
-  secondary_color: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid color format').optional(),
-  accent_color: z.string().regex(/^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/, 'Invalid color format').optional(),
-  favicon_url: z.string().optional(),
-  social_card_url: z.string().optional(),
-  brand_guidelines: z.string().optional(),
-  logo_usage_rules: z.string().optional(),
   email: z.string().email().optional().or(z.literal('')),
   phone: z.string().optional(),
   address: z.string().optional(),
@@ -68,14 +56,6 @@ export const ComprehensiveBrandingTab = () => {
       tagline: '',
       logo_url: '',
       logo_alt_text: '',
-      logo_dark_url: '',
-      primary_color: '#3b82f6',
-      secondary_color: '#1e40af',
-      accent_color: '#f59e0b',
-      favicon_url: '',
-      social_card_url: '',
-      brand_guidelines: '',
-      logo_usage_rules: '',
       email: '',
       phone: '',
       address: '',
@@ -100,14 +80,6 @@ export const ComprehensiveBrandingTab = () => {
         tagline: settings.tagline || '',
         logo_url: settings.logo_url || '',
         logo_alt_text: settings.logo_alt_text || '',
-        logo_dark_url: settings.logo_dark_url || '',
-        primary_color: settings.primary_color || '#3b82f6',
-        secondary_color: settings.secondary_color || '#1e40af',
-        accent_color: settings.accent_color || '#f59e0b',
-        favicon_url: settings.favicon_url || '',
-        social_card_url: settings.social_card_url || '',
-        brand_guidelines: settings.brand_guidelines || '',
-        logo_usage_rules: settings.logo_usage_rules || '',
         email: settings.email || '',
         phone: settings.phone || '',
         address: settings.address || '',
@@ -167,18 +139,9 @@ export const ComprehensiveBrandingTab = () => {
         tagline: form.getValues('tagline'),
         website: form.getValues('website_url'),
       },
-      colors: {
-        primary: form.getValues('primary_color'),
-        secondary: form.getValues('secondary_color'),
-        accent: form.getValues('accent_color'),
-      },
       assets: {
         logo: form.getValues('logo_url'),
-        logoDark: form.getValues('logo_dark_url'),
-        favicon: form.getValues('favicon_url'),
-        socialCard: form.getValues('social_card_url'),
       },
-      guidelines: form.getValues('brand_guidelines'),
       exportDate: new Date().toISOString(),
     };
 
@@ -225,26 +188,14 @@ export const ComprehensiveBrandingTab = () => {
       </div>
 
       <Tabs defaultValue="identity" className="w-full">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-2">
           <TabsTrigger value="identity" className="flex items-center gap-2">
             <FileImage className="h-4 w-4" />
             Brand Identity
           </TabsTrigger>
-          <TabsTrigger value="colors" className="flex items-center gap-2">
-            <Palette className="h-4 w-4" />
-            Colors & Assets
-          </TabsTrigger>
           <TabsTrigger value="hero" className="flex items-center gap-2">
             <FileImage className="h-4 w-4" />
             Hero Content
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Analytics
-          </TabsTrigger>
-          <TabsTrigger value="guidelines" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Guidelines
           </TabsTrigger>
         </TabsList>
 
@@ -336,218 +287,11 @@ export const ComprehensiveBrandingTab = () => {
               </div>
             </TabsContent>
 
-            <TabsContent value="colors" className="space-y-6">
-              <div className="grid gap-6 lg:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Brand Colors</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="grid grid-cols-3 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="primary_color"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Primary</FormLabel>
-                            <div className="space-y-2">
-                              <FormControl>
-                                <Input type="color" {...field} disabled={previewMode} className="h-10" />
-                              </FormControl>
-                              <FormControl>
-                                <Input {...field} disabled={previewMode} placeholder="#3b82f6" />
-                              </FormControl>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="secondary_color"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Secondary</FormLabel>
-                            <div className="space-y-2">
-                              <FormControl>
-                                <Input type="color" {...field} disabled={previewMode} className="h-10" />
-                              </FormControl>
-                              <FormControl>
-                                <Input {...field} disabled={previewMode} placeholder="#1e40af" />
-                              </FormControl>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="accent_color"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Accent</FormLabel>
-                            <div className="space-y-2">
-                              <FormControl>
-                                <Input type="color" {...field} disabled={previewMode} className="h-10" />
-                              </FormControl>
-                              <FormControl>
-                                <Input {...field} disabled={previewMode} placeholder="#f59e0b" />
-                              </FormControl>
-                            </div>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    </div>
-                    
-                    {/* Color Preview */}
-                    <div className="mt-6 p-4 rounded-lg border">
-                      <h4 className="font-medium mb-3">Color Preview</h4>
-                      <div className="flex gap-2">
-                        <div 
-                          className="w-16 h-16 rounded-lg shadow-sm border"
-                          style={{ backgroundColor: form.watch('primary_color') }}
-                          title="Primary Color"
-                        />
-                        <div 
-                          className="w-16 h-16 rounded-lg shadow-sm border"
-                          style={{ backgroundColor: form.watch('secondary_color') }}
-                          title="Secondary Color"
-                        />
-                        <div 
-                          className="w-16 h-16 rounded-lg shadow-sm border"
-                          style={{ backgroundColor: form.watch('accent_color') }}
-                          title="Accent Color"
-                        />
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Additional Assets</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <FormField
-                      control={form.control}
-                      name="logo_dark_url"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Dark Mode Logo URL</FormLabel>
-                          <FormControl>
-                            <Input {...field} disabled={previewMode} placeholder="https://..." />
-                          </FormControl>
-                          <FormDescription>
-                            Alternative logo for dark backgrounds
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="favicon_url"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Favicon URL</FormLabel>
-                          <FormControl>
-                            <Input {...field} disabled={previewMode} placeholder="https://..." />
-                          </FormControl>
-                          <FormDescription>
-                            Browser tab icon (32x32px recommended)
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="social_card_url"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Social Media Card Image</FormLabel>
-                          <FormControl>
-                            <Input {...field} disabled={previewMode} placeholder="https://..." />
-                          </FormControl>
-                          <FormDescription>
-                            Image for social media sharing (1200x630px)
-                          </FormDescription>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </CardContent>
-                </Card>
-              </div>
-            </TabsContent>
-
             <TabsContent value="hero" className="space-y-6">
               <div className="grid gap-6">
                 <HeroImagesManager />
                 <BudgetBallerManager />
               </div>
-            </TabsContent>
-
-            <TabsContent value="analytics" className="space-y-6">
-              <BrandingAnalytics />
-            </TabsContent>
-
-            <TabsContent value="guidelines" className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Brand Guidelines</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="brand_guidelines"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>General Brand Guidelines</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            {...field} 
-                            disabled={previewMode}
-                            placeholder="Describe your brand personality, tone of voice, and key messaging guidelines..."
-                            className="min-h-[120px]"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Define how your brand should be represented and communicated
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="logo_usage_rules"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Logo Usage Rules</FormLabel>
-                        <FormControl>
-                          <Textarea 
-                            {...field} 
-                            disabled={previewMode}
-                            placeholder="Specify minimum sizes, clear space requirements, acceptable backgrounds, and what NOT to do with your logo..."
-                            className="min-h-[120px]"
-                          />
-                        </FormControl>
-                        <FormDescription>
-                          Specific guidelines for logo placement and usage
-                        </FormDescription>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </CardContent>
-              </Card>
             </TabsContent>
 
             {!previewMode && (

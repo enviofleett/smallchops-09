@@ -664,8 +664,13 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({
+          success: true,
           order_id: orderId,
-          payment_url: paystackData.data.authorization_url
+          order_number: orderDetails?.order_number,
+          payment: {
+            payment_url: paystackData.data.authorization_url,
+            reference: paymentReference
+          }
         }),
         { status: 200, headers: corsHeaders }
       );
@@ -714,7 +719,11 @@ serve(async (req) => {
     console.log(`⏱️ [${requestId}] Total processing time: ${processingTime}ms`);
 
     return new Response(
-      JSON.stringify({ order_id: orderId }),
+      JSON.stringify({ 
+        success: true,
+        order_id: orderId,
+        order_number: orderDetails?.order_number
+      }),
       { status: 200, headers: corsHeaders }
     );
 

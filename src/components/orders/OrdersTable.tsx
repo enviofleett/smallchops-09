@@ -170,6 +170,7 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
               <th className="text-left py-4 px-6 font-medium text-gray-600">Amount</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Type/Zone</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Payment</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
             </tr>
           </thead>
@@ -215,6 +216,17 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                 <td className="py-4 px-6">
                   <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
                     {getStatusBadge(order.status).label}
+                  </span>
+                </td>
+                <td className="py-4 px-6">
+                  <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${
+                    order.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 
+                    order.payment_status === 'failed' ? 'bg-red-100 text-red-800' : 
+                    'bg-yellow-100 text-yellow-800'
+                  }`}>
+                    {order.payment_status === 'paid' ? 'Paid' : 
+                     order.payment_status === 'failed' ? 'Failed' : 
+                     'Pending'}
                   </span>
                 </td>
                 <td className="py-4 px-6">

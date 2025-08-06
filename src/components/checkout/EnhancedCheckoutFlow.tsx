@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/hooks/useCart";
@@ -58,7 +58,49 @@ interface EnhancedCheckoutFlowProps {
   onClose: () => void;
 }
 
-export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({ 
+// Error boundary component
+class CheckoutErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: any) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error: Error, errorInfo: any) {
+    console.error('🚨 Checkout error boundary caught:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="p-4 text-center">
+          <p className="text-destructive">Something went wrong with checkout. Please refresh and try again.</p>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+// Suppress WebSocket errors in development
+const originalError = console.error;
+if (typeof window !== 'undefined' && window.location.hostname === 'localhost') {
+  console.error = (...args) => {
+    if (args[0]?.includes?.('WebSocket') || args[0]?.includes?.('ws://')) {
+      return; // Suppress WebSocket errors in development
+    }
+    originalError(...args);
+  };
+}
+
+const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = ({ 
   isOpen, 
   onClose 
 }) => {
@@ -74,28 +116,11 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
   const [paymentInProgress, setPaymentInProgress] = useState(false);
   const [paystackLoaded, setPaystackLoaded] = useState(false);
 
-  // Load Paystack script on component mount
-  useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://js.paystack.co/v1/inline.js';
-    script.async = true;
-    script.onload = () => {
-      console.log('✅ Paystack script loaded successfully');
-      setPaystackLoaded(true);
-    };
-    script.onerror = () => {
-      console.error('❌ Failed to load Paystack script');
-    };
-    
-    if (!document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]')) {
-      document.head.appendChild(script);
-    } else {
-      setPaystackLoaded(true);
+  // Debug logging with environment check
+  const debugLog = useCallback((message: string, ...args: any[]) => {
+    if (window.location.hostname === 'localhost') {
+      console.log(message, ...args);
     }
-
-    return () => {
-      // Cleanup if needed
-    };
   }, []);
 
   const [formData, setFormData] = useState<CheckoutData>({
@@ -116,24 +141,56 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     pickup_point_id: ''
   });
 
-  const items = cart?.items || [];
-  const currentDeliveryFee = formData.fulfillment_type === 'pickup' ? 0 : deliveryFee;
-  const total = (cart?.summary?.total_amount || 0) + currentDeliveryFee;
+  // Memoize cart values to prevent unnecessary re-renders
+  const items = useMemo(() => cart?.items || [], [cart?.items]);
+  const currentDeliveryFee = useMemo(() => 
+    formData.fulfillment_type === 'pickup' ? 0 : deliveryFee, 
+    [formData.fulfillment_type, deliveryFee]
+  );
+  const total = useMemo(() => 
+    (cart?.summary?.total_amount || 0) + currentDeliveryFee, 
+    [cart?.summary?.total_amount, currentDeliveryFee]
+  );
 
-  // Handle authentication choice
-  const handleContinueAsGuest = async () => {
+  // Load Paystack script on component mount
+  useEffect(() => {
+    const script = document.createElement('script');
+    script.src = 'https://js.paystack.co/v1/inline.js';
+    script.async = true;
+    script.onload = () => {
+      debugLog('✅ Paystack script loaded successfully');
+      setPaystackLoaded(true);
+    };
+    script.onerror = () => {
+      console.error('❌ Failed to load Paystack script');
+    };
+    
+    if (!document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]')) {
+      document.head.appendChild(script);
+    } else {
+      setPaystackLoaded(true);
+    }
+
+    return () => {
+      // Cleanup if needed
+    };
+  }, [debugLog]);
+
+
+  // Handle authentication choice with useCallback to prevent re-renders
+  const handleContinueAsGuest = useCallback(async () => {
     if (!guestSession) {
       await generateGuestSession();
     }
     setCheckoutStep('details');
-  };
+  }, [guestSession, generateGuestSession]);
 
-  const handleLogin = () => {
+  const handleLogin = useCallback(() => {
     // Store current URL for redirect after login
     storeRedirectUrl(window.location.pathname + window.location.search);
     onClose();
     navigate('/auth');
-  };
+  }, [onClose, navigate]);
 
   // Auto-advance to details if user is already authenticated
   React.useEffect(() => {
@@ -261,7 +318,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         guestSession: guestSession
       };
 
-      console.log('🔍 Raw checkout data:', rawData);
+      debugLog('🔍 Raw checkout data:', rawData);
 
       // Sanitize and clean all data
       const sanitizedData = {
@@ -279,7 +336,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         guest_session_id: !isAuthenticated ? sanitizeGuestSessionId(guestSession) : null
       };
 
-      console.log('✅ Sanitized checkout data:', sanitizedData);
+      debugLog('✅ Sanitized checkout data:', sanitizedData);
 
       // Validate sanitized data
       const validation = validateCheckoutData(sanitizedData);
@@ -293,7 +350,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         return;
       }
 
-      console.log('🚀 Processing checkout with clean data...');
+      debugLog('🚀 Processing checkout with clean data...');
 
       const { data, error } = await supabase.functions.invoke('process-checkout', {
         body: sanitizedData
@@ -314,11 +371,11 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         throw new Error(error.message);
       }
 
-      // ✅ CRITICAL FIX: Handle both boolean true and string "true"
+      // ✅ CRITICAL FIX: Handle both boolean true and string "true"  
       const isSuccess = data && (data.success === true || data.success === 'true' || String(data.success).toLowerCase() === 'true');
       
       if (isSuccess) {
-        console.log('✅ Checkout successful! Order created:', {
+        debugLog('✅ Checkout successful! Order created:', {
           orderId: data.order_id,
           orderNumber: data.order_number,
           totalAmount: data.total_amount,
@@ -329,7 +386,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
 
         // Process Paystack payment with popup
         if (data.payment?.payment_url && data.payment?.reference) {
-          console.log('🛒 Initializing Paystack popup payment...');
+          debugLog('🛒 Initializing Paystack popup payment...');
           
           try {
             await processPaystackPayment({
@@ -369,6 +426,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
           error: data?.error,
           fullResponse: data
         });
+        console.trace('❌ Checkout failure trace'); // Add trace to debug source
         
         const errorMessage = data?.message || data?.error || "Failed to process checkout";
         toast({
@@ -425,7 +483,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     setPaymentInProgress(true);
     
     try {
-      console.log('🚀 Starting Paystack payment initialization...', {
+      debugLog('🚀 Starting Paystack payment initialization...', {
         amount: paymentData.amount,
         email: paymentData.email,
         reference: paymentData.reference,
@@ -443,7 +501,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         throw new Error('Paystack failed to load after 3 seconds');
       }
 
-      console.log('✅ Paystack available, initializing payment popup...');
+      debugLog('✅ Paystack available, initializing payment popup...');
 
       // Use setup method which is available on the PaystackPop object
       const handler = window.PaystackPop.setup({
@@ -458,7 +516,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
           customer_email: paymentData.email
         },
         callback: function(response: any) {
-          console.log('✅ Paystack payment callback received:', response);
+          debugLog('✅ Paystack payment callback received:', response);
           setPaymentInProgress(false);
           
           if (response.status === 'success') {
@@ -482,7 +540,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
           }
         },
         onClose: function() {
-          console.log('🚪 Paystack popup closed by user');
+          debugLog('🚪 Paystack popup closed by user');
           setPaymentInProgress(false);
           // Don't show error toast for user-initiated close
         }
@@ -508,7 +566,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     }
   };
 
-  console.log('🔄 EnhancedCheckoutFlow render - isOpen:', isOpen, 'cart items:', cart?.items?.length);
+  debugLog('🔄 EnhancedCheckoutFlow render - isOpen:', isOpen, 'cart items:', cart?.items?.length);
 
   if (!isOpen) return null;
 
@@ -840,3 +898,10 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     </div>
   );
 };
+
+// Export both the component and error boundary wrapped version
+export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = (props) => (
+  <CheckoutErrorBoundary>
+    <EnhancedCheckoutFlowComponent {...props} />
+  </CheckoutErrorBoundary>
+);

@@ -90,10 +90,16 @@ serve(async (req) => {
       discount_amount: item.discount_amount || 0
     }));
 
+    // Convert items to JSONB for database function
+    const itemsJsonb = JSON.stringify(transformedItems);
+    
+    console.log('Transformed items:', transformedItems);
+    console.log('Items as JSONB:', itemsJsonb);
+    
     console.log('Calling create_order_with_items with:', {
       p_customer_email: checkoutData.customer_email,
       p_customer_name: checkoutData.customer_name,
-      p_items: transformedItems,
+      p_items: itemsJsonb,
       p_customer_phone: checkoutData.customer_phone || '',
       p_fulfillment_type: checkoutData.fulfillment_type,
       p_delivery_address: checkoutData.delivery_address || null,
@@ -109,7 +115,7 @@ serve(async (req) => {
       .rpc('create_order_with_items', {
         p_customer_email: checkoutData.customer_email,
         p_customer_name: checkoutData.customer_name,
-        p_items: transformedItems,
+        p_items: itemsJsonb,
         p_customer_phone: checkoutData.customer_phone || '',
         p_fulfillment_type: checkoutData.fulfillment_type,
         p_delivery_address: checkoutData.delivery_address || null,

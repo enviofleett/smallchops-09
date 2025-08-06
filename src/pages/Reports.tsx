@@ -6,6 +6,7 @@ import { fetchReportsData } from "@/api/reports";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
+import ProductionErrorBoundary from '@/components/ui/production-error-boundary';
 
 // Dynamic icon/color logic has to remain for each KPI type
 const kpiIconClasses = [
@@ -38,7 +39,8 @@ export default function Reports() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["reports/analytics"],
     queryFn: () => fetchReportsData(3), // Pass retry count as argument
-    staleTime: 3 * 60 * 1000, // 3min cache
+    staleTime: 2 * 60 * 1000, // 2min cache for live data
+    refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes for live updates
     retry: false // Disable react-query retry since fetchReportsData handles its own retry logic
   });
 
@@ -55,7 +57,7 @@ export default function Reports() {
     ? [
         {
           label: "Today's Revenue",
-          value: data.kpiStats?.todaysRevenue !== undefined ? `₦${Number(data.kpiStats.todaysRevenue).toLocaleString()}` : "-",
+          value: data.stats?.totalRevenue !== undefined ? `₦${Number(data.stats.totalRevenue).toLocaleString()}` : "-",
           sub: "",
           icon: (
             <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -66,8 +68,8 @@ export default function Reports() {
           className: kpiIconClasses[0],
         },
         {
-          label: "Orders Today",
-          value: data.kpiStats?.ordersToday !== undefined ? data.kpiStats.ordersToday : "-",
+          label: "Total Orders",
+          value: data.stats?.totalOrders !== undefined ? data.stats.totalOrders : "-",
           sub: "",
           icon: (
             <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -78,8 +80,8 @@ export default function Reports() {
           className: kpiIconClasses[1],
         },
         {
-          label: "Pending Orders",
-          value: data.kpiStats?.pendingOrders !== undefined ? data.kpiStats.pendingOrders : "-",
+          label: "Total Products",
+          value: data.stats?.totalProducts !== undefined ? data.stats.totalProducts : "-",
           sub: "",
           icon: (
             <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="#84cc16" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -90,8 +92,8 @@ export default function Reports() {
           className: kpiIconClasses[2],
         },
         {
-          label: "Completed Orders",
-          value: data.kpiStats?.completedOrders !== undefined ? data.kpiStats.completedOrders : "-",
+          label: "Total Customers",
+          value: data.stats?.totalCustomers !== undefined ? data.stats.totalCustomers : "-",
           sub: "",
           icon: (
             <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
@@ -105,96 +107,98 @@ export default function Reports() {
     : [];
 
   return (
-    <div className="space-y-6 md:space-y-8 px-4 md:px-0">
-      {/* Header */}
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-        <div>
-          <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800">
-            Reports & Analytics
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Track your business performance and insights
-          </p>
-        </div>
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          {/* Weekly Dropdown */}
-          <select
-            className="rounded-xl px-4 py-2 bg-gray-100 border border-gray-200 text-teal-700 font-medium focus:outline-none min-h-[44px]"
-            defaultValue="weekly"
-          >
-            <option value="weekly">Weekly</option>
-            <option value="monthly">Monthly</option>
-            <option value="custom">Custom</option>
-          </select>
-          {/* Export Buttons */}
-          <div className="flex gap-2">
-            <button 
-              onClick={() => {
-                if (data) {
-                  const csvData = [
-                    ['Metric', 'Value'],
-                    ['Total Revenue', data.kpiStats?.todaysRevenue || 0],
-                    ['Orders Today', data.kpiStats?.ordersToday || 0],
-                    ['Pending Orders', data.kpiStats?.pendingOrders || 0],
-                    ['Completed Orders', data.kpiStats?.completedOrders || 0]
-                  ];
-                  const csvContent = csvData.map(row => row.join(',')).join('\n');
-                  const blob = new Blob([csvContent], { type: 'text/csv' });
-                  const url = window.URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `reports-${new Date().toISOString().split('T')[0]}.csv`;
-                  a.click();
-                  window.URL.revokeObjectURL(url);
-                }
-              }}
-              className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none"
+    <ProductionErrorBoundary context="Reports">
+      <div className="space-y-6 md:space-y-8 px-4 md:px-0">
+        {/* Header */}
+        <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+          <div>
+            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800">
+              Reports & Analytics
+            </h1>
+            <p className="text-gray-600 mt-2">
+              Track your business performance and insights
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+            {/* Weekly Dropdown */}
+            <select
+              className="rounded-xl px-4 py-2 bg-gray-100 border border-gray-200 text-teal-700 font-medium focus:outline-none min-h-[44px]"
+              defaultValue="weekly"
             >
-              <FileText className="w-4 h-4" /> 
-              <span className="hidden sm:inline">Export CSV</span>
-              <span className="sm:hidden">CSV</span>
-            </button>
-            <button 
-              onClick={() => {
-                window.print();
-              }}
-              className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none"
-            >
-              <Download className="w-4 h-4" /> 
-              <span className="hidden sm:inline">Print Report</span>
-              <span className="sm:hidden">Print</span>
-            </button>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="custom">Custom</option>
+            </select>
+            {/* Export Buttons */}
+            <div className="flex gap-2">
+              <button 
+                onClick={() => {
+                  if (data) {
+                    const csvData = [
+                      ['Metric', 'Value'],
+                      ['Total Revenue', data.stats?.totalRevenue || 0],
+                      ['Total Orders', data.stats?.totalOrders || 0],
+                      ['Total Products', data.stats?.totalProducts || 0],
+                      ['Total Customers', data.stats?.totalCustomers || 0]
+                    ];
+                    const csvContent = csvData.map(row => row.join(',')).join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv' });
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `reports-${new Date().toISOString().split('T')[0]}.csv`;
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                  }
+                }}
+                className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none"
+              >
+                <FileText className="w-4 h-4" /> 
+                <span className="hidden sm:inline">Export CSV</span>
+                <span className="sm:hidden">CSV</span>
+              </button>
+              <button 
+                onClick={() => {
+                  window.print();
+                }}
+                className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none"
+              >
+                <Download className="w-4 h-4" /> 
+                <span className="hidden sm:inline">Print Report</span>
+                <span className="sm:hidden">Print</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-      {/* KPI Cards */}
-      {isLoading ? (
-        <KpiSkeletons />
-      ) : (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          {kpiData.map((kpi, i) => (
-            <div
-              key={kpi.label}
-              className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 flex flex-col gap-3"
-            >
-              <div className={`rounded-xl flex items-center justify-center w-10 h-10 md:w-12 md:h-12 ${kpi.className}`}>
-                {kpi.icon}
+        {/* KPI Cards */}
+        {isLoading ? (
+          <KpiSkeletons />
+        ) : (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+            {kpiData.map((kpi, i) => (
+              <div
+                key={kpi.label}
+                className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 flex flex-col gap-3"
+              >
+                <div className={`rounded-xl flex items-center justify-center w-10 h-10 md:w-12 md:h-12 ${kpi.className}`}>
+                  {kpi.icon}
+                </div>
+                <div className="text-xs md:text-sm text-gray-500 font-semibold">{kpi.label}</div>
+                <div className="text-xl md:text-2xl font-bold text-gray-800">{kpi.value}</div>
+                {/* Optionally add sub: Not implemented yet in get_dashboard_data, left empty. */}
               </div>
-              <div className="text-xs md:text-sm text-gray-500 font-semibold">{kpi.label}</div>
-              <div className="text-xl md:text-2xl font-bold text-gray-800">{kpi.value}</div>
-              {/* Optionally add sub: Not implemented yet in get_dashboard_data, left empty. */}
-            </div>
-          ))}
+            ))}
+          </div>
+        )}
+
+        {/* Revenue Breakdown */}
+        <RevenueBreakdown data={data} isLoading={isLoading} />
+
+        {/* Chart & Tabs Section */}
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+          <ReportTabs reportsData={data} isLoading={isLoading} />
         </div>
-      )}
-
-      {/* Revenue Breakdown */}
-      <RevenueBreakdown data={data} isLoading={isLoading} />
-
-      {/* Chart & Tabs Section */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
-        <ReportTabs reportsData={data} isLoading={isLoading} />
       </div>
-    </div>
+    </ProductionErrorBoundary>
   );
 }

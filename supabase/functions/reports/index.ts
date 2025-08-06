@@ -104,8 +104,10 @@ serve(async (req) => {
         }, {} as Record<string, number>);
 
         revenueTrendsFormatted = Object.entries(revenueByDate).map(([date, revenue]) => ({
-          date,
-          revenue
+          day: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
+          name: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          revenue,
+          orders: 0 // Will be populated separately
         }));
         console.log(`Revenue trends: ${revenueTrendsFormatted.length} data points`);
       }
@@ -132,7 +134,9 @@ serve(async (req) => {
         }, {} as Record<string, number>);
 
         orderTrendsFormatted = Object.entries(ordersByDate).map(([date, orders]) => ({
-          date,
+          day: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
+          name: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+          revenue: 0, // Will be merged with revenue data
           orders
         }));
         console.log(`Order trends: ${orderTrendsFormatted.length} data points`);
@@ -163,7 +167,13 @@ serve(async (req) => {
           .slice(0, 5)
           .map(([key, orders]) => {
             const [name, email] = key.split('-');
-            return { customer_name: name, customer_email: email, orders };
+            return { 
+              id: email, 
+              name, 
+              email, 
+              totalOrders: orders,
+              totalSpent: 0
+            };
           });
         console.log(`Top customers by orders: ${topCustomersByOrdersFormatted.length} customers`);
       }
@@ -193,7 +203,13 @@ serve(async (req) => {
           .slice(0, 5)
           .map(([key, spending]) => {
             const [name, email] = key.split('-');
-            return { customer_name: name, customer_email: email, spending };
+            return { 
+              id: email, 
+              name, 
+              email, 
+              totalOrders: 0,
+              totalSpent: spending
+            };
           });
         console.log(`Top customers by spending: ${topCustomersBySpendingFormatted.length} customers`);
       }

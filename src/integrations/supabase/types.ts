@@ -6208,6 +6208,9 @@ export type Database = {
         Returns: {
           public_key: string
           test_mode: boolean
+          secret_key: string
+          webhook_secret: string
+          environment: string
         }[]
       }
       get_admin_invitation_metrics: {

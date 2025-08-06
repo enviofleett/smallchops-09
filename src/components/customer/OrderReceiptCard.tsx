@@ -15,6 +15,7 @@ import {
   Package
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { formatAddress } from '@/utils/formatAddress';
 
 interface OrderItem {
   id: string;
@@ -124,7 +125,7 @@ export function OrderReceiptCard({
                 <MapPin className="w-4 h-4" />
                 Delivery Address
               </h3>
-              <p className="text-sm">{order.delivery_address}</p>
+              <p className="text-sm">{formatAddress(order.delivery_address)}</p>
             </div>
           )}
         </div>

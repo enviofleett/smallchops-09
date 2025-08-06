@@ -9,6 +9,7 @@ import {
 import { Mail, Phone, MapPin, Truck, FileText, Package } from "lucide-react";
 import { getCustomerDeliveryHistory } from "@/api/customers";
 import { Customer } from "@/types/customers";
+import { formatAddress } from '@/utils/formatAddress';
 
 interface CustomerDetailsModalProps {
   open: boolean;
@@ -95,7 +96,7 @@ export const CustomerDetailsModal = ({
                   <div className="flex items-center gap-1 text-gray-700 text-sm truncate">
                     <MapPin className="h-4 w-4 text-purple-500" />
                     <span className="truncate">
-                      {order.delivery_address || "No address provided"}
+                      {formatAddress(order.delivery_address)}
                     </span>
                   </div>
 

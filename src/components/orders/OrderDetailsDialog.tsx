@@ -10,6 +10,7 @@ import { Constants } from '@/integrations/supabase/types';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
 import { User, Phone, MapPin, Calendar, Hash, X } from 'lucide-react';
+import { formatAddressMultiline } from '@/utils/formatAddress';
 
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -96,11 +97,11 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
               </div>
               <div className="flex items-start">
                 <MapPin className="h-4 w-4 mr-3 mt-1 text-gray-500 flex-shrink-0" />
-                <span className="break-words">
-                  {typeof order.delivery_address === 'string' 
-                    ? order.delivery_address || 'N/A'
-                    : JSON.stringify(order.delivery_address, null, 2) || 'N/A'}
-                </span>
+                <div className="break-words">
+                  {formatAddressMultiline(order.delivery_address).split('\n').map((line, index) => (
+                    <div key={index} className="text-sm">{line}</div>
+                  ))}
+                </div>
               </div>
             </div>
 

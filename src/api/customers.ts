@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { formatAddress } from '@/utils/formatAddress';
 import type { Customer, CustomerDb, CustomerAnalytics as CustomerAnalyticsType } from '@/types/customers';
 import { getCustomerEmailStatuses } from './emailStatus';
 
@@ -97,9 +98,7 @@ export const getCustomerDeliveryHistory = async (
   }
   return (data ?? []).map(order => ({
     ...order,
-    delivery_address: typeof order.delivery_address === 'string' 
-      ? order.delivery_address 
-      : JSON.stringify(order.delivery_address || ''),
+    delivery_address: formatAddress(order.delivery_address),
     order_type: order.order_type as string,
     status: order.status as string
   }));

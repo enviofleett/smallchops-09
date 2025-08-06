@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { BrandingTab } from "@/components/settings/BrandingTab";
+import { ComprehensiveBrandingTab } from "@/components/branding/ComprehensiveBrandingTab";
 import { AdminUserControl } from "@/components/settings/AdminUserControl";
 import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
 import { PaymentSettingsTab } from "@/components/payments/PaymentSettingsTab";
@@ -74,11 +74,7 @@ const Settings = () => {
             </TabsList>
             
             <TabsContent value="branding">
-              <Card>
-                <CardContent className="pt-6">
-                  <BrandingTab />
-                </CardContent>
-              </Card>
+              <ComprehensiveBrandingTab />
             </TabsContent>
             
             <TabsContent value="content">

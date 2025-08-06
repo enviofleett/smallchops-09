@@ -58,43 +58,104 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
     setCurrentReference(newReference);
   }, [initialReference]);
 
-  // Load Paystack script
+  // Load Paystack script with timeout and enhanced error handling
   useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
     const loadPaystackScript = () => {
       return new Promise<void>((resolve, reject) => {
+        // Set 10-second timeout for script loading
+        timeoutId = setTimeout(() => {
+          reject(new Error('Script loading timeout (10 seconds)'));
+        }, 10000);
+
         if (window.PaystackPop) {
-          console.log('✅ Paystack script already loaded');
+          clearTimeout(timeoutId);
           resolve();
           return;
         }
 
         const existingScript = document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]');
         if (existingScript) {
-          console.log('⏳ Paystack script loading...');
-          existingScript.addEventListener('load', () => resolve());
-          existingScript.addEventListener('error', () => reject(new Error('Script failed to load')));
+          const handleLoad = () => {
+            clearTimeout(timeoutId);
+            existingScript.removeEventListener('load', handleLoad);
+            existingScript.removeEventListener('error', handleError);
+            resolve();
+          };
+          
+          const handleError = () => {
+            clearTimeout(timeoutId);
+            existingScript.removeEventListener('load', handleLoad);
+            existingScript.removeEventListener('error', handleError);
+            reject(new Error('Script failed to load'));
+          };
+          
+          existingScript.addEventListener('load', handleLoad);
+          existingScript.addEventListener('error', handleError);
           return;
         }
 
-        console.log('📦 Loading Paystack script');
         const script = document.createElement('script');
         script.src = 'https://js.paystack.co/v1/inline.js';
         script.async = true;
-        script.onload = () => {
-          console.log('✅ Paystack script loaded successfully');
-          resolve();
+        
+        const handleScriptLoad = () => {
+          clearTimeout(timeoutId);
+          script.removeEventListener('load', handleScriptLoad);
+          script.removeEventListener('error', handleScriptError);
+          
+          // Verify PaystackPop is available
+          if (window.PaystackPop) {
+            resolve();
+          } else {
+            reject(new Error('PaystackPop not available after script load'));
+          }
         };
-        script.onerror = () => reject(new Error('Failed to load Paystack script'));
+        
+        const handleScriptError = () => {
+          clearTimeout(timeoutId);
+          script.removeEventListener('load', handleScriptLoad);
+          script.removeEventListener('error', handleScriptError);
+          reject(new Error('Failed to load Paystack script'));
+        };
+        
+        script.addEventListener('load', handleScriptLoad);
+        script.addEventListener('error', handleScriptError);
         document.head.appendChild(script);
       });
     };
 
+    setScriptError(null);
+    setPaystackReady(false);
+    
     loadPaystackScript()
-      .then(() => setPaystackReady(true))
+      .then(() => {
+        setPaystackReady(true);
+        setScriptError(null);
+      })
       .catch((error) => {
-        console.error('❌ Paystack script loading error:', error);
         setScriptError(error.message);
+        setPaystackReady(false);
+        
+        // Auto-retry once after 2 seconds for timeout errors
+        if (error.message.includes('timeout')) {
+          setTimeout(() => {
+            loadPaystackScript()
+              .then(() => {
+                setPaystackReady(true);
+                setScriptError(null);
+              })
+              .catch((retryError) => {
+                setScriptError(`Script loading failed: ${retryError.message}`);
+              });
+          }, 2000);
+        }
       });
+
+    return () => {
+      if (timeoutId) clearTimeout(timeoutId);
+    };
   }, []);
 
   const initializePayment = useCallback(async () => {
@@ -260,7 +321,19 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
       {!paystackReady && !scriptError && (
         <div className="text-center text-sm text-muted-foreground">
           <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
-          Loading secure payment...
+          Loading secure payment gateway...
+        </div>
+      )}
+
+      {/* Progress indicator for better UX */}
+      {paymentInProgress && (
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
+          <div className="flex items-center justify-center space-x-2">
+            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+            <span className="text-sm text-blue-800">
+              Secure payment in progress... Please do not close this window.
+            </span>
+          </div>
         </div>
       )}
 

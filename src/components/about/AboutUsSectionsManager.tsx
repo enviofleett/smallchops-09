@@ -290,7 +290,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
             <Label>Section Image</Label>
             <ImageUpload
               value={formData.image_url}
-              onChange={(file) => setFormData({ ...formData, image_url: file ? URL.createObjectURL(file) : '' })}
+              onChange={(file) => setFormData({ ...formData, image_url: file ? (typeof file === 'string' ? file : URL.createObjectURL(file)) : '' })}
             />
           </div>
 

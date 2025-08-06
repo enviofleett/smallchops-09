@@ -273,11 +273,18 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         body: sanitizedData
       });
 
+      // DEBUG: Log the exact response structure
+      console.log('🔍 DEBUG - Full response:', { data, error });
+      console.log('🔍 DEBUG - Response data:', JSON.stringify(data, null, 2));
+      console.log('🔍 DEBUG - Response data.success:', data?.success);
+      console.log('🔍 DEBUG - Response data type:', typeof data);
+
       if (error) {
+        console.error('🔍 DEBUG - Supabase function error:', error);
         throw new Error(error.message);
       }
 
-      if (!data.success) {
+      if (!data?.success) {
         toast({
           title: "Checkout Failed",
           description: data.message || "Failed to process checkout",

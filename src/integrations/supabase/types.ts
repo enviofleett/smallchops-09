@@ -6040,6 +6040,10 @@ export type Database = {
         Args: { product_ids: string[] }
         Returns: Json
       }
+      bulk_update_payment_status_to_success: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       calculate_bogo_discount: {
         Args: { p_promotion_id: string; p_cart_items: Json }
         Returns: Json
@@ -6620,6 +6624,10 @@ export type Database = {
           p_details?: Json
         }
         Returns: string
+      }
+      manual_payment_verification: {
+        Args: { p_payment_reference: string }
+        Returns: Json
       }
       minimal_payment_test_insert: {
         Args: { p_order_id: string; p_amount: number }

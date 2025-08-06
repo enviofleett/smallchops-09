@@ -299,11 +299,13 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         body: sanitizedData
       });
 
-      console.log('💳 Checkout response received:', { 
+      console.log('💳 Full checkout response:', data);
+      console.log('🔍 Response validation:', { 
         success: data?.success, 
         hasPaymentUrl: !!data?.payment?.payment_url,
         hasReference: !!data?.payment?.reference,
-        totalAmount: data?.total_amount
+        totalAmount: data?.total_amount,
+        errorPresent: !!error
       });
 
       if (error) {
@@ -311,15 +313,19 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         throw new Error(error.message);
       }
 
-      if (!data?.success) {
-        console.error('❌ Checkout failed:', data);
+      // CRITICAL FIX: Check for actual success value
+      if (data?.success !== true) {
+        console.error('❌ Checkout failed - backend returned:', data);
+        const errorMessage = data?.message || data?.error || "Failed to process checkout";
         toast({
           title: "Checkout Failed",
-          description: data.message || "Failed to process checkout",
+          description: errorMessage,
           variant: "destructive",
         });
         return;
       }
+
+      console.log('✅ Checkout successful, processing payment...');
 
       // Process Paystack payment with popup
       if (data.payment?.payment_url && data.payment?.reference) {
@@ -405,82 +411,86 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     setPaymentInProgress(true);
     
     try {
-      // Ensure Paystack script is loaded
-      await loadPaystackScript();
-      
-      console.log('🚀 Initializing Paystack payment with newTransaction...', {
+      console.log('🚀 Starting Paystack payment initialization...', {
         amount: paymentData.amount,
         email: paymentData.email,
-        reference: paymentData.reference
+        reference: paymentData.reference,
+        paystackLoaded: !!window.PaystackPop
       });
 
-      // Use newTransaction method for better reliability
-      if (typeof window.PaystackPop.setup === 'function') {
-        // Use setup method as fallback
-        const handler = window.PaystackPop.setup({
-          key: 'pk_live_0b6a7a38a3afaaa5dd1ab30c7fbee8a3d9a4e2e7',
-          email: paymentData.email,
-          amount: paymentData.amount * 100,
-          currency: 'NGN',
-          ref: paymentData.reference,
-          channels: ['card', 'bank', 'ussd', 'mobile_money'],
-          metadata: {
-            order_number: paymentData.orderNumber,
-            customer_email: paymentData.email,
-            order_id: paymentData.reference.split('_')[0]
-          },
-          callback: function(response: any) {
-            console.log('✅ Paystack payment callback received:', response);
-            setPaymentInProgress(false);
+      // Wait for Paystack to be available with timeout
+      let attempts = 0;
+      while (!window.PaystackPop && attempts < 30) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        attempts++;
+      }
+
+      if (!window.PaystackPop) {
+        throw new Error('Paystack failed to load after 3 seconds');
+      }
+
+      console.log('✅ Paystack available, initializing payment popup...');
+
+      // Use setup method which is available on the PaystackPop object
+      const handler = window.PaystackPop.setup({
+        key: 'pk_live_0b6a7a38a3afaaa5dd1ab30c7fbee8a3d9a4e2e7',
+        email: paymentData.email,
+        amount: paymentData.amount * 100, // Convert to kobo
+        currency: 'NGN',
+        ref: paymentData.reference,
+        channels: ['card', 'bank', 'ussd', 'mobile_money'],
+        metadata: {
+          order_number: paymentData.orderNumber,
+          customer_email: paymentData.email
+        },
+        callback: function(response: any) {
+          console.log('✅ Paystack payment callback received:', response);
+          setPaymentInProgress(false);
+          
+          if (response.status === 'success') {
+            markCheckoutInProgress(response.reference);
+            clearCart();
             
-            if (response.status === 'success') {
-              markCheckoutInProgress(response.reference);
-              clearCart();
-              
-              toast({
-                title: "Payment Successful!",
-                description: "Your payment has been processed successfully.",
-              });
-              
-              window.location.href = `/payment-callback?reference=${response.reference}&status=success`;
-            } else {
-              console.error('❌ Payment was not successful:', response);
-              toast({
-                title: "Payment Failed",
-                description: response.message || "Your payment was not successful. Please try again.",
-                variant: "destructive",
-              });
-            }
-          },
-          onClose: function() {
-            console.log('🚪 Paystack popup closed by user');
-            setPaymentInProgress(false);
             toast({
-              title: "Payment Cancelled",
-              description: "You cancelled the payment process.",
+              title: "Payment Successful!",
+              description: "Your payment has been processed successfully.",
+            });
+            
+            // Navigate to payment callback for verification
+            window.location.href = `/payment-callback?reference=${response.reference}&status=success`;
+          } else {
+            console.error('❌ Payment was not successful:', response);
+            toast({
+              title: "Payment Failed",
+              description: response.message || "Your payment was not successful. Please try again.",
               variant: "destructive",
             });
           }
-        });
-        
-        handler.openIframe();
-      } else {
-        throw new Error('Paystack popup not properly initialized');
-      }
+        },
+        onClose: function() {
+          console.log('🚪 Paystack popup closed by user');
+          setPaymentInProgress(false);
+          // Don't show error toast for user-initiated close
+        }
+      });
+
+      // Open the payment popup
+      handler.openIframe();
       
     } catch (error) {
       console.error('💳 Paystack initialization failed:', error);
       setPaymentInProgress(false);
       
-      // Fallback to redirect if popup fails
+      // Show error and fallback to redirect
       toast({
-        title: "Payment Popup Unavailable",
-        description: "Redirecting to secure payment page...",
+        title: "Payment Error",
+        description: "Failed to open payment popup. Redirecting to secure payment page...",
+        variant: "destructive",
       });
       
       setTimeout(() => {
         window.location.href = paymentData.paymentUrl;
-      }, 1500);
+      }, 2000);
     }
   };
 

@@ -119,7 +119,7 @@ const CategoryProductsContent = () => {
         </div>
       </div>
 
-      <div className={`container mx-auto px-4 py-6 sm:py-8 ${isCustomizationCategory ? 'lg:pr-96' : ''}`}>
+      <div className={`container mx-auto px-4 py-6 sm:py-8 ${isCustomizationCategory ? 'lg:pr-96' : ''} transition-all duration-300`}>
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 lg:gap-8">
           {/* Left Sidebar - Categories - Hidden on mobile */}
           <div className="hidden lg:block lg:col-span-1">
@@ -342,11 +342,13 @@ const CategoryProductsContent = () => {
         </div>
       </div>
 
-      {/* Customization Order Builder */}
-      <CustomizationOrderBuilder
-        isOpen={showCustomizationBuilder}
-        onClose={() => setShowCustomizationBuilder(false)}
-      />
+      {/* Customization Order Builder - Shows automatically for customization category */}
+      {isCustomizationCategory && (
+        <CustomizationOrderBuilder
+          isOpen={showCustomizationBuilder || !customizationContext.isEmpty}
+          onClose={() => setShowCustomizationBuilder(false)}
+        />
+      )}
 
       <PublicFooter />
     </div>

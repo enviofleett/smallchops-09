@@ -1,40 +1,22 @@
-// PRODUCTION-READY PAYSTACK WEBHOOK HANDLER
-// Enhanced security, monitoring, and error handling for live transactions
-
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-
-// Official Paystack IP addresses (updated 2025)
-const PAYSTACK_IPS = [
-  '52.31.139.75',
-  '52.49.173.169', 
-  '52.214.14.220',
-  '54.154.89.105',
-  '54.154.151.138',
-  '54.217.79.138'
-];
+import { crypto } from "https://deno.land/std@0.190.0/crypto/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type, x-paystack-signature',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Content-Security-Policy': "default-src 'none'",
-  'X-Content-Type-Options': 'nosniff',
-  'X-Frame-Options': 'DENY',
-  'X-XSS-Protection': '1; mode=block'
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
 };
 
+// Paystack webhook events that we handle
 interface PaystackWebhookPayload {
   event: string;
   data: {
-    id?: string;
+    id: string;
     reference: string;
     amount: number;
-    currency: string;
     status: string;
     gateway_response: string;
     paid_at?: string;
-    created_at: string;
     channel: string;
     fees?: number;
     authorization?: {
@@ -44,24 +26,19 @@ interface PaystackWebhookPayload {
       exp_month: string;
       exp_year: string;
       bank: string;
+      account_name?: string;
     };
+    customer?: {
+      email: string;
+      customer_code: string;
+    };
+    metadata?: any;
   };
 }
 
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-  { auth: { persistSession: false } }
-);
-
+// Security function to verify webhook signature
 async function verifyWebhookSignature(payload: string, signature: string, secret: string): Promise<boolean> {
   try {
-    // Validate inputs
-    if (!payload || !signature || !secret) {
-      console.error('[WEBHOOK] Missing required parameters for signature verification');
-      return false;
-    }
-
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       'raw',
@@ -71,165 +48,182 @@ async function verifyWebhookSignature(payload: string, signature: string, secret
       ['sign']
     );
     
-    const signatureBuffer = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
-    const computedSignature = Array.from(new Uint8Array(signatureBuffer))
+    const computedSignature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
+    const computedHex = Array.from(new Uint8Array(computedSignature))
       .map(b => b.toString(16).padStart(2, '0'))
       .join('');
     
-    // Timing-safe comparison to prevent timing attacks
-    if (computedSignature.length !== signature.length) {
-      return false;
-    }
-    
-    let result = 0;
-    for (let i = 0; i < computedSignature.length; i++) {
-      result |= computedSignature.charCodeAt(i) ^ signature.charCodeAt(i);
-    }
-    
-    const isValid = result === 0;
-    console.log(`[WEBHOOK] Signature verification: ${isValid ? 'VALID' : 'INVALID'}`);
-    
-    return isValid;
+    return computedHex === signature;
   } catch (error) {
-    console.error('[WEBHOOK] Signature verification error:', error);
+    console.error('Signature verification error:', error);
     return false;
   }
 }
 
-async function logSecurityIncident(type: string, description: string, severity: string, metadata: any = {}) {
+// Function to log security incidents
+async function logSecurityIncident(
+  type: string, 
+  description: string, 
+  severity: string, 
+  metadata?: any
+): Promise<void> {
   try {
-    await supabase.rpc('log_payment_security_event', {
-      event_type: type,
-      severity: severity,
-      details: { description, ...metadata }
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    );
+
+    await supabase.from('audit_logs').insert({
+      action: type,
+      category: 'Security',
+      message: description,
+      new_values: { 
+        severity, 
+        metadata,
+        timestamp: new Date().toISOString() 
+      }
     });
   } catch (error) {
     console.error('Failed to log security incident:', error);
   }
 }
 
+// Handle charge.success events
 async function processChargeSuccess(data: any): Promise<{ success: boolean; message: string }> {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    { auth: { persistSession: false } }
+  );
+
   try {
-    const result = await supabase.rpc('confirm_payment_atomic', {
+    // Use the existing successful payment handler
+    await supabase.rpc('handle_successful_payment', {
       p_reference: data.reference,
-      p_amount: data.amount,
-      p_paystack_data: data,
-      p_confirmed_at: new Date().toISOString()
+      p_paid_at: data.paid_at ? new Date(data.paid_at) : new Date(),
+      p_gateway_response: data.gateway_response,
+      p_fees: data.fees ? data.fees / 100 : 0,
+      p_channel: data.channel,
+      p_authorization_code: data.authorization?.authorization_code,
+      p_card_type: data.authorization?.card_type,
+      p_last4: data.authorization?.last4,
+      p_exp_month: data.authorization?.exp_month,
+      p_exp_year: data.authorization?.exp_year,
+      p_bank: data.authorization?.bank
     });
 
-    if (result.error) {
-      throw result.error;
-    }
-
-    return { success: true, message: 'Payment confirmed successfully' };
+    return { success: true, message: 'Charge success processed' };
   } catch (error) {
     console.error('Error processing charge success:', error);
-    await logSecurityIncident(
-      'webhook_processing_error',
-      'Failed to process charge.success webhook',
-      'high',
-      { reference: data.reference, error: error.message }
-    );
-    throw error;
+    return { success: false, message: error.message };
   }
 }
 
+// Handle charge.failed events
 async function processChargeFailed(data: any): Promise<{ success: boolean; message: string }> {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    { auth: { persistSession: false } }
+  );
+
   try {
-    const { error } = await supabase
+    // Update payment transaction status
+    const { error: updateError } = await supabase
       .from('payment_transactions')
       .update({
         status: 'failed',
         gateway_response: data.gateway_response,
-        provider_response: data,
-        updated_at: new Date().toISOString()
+        updated_at: new Date()
       })
       .eq('provider_reference', data.reference);
 
-    if (error) {
-      throw error;
+    if (updateError) throw updateError;
+
+    // Update associated order status
+    const { data: transaction } = await supabase
+      .from('payment_transactions')
+      .select('order_id')
+      .eq('provider_reference', data.reference)
+      .single();
+
+    if (transaction?.order_id) {
+      await supabase
+        .from('orders')
+        .update({
+          payment_status: 'failed',
+          status: 'cancelled',
+          updated_at: new Date()
+        })
+        .eq('id', transaction.order_id);
     }
 
-    // Also update related order if exists
-    await supabase
-      .from('orders')
-      .update({
-        payment_status: 'failed',
-        status: 'cancelled',
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', (
-        await supabase
-          .from('payment_transactions')
-          .select('order_id')
-          .eq('provider_reference', data.reference)
-          .single()
-      ).data?.order_id);
-
-    return { success: true, message: 'Payment failure recorded' };
+    return { success: true, message: 'Charge failure processed' };
   } catch (error) {
-    console.error('Error processing charge failed:', error);
-    throw error;
+    console.error('Error processing charge failure:', error);
+    return { success: false, message: error.message };
   }
 }
 
+// Handle transfer.success events
 async function processTransferSuccess(data: any): Promise<{ success: boolean; message: string }> {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    { auth: { persistSession: false } }
+  );
+
   try {
+    // Update refund status if applicable
     const { error } = await supabase
-      .from('payment_refunds')
+      .from('refunds')
       .update({
         status: 'completed',
-        provider_refund_id: data.id,
-        updated_at: new Date().toISOString()
+        processed_at: new Date(),
+        gateway_response: data.gateway_response
       })
-      .eq('transaction_id', (
-        await supabase
-          .from('payment_transactions')
-          .select('id')
-          .eq('provider_reference', data.reference)
-          .single()
-      ).data?.id);
+      .eq('provider_reference', data.reference);
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    return { success: true, message: 'Transfer success recorded' };
+    return { success: true, message: 'Transfer success processed' };
   } catch (error) {
     console.error('Error processing transfer success:', error);
-    throw error;
+    return { success: false, message: error.message };
   }
 }
 
+// Handle transfer.failed events
 async function processTransferFailed(data: any): Promise<{ success: boolean; message: string }> {
+  const supabase = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    { auth: { persistSession: false } }
+  );
+
   try {
+    // Update refund status
     const { error } = await supabase
-      .from('payment_refunds')
+      .from('refunds')
       .update({
         status: 'failed',
-        updated_at: new Date().toISOString()
+        processed_at: new Date(),
+        gateway_response: data.gateway_response
       })
-      .eq('transaction_id', (
-        await supabase
-          .from('payment_transactions')
-          .select('id')
-          .eq('provider_reference', data.reference)
-          .single()
-      ).data?.id);
+      .eq('provider_reference', data.reference);
 
-    if (error) {
-      throw error;
-    }
+    if (error) throw error;
 
-    return { success: true, message: 'Transfer failure recorded' };
+    return { success: true, message: 'Transfer failure processed' };
   } catch (error) {
-    console.error('Error processing transfer failed:', error);
-    throw error;
+    console.error('Error processing transfer failure:', error);
+    return { success: false, message: error.message };
   }
 }
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
@@ -240,233 +234,197 @@ serve(async (req) => {
   }
 
   try {
-    console.log('[WEBHOOK] Processing Paystack webhook...');
-    
-    // Enhanced IP validation
-    const clientIP = req.headers.get('cf-connecting-ip') || 
-                    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-                    req.headers.get('x-real-ip') || 
-                    'unknown';
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    );
 
-    // Enhanced IP validation using database function
-    if (Deno.env.get('DENO_ENV') === 'production') {
-      const { data: isValidIP, error: ipCheckError } = await supabase
-        .rpc('validate_paystack_webhook_ip', { request_ip: clientIP });
-      
-      if (ipCheckError || !isValidIP) {
-        await logSecurityIncident(
-          'unauthorized_webhook_ip',
-          `Webhook request from unauthorized IP: ${clientIP}`,
-          'high',
-          { ip: clientIP, user_agent: req.headers.get('user-agent'), validation_error: ipCheckError?.message }
-        );
-
-        return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 403,
-        });
-      }
-    }
-    
-    // Get request body first
-    const body = await req.text();
-    console.log('[WEBHOOK] Received payload, processing...');
-
-    // OPTIONAL SECURITY: Verify webhook signature (production-safe)
+    // Get the raw payload for signature verification
+    const payload = await req.text();
     const signature = req.headers.get('x-paystack-signature');
-    let signatureVerified = false;
-    
-    // Get active webhook secret from database (optional for production safety)
-    const { data: config } = await supabase.rpc('get_active_paystack_config');
-    const webhookSecret = config?.webhook_secret;
-    
-    // Only verify signature if both signature header and secret are available
-    if (signature && webhookSecret) {
-      try {
-        signatureVerified = await verifyWebhookSignature(body, signature, webhookSecret);
-        if (signatureVerified) {
-          console.log('[WEBHOOK] Signature verified successfully');
-        } else {
-          console.warn('[WEBHOOK] Signature verification failed - processing anyway for production safety');
+
+    if (!signature) {
+      await logSecurityIncident(
+        'webhook_no_signature',
+        'Webhook received without signature',
+        'high',
+        { ip: req.headers.get('cf-connecting-ip') }
+      );
+      return new Response('No signature provided', { status: 401, headers: corsHeaders });
+    }
+
+    // Validate request is from Paystack IPs (basic IP validation)
+    const clientIP = req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for');
+    const paystackIPs = [
+      '52.31.139.75',
+      '52.49.173.169',
+      '52.214.14.220'
+    ];
+
+    // In production, you should verify against Paystack IPs or use the function validator
+    if (Deno.env.get('ENVIRONMENT') === 'production' && clientIP) {
+      if (!paystackIPs.includes(clientIP.split(',')[0].trim())) {
+        // Call IP validation function
+        const { data: ipValidation } = await supabase.functions.invoke('validate-paystack-ip', {
+          body: { ip: clientIP }
+        });
+        
+        if (!ipValidation?.valid) {
           await logSecurityIncident(
-            'webhook_signature_mismatch',
-            'Invalid webhook signature detected but processing for production safety',
-            'medium',
-            {
-              payload_length: body.length,
-              has_signature: !!signature,
-              has_secret: !!webhookSecret
-            }
+            'webhook_invalid_ip',
+            `Webhook from unauthorized IP: ${clientIP}`,
+            'critical',
+            { ip: clientIP }
           );
+          return new Response('Unauthorized IP', { status: 403, headers: corsHeaders });
         }
-      } catch (error) {
-        console.warn('[WEBHOOK] Signature verification error - processing anyway for production safety:', error);
-        await logSecurityIncident(
-          'webhook_signature_error',
-          'Error during signature verification but processing for production safety',
-          'medium',
-          { error: error.message }
-        );
-      }
-    } else {
-      // Log missing signature or secret for monitoring
-      if (!signature) {
-        console.warn('[WEBHOOK] No signature header - processing without verification for production safety');
-      }
-      if (!webhookSecret) {
-        console.warn('[WEBHOOK] No webhook secret configured - processing without verification for production safety');
       }
     }
 
-    console.log(`[WEBHOOK] Processing webhook - signature verified: ${signatureVerified}`);
+    // Get webhook secret from configuration
+    const { data: config } = await supabase
+      .from('payment_integrations')
+      .select('webhook_secret')
+      .eq('provider', 'paystack')
+      .eq('connection_status', 'connected')
+      .single();
 
-    // CRITICAL SECURITY 2: Parse and validate event data
-    let eventData: PaystackWebhookPayload;
+    if (!config?.webhook_secret) {
+      console.error('Webhook secret not configured');
+      return new Response('Webhook not configured', { status: 500, headers: corsHeaders });
+    }
+
+    // Verify webhook signature
+    const isValidSignature = await verifyWebhookSignature(payload, signature, config.webhook_secret);
+    
+    if (!isValidSignature) {
+      await logSecurityIncident(
+        'webhook_invalid_signature',
+        'Webhook with invalid signature',
+        'critical',
+        { ip: clientIP, signature }
+      );
+      return new Response('Invalid signature', { status: 401, headers: corsHeaders });
+    }
+
+    // Parse the webhook payload
+    let webhookData: PaystackWebhookPayload;
     try {
-      eventData = JSON.parse(body);
+      webhookData = JSON.parse(payload);
     } catch (error) {
-      console.error('[WEBHOOK] Invalid JSON payload:', error);
-      return new Response('Invalid JSON payload', { status: 400, headers: corsHeaders });
+      console.error('Invalid JSON payload:', error);
+      return new Response('Invalid JSON', { status: 400, headers: corsHeaders });
     }
 
-    if (!eventData.event || !eventData.data) {
-      console.error('[WEBHOOK] Invalid event structure');
-      return new Response('Invalid event structure', { status: 400, headers: corsHeaders });
+    // Validate event structure
+    if (!webhookData.event || !webhookData.data) {
+      console.error('Invalid webhook structure');
+      return new Response('Invalid webhook structure', { status: 400, headers: corsHeaders });
     }
 
-    const eventId = eventData.data.id || eventData.data.reference;
-    console.log(`[WEBHOOK] Processing event: ${eventData.event} for ${eventId}`);
-
-    // CRITICAL SECURITY 3: Prevent replay attacks and duplicate processing
-    const { data: existingEvent, error: duplicateError } = await supabase
+    // Check for duplicate events (prevent replay attacks)
+    const eventId = `${webhookData.event}-${webhookData.data.reference}-${webhookData.data.id}`;
+    const { data: existingEvent } = await supabase
       .from('webhook_events')
-      .select('id, processed')
-      .eq('paystack_event_id', eventId)
-      .eq('event_type', eventData.event)
+      .select('id')
+      .eq('event_id', eventId)
       .single();
 
     if (existingEvent) {
-      console.log(`[WEBHOOK] Event ${eventId} already processed`);
+      console.log('Duplicate webhook event ignored:', eventId);
       return new Response('Event already processed', { status: 200, headers: corsHeaders });
     }
 
-    // CRITICAL SECURITY 4: Log webhook event for audit
-    const { data: loggedEvent, error: logError } = await supabase
+    // Log the webhook event
+    const { error: logError } = await supabase
       .from('webhook_events')
       .insert({
-        paystack_event_id: eventId,
-        event_type: eventData.event,
-        event_data: eventData,
-        signature: signature,
+        event_id: eventId,
+        event_type: webhookData.event,
+        provider: 'paystack',
+        payload: webhookData,
         processed: false,
-        source_ip: clientIP,
-        user_agent: req.headers.get('user-agent') || 'unknown',
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
+        received_at: new Date()
+      });
 
     if (logError) {
-      console.error('[WEBHOOK] Failed to log event:', logError);
-      await logSecurityIncident(
-        'webhook_logging_failure',
-        'Failed to log webhook event to audit trail',
-        'high',
-        { event_id: eventId, error: logError.message }
-      );
-      throw logError;
+      console.error('Failed to log webhook event:', logError);
     }
 
-    // CRITICAL SECURITY 5: Process event with comprehensive error handling
+    console.log(`Processing Paystack webhook: ${webhookData.event}`);
+
+    // Process the webhook event
     let processingResult: { success: boolean; message: string };
 
-    try {
-      switch (eventData.event) {
-        case 'charge.success':
-          console.log('[WEBHOOK] Processing charge.success');
-          processingResult = await processChargeSuccess(eventData.data);
-          break;
-        
-        case 'charge.failed':
-          console.log('[WEBHOOK] Processing charge.failed');
-          processingResult = await processChargeFailed(eventData.data);
-          break;
-        
-        case 'transfer.success':
-          console.log('[WEBHOOK] Processing transfer.success');
-          processingResult = await processTransferSuccess(eventData.data);
-          break;
-        
-        case 'transfer.failed':
-          console.log('[WEBHOOK] Processing transfer.failed');
-          processingResult = await processTransferFailed(eventData.data);
-          break;
-        
-        default:
-          console.log(`[WEBHOOK] Unhandled event type: ${eventData.event}`);
-          processingResult = { success: true, message: `Event type ${eventData.event} acknowledged but not processed` };
-      }
-
-      // Update event processing status
-      await supabase
-        .from('webhook_events')
-        .update({
-          processed: true,
-          processing_result: processingResult,
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', loggedEvent.id);
-
-      console.log(`[WEBHOOK] Successfully processed ${eventData.event} for ${eventId}`);
-      return new Response(
-        JSON.stringify({ success: true, message: processingResult.message }), 
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } catch (processingError) {
-      console.error('[WEBHOOK] Event processing error:', processingError);
+    switch (webhookData.event) {
+      case 'charge.success':
+        processingResult = await processChargeSuccess(webhookData.data);
+        break;
       
-      // Update event with error status
-      await supabase
-        .from('webhook_events')
-        .update({
-          processed: false,
-          processing_result: { success: false, error: processingError.message },
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', loggedEvent.id);
-
-      // Log security incident
-      await logSecurityIncident(
-        'webhook_processing_error',
-        'Failed to process webhook event',
-        'high',
-        {
-          event_type: eventData.event,
-          event_id: eventId,
-          error: processingError.message
-        }
-      );
-
-      return new Response(
-        JSON.stringify({ success: false, error: 'Event processing failed' }), 
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      case 'charge.failed':
+        processingResult = await processChargeFailed(webhookData.data);
+        break;
+      
+      case 'transfer.success':
+        processingResult = await processTransferSuccess(webhookData.data);
+        break;
+      
+      case 'transfer.failed':
+        processingResult = await processTransferFailed(webhookData.data);
+        break;
+      
+      default:
+        console.log(`Unhandled webhook event: ${webhookData.event}`);
+        processingResult = { success: true, message: 'Event ignored' };
     }
 
+    // Update webhook event processing status
+    const { error: updateError } = await supabase
+      .from('webhook_events')
+      .update({
+        processed: true,
+        processing_result: processingResult,
+        processed_at: new Date()
+      })
+      .eq('event_id', eventId);
+
+    if (updateError) {
+      console.error('Failed to update webhook processing status:', updateError);
+    }
+
+    // Log successful processing
+    if (processingResult.success) {
+      console.log(`Successfully processed ${webhookData.event}:`, processingResult.message);
+    } else {
+      console.error(`Failed to process ${webhookData.event}:`, processingResult.message);
+    }
+
+    return new Response(JSON.stringify({
+      success: processingResult.success,
+      message: processingResult.message
+    }), {
+      status: processingResult.success ? 200 : 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
   } catch (error) {
-    console.error('[WEBHOOK] Webhook handler error:', error);
+    console.error('Webhook processing error:', error);
     
+    // Log the error
     await logSecurityIncident(
-      'webhook_handler_error',
-      'Critical error in webhook handler',
-      'critical',
-      { error: error.message }
+      'webhook_processing_error',
+      `Webhook processing failed: ${error.message}`,
+      'high',
+      { error: error.message, stack: error.stack }
     );
 
-    return new Response(
-      JSON.stringify({ success: false, error: 'Webhook processing failed' }), 
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Internal server error'
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 });

@@ -95,7 +95,14 @@ export const getCustomerDeliveryHistory = async (
   if (error) {
     throw new Error(error.message);
   }
-  return data ?? [];
+  return (data ?? []).map(order => ({
+    ...order,
+    delivery_address: typeof order.delivery_address === 'string' 
+      ? order.delivery_address 
+      : JSON.stringify(order.delivery_address || ''),
+    order_type: order.order_type as string,
+    status: order.status as string
+  }));
 };
 
 // New helper for resolving or creating a customer by email (use on checkout/registration)

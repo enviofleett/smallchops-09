@@ -451,6 +451,33 @@ serve(async (req) => {
             { status: 400, headers: corsHeaders }
           );
         }
+      } else {
+        // Validate that the specified pickup point exists and is active
+        console.log(`🔍 [${requestId}] Validating pickup point: ${cleanPickupPointId}`);
+        const { data: pickupPoint, error: pickupError } = await supabaseClient
+          .from('pickup_points')
+          .select('id, name, is_active')
+          .eq('id', cleanPickupPointId)
+          .eq('is_active', true)
+          .maybeSingle();
+        
+        if (pickupError) {
+          console.error(`❌ [${requestId}] Error validating pickup point:`, pickupError);
+          return new Response(
+            JSON.stringify({ error: 'Failed to validate pickup point' }),
+            { status: 500, headers: corsHeaders }
+          );
+        }
+        
+        if (!pickupPoint) {
+          console.error(`❌ [${requestId}] Invalid or inactive pickup point: ${cleanPickupPointId}`);
+          return new Response(
+            JSON.stringify({ error: 'Invalid or inactive pickup point' }),
+            { status: 400, headers: corsHeaders }
+          );
+        }
+        
+        console.log(`✅ [${requestId}] Pickup point validated: ${pickupPoint.name}`);
       }
     }
 

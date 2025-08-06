@@ -379,18 +379,17 @@ export const EmailSystemAuditDashboard = () => {
       updateUserJourneyStep(journeyName, 1, { action: 'Creating test order' });
       
       const { data: orderResult, error: orderError } = await supabase.rpc('create_order_with_items', {
-        p_customer_email: testOrderEmail,
-        p_customer_name: 'Test Customer',
+        p_customer_id: 'test-customer-id',
+        p_fulfillment_type: 'delivery',
+        p_delivery_address: null,
+        p_pickup_point_id: null,
+        p_delivery_zone_id: null,
+        p_guest_session_id: null,
         p_items: JSON.stringify([{
           product_id: '00000000-0000-0000-0000-000000000001',
           quantity: 1,
-          unit_price: 1500,
-          total_price: 1500
-        }]),
-        p_customer_phone: '+2348012345678',
-        p_delivery_address: null,
-        p_fulfillment_type: 'delivery',
-        p_payment_method: 'paystack'
+          unit_price: 1500
+        }])
       });
 
       const orderData = orderResult as any;

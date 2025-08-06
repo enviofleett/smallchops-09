@@ -96,7 +96,11 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
               </div>
               <div className="flex items-start">
                 <MapPin className="h-4 w-4 mr-3 mt-1 text-gray-500 flex-shrink-0" />
-                <span className="break-words">{order.delivery_address || 'N/A'}</span>
+                <span className="break-words">
+                  {typeof order.delivery_address === 'string' 
+                    ? order.delivery_address || 'N/A'
+                    : JSON.stringify(order.delivery_address, null, 2) || 'N/A'}
+                </span>
               </div>
             </div>
 

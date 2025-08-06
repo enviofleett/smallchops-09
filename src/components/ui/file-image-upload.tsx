@@ -3,17 +3,15 @@ import { Upload, X, ImageIcon, Loader2, AlertCircle, RotateCcw } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { resizeImage } from '@/lib/imageProcessing';
-import { supabase } from '@/integrations/supabase/client';
 
-interface ImageUploadProps {
-  value?: string | File;
-  onChange: (value: string | File | null) => void;
+interface FileImageUploadProps {
+  value?: File | null;
+  onChange: (file: File | null) => void;
   disabled?: boolean;
   className?: string;
-  uploadMode?: 'file' | 'url'; // Default 'file' returns File, 'url' uploads and returns URL
 }
 
-export const ImageUpload = ({ value, onChange, disabled, className, uploadMode = 'file' }: ImageUploadProps) => {
+export const FileImageUpload = ({ value, onChange, disabled, className }: FileImageUploadProps) => {
   const [isDragOver, setIsDragOver] = useState(false);
   const [preview, setPreview] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -33,57 +31,17 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
     }
   }, []);
 
-  const uploadFileToServer = useCallback(async (file: File): Promise<string> => {
-    // Convert file to base64
-    const fileData = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader();
-      reader.onload = () => {
-        const result = reader.result as string;
-        const base64 = result.split(',')[1]; // Remove data:image/jpeg;base64, prefix
-        resolve(base64);
-      };
-      reader.onerror = reject;
-      reader.readAsDataURL(file);
-    });
-
-    // Upload via edge function
-    const { data, error } = await supabase.functions.invoke('upload-hero-image', {
-      body: {
-        file: {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-          data: fileData
-        }
-      }
-    });
-
-    if (error) {
-      throw error;
-    }
-
-    if (!data?.success) {
-      throw new Error(data?.error || 'Upload failed');
-    }
-
-    return data.data.url;
-  }, []);
-
   // Sync preview with external value changes
   useEffect(() => {
-    console.log("ImageUpload: External value changed to:", value);
+    console.log("FileImageUpload: External value changed to:", value);
     
     // Cleanup previous URL before setting new one
     cleanupPreviewUrl();
     
-    if (value) {
-      if (typeof value === 'string') {
-        setPreview(value);
-      } else if (value instanceof File) {
-        const previewUrl = URL.createObjectURL(value);
-        previewUrlRef.current = previewUrl;
-        setPreview(previewUrl);
-      }
+    if (value instanceof File) {
+      const previewUrl = URL.createObjectURL(value);
+      previewUrlRef.current = previewUrl;
+      setPreview(previewUrl);
     } else {
       setPreview(null);
     }
@@ -121,7 +79,7 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
     const maxRetries = 3;
     
     try {
-      console.log(`ImageUpload: Processing attempt ${attempt}/${maxRetries}`, { 
+      console.log(`FileImageUpload: Processing attempt ${attempt}/${maxRetries}`, { 
         name: file.name, 
         size: file.size, 
         type: file.type 
@@ -141,7 +99,7 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
         lastModified: Date.now(),
       });
 
-      console.log('ImageUpload: Image processing completed', { 
+      console.log('FileImageUpload: Image processing completed', { 
         originalSize: file.size,
         resizedSize: resizedFile.size,
         compressionRatio: (file.size / resizedFile.size).toFixed(2)
@@ -149,7 +107,7 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
 
       return resizedFile;
     } catch (error) {
-      console.error(`ImageUpload: Processing attempt ${attempt} failed:`, error);
+      console.error(`FileImageUpload: Processing attempt ${attempt} failed:`, error);
       
       if (attempt < maxRetries) {
         // Wait before retry (exponential backoff)
@@ -165,7 +123,7 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
   const handleFileChange = useCallback(async (file: File | null) => {
     setError(null);
     setIsProcessing(false);
-    console.log("ImageUpload: handleFileChange called with file:", file?.name, file?.size, file?.type);
+    console.log("FileImageUpload: handleFileChange called with file:", file?.name, file?.size, file?.type);
     
     if (file) {
       // Validate file
@@ -177,39 +135,27 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
 
       try {
         setIsProcessing(true);
-        console.log("ImageUpload: Processing image to 1000x1000px");
+        console.log("FileImageUpload: Processing image to 1000x1000px");
         
         // Process image with retry logic
         const processedFile = await processImageWithRetry(file);
         
-        if (uploadMode === 'url') {
-          // Upload to server and return URL
-          try {
-            const uploadedUrl = await uploadFileToServer(processedFile);
-            onChange(uploadedUrl);
-            setRetryCount(0);
-          } catch (uploadError) {
-            console.error('ImageUpload: Failed to upload file:', uploadError);
-            setError(uploadError instanceof Error ? uploadError.message : 'Failed to upload image');
-          }
-        } else {
-          // Return File object directly
-          try {
-            cleanupPreviewUrl(); // Clean up previous URL
-            const previewUrl = URL.createObjectURL(processedFile);
-            previewUrlRef.current = previewUrl;
-            setPreview(previewUrl);
-            onChange(processedFile);
-            setRetryCount(0); // Reset retry count on success
-          } catch (previewError) {
-            console.error('ImageUpload: Failed to create preview URL:', previewError);
-            // Still pass the file even if preview fails
-            onChange(processedFile);
-            setError('Image processed successfully but preview unavailable');
-          }
+        // Return File object directly
+        try {
+          cleanupPreviewUrl(); // Clean up previous URL
+          const previewUrl = URL.createObjectURL(processedFile);
+          previewUrlRef.current = previewUrl;
+          setPreview(previewUrl);
+          onChange(processedFile);
+          setRetryCount(0); // Reset retry count on success
+        } catch (previewError) {
+          console.error('FileImageUpload: Failed to create preview URL:', previewError);
+          // Still pass the file even if preview fails
+          onChange(processedFile);
+          setError('Image processed successfully but preview unavailable');
         }
       } catch (error) {
-        console.error("ImageUpload: Error processing image:", error);
+        console.error("FileImageUpload: Error processing image:", error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to process image';
         setError(errorMessage);
         setRetryCount(prev => prev + 1);
@@ -220,10 +166,10 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
       cleanupPreviewUrl();
       setPreview(null);
       setRetryCount(0);
-      console.log("ImageUpload: File removed, clearing preview");
+      console.log("FileImageUpload: File removed, clearing preview");
       onChange(file);
     }
-  }, [onChange, validateFile, processImageWithRetry, cleanupPreviewUrl, uploadFileToServer, uploadMode]);
+  }, [onChange, validateFile, processImageWithRetry, cleanupPreviewUrl]);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -232,7 +178,7 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
     if (disabled) return;
     
     const files = Array.from(e.dataTransfer.files);
-    console.log("ImageUpload: Files dropped:", files.length);
+    console.log("FileImageUpload: Files dropped:", files.length);
     if (files.length > 0) {
       handleFileChange(files[0]);
     }
@@ -252,12 +198,12 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
 
   const handleFileInput = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null;
-    console.log("ImageUpload: File input changed:", file?.name, file?.size);
+    console.log("FileImageUpload: File input changed:", file?.name, file?.size);
     handleFileChange(file);
   }, [handleFileChange]);
 
   const removeImage = useCallback(() => {
-    console.log("ImageUpload: Removing image");
+    console.log("FileImageUpload: Removing image");
     cleanupPreviewUrl();
     setError(null);
     setRetryCount(0);
@@ -289,11 +235,11 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
               alt="Preview"
               className="w-full h-48 object-cover rounded-lg border"
               onLoad={() => {
-                console.log("ImageUpload: Preview image loaded successfully");
+                console.log("FileImageUpload: Preview image loaded successfully");
                 setError(null); // Clear any previous errors on successful load
               }}
               onError={(e) => {
-                console.error("ImageUpload: Preview image failed to load:", preview, e);
+                console.error("FileImageUpload: Preview image failed to load:", preview, e);
                 setError("Failed to display image preview - the image may be corrupted");
               }}
             />
@@ -333,7 +279,7 @@ export const ImageUpload = ({ value, onChange, disabled, className, uploadMode =
           onDragOver={handleDragOver}
           onDragLeave={handleDragLeave}
           onClick={() => {
-            console.log("ImageUpload: Click detected, disabled:", disabled);
+            console.log("FileImageUpload: Click detected, disabled:", disabled);
             if (!disabled) {
               document.getElementById(inputId)?.click();
             }

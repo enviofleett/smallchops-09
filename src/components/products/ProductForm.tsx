@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { FileImageUpload } from '@/components/ui/file-image-upload';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
 import { FeaturesList } from './FeaturesList';
@@ -257,8 +257,8 @@ export const ProductForm = ({
           <div className="space-y-4">
             <div>
               <Label>Product Image</Label>
-              <ImageUpload
-                value={form.watch('image_url')}
+              <FileImageUpload
+                value={imageFile}
                 onChange={setImageFile}
                 className="mt-2"
               />

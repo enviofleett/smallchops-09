@@ -5,7 +5,7 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { ImageUpload } from '@/components/ui/image-upload';
+import { FileImageUpload } from '@/components/ui/file-image-upload';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { categorySchema, CategoryFormData, generateSlug, sanitizeHtml } from '@/lib/validations/category';
 import { Category } from '@/types/database';
@@ -62,8 +62,8 @@ const CategoryForm = ({ category, onSubmit, isLoading }: CategoryFormProps) => {
 
         <div className="space-y-2">
           <FormLabel>Banner Image (Optional)</FormLabel>
-          <ImageUpload
-            value={category?.banner_url || undefined}
+          <FileImageUpload
+            value={bannerFile}
             onChange={setBannerFile}
             disabled={isLoading}
           />

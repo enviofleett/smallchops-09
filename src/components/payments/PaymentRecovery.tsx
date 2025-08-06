@@ -156,10 +156,18 @@ export const PaymentRecovery: React.FC<PaymentRecoveryProps> = ({
         </CardContent>
       </Card>
 
-      <ProductionHealthCheck 
-        isVisible={showHealthCheck}
-        onClose={() => setShowHealthCheck(false)}
-      />
+      {showHealthCheck && (
+        <div className="mt-6">
+          <ProductionHealthCheck />
+          <Button 
+            variant="outline" 
+            onClick={() => setShowHealthCheck(false)}
+            className="mt-4"
+          >
+            Close Health Check
+          </Button>
+        </div>
+      )}
     </div>
   );
 };

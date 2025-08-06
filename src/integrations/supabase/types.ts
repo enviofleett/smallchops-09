@@ -4090,6 +4090,45 @@ export type Database = {
           },
         ]
       }
+      payment_verification_logs: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          id: string
+          ip_address: unknown | null
+          reference: string
+          response_time_ms: number | null
+          success: boolean | null
+          user_agent: string | null
+          user_id: string | null
+          verification_attempt: number | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown | null
+          reference: string
+          response_time_ms?: number | null
+          success?: boolean | null
+          user_agent?: string | null
+          user_id?: string | null
+          verification_attempt?: number | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          id?: string
+          ip_address?: unknown | null
+          reference?: string
+          response_time_ms?: number | null
+          success?: boolean | null
+          user_agent?: string | null
+          user_id?: string | null
+          verification_attempt?: number | null
+        }
+        Relationships: []
+      }
       performance_analytics: {
         Row: {
           cache_hit: boolean | null
@@ -4359,6 +4398,45 @@ export type Database = {
           item_name?: string
           priority_level?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      production_config: {
+        Row: {
+          allowed_origins: string[] | null
+          created_at: string
+          environment: string
+          id: string
+          is_live_mode: boolean | null
+          monitoring_enabled: boolean | null
+          rate_limits: Json | null
+          security_config: Json | null
+          updated_at: string
+          webhook_url: string | null
+        }
+        Insert: {
+          allowed_origins?: string[] | null
+          created_at?: string
+          environment?: string
+          id?: string
+          is_live_mode?: boolean | null
+          monitoring_enabled?: boolean | null
+          rate_limits?: Json | null
+          security_config?: Json | null
+          updated_at?: string
+          webhook_url?: string | null
+        }
+        Update: {
+          allowed_origins?: string[] | null
+          created_at?: string
+          environment?: string
+          id?: string
+          is_live_mode?: boolean | null
+          monitoring_enabled?: boolean | null
+          rate_limits?: Json | null
+          security_config?: Json | null
+          updated_at?: string
+          webhook_url?: string | null
         }
         Relationships: []
       }
@@ -6033,6 +6111,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      check_production_readiness: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       check_production_security: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -6467,6 +6549,16 @@ export type Database = {
           user_agent?: string
         }
         Returns: string
+      }
+      log_payment_verification_attempt: {
+        Args: {
+          p_reference: string
+          p_user_id?: string
+          p_success?: boolean
+          p_error_message?: string
+          p_ip_address?: unknown
+        }
+        Returns: undefined
       }
       log_profile_activity: {
         Args: {

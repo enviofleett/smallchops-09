@@ -1,164 +1,301 @@
-import React from 'react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle, AlertTriangle, XCircle, Clock, Shield, Zap, Globe } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { CheckCircle, AlertTriangle, XCircle, RefreshCw, Settings, ExternalLink } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
-interface ProductionHealthCheckProps {
-  isVisible: boolean;
-  onClose: () => void;
+interface ProductionReadiness {
+  ready_for_production: boolean;
+  score: number;
+  webhook_secret_configured: boolean;
+  live_keys_configured: boolean;
+  webhook_url_configured: boolean;
+  issues: string[];
+  last_checked: string;
 }
 
-export const ProductionHealthCheck: React.FC<ProductionHealthCheckProps> = ({ isVisible, onClose }) => {
-  if (!isVisible) return null;
+interface PaymentConfig {
+  public_key: string;
+  test_mode: boolean;
+  secret_key: string;
+  webhook_secret: string;
+  environment: string;
+}
 
-  const healthChecks = [
-    {
-      category: "Payment Gateway",
-      items: [
-        { name: "Live Paystack Keys Configured", status: "success", description: "Live API keys are properly set up" },
-        { name: "Webhook URL Active", status: "warning", description: "Production webhook needs verification" },
-        { name: "Payment Error Handling", status: "success", description: "Comprehensive error handling implemented" },
-        { name: "Rate Limiting", status: "success", description: "Payment rate limiting active" }
-      ]
-    },
-    {
-      category: "Security",
-      items: [
-        { name: "Database Functions Secured", status: "success", description: "All functions have proper search_path" },
-        { name: "RLS Policies Active", status: "success", description: "Row Level Security enabled on all tables" },
-        { name: "Input Validation", status: "success", description: "Comprehensive input validation implemented" },
-        { name: "API Rate Limiting", status: "success", description: "API endpoints are rate limited" }
-      ]
-    },
-    {
-      category: "User Experience",
-      items: [
-        { name: "Payment Loading States", status: "success", description: "Clear loading indicators for users" },
-        { name: "Error Recovery", status: "success", description: "Automatic retry mechanisms in place" },
-        { name: "Payment Status Monitoring", status: "success", description: "Real-time payment status tracking" },
-        { name: "Fallback Payment Options", status: "success", description: "Alternative payment methods available" }
-      ]
-    },
-    {
-      category: "Monitoring",
-      items: [
-        { name: "Payment Analytics", status: "success", description: "Transaction analytics tracking enabled" },
-        { name: "Error Tracking", status: "success", description: "Payment error logging implemented" },
-        { name: "Health Metrics", status: "success", description: "Payment health monitoring active" },
-        { name: "Production Logs", status: "info", description: "Debug logs removed for production" }
-      ]
-    }
-  ];
+export const ProductionHealthCheck: React.FC = () => {
+  const [readiness, setReadiness] = useState<ProductionReadiness | null>(null);
+  const [paymentConfig, setPaymentConfig] = useState<PaymentConfig | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [checking, setChecking] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'success': return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-600" />;
-      case 'error': return <XCircle className="h-4 w-4 text-red-600" />;
-      default: return <Clock className="h-4 w-4 text-blue-600" />;
+  useEffect(() => {
+    checkProductionReadiness();
+  }, []);
+
+  const checkProductionReadiness = async () => {
+    try {
+      setChecking(true);
+      setError(null);
+
+      // Check production readiness
+      const { data: readinessData, error: readinessError } = await supabase
+        .rpc('check_production_readiness');
+
+      if (readinessError) throw readinessError;
+
+      // Get current Paystack configuration
+      const { data: configData, error: configError } = await supabase
+        .rpc('get_active_paystack_config');
+
+      if (configError) {
+        console.warn('Could not get Paystack config:', configError);
+      }
+
+      setReadiness(readinessData as unknown as ProductionReadiness);
+      setPaymentConfig(configData?.[0] || null);
+    } catch (err) {
+      console.error('Failed to check production readiness:', err);
+      setError(err instanceof Error ? err.message : 'Failed to check system status');
+    } finally {
+      setLoading(false);
+      setChecking(false);
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'success': return 'text-green-800 bg-green-50 border-green-200';
-      case 'warning': return 'text-yellow-800 bg-yellow-50 border-yellow-200';
-      case 'error': return 'text-red-800 bg-red-50 border-red-200';
-      default: return 'text-blue-800 bg-blue-50 border-blue-200';
-    }
+  const getStatusColor = (score: number) => {
+    if (score >= 80) return 'text-green-600';
+    if (score >= 60) return 'text-yellow-600';
+    return 'text-red-600';
   };
 
-  const overallScore = healthChecks
-    .flatMap(category => category.items)
-    .reduce((score, item) => score + (item.status === 'success' ? 1 : item.status === 'warning' ? 0.5 : 0), 0);
-  
-  const totalItems = healthChecks.flatMap(category => category.items).length;
-  const scorePercentage = Math.round((overallScore / totalItems) * 100);
+  const getStatusIcon = (ready: boolean, score: number) => {
+    if (ready) return <CheckCircle className="h-5 w-5 text-green-600" />;
+    if (score >= 60) return <AlertTriangle className="h-5 w-5 text-yellow-600" />;
+    return <XCircle className="h-5 w-5 text-red-600" />;
+  };
 
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto">
-        <CardHeader className="pb-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <Shield className="h-6 w-6 text-blue-600" />
-              <div>
-                <CardTitle>Production Readiness Check</CardTitle>
-                <CardDescription>
-                  Comprehensive health check for live deployment
-                </CardDescription>
-              </div>
-            </div>
-            <Button variant="outline" onClick={onClose}>Close</Button>
-          </div>
-          
-          <Alert className={`mt-4 ${scorePercentage >= 85 ? 'border-green-200 bg-green-50' : 'border-yellow-200 bg-yellow-50'}`}>
-            <div className="flex items-center space-x-3">
-              {scorePercentage >= 85 ? 
-                <CheckCircle className="h-5 w-5 text-green-600" /> : 
-                <AlertTriangle className="h-5 w-5 text-yellow-600" />
-              }
-              <div>
-                <div className="font-semibold">
-                  Production Readiness Score: {scorePercentage}%
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  {scorePercentage >= 85 ? 
-                    "✅ System is ready for production deployment!" :
-                    "⚠️ Some items need attention before production deployment"
-                  }
-                </div>
-              </div>
-            </div>
-          </Alert>
+  if (loading) {
+    return (
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <RefreshCw className="h-5 w-5 animate-spin" />
+            Checking Production Readiness...
+          </CardTitle>
         </CardHeader>
+      </Card>
+    );
+  }
 
-        <CardContent className="space-y-6">
-          {healthChecks.map((category, categoryIndex) => (
-            <div key={categoryIndex} className="space-y-3">
-              <div className="flex items-center space-x-2">
-                {category.category === "Payment Gateway" && <Zap className="h-4 w-4 text-blue-600" />}
-                {category.category === "Security" && <Shield className="h-4 w-4 text-green-600" />}
-                {category.category === "User Experience" && <Globe className="h-4 w-4 text-purple-600" />}
-                {category.category === "Monitoring" && <Clock className="h-4 w-4 text-orange-600" />}
-                <h3 className="font-semibold text-lg">{category.category}</h3>
-              </div>
-              
-              <div className="grid gap-2">
-                {category.items.map((item, itemIndex) => (
-                  <div 
-                    key={itemIndex} 
-                    className={`flex items-center justify-between p-3 rounded-lg border ${getStatusColor(item.status)}`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      {getStatusIcon(item.status)}
-                      <div>
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-sm opacity-80">{item.description}</div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
-
-          <Alert className="border-blue-200 bg-blue-50">
-            <CheckCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800">
-              <div className="font-semibold mb-2">Ready for Production!</div>
-              <div className="space-y-1 text-sm">
-                <div>✅ Payment processing optimized and secure</div>
-                <div>✅ Error handling and recovery implemented</div>
-                <div>✅ Database security warnings resolved</div>
-                <div>✅ User experience enhancements complete</div>
-                <div>✅ Production monitoring and analytics active</div>
-              </div>
-            </AlertDescription>
+  if (error) {
+    return (
+      <Card className="w-full max-w-2xl">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-red-600">
+            <XCircle className="h-5 w-5" />
+            Health Check Failed
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
           </Alert>
+          <Button onClick={checkProductionReadiness} className="mt-4" variant="outline">
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry Check
+          </Button>
         </CardContent>
       </Card>
+    );
+  }
+
+  if (!readiness) return null;
+
+  return (
+    <div className="space-y-6 w-full max-w-4xl">
+      {/* Overall Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              {getStatusIcon(readiness.ready_for_production, readiness.score)}
+              Production Readiness
+            </div>
+            <Badge variant={readiness.ready_for_production ? 'default' : 'destructive'}>
+              {readiness.ready_for_production ? 'Ready' : 'Not Ready'}
+            </Badge>
+          </CardTitle>
+          <CardDescription>
+            System score: <span className={getStatusColor(readiness.score)}>{readiness.score}/100</span>
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  readiness.score >= 80 ? 'bg-green-600' : 
+                  readiness.score >= 60 ? 'bg-yellow-600' : 'bg-red-600'
+                }`}
+                style={{ width: `${readiness.score}%` }}
+              />
+            </div>
+            
+            {readiness.ready_for_production ? (
+              <Alert>
+                <CheckCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Your payment system is ready for production! All critical components are properly configured.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>
+                  Your system needs attention before going live. Please address the issues below.
+                </AlertDescription>
+              </Alert>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Configuration Status */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Configuration Status</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center justify-between">
+              <span>Webhook Secret</span>
+              <Badge variant={readiness.webhook_secret_configured ? 'default' : 'destructive'}>
+                {readiness.webhook_secret_configured ? 'Configured' : 'Missing'}
+              </Badge>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <span>Live API Keys</span>
+              <Badge variant={readiness.live_keys_configured ? 'default' : 'destructive'}>
+                {readiness.live_keys_configured ? 'Configured' : 'Missing'}
+              </Badge>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <span>Webhook URL</span>
+              <Badge variant={readiness.webhook_url_configured ? 'default' : 'destructive'}>
+                {readiness.webhook_url_configured ? 'Configured' : 'Missing'}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Current Environment</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {paymentConfig ? (
+              <>
+                <div className="flex items-center justify-between">
+                  <span>Environment</span>
+                  <Badge variant={paymentConfig.test_mode ? 'secondary' : 'default'}>
+                    {paymentConfig.environment.toUpperCase()}
+                  </Badge>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span>Public Key</span>
+                  <code className="text-xs bg-muted px-2 py-1 rounded">
+                    {paymentConfig.public_key.substring(0, 20)}...
+                  </code>
+                </div>
+                
+                <div className="flex items-center justify-between">
+                  <span>Test Mode</span>
+                  <Badge variant={paymentConfig.test_mode ? 'secondary' : 'default'}>
+                    {paymentConfig.test_mode ? 'Enabled' : 'Disabled'}
+                  </Badge>
+                </div>
+              </>
+            ) : (
+              <Alert variant="destructive">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertDescription>No payment configuration found</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Issues */}
+      {readiness.issues.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg text-red-600">Issues to Resolve</CardTitle>
+            <CardDescription>
+              Address these issues before deploying to production
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <ul className="space-y-2">
+              {readiness.issues.map((issue, index) => (
+                <li key={index} className="flex items-start gap-2">
+                  <XCircle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                  <span className="text-sm">{issue}</span>
+                </li>
+              ))}
+            </ul>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Actions */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Actions</CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-wrap gap-2">
+          <Button 
+            onClick={checkProductionReadiness} 
+            disabled={checking}
+            variant="outline"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${checking ? 'animate-spin' : ''}`} />
+            Refresh Status
+          </Button>
+          
+          <Button asChild variant="outline">
+            <a 
+              href="https://dashboard.paystack.com/#/settings/developer" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <ExternalLink className="h-4 w-4 mr-2" />
+              Paystack Dashboard
+            </a>
+          </Button>
+          
+          <Button asChild variant="outline">
+            <a 
+              href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/functions" 
+              target="_blank" 
+              rel="noopener noreferrer"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Edge Functions
+            </a>
+          </Button>
+        </CardContent>
+      </Card>
+
+      <div className="text-xs text-muted-foreground">
+        Last checked: {new Date(readiness.last_checked).toLocaleString()}
+      </div>
     </div>
   );
 };

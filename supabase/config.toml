@@ -42,3 +42,9 @@ verify_jwt = false
 
 [functions.process-checkout]
 verify_jwt = false
+
+[functions.paystack-verify]
+verify_jwt = true
+
+[functions.paystack-webhook-secure]
+verify_jwt = false

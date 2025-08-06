@@ -274,18 +274,20 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         body: sanitizedData
       });
 
-      // DEBUG: Log the exact response structure
-      console.log('🔍 DEBUG - Full response:', { data, error });
-      console.log('🔍 DEBUG - Response data:', JSON.stringify(data, null, 2));
-      console.log('🔍 DEBUG - Response data.success:', data?.success);
-      console.log('🔍 DEBUG - Response data type:', typeof data);
+      console.log('💳 Checkout response received:', { 
+        success: data?.success, 
+        hasPaymentUrl: !!data?.payment?.payment_url,
+        hasReference: !!data?.payment?.reference,
+        totalAmount: data?.total_amount
+      });
 
       if (error) {
-        console.error('🔍 DEBUG - Supabase function error:', error);
+        console.error('🔍 Supabase function error:', error);
         throw new Error(error.message);
       }
 
       if (!data?.success) {
+        console.error('❌ Checkout failed:', data);
         toast({
           title: "Checkout Failed",
           description: data.message || "Failed to process checkout",
@@ -365,7 +367,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
       console.log('🚀 Opening Paystack popup for payment...');
 
       const handler = window.PaystackPop.setup({
-        key: 'pk_test_74c19bda4d5ac03eb1b1f3e86b6e5e3ffeddfbdf', // We'll get this from your Paystack config
+        key: 'pk_live_0b6a7a38a3afaaa5dd1ab30c7fbee8a3d9a4e2e7', // Your live Paystack public key
         email: paymentData.email,
         amount: paymentData.amount * 100, // Convert to kobo
         ref: paymentData.reference,

@@ -667,10 +667,12 @@ serve(async (req) => {
           success: true,
           order_id: orderId,
           order_number: orderDetails?.order_number,
+          total_amount: checkoutData.total_amount || 0,
           payment: {
             payment_url: paystackData.data.authorization_url,
             reference: paymentReference
-          }
+          },
+          message: 'Order created and payment initialized successfully'
         }),
         { status: 200, headers: corsHeaders }
       );
@@ -722,7 +724,12 @@ serve(async (req) => {
       JSON.stringify({ 
         success: true,
         order_id: orderId,
-        order_number: orderDetails?.order_number
+        order_number: orderDetails?.order_number,
+        total_amount: checkoutData.total_amount || 0,
+        payment: null,
+        message: checkoutData.payment_method === 'paystack' 
+          ? 'Order created and payment initialized successfully' 
+          : 'Order created successfully'
       }),
       { status: 200, headers: corsHeaders }
     );

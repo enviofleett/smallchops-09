@@ -71,6 +71,7 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [checkoutStep, setCheckoutStep] = useState<'choice' | 'details'>('choice');
+  const [paymentInProgress, setPaymentInProgress] = useState(false);
 
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: session?.user?.email || '',
@@ -293,21 +294,30 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
         return;
       }
 
-      // Redirect to Paystack for payment
-      if (data.payment?.payment_url) {
-        // Mark checkout as in progress and clear cart before redirecting
-        console.log('🛒 Preparing for payment redirect...');
+      // Process Paystack payment with popup
+      if (data.payment?.payment_url && data.payment?.reference) {
+        console.log('🛒 Initializing Paystack popup payment...');
         
-        if (data.payment?.reference) {
-          markCheckoutInProgress(data.payment.reference);
+        try {
+          await processPaystackPayment({
+            reference: data.payment.reference,
+            amount: data.total_amount,
+            email: formData.customer_email,
+            orderNumber: data.order_number,
+            paymentUrl: data.payment.payment_url
+          });
+          
+          // Success is handled in the payment callback
+          return;
+        } catch (paymentError) {
+          console.error('🚨 Paystack payment error:', paymentError);
+          toast({
+            title: "Payment Error",
+            description: "Failed to initialize payment. Please try again.",
+            variant: "destructive",
+          });
+          return;
         }
-        
-        // Clear cart before redirecting to prevent duplicate orders
-        console.log('🛒 Clearing cart before payment redirect');
-        clearCart();
-        
-        window.location.href = data.payment.payment_url;
-        return;
       }
       clearCart();
       toast({
@@ -332,6 +342,75 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  // Process Paystack payment with popup
+  const processPaystackPayment = async (paymentData: {
+    reference: string;
+    amount: number;
+    email: string;
+    orderNumber: string;
+    paymentUrl: string;
+  }) => {
+    return new Promise((resolve, reject) => {
+      setPaymentInProgress(true);
+      
+      // Check if Paystack is loaded
+      if (!window.PaystackPop) {
+        console.log('🔄 Paystack popup not available, redirecting to payment page...');
+        window.location.href = paymentData.paymentUrl;
+        return;
+      }
+
+      console.log('🚀 Opening Paystack popup for payment...');
+
+      const handler = window.PaystackPop.setup({
+        key: 'pk_test_74c19bda4d5ac03eb1b1f3e86b6e5e3ffeddfbdf', // We'll get this from your Paystack config
+        email: paymentData.email,
+        amount: paymentData.amount * 100, // Convert to kobo
+        ref: paymentData.reference,
+        currency: 'NGN',
+        channels: ['card', 'bank', 'ussd', 'mobile_money'],
+        metadata: {
+          order_number: paymentData.orderNumber,
+          customer_email: paymentData.email
+        },
+        callback: function(response: any) {
+          console.log('✅ Paystack payment successful:', response);
+          setPaymentInProgress(false);
+          
+          if (response.status === 'success') {
+            // Clear cart and mark checkout progress
+            markCheckoutInProgress(response.reference);
+            clearCart();
+            
+            // Redirect to payment callback page for verification
+            window.location.href = `/payment-callback?reference=${response.reference}&status=success`;
+            resolve(response);
+          } else {
+            console.error('❌ Payment was not successful:', response);
+            toast({
+              title: "Payment Failed",
+              description: "Your payment was not successful. Please try again.",
+              variant: "destructive",
+            });
+            reject(new Error('Payment was not successful'));
+          }
+        },
+        onClose: function() {
+          console.log('🚪 Paystack popup closed by user');
+          setPaymentInProgress(false);
+          toast({
+            title: "Payment Cancelled",
+            description: "You cancelled the payment process.",
+            variant: "destructive",
+          });
+          reject(new Error('Payment cancelled by user'));
+        }
+      });
+
+      handler.openIframe();
+    });
   };
 
   console.log('🔄 EnhancedCheckoutFlow render - isOpen:', isOpen, 'cart items:', cart?.items?.length);
@@ -650,10 +729,13 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={isSubmitting || items.length === 0} 
+                  disabled={isSubmitting || paymentInProgress || items.length === 0} 
                   className="flex-1"
                 >
-                  {isSubmitting ? "Processing..." : "Place Order"}
+                  {isSubmitting || paymentInProgress ? 
+                    (paymentInProgress ? "Processing Payment..." : "Processing...") : 
+                    "Place Order"
+                  }
                 </Button>
               </div>
             </form>

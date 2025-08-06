@@ -84,9 +84,9 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
 
   return (
     <>
-      {/* Desktop compact floating sidebar - always visible for customization */}
-      <div className="hidden lg:block lg:fixed lg:right-4 lg:top-24 lg:bottom-20 lg:w-72 lg:bg-white lg:border lg:shadow-xl lg:z-40 lg:rounded-lg lg:overflow-hidden">
-        <div className="h-full flex flex-col max-h-[calc(100vh-11rem)]">
+      {/* Desktop compact floating sidebar - fixed height to avoid footer */}
+      <div className="hidden lg:block lg:fixed lg:right-4 lg:top-24 lg:w-72 lg:bg-white lg:border lg:shadow-xl lg:z-40 lg:rounded-lg lg:overflow-hidden lg:max-h-[calc(100vh-180px)]">
+        <div className="h-full flex flex-col max-h-[calc(100vh-180px)]">
           <div className="flex items-center justify-between p-3 border-b bg-gradient-to-r from-primary/5 to-primary/10 rounded-t-lg">
             <h2 className="text-base font-semibold text-primary">Custom Order</h2>
             {isEmpty ? (
@@ -103,8 +103,8 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
             )}
           </div>
           
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden max-h-[calc(100vh-280px)]">
+            <div className="flex-1 overflow-y-auto p-3 scrollbar-thin scrollbar-thumb-muted scrollbar-track-transparent max-h-[400px]">
               {isEmpty ? (
                 <div className="text-center py-6 text-muted-foreground">
                   <ShoppingCart className="mx-auto h-8 w-8 mb-2 opacity-40" />
@@ -223,13 +223,13 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
         </div>
       </div>
 
-      {/* Mobile bottom sheet - improved responsiveness */}
+      {/* Mobile bottom sheet - constrained height */}
       <div className="lg:hidden fixed inset-0 z-50 bg-black/50 animate-fade-in" onClick={onClose}>
-        <div 
-          className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl max-h-[85vh] transform transition-transform animate-slide-in-bottom"
+        <div
+          className="fixed bottom-0 left-0 right-0 bg-white rounded-t-xl max-h-[75vh] transform transition-transform animate-slide-in-bottom"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex flex-col h-full max-h-[85vh]">
+          <div className="flex flex-col h-full max-h-[75vh]">
             {/* Mobile Header */}
             <div className="flex items-center justify-between p-4 border-b bg-muted/5">
               <h2 className="text-lg font-semibold">Custom Order</h2>
@@ -243,8 +243,8 @@ export const CustomizationOrderBuilder: React.FC<CustomizationOrderBuilderProps>
               </Button>
             </div>
             
-            {/* Mobile Content */}
-            <div className="flex-1 overflow-y-auto p-4 pb-safe">
+            {/* Mobile Content - scrollable within bounds */}
+            <div className="flex-1 overflow-y-auto p-4 pb-safe max-h-[50vh]">
               {isEmpty ? (
                 <div className="text-center py-12 text-muted-foreground">
                   <ShoppingCart className="mx-auto h-16 w-16 mb-4 opacity-40" />

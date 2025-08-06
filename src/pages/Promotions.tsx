@@ -146,6 +146,25 @@ export default function PromotionsPage() {
                         value={promo.min_order_amount || "-"} 
                       />
                       <MobileCardRow 
+                        label="Applicable Days" 
+                        value={
+                          (!promo.applicable_days || promo.applicable_days.length === 0) ? (
+                            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">All Days</span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {promo.applicable_days.slice(0, 4).map((day) => (
+                                <span key={day} className="text-xs bg-muted text-muted-foreground px-1 py-0.5 rounded capitalize">
+                                  {day.slice(0, 3)}
+                                </span>
+                              ))}
+                              {promo.applicable_days.length > 4 && (
+                                <span className="text-xs text-muted-foreground">+{promo.applicable_days.length - 4}</span>
+                              )}
+                            </div>
+                          )
+                        } 
+                      />
+                      <MobileCardRow 
                         label="Valid From" 
                         value={promo.valid_from ? promo.valid_from.substring(0,10) : "-"} 
                       />

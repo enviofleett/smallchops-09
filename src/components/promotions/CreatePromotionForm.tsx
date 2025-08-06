@@ -3,7 +3,7 @@ import { useForm } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
-import { CalendarIcon, Plus, Percent, DollarSign, Gift, Truck, Shuffle, Eye } from "lucide-react";
+import { CalendarIcon, Plus, Percent, DollarSign, Gift, Truck, Shuffle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCreatePromotion } from "@/hooks/usePromotions";
 import {
@@ -31,7 +31,7 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { PromotionHelpPanel } from "./PromotionHelpPanel";
+import { DaysSelector } from "./DaysSelector";
 
 const PromotionFormSchema = z.object({
   name: z.string().min(2, "Name is required"),
@@ -61,6 +61,7 @@ const PromotionFormSchema = z.object({
   code: z.string().optional(),
   applicable_categories: z.array(z.string()).optional(),
   applicable_products: z.array(z.string()).optional(),
+  applicable_days: z.array(z.string()).optional(),
   valid_from: z.date().optional(),
   valid_until: z.date().optional(),
 });
@@ -74,7 +75,6 @@ export default function CreatePromotionForm({
   onSuccess?: () => void;
   disabled?: boolean;
 }) {
-  const [showHelp, setShowHelp] = useState(true);
   const [generateCode, setGenerateCode] = useState(false);
   
   const createMutation = useCreatePromotion();
@@ -91,6 +91,7 @@ export default function CreatePromotionForm({
       code: "",
       applicable_categories: [],
       applicable_products: [],
+      applicable_days: [],
       valid_from: undefined,
       valid_until: undefined,
     },
@@ -154,18 +155,9 @@ export default function CreatePromotionForm({
 
   return (
     <div className="space-y-6">
-      {/* Help Toggle */}
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Create New Promotion</h3>
-        <div className="flex items-center gap-2">
-          <Eye className="w-4 h-4" />
-          <span className="text-sm">Show Help</span>
-          <Switch checked={showHelp} onCheckedChange={setShowHelp} />
-        </div>
       </div>
-
-      {/* Help Panel */}
-      {showHelp && <PromotionHelpPanel selectedType={watchType} />}
 
       <Form {...form}>
         <form
@@ -408,6 +400,24 @@ export default function CreatePromotionForm({
             )}
           />
         </div>
+
+        {/* Days Selection */}
+        <FormField
+          control={form.control}
+          name="applicable_days"
+          render={({ field }) => (
+            <FormItem>
+              <FormControl>
+                <DaysSelector
+                  selectedDays={field.value || []}
+                  onDaysChange={field.onChange}
+                  disabled={disabled}
+                />
+              </FormControl>
+              <FormMessage />
+            </FormItem>
+          )}
+        />
 
         {/* Dates */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

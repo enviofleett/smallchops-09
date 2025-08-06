@@ -213,7 +213,7 @@ export default function PromotionsPage() {
                 <th className="p-3">Name</th>
                 <th className="p-3">Type</th>
                 <th className="p-3">Discount</th>
-                <th className="p-3">Points</th>
+                <th className="p-3">Days</th>
                 <th className="p-3">Min. Purchase</th>
                 <th className="p-3">Starts</th>
                 <th className="p-3">Expires</th>
@@ -226,11 +226,29 @@ export default function PromotionsPage() {
               {data.map(promo => (
                 <tr key={promo.id} className="border-b hover:bg-gray-50">
                   <td className="p-3">{promo.name}</td>
-                  <td className="p-3">{promo.type}</td>
+                  <td className="p-3 capitalize">{promo.type.replace('_', ' ')}</td>
                   <td className="p-3">
-                    {promo.value ? `₦${promo.value}` : "-"}
+                    {promo.type === "percentage" && `${promo.value}%`}
+                    {promo.type === "fixed_amount" && `₦${promo.value}`}
+                    {promo.type === "buy_one_get_one" && "BOGO"}
+                    {promo.type === "free_delivery" && "Free"}
                   </td>
-                  <td className="p-3">{promo.value || "-"}</td>
+                  <td className="p-3">
+                    {(!promo.applicable_days || promo.applicable_days.length === 0) ? (
+                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">All</span>
+                    ) : (
+                      <div className="flex flex-wrap gap-1">
+                        {promo.applicable_days.slice(0, 2).map((day) => (
+                          <span key={day} className="text-xs bg-muted text-muted-foreground px-1 py-0.5 rounded capitalize">
+                            {day.slice(0, 3)}
+                          </span>
+                        ))}
+                        {promo.applicable_days.length > 2 && (
+                          <span className="text-xs text-muted-foreground">+{promo.applicable_days.length - 2}</span>
+                        )}
+                      </div>
+                    )}
+                  </td>
                   <td className="p-3">{promo.min_order_amount || "-"}</td>
                   <td className="p-3">{promo.valid_from ? promo.valid_from.substring(0,10) : "-"}</td>
                   <td className="p-3">{promo.valid_until ? promo.valid_until.substring(0,10) : "-"}</td>

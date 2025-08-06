@@ -79,6 +79,11 @@ export function calculateProductDiscount(
     if (currentDate < validFrom || (validUntil && currentDate > validUntil)) {
       continue;
     }
+
+    // Check if promotion is applicable on current day
+    if (!isPromotionValidForCurrentDay(promotion)) {
+      continue;
+    }
     
     // Check if promotion applies to this product
     // FIXED: Only apply promotion if it specifically targets this product or category
@@ -198,6 +203,11 @@ export function calculateAdvancedOrderDiscount(
 
     // Check if promotion is currently valid
     if (currentDate < validFrom || (validUntil && currentDate > validUntil)) {
+      continue;
+    }
+
+    // Check if promotion is applicable on current day
+    if (!isPromotionValidForCurrentDay(promotion)) {
       continue;
     }
 
@@ -368,6 +378,7 @@ export function calculateOrderDiscount(
       valid_until: null,
       applicable_categories: [],
       applicable_products: [],
+      applicable_days: [],
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
       created_by: null,
@@ -385,4 +396,29 @@ export function formatCurrency(amount: number): string {
 
 export function formatDiscount(discountPercentage: number): string {
   return `${Math.round(discountPercentage)}% OFF`;
+}
+
+/**
+ * Production-ready function to check if a promotion is valid for the current day
+ */
+export function isPromotionValidForCurrentDay(promotion: Promotion): boolean {
+  // If no specific days are set, promotion is valid all days
+  if (!promotion.applicable_days || promotion.applicable_days.length === 0) {
+    return true;
+  }
+
+  const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'short' }).toLowerCase(); // Get current day (e.g., 'mon', 'tue')
+  const dayMap: Record<string, string> = {
+    'sun': 'sunday',
+    'mon': 'monday',
+    'tue': 'tuesday',
+    'wed': 'wednesday',
+    'thu': 'thursday',
+    'fri': 'friday',
+    'sat': 'saturday'
+  };
+
+  const fullDayName = dayMap[currentDay] || new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+  
+  return promotion.applicable_days.includes(fullDayName);
 }

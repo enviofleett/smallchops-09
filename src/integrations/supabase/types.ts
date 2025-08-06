@@ -4773,6 +4773,7 @@ export type Database = {
       promotions: {
         Row: {
           applicable_categories: string[] | null
+          applicable_days: string[] | null
           applicable_products: string[] | null
           code: string | null
           created_at: string
@@ -4793,6 +4794,7 @@ export type Database = {
         }
         Insert: {
           applicable_categories?: string[] | null
+          applicable_days?: string[] | null
           applicable_products?: string[] | null
           code?: string | null
           created_at?: string
@@ -4813,6 +4815,7 @@ export type Database = {
         }
         Update: {
           applicable_categories?: string[] | null
+          applicable_days?: string[] | null
           applicable_products?: string[] | null
           code?: string | null
           created_at?: string

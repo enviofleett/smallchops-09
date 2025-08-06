@@ -140,14 +140,40 @@ serve(async (req) => {
 
     console.log('Order creation result:', orderResult);
 
+    // **CRITICAL FIX**: Check if function returned success = false
+    if (!orderResult?.success) {
+      console.error('Order creation failed:', {
+        result: orderResult,
+        error: orderResult?.error,
+        message: orderResult?.message
+      });
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Order creation failed',
+          details: orderResult?.error || orderResult?.message || 'Unknown database error'
+        }),
+        { 
+          status: 500, 
+          headers: corsHeaders
+        }
+      );
+    }
+
     // Extract order ID from the returned JSON
     const orderId = orderResult?.order_id;
     const subtotal = orderResult?.subtotal || 0;
 
     if (!orderId) {
       console.error('No order ID returned from function');
+      console.error('Complete order result:', JSON.stringify(orderResult, null, 2));
+      
       return new Response(
-        JSON.stringify({ error: 'Failed to get order ID' }),
+        JSON.stringify({ 
+          error: 'Failed to get order ID',
+          debug: orderResult
+        }),
         { status: 500, headers: corsHeaders }
       );
     }

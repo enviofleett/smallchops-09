@@ -260,7 +260,7 @@ function cleanUUID(value: any): string | null {
   return isValidUUID(cleaned) ? cleaned : null;
 }
 
-// Helper function to find or create customer account - now supports guest users
+// Legacy function - kept for compatibility but no longer used in main flow
 async function findOrCreateCustomer(
   supabase: any,
   email: string,
@@ -332,13 +332,42 @@ serve(async (req) => {
       }
     );
 
+    // Get user from authorization header if present
+    const authHeader = req.headers.get('authorization');
+    let user = null;
+    
+    if (authHeader) {
+      try {
+        const token = authHeader.replace('Bearer ', '');
+        const { data: { user: authUser }, error } = await supabaseClient.auth.getUser(token);
+        if (!error && authUser) {
+          user = authUser;
+          console.log(`🔐 [${requestId}] Authenticated user: ${user.email}`);
+        }
+      } catch (error) {
+        console.log(`⚠️ [${requestId}] Auth token invalid or expired, proceeding as guest`);
+      }
+    }
+
     const rawData = await req.json();
+    const { customer_email, customer_name, guest_session_id, customer_phone } = rawData;
+    const isGuestCheckout = !user && guest_session_id;
+
+    console.log('🔍 User context analysis:', {
+      hasUser: !!user,
+      userId: user?.id,
+      isGuest: isGuestCheckout,
+      guestSessionId: guest_session_id,
+      customerEmail: customer_email
+    });
+    
     console.log(`📦 [${requestId}] Processing checkout request:`, {
       customer_email: rawData.customer_email,
       customer_name: rawData.customer_name,
       fulfillment_type: rawData.fulfillment_type,
       items_count: rawData.order_items?.length || 0,
-      payment_method: rawData.payment_method
+      payment_method: rawData.payment_method,
+      checkout_type: isGuestCheckout ? 'guest' : 'authenticated'
     });
 
     // JSON Schema validation
@@ -371,13 +400,59 @@ serve(async (req) => {
       }
     }
 
-    // Find or create customer account
-    const { customer_id, isNew: isNewCustomer } = await findOrCreateCustomer(
-      supabaseClient,
-      checkoutData.customer_email,
-      checkoutData.customer_name,
-      checkoutData.customer_phone
-    );
+    // Handle customer account creation based on authentication status
+    let customerId = null;
+    let isNewCustomer = false;
+
+    if (isGuestCheckout) {
+      // 🔧 GUEST CHECKOUT: Skip customer account creation
+      console.log('👤 Processing guest checkout, skipping customer account creation');
+      customerId = null;
+    } else if (user) {
+      // 🔧 AUTHENTICATED USER: Create or get customer account
+      try {
+        // First, check if customer account already exists
+        const { data: existingCustomer } = await supabaseClient
+          .from('customer_accounts')
+          .select('id')
+          .eq('user_id', user.id)
+          .maybeSingle();
+
+        if (existingCustomer) {
+          console.log('✅ Found existing customer account:', existingCustomer.id);
+          customerId = existingCustomer.id;
+        } else {
+          // Create new customer account for authenticated user
+          const { data: newCustomer, error: customerError } = await supabaseClient
+            .from('customer_accounts')
+            .insert({
+              user_id: user.id,
+              name: customer_name,
+              email: customer_email,
+              phone: customer_phone
+            })
+            .select('id')
+            .single();
+
+          if (customerError) {
+            console.error('❌ Error creating customer account:', customerError);
+            throw customerError;
+          }
+
+          console.log('✅ Created new customer account:', newCustomer.id);
+          customerId = newCustomer.id;
+          isNewCustomer = true;
+        }
+      } catch (error) {
+        console.error('❌ Customer account handling failed:', error);
+        // For authenticated users, this is an error
+        throw new Error(`Customer account creation failed: ${error.message}`);
+      }
+    } else {
+      // Fallback for edge cases - treat as guest
+      console.log('👤 No user context and no guest session, treating as guest checkout');
+      customerId = null;
+    }
 
     // Transform order items with enhanced fallback pricing
     const transformedItems: OrderItem[] = await Promise.all(
@@ -493,6 +568,13 @@ serve(async (req) => {
     console.log(`🚀 [${requestId}] Calling create_order_with_items function...`);
     console.log(`💳 [${requestId}] Payment method mapping: ${checkoutData.payment_method} -> ${dbPaymentMethod}`);
 
+    console.log('📦 Creating order with data:', {
+      customerId: customerId,
+      isGuest: isGuestCheckout,
+      hasGuestSession: !!cleanGuestSessionId,
+      customerEmail: checkoutData.customer_email
+    });
+
     // Call the database function with retry logic for transient errors
     let orderId: string | null = null;
     let orderError: any = null;
@@ -500,7 +582,7 @@ serve(async (req) => {
     for (let attempt = 1; attempt <= FALLBACK_CONFIG.RETRY_ATTEMPTS; attempt++) {
       const { data, error } = await supabaseClient
         .rpc('create_order_with_items', {
-          p_customer_id: customer_id,
+          p_customer_id: customerId,
           p_fulfillment_type: checkoutData.fulfillment_type,
           p_delivery_address: checkoutData.delivery_address || null,
           p_pickup_point_id: cleanPickupPointId,
@@ -687,12 +769,13 @@ serve(async (req) => {
         new_values: {
           order_id: orderId,
           order_number: orderDetails?.order_number,
-          customer_id,
+          customer_id: customerId,
           customer_email: checkoutData.customer_email,
           payment_method: checkoutData.payment_method,
           total_amount: orderDetails?.total_amount,
           is_new_customer: isNewCustomer,
-          fulfillment_type: checkoutData.fulfillment_type
+          fulfillment_type: checkoutData.fulfillment_type,
+          checkout_type: isGuestCheckout ? 'guest' : 'authenticated'
         }
       });
 

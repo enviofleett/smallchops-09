@@ -4,6 +4,8 @@ import { Upload, X, ImageIcon, Loader2, AlertCircle, RotateCcw } from 'lucide-re
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { resizeImage, validateImageFile } from '@/lib/imageProcessing';
+import { UploadProgress } from '@/components/ui/upload-progress';
+import { handleUploadError } from '@/utils/uploadErrorHandler';
 
 interface ImageUploadProps {
   value?: string;
@@ -122,7 +124,7 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
     console.log("ImageUpload: handleFileChange called with file:", file?.name, file?.size, file?.type);
     
     if (file) {
-      // Validate file
+      // Validate file first
       const validationError = validateFile(file);
       if (validationError) {
         setError(validationError);
@@ -133,27 +135,74 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
         setIsProcessing(true);
         console.log("ImageUpload: Processing image to 1000x1000px");
         
-        // Process image with retry logic
+        // Enhanced validation before processing
+        if (!file.type.startsWith('image/')) {
+          throw new Error('Selected file is not a valid image');
+        }
+
+        // Check if file is readable
+        try {
+          await new Promise((resolve, reject) => {
+            const testReader = new FileReader();
+            testReader.onload = resolve;
+            testReader.onerror = () => reject(new Error('File cannot be read - it may be corrupted'));
+            testReader.readAsArrayBuffer(file.slice(0, 1024)); // Read first 1KB to test
+          });
+        } catch (readError) {
+          throw new Error('File appears to be corrupted or unreadable');
+        }
+        
+        // Process image with enhanced retry logic
         const processedFile = await processImageWithRetry(file);
         
-        // Create preview URL with error handling
+        // Create preview URL with comprehensive error handling
         try {
           cleanupPreviewUrl(); // Clean up previous URL
+          
+          // Validate processed file before creating preview
+          if (!processedFile || processedFile.size === 0) {
+            throw new Error('Processed file is invalid');
+          }
+          
           const previewUrl = URL.createObjectURL(processedFile);
           previewUrlRef.current = previewUrl;
+          
+          // Test if the URL is valid by creating a temporary image
+          await new Promise((resolve, reject) => {
+            const testImg = new Image();
+            testImg.onload = resolve;
+            testImg.onerror = () => reject(new Error('Generated preview is invalid'));
+            testImg.src = previewUrl;
+          });
+          
           setPreview(previewUrl);
           onChange(processedFile);
           setRetryCount(0); // Reset retry count on success
+          
+          console.log('ImageUpload: Successfully processed and previewing image');
         } catch (previewError) {
           console.error('ImageUpload: Failed to create preview URL:', previewError);
           // Still pass the file even if preview fails
           onChange(processedFile);
-          setError('Image processed successfully but preview unavailable');
+          setError('Image processed successfully but preview unavailable. You can still proceed with upload.');
         }
       } catch (error) {
         console.error("ImageUpload: Error processing image:", error);
         const errorMessage = error instanceof Error ? error.message : 'Failed to process image';
-        setError(errorMessage);
+        
+        // Provide specific error messages based on error type
+        let userFriendlyMessage = errorMessage;
+        if (errorMessage.includes('corrupted') || errorMessage.includes('unreadable')) {
+          userFriendlyMessage = 'This image file appears to be corrupted. Please try a different image or re-save the file.';
+        } else if (errorMessage.includes('too large') || errorMessage.includes('size')) {
+          userFriendlyMessage = 'Image is too large to process. Please use a smaller image (under 10MB).';
+        } else if (errorMessage.includes('format') || errorMessage.includes('type')) {
+          userFriendlyMessage = 'Unsupported image format. Please use PNG, JPG, or WebP format.';
+        } else if (errorMessage.includes('timeout')) {
+          userFriendlyMessage = 'Image processing timed out. Please try a smaller image or check your connection.';
+        }
+        
+        setError(userFriendlyMessage);
         setRetryCount(prev => prev + 1);
       } finally {
         setIsProcessing(false);
@@ -303,44 +352,13 @@ export const ImageUpload = ({ value, onChange, disabled, className }: ImageUploa
         </div>
       )}
       
-      {error && (
-        <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-          <div className="flex items-start gap-2 text-sm text-destructive">
-            <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-            <div className="flex-1">
-              <p className="font-medium">Upload Error</p>
-              <p className="text-xs opacity-90 mt-1">{error}</p>
-              {retryCount > 0 && (
-                <p className="text-xs opacity-75 mt-1">
-                  Attempts: {retryCount}/3
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="flex gap-2 mt-3">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={retryUpload}
-              className="inline-flex items-center gap-1"
-            >
-              <RotateCcw className="h-3 w-3" />
-              Try Again
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={removeImage}
-              className="inline-flex items-center gap-1"
-            >
-              <X className="h-3 w-3" />
-              Clear
-            </Button>
-          </div>
-        </div>
-      )}
+      {/* Enhanced progress/error display */}
+      <UploadProgress
+        status={isProcessing ? 'processing' : error ? 'error' : 'idle'}
+        error={error}
+        onRetry={retryUpload}
+        onCancel={() => setError(null)}
+      />
     </div>
   );
 };

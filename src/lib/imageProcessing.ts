@@ -99,7 +99,43 @@ export const validateImageFile = (file: File): FileValidationResult => {
     };
   }
 
-  console.log('validateImageFile: Validation passed');
+  // Additional file integrity checks
+  try {
+    // Check for malformed files by trying to read basic properties
+    if (!file.name || file.name.trim().length === 0) {
+      return {
+        isValid: false,
+        error: 'Invalid file name',
+        suggestedAction: 'Please ensure the file has a valid name'
+      };
+    }
+
+    // Check for suspicious file patterns that might indicate corruption
+    if (file.type === 'image/jpeg' && file.size < 1024) {
+      return {
+        isValid: false,
+        error: 'JPEG file appears too small to be valid',
+        suggestedAction: 'Please check if the file is corrupted'
+      };
+    }
+
+    if (file.type === 'image/png' && file.size < 1024) {
+      return {
+        isValid: false,
+        error: 'PNG file appears too small to be valid',
+        suggestedAction: 'Please check if the file is corrupted'
+      };
+    }
+
+  } catch (error) {
+    return {
+      isValid: false,
+      error: 'File appears to be corrupted or invalid',
+      suggestedAction: 'Please try a different image file'
+    };
+  }
+
+  console.log('validateImageFile: Validation passed successfully');
   return { isValid: true };
 };
 

@@ -24,7 +24,7 @@
         },
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://cdn.gpteng.co; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; img-src 'self' data: https: https://images.unsplash.com; font-src 'self' data: https://fonts.gstatic.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paystack.co;"
+          "value": "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval' https://js.paystack.co https://paystack.com https://checkout.paystack.com https://cdn.gpteng.co https://startersmallchops.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://startersmallchops.com; img-src 'self' data: blob: https: https://images.unsplash.com https://oknnklksdiqaifhxaccs.supabase.co https://startersmallchops.com https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com https://id-preview--7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovable.app; font-src 'self' data: https://fonts.gstatic.com https://startersmallchops.com; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.paystack.co https://paystack.co https://startersmallchops.com ws://localhost:* https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.lovableproject.com;"
         }
       ]
     }

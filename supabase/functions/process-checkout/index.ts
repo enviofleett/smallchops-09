@@ -311,6 +311,8 @@ serve(async (req) => {
     const paymentReference = payment_reference || `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
     let paymentResponse: any = null;
+    let finalAuthUrl: string | null = null;
+    let finalAccessCode: string | null = null;
     let lastError: string = '';
     const maxRetries = 2;
     
@@ -437,6 +439,8 @@ serve(async (req) => {
             reference: paymentReference
           }
         };
+        finalAuthUrl = authorizationUrl;
+        finalAccessCode = accessCode;
         
         console.log(`✅ Payment initialized successfully on attempt ${attempt}`);
         break;
@@ -489,10 +493,10 @@ serve(async (req) => {
       order_number: orderDetails.order_number,
       total_amount: total_amount,
       payment: {
-        payment_url: paymentResponse?.data?.authorization_url || null,
-        authorization_url: paymentResponse?.data?.authorization_url || null,
+        payment_url: finalAuthUrl,
+        authorization_url: finalAuthUrl,
         reference: paymentReference,
-        access_code: paymentResponse?.data?.access_code || null
+        access_code: finalAccessCode
       },
       message: 'Order created and payment initialized successfully'
     };

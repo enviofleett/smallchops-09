@@ -59,17 +59,22 @@ export function DiscountedProductCard({
                 objectFit: 'cover',
                 objectPosition: 'center',
                 width: '100%',
-                height: '100%'
+                height: '100%',
+                display: 'block'
               }}
               onError={(e) => {
-                e.currentTarget.style.display = 'none';
-                e.currentTarget.nextElementSibling?.classList.remove('hidden');
+                const target = e.currentTarget;
+                target.style.display = 'none';
+                const fallback = target.parentElement?.querySelector('.fallback-content');
+                if (fallback) {
+                  (fallback as HTMLElement).style.display = 'flex';
+                }
               }}
             />
           ) : null}
           
           {/* Fallback for missing images */}
-          <div className={`w-full h-full flex items-center justify-center bg-muted text-muted-foreground ${product.image_url ? 'hidden' : ''}`}>
+          <div className={`fallback-content w-full h-full flex items-center justify-center bg-muted text-muted-foreground ${product.image_url ? 'hidden' : 'flex'}`} style={{ display: product.image_url ? 'none' : 'flex' }}>
             No Image
           </div>
           

@@ -48,7 +48,7 @@ export function OptimizedImage({
   return (
     <div className={`relative overflow-hidden ${className}`} style={{ width, height }}>
       {isLoading && showLoader && (
-        <div className="absolute inset-0 flex items-center justify-center bg-muted">
+        <div className="absolute inset-0 flex items-center justify-center bg-muted/50">
           <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
         </div>
       )}
@@ -61,7 +61,7 @@ export function OptimizedImage({
         alt={alt}
         className={`transition-opacity duration-300 ${
           isLoading ? 'opacity-0' : 'opacity-100'
-        } ${hasError ? 'object-contain' : 'object-cover'} w-full h-full`}
+        } w-full h-full object-cover object-center`}
         onLoad={handleLoad}
         onError={handleError}
         loading="lazy"
@@ -69,6 +69,8 @@ export function OptimizedImage({
         style={{
           objectFit: hasError ? 'contain' : 'cover',
           objectPosition: 'center',
+          width: '100%',
+          height: '100%',
           maxWidth: '100%',
           maxHeight: '100%'
         }}

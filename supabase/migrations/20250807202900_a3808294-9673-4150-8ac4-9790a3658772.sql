@@ -1,0 +1,21 @@
+-- Final security fixes for all remaining functions  
+ALTER FUNCTION bulk_safe_delete_products(uuid[]) SET search_path TO 'public';
+ALTER FUNCTION bulk_update_payment_status_to_success() SET search_path TO 'public';
+ALTER FUNCTION calculate_bogo_discount(uuid, jsonb) SET search_path TO 'public';
+ALTER FUNCTION calculate_daily_email_metrics() SET search_path TO 'public';
+ALTER FUNCTION calculate_daily_email_metrics(date) SET search_path TO 'public';
+ALTER FUNCTION calculate_sender_reputation(text) SET search_path TO 'public';
+ALTER FUNCTION calculate_vat_breakdown(jsonb, numeric) SET search_path TO 'public';
+ALTER FUNCTION can_send_email_to(text, text) SET search_path TO 'public';
+ALTER FUNCTION check_admin_creation_rate_limit() SET search_path TO 'public';
+ALTER FUNCTION check_admin_invitation_rate_limit(uuid) SET search_path TO 'public';
+ALTER FUNCTION check_customer_rate_limit(uuid, inet, text, text) SET search_path TO 'public';
+ALTER FUNCTION check_email_rate_limit(text, text) SET search_path TO 'public';
+ALTER FUNCTION check_enhanced_rate_limit(uuid, text, text, integer, integer) SET search_path TO 'public';
+ALTER FUNCTION check_paystack_production_readiness() SET search_path TO 'public';
+ALTER FUNCTION check_production_readiness() SET search_path TO 'public';
+ALTER FUNCTION check_promotion_expiration() SET search_path TO 'public';
+ALTER FUNCTION check_rate_limit_with_reputation(text, text) SET search_path TO 'public';
+ALTER FUNCTION check_upload_rate_limit(uuid) SET search_path TO 'public';
+ALTER FUNCTION check_user_permission(uuid, text, text) SET search_path TO 'public';
+ALTER FUNCTION cleanup_email_processing_data() SET search_path TO 'public';

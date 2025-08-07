@@ -85,10 +85,10 @@ const CustomerRegister = () => {
       return false;
     }
 
-    if (formData.password.length < 6) {
+    if (formData.password.length < 8) {
       toast({
         title: "Password too short",
-        description: "Password must be at least 6 characters long.",
+        description: "Password must be at least 8 characters long for security.",
         variant: "destructive",
       });
       return false;
@@ -114,42 +114,78 @@ const CustomerRegister = () => {
     setIsLoading(true);
 
     try {
-      // Create account using customer direct auth
-      const result = await register({
-        email: formData.email,
-        password: formData.password,
+      console.log('=== Starting Registration Process ===');
+      console.log('Form data:', {
         name: formData.name,
-        phone: formData.phone
+        email: formData.email,
+        phone: formData.phone,
+        hasPassword: !!formData.password
       });
 
+      // Create account using customer direct auth
+      const result = await register({
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+        name: formData.name.trim(),
+        phone: formData.phone.trim()
+      });
+
+      console.log('Registration result:', result);
+
       if (!result.success) {
-        throw new Error(result.error || 'Registration failed');
+        let errorMessage = result.error || 'Registration failed';
+        
+        // Provide specific error messages based on common issues
+        if (errorMessage.includes('already exists')) {
+          errorMessage = 'An account with this email already exists. Please sign in instead.';
+        } else if (errorMessage.includes('rate limit')) {
+          errorMessage = 'Too many registration attempts. Please wait a few minutes and try again.';
+        } else if (errorMessage.includes('invalid email')) {
+          errorMessage = 'Please enter a valid email address.';
+        } else if (errorMessage.includes('password')) {
+          errorMessage = 'Password must be at least 8 characters long.';
+        } else if (errorMessage.includes('phone')) {
+          errorMessage = 'Please enter a valid Nigerian phone number (11 digits starting with 0).';
+        }
+        
+        throw new Error(errorMessage);
       }
 
       toast({
         title: "Registration successful!",
-        description: "Your account has been created. Please check your email for verification.",
+        description: "Please check your email for a verification code to complete your registration.",
+        duration: 6000,
       });
 
-      // Clear form on success
+      // Clear sensitive form data but keep email for verification
       setFormData({
         name: '',
-        email: '',
+        email: formData.email, // Keep for OTP verification
         phone: '',
         password: '',
         confirmPassword: '',
       });
 
-      // Redirect using proper redirect handling
-      const redirectPath = handlePostLoginRedirect('customer');
-      navigate(redirectPath);
+      // Navigate to verification page or stay for OTP input
+      console.log('Registration completed, awaiting OTP verification');
+      
     } catch (error: any) {
       console.error('Registration error:', error);
       
+      let displayMessage = error.message || "Failed to create account. Please try again.";
+      
+      // Handle specific network or Edge Function errors
+      if (error.message?.includes('Edge Function returned a non-2xx status code')) {
+        displayMessage = "Registration service is temporarily unavailable. Please try again in a few minutes.";
+      } else if (error.message?.includes('Failed to fetch')) {
+        displayMessage = "Network connection issue. Please check your internet connection and try again.";
+      }
+      
       toast({
         title: "Registration failed",
-        description: error.message || "Failed to create account. Please try again.",
+        description: displayMessage,
         variant: "destructive",
+        duration: 8000,
       });
     } finally {
       setIsLoading(false);
@@ -253,10 +289,10 @@ const CustomerRegister = () => {
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(e) => handleInputChange('password', e.target.value)}
-                    placeholder="Create a password (min 6 characters)"
+                    placeholder="Create a password (min 8 characters)"
                     className="pl-10 pr-10"
                     required
-                    minLength={6}
+                    minLength={8}
                     disabled={isLoading}
                     onFocus={() => setShowValidation(true)}
                   />

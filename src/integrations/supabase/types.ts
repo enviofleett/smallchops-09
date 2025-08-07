@@ -6781,12 +6781,19 @@ export type Database = {
         Returns: Json
       }
       verify_customer_otp: {
-        Args: {
-          p_email: string
-          p_otp_code: string
-          p_otp_type: string
-          p_ip_address?: unknown
-        }
+        Args:
+          | {
+              p_email: string
+              p_otp_code: string
+              p_otp_type: string
+              p_ip_address?: string
+            }
+          | {
+              p_email: string
+              p_otp_code: string
+              p_otp_type: string
+              p_ip_address?: unknown
+            }
         Returns: Json
       }
       verify_payment_atomic: {

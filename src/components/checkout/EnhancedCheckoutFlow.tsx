@@ -283,13 +283,17 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
       savePrePaymentState(formData, checkoutStep, deliveryFee, uniqueReference);
 
       console.log('🚀 Processing checkout with enhanced debugging...');
+      console.log('🔍 Sanitized data being sent:', sanitizedData);
       
       // Log payment attempt
       logPaymentAttempt(sanitizedData, 'attempt');
 
+      console.log('🌐 Calling Supabase function: process-checkout');
       const { data, error } = await supabase.functions.invoke('process-checkout', {
         body: sanitizedData
       });
+
+      console.log('📥 Raw Supabase response received:', { data, error, dataType: typeof data });
 
       if (error) {
         console.error('🔍 Supabase function error:', error);
@@ -297,16 +301,26 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         throw new Error(error.message);
       }
 
+      console.log('✅ No Supabase error, processing response data...');
+
       let parsedData = data;
+      console.log('🔄 Parsing response data, current type:', typeof data);
+      
       if (typeof data === 'string') {
+        console.log('📝 Response is string, attempting JSON parse...');
         try {
           parsedData = JSON.parse(data);
+          console.log('✅ JSON parse successful');
         } catch (parseError) {
           console.error('❌ Failed to parse JSON response:', parseError);
+          console.error('❌ Raw response was:', data);
           handlePaymentFailure({ type: 'parse_error', message: 'Invalid response format' });
           throw new Error('Invalid response format from server');
         }
       }
+
+      console.log('🔍 Final parsed data:', parsedData);
+      console.log('🔍 Success flag:', parsedData?.success);
 
       if (parsedData?.success === true) {
         // Enhanced debugging before normalization
@@ -397,13 +411,15 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           console.error('❌ No payment URL available for redirect even after normalization:', {
             originalAuthUrl: normalizedData.payment?.authorization_url,
             normalizedPaymentUrl: normalizedData.payment?.payment_url,
-            paymentObject: normalizedData.payment
+            paymentObject: normalizedData.payment,
+            fullNormalizedData: normalizedData
           });
           setLastPaymentError('Payment URL not available after processing');
           handlePaymentFailure({ type: 'no_payment_url', responseData: normalizedData });
         }
         
       } else {
+        console.error('❌ Checkout response indicates failure:', parsedData);
         const errorMessage = parsedData?.message || parsedData?.error || "Failed to process checkout";
         handlePaymentFailure({ type: 'checkout_failed', message: errorMessage });
         logPaymentAttempt(sanitizedData, 'failure', { error: errorMessage });
@@ -415,7 +431,9 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
       }
 
     } catch (error) {
-      console.error('💥 Checkout error:', error);
+      console.error('💥 Checkout error caught in try-catch:', error);
+      console.error('💥 Error type:', typeof error);
+      console.error('💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
       const errorMessage = error instanceof Error ? error.message : "Failed to process checkout. Please try again.";
       setLastPaymentError(errorMessage);
       

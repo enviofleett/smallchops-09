@@ -1,0 +1,20 @@
+-- Final batch: Complete remaining security fixes
+ALTER FUNCTION get_hourly_email_stats(start_time timestamp with time zone, end_time timestamp with time zone) SET search_path TO 'public';
+ALTER FUNCTION get_order_linking_stats() SET search_path TO 'public';
+ALTER FUNCTION get_production_health_status() SET search_path TO 'public';
+ALTER FUNCTION get_public_delivery_zones() SET search_path TO 'public';
+ALTER FUNCTION get_smtp_config_with_fallback() SET search_path TO 'public';
+ALTER FUNCTION get_time_ago(target_time timestamp with time zone) SET search_path TO 'public';
+ALTER FUNCTION get_user_role(user_uuid uuid) SET search_path TO 'public';
+ALTER FUNCTION handle_admin_invitation() SET search_path TO 'public';
+ALTER FUNCTION handle_new_admin_user() SET search_path TO 'public';
+ALTER FUNCTION handle_new_customer_account() SET search_path TO 'public';
+ALTER FUNCTION handle_new_customer_auth() SET search_path TO 'public';
+ALTER FUNCTION handle_new_customer_registration() SET search_path TO 'public';
+ALTER FUNCTION handle_new_customer_user() SET search_path TO 'public';
+ALTER FUNCTION handle_new_user() SET search_path TO 'public';
+ALTER FUNCTION has_email_consent(email_address text, consent_type text) SET search_path TO 'public';
+ALTER FUNCTION health_check() SET search_path TO 'public';
+ALTER FUNCTION increment_promotion_usage(p_promotion_id uuid, p_order_id uuid, p_customer_email text, p_discount_amount numeric, p_original_amount numeric, p_final_amount numeric, p_metadata jsonb) SET search_path TO 'public';
+ALTER FUNCTION increment_rate_limit_counter(p_identifier text, p_identifier_type text) SET search_path TO 'public';
+ALTER FUNCTION instant_email_trigger() SET search_path TO 'public';

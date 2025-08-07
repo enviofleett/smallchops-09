@@ -66,7 +66,7 @@ const Contact = () => {
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Our Location</h3>
                         <p className="text-gray-600">
-                          {settings?.address || '2B Close Off 11Crescent Kado Estate, Kado'}
+                          {settings?.address || '2B Close Off 11Crescent Kado Estate, Kado Abuja'}
                         </p>
                       </div>
                     </div>

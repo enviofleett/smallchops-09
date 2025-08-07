@@ -56,7 +56,7 @@ const PublicFooterContent = () => {
             <h3 className="text-lg font-bold mb-4 text-white">Contact Us</h3>
             <div className="space-y-2 text-gray-300">
               <div>+234 807 3011 100</div>
-              <div>+234 908 8388 886</div>
+              
               <div>support@startersmallchops.com</div>
             </div>
           </div>

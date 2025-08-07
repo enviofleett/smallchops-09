@@ -149,7 +149,18 @@ serve(async (req) => {
 
     if (orderError) {
       console.error('❌ Order creation failed:', orderError);
-      throw new Error('Failed to create order: ' + orderError.message);
+      
+      // Provide specific error messages for common issues
+      let userFriendlyMessage = 'Failed to create order';
+      if (orderError.message.includes('22P02') || orderError.message.includes('invalid input syntax for type uuid')) {
+        userFriendlyMessage = 'There was an issue processing your order items. Please try again or contact support.';
+      } else if (orderError.message.includes('customer')) {
+        userFriendlyMessage = 'There was an issue with customer information. Please check your details and try again.';
+      } else if (orderError.message.includes('delivery')) {
+        userFriendlyMessage = 'There was an issue with delivery information. Please check your address and try again.';
+      }
+      
+      throw new Error(userFriendlyMessage + ' (Error: ' + orderError.message + ')');
     }
 
     console.log('✅ Order created successfully:', orderId);

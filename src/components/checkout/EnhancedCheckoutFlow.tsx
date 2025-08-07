@@ -364,15 +364,44 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
 
         logPaymentAttempt(sanitizedData, 'success', { orderId: normalizedData.order_id });
 
-        setPaymentData({
-          reference: normalizedData.payment.reference,
-          amount: normalizedData.total_amount,
-          email: formData.customer_email,
+        // Save order details for success page
+        const orderDetails = {
+          orderId: normalizedData.order_id,
           orderNumber: normalizedData.order_number,
-          paymentUrl: normalizedData.payment.payment_url
-        });
-        setCheckoutStep('payment');
-        setShowRecoveryOption(false); // Hide recovery option on success
+          totalAmount: normalizedData.total_amount,
+          customerEmail: sanitizedData.customer_email,
+          customerName: sanitizedData.customer_name,
+          fulfillmentType: sanitizedData.fulfillment_type,
+          deliveryAddress: sanitizedData.delivery_address,
+          orderItems: sanitizedData.order_items
+        };
+        
+        sessionStorage.setItem('orderDetails', JSON.stringify(orderDetails));
+        
+        // Clear cart after successful order
+        clearCart();
+        
+        // Clear any saved checkout state since we're done
+        clearState();
+        
+        // Handle payment redirection - use payment_url (which should now be normalized)
+        const redirectUrl = normalizedData.payment?.payment_url;
+        
+        if (redirectUrl) {
+          console.log('🔗 Redirecting to payment URL:', redirectUrl);
+          
+          // Use window.location for immediate redirect
+          window.location.href = redirectUrl;
+        } else {
+          // This should not happen after normalization, but add defensive check
+          console.error('❌ No payment URL available for redirect even after normalization:', {
+            originalAuthUrl: normalizedData.payment?.authorization_url,
+            normalizedPaymentUrl: normalizedData.payment?.payment_url,
+            paymentObject: normalizedData.payment
+          });
+          setLastPaymentError('Payment URL not available after processing');
+          handlePaymentFailure({ type: 'no_payment_url', responseData: normalizedData });
+        }
         
       } else {
         const errorMessage = parsedData?.message || parsedData?.error || "Failed to process checkout";

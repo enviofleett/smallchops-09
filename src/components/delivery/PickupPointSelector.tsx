@@ -96,12 +96,12 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
         <div className="space-y-4">
           <Card
             className={`cursor-pointer transition-all ${
-              selectedPointId === 'default'
+              selectedPointId === '00000000-0000-0000-0000-000000000001'
                 ? 'ring-2 ring-primary border-primary'
                 : 'hover:border-primary/50'
             } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             onClick={() => !disabled && onSelect({
-              id: 'default',
+              id: '00000000-0000-0000-0000-000000000001',
               name: 'Main Store',
               address: '2B Close Off 11Crescent Kado Estate, Kado',
               contact_phone: '0807 301 1100',
@@ -133,7 +133,7 @@ export function PickupPointSelector({ selectedPointId, onSelect, disabled }: Pic
                       Closed
                     </Badge>
                   )}
-                  {selectedPointId === 'default' && (
+                  {selectedPointId === '00000000-0000-0000-0000-000000000001' && (
                     <Badge variant="default">
                       Selected
                     </Badge>

@@ -22,7 +22,28 @@ serve(async (req) => {
     );
 
     const requestBody = await req.json();
-    console.log('📨 Checkout request:', JSON.stringify(requestBody, null, 2));
+    console.log('📥 Received checkout request:', JSON.stringify(requestBody, null, 2));
+
+    // Get user context for debugging
+    const authHeader = req.headers.get('authorization');
+    const hasAuthHeader = !!authHeader;
+    
+    let authenticatedUser = null;
+    if (hasAuthHeader) {
+      try {
+        const { data: { user } } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
+        authenticatedUser = user;
+      } catch (authError) {
+        console.log('🔓 No authenticated user found (this is normal for guest checkout)');
+      }
+    }
+
+    console.log('👤 User context analysis:', {
+      hasUser: !!authenticatedUser,
+      userId: authenticatedUser?.id,
+      isGuest: !!requestBody.guest_session_id,
+      guestSessionId: requestBody.guest_session_id
+    });
     
     const {
       customer_email,
@@ -96,44 +117,126 @@ serve(async (req) => {
 
     console.log('Processed order items:', JSON.stringify(processedOrderItems, null, 2));
 
+    // Process guest session ID for database compatibility
+    let processedGuestSessionId = null;
+    if (guest_session_id) {
+      console.log('🔍 Processing guest session ID:', guest_session_id);
+      
+      // Extract UUID from guest session ID if it has the "guest_" prefix
+      if (typeof guest_session_id === 'string' && guest_session_id.startsWith('guest_')) {
+        const extractedUuid = guest_session_id.replace('guest_', '');
+        
+        // Validate that the extracted part is a valid UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(extractedUuid)) {
+          processedGuestSessionId = extractedUuid;
+          console.log('✅ Successfully extracted UUID from guest session:', processedGuestSessionId);
+        } else {
+          console.error('❌ Invalid UUID format in guest session ID:', extractedUuid);
+          // Continue without guest session ID rather than failing
+          console.log('⚠️ Continuing checkout without guest session ID');
+        }
+      } else if (typeof guest_session_id === 'string') {
+        // Check if it's already a valid UUID
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(guest_session_id)) {
+          processedGuestSessionId = guest_session_id;
+          console.log('✅ Guest session ID is already a valid UUID:', processedGuestSessionId);
+        } else {
+          console.error('❌ Guest session ID is not a valid UUID format:', guest_session_id);
+          console.log('⚠️ Continuing checkout without guest session ID');
+        }
+      } else {
+        console.error('❌ Guest session ID is not a string:', typeof guest_session_id, guest_session_id);
+        console.log('⚠️ Continuing checkout without guest session ID');
+      }
+    }
+
     // Find or create customer account
     let customerId: string | null = null;
     
-    // Check if customer exists
-    const { data: existingCustomer } = await supabaseClient
-      .from('customer_accounts')
-      .select('id')
-      .eq('email', customer_email)
-      .single();
+    // Determine checkout type based on user authentication and guest session
+    if (authenticatedUser) {
+      console.log('🔍 Processing authenticated user checkout...');
+      
+      // Check if customer account exists for authenticated user
+      const { data: existingCustomer } = await supabaseClient
+        .from('customer_accounts')
+        .select('id')
+        .eq('email', customer_email)
+        .single();
 
-    if (existingCustomer) {
-      customerId = existingCustomer.id;
-      console.log('🔍 Found existing customer:', customerId);
+      if (existingCustomer) {
+        customerId = existingCustomer.id;
+        console.log('✅ Found existing customer account:', customerId);
+      } else {
+        // Create customer account for authenticated user
+        const { data: newCustomer, error: customerError } = await supabaseClient
+          .from('customer_accounts')
+          .insert({
+            name: customer_name,
+            email: customer_email,
+            phone: customer_phone,
+            user_id: authenticatedUser.id,
+            email_verified: true, // Assume verified if authenticated
+            phone_verified: false
+          })
+          .select('id')
+          .single();
+
+        if (customerError) {
+          console.error('❌ Failed to create customer account for authenticated user:', customerError);
+          throw new Error('Failed to create customer account');
+        }
+
+        customerId = newCustomer.id;
+        console.log('✅ Created customer account for authenticated user:', customerId);
+      }
     } else {
-      // Create new customer account
-      const { data: newCustomer, error: customerError } = await supabaseClient
+      console.log('👤 Processing guest checkout, skipping customer account creation');
+      // For guest checkout, we'll create customer account in the database function
+      // Set customerId to null to indicate guest checkout
+      customerId = null;
+    }
+
+    // Generate unique order number
+    const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+    
+    // For guest checkout, we need to create a customer account first since the database function requires one
+    if (!customerId && guest_session_id) {
+      console.log('🆕 Creating customer account for guest checkout...');
+      
+      const { data: guestCustomer, error: guestCustomerError } = await supabaseClient
         .from('customer_accounts')
         .insert({
           name: customer_name,
           email: customer_email,
           phone: customer_phone,
+          user_id: null, // Guest users don't have auth user IDs
           email_verified: false,
           phone_verified: false
         })
         .select('id')
         .single();
 
-      if (customerError) {
-        console.error('❌ Failed to create customer:', customerError);
-        throw new Error('Failed to create customer account');
+      if (guestCustomerError) {
+        console.error('❌ Failed to create customer account for guest:', guestCustomerError);
+        throw new Error('Failed to create customer account for guest checkout');
       }
 
-      customerId = newCustomer.id;
-      console.log('✅ Created new customer:', customerId);
+      customerId = guestCustomer.id;
+      console.log('✅ Created customer account for guest:', customerId);
     }
 
-    // Generate unique order number
-    const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+    // Log the final data being sent to the database function
+    console.log('📦 Creating order with data:', {
+      customer_id: customerId,
+      customer_email: customer_email,
+      order_number: orderNumber,
+      total_amount: total_amount,
+      isGuest: !!guest_session_id,
+      processedGuestSessionId: processedGuestSessionId
+    });
     
     // Create order using the existing order creation function with processed items
     const { data: orderId, error: orderError } = await supabaseClient
@@ -143,7 +246,7 @@ serve(async (req) => {
         p_delivery_address: fulfillment_type === 'delivery' ? delivery_address : null,
         p_pickup_point_id: fulfillment_type === 'pickup' ? pickup_point_id : null,
         p_delivery_zone_id: delivery_zone_id || null,
-        p_guest_session_id: guest_session_id || null,
+        p_guest_session_id: processedGuestSessionId, // Use the processed UUID
         p_items: processedOrderItems
       });
 

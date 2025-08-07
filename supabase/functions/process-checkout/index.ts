@@ -159,6 +159,13 @@ serve(async (req) => {
     }
 
     console.log('✅ Payment initialized successfully');
+    console.log('📦 Payment response data:', JSON.stringify(paymentResponse, null, 2));
+
+    // Validate payment response structure
+    if (!paymentResponse.data || !paymentResponse.data.authorization_url) {
+      console.error('❌ Payment response missing required fields:', paymentResponse);
+      throw new Error('Payment response missing authorization URL');
+    }
 
     // Create payment transaction record
     const { error: transactionError } = await supabaseClient
@@ -189,10 +196,11 @@ serve(async (req) => {
       order_number: orderDetails.order_number,
       total_amount: total_amount,
       payment: {
-        reference: paymentReference,
         payment_url: paymentResponse.data.authorization_url,
+        reference: paymentReference,
         access_code: paymentResponse.data.access_code
-      }
+      },
+      message: 'Order created and payment initialized successfully'
     };
 
     console.log('🎉 Checkout process completed successfully:', response);

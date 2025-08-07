@@ -323,66 +323,66 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
       console.log('🔍 Success flag:', parsedData?.success);
 
       if (parsedData?.success === true) {
-        // Enhanced debugging before normalization
-        console.log('🔍 Raw response data before normalization:', {
-          success: parsedData?.success,
-          hasPayment: !!parsedData?.payment,
-          paymentKeys: parsedData?.payment ? Object.keys(parsedData.payment) : null,
-          paymentUrl: parsedData?.payment?.payment_url,
-          authUrl: parsedData?.payment?.authorization_url,
-          reference: parsedData?.payment?.reference
-        });
-
-        // Normalize the payment data FIRST (handle authorization_url vs payment_url mismatch)
-        const normalizedData = normalizePaymentData(parsedData);
+        console.log('✅ Success response received, analyzing structure...');
         
-        console.log('🔄 Data normalized successfully:', {
-          hasPaymentUrl: !!normalizedData?.payment?.payment_url,
-          paymentUrl: normalizedData?.payment?.payment_url,
-          authUrl: normalizedData?.payment?.authorization_url,
-          reference: normalizedData?.payment?.reference
-        });
-
-        // Run diagnostics AFTER normalization to avoid false positives
-        const debugInfo = debugPaymentInitialization(sanitizedData, normalizedData);
-        const quickDiag = quickPaymentDiagnostic(normalizedData);
+        // Detect and handle nested response structures from Supabase
+        let workingData = parsedData;
+        console.log('🔍 Initial data keys:', Object.keys(parsedData));
         
-        if (quickDiag) {
-          console.error('🚨 Quick diagnostic found issue after normalization:', quickDiag);
-          setLastPaymentError(quickDiag.fix);
-          handlePaymentFailure({ type: 'diagnostic_issue', ...quickDiag });
-          throw new Error(quickDiag.issue);
-        }
-
-        // Validate payment initialization data using normalized data
-        const validationResult = validatePaymentInitializationData(normalizedData);
-        
-        if (!validationResult.isValid) {
-          const userFriendlyError = generateUserFriendlyErrorMessage(validationResult);
-          console.error('❌ Payment validation failed:', validationResult);
-          setLastPaymentError(userFriendlyError);
-          handlePaymentFailure({ type: 'validation_failed', validation: validationResult });
-          logPaymentAttempt(sanitizedData, 'failure', { validation: validationResult });
-          throw new Error(userFriendlyError);
+        // Handle possible nested data structures (Supabase sometimes wraps responses)
+        if (parsedData.data && typeof parsedData.data === 'object' && !parsedData.payment) {
+          console.log('📦 Found nested data structure, unwrapping...');
+          workingData = parsedData.data;
+          console.log('🔍 Unwrapped data keys:', Object.keys(workingData));
         }
         
-        console.log('✅ Checkout successful! Order created:', {
-          orderId: normalizedData.order_id,
-          orderNumber: normalizedData.order_number,
-          totalAmount: normalizedData.total_amount,
-          paymentReference: normalizedData.payment?.reference,
-          paymentUrl: normalizedData.payment?.payment_url,
-          hasAuthUrl: !!normalizedData.payment?.authorization_url,
-          normalized: normalizedData !== parsedData
-        });
-
-        logPaymentAttempt(sanitizedData, 'success', { orderId: normalizedData.order_id });
-
+        // Locate payment object with fallbacks
+        let paymentObj = workingData.payment;
+        if (!paymentObj && workingData.data?.payment) {
+          console.log('📦 Payment object found in nested location...');
+          paymentObj = workingData.data.payment;
+        }
+        
+        console.log('🔍 Payment object located:', !!paymentObj);
+        if (paymentObj) {
+          console.log('🔍 Payment object keys:', Object.keys(paymentObj));
+          console.log('🔍 Authorization URL:', paymentObj.authorization_url);
+          console.log('🔍 Payment URL:', paymentObj.payment_url);
+        }
+        
+        // Validate we have essential data
+        if (!paymentObj) {
+          console.error('❌ No payment object found in response structure');
+          setLastPaymentError('Payment initialization failed - no payment data');
+          handlePaymentFailure({ type: 'no_payment_object', responseData: parsedData });
+          throw new Error('No payment object in response');
+        }
+        
+        // Extract payment URL with fallbacks
+        const authUrl = paymentObj.authorization_url;
+        const paymentUrl = paymentObj.payment_url || authUrl;
+        
+        if (!paymentUrl) {
+          console.error('❌ No payment URL found:', paymentObj);
+          setLastPaymentError('Payment URL not available');
+          handlePaymentFailure({ type: 'no_payment_url', responseData: paymentObj });
+          throw new Error('No payment URL in response');
+        }
+        
+        console.log('✅ Valid payment URL found:', paymentUrl);
+        
+        // Extract other order details
+        const orderNumber = workingData.order_number || workingData.data?.order_number;
+        const totalAmount = workingData.total_amount || workingData.data?.total_amount;
+        const orderId = workingData.order_id || workingData.data?.order_id;
+        
+        console.log('✅ Order details extracted:', { orderNumber, totalAmount, orderId });
+        
         // Save order details for success page
         const orderDetails = {
-          orderId: normalizedData.order_id,
-          orderNumber: normalizedData.order_number,
-          totalAmount: normalizedData.total_amount,
+          orderId,
+          orderNumber,
+          totalAmount,
           customerEmail: sanitizedData.customer_email,
           customerName: sanitizedData.customer_name,
           fulfillmentType: sanitizedData.fulfillment_type,
@@ -392,31 +392,19 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         
         sessionStorage.setItem('orderDetails', JSON.stringify(orderDetails));
         
-        // Clear cart after successful order
+        // Clear cart and checkout state
         clearCart();
-        
-        // Clear any saved checkout state since we're done
         clearState();
         
-        // Handle payment redirection - use payment_url (which should now be normalized)
-        const redirectUrl = normalizedData.payment?.payment_url;
+        logPaymentAttempt(sanitizedData, 'success', { 
+          orderId, 
+          orderNumber, 
+          paymentUrl,
+          reference: paymentObj.reference 
+        });
         
-        if (redirectUrl) {
-          console.log('🔗 Redirecting to payment URL:', redirectUrl);
-          
-          // Use window.location for immediate redirect
-          window.location.href = redirectUrl;
-        } else {
-          // This should not happen after normalization, but add defensive check
-          console.error('❌ No payment URL available for redirect even after normalization:', {
-            originalAuthUrl: normalizedData.payment?.authorization_url,
-            normalizedPaymentUrl: normalizedData.payment?.payment_url,
-            paymentObject: normalizedData.payment,
-            fullNormalizedData: normalizedData
-          });
-          setLastPaymentError('Payment URL not available after processing');
-          handlePaymentFailure({ type: 'no_payment_url', responseData: normalizedData });
-        }
+        console.log('🚀 Redirecting to payment URL:', paymentUrl);
+        window.location.href = paymentUrl;
         
       } else {
         console.error('❌ Checkout response indicates failure:', parsedData);

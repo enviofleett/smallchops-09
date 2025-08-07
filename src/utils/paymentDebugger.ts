@@ -191,8 +191,11 @@ export function debugPaymentInitialization(checkoutData: any, responseData: any)
 
 /**
  * Quick diagnostic function for immediate issue identification
+ * Updated to handle nested Supabase response structures
  */
 export function quickPaymentDiagnostic(responseData: any): { issue: string; fix: string } | null {
+  console.log('🔍 Quick diagnostic analyzing response:', responseData);
+  
   if (!responseData) {
     return {
       issue: 'No response data received',
@@ -200,22 +203,36 @@ export function quickPaymentDiagnostic(responseData: any): { issue: string; fix:
     };
   }
 
-  if (responseData.success !== true) {
+  // Handle nested data structures from Supabase
+  let dataToCheck = responseData;
+  if (responseData.data && typeof responseData.data === 'object') {
+    console.log('📦 Diagnostic found nested data structure');
+    dataToCheck = responseData.data;
+  }
+
+  if (dataToCheck.success !== true) {
     return {
       issue: 'API call failed',
-      fix: responseData.message || responseData.error || 'Check edge function for specific error'
+      fix: dataToCheck.message || dataToCheck.error || 'Check edge function for specific error'
     };
   }
 
-  if (!responseData.payment) {
+  // Check for payment object in multiple possible locations
+  let paymentObj = dataToCheck.payment;
+  if (!paymentObj && dataToCheck.data?.payment) {
+    paymentObj = dataToCheck.data.payment;
+  }
+
+  if (!paymentObj) {
     return {
-      issue: 'Payment object missing',
-      fix: 'Verify Paystack integration and configuration'
+      issue: 'Payment object missing from response',
+      fix: 'Verify Paystack integration returns payment object'
     };
   }
 
   // Check for payment URLs - either payment_url OR authorization_url is valid
-  if (!responseData.payment.payment_url && !responseData.payment.authorization_url) {
+  if (!paymentObj.payment_url && !paymentObj.authorization_url) {
+    console.error('❌ Diagnostic: No payment URLs found in payment object:', paymentObj);
     return {
       issue: 'No payment URL in response',
       fix: 'Check Paystack API response and ensure proper URL extraction'
@@ -223,13 +240,11 @@ export function quickPaymentDiagnostic(responseData: any): { issue: string; fix:
   }
 
   // If we have either URL, the response is valid
-  if (responseData.payment.authorization_url || responseData.payment.payment_url) {
-    console.log('✅ Valid payment URL found:', {
-      hasAuthUrl: !!responseData.payment.authorization_url,
-      hasPaymentUrl: !!responseData.payment.payment_url,
-      urlUsed: responseData.payment.payment_url || responseData.payment.authorization_url
-    });
-  }
+  console.log('✅ Diagnostic: Valid payment URL found:', {
+    hasAuthUrl: !!paymentObj.authorization_url,
+    hasPaymentUrl: !!paymentObj.payment_url,
+    urlUsed: paymentObj.payment_url || paymentObj.authorization_url
+  });
 
   return null; // No obvious issues
 }

@@ -128,44 +128,156 @@ serve(async (req) => {
       throw new Error('Failed to retrieve created order');
     }
 
-    // Initialize payment with Paystack
+    // Initialize payment with Paystack (with retry mechanism)
     console.log('💳 Initializing payment...');
     
     const paymentReference = payment_reference || `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    const { data: paymentResponse, error: paymentError } = await supabaseClient.functions.invoke('paystack-secure', {
-      body: {
-        action: 'initialize',
-        email: customer_email,
-        amount: Math.round(total_amount * 100), // Convert to kobo
-        reference: paymentReference,
-        metadata: {
-          order_id: orderId,
-          customer_name: customer_name,
-          order_number: orderDetails.order_number,
-          fulfillment_type: fulfillment_type
+    let paymentResponse: any = null;
+    let lastError: string = '';
+    const maxRetries = 2;
+    
+    // Retry mechanism for payment initialization
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        console.log(`🔄 Payment initialization attempt ${attempt}/${maxRetries}`);
+        
+        const { data: response, error: paymentError } = await supabaseClient.functions.invoke('paystack-secure', {
+          body: {
+            action: 'initialize',
+            email: customer_email,
+            amount: Math.round(total_amount * 100), // Convert to kobo
+            reference: paymentReference,
+            metadata: {
+              order_id: orderId,
+              customer_name: customer_name,
+              order_number: orderDetails.order_number,
+              fulfillment_type: fulfillment_type
+            }
+          }
+        });
+
+        console.log('📡 Raw response from paystack-secure:', JSON.stringify(response, null, 2));
+        console.log('🔍 Response structure analysis:', {
+          hasResponse: !!response,
+          responseType: typeof response,
+          hasStatus: response?.status !== undefined,
+          statusValue: response?.status,
+          hasData: !!response?.data,
+          dataKeys: response?.data ? Object.keys(response.data) : null,
+          hasAuthUrl: !!(response?.data?.authorization_url || response?.authorization_url),
+          errorDetails: paymentError
+        });
+
+        if (paymentError) {
+          lastError = `Supabase function error: ${paymentError.message}`;
+          console.error(`❌ Attempt ${attempt} - Paystack function call failed:`, paymentError);
+          
+          if (attempt === maxRetries) {
+            throw new Error(lastError);
+          }
+          
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          continue;
         }
+
+        if (!response) {
+          lastError = 'No response received from payment service';
+          console.error(`❌ Attempt ${attempt} - No response received`);
+          
+          if (attempt === maxRetries) {
+            throw new Error(lastError);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+
+        if (!response.status) {
+          lastError = `Payment service returned failure: ${response.error || 'Unknown error'}`;
+          console.error(`❌ Attempt ${attempt} - Payment service returned status false:`, response);
+          
+          if (attempt === maxRetries) {
+            throw new Error(lastError);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+
+        // Extract authorization URL with multiple fallback paths
+        let authorizationUrl = null;
+        let accessCode = null;
+        
+        // Try different response structure possibilities
+        if (response.data) {
+          authorizationUrl = response.data.authorization_url;
+          accessCode = response.data.access_code;
+        } else {
+          // Fallback: check if response is the actual Paystack data
+          authorizationUrl = response.authorization_url;
+          accessCode = response.access_code;
+        }
+
+        if (!authorizationUrl) {
+          lastError = `Authorization URL missing from payment response. Response structure: ${JSON.stringify(response)}`;
+          console.error(`❌ Attempt ${attempt} - Authorization URL not found in response:`, response);
+          
+          if (attempt === maxRetries) {
+            throw new Error(lastError);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+
+        // Validate URL format
+        try {
+          new URL(authorizationUrl);
+        } catch (urlError) {
+          lastError = `Invalid authorization URL format: ${authorizationUrl}`;
+          console.error(`❌ Attempt ${attempt} - Invalid URL format:`, authorizationUrl);
+          
+          if (attempt === maxRetries) {
+            throw new Error(lastError);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+
+        // Success! Store the response and break the retry loop
+        paymentResponse = {
+          status: true,
+          data: {
+            authorization_url: authorizationUrl,
+            access_code: accessCode,
+            reference: paymentReference
+          }
+        };
+        
+        console.log(`✅ Payment initialized successfully on attempt ${attempt}`);
+        break;
+
+      } catch (error) {
+        lastError = `Attempt ${attempt} failed: ${error.message}`;
+        console.error(`❌ Payment initialization attempt ${attempt} failed:`, error);
+        
+        if (attempt === maxRetries) {
+          throw new Error(`Payment initialization failed after ${maxRetries} attempts. Last error: ${lastError}`);
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
       }
-    });
-
-    if (paymentError) {
-      console.error('❌ Payment initialization failed:', paymentError);
-      throw new Error('Failed to initialize payment: ' + paymentError.message);
     }
 
-    if (!paymentResponse || !paymentResponse.status) {
-      console.error('❌ Payment response invalid:', paymentResponse);
-      throw new Error('Payment initialization failed: ' + (paymentResponse?.error || 'Invalid response'));
+    if (!paymentResponse) {
+      throw new Error(`Failed to initialize payment after ${maxRetries} attempts. Last error: ${lastError}`);
     }
 
-    console.log('✅ Payment initialized successfully');
-    console.log('📦 Payment response data:', JSON.stringify(paymentResponse, null, 2));
-
-    // Validate payment response structure
-    if (!paymentResponse.data || !paymentResponse.data.authorization_url) {
-      console.error('❌ Payment response missing required fields:', paymentResponse);
-      throw new Error('Payment response missing authorization URL');
-    }
+    console.log('📦 Final payment response:', JSON.stringify(paymentResponse, null, 2));
 
     // Create payment transaction record
     const { error: transactionError } = await supabaseClient

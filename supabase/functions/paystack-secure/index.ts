@@ -154,15 +154,31 @@ async function initializePayment(supabaseClient: any, requestData: any) {
 
     console.log('Paystack payment initialized successfully:', paystackData.data.reference);
 
+    // Validate response structure before returning
+    if (!paystackData.data || !paystackData.data.authorization_url) {
+      console.error('❌ Invalid Paystack response structure:', paystackData);
+      throw new Error('Paystack returned invalid response structure - missing authorization_url');
+    }
+
+    // Additional validation for required fields
+    if (!paystackData.data.access_code || !paystackData.data.reference) {
+      console.error('❌ Incomplete Paystack response:', paystackData);
+      throw new Error('Paystack response missing required fields (access_code or reference)');
+    }
+
+    const responseData = {
+      status: true,
+      data: {
+        authorization_url: paystackData.data.authorization_url,
+        access_code: paystackData.data.access_code,
+        reference: paystackData.data.reference
+      }
+    };
+
+    console.log('✅ Validated response structure:', JSON.stringify(responseData, null, 2));
+
     return new Response(
-      JSON.stringify({
-        status: true,
-        data: {
-          authorization_url: paystackData.data.authorization_url,
-          access_code: paystackData.data.access_code,
-          reference: paystackData.data.reference
-        }
-      }),
+      JSON.stringify(responseData),
       { 
         status: 200, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

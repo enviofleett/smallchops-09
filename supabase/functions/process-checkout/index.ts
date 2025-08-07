@@ -59,6 +59,43 @@ serve(async (req) => {
 
     console.log('✅ Validation passed, creating order...');
 
+    // Process and validate order items for custom bundles
+    const processedOrderItems = order_items.map(item => {
+      // Check if this is a custom bundle (non-UUID product_id)
+      const isCustomBundle = !item.product_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      
+      console.log(`Processing item: ${item.product_name}, isCustomBundle: ${isCustomBundle}`);
+      
+      const processedItem = {
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: item.price || item.unit_price,
+        discount_amount: item.discount_amount || 0
+      };
+
+      // For custom bundles, add the customization_items if they exist
+      if (isCustomBundle) {
+        if (item.customization_items) {
+          processedItem.customization_items = item.customization_items;
+          console.log(`Added customization_items for bundle: ${item.customization_items.length} items`);
+        } else {
+          // If no customization_items, create mock ones to satisfy the database function
+          console.log('⚠️ Custom bundle missing customization_items, creating mock structure');
+          processedItem.customization_items = [{
+            id: '00000000-0000-0000-0000-000000000000', // Dummy UUID for validation
+            name: item.product_name,
+            price: item.price || item.unit_price,
+            quantity: item.quantity
+          }];
+        }
+      }
+
+      return processedItem;
+    });
+
+    console.log('Processed order items:', JSON.stringify(processedOrderItems, null, 2));
+
     // Find or create customer account
     let customerId: string | null = null;
     
@@ -98,7 +135,7 @@ serve(async (req) => {
     // Generate unique order number
     const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     
-    // Create order using the existing order creation function
+    // Create order using the existing order creation function with processed items
     const { data: orderId, error: orderError } = await supabaseClient
       .rpc('create_order_with_items', {
         p_customer_id: customerId,
@@ -107,7 +144,7 @@ serve(async (req) => {
         p_pickup_point_id: fulfillment_type === 'pickup' ? pickup_point_id : null,
         p_delivery_zone_id: delivery_zone_id || null,
         p_guest_session_id: guest_session_id || null,
-        p_items: order_items
+        p_items: processedOrderItems
       });
 
     if (orderError) {

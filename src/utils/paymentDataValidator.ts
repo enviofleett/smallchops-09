@@ -66,14 +66,13 @@ export function validatePaymentInitializationData(responseData: any): PaymentVal
     result.missingFields.push('payment');
     console.error('❌ Payment validation failed: Missing payment object');
   } else {
-    // Check for payment URL (frontend expects payment_url but backend might send authorization_url)
+    // Check for payment URL (Paystack sends authorization_url which is correct)
     if (!responseData.payment.payment_url && !responseData.payment.authorization_url) {
       result.errors.push('Neither payment_url nor authorization_url found in payment object');
       result.missingFields.push('payment.payment_url / payment.authorization_url');
       console.error('❌ Payment validation failed: Missing payment URLs');
-    } else if (responseData.payment.authorization_url && !responseData.payment.payment_url) {
-      result.warnings.push('Found authorization_url but payment_url is missing - this might cause frontend issues');
-      console.warn('⚠️ Payment validation warning: Using authorization_url instead of payment_url');
+    } else if (responseData.payment.authorization_url) {
+      console.log('✅ Found authorization_url from Paystack - this is the correct response format');
     }
 
     // Check payment reference

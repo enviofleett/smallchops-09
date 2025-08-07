@@ -144,8 +144,7 @@ export function debugPaymentInitialization(checkoutData: any, responseData: any)
 
   // Check for common Paystack issues
   if (responseData?.payment?.authorization_url && !responseData?.payment?.payment_url) {
-    issues.push('Paystack returned authorization_url but frontend expects payment_url');
-    recommendations.push('Update frontend to handle authorization_url or normalize the response');
+    console.log('✅ Paystack returned authorization_url - this is the correct format, will be normalized');
   }
 
   if (responseData?.payment?.reference !== checkoutData?.payment_reference) {
@@ -222,11 +221,9 @@ export function quickPaymentDiagnostic(responseData: any): { issue: string; fix:
     };
   }
 
-  if (responseData.payment.authorization_url && !responseData.payment.payment_url) {
-    return {
-      issue: 'Frontend expects payment_url but got authorization_url',
-      fix: 'Normalize response to use authorization_url as payment_url'
-    };
+  // authorization_url is the correct field from Paystack - this is NOT an error
+  if (responseData.payment.authorization_url) {
+    console.log('✅ Found authorization_url from Paystack - this is correct');
   }
 
   return null; // No obvious issues

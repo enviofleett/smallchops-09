@@ -106,7 +106,7 @@ async function sendSMTPEmailWithResilience(config: SMTPConfig, emailData: EmailR
     }
     
     // Send email
-    const fromResponse = await sendSMTPCommand(`MAIL FROM:<${config.username}>`);
+    const fromResponse = await sendSMTPCommand(`MAIL FROM:<${fromAddress}>`);
     if (!fromResponse.startsWith('250')) {
       throw new Error(`MAIL FROM failed: ${fromResponse}`);
     }
@@ -121,18 +121,34 @@ async function sendSMTPEmailWithResilience(config: SMTPConfig, emailData: EmailR
       throw new Error(`DATA failed: ${dataResponse}`);
     }
     
-    // Construct email message
+    // Construct email message with compliance headers to reduce spam/blocks
     const messageId = `production-smtp-${Date.now()}@${config.host}`;
-    const emailMessage = [
+    const fromAddress = Deno.env.get('SENDER_EMAIL') || config.username || `no-reply@${config.host}`;
+    const senderName = Deno.env.get('SENDER_NAME') || 'Smallchops';
+    const unsubscribeMailto = `mailto:${fromAddress}?subject=unsubscribe`;
+    const projectRef = (Deno.env.get('SUPABASE_URL') || '').replace('https://', '').split('.')[0];
+    const unsubFunctionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/unsubscribe-email?email=${encodeURIComponent(emailData.to)}`;
+
+    const headers = [
       `Message-ID: <${messageId}>`,
-      `From: "${emailData.toName || 'Starters'}" <${config.username}>`,
+      `Date: ${new Date().toUTCString()}`,
+      `From: "${senderName}" <${fromAddress}>`,
+      `Reply-To: ${fromAddress}`,
       `To: <${emailData.to}>`,
       `Subject: ${emailData.subject}`,
       'MIME-Version: 1.0',
       'Content-Type: text/html; charset=UTF-8',
+      // Spam-compliance headers
+      `List-Unsubscribe: <${unsubscribeMailto}>, <${unsubFunctionUrl}>`,
+      'List-Unsubscribe-Post: List-Unsubscribe=One-Click',
+      'X-Auto-Response-Suppress: All',
+    ];
+
+    const emailMessage = [
+      ...headers,
       '',
       emailData.html,
-      '.'
+      '.',
     ].join('\r\n');
     
     const encoder = new TextEncoder();
@@ -202,7 +218,19 @@ serve(async (req) => {
     // Extract domain for rate limiting and reputation checking
     const domain = emailRequest.to.split('@')[1];
     
-    // Check if email is suppressed
+    // Hard suppression guard (function-level list)
+    const { data: isSuppressed } = await supabase
+      .rpc('is_email_suppressed', { email_address: emailRequest.to });
+
+    if (isSuppressed === true) {
+      console.log(`🚫 Email ${emailRequest.to} blocked by suppression list`);
+      return new Response(
+        JSON.stringify({ success: false, error: 'Email address is suppressed' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    // Check if email is suppressed based on bounce tracking with suppressed_at
     const { data: suppressedData } = await supabase
       .from('email_bounce_tracking')
       .select('*')

@@ -1,0 +1,26 @@
+-- Fix remaining database functions with correct signatures (Batch 1 of 3)
+ALTER FUNCTION bulk_safe_delete_products(product_ids uuid[]) SET search_path TO 'public';
+ALTER FUNCTION bulk_update_payment_status_to_success() SET search_path TO 'public';
+ALTER FUNCTION calculate_bogo_discount(p_promotion_id uuid, p_cart_items jsonb) SET search_path TO 'public';
+ALTER FUNCTION calculate_daily_email_metrics() SET search_path TO 'public';
+ALTER FUNCTION calculate_daily_email_metrics(target_date date) SET search_path TO 'public';
+ALTER FUNCTION calculate_profile_completion(customer_uuid uuid) SET search_path TO 'public';
+ALTER FUNCTION calculate_sender_reputation(p_domain text) SET search_path TO 'public';
+ALTER FUNCTION calculate_vat_breakdown(cart_items jsonb, delivery_fee numeric) SET search_path TO 'public';
+ALTER FUNCTION can_send_email_to(email_address text, email_type text) SET search_path TO 'public';
+ALTER FUNCTION check_admin_invitation_rate_limit(user_id_param uuid) SET search_path TO 'public';
+ALTER FUNCTION check_customer_rate_limit(p_customer_id uuid, p_ip_address inet, p_endpoint text, p_tier text) SET search_path TO 'public';
+ALTER FUNCTION check_email_rate_limit(p_identifier text, p_email_type text) SET search_path TO 'public';
+ALTER FUNCTION check_promotion_expiration() SET search_path TO 'public';
+ALTER FUNCTION check_rate_limit_with_reputation(p_identifier text, p_identifier_type text) SET search_path TO 'public';
+ALTER FUNCTION check_user_permission(user_id_param uuid, menu_key_param text, required_level_param text) SET search_path TO 'public';
+ALTER FUNCTION cleanup_email_processing_data() SET search_path TO 'public';
+ALTER FUNCTION cleanup_expired_admin_invitations() SET search_path TO 'public';
+ALTER FUNCTION cleanup_expired_customer_otps() SET search_path TO 'public';
+ALTER FUNCTION cleanup_expired_otp_codes() SET search_path TO 'public';
+ALTER FUNCTION cleanup_monitoring_data() SET search_path TO 'public';
+ALTER FUNCTION cleanup_old_email_events() SET search_path TO 'public';
+ALTER FUNCTION cleanup_old_guest_sessions() SET search_path TO 'public';
+ALTER FUNCTION clear_cart_after_payment() SET search_path TO 'public';
+ALTER FUNCTION confirm_payment_atomic(p_reference text, p_amount integer, p_paystack_data jsonb, p_confirmed_at timestamp with time zone) SET search_path TO 'public';
+ALTER FUNCTION convert_guest_cart_to_customer(p_guest_session_id text, p_customer_id uuid) SET search_path TO 'public';

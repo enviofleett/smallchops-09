@@ -1,0 +1,21 @@
+-- Fix remaining database functions with correct signatures (Batch 2 of 3)
+ALTER FUNCTION create_admin_session(p_user_id uuid, p_ip_address inet, p_user_agent text) SET search_path TO 'public';
+ALTER FUNCTION create_customer_with_validation(p_name text, p_email text, p_phone text, p_admin_id uuid, p_send_welcome_email boolean, p_ip_address inet, p_user_agent text) SET search_path TO 'public';
+ALTER FUNCTION create_missing_customer_account(p_user_id uuid) SET search_path TO 'public';
+ALTER FUNCTION debug_payment_transaction_insert(p_order_id text, p_customer_email text, p_amount numeric, p_currency text, p_payment_method text, p_transaction_type text, p_status text) SET search_path TO 'public';
+ALTER FUNCTION delete_customer_cascade(p_customer_id uuid) SET search_path TO 'public';
+ALTER FUNCTION detect_abandoned_carts() SET search_path TO 'public';
+ALTER FUNCTION detect_orphaned_customer_records() SET search_path TO 'public';
+ALTER FUNCTION diagnose_registration_issues(p_email text) SET search_path TO 'public';
+ALTER FUNCTION enhanced_security_check() SET search_path TO 'public';
+ALTER FUNCTION find_or_create_customer(p_email text, p_name text, p_phone text, p_is_guest boolean) SET search_path TO 'public';
+ALTER FUNCTION fix_user_linking() SET search_path TO 'public';
+ALTER FUNCTION generate_guest_session_id() SET search_path TO 'public';
+ALTER FUNCTION generate_order_number() SET search_path TO 'public';
+ALTER FUNCTION get_admin_invitation_metrics() SET search_path TO 'public';
+ALTER FUNCTION get_all_customers_display() SET search_path TO 'public';
+ALTER FUNCTION get_best_smtp_provider() SET search_path TO 'public';
+ALTER FUNCTION get_customer_analytics_safe(p_start_date timestamp with time zone, p_end_date timestamp with time zone) SET search_path TO 'public';
+ALTER FUNCTION get_dashboard_data() SET search_path TO 'public';
+ALTER FUNCTION get_email_health_status() SET search_path TO 'public';
+ALTER FUNCTION get_environment_config() SET search_path TO 'public';

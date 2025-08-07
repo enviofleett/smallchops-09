@@ -66,6 +66,12 @@ export function OptimizedImage({
         onError={handleError}
         loading="lazy"
         decoding="async"
+        style={{
+          objectFit: hasError ? 'contain' : 'cover',
+          objectPosition: 'center',
+          maxWidth: '100%',
+          maxHeight: '100%'
+        }}
       />
     </div>
   );

@@ -48,13 +48,19 @@ export function DiscountedProductCard({
 
       <CardContent className="p-0 flex flex-col h-full">
         {/* Product Image */}
-        <div className="aspect-square relative overflow-hidden">
+        <div className="aspect-square relative overflow-hidden bg-muted">
           {product.image_url ? (
             <img 
               src={product.image_url} 
               alt={product.name}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-200"
               loading="lazy"
+              style={{
+                objectFit: 'cover',
+                objectPosition: 'center',
+                width: '100%',
+                height: '100%'
+              }}
               onError={(e) => {
                 e.currentTarget.style.display = 'none';
                 e.currentTarget.nextElementSibling?.classList.remove('hidden');

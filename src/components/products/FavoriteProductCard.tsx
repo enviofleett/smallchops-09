@@ -38,7 +38,13 @@ export const FavoriteProductCard = ({
                 e.currentTarget.style.display = 'none';
                 e.currentTarget.nextElementSibling?.classList.remove('hidden');
               }}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-cover object-center"
+              style={{
+                objectFit: 'cover',
+                objectPosition: 'center',
+                width: '100%',
+                height: '100%'
+              }}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center text-muted-foreground">

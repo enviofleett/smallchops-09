@@ -10,9 +10,7 @@ export const usePasswordReset = () => {
     try {
       setIsLoading(true);
 
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth-callback?type=recovery`,
-      });
+      const { error } = await supabase.auth.resetPasswordForEmail(email);
 
       if (error) {
         toast({

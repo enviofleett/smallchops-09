@@ -358,9 +358,16 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           throw new Error('No payment object in response');
         }
         
+        // Extract order details early for potential fallback
+        const orderNumber = workingData.order_number || workingData.data?.order_number;
+        const totalAmount = workingData.total_amount || workingData.data?.total_amount;
+        const orderId = workingData.order_id || workingData.data?.order_id;
+        
+        console.log('✅ Order details extracted:', { orderNumber, totalAmount, orderId });
+        
         // Extract payment URL with fallbacks
-        const authUrl = paymentObj.authorization_url;
-        const paymentUrl = paymentObj.payment_url || authUrl;
+        let authUrl = paymentObj.authorization_url;
+        let paymentUrl = paymentObj.payment_url || authUrl;
         
         console.log('🔍 URL extraction debug:', {
           authUrl: authUrl,
@@ -371,7 +378,29 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           paymentUrlLength: paymentUrl?.length
         });
         
-        // Fix validation logic - check for truthy values and non-empty strings
+        // Fallback: if no URL but we have a reference, try to re-initialize payment to get the URL
+        if ((!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) && paymentObj.reference) {
+          console.warn('⚠️ Missing payment URL; attempting fallback initialization via paystack-secure...');
+          const initBody = {
+            action: 'initialize',
+            email: sanitizedData.customer_email,
+            amount: Math.round((totalAmount || sanitizedData.total_amount) * 100),
+            reference: paymentObj.reference, // reuse server reference for idempotency
+            metadata: {
+              order_id: orderId,
+              customer_name: sanitizedData.customer_name,
+              order_number: orderNumber
+            }
+          };
+          const { data: initResp, error: initErr } = await supabase.functions.invoke('paystack-secure', { body: initBody });
+          console.log('🔁 Fallback init response:', { initResp, initErr });
+          if (!initErr && initResp?.status && (initResp.data?.authorization_url || initResp.authorization_url)) {
+            authUrl = initResp.data?.authorization_url || initResp.authorization_url;
+            paymentUrl = initResp.data?.authorization_url || initResp.authorization_url;
+          }
+        }
+        
+        // Final validation for URL
         if (!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) {
           console.error('❌ No payment URL found:', paymentObj);
           setLastPaymentError('Payment URL not available');
@@ -380,13 +409,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         }
         
         console.log('✅ Valid payment URL found:', paymentUrl);
-        
-        // Extract other order details
-        const orderNumber = workingData.order_number || workingData.data?.order_number;
-        const totalAmount = workingData.total_amount || workingData.data?.total_amount;
-        const orderId = workingData.order_id || workingData.data?.order_id;
-        
-        console.log('✅ Order details extracted:', { orderNumber, totalAmount, orderId });
         
         // Save order details for success page
         const orderDetails = {
@@ -399,7 +421,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           deliveryAddress: sanitizedData.delivery_address,
           orderItems: sanitizedData.order_items
         };
-        
         sessionStorage.setItem('orderDetails', JSON.stringify(orderDetails));
         
         // Clear cart and checkout state

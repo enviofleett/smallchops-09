@@ -25,9 +25,7 @@ const PublicFooterContent = () => {
             <h3 className="text-lg font-bold mb-4 text-white">Address</h3>
             <div className="space-y-2 text-gray-300">
               <div className="font-medium">Headquarters:</div>
-              <div>2B Close Off 11Crescent Kado Estate, Abuja
-
-            </div>
+              <div>2B Close Off 11 Crescent Kado Estate, Abuja</div>
               
               
             </div>
@@ -59,7 +57,7 @@ const PublicFooterContent = () => {
             <div className="space-y-2 text-gray-300">
               <div>+234 807 3011 100</div>
               <div>+234 908 8388 886</div>
-              <div>support@starters.co</div>
+              <div>support@startersmallchops.com</div>
             </div>
           </div>
         </div>

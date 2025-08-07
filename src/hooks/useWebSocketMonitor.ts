@@ -23,13 +23,13 @@ export const useWebSocketMonitor = (url?: string) => {
   const baseRetryDelay = 2000; // 2 seconds
 
   const connect = () => {
-    // Skip WebSocket connection in development if no proper URL
-    if (!url || url.includes('localhost:8098')) {
-      console.log('Skipping WebSocket connection in development environment');
+    // Skip WebSocket connection in development or production without proper WebSocket server
+    if (!url || url.includes('localhost:8098') || window.location.hostname === 'startersmallchops.com') {
+      console.log('Skipping WebSocket connection - no WebSocket server available');
       setStatus(prev => ({ 
         ...prev, 
         isConnected: false, 
-        lastError: 'Development mode - WebSocket disabled',
+        lastError: 'WebSocket disabled - no server available',
         isRetrying: false 
       }));
       return;

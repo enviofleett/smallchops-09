@@ -1,0 +1,41 @@
+-- Fix critical security vulnerabilities in database functions by setting search_path
+
+-- Update all functions to have secure search_path
+ALTER FUNCTION public.check_otp_rate_limit(text) SET search_path TO 'public';
+ALTER FUNCTION public.verify_customer_otp(text, text, text, text) SET search_path TO 'public';
+ALTER FUNCTION public.cleanup_old_communication_events() SET search_path TO 'public';
+ALTER FUNCTION public.create_order_with_items(uuid, text, jsonb, uuid, uuid, uuid, jsonb) SET search_path TO 'public';
+ALTER FUNCTION public.cleanup_expired_rate_limits() SET search_path TO 'public';
+ALTER FUNCTION public.requeue_failed_welcome_emails() SET search_path TO 'public';
+ALTER FUNCTION public.update_customer_with_validation(uuid, text, text, text, uuid, inet, text) SET search_path TO 'public';
+ALTER FUNCTION public.create_logo_version(text, bigint, text, jsonb, uuid) SET search_path TO 'public';
+ALTER FUNCTION public.log_branding_change(text, text, text, text, jsonb, inet, text) SET search_path TO 'public';
+ALTER FUNCTION public.validate_admin_invitation() SET search_path TO 'public';
+ALTER FUNCTION public.handle_admin_invitation_signup() SET search_path TO 'public';
+ALTER FUNCTION public.update_payment_transaction_timestamp() SET search_path TO 'public';
+ALTER FUNCTION public.check_customer_operation_rate_limit(uuid, text, integer) SET search_path TO 'public';
+ALTER FUNCTION public.trigger_order_status_email() SET search_path TO 'public';
+ALTER FUNCTION public.check_production_security() SET search_path TO 'public';
+ALTER FUNCTION public.handle_successful_payment(text, timestamp with time zone, text, numeric, text, text, text, text, text, text, text) SET search_path TO 'public';
+ALTER FUNCTION public.log_api_request(text, text, inet, text, jsonb, integer, integer, uuid, text, jsonb) SET search_path TO 'public';
+ALTER FUNCTION public.calculate_brand_consistency_score() SET search_path TO 'public';
+ALTER FUNCTION public.get_active_paystack_config() SET search_path TO 'public';
+ALTER FUNCTION public.check_upload_rate_limit(uuid) SET search_path TO 'public';
+ALTER FUNCTION public.update_refunds_timestamp() SET search_path TO 'public';
+ALTER FUNCTION public.log_payment_verification_attempt(text, uuid, boolean, text, inet) SET search_path TO 'public';
+ALTER FUNCTION public.check_production_readiness() SET search_path TO 'public';
+ALTER FUNCTION public.update_production_config_timestamp() SET search_path TO 'public';
+ALTER FUNCTION public.log_payment_error(text, text, jsonb, uuid, uuid, text, text) SET search_path TO 'public';
+ALTER FUNCTION public.record_payment_metric(text, numeric, text, jsonb) SET search_path TO 'public';
+ALTER FUNCTION public.check_admin_creation_rate_limit() SET search_path TO 'public';
+ALTER FUNCTION public.track_price_changes() SET search_path TO 'public';
+ALTER FUNCTION public.update_updated_at_column() SET search_path TO 'public';
+ALTER FUNCTION public.sync_payment_to_order_status(uuid, text, text) SET search_path TO 'public';
+ALTER FUNCTION public.verify_webhook_signature(text, text, text) SET search_path TO 'public';
+ALTER FUNCTION public.check_enhanced_rate_limit(uuid, text, text, integer, integer) SET search_path TO 'public';
+ALTER FUNCTION public.get_queued_communication_events(integer) SET search_path TO 'public';
+ALTER FUNCTION public.customer_purchased_product(uuid, uuid) SET search_path TO 'public';
+ALTER FUNCTION public.log_admin_management_action(text, uuid, text, jsonb, text) SET search_path TO 'public';
+ALTER FUNCTION public.validate_admin_permission(text) SET search_path TO 'public';
+ALTER FUNCTION public.get_all_customers_for_analytics() SET search_path TO 'public';
+ALTER FUNCTION public.check_paystack_production_readiness() SET search_path TO 'public';

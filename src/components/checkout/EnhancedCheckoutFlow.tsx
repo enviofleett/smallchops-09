@@ -308,30 +308,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         }
       }
 
-      // Enhanced debugging and validation
-      const debugInfo = debugPaymentInitialization(sanitizedData, parsedData);
-      const quickDiag = quickPaymentDiagnostic(parsedData);
-      
-      if (quickDiag) {
-        console.error('🚨 Quick diagnostic found issue:', quickDiag);
-        setLastPaymentError(quickDiag.fix);
-        handlePaymentFailure({ type: 'diagnostic_issue', ...quickDiag });
-        throw new Error(quickDiag.issue);
-      }
-
       if (parsedData?.success === true) {
-        // Validate payment initialization data
-        const validationResult = validatePaymentInitializationData(parsedData);
-        
-        if (!validationResult.isValid) {
-          const userFriendlyError = generateUserFriendlyErrorMessage(validationResult);
-          console.error('❌ Payment validation failed:', validationResult);
-          setLastPaymentError(userFriendlyError);
-          handlePaymentFailure({ type: 'validation_failed', validation: validationResult });
-          logPaymentAttempt(sanitizedData, 'failure', { validation: validationResult });
-          throw new Error(userFriendlyError);
-        }
-
         // Enhanced debugging before normalization
         console.log('🔍 Raw response data before normalization:', {
           success: parsedData?.success,
@@ -342,8 +319,38 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           reference: parsedData?.payment?.reference
         });
 
-        // Normalize the payment data (handle authorization_url vs payment_url mismatch)
+        // Normalize the payment data FIRST (handle authorization_url vs payment_url mismatch)
         const normalizedData = normalizePaymentData(parsedData);
+        
+        console.log('🔄 Data normalized successfully:', {
+          hasPaymentUrl: !!normalizedData?.payment?.payment_url,
+          paymentUrl: normalizedData?.payment?.payment_url,
+          authUrl: normalizedData?.payment?.authorization_url,
+          reference: normalizedData?.payment?.reference
+        });
+
+        // Run diagnostics AFTER normalization to avoid false positives
+        const debugInfo = debugPaymentInitialization(sanitizedData, normalizedData);
+        const quickDiag = quickPaymentDiagnostic(normalizedData);
+        
+        if (quickDiag) {
+          console.error('🚨 Quick diagnostic found issue after normalization:', quickDiag);
+          setLastPaymentError(quickDiag.fix);
+          handlePaymentFailure({ type: 'diagnostic_issue', ...quickDiag });
+          throw new Error(quickDiag.issue);
+        }
+
+        // Validate payment initialization data using normalized data
+        const validationResult = validatePaymentInitializationData(normalizedData);
+        
+        if (!validationResult.isValid) {
+          const userFriendlyError = generateUserFriendlyErrorMessage(validationResult);
+          console.error('❌ Payment validation failed:', validationResult);
+          setLastPaymentError(userFriendlyError);
+          handlePaymentFailure({ type: 'validation_failed', validation: validationResult });
+          logPaymentAttempt(sanitizedData, 'failure', { validation: validationResult });
+          throw new Error(userFriendlyError);
+        }
         
         console.log('✅ Checkout successful! Order created:', {
           orderId: normalizedData.order_id,

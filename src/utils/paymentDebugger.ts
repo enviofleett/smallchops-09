@@ -214,6 +214,7 @@ export function quickPaymentDiagnostic(responseData: any): { issue: string; fix:
     };
   }
 
+  // Check for payment URLs - either payment_url OR authorization_url is valid
   if (!responseData.payment.payment_url && !responseData.payment.authorization_url) {
     return {
       issue: 'No payment URL in response',
@@ -221,9 +222,13 @@ export function quickPaymentDiagnostic(responseData: any): { issue: string; fix:
     };
   }
 
-  // authorization_url is the correct field from Paystack - this is NOT an error
-  if (responseData.payment.authorization_url) {
-    console.log('✅ Found authorization_url from Paystack - this is correct');
+  // If we have either URL, the response is valid
+  if (responseData.payment.authorization_url || responseData.payment.payment_url) {
+    console.log('✅ Valid payment URL found:', {
+      hasAuthUrl: !!responseData.payment.authorization_url,
+      hasPaymentUrl: !!responseData.payment.payment_url,
+      urlUsed: responseData.payment.payment_url || responseData.payment.authorization_url
+    });
   }
 
   return null; // No obvious issues

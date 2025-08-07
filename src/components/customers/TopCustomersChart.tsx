@@ -3,11 +3,15 @@ import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 interface DashboardCustomer {
-  id: string;
-  name: string;
-  email: string;
-  totalOrders: number;
-  totalSpent: number;
+  id?: string;
+  name?: string;
+  customer_name?: string;
+  email?: string;
+  customer_email?: string;
+  totalOrders?: number;
+  orders?: number;
+  totalSpent?: number;
+  spending?: number;
 }
 
 interface TopCustomersChartProps {
@@ -17,11 +21,18 @@ interface TopCustomersChartProps {
 }
 
 export const TopCustomersChart = ({ customers, type, title }: TopCustomersChartProps) => {
-  const data = customers.slice(0, 5).map(customer => ({
-    name: customer.name.split(' ')[0], // First name only for better display
-    value: type === 'orders' ? customer.totalOrders : customer.totalSpent,
-    fullName: customer.name
-  }));
+  const data = customers.slice(0, 5).map(customer => {
+    // Handle both API formats
+    const customerName = customer.customer_name || customer.name || 'Unknown';
+    const totalOrders = customer.orders || customer.totalOrders || 0;
+    const totalSpent = customer.spending || customer.totalSpent || 0;
+    
+    return {
+      name: customerName.split(' ')[0], // First name only for better display
+      value: type === 'orders' ? totalOrders : totalSpent,
+      fullName: customerName
+    };
+  });
 
   const formatValue = (value: number) => {
     return type === 'spending' ? `₦${value.toLocaleString()}` : value.toString();

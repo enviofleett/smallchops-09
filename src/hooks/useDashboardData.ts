@@ -16,11 +16,15 @@ export interface TrendData {
 }
 
 export interface DashboardCustomer {
-  id: string;
-  name: string;
-  email: string;
-  totalOrders: number;
-  totalSpent: number;
+  id?: string;
+  name?: string;
+  customer_name?: string;
+  email?: string;
+  customer_email?: string;
+  totalOrders?: number;
+  orders?: number;
+  totalSpent?: number;
+  spending?: number;
 }
 
 export interface DashboardData {

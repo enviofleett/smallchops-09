@@ -440,10 +440,17 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   };
 
   const resetPassword = async (email: string) => {
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/reset`,
-    });
-    if (error) throw error;
+    const send = () => supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/reset` });
+    let { error } = await send();
+    if (error) {
+      const msg = String(error.message || '').toLowerCase();
+      if (msg.includes('timeout') || msg.includes('context deadline exceeded') || msg.includes('504')) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const retry = await send();
+        if (!retry.error) return;
+      }
+      throw error;
+    }
   };
 
   const value = {

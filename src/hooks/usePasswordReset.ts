@@ -10,24 +10,27 @@ export const usePasswordReset = () => {
     try {
       setIsLoading(true);
 
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      const send = () => supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset`,
       });
 
+      let { error } = await send();
       if (error) {
         const msg = String(error.message || '').toLowerCase();
         if (msg.includes('timeout') || msg.includes('context deadline exceeded') || msg.includes('504')) {
-          toast({
-            title: "Request queued",
-            description: "Email provider is slow. Check your inbox in a few minutes or retry.",
-          });
-        } else {
-          toast({
-            title: "Password reset failed",
-            description: error.message,
-            variant: "destructive"
-          });
+          // Retry once after brief delay for transient SMTP/GoTrue timeouts
+          await new Promise((r) => setTimeout(r, 1500));
+          const retry = await send();
+          if (!retry.error) {
+            toast({ title: "Reset email sent", description: "Please check your email." });
+            return { success: true };
+          }
         }
+        toast({
+          title: "Password reset failed",
+          description: error.message,
+          variant: "destructive"
+        });
         return { success: false, error: error.message };
       }
 

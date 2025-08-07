@@ -357,6 +357,7 @@ serve(async (req) => {
       total_amount: total_amount,
       payment: {
         payment_url: paymentResponse?.data?.authorization_url || null,
+        authorization_url: paymentResponse?.data?.authorization_url || null,
         reference: paymentReference,
         access_code: paymentResponse?.data?.access_code || null
       },
@@ -364,6 +365,13 @@ serve(async (req) => {
     };
 
     console.log('🎉 Checkout process completed successfully:', response);
+    console.log('📋 Payment response details:', {
+      hasPaymentResponse: !!paymentResponse,
+      hasData: !!paymentResponse?.data,
+      authUrl: paymentResponse?.data?.authorization_url,
+      accessCode: paymentResponse?.data?.access_code,
+      reference: paymentReference
+    });
 
     return new Response(
       JSON.stringify(response),

@@ -332,6 +332,16 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           throw new Error(userFriendlyError);
         }
 
+        // Enhanced debugging before normalization
+        console.log('🔍 Raw response data before normalization:', {
+          success: parsedData?.success,
+          hasPayment: !!parsedData?.payment,
+          paymentKeys: parsedData?.payment ? Object.keys(parsedData.payment) : null,
+          paymentUrl: parsedData?.payment?.payment_url,
+          authUrl: parsedData?.payment?.authorization_url,
+          reference: parsedData?.payment?.reference
+        });
+
         // Normalize the payment data (handle authorization_url vs payment_url mismatch)
         const normalizedData = normalizePaymentData(parsedData);
         

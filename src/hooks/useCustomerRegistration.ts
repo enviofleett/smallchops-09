@@ -37,12 +37,13 @@ export const useCustomerRegistration = () => {
       });
 
       if (error) {
+        const friendly = (response as any)?.error || error.message || "Failed to initiate registration";
         toast({
           title: "Registration failed",
-          description: error.message || "Failed to initiate registration",
+          description: friendly,
           variant: "destructive"
         });
-        return { success: false, error: error.message };
+        return { success: false, error: friendly };
       }
 
       if (response?.success) {
@@ -90,12 +91,13 @@ export const useCustomerRegistration = () => {
       });
 
       if (error) {
+        const friendly = (response as any)?.error || error.message || "Failed to verify OTP";
         toast({
           title: "Verification failed",
-          description: error.message || "Failed to verify OTP",
+          description: friendly,
           variant: "destructive"
         });
-        return { success: false, error: error.message };
+        return { success: false, error: friendly };
       }
 
       if (response?.success) {

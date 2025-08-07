@@ -25,7 +25,9 @@ const PublicFooterContent = () => {
             <h3 className="text-lg font-bold mb-4 text-white">Address</h3>
             <div className="space-y-2 text-gray-300">
               <div className="font-medium">Headquarters:</div>
-              <div>346 Adeoye Ogunlana St, lifecamp, Abuja</div>
+              <div>2B Close Off 11Crescent Kado Estate, Abuja
+
+            </div>
               
               
             </div>

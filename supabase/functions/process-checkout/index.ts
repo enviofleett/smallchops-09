@@ -6,6 +6,9 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   const allowedOrigins = [
     'https://oknnklksdiqaifhxaccs.supabase.co',
     'https://oknnklksdiqaifhxaccs.lovable.app',
+    'https://preview--smallchops-09.lovable.app',
+    'https://startersmallchops.com',
+    'https://www.startersmallchops.com',
     'http://localhost:3000',
     'http://localhost:5173'
   ];

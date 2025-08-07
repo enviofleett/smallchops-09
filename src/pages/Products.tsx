@@ -1,7 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import ProductionErrorBoundary from '@/components/ui/production-error-boundary';
 
 import { getProducts, createProduct, updateProduct } from '@/api/products';
 import { getCategories } from '@/api/categories';
@@ -125,44 +124,42 @@ const Products = () => {
   const isSubmitting = createMutation.isPending || updateMutation.isPending;
 
   return (
-    <ProductionErrorBoundary context="Products">
-      <div className="space-y-6">
-        <ProductsHeader onAddProduct={handleAddProduct} />
-        
-        <ProductsFilters 
-          categoryFilter={categoryFilter}
-          onCategoryChange={setCategoryFilter}
-          searchQuery={searchQuery}
-          onSearchChange={setSearchQuery}
-          categories={categories}
-          isLoadingCategories={isLoadingCategories}
-        />
-        
-        <ProductsTable
-          products={filteredProducts}
-          isLoading={isLoadingProducts}
-          isError={isErrorProducts}
-          error={errorProducts}
-          onEditProduct={handleEditProduct}
-          onDeleteProduct={handleDeleteProduct}
-        />
+    <div className="space-y-6">
+      <ProductsHeader onAddProduct={handleAddProduct} />
+      
+      <ProductsFilters 
+        categoryFilter={categoryFilter}
+        onCategoryChange={setCategoryFilter}
+        searchQuery={searchQuery}
+        onSearchChange={setSearchQuery}
+        categories={categories}
+        isLoadingCategories={isLoadingCategories}
+      />
+      
+      <ProductsTable
+        products={filteredProducts}
+        isLoading={isLoadingProducts}
+        isError={isErrorProducts}
+        error={errorProducts}
+        onEditProduct={handleEditProduct}
+        onDeleteProduct={handleDeleteProduct}
+      />
 
-        <ProductDialog
-          open={isProductDialogOpen}
-          onOpenChange={setIsProductDialogOpen}
-          product={selectedProduct || undefined}
-          categories={categories || []}
-          onSubmit={handleSubmitProduct}
-          isSubmitting={isSubmitting}
-        />
+      <ProductDialog
+        open={isProductDialogOpen}
+        onOpenChange={setIsProductDialogOpen}
+        product={selectedProduct || undefined}
+        categories={categories || []}
+        onSubmit={handleSubmitProduct}
+        isSubmitting={isSubmitting}
+      />
 
-        <DeleteProductDialog
-          open={isDeleteDialogOpen}
-          onOpenChange={setIsDeleteDialogOpen}
-          product={selectedProduct}
-        />
-      </div>
-    </ProductionErrorBoundary>
+      <DeleteProductDialog
+        open={isDeleteDialogOpen}
+        onOpenChange={setIsDeleteDialogOpen}
+        product={selectedProduct}
+      />
+    </div>
   );
 };
 

@@ -1,12 +1,14 @@
 import React, { useEffect } from "react";
-import { Download, FileText } from "lucide-react";
+import { Download, Calendar, Printer } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import ReportTabs from "@/components/ReportTabs";
 import { RevenueBreakdown } from "@/components/reports/RevenueBreakdown";
 import { fetchReportsData } from "@/api/reports";
 import { useQuery } from "@tanstack/react-query";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useErrorHandler } from "@/hooks/useErrorHandler";
-import ProductionErrorBoundary from '@/components/ui/production-error-boundary';
+
 
 // Dynamic icon/color logic has to remain for each KPI type
 const kpiIconClasses = [
@@ -49,8 +51,29 @@ export default function Reports() {
     if (error) {
       handleError(error, "Reports Page");
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [error]); // Only run when error changes
+
+  const exportToCSV = () => {
+    if (!data) return;
+    
+    const csvData = [
+      ['Metric', 'Value'],
+      ['Total Revenue', data.stats?.totalRevenue || 0],
+      ['Total Orders', data.stats?.totalOrders || 0],
+      ['Total Products', data.stats?.totalProducts || 0],
+      ['Total Customers', data.stats?.totalCustomers || 0],
+    ];
+    
+    const csvContent = csvData.map(row => row.join(',')).join('\\n');
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'reports.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
 
   // KPIs mapping for grid
   const kpiData = data
@@ -73,140 +96,109 @@ export default function Reports() {
               <path d="M6 15l6-6 6 6" />
             </svg>
           ),
-          className: kpiIconClasses[0],
+          iconClass: kpiIconClasses[0],
         },
         {
           label: "Total Orders",
           value: data.stats?.totalOrders !== undefined ? data.stats.totalOrders : "-",
           sub: "",
-          icon: (
-            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <rect x="3" y="3" width="18" height="18" rx="3" />
-              <path d="M16 3v4a1 1 0 001 1h4" />
-            </svg>
-          ),
-          className: kpiIconClasses[1],
+          icon: Download,
+          iconClass: kpiIconClasses[1],
         },
         {
           label: "Total Products",
           value: data.stats?.totalProducts !== undefined ? data.stats.totalProducts : "-",
           sub: "",
-          icon: (
-            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="#84cc16" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="12 6 12 12 16 14" />
-            </svg>
-          ),
-          className: kpiIconClasses[2],
+          icon: Calendar,
+          iconClass: kpiIconClasses[2],
         },
         {
           label: "Total Customers",
           value: data.stats?.totalCustomers !== undefined ? data.stats.totalCustomers : "-",
           sub: "",
-          icon: (
-            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="#fb923c" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="12" cy="12" r="10" />
-              <polyline points="9 12 12 15 15 12" />
-            </svg>
-          ),
-          className: kpiIconClasses[3],
+          icon: Printer,
+          iconClass: kpiIconClasses[3],
         },
       ]
     : [];
 
   return (
-    <ProductionErrorBoundary context="Reports">
-      <div className="space-y-6 md:space-y-8 px-4 md:px-0">
-        {/* Header */}
-        <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-          <div>
-            <h1 className="text-2xl md:text-3xl font-extrabold text-gray-800">
-              Reports & Analytics
-            </h1>
-            <p className="text-gray-600 mt-2">
-              Track your business performance and insights
-            </p>
+    <div className="space-y-6 md:space-y-8 px-4 md:px-0">
+      {/* Header */}
+      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
+        <div className="space-y-1">
+          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+            Reports & Analytics
+          </h2>
+          <p className="text-sm md:text-base text-muted-foreground">
+            Comprehensive business insights and performance metrics
+          </p>
+        </div>
+        
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <div className="flex items-center space-x-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
+            <Calendar className="h-4 w-4" />
+            <span>Last 30 days</span>
           </div>
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {/* Weekly Dropdown */}
-            <select
-              className="rounded-xl px-4 py-2 bg-gray-100 border border-gray-200 text-teal-700 font-medium focus:outline-none min-h-[44px]"
-              defaultValue="weekly"
+          
+          <div className="flex gap-2">
+            <Button
+              onClick={exportToCSV}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
             >
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="custom">Custom</option>
-            </select>
-            {/* Export Buttons */}
-            <div className="flex gap-2">
-              <button 
-                onClick={() => {
-                  if (data) {
-                    const csvData = [
-                      ['Metric', 'Value'],
-                      ['Total Revenue', data.stats?.totalRevenue || 0],
-                      ['Total Orders', data.stats?.totalOrders || 0],
-                      ['Total Products', data.stats?.totalProducts || 0],
-                      ['Total Customers', data.stats?.totalCustomers || 0]
-                    ];
-                    const csvContent = csvData.map(row => row.join(',')).join('\n');
-                    const blob = new Blob([csvContent], { type: 'text/csv' });
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `reports-${new Date().toISOString().split('T')[0]}.csv`;
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                  }
-                }}
-                className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none"
-              >
-                <FileText className="w-4 h-4" /> 
-                <span className="hidden sm:inline">Export CSV</span>
-                <span className="sm:hidden">CSV</span>
-              </button>
-              <button 
-                onClick={() => {
-                  window.print();
-                }}
-                className="flex items-center justify-center gap-2 bg-white text-gray-700 border border-gray-200 px-3 md:px-4 py-2 rounded-xl hover:bg-gray-50 transition text-sm min-h-[44px] flex-1 sm:flex-none"
-              >
-                <Download className="w-4 h-4" /> 
-                <span className="hidden sm:inline">Print Report</span>
-                <span className="sm:hidden">Print</span>
-              </button>
-            </div>
+              <Download className="h-4 w-4" />
+              Export CSV
+            </Button>
+            
+            <Button
+              onClick={() => window.print()}
+              variant="outline"
+              size="sm"
+              className="flex items-center gap-2"
+            >
+              <Printer className="h-4 w-4" />
+              Print
+            </Button>
           </div>
         </div>
-        {/* KPI Cards */}
+      </div>
+
+      {/* KPI Grid */}
+      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {isLoading ? (
           <KpiSkeletons />
         ) : (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {kpiData.map((kpi, i) => (
-              <div
-                key={kpi.label}
-                className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6 flex flex-col gap-3"
-              >
-                <div className={`rounded-xl flex items-center justify-center w-10 h-10 md:w-12 md:h-12 ${kpi.className}`}>
-                  {kpi.icon}
+          kpiData.map((kpi, index) => (
+            <Card key={index} className="overflow-hidden">
+              <CardContent className="p-4 md:p-6">
+                <div className="flex items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    {kpi.label}
+                  </CardTitle>
+                   <div className={`p-2 rounded-md ${kpi.iconClass}`}>
+                     {typeof kpi.icon === 'function' ? <kpi.icon className="h-4 w-4" /> : kpi.icon}
+                   </div>
                 </div>
-                <div className="text-xs md:text-sm text-gray-500 font-semibold">{kpi.label}</div>
-                <div className="text-xl md:text-2xl font-bold text-gray-800">{kpi.value}</div>
-                {/* Optionally add sub: Not implemented yet in get_dashboard_data, left empty. */}
-              </div>
-            ))}
-          </div>
+                 <div className="space-y-1">
+                   <div className="text-2xl font-bold">{kpi.value}</div>
+                 </div>
+              </CardContent>
+            </Card>
+          ))
         )}
+      </div>
 
-        {/* Revenue Breakdown */}
-        <RevenueBreakdown data={data} isLoading={isLoading} />
-
-        {/* Chart & Tabs Section */}
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4 md:p-6">
+      {/* Charts Section */}
+      <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-3">
+        <div className="lg:col-span-2">
+          <RevenueBreakdown data={data} isLoading={isLoading} />
+        </div>
+        <div className="lg:col-span-1">
           <ReportTabs reportsData={data} isLoading={isLoading} />
         </div>
       </div>
-    </ProductionErrorBoundary>
+    </div>
   );
 }

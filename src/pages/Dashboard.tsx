@@ -1,6 +1,5 @@
 
 import React from 'react';
-import ProductionErrorBoundary from '@/components/ui/production-error-boundary';
 import { Package, ShoppingCart, Users, TrendingUp, RefreshCw } from 'lucide-react';
 import DashboardCard from '@/components/DashboardCard';
 import RevenueChart from '@/components/charts/RevenueChart';
@@ -61,97 +60,98 @@ const Dashboard = () => {
   };
 
   return (
-    <ProductionErrorBoundary context="Dashboard">
-      <div className="space-y-4 md:space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <DashboardHeader />
-          <Button
-            onClick={() => refresh(true)}
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-2 self-start sm:self-auto"
-          >
-            <RefreshCw className="w-4 h-4" />
-            <span className="hidden sm:inline">Refresh</span>
+    <div className="space-y-4 md:space-y-6">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <DashboardHeader />
+        <Button
+          onClick={() => refresh(true)}
+          disabled={isLoading}
+          variant="outline"
+          size="sm"
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <DashboardCard
+              key={i}
+              title="Loading..."
+              value="..."
+              icon={<Package />}
+              className="animate-pulse"
+            />
+          ))}
+        </div>
+      ) : error ? (
+        <div className="text-center py-8">
+          <p className="text-muted-foreground">Failed to load dashboard data</p>
+          <Button onClick={() => refresh(true)} className="mt-2">
+            Try Again
           </Button>
         </div>
-        
-        {error && (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <p className="text-red-800">Error loading dashboard: {error}</p>
-          </div>
-        )}
-
-        
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <DashboardCard
-            title="Total Products"
-            value={formatNumber(data?.stats.totalProducts || 0)}
-            icon={<Package className="w-5 h-5 md:w-6 md:h-6 text-blue-600" />}
-          />
-          <DashboardCard
-            title="Total Orders"
-            value={formatNumber(data?.stats.totalOrders || 0)}
-            icon={<ShoppingCart className="w-5 h-5 md:w-6 md:h-6 text-green-600" />}
-          />
-          <DashboardCard
-            title="Total Customers"
-            value={formatNumber(data?.stats.totalCustomers || 0)}
-            icon={<Users className="w-5 h-5 md:w-6 md:h-6 text-purple-600" />}
-          />
-          <DashboardCard
-            title="Revenue"
-            value={formatCurrency(data?.stats.totalRevenue || 0)}
-            icon={<TrendingUp className="w-5 h-5 md:w-6 md:h-6 text-orange-600" />}
-          />
-        </div>
-
-        {/* Charts Section */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-          <div className="bg-card p-4 md:p-6 rounded-xl shadow-sm border border-border">
-            <h3 className="text-base md:text-lg font-semibold text-card-foreground mb-4">Revenue Overview</h3>
-            <div className="min-h-[200px] md:min-h-[250px]">
-              <RevenueChart data={data?.revenueTrends} isLoading={isLoading} />
-            </div>
-          </div>
-          
-          <div className="bg-card p-4 md:p-6 rounded-xl shadow-sm border border-border">
-            <h3 className="text-base md:text-lg font-semibold text-card-foreground mb-4">Orders This Week</h3>
-            <div className="min-h-[200px] md:min-h-[250px]">
-              <OrdersChart data={data?.orderTrends} isLoading={isLoading} />
-            </div>
-          </div>
-        </div>
-
-        {/* Top Customers Section */}
-        {data?.topCustomersByOrders && data.topCustomersByOrders.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-            <TopCustomersChart 
-              customers={data.topCustomersByOrders} 
-              type="orders" 
-              title="Top Customers by Orders" 
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+            <DashboardCard
+              title="Total Products"
+              value={formatNumber(data?.stats.totalProducts || 0)}
+              icon={<Package />}
+              className="bg-gradient-to-br from-blue-50 to-blue-100 dark:from-blue-950 dark:to-blue-900"
             />
-            <TopCustomersChart 
-              customers={data.topCustomersBySpending} 
-              type="spending" 
-              title="Top Customers by Spending" 
+            <DashboardCard
+              title="Total Orders"
+              value={formatNumber(data?.stats.totalOrders || 0)}
+              icon={<ShoppingCart />}
+              className="bg-gradient-to-br from-green-50 to-green-100 dark:from-green-950 dark:to-green-900"
+            />
+            <DashboardCard
+              title="Total Customers"
+              value={formatNumber(data?.stats.totalCustomers || 0)}
+              icon={<Users />}
+              className="bg-gradient-to-br from-purple-50 to-purple-100 dark:from-purple-950 dark:to-purple-900"
+            />
+            <DashboardCard
+              title="Total Revenue"
+              value={formatCurrency(data?.stats.totalRevenue || 0)}
+              icon={<TrendingUp />}
+              className="bg-gradient-to-br from-orange-50 to-orange-100 dark:from-orange-950 dark:to-orange-900"
             />
           </div>
-        )}
 
-        {/* Empty State for No Data */}
-        {(!data?.topCustomersByOrders || data.topCustomersByOrders.length === 0) && (
-          <div className="bg-card p-6 md:p-8 rounded-xl shadow-sm border border-border">
-            <div className="text-center">
-              <Package className="w-10 h-10 md:w-12 md:h-12 text-muted-foreground mx-auto mb-4" />
-              <h3 className="text-base md:text-lg font-semibold text-card-foreground mb-2">No Data Available</h3>
-              <p className="text-sm md:text-base text-muted-foreground">Start adding products and taking orders to see analytics here.</p>
-            </div>
+          <div className="grid gap-4 md:grid-cols-2">
+            <RevenueChart 
+              data={data?.revenueTrends || []} 
+              isLoading={isLoading}
+            />
+            <OrdersChart 
+              data={data?.orderTrends || []} 
+              isLoading={isLoading}
+            />
           </div>
-        )}
-      </div>
-    </ProductionErrorBoundary>
+
+          <TopCustomersChart 
+            customers={data?.topCustomersByOrders || []} 
+            type="orders"
+            title="Top Customers by Orders"
+          />
+        </>
+      )}
+
+      {(!data || (!data.stats.totalProducts && !data.stats.totalOrders)) && !isLoading && (
+        <div className="text-center py-8 space-y-4">
+          <div className="text-muted-foreground">
+            <Package className="mx-auto h-12 w-12 mb-4 opacity-50" />
+            <h3 className="text-lg font-medium">No Data Available</h3>
+            <p>Your dashboard will show data once you start adding products and receiving orders.</p>
+          </div>
+        </div>
+      )}
+    </div>
   );
 };
 

@@ -195,12 +195,32 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         fulfillment_type: formData.fulfillment_type,
         delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : null,
         pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : null,
-        order_items: items.map(item => ({
-          product_id: String(item.product_id || ''),
-          quantity: Number(item.quantity || 1),
-          unit_price: Number(item.price || 0),
-          total_price: Number((item.price || 0) * (item.quantity || 1))
-        })),
+        order_items: items.map(item => {
+          // Check if this is a custom bundle by checking the product_id format
+          const isCustomBundle = item.product_id && !item.product_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+          
+          if (isCustomBundle) {
+            // For custom bundles, include the customization_items from the cart item
+            const customizationItems = (item as any).customization_items || [];
+            
+            return {
+              product_id: String(item.product_id || ''),
+              product_name: item.product_name,
+              quantity: Number(item.quantity || 1),
+              unit_price: Number(item.price || 0),
+              total_price: Number((item.price || 0) * (item.quantity || 1)),
+              customization_items: customizationItems
+            };
+          } else {
+            // For regular products
+            return {
+              product_id: String(item.product_id || ''),
+              quantity: Number(item.quantity || 1),
+              unit_price: Number(item.price || 0),
+              total_price: Number((item.price || 0) * (item.quantity || 1))
+            };
+          }
+        }),
         total_amount: total,
         delivery_fee: formData.fulfillment_type === 'delivery' ? deliveryFee : 0,
         delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id ? formData.delivery_zone_id : null,

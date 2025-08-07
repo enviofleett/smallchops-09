@@ -383,19 +383,23 @@ serve(async (req) => {
           continue;
         }
 
-        // Extract authorization URL with multiple fallback paths
-        let authorizationUrl = null;
-        let accessCode = null;
-        
-        // Try different response structure possibilities
-        if (response.data) {
-          authorizationUrl = response.data.authorization_url;
-          accessCode = response.data.access_code;
-        } else {
-          // Fallback: check if response is the actual Paystack data
-          authorizationUrl = response.authorization_url;
-          accessCode = response.access_code;
+        // Extract authorization URL with robust parsing and fallbacks
+        let authorizationUrl: string | null = null;
+        let accessCode: string | null = null;
+
+        // Some environments may return stringified JSON; normalize first
+        let resp: any = response;
+        if (typeof resp === 'string') {
+          try { resp = JSON.parse(resp); } catch (_) {}
         }
+        if (resp?.data && typeof resp.data === 'string') {
+          try { resp.data = JSON.parse(resp.data); } catch (_) {}
+        }
+
+        // Prefer nested data, but support flat shape too
+        const inner = resp?.data ?? resp;
+        authorizationUrl = inner?.authorization_url ?? inner?.data?.authorization_url ?? null;
+        accessCode = inner?.access_code ?? inner?.data?.access_code ?? null;
 
         if (!authorizationUrl) {
           lastError = `Authorization URL missing from payment response. Response structure: ${JSON.stringify(response)}`;

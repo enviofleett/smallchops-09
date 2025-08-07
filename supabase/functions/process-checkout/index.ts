@@ -356,9 +356,9 @@ serve(async (req) => {
       order_number: orderDetails.order_number,
       total_amount: total_amount,
       payment: {
-        payment_url: paymentResponse.data.authorization_url,
+        payment_url: paymentResponse?.data?.authorization_url || null,
         reference: paymentReference,
-        access_code: paymentResponse.data.access_code
+        access_code: paymentResponse?.data?.access_code || null
       },
       message: 'Order created and payment initialized successfully'
     };

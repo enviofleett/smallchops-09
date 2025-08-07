@@ -9,13 +9,16 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCustomerProfile } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
-import { Mail, Phone, MapPin, Truck, X } from "lucide-react";
+import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle } from "lucide-react";
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
 import { PaystackPaymentHandler } from "@/components/payments/PaystackPaymentHandler";
 import { storeRedirectUrl } from "@/utils/redirect";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
+import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
+import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
+import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
 import {
   Select,
   SelectContent,
@@ -99,11 +102,23 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
   const { guestSession, generateGuestSession } = useGuestSession();
   const { markCheckoutInProgress } = useOrderProcessing();
   const navigate = useNavigate();
+  const { 
+    saveState, 
+    recoverState, 
+    clearState, 
+    hasRecoverableState,
+    savePrePaymentState,
+    markPaymentCompleted,
+    handlePaymentFailure,
+    getRetryInfo
+  } = useCheckoutStateRecovery();
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [deliveryFee, setDeliveryFee] = useState(0);
   const [checkoutStep, setCheckoutStep] = useState<'choice' | 'details' | 'payment'>('choice');
   const [paymentData, setPaymentData] = useState<any>(null);
+  const [lastPaymentError, setLastPaymentError] = useState<string | null>(null);
+  const [showRecoveryOption, setShowRecoveryOption] = useState(false);
 
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: session?.user?.email || '',
@@ -133,12 +148,45 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     [cart?.summary?.total_amount, currentDeliveryFee]
   );
 
+  // Recovery and initialization effect
+  useEffect(() => {
+    if (isOpen) {
+      // Check for recoverable state when checkout opens
+      if (hasRecoverableState()) {
+        const recovered = recoverState();
+        if (recovered) {
+          const retryInfo = getRetryInfo();
+          console.log('🔄 Checkout state recovery available:', {
+            step: recovered.checkoutStep,
+            retryCount: retryInfo.retryCount,
+            canRetry: retryInfo.canRetry
+          });
+          
+          if (retryInfo.canRetry) {
+            setShowRecoveryOption(true);
+            setLastPaymentError(retryInfo.lastError?.message || 'Previous payment attempt failed');
+          } else {
+            clearState(); // Clear if max retries exceeded
+          }
+        }
+      }
+    }
+  }, [isOpen]);
+
   // Clear payment state when component mounts or step changes
   useEffect(() => {
     if (checkoutStep !== 'payment') {
       setPaymentData(null);
+      setLastPaymentError(null);
     }
   }, [checkoutStep]);
+
+  // Auto-save state when form data changes
+  useEffect(() => {
+    if (checkoutStep === 'details' && formData.customer_email) {
+      saveState(formData, checkoutStep, deliveryFee);
+    }
+  }, [formData, checkoutStep, deliveryFee]);
 
   const handleContinueAsGuest = useCallback(async () => {
     if (!guestSession) {
@@ -173,9 +221,10 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Clear any previous payment state
+    // Clear any previous payment state and errors
     setIsSubmitting(false);
     setPaymentData(null);
+    setLastPaymentError(null);
     
     // Add a small delay to ensure cleanup
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -226,10 +275,17 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id ? formData.delivery_zone_id : null,
         payment_method: 'paystack',
         guest_session_id: !isAuthenticated ? guestSession?.sessionId : null,
-        payment_reference: uniqueReference // Add unique reference
+        payment_reference: uniqueReference, // Add unique reference
+        timestamp: new Date().toISOString()
       };
 
-      console.log('🚀 Processing checkout with clean data and unique reference...');
+      // Save pre-payment state
+      savePrePaymentState(formData, checkoutStep, deliveryFee, uniqueReference);
+
+      console.log('🚀 Processing checkout with enhanced debugging...');
+      
+      // Log payment attempt
+      logPaymentAttempt(sanitizedData, 'attempt');
 
       const { data, error } = await supabase.functions.invoke('process-checkout', {
         body: sanitizedData
@@ -237,6 +293,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
 
       if (error) {
         console.error('🔍 Supabase function error:', error);
+        handlePaymentFailure({ type: 'supabase_error', message: error.message });
         throw new Error(error.message);
       }
 
@@ -246,33 +303,64 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           parsedData = JSON.parse(data);
         } catch (parseError) {
           console.error('❌ Failed to parse JSON response:', parseError);
+          handlePaymentFailure({ type: 'parse_error', message: 'Invalid response format' });
           throw new Error('Invalid response format from server');
         }
       }
 
+      // Enhanced debugging and validation
+      const debugInfo = debugPaymentInitialization(sanitizedData, parsedData);
+      const quickDiag = quickPaymentDiagnostic(parsedData);
+      
+      if (quickDiag) {
+        console.error('🚨 Quick diagnostic found issue:', quickDiag);
+        setLastPaymentError(quickDiag.fix);
+        handlePaymentFailure({ type: 'diagnostic_issue', ...quickDiag });
+        throw new Error(quickDiag.issue);
+      }
+
       if (parsedData?.success === true) {
+        // Validate payment initialization data
+        const validationResult = validatePaymentInitializationData(parsedData);
+        
+        if (!validationResult.isValid) {
+          const userFriendlyError = generateUserFriendlyErrorMessage(validationResult);
+          console.error('❌ Payment validation failed:', validationResult);
+          setLastPaymentError(userFriendlyError);
+          handlePaymentFailure({ type: 'validation_failed', validation: validationResult });
+          logPaymentAttempt(sanitizedData, 'failure', { validation: validationResult });
+          throw new Error(userFriendlyError);
+        }
+
+        // Normalize the payment data (handle authorization_url vs payment_url mismatch)
+        const normalizedData = normalizePaymentData(parsedData);
+        
         console.log('✅ Checkout successful! Order created:', {
-          orderId: parsedData.order_id,
-          orderNumber: parsedData.order_number,
-          totalAmount: parsedData.total_amount,
-          paymentReference: parsedData.payment?.reference,
-          paymentUrl: parsedData.payment?.payment_url
+          orderId: normalizedData.order_id,
+          orderNumber: normalizedData.order_number,
+          totalAmount: normalizedData.total_amount,
+          paymentReference: normalizedData.payment?.reference,
+          paymentUrl: normalizedData.payment?.payment_url,
+          hasAuthUrl: !!normalizedData.payment?.authorization_url,
+          normalized: normalizedData !== parsedData
         });
 
-        if (parsedData.payment?.payment_url && parsedData.payment?.reference) {
-          setPaymentData({
-            reference: parsedData.payment.reference,
-            amount: parsedData.total_amount,
-            email: formData.customer_email,
-            orderNumber: parsedData.order_number,
-            paymentUrl: parsedData.payment.payment_url
-          });
-          setCheckoutStep('payment');
-        } else {
-          throw new Error('Payment initialization data missing');
-        }
+        logPaymentAttempt(sanitizedData, 'success', { orderId: normalizedData.order_id });
+
+        setPaymentData({
+          reference: normalizedData.payment.reference,
+          amount: normalizedData.total_amount,
+          email: formData.customer_email,
+          orderNumber: normalizedData.order_number,
+          paymentUrl: normalizedData.payment.payment_url
+        });
+        setCheckoutStep('payment');
+        setShowRecoveryOption(false); // Hide recovery option on success
+        
       } else {
         const errorMessage = parsedData?.message || parsedData?.error || "Failed to process checkout";
+        handlePaymentFailure({ type: 'checkout_failed', message: errorMessage });
+        logPaymentAttempt(sanitizedData, 'failure', { error: errorMessage });
         toast({
           title: "Checkout Failed",
           description: errorMessage,
@@ -282,9 +370,12 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
 
     } catch (error) {
       console.error('💥 Checkout error:', error);
+      const errorMessage = error instanceof Error ? error.message : "Failed to process checkout. Please try again.";
+      setLastPaymentError(errorMessage);
+      
       toast({
         title: "Checkout Error",
-        description: error instanceof Error ? error.message : "Failed to process checkout. Please try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -294,6 +385,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
 
   const handlePaymentSuccess = useCallback((reference: string) => {
     markCheckoutInProgress(reference);
+    markPaymentCompleted(); // Clear recovery state
     clearCart();
     
     toast({
@@ -302,10 +394,13 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     });
     
     window.location.href = `/payment-callback?reference=${reference}&status=success`;
-  }, [markCheckoutInProgress, clearCart]);
+  }, [markCheckoutInProgress, clearCart, markPaymentCompleted]);
 
   const handlePaymentError = useCallback((error: string) => {
     console.error('❌ Payment error:', error);
+    handlePaymentFailure({ type: 'payment_gateway_error', message: error });
+    setLastPaymentError(error);
+    
     toast({
       title: "Payment Failed",
       description: error || "Your payment was not successful. Please try again.",
@@ -313,7 +408,31 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     });
     
     setCheckoutStep('details');
-  }, []);
+    setShowRecoveryOption(true); // Show recovery option after payment failure
+  }, [handlePaymentFailure]);
+
+  // Recovery functions
+  const handleRecoverCheckout = useCallback(() => {
+    const recovered = recoverState();
+    if (recovered) {
+      setFormData(recovered.formData);
+      setDeliveryFee(recovered.deliveryFee);
+      setCheckoutStep(recovered.checkoutStep as 'choice' | 'details' | 'payment');
+      setShowRecoveryOption(false);
+      setLastPaymentError(null);
+      
+      toast({
+        title: "Checkout Recovered",
+        description: "Your previous checkout data has been restored.",
+      });
+    }
+  }, [recoverState]);
+
+  const handleDiscardRecovery = useCallback(() => {
+    clearState();
+    setShowRecoveryOption(false);
+    setLastPaymentError(null);
+  }, [clearState]);
 
   if (!isOpen) return null;
 
@@ -338,6 +457,40 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         </CardHeader>
         
         <CardContent>
+          {/* Recovery Option Banner */}
+          {showRecoveryOption && (
+            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                <div className="flex-1">
+                  <h4 className="font-medium text-amber-800">Previous Checkout Found</h4>
+                  <p className="text-sm text-amber-700 mt-1">
+                    {lastPaymentError || 'Your previous checkout attempt was interrupted.'}
+                  </p>
+                  <div className="flex gap-2 mt-3">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={handleRecoverCheckout}
+                      className="border-amber-300 text-amber-700 hover:bg-amber-100"
+                    >
+                      <RefreshCw className="h-4 w-4 mr-1" />
+                      Recover & Retry
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={handleDiscardRecovery}
+                      className="text-amber-600"
+                    >
+                      Start Fresh
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           <div className="space-y-4 mb-6">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold text-lg">Order Summary</h3>

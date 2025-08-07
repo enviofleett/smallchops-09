@@ -362,7 +362,17 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         const authUrl = paymentObj.authorization_url;
         const paymentUrl = paymentObj.payment_url || authUrl;
         
-        if (!paymentUrl) {
+        console.log('🔍 URL extraction debug:', {
+          authUrl: authUrl,
+          paymentUrl: paymentUrl,
+          authUrlType: typeof authUrl,
+          paymentUrlType: typeof paymentUrl,
+          authUrlLength: authUrl?.length,
+          paymentUrlLength: paymentUrl?.length
+        });
+        
+        // Fix validation logic - check for truthy values and non-empty strings
+        if (!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) {
           console.error('❌ No payment URL found:', paymentObj);
           setLastPaymentError('Payment URL not available');
           handlePaymentFailure({ type: 'no_payment_url', responseData: paymentObj });

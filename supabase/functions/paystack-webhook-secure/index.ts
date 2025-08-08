@@ -336,9 +336,9 @@ serve(async (req) => {
     const eventId = `${webhookData.event}-${webhookData.data.reference}-${webhookData.data.id}`;
     const { data: existingEvent } = await supabase
       .from('webhook_events')
-      .select('id')
-      .eq('event_id', eventId)
-      .single();
+      .select('paystack_event_id')
+      .eq('paystack_event_id', eventId)
+      .maybeSingle();
 
     if (existingEvent) {
       console.log('Duplicate webhook event ignored:', eventId);
@@ -349,12 +349,12 @@ serve(async (req) => {
     const { error: logError } = await supabase
       .from('webhook_events')
       .insert({
-        event_id: eventId,
+        paystack_event_id: eventId,
         event_type: webhookData.event,
-        provider: 'paystack',
-        payload: webhookData,
+        event_data: webhookData,
+        signature: signature,
         processed: false,
-        received_at: new Date()
+        created_at: new Date()
       });
 
     if (logError) {
@@ -432,7 +432,7 @@ serve(async (req) => {
         processing_result: processingResult,
         processed_at: new Date()
       })
-      .eq('event_id', eventId);
+      .eq('paystack_event_id', eventId);
 
     if (updateError) {
       console.error('Failed to update webhook processing status:', updateError);

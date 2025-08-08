@@ -63,12 +63,18 @@ export const PaymentsWebhooksPanel: React.FC = () => {
     try {
       const { data, error } = await (supabase as any)
         .from('webhook_events')
-        .select('event_id, event_type, processed, received_at, processing_result')
-        .eq('provider', 'paystack')
-        .order('received_at', { ascending: false })
+        .select('paystack_event_id, event_type, processed, created_at, processing_result')
+        .order('created_at', { ascending: false })
         .limit(20);
       if (error) throw error;
-      setEvents(((data as any) || []) as WebhookEventRow[]);
+      const mapped = ((data as any) || []).map((d: any) => ({
+        event_id: d.paystack_event_id,
+        event_type: d.event_type,
+        processed: d.processed,
+        received_at: d.created_at,
+        processing_result: d.processing_result,
+      })) as WebhookEventRow[];
+      setEvents(mapped);
     } catch (e: any) {
       toast({ title: 'Error', description: 'Failed to load webhook events', variant: 'destructive' });
     } finally {

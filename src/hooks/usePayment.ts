@@ -42,6 +42,7 @@ export const usePayment = () => {
           email: customerEmail || '',
           amount,
           reference,
+          callback_url: `${window.location.origin}/payment/callback`,
           metadata: { orderId }
         });
         

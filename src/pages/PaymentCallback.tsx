@@ -40,9 +40,35 @@ export default function PaymentCallback() {
     };
   }, []);
 
+  // One-time hard refresh to clear any stale Service Worker/CSP state
+  useEffect(() => {
+    const hardRefreshSW = async () => {
+      try {
+        if (sessionStorage.getItem('swHardRefreshed')) return;
+        if ('serviceWorker' in navigator) {
+          const regs = await navigator.serviceWorker.getRegistrations();
+          let didUnregister = false;
+          for (const reg of regs) {
+            if (reg.active) {
+              await reg.unregister();
+              didUnregister = true;
+            }
+          }
+          if (didUnregister) {
+            sessionStorage.setItem('swHardRefreshed', '1');
+            window.location.reload();
+          }
+        }
+      } catch (e) {
+        // no-op
+      }
+    };
+    hardRefreshSW();
+  }, []);
+
   // Robust retry controller to prevent infinite loops
   const retryRef = useRef(0);
-  const scheduleRetry = (paymentReference: string, delayMs = 3000) => {
+  const scheduleRetry = (paymentReference: string, delayMs?: number) => {
     if (retryRef.current >= maxRetries) {
       setStatus('failed');
       setResult({
@@ -57,9 +83,11 @@ export default function PaymentCallback() {
     const next = retryRef.current + 1;
     retryRef.current = next;
     setRetryCount(next);
+    const delays = [2000, 3000, 5000];
+    const computedDelay = delayMs ?? delays[Math.min(next - 1, delays.length - 1)];
     retryTimer.current = window.setTimeout(() => {
       verifyPayment(paymentReference);
-    }, delayMs);
+    }, computedDelay);
   };
 
   // Enhanced parameter detection with fallback handling
@@ -177,7 +205,7 @@ export default function PaymentCallback() {
       } else if (data?.status === 'pending' && retryCount < maxRetries) {
         // Payment still pending, retry
         console.log(`Payment pending, retrying... (${retryRef.current + 1}/${maxRetries})`);
-        scheduleRetry(paymentReference, 5000);
+        scheduleRetry(paymentReference);
         return;
       } else {
         // Payment failed or other error
@@ -194,7 +222,7 @@ export default function PaymentCallback() {
 
       if (isRetryable) {
         console.log(`Retrying verification... (${retryRef.current + 1}/${maxRetries})`);
-        scheduleRetry(paymentReference, 5000);
+        scheduleRetry(paymentReference);
         return;
       }
 

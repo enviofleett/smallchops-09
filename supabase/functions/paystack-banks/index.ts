@@ -1,61 +1,100 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
+// CORS headers
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Content-Type": "application/json",
 };
 
+// Lightweight in-memory cache for banks to avoid rate limits / bottlenecks
+let banksCache: { data: any[]; expiresAt: number } | null = null;
+const BANKS_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
+// Helper: resolve effective Paystack secret key from ENV first, fallback to DB RPC
+async function getPaystackSecret(): Promise<string> {
+  // ENV override first for operational convenience
+  const envSecret = Deno.env.get("PAYSTACK_SECRET_KEY");
+  if (envSecret) return envSecret;
+
+  try {
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    const { data: cfg, error } = await supabase.rpc("get_active_paystack_config");
+    if (error) {
+      console.warn("RPC get_active_paystack_config error:", error.message);
+      return "";
+    }
+    const effective = Array.isArray(cfg) ? cfg?.[0] : cfg;
+    return (effective?.secret_key as string) || "";
+  } catch (e) {
+    console.warn("RPC get_active_paystack_config call failed:", e);
+    return "";
+  }
+}
+
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+  // Preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { status: 200, headers: corsHeaders });
+  }
+
+  if (req.method !== "GET") {
+    return new Response(JSON.stringify({ status: false, error: "Method not allowed" }), {
+      status: 405,
+      headers: corsHeaders,
+    });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    // Serve from cache if fresh
+    const now = Date.now();
+    if (banksCache && now < banksCache.expiresAt) {
+      return new Response(
+        JSON.stringify({ status: true, data: banksCache.data, count: banksCache.data.length }),
+        { status: 200, headers: corsHeaders }
+      );
+    }
 
-    // Get Paystack configuration from database
-    const { data: config, error: configError } = await supabaseClient
-      .from('payment_integrations')
-      .select('*')
-      .eq('provider', 'paystack')
-      .eq('is_active', true)
-      .single();
-
-    if (configError || !config) {
-      console.error('Configuration error:', configError);
-      return new Response(JSON.stringify({
-        status: false,
-        error: 'Payment configuration not found'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      });
+    const secret = await getPaystackSecret();
+    if (!secret) {
+      return new Response(
+        JSON.stringify({ status: false, error: "Paystack secret key not configured" }),
+        { status: 500, headers: corsHeaders }
+      );
     }
 
     // Fetch Nigerian banks from Paystack
-    const response = await fetch('https://api.paystack.co/bank?currency=NGN', {
+    const res = await fetch("https://api.paystack.co/bank?currency=NGN", {
       headers: {
-        'Authorization': `Bearer ${config.secret_key}`,
-        'Content-Type': 'application/json',
-      }
+        Authorization: `Bearer ${secret}`,
+        "Content-Type": "application/json",
+      },
     });
 
-    if (!response.ok) {
-      throw new Error(`Paystack API error: ${response.statusText}`);
+    const text = await res.text();
+    if (!res.ok) {
+      return new Response(
+        JSON.stringify({ status: false, error: `Paystack API error: ${res.status} ${res.statusText}` }),
+        { status: res.status, headers: corsHeaders }
+      );
     }
 
-    const data = await response.json();
-
-    if (!data.status) {
-      throw new Error(data.message || 'Failed to fetch banks');
+    const parsed: any = text ? JSON.parse(text) : { status: false, data: [] };
+    if (!parsed?.status) {
+      return new Response(
+        JSON.stringify({ status: false, error: parsed?.message || "Failed to fetch banks" }),
+        { status: 502, headers: corsHeaders }
+      );
     }
 
-    // Cache the result for better performance
-    const banks = data.data.map((bank: any) => ({
+    const banks = (parsed.data || []).map((bank: any) => ({
       name: bank.name,
       code: bank.code,
       active: bank.active,
@@ -63,26 +102,21 @@ serve(async (req) => {
       country: bank.country,
       currency: bank.currency,
       type: bank.type,
-      slug: bank.slug
+      slug: bank.slug,
     }));
 
-    return new Response(JSON.stringify({
-      status: true,
-      data: banks,
-      count: banks.length
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    });
+    // Cache the result
+    banksCache = { data: banks, expiresAt: now + BANKS_TTL_MS };
 
-  } catch (error) {
-    console.error('Banks fetch error:', error);
-    return new Response(JSON.stringify({
-      status: false,
-      error: error.message || 'Failed to fetch banks'
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
+    return new Response(JSON.stringify({ status: true, data: banks, count: banks.length }), {
+      status: 200,
+      headers: corsHeaders,
     });
+  } catch (error: any) {
+    console.error("Banks fetch error:", error);
+    return new Response(
+      JSON.stringify({ status: false, error: error?.message || "Failed to fetch banks" }),
+      { status: 500, headers: corsHeaders }
+    );
   }
 });

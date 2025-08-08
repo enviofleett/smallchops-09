@@ -449,7 +449,7 @@ serve(async (req) => {
       success: processingResult.success,
       message: processingResult.message
     }), {
-      status: processingResult.success ? 200 : 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
@@ -468,7 +468,7 @@ serve(async (req) => {
       success: false,
       error: 'Internal server error'
     }), {
-      status: 500,
+      status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }

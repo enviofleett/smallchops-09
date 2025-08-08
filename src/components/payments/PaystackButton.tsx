@@ -59,12 +59,14 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
     try {
       // Generate secure reference
       const reference = paystackService.generateReference();
+      const callbackUrl = `${window.location.origin}/payment-callback?order_id=${orderId}`;
       
       // Initialize transaction with backend
       const response = await paystackService.initializeTransaction({
         email,
         amount: paystackService.formatAmount(amount),
         reference,
+        callback_url: callbackUrl,
         channels,
         metadata: {
           orderId,

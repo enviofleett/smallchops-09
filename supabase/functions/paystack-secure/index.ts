@@ -62,7 +62,7 @@ serve(async (req) => {
 
 async function initializePayment(supabaseClient: any, requestData: any) {
   try {
-    const { email, amount, reference, channels, metadata } = requestData;
+    const { email, amount, reference, channels, metadata, callback_url } = requestData;
 
     // Input validation
     if (!email || !amount) {
@@ -105,15 +105,15 @@ async function initializePayment(supabaseClient: any, requestData: any) {
 
     // Prepare Paystack payload according to API spec
     // CRITICAL: Paystack expects metadata as STRINGIFIED JSON, not a plain object
-    const paystackPayload = {
+    const paystackPayload: Record<string, any> = {
       email,
       amount: Math.round(amount).toString(), // Paystack requires amount as STRING in kobo (integers only)
       currency: 'NGN',
       reference: transactionRef,
       channels: channels || ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
-      metadata: JSON.stringify(metadata || {}) // MUST be stringified JSON
+      metadata: JSON.stringify(metadata || {}), // MUST be stringified JSON
+      ...(callback_url ? { callback_url } : {})
     };
-
     console.log('🚀 Sending to Paystack:', JSON.stringify(paystackPayload, null, 2));
 
     // Initialize payment with Paystack

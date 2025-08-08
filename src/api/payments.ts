@@ -102,11 +102,8 @@ export class PaymentsAPI {
    */
   static async verifyPayment(reference: string): Promise<VerifyPaymentResponse> {
     try {
-      const { data, error } = await supabase.functions.invoke('paystack-secure', {
-        body: {
-          action: 'verify',
-          reference
-        }
+      const { data, error } = await supabase.functions.invoke('paystack-verify', {
+        body: { reference }
       });
 
       if (error) {

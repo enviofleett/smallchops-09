@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useCart } from "@/hooks/useCart";
 import { useCustomerOrders } from "@/hooks/useCustomerOrders";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
+import { Helmet } from "react-helmet-async";
 
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
@@ -276,10 +277,16 @@ export default function PaymentCallback() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center pb-4">
-          <div className="flex justify-center mb-4">
+    <>
+      <Helmet>
+        <title>Paystack Payment Verification | Starters Small Chops</title>
+        <meta name="description" content="Verify your Paystack payment and order status." />
+        <link rel="canonical" href={`${window.location.origin}/payment-callback`} />
+      </Helmet>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center pb-4">
+            <div className="flex justify-center mb-4">
             {getStatusIcon()}
           </div>
           <CardTitle className="text-2xl">{getStatusTitle()}</CardTitle>
@@ -373,5 +380,6 @@ export default function PaymentCallback() {
         </CardContent>
       </Card>
     </div>
+    </>
   );
 }

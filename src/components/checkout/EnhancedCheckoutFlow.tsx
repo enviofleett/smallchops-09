@@ -390,7 +390,8 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
               order_id: orderId,
               customer_name: sanitizedData.customer_name,
               order_number: orderNumber
-            }
+            },
+            callback_url: `${window.location.origin}/payment-callback?order_id=${orderId}`
           };
           const { data: initResp, error: initErr } = await supabase.functions.invoke('paystack-secure', { body: initBody });
           console.log('🔁 Fallback init response:', { initResp, initErr });

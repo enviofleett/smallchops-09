@@ -108,84 +108,23 @@ export default function PaymentCallback() {
   const paymentStatus = searchParams.get('status');
   const forceUi = ((searchParams.get('force') || '').toLowerCase() === 'ui');
 
-  // Fast path: confirm in background and redirect immediately when success-like or missing status
+  // Disabled instant redirect: always verify before navigating
   useEffect(() => {
-    const statusNorm = (paymentStatus || '').toLowerCase();
-    const successLike = statusNorm === 'success' || statusNorm === 'successful';
-    const shouldInstant = !forceUi && reference && (!paymentStatus || successLike);
-    if (!shouldInstant) return;
+    // Intentionally left blank to enforce verification-first flow
+  }, []);
 
-    console.log('PaymentCallback - Instant redirect path triggered', { reference, status: statusNorm });
-
-    // Fire background verification with keepalive to avoid abort on redirect
-    try {
-      const EDGE_URL = 'https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/paystack-verify';
-      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA';
-      // Important: keepalive ensures the request continues even if the page navigates away
-      fetch(EDGE_URL, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': ANON_KEY,
-          'Authorization': `Bearer ${ANON_KEY}`,
-        },
-        body: JSON.stringify({ reference }),
-        keepalive: true,
-        mode: 'cors',
-      }).then(async (res) => {
-        // Optional: log minimal outcome for diagnostics (non-blocking)
-        const text = await res.text().catch(() => '');
-        console.log('Background paystack-verify dispatched:', res.status, text?.slice(0, 200));
-      }).catch((e) => {
-        console.warn('Background verification dispatch failed:', e);
-      });
-    } catch (e) {
-      console.warn('Background verification setup failed:', e);
-    }
-
-    (async () => {
-      try { await clearCartAfterPayment(); } catch {}
-      clearCheckoutState();
-      try {
-        sessionStorage.removeItem('paystack_last_reference');
-        localStorage.removeItem('paystack_last_reference');
-      } catch {}
-
-      // Small delay to allow the background request to start
-      setRedirected(true);
-      setTimeout(() => {
-        const target = 'https://startersmallchops.com/customer-profile';
-        try {
-          if (window.top) {
-            window.top.location.replace(target);
-          } else {
-            window.location.replace(target);
-          }
-        } catch {
-          window.location.href = target;
-        }
-      }, 350);
-    })();
-  }, [reference, paymentStatus, forceUi, clearCartAfterPayment, clearCheckoutState]);
-
-  // If no reference and not forcing UI, redirect to profile to avoid dead-ends
+  // If no reference, show error instead of redirecting
   useEffect(() => {
     if (redirected || forceUi) return;
     if (!reference) {
-      console.warn('PaymentCallback - No reference; redirecting to profile');
-      setRedirected(true);
-      setTimeout(() => {
-        const target = 'https://startersmallchops.com/customer-profile';
-        try {
-          if (window.top) {
-            window.top.location.replace(target);
-          } else {
-            window.location.replace(target);
-          }
-        } catch {
-          window.location.href = target;
-        }
-      }, 200);
+      console.warn('PaymentCallback - No reference; showing error UI');
+      setStatus('error');
+      setResult({
+        success: false,
+        error: 'No payment reference found',
+        message: 'We could not detect your payment reference. Please check your email for order status or contact support.',
+        retryable: false
+      });
     }
   }, [reference, forceUi, redirected]);
 

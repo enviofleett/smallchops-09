@@ -4,6 +4,9 @@ export function getCorsHeaders(origin: string | null): Record<string, string> {
   const allowedOrigins = [
     'https://oknnklksdiqaifhxaccs.supabase.co', // Default Supabase hosting
     'https://oknnklksdiqaifhxaccs.lovable.app', // Lovable staging
+    'https://startersmallchops.com', // Production domain
+    'https://www.startersmallchops.com', // Production www domain
+    'https://preview--smallchops-09.lovable.app', // Lovable preview domain
     'http://localhost:3000', // Local development
     'http://localhost:5173', // Vite dev server
     'https://localhost:3000', // Local HTTPS

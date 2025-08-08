@@ -182,12 +182,47 @@ export const PaymentSettingsTab: React.FC = () => {
             </Button>
           </div>
 
-          {provider === 'paystack' && <Alert>
+          {provider === 'paystack' && (
+            <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                Webhook URL: <code className="text-xs">{window.location.origin}/api/webhooks/paystack</code>
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="font-medium">Live Redirect/Callback URL</div>
+                      <code className="text-xs break-all">https://startersmallchops.com/payment/callback</code>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText('https://startersmallchops.com/payment/callback');
+                        toast.success('Callback URL copied');
+                      }}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                  <div className="flex items-center justify-between gap-2">
+                    <div>
+                      <div className="font-medium">Webhook URL</div>
+                      <code className="text-xs break-all">https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/paystack-webhook-secure</code>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText('https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/paystack-webhook-secure');
+                        toast.success('Webhook URL copied');
+                      }}
+                    >
+                      Copy
+                    </Button>
+                  </div>
+                </div>
               </AlertDescription>
-            </Alert>}
+            </Alert>
+          )}
         </CardContent>
       </Card>;
   };

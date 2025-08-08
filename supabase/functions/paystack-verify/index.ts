@@ -12,8 +12,15 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight requests properly
   if (req.method === 'OPTIONS') {
+    const reqHeaders = req.headers.get('Access-Control-Request-Headers') ?? '';
+    const allowHeaders = reqHeaders || corsHeaders['Access-Control-Allow-Headers'];
+    const allowMethod = req.headers.get('Access-Control-Request-Method') ?? 'POST';
     return new Response('ok', {
-      headers: corsHeaders,
+      headers: {
+        ...corsHeaders,
+        'Access-Control-Allow-Headers': allowHeaders,
+        'Access-Control-Allow-Methods': `${corsHeaders['Access-Control-Allow-Methods']}, ${allowMethod}`
+      },
       status: 200
     });
   }

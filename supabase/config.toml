@@ -44,7 +44,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.paystack-verify]
-verify_jwt = true
+verify_jwt = false
 
 [functions.paystack-webhook-secure]
 verify_jwt = false

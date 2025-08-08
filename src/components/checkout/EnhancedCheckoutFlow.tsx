@@ -381,11 +381,13 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         // Fallback: if no URL but we have a reference, try to re-initialize payment to get the URL
         if ((!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) && paymentObj.reference) {
           console.warn('⚠️ Missing payment URL; attempting fallback initialization via paystack-secure...');
+          // Generate a fresh reference to avoid duplicate_reference errors
+          const freshRef = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
           const initBody = {
             action: 'initialize',
             email: sanitizedData.customer_email,
             amount: Math.round((totalAmount || sanitizedData.total_amount) * 100),
-            reference: paymentObj.reference, // reuse server reference for idempotency
+            reference: freshRef,
             metadata: {
               order_id: orderId,
               customer_name: sanitizedData.customer_name,

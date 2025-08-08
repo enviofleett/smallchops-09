@@ -132,6 +132,54 @@ async function initializePayment(supabaseClient: any, requestData: any) {
       const errorText = await paystackResponse.text();
       console.error('❌ Paystack HTTP error:', paystackResponse.status, errorText);
       
+      // Handle duplicate reference by retrying ONCE with a fresh reference
+      let parsed: any = null;
+      try {
+        parsed = JSON.parse(errorText);
+      } catch {}
+
+      const isDuplicate =
+        paystackResponse.status === 400 &&
+        (parsed?.code === 'duplicate_reference' ||
+         (typeof parsed?.message === 'string' && parsed.message.toLowerCase().includes('duplicate transaction reference')));
+
+      if (isDuplicate) {
+        const newRef = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        paystackPayload.reference = newRef;
+        console.warn('♻️ Duplicate reference detected. Retrying with new reference:', newRef);
+
+        const retryResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${secretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(paystackPayload)
+        });
+
+        if (!retryResponse.ok) {
+          const retryText = await retryResponse.text();
+          console.error('❌ Paystack retry HTTP error:', retryResponse.status, retryText);
+          throw new Error(`Paystack API error (${retryResponse.status}): ${retryText}`);
+        }
+
+        const retriedData = await retryResponse.json();
+        if (!retriedData?.status) {
+          throw new Error(retriedData?.message || 'Failed to initialize payment after retry');
+        }
+
+        // Ensure the response contains the new reference
+        retriedData.data = { ...(retriedData.data || {}), reference: newRef };
+
+        return new Response(
+          JSON.stringify({ status: true, data: retriedData.data }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
       // Parse the error response if possible
       let errorDetails = errorText;
       try {

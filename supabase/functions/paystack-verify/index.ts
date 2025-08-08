@@ -35,7 +35,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log(`Processing ${req.method} request to paystack-verify (build 2025-08-08-4)`);
+    console.log(`Processing ${req.method} request to paystack-verify (build 2025-08-08-5)`);
 
     // Healthcheck endpoint: GET ?health=1 returns presence of required secrets
     let reference = '';

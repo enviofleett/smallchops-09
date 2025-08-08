@@ -135,10 +135,11 @@ const Settings = () => {
 
         {isAdmin && <TabsContent value="developer" className="space-y-6">
             <Tabs defaultValue="auth-endpoints" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-7">
+              <TabsList className="grid w-full grid-cols-8">
                 <TabsTrigger value="auth-endpoints">Auth API</TabsTrigger>
                 <TabsTrigger value="buying-logic">Buying Logic</TabsTrigger>
                 <TabsTrigger value="checkout">Checkout</TabsTrigger>
+                <TabsTrigger value="payments-webhooks">Payments/Webhooks</TabsTrigger>
                 <TabsTrigger value="email">Email</TabsTrigger>
                 <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
                 <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
@@ -163,6 +164,10 @@ const Settings = () => {
                     <AdminCheckoutSettingsCard />
                   </CardContent>
                 </Card>
+              </TabsContent>
+              
+              <TabsContent value="payments-webhooks">
+                <PaymentsWebhooksPanel />
               </TabsContent>
               
               <TabsContent value="email">

@@ -125,147 +125,85 @@ export default function PaymentCallback() {
       console.log(`🔍 Verifying payment (attempt ${retryCount + 1}):`, paymentReference);
       setStatus('verifying');
 
-      // Verify payment with backend - enhanced with order details
-      const orderId = searchParams.get('order_id');
       const { data, error } = await supabase.functions.invoke('paystack-verify', {
-        body: { 
-          reference: paymentReference,
-          order_id: orderId,
-          recover: true
-        }
+        body: { reference: paymentReference }
       });
 
       if (error) {
-        // Handle specific error types
-        if (error.message?.includes('403') || error.message?.includes('Forbidden')) {
-          throw new Error('Access denied. Please ensure you are logged in and try again.');
-        }
         throw new Error(error.message || 'Verification failed');
       }
 
-      console.log('✅ Payment verification response:', { data, error });
+      console.log('✅ Payment verification response:', data);
 
-      // Enhanced response handling
-      if (data?.success) {
-        console.log('🎉 Payment verification successful:', data);
+      // Handle success response
+      if (data?.success === true) {
+        console.log('🎉 Payment verification successful');
         setStatus('success');
         setResult({
           success: true,
-          order_id: data.order_id || orderId,
-          order_number: data.order_number || orderId,
-          amount: data.amount,
-          message: 'Payment verified successfully! Your order has been confirmed.'
+          order_id: data.order_id,
+          order_number: data.order_number,
+          amount: data.data?.amount || data.amount,
+          message: data.message || 'Payment verified successfully! Your order has been confirmed.'
         });
-        // Stop any scheduled retries on success
-        if (retryTimer.current) { clearTimeout(retryTimer.current); retryTimer.current = null; }
+        
+        // Stop retries on success
+        if (retryTimer.current) {
+          clearTimeout(retryTimer.current);
+          retryTimer.current = null;
+        }
         retryRef.current = maxRetries;
         
-        // Enhanced cart clearing and order refresh
-        console.log('🛒 Processing successful payment - clearing cart and refreshing orders');
-        await clearCartAfterPayment(data.order_number || orderId);
+        // Clear cart and refresh orders
+        console.log('🛒 Processing successful payment');
+        await clearCartAfterPayment(data.order_number);
         clearCheckoutState();
-        try { sessionStorage.removeItem('paystack_last_reference'); localStorage.removeItem('paystack_last_reference'); } catch {}
+        try { 
+          sessionStorage.removeItem('paystack_last_reference'); 
+          localStorage.removeItem('paystack_last_reference'); 
+        } catch {}
         
-        
-        // Refresh orders with retry mechanism
+        // Refresh orders
         if (refetchOrders) {
           setTimeout(async () => {
             try {
               await refetchOrders();
-              console.log('🔄 Orders refreshed after payment success');
+              console.log('🔄 Orders refreshed');
             } catch (refreshError) {
               console.warn('Failed to refresh orders:', refreshError);
             }
           }, 1500);
         }
-      } else if (data?.status === true && data?.data) {
-        const transactionData = data.data;
-        
-        if (transactionData.status === 'success') {
-          setStatus('success');
-          const orderNumber = transactionData.metadata?.order_number;
-          setResult({
-            success: true,
-            order_id: transactionData.metadata?.order_id,
-            order_number: orderNumber,
-            amount: transactionData.amount / 100, // Convert from kobo to naira
-            message: 'Payment verified successfully! Your order has been confirmed.'
-          });
-          
-          // Enhanced cart clearing and order refresh
-          console.log('🛒 Processing successful payment - clearing cart and refreshing orders');
-          await clearCartAfterPayment(orderNumber);
-          clearCheckoutState();
-          
-          // Refresh orders with retry mechanism
-          if (refetchOrders) {
-            setTimeout(async () => {
-              try {
-                await refetchOrders();
-                console.log('🔄 Orders refreshed after payment success');
-              } catch (refreshError) {
-                console.warn('Failed to refresh orders:', refreshError);
-              }
-            }, 1500);
-          }
-        } else if (transactionData.status === 'failed' || transactionData.status === 'abandoned') {
-          setStatus('failed');
-          setResult({
-            success: false,
-            error: transactionData.gateway_response || 'Payment failed',
-            message: transactionData.gateway_response || 'Your payment was not successful. Please try again.',
-            retryable: true
-          });
-        } else {
-          // Payment still pending, might need retry
-          if (retryCount < maxRetries) {
-            console.log(`Payment still pending, retrying in 3 seconds... (${retryRef.current + 1}/${maxRetries})`);
-            scheduleRetry(paymentReference, 3000);
-            return;
-          } else {
-            setStatus('failed');
-            setResult({
-              success: false,
-              error: 'Payment verification timeout',
-              message: 'Unable to verify payment status. Please contact support with your payment reference.',
-              retryable: true
-            });
-          }
-        }
+      } else if (data?.status === 'pending' && retryCount < maxRetries) {
+        // Payment still pending, retry
+        console.log(`Payment pending, retrying... (${retryRef.current + 1}/${maxRetries})`);
+        scheduleRetry(paymentReference, 5000);
+        return;
       } else {
-        throw new Error(data?.error || data?.message || 'Invalid verification response');
+        // Payment failed or other error
+        const errorMsg = data?.error || data?.message || 'Payment verification failed';
+        throw new Error(errorMsg);
       }
     } catch (error) {
       console.error('Payment verification error:', error);
       
-      // Determine if error is retryable
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const msgLower = errorMessage.toLowerCase();
-      
-      // Handle rate limiting explicitly with longer backoff
-      if ((msgLower.includes('429') || msgLower.includes('too many') || msgLower.includes('rate limit')) && retryCount < maxRetries) {
-        console.warn('Rate limited by verification function. Backing off before retry...');
-        scheduleRetry(paymentReference, 12000); // 12s backoff to respect server rate limits
-        return;
-      }
-
-      const isRetryable = !errorMessage.includes('Access denied') && 
-                         !errorMessage.includes('Invalid') && 
-                         retryCount < maxRetries;
+      const isRetryable = retryCount < maxRetries && 
+                         !errorMessage.includes('Access denied') && 
+                         !errorMessage.includes('Invalid');
 
       if (isRetryable) {
-        console.log(`Retrying verification in 5 seconds... (${retryRef.current + 1}/${maxRetries})`);
+        console.log(`Retrying verification... (${retryRef.current + 1}/${maxRetries})`);
         scheduleRetry(paymentReference, 5000);
         return;
       }
 
-      setStatus('error');
+      // Max retries reached or non-retryable error
+      setStatus('failed');
       setResult({
         success: false,
         error: errorMessage,
-        message: errorMessage.includes('Access denied') 
-          ? 'Please log in to your account and try again.'
-          : 'Failed to verify payment. Please contact support if payment was deducted.',
+        message: 'Unable to verify payment. Please contact support with your payment reference.',
         retryable: false
       });
     }

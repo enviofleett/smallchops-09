@@ -240,6 +240,15 @@ export default function PaymentCallback() {
       
       // Determine if error is retryable
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const msgLower = errorMessage.toLowerCase();
+      
+      // Handle rate limiting explicitly with longer backoff
+      if ((msgLower.includes('429') || msgLower.includes('too many') || msgLower.includes('rate limit')) && retryCount < maxRetries) {
+        console.warn('Rate limited by verification function. Backing off before retry...');
+        scheduleRetry(paymentReference, 12000); // 12s backoff to respect server rate limits
+        return;
+      }
+
       const isRetryable = !errorMessage.includes('Access denied') && 
                          !errorMessage.includes('Invalid') && 
                          retryCount < maxRetries;

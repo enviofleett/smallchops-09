@@ -87,22 +87,23 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
 
       if (error) throw error;
       
-      const providers = (data || []).map(item => ({
-        provider: item.provider,
-        currency: item.currency || 'NGN',
-        test_mode: item.test_mode || true,
-        payment_methods: Array.isArray(item.payment_methods) 
-          ? item.payment_methods as string[]
-          : typeof item.payment_methods === 'string' 
-            ? [item.payment_methods]
-            : ['card']
-      }));
+      const providers = (data || [])
+        .map(item => ({
+          provider: item.provider,
+          currency: item.currency || 'NGN',
+          test_mode: item.test_mode || true,
+          payment_methods: Array.isArray(item.payment_methods) 
+            ? item.payment_methods as string[]
+            : typeof item.payment_methods === 'string' 
+              ? [item.payment_methods]
+              : ['card']
+        }))
+        .filter(p => p.provider === 'paystack');
       
       setAvailableProviders(providers);
       
-      if (providers.length > 0) {
-        setSelectedProvider(providers[0].provider as PaymentProvider);
-      }
+      // Force Paystack as the only provider
+      setSelectedProvider('paystack' as PaymentProvider);
     } catch (error) {
       handleError(error, 'loading payment providers');
     }

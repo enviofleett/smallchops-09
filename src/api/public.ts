@@ -118,29 +118,8 @@ class PublicAPIService {
     return response.json();
   }
 
-  // Payment processing
-  async createPayment(orderId: string, amount: number, customerEmail?: string) {
-    const response = await supabase.functions.invoke('create-payment', {
-      body: {
-        orderId,
-        amount: Math.round(amount * 100), // Convert to cents
-        customerEmail,
-        description: `Order Payment`
-      }
-    });
+  // Stripe payment endpoints removed in favor of Paystack integration
 
-    if (response.error) throw new Error(response.error.message);
-    return response.data;
-  }
-
-  async verifyPayment(sessionId: string, orderId?: string) {
-    const response = await supabase.functions.invoke('verify-payment', {
-      body: { sessionId, orderId }
-    });
-
-    if (response.error) throw new Error(response.error.message);
-    return response.data;
-  }
 
   // Send email
   async sendEmail(emailData: {

@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { publicAPI } from '@/api/public';
 import { paystackService } from '@/lib/paystack';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -15,13 +14,13 @@ export interface PaymentResult {
 
 export interface PaymentVerification {
   success: boolean;
-  paymentStatus: string;
-  orderStatus: string;
-  orderNumber: string;
-  amount: number;
+  paymentStatus?: string;
+  orderStatus?: string;
+  orderNumber?: string;
+  amount?: number;
 }
 
-export type PaymentProvider = 'stripe' | 'paystack';
+export type PaymentProvider = 'paystack';
 
 export const usePayment = () => {
   const [loading, setLoading] = useState(false);
@@ -32,43 +31,29 @@ export const usePayment = () => {
     orderId: string,
     amount: number,
     customerEmail?: string,
-    provider: PaymentProvider = 'stripe'
+    provider: PaymentProvider = 'paystack'
   ): Promise<PaymentResult> => {
     setLoading(true);
     try {
-      if (provider === 'paystack') {
-        const reference = paystackService.generateReference();
-        const response = await paystackService.initializeTransaction({
-          email: customerEmail || '',
-          amount,
-          reference,
-          callback_url: `${window.location.origin}/payment/callback`,
-          metadata: { orderId }
-        });
-        
-        return {
-          success: true,
-          url: response.authorization_url,
-          sessionId: response.reference
-        };
-      } else {
-        const response = await publicAPI.createPayment(orderId, amount, customerEmail);
-        
-        if (response.success && response.url) {
-          return {
-            success: true,
-            sessionId: response.sessionId,
-            url: response.url
-          };
-        } else {
-          throw new Error(response.error || 'Failed to create payment session');
-        }
-      }
+      const reference = paystackService.generateReference();
+      const response = await paystackService.initializeTransaction({
+        email: customerEmail || '',
+        amount,
+        reference,
+        callback_url: `${window.location.origin}/payment/callback`,
+        metadata: { orderId }
+      });
+
+      return {
+        success: true,
+        url: response.authorization_url,
+        sessionId: response.reference
+      };
     } catch (error) {
       console.error('Payment initiation error:', error);
       handleError(error, 'payment initiation');
       const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
-      
+
       return {
         success: false,
         error: errorInfo.message
@@ -83,15 +68,15 @@ export const usePayment = () => {
     amount: number,
     customerEmail?: string,
     openInNewTab = true,
-    provider: PaymentProvider = 'stripe'
+    provider: PaymentProvider = 'paystack'
   ): Promise<boolean> => {
     setProcessing(true);
     try {
       const result = await initiatePayment(orderId, amount, customerEmail, provider);
-      
+
       if (result.success && result.url) {
         if (openInNewTab) {
-          // Open Stripe checkout in a new tab
+          // Open checkout in a new tab
           window.open(result.url, '_blank');
         } else {
           // Redirect in the same window
@@ -109,7 +94,7 @@ export const usePayment = () => {
     } catch (error) {
       console.error('Payment processing error:', error);
       const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
-      
+
       toast.error(errorInfo.title, {
         description: errorInfo.message,
         duration: 5000,
@@ -125,28 +110,17 @@ export const usePayment = () => {
     provider: PaymentProvider = 'paystack'
   ): Promise<any> => {
     try {
-      if (provider === 'paystack') {
-        // Call the enhanced paystack verify function
-        const { data, error } = await supabase.functions.invoke('paystack-verify', {
-          body: { reference }
-        });
+      const { data, error } = await supabase.functions.invoke('paystack-verify', {
+        body: { reference }
+      });
 
-        if (error) throw new Error(error.message);
-        
-        return data.data;
-      } else {
-        const response = await publicAPI.verifyPayment(reference);
-        
-        if (response.success) {
-          return response.data;
-        } else {
-          throw new Error(response.error || 'Payment verification failed');
-        }
-      }
+      if (error) throw new Error(error.message);
+
+      return data; // paystack-verify returns top-level fields
     } catch (error) {
       console.error('Payment verification error:', error);
       const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
-      
+
       toast.error(errorInfo.title, {
         description: errorInfo.message,
         duration: 5000,
@@ -155,23 +129,21 @@ export const usePayment = () => {
     }
   };
 
-  const handlePaymentSuccess = async (sessionId: string, provider: PaymentProvider = 'stripe') => {
+  const handlePaymentSuccess = async (sessionId: string, provider: PaymentProvider = 'paystack') => {
     try {
       const verification = await verifyPayment(sessionId, provider);
-      
-      if (verification && verification.success) {
-        if (verification.paymentStatus === 'paid') {
-          toast.success(`Payment successful! Order #${verification.orderNumber} confirmed.`);
-          return verification;
-        } else {
-          toast.error('Payment was not completed successfully');
-          return null;
-        }
+
+      if (verification?.success) {
+        toast.success('Payment successful!');
+        return verification;
+      } else {
+        toast.error('Payment was not completed successfully');
+        return null;
       }
     } catch (error) {
       console.error('Error handling payment success:', error);
       const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
-      
+
       toast.error(errorInfo.title, {
         description: errorInfo.message,
         duration: 5000,
@@ -183,7 +155,7 @@ export const usePayment = () => {
   const handlePaymentError = (error?: string) => {
     console.error('Payment error:', error);
     const errorInfo = PaymentErrorHandler.formatErrorForUser(new Error(error || 'Payment was cancelled or failed'));
-    
+
     toast.error(errorInfo.title, {
       description: errorInfo.message,
       duration: 5000,

@@ -21,6 +21,7 @@ import { ProductionHealthMonitor } from "@/components/admin/ProductionHealthMoni
 import { ProductionReadinessStatus } from "@/components/admin/ProductionReadinessStatus";
 import RegistrationHealth from "./RegistrationHealth";
 import AdminCheckoutSettingsCard from '@/components/admin/settings/AdminCheckoutSettingsCard';
+import PaymentsWebhooksPanel from '@/components/admin/dev/PaymentsWebhooksPanel';
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 

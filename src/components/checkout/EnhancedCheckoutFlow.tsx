@@ -438,7 +438,18 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         });
         
         console.log('🚀 Redirecting to payment URL:', paymentUrl);
-        window.location.href = paymentUrl;
+        try {
+          const url = paymentUrl as string;
+          if (window.top && window.top !== window.self) {
+            // Break out of Lovable preview iframe
+            (window.top as Window).location.href = url;
+          } else {
+            window.location.href = url;
+          }
+        } catch {
+          // Fallback: open new tab if cross-frame navigation is blocked
+          window.open(paymentUrl as string, '_blank', 'noopener,noreferrer');
+        }
         
       } else {
         console.error('❌ Checkout response indicates failure:', parsedData);

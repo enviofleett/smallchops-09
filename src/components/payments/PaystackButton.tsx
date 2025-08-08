@@ -111,8 +111,17 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
           
           handler.openIframe();
         } else {
-          // Fallback to redirect
-          window.location.href = response.authorization_url;
+          // Fallback to redirect (break out of preview iframe if needed)
+          const url = response.authorization_url;
+          try {
+            if (window.top && window.top !== window.self) {
+              (window.top as Window).location.href = url;
+            } else {
+              window.location.href = url;
+            }
+          } catch {
+            window.open(url, '_blank', 'noopener,noreferrer');
+          }
         }
       } else {
         throw new Error('Failed to initialize payment');

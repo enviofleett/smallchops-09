@@ -33,7 +33,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log(`Processing ${req.method} request to paystack-verify`);
+    console.log(`Processing ${req.method} request to paystack-verify (build 2025-08-08-1)`);
 
     // Support POST body and GET query parameter for reference (POST preferred)
     let reference = '';

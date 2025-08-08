@@ -1,5 +1,5 @@
 // Minimal, production-safe Service Worker
-const CACHE_NAME = 'starters-v2';
+const CACHE_NAME = 'starters-v3';
 const PRECACHE_URLS = ['/', '/manifest.json'];
 
 // Install: precache critical shell

@@ -3,15 +3,17 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 // Compute CORS headers per-request based on origin
 function buildCorsHeaders(originHeader: string | null): Record<string, string> {
-  const prodOrigin = 'https://startersmallchops.com';
+  const prodOrigins = ['https://startersmallchops.com', 'https://www.startersmallchops.com'];
   const origin = originHeader || '';
   const isLocal =
     origin.startsWith('http://localhost') ||
     origin.startsWith('http://127.0.0.1') ||
     origin.includes('.lovable.app');
 
-  // In production only allow the production domain; in local allow *
-  const allowOrigin = isLocal ? '*' : prodOrigin;
+  // Echo back the exact allowed origin in production; use * for local and previews
+  const allowOrigin = isLocal
+    ? '*'
+    : (prodOrigins.includes(origin) ? origin : prodOrigins[0]);
 
   return {
     'Access-Control-Allow-Origin': allowOrigin,
@@ -33,7 +35,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log(`Processing ${req.method} request to paystack-verify (build 2025-08-08-2)`);
+    console.log(`Processing ${req.method} request to paystack-verify (build 2025-08-08-3)`);
 
     // Support POST body and GET query parameter for reference (POST preferred)
     let reference = '';

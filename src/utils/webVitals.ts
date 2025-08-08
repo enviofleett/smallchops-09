@@ -12,12 +12,12 @@ export class WebVitals {
   static reportWebVitals(metric: WebVitalsMetric) {
     try {
       // Ensure metrics Map is initialized
-      if (!this.metrics) {
-        this.metrics = new Map();
+      if (!WebVitals.metrics) {
+        WebVitals.metrics = new Map();
       }
       
       // Store metric safely
-      this.metrics.set(metric.name, metric.value);
+      WebVitals.metrics.set(metric.name, metric.value);
 
       // Log in development
       if (import.meta.env.DEV) {
@@ -26,7 +26,7 @@ export class WebVitals {
 
       // Send to analytics in production
       if (import.meta.env.PROD) {
-        this.sendToAnalytics(metric);
+        WebVitals.sendToAnalytics(metric);
       }
     } catch (error) {
       console.warn('Error reporting web vitals:', error);
@@ -53,7 +53,7 @@ export class WebVitals {
 
   static getMetrics() {
     try {
-      return this.metrics ? Object.fromEntries(this.metrics) : {};
+      return WebVitals.metrics ? (Object.fromEntries(WebVitals.metrics) as Record<string, number>) : {};
     } catch (error) {
       console.warn('Error getting metrics:', error);
       return {};

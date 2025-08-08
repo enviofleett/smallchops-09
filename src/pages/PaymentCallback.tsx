@@ -40,6 +40,28 @@ export default function PaymentCallback() {
     };
   }, []);
 
+  // Robust retry controller to prevent infinite loops
+  const retryRef = useRef(0);
+  const scheduleRetry = (paymentReference: string, delayMs = 3000) => {
+    if (retryRef.current >= maxRetries) {
+      setStatus('failed');
+      setResult({
+        success: false,
+        error: 'Payment verification timeout',
+        message: 'Unable to verify payment status. Please contact support with your payment reference.',
+        retryable: true
+      });
+      return;
+    }
+    if (retryTimer.current) clearTimeout(retryTimer.current);
+    const next = retryRef.current + 1;
+    retryRef.current = next;
+    setRetryCount(next);
+    retryTimer.current = window.setTimeout(() => {
+      verifyPayment(paymentReference);
+    }, delayMs);
+  };
+
   // Enhanced parameter detection with fallback handling
   const getPaymentReference = () => {
     // Try multiple parameter names that Paystack might use
@@ -194,12 +216,8 @@ export default function PaymentCallback() {
         } else {
           // Payment still pending, might need retry
           if (retryCount < maxRetries) {
-            console.log(`Payment still pending, retrying in 3 seconds... (${retryCount + 1}/${maxRetries})`);
-            if (retryTimer.current) clearTimeout(retryTimer.current);
-            retryTimer.current = window.setTimeout(() => {
-              setRetryCount(prev => prev + 1);
-              verifyPayment(paymentReference);
-            }, 3000);
+            console.log(`Payment still pending, retrying in 3 seconds... (${retryRef.current + 1}/${maxRetries})`);
+            scheduleRetry(paymentReference, 3000);
             return;
           } else {
             setStatus('failed');
@@ -224,11 +242,8 @@ export default function PaymentCallback() {
                          retryCount < maxRetries;
 
       if (isRetryable) {
-        console.log(`Retrying verification in 5 seconds... (${retryCount + 1}/${maxRetries})`);
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-          verifyPayment(paymentReference);
-        }, 5000);
+        console.log(`Retrying verification in 5 seconds... (${retryRef.current + 1}/${maxRetries})`);
+        scheduleRetry(paymentReference, 5000);
         return;
       }
 

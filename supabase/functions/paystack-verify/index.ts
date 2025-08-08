@@ -215,17 +215,17 @@ serve(async (req) => {
       // Do not fail the verification result if order update failed
     }
 
-    // Return a Paystack-compatible structure for the app
-    const responseBody = {
-      status: isSuccess,
+    // Return a structure compatible with the frontend hook (verifyPayment expects data.data)
+    const payload = {
       success: isSuccess,
-      data: ps ?? verification, // prefer Paystack "data" object; fallback to entire response
-      order_id: orderInfo.order_id,
-      order_number: orderInfo.order_number,
-      message: isSuccess ? 'Payment verified successfully' : (verification?.message || 'Verification completed'),
+      paymentStatus: isSuccess ? 'paid' : (ps?.status || 'failed'),
+      orderStatus: isSuccess ? 'confirmed' : 'pending',
+      orderNumber: orderInfo.order_number || '',
+      amount: typeof ps?.amount === 'number' ? Math.round(ps.amount) / 100 : 0,
+      reference,
     };
 
-    return new Response(JSON.stringify(responseBody), { status: 200, headers: corsHeaders });
+    return new Response(JSON.stringify({ data: payload }), { status: 200, headers: corsHeaders });
 
   } catch (error: any) {
     console.error('paystack-verify error:', error);

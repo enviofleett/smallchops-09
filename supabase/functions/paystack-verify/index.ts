@@ -59,28 +59,36 @@ serve(async (req) => {
       return new Response(JSON.stringify(res), { status: 500, headers: corsHeaders });
     }
 
-    // Verify with Paystack
+    // Verify with Paystack (retry up to 3 times)
     const verifyUrl = `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`;
-    const paystackResponse = await fetch(verifyUrl, {
-      headers: {
-        'Authorization': `Bearer ${paystackSecretKey}`,
-        'Content-Type': 'application/json'
+    let verification: any = null;
+    let lastStatus = 0;
+    let lastText = '';
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const res = await fetch(verifyUrl, {
+        headers: {
+          'Authorization': `Bearer ${paystackSecretKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+      lastStatus = res.status;
+      lastText = await res.text();
+      try {
+        verification = lastText ? JSON.parse(lastText) : {};
+      } catch (_e) {
+        verification = { status: false, message: 'Invalid JSON from Paystack', raw: lastText };
       }
-    });
-
-    const text = await paystackResponse.text();
-    let verification: any;
-    try {
-      verification = text ? JSON.parse(text) : {};
-    } catch (_e) {
-      verification = { status: false, message: 'Invalid JSON from Paystack', raw: text };
+      if (res.ok) break;
+      const shouldRetry = res.status >= 500 || res.status === 429;
+      if (!shouldRetry && attempt === 1) break;
+      await new Promise((r) => setTimeout(r, attempt * 400));
     }
 
-    if (!paystackResponse.ok) {
+    if (!verification || (lastStatus && lastStatus >= 400 && verification?.status !== true)) {
       // Bubble up Paystack status code with a clean message
-      const detail = verification?.message || text || `status ${paystackResponse.status}`;
+      const detail = verification?.message || lastText || `status ${lastStatus}`;
       const res = { error: `Paystack verification failed: ${detail}` };
-      return new Response(JSON.stringify(res), { status: paystackResponse.status, headers: corsHeaders });
+      return new Response(JSON.stringify(res), { status: lastStatus || 502, headers: corsHeaders });
     }
 
     // Determine success flag based on Paystack response

@@ -5,6 +5,7 @@ import { crypto } from "https://deno.land/std@0.190.0/crypto/mod.ts";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
 // Paystack webhook events that we handle
@@ -251,7 +252,8 @@ serve(async (req) => {
         'high',
         { ip: req.headers.get('cf-connecting-ip') }
       );
-      return new Response('No signature provided', { status: 401, headers: corsHeaders });
+      // Return 200 to prevent repeated retries while ignoring processing
+      return new Response('No signature provided (ignored)', { status: 200, headers: corsHeaders });
     }
 
     // Validate request is from Paystack IPs (basic IP validation)
@@ -282,21 +284,27 @@ serve(async (req) => {
       }
     }
 
-    // Get webhook secret from configuration
+    // Attempt to get secret for signature: prefer DB webhook_secret, fallback to PAYSTACK_SECRET_KEY
     const { data: config } = await supabase
       .from('payment_integrations')
-      .select('webhook_secret')
+      .select('webhook_secret, test_mode, secret_key, live_secret_key')
       .eq('provider', 'paystack')
       .eq('connection_status', 'connected')
       .single();
 
-    if (!config?.webhook_secret) {
-      console.error('Webhook secret not configured');
-      return new Response('Webhook not configured', { status: 500, headers: corsHeaders });
+    const secretForSignature = config?.webhook_secret 
+      || Deno.env.get('PAYSTACK_SECRET_KEY') 
+      || (config?.test_mode ? config?.secret_key : (config?.live_secret_key || config?.secret_key));
+
+    if (!secretForSignature) {
+      console.error('No signature secret available (ignored)');
+      await logSecurityIncident('webhook_missing_secret', 'No secret available for signature verification', 'high');
+      // Return 200 to avoid repeated retries, but ignore processing
+      return new Response('Signature secret missing (ignored)', { status: 200, headers: corsHeaders });
     }
 
     // Verify webhook signature
-    const isValidSignature = await verifyWebhookSignature(payload, signature, config.webhook_secret);
+    const isValidSignature = await verifyWebhookSignature(payload, signature, secretForSignature);
     
     if (!isValidSignature) {
       await logSecurityIncident(
@@ -305,7 +313,8 @@ serve(async (req) => {
         'critical',
         { ip: clientIP, signature }
       );
-      return new Response('Invalid signature', { status: 401, headers: corsHeaders });
+      // Return 200 to prevent retries but do not process
+      return new Response('Invalid signature (ignored)', { status: 200, headers: corsHeaders });
     }
 
     // Parse the webhook payload
@@ -358,9 +367,45 @@ serve(async (req) => {
     let processingResult: { success: boolean; message: string };
 
     switch (webhookData.event) {
-      case 'charge.success':
-        processingResult = await processChargeSuccess(webhookData.data);
+      case 'charge.success': {
+        // Double-verify with Paystack before processing
+        try {
+          const verifyKey = Deno.env.get('PAYSTACK_SECRET_KEY') 
+            || (config?.test_mode ? config?.secret_key : (config?.live_secret_key || config?.secret_key));
+          if (!verifyKey) {
+            console.warn('No key available for double verification; skipping processing');
+            processingResult = { success: false, message: 'Missing key for verification' };
+            break;
+          }
+          const ref = webhookData.data.reference;
+          const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(ref)}`, {
+            headers: { 'Authorization': `Bearer ${verifyKey}`, 'Content-Type': 'application/json' }
+          });
+          const verifyText = await verifyRes.text();
+          const verifyJson: any = verifyText ? JSON.parse(verifyText) : {};
+          const vData = verifyJson?.data;
+          const verifiedSuccess = verifyJson?.status === true && vData?.status === 'success';
+          if (!verifiedSuccess) {
+            console.warn('Verification did not confirm success; ignoring event', verifyJson?.message);
+            processingResult = { success: false, message: 'Verification did not confirm success' };
+            break;
+          }
+          // Merge verified fields with webhook payload and process
+          const merged = {
+            ...webhookData.data,
+            paid_at: vData?.paid_at ?? webhookData.data.paid_at,
+            gateway_response: vData?.gateway_response ?? webhookData.data.gateway_response,
+            fees: (typeof vData?.fees === 'number' ? vData.fees : webhookData.data.fees),
+            channel: vData?.channel ?? webhookData.data.channel,
+            authorization: vData?.authorization ?? webhookData.data.authorization,
+          };
+          processingResult = await processChargeSuccess(merged);
+        } catch (e) {
+          console.error('Double verification error:', e);
+          processingResult = { success: false, message: 'Verification error' };
+        }
         break;
+      }
       
       case 'charge.failed':
         processingResult = await processChargeFailed(webhookData.data);

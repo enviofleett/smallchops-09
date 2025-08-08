@@ -351,9 +351,17 @@ serve(async (req) => {
     
     console.log('Payment verified successfully:', sanitizedLog);
 
+    const isSuccess = data.status === 'success';
+
     return new Response(JSON.stringify({
+      // Backward compatible shape
       status: true,
-      data: verification.data
+      data: verification.data,
+      // New top-level helpers for clients
+      success: isSuccess,
+      order_id: data?.metadata?.order_id || null,
+      order_number: data?.metadata?.order_number || null,
+      amount: typeof data?.amount === 'number' ? data.amount / 100 : null,
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,

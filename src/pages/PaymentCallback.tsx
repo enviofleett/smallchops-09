@@ -156,6 +156,9 @@ export default function PaymentCallback() {
           amount: data.amount,
           message: 'Payment verified successfully! Your order has been confirmed.'
         });
+        // Stop any scheduled retries on success
+        if (retryTimer.current) { clearTimeout(retryTimer.current); retryTimer.current = null; }
+        retryRef.current = maxRetries;
         
         // Enhanced cart clearing and order refresh
         console.log('🛒 Processing successful payment - clearing cart and refreshing orders');

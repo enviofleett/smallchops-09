@@ -131,6 +131,8 @@ export default function PaymentCallback() {
         console.log('🛒 Processing successful payment - clearing cart and refreshing orders');
         await clearCartAfterPayment(data.order_number || orderId);
         clearCheckoutState();
+        try { sessionStorage.removeItem('paystack_last_reference'); localStorage.removeItem('paystack_last_reference'); } catch {}
+        
         
         // Refresh orders with retry mechanism
         if (refetchOrders) {

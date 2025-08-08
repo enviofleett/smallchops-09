@@ -400,7 +400,10 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           if (!initErr && initResp?.status && (initResp.data?.authorization_url || initResp.authorization_url)) {
             authUrl = initResp.data?.authorization_url || initResp.authorization_url;
             paymentUrl = initResp.data?.authorization_url || initResp.authorization_url;
-            try { sessionStorage.setItem('paystack_last_reference', freshRef); } catch {}
+            try { 
+              sessionStorage.setItem('paystack_last_reference', freshRef); 
+              localStorage.setItem('paystack_last_reference', freshRef);
+            } catch {}
           }
         }
         

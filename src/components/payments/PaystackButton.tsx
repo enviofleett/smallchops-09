@@ -102,6 +102,10 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
             callback: (response: any) => {
               setLoading(false);
               if (response.status === 'success') {
+                try { 
+                  sessionStorage.setItem('paystack_last_reference', response.reference);
+                  localStorage.setItem('paystack_last_reference', response.reference);
+                } catch {}
                 onSuccess(response.reference, response);
               } else {
                 onError('Payment was not completed');

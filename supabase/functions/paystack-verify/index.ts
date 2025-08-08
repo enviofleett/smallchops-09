@@ -73,12 +73,40 @@ serve(async (req) => {
       throw new Error('Paystack not configured');
     }
 
-    // Verify with Paystack
-    const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-      headers: {
-        'Authorization': `Bearer ${config.secret_key}`,
-      }
-    });
+    // Choose correct secret key based on environment (test vs live)
+    let primaryKey = config.test_mode 
+      ? (config.secret_key as string)
+      : ((config.live_secret_key as string) || (config.secret_key as string));
+    let secondaryKey = config.test_mode 
+      ? ((config.live_secret_key as string) || '')
+      : ((config.secret_key as string) || '');
+    if (!primaryKey) {
+      throw new Error('Paystack secret key not configured');
+    }
+
+    // Function to perform verify call with a given key
+    const performVerify = async (key: string) => {
+      return await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+        headers: {
+          'Authorization': `Bearer ${key}`,
+          'Content-Type': 'application/json'
+        }
+      });
+    };
+
+    // Verify with Paystack using primary key
+    let paystackResponse = await performVerify(primaryKey);
+
+    // If auth error, retry once with secondary key (handles wrong env key)
+    if ((paystackResponse.status === 401 || paystackResponse.status === 403) && secondaryKey) {
+      console.warn('paystack-verify: primary key unauthorized, retrying with secondary key');
+      paystackResponse = await performVerify(secondaryKey);
+    }
+
+    if (!paystackResponse.ok) {
+      const errText = await paystackResponse.text();
+      throw new Error(`Verification HTTP ${paystackResponse.status}: ${errText}`);
+    }
 
     const verification = await paystackResponse.json();
 

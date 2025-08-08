@@ -11,6 +11,7 @@ import EnhancedErrorBoundary from "./components/ui/enhanced-error-boundary";
 import { withLazyLoading, preloadRoute } from "./utils/lazyLoad";
 import { FullPageLoader } from "./components/ui/page-loader";
 import { PerformanceMonitor } from "./utils/performance";
+import DynamicFavicon from "./components/seo/DynamicFavicon";
 
 // Immediate load critical components
 import NotFound from "./pages/NotFound";
@@ -84,6 +85,7 @@ const App = () => {
       <TooltipProvider>
         <Toaster />
         <Sonner />
+        <DynamicFavicon />
         <AuthProvider>
           <BrowserRouter>
             <Routes>

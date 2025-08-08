@@ -12,23 +12,31 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight requests properly
   if (req.method === 'OPTIONS') {
-    return new Response(null, { 
+    return new Response('ok', {
       headers: corsHeaders,
-      status: 200 
+      status: 200
     });
   }
 
   try {
     console.log(`Processing ${req.method} request to paystack-verify`);
-    
+
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { persistSession: false } }
     );
 
-    const { reference } = await req.json();
-    
+    // Support both POST body and GET query parameter for reference
+    let reference = '';
+    if (req.method === 'POST') {
+      const body = await req.json().catch(() => ({}));
+      reference = body?.reference || '';
+    } else if (req.method === 'GET') {
+      const url = new URL(req.url);
+      reference = url.searchParams.get('reference') ?? '';
+    }
+
     if (!reference) {
       return new Response(JSON.stringify({
         success: false,
@@ -68,33 +76,33 @@ serve(async (req) => {
       throw new Error(verification.message || 'Verification failed');
     }
 
-    const data = verification.data;
-    const isSuccess = data.status === 'success';
+    const ps = verification.data;
+    const isSuccess = ps?.status === 'success';
 
     // Update order status if payment successful
-    let orderInfo = null;
+    let orderInfo: { order_id: string; order_number: string; customer_name: string } | null = null;
     if (isSuccess) {
       // Try to find and update the order
-      const { data: orderData, error: orderError } = await supabaseClient
+      const { data: foundOrder, error: findOrderError } = await supabaseClient
         .from('orders')
         .select('id, order_number, customer_name, customer_email')
         .or(`payment_reference.eq.${reference},id.eq.${reference}`)
         .single();
 
-      if (orderData && !orderError) {
+      if (foundOrder && !findOrderError) {
         await supabaseClient
           .from('orders')
-          .update({ 
+          .update({
             payment_status: 'paid',
             status: 'confirmed',
             updated_at: new Date().toISOString()
           })
-          .eq('id', orderData.id);
+          .eq('id', foundOrder.id);
 
         orderInfo = {
-          order_id: orderData.id,
-          order_number: orderData.order_number,
-          customer_name: orderData.customer_name
+          order_id: foundOrder.id,
+          order_number: foundOrder.order_number,
+          customer_name: foundOrder.customer_name
         };
 
         console.log('Order updated successfully:', orderInfo);
@@ -103,33 +111,33 @@ serve(async (req) => {
 
     console.log('Payment verification completed:', {
       reference,
-      status: data.status,
-      amount: data.amount / 100,
+      status: ps?.status,
+      amount: (ps?.amount ?? 0) / 100,
       success: isSuccess
     });
 
     // Return simplified, consistent response
     return new Response(JSON.stringify({
       success: isSuccess,
-      status: data.status,
+      status: ps?.status,
       data: {
-        reference: data.reference,
-        amount: data.amount / 100,
-        currency: data.currency,
-        status: data.status,
-        paid_at: data.paid_at,
-        channel: data.channel,
-        gateway_response: data.gateway_response
+        reference: ps?.reference,
+        amount: (ps?.amount ?? 0) / 100,
+        currency: ps?.currency,
+        status: ps?.status,
+        paid_at: ps?.paid_at,
+        channel: ps?.channel,
+        gateway_response: ps?.gateway_response
       },
       order_id: orderInfo?.order_id || null,
       order_number: orderInfo?.order_number || null,
-      message: isSuccess ? 'Payment verified successfully' : `Payment ${data.status}`
+      message: isSuccess ? 'Payment verified successfully' : `Payment ${ps?.status}`
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Paystack verification error:', error);
     return new Response(JSON.stringify({
       success: false,

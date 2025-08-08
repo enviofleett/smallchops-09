@@ -23,7 +23,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log(`Processing ${req.method} request to paystack-verify (build 2025-08-08-5)`);
+    console.log(`Processing ${req.method} request to paystack-verify (build 2025-08-08-6)`);
 
     // Healthcheck endpoint: GET ?health=1 returns presence of required secrets
     let reference = '';
@@ -35,6 +35,8 @@ serve(async (req) => {
           ok: true,
           hasPaystackKey: Boolean(Deno.env.get('PAYSTACK_SECRET_KEY')),
           hasServiceRole: Boolean(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')),
+          hasSupabaseUrl: Boolean(Deno.env.get('SUPABASE_URL')),
+          version: '2025-08-08-6',
           timestamp: new Date().toISOString(),
         };
         return new Response(JSON.stringify(healthBody), { status: 200, headers: corsHeaders });
@@ -187,9 +189,9 @@ serve(async (req) => {
       // Do not fail the verification result if order update failed
     }
 
-    // Return exactly { success: true, data } with Paystack JSON data,
-    // while keeping top-level order fields for compatibility with existing frontend code.
+    // Return a Paystack-compatible structure for the app
     const responseBody = {
+      status: isSuccess,
       success: isSuccess,
       data: ps ?? verification, // prefer Paystack "data" object; fallback to entire response
       order_id: orderInfo.order_id,

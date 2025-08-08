@@ -714,6 +714,7 @@ export type Database = {
           admin_notification_email: string | null
           admin_order_notifications: boolean | null
           admin_payment_notifications: boolean | null
+          allow_guest_checkout: boolean
           brand_guidelines: string | null
           business_hours: Json | null
           created_at: string
@@ -751,6 +752,7 @@ export type Database = {
           admin_notification_email?: string | null
           admin_order_notifications?: boolean | null
           admin_payment_notifications?: boolean | null
+          allow_guest_checkout?: boolean
           brand_guidelines?: string | null
           business_hours?: Json | null
           created_at?: string
@@ -788,6 +790,7 @@ export type Database = {
           admin_notification_email?: string | null
           admin_order_notifications?: boolean | null
           admin_payment_notifications?: boolean | null
+          allow_guest_checkout?: boolean
           brand_guidelines?: string | null
           business_hours?: Json | null
           created_at?: string

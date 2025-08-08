@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -73,6 +74,31 @@ serve(async (req) => {
       isGuest: !!requestBody.guest_session_id,
       guestSessionId: requestBody.guest_session_id
     });
+
+    // NEW: Enforce allow_guest_checkout from business settings
+    console.log('⚙️ Fetching business settings for guest checkout enforcement...');
+    const { data: settingsRow, error: settingsErr } = await supabaseClient
+      .from('business_settings')
+      .select('allow_guest_checkout')
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const allowGuest = settingsRow?.allow_guest_checkout !== false; // default to true if missing
+    if (settingsErr) {
+      console.warn('⚠️ Could not fetch business settings; defaulting allow_guest_checkout to true', settingsErr);
+    } else {
+      console.log('✅ Business settings loaded:', { allow_guest_checkout: allowGuest });
+    }
+
+    if (!allowGuest && !authenticatedUser) {
+      console.log('🚫 Guest checkout is disabled and user is not authenticated. Blocking request.');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Guest checkout is currently disabled. Please sign in to continue.',
+        requires_auth: true
+      }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
     
     const {
       customer_email,

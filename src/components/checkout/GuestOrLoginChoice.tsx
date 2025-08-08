@@ -1,8 +1,10 @@
+
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { User, UserPlus, Clock, ShoppingBag } from 'lucide-react';
+import { User, UserPlus, Clock, ShoppingBag, Lock } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
+import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 
 interface GuestOrLoginChoiceProps {
   onContinueAsGuest: () => void;
@@ -15,6 +17,9 @@ export const GuestOrLoginChoice: React.FC<GuestOrLoginChoiceProps> = ({
   onLogin,
   totalAmount,
 }) => {
+  const { data: settings } = useBusinessSettings();
+  const allowGuest = settings?.allow_guest_checkout !== false; // default true
+
   return (
     <div className="space-y-6">
       <div className="text-center space-y-2">
@@ -26,7 +31,7 @@ export const GuestOrLoginChoice: React.FC<GuestOrLoginChoiceProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Guest Checkout Option */}
-        <Card className="cursor-pointer hover:border-primary transition-colors group">
+        <Card className={`transition-colors group ${allowGuest ? 'hover:border-primary cursor-pointer' : 'opacity-60'}`}>
           <CardContent className="p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="p-3 rounded-full bg-primary/10 group-hover:bg-primary/20 transition-colors">
@@ -34,7 +39,9 @@ export const GuestOrLoginChoice: React.FC<GuestOrLoginChoiceProps> = ({
               </div>
               <div>
                 <h4 className="font-semibold">Continue as Guest</h4>
-                <p className="text-sm text-muted-foreground">Quick and easy</p>
+                <p className="text-sm text-muted-foreground">
+                  {allowGuest ? 'Quick and easy' : 'Disabled by admin'}
+                </p>
               </div>
             </div>
             
@@ -54,11 +61,14 @@ export const GuestOrLoginChoice: React.FC<GuestOrLoginChoiceProps> = ({
             </ul>
 
             <Button 
-              onClick={onContinueAsGuest}
+              onClick={allowGuest ? onContinueAsGuest : onLogin}
               className="w-full"
-              variant="outline"
+              variant={allowGuest ? 'outline' : 'default'}
+              disabled={!allowGuest}
             >
-              Continue as Guest
+              {allowGuest ? 'Continue as Guest' : (
+                <span className="inline-flex items-center gap-2"><Lock className="h-4 w-4" /> Sign in required</span>
+              )}
             </Button>
           </CardContent>
         </Card>
@@ -104,7 +114,9 @@ export const GuestOrLoginChoice: React.FC<GuestOrLoginChoiceProps> = ({
       <Separator />
       
       <div className="text-center text-xs text-muted-foreground">
-        Don't worry - you can create an account after placing your order as a guest
+        {allowGuest 
+          ? "Don't worry - you can create an account after placing your order as a guest"
+          : "Guest checkout is turned off by the store admin. Please sign in to continue."}
       </div>
     </div>
   );

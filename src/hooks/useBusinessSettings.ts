@@ -35,6 +35,7 @@ export interface BusinessSettings {
   logo_usage_rules?: string;
   created_at: string;
   updated_at: string;
+  allow_guest_checkout?: boolean; // NEW
 }
 
 export const useBusinessSettings = () => {
@@ -61,7 +62,7 @@ export const useBusinessSettings = () => {
         if (!dbError && data) {
           logger.info('Business settings fetched successfully via direct query');
           measurePerformance();
-          return data;
+          return data as BusinessSettings;
         }
         
         if (dbError) {
@@ -94,7 +95,7 @@ export const useBusinessSettings = () => {
           if (!error && result?.data) {
             logger.info('Business settings fetched successfully via edge function');
             measurePerformance();
-            return result.data;
+            return result.data as BusinessSettings;
           }
           
           if (error) {
@@ -106,7 +107,7 @@ export const useBusinessSettings = () => {
         if (data) {
           logger.info('Returning cached data despite edge function failure');
           measurePerformance();
-          return data;
+          return data as BusinessSettings;
         }
         
         // Return null instead of throwing error for graceful degradation
@@ -129,7 +130,7 @@ export const useBusinessSettings = () => {
             
           if (!finalError && data) {
             logger.info('Final fallback query successful');
-            return data;
+            return data as BusinessSettings;
           }
         } catch (finalAttemptError) {
           logger.error('Final fallback query failed', finalAttemptError);

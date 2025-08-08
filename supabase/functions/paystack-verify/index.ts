@@ -52,8 +52,26 @@ serve(async (req) => {
       return new Response(JSON.stringify(res), { status: 400, headers: corsHeaders });
     }
 
-    // Get secrets
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    // Resolve Paystack secret key: ENV first, fallback to DB config
+    let paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY') || '';
+    if (!paystackSecretKey) {
+      try {
+        const supabaseClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          { auth: { persistSession: false } }
+        );
+        const { data: cfg, error: cfgErr } = await supabaseClient
+          .from('payment_integrations')
+          .select('test_mode, secret_key, live_secret_key')
+          .eq('provider', 'paystack')
+          .eq('connection_status', 'connected')
+          .single();
+        if (!cfgErr && cfg) {
+          paystackSecretKey = cfg.test_mode ? cfg.secret_key : (cfg.live_secret_key || cfg.secret_key);
+        }
+      } catch (_e) {}
+    }
     if (!paystackSecretKey) {
       const res = { error: 'Paystack secret key not configured' };
       return new Response(JSON.stringify(res), { status: 500, headers: corsHeaders });

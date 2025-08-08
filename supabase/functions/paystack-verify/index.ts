@@ -144,6 +144,14 @@ serve(async (req) => {
         const metadata = ps?.metadata || ps?.meta || {};
         let targetOrderId: string | null = metadata?.order_id || metadata?.orderId || metadata?.order?.id || null;
 
+        // Pre-fill basic order info from metadata if available
+        if (!orderInfo.order_number && (metadata?.order_number || metadata?.orderNumber || metadata?.order?.number)) {
+          orderInfo.order_number = metadata.order_number || metadata.orderNumber || metadata.order?.number || null;
+        }
+        if (!orderInfo.customer_name && (metadata?.customer_name || metadata?.customerName)) {
+          orderInfo.customer_name = metadata.customer_name || metadata.customerName || null;
+        }
+
         // Fallback 1: find order by stored reference or by assuming the reference is the order id
         if (!targetOrderId) {
           const { data: foundOrder, error: findOrderError } = await supabaseClient
@@ -228,17 +236,39 @@ serve(async (req) => {
       // Do not fail the verification result if order update failed
     }
 
-    // Return a structure compatible with the frontend hook
-    const payload = {
-      success: isSuccess,
-      paymentStatus: isSuccess ? 'paid' : (ps?.status || 'failed'),
-      orderStatus: isSuccess ? 'confirmed' : 'pending',
-      orderNumber: '', // kept minimal; existing code below may fill this after DB lookups
-      amount: typeof ps?.amount === 'number' ? Math.round(ps.amount) / 100 : 0,
+    // Normalize response shape for frontend (top-level fields)
+    if (isSuccess) {
+      const amountNgn = typeof ps?.amount === 'number' ? Math.round(ps.amount) / 100 : 0;
+      const successPayload = {
+        success: true,
+        order_id: orderInfo.order_id,
+        order_number: orderInfo.order_number,
+        amount: amountNgn,
+        message: 'Payment verified successfully',
+        reference,
+      };
+      return new Response(JSON.stringify(successPayload), { status: 200, headers: corsHeaders });
+    }
+
+    // Non-success: decide between pending vs failed
+    const statusText = ps?.status || 'pending';
+    if (statusText !== 'failed' && statusText !== 'reversed' && statusText !== 'declined') {
+      const pendingPayload = {
+        success: false,
+        status: 'pending',
+        message: 'Payment not completed yet. Please retry shortly.',
+        reference,
+      };
+      return new Response(JSON.stringify(pendingPayload), { status: 200, headers: corsHeaders });
+    }
+
+    // Failed
+    const failedPayload = {
+      success: false,
+      error: ps?.gateway_response || verification?.message || 'Payment verification failed',
       reference,
     };
-
-    return new Response(JSON.stringify({ data: payload }), { status: 200, headers: corsHeaders });
+    return new Response(JSON.stringify(failedPayload), { status: 200, headers: corsHeaders });
 
   } catch (error: any) {
     console.error('paystack-verify error:', error);

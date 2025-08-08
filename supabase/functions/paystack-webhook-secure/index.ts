@@ -102,7 +102,7 @@ async function processChargeSuccess(data: any): Promise<{ success: boolean; mess
     // Use the existing successful payment handler
     await supabase.rpc('handle_successful_payment', {
       p_reference: data.reference,
-      p_paid_at: data.paid_at ? new Date(data.paid_at) : new Date(),
+      p_paid_at: (data.paid_at ? new Date(data.paid_at) : new Date()).toISOString(),
       p_gateway_response: data.gateway_response,
       p_fees: data.fees ? data.fees / 100 : 0,
       p_channel: data.channel,

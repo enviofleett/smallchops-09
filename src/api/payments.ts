@@ -113,22 +113,42 @@ export class PaymentsAPI {
         };
       }
 
-      if (!data?.status) {
+      // New function wrapper shape: { data: { success, paymentStatus, orderStatus, orderNumber, amount, reference, ... } }
+      const fnRes: any = data;
+
+      if (fnRes?.data && typeof fnRes.data.success === 'boolean') {
+        return {
+          success: true,
+          data: {
+            status: fnRes.data.paymentStatus || (fnRes.data.success ? 'paid' : 'failed'),
+            // The function already normalizes to base currency (not kobo), so DO NOT divide again
+            amount: typeof fnRes.data.amount === 'number' ? fnRes.data.amount : 0,
+            // Optional passthrough fields if present
+            customer: fnRes.data.customer ?? null,
+            metadata: fnRes.data.metadata ?? null,
+            paid_at: fnRes.data.paid_at ?? '',
+            channel: fnRes.data.channel ?? ''
+          }
+        };
+      }
+
+      // Legacy/alternative shape: raw Paystack-like: { status: true, data: { amount, customer, metadata, paid_at, channel, ... } }
+      if (!fnRes?.status) {
         return {
           success: false,
-          error: data?.error || 'Payment verification failed'
+          error: fnRes?.error || 'Payment verification failed'
         };
       }
 
       return {
         success: true,
         data: {
-          status: data.data.status,
-          amount: data.data.amount / 100, // Convert from kobo
-          customer: data.data.customer,
-          metadata: data.data.metadata,
-          paid_at: data.data.paid_at,
-          channel: data.data.channel
+          status: fnRes.data?.status || (fnRes.status ? 'paid' : 'failed'),
+          amount: typeof fnRes.data?.amount === 'number' ? fnRes.data.amount / 100 : 0, // Legacy path expects kobo conversion
+          customer: fnRes.data?.customer,
+          metadata: fnRes.data?.metadata,
+          paid_at: fnRes.data?.paid_at,
+          channel: fnRes.data?.channel
         }
       };
     } catch (error) {

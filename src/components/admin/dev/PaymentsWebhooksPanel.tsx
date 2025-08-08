@@ -1,3 +1,4 @@
+
 import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -87,8 +88,15 @@ export const PaymentsWebhooksPanel: React.FC = () => {
         body: { reference: reference.trim() }
       });
       if (error) throw error;
+
       setVerifyResult(data);
-      toast({ title: data?.success ? 'Verified' : 'Verification complete', description: data?.message || 'See details below' });
+
+      // Support both new and legacy response shapes
+      const ok = (data as any)?.data?.success ?? (data as any)?.status ?? false;
+      toast({
+        title: ok ? 'Verified' : 'Verification complete',
+        description: ok ? 'Payment confirmed successfully' : 'See details below',
+      });
     } catch (e: any) {
       setVerifyResult({ error: e?.message || 'Verification failed' });
       toast({ title: 'Verification failed', description: e?.message || 'See console for details', variant: 'destructive' });

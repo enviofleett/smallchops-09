@@ -210,7 +210,6 @@ serve(async (req) => {
         }
 
         // Queue order confirmation emails using correct template keys
-        const orderData = transaction.order;
         if (orderData?.customer_email) {
           console.log('Queuing order confirmation emails for:', orderData.customer_email);
           

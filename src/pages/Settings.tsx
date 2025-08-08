@@ -20,6 +20,7 @@ import { PickupPointsManager } from "@/components/admin/PickupPointsManager";
 import { ProductionHealthMonitor } from "@/components/admin/ProductionHealthMonitor";
 import { ProductionReadinessStatus } from "@/components/admin/ProductionReadinessStatus";
 import RegistrationHealth from "./RegistrationHealth";
+import AdminCheckoutSettingsCard from '@/components/admin/settings/AdminCheckoutSettingsCard';
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 
@@ -133,9 +134,10 @@ const Settings = () => {
 
         {isAdmin && <TabsContent value="developer" className="space-y-6">
             <Tabs defaultValue="auth-endpoints" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-6">
+              <TabsList className="grid w-full grid-cols-7">
                 <TabsTrigger value="auth-endpoints">Auth API</TabsTrigger>
                 <TabsTrigger value="buying-logic">Buying Logic</TabsTrigger>
+                <TabsTrigger value="checkout">Checkout</TabsTrigger>
                 <TabsTrigger value="email">Email</TabsTrigger>
                 <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
                 <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
@@ -148,6 +150,18 @@ const Settings = () => {
               
               <TabsContent value="buying-logic">
                 <BuyingLogicEndpointsTab />
+              </TabsContent>
+
+              <TabsContent value="checkout">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Checkout Settings</CardTitle>
+                    <CardDescription>Enable or disable guest checkout</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <AdminCheckoutSettingsCard />
+                  </CardContent>
+                </Card>
               </TabsContent>
               
               <TabsContent value="email">

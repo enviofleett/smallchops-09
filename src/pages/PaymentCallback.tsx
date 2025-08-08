@@ -106,13 +106,15 @@ export default function PaymentCallback() {
 
   const reference = getPaymentReference();
   const paymentStatus = searchParams.get('status');
-  
-  // Fast path: if Paystack returned success in the URL, confirm in background and redirect immediately
+  const forceUi = ((searchParams.get('force') || '').toLowerCase() === 'ui');
+  // Fast path: confirm in background and redirect immediately when success-like or missing status
   useEffect(() => {
     const statusNorm = (paymentStatus || '').toLowerCase();
-    if (!reference || !(statusNorm === 'success' || statusNorm === 'successful')) return;
+    const successLike = statusNorm === 'success' || statusNorm === 'successful';
+    const shouldInstant = !forceUi && reference && (!paymentStatus || successLike);
+    if (!shouldInstant) return;
 
-    console.log('PaymentCallback - Success in URL, triggering background confirmation and redirect');
+    console.log('PaymentCallback - Instant redirect path triggered', { reference, status: statusNorm });
 
     // Fire background verification (do not await)
     supabase.functions
@@ -130,10 +132,40 @@ export default function PaymentCallback() {
       // Small delay to allow the background request to dispatch
       setRedirected(true);
       setTimeout(() => {
-        window.location.assign('https://startersmallchops.com/customer-profile');
-      }, 300);
+        const target = 'https://startersmallchops.com/customer-profile';
+        try {
+          if (window.top) {
+            window.top.location.replace(target);
+          } else {
+            window.location.replace(target);
+          }
+        } catch {
+          window.location.href = target;
+        }
+      }, 350);
     })();
-  }, [reference, paymentStatus, clearCartAfterPayment, clearCheckoutState]);
+  }, [reference, paymentStatus, forceUi, clearCartAfterPayment, clearCheckoutState]);
+
+  // If no reference and not forcing UI, redirect to profile to avoid dead-ends
+  useEffect(() => {
+    if (redirected || forceUi) return;
+    if (!reference) {
+      console.warn('PaymentCallback - No reference; redirecting to profile');
+      setRedirected(true);
+      setTimeout(() => {
+        const target = 'https://startersmallchops.com/customer-profile';
+        try {
+          if (window.top) {
+            window.top.location.replace(target);
+          } else {
+            window.location.replace(target);
+          }
+        } catch {
+          window.location.href = target;
+        }
+      }, 200);
+    }
+  }, [reference, forceUi, redirected]);
 
   // Fallback: full verification flow (when status not explicitly success)
   useEffect(() => {

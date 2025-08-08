@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { crypto } from "https://deno.land/std@0.190.0/crypto/mod.ts";
@@ -284,17 +285,29 @@ serve(async (req) => {
       }
     }
 
-    // Attempt to get secret for signature: prefer DB webhook_secret, fallback to PAYSTACK_SECRET_KEY
-    const { data: config } = await supabase
-      .from('payment_integrations')
-      .select('webhook_secret, test_mode, secret_key, live_secret_key')
-      .eq('provider', 'paystack')
-      .eq('connection_status', 'connected')
-      .single();
+    // Resolve signature secret from a single centralized source:
+    // 1) RPC get_active_paystack_config (webhook_secret is guaranteed non-null by SQL)
+    // 2) PAYSTACK_WEBHOOK_SECRET env (optional explicit override)
+    // 3) PAYSTACK_SECRET_KEY env (valid fallback per Paystack docs)
+    let secretForSignature = '';
+    let effectiveConfig: any = null;
 
-    const secretForSignature = config?.webhook_secret 
-      || Deno.env.get('PAYSTACK_SECRET_KEY') 
-      || (config?.test_mode ? config?.secret_key : (config?.live_secret_key || config?.secret_key));
+    try {
+      const { data: cfg, error: cfgErr } = await supabase.rpc('get_active_paystack_config');
+      if (cfgErr) {
+        console.warn('RPC get_active_paystack_config error:', cfgErr.message);
+      }
+      effectiveConfig = Array.isArray(cfg) ? cfg?.[0] : cfg;
+    } catch (e) {
+      console.warn('RPC get_active_paystack_config call failed:', e);
+    }
+
+    secretForSignature =
+      (effectiveConfig?.webhook_secret as string | undefined) ||
+      Deno.env.get('PAYSTACK_WEBHOOK_SECRET') ||
+      Deno.env.get('PAYSTACK_SECRET_KEY') ||
+      (effectiveConfig?.secret_key as string | undefined) ||
+      '';
 
     if (!secretForSignature) {
       console.error('No signature secret available (ignored)');
@@ -318,7 +331,7 @@ serve(async (req) => {
     }
 
     // Parse the webhook payload
-    let webhookData: PaystackWebhookPayload;
+    let webhookData: any;
     try {
       webhookData = JSON.parse(payload);
     } catch (error) {
@@ -368,15 +381,28 @@ serve(async (req) => {
 
     switch (webhookData.event) {
       case 'charge.success': {
-        // Double-verify with Paystack before processing
+        // Double-verify with Paystack before processing, use env first then RPC secret_key
+        let verifyKey =
+          Deno.env.get('PAYSTACK_SECRET_KEY') ||
+          (effectiveConfig?.secret_key as string | undefined) ||
+          '';
+
+        if (!verifyKey && !effectiveConfig) {
+          // Try RPC again if we didn't have it
+          try {
+            const { data: cfg2 } = await supabase.rpc('get_active_paystack_config');
+            const eff2 = Array.isArray(cfg2) ? cfg2?.[0] : cfg2;
+            verifyKey = eff2?.secret_key || '';
+          } catch (_e) {}
+        }
+
+        if (!verifyKey) {
+          console.warn('No key available for double verification; skipping processing');
+          processingResult = { success: false, message: 'Missing key for verification' };
+          break;
+        }
+
         try {
-          const verifyKey = Deno.env.get('PAYSTACK_SECRET_KEY') 
-            || (config?.test_mode ? config?.secret_key : (config?.live_secret_key || config?.secret_key));
-          if (!verifyKey) {
-            console.warn('No key available for double verification; skipping processing');
-            processingResult = { success: false, message: 'Missing key for verification' };
-            break;
-          }
           const ref = webhookData.data.reference;
           const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(ref)}`, {
             headers: { 'Authorization': `Bearer ${verifyKey}`, 'Content-Type': 'application/json' }
@@ -453,7 +479,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
-  } catch (error) {
+  } catch (error: any) {
     console.error('Webhook processing error:', error);
     
     // Log the error

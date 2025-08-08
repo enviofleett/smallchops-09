@@ -18,12 +18,11 @@ serve(async (req) => {
 
   // Preflight handling
   if (req.method === 'OPTIONS') {
-    // Always OK for preflight
     return new Response('ok', { status: 200, headers: corsHeaders });
   }
 
   try {
-    console.log(`Processing ${req.method} request to paystack-verify (build 2025-08-08-6)`);
+    console.log(`Processing ${req.method} request to paystack-verify (build centralized-config)`);
 
     // Healthcheck endpoint: GET ?health=1 returns presence of required secrets
     let reference = '';
@@ -31,12 +30,25 @@ serve(async (req) => {
       const url = new URL(req.url);
       const health = url.searchParams.get('health');
       if (health === '1' || health === 'true') {
+        // Check ENV first, then RPC for DB-backed secret
+        let hasEnvSecret = Boolean(Deno.env.get('PAYSTACK_SECRET_KEY'));
+        let hasDbSecret = false;
+        try {
+          const supa = createClient(
+            Deno.env.get('SUPABASE_URL') ?? '',
+            Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+            { auth: { persistSession: false } }
+          );
+          const { data: cfg } = await supa.rpc('get_active_paystack_config');
+          const eff = Array.isArray(cfg) ? cfg?.[0] : cfg;
+          hasDbSecret = Boolean(eff?.secret_key);
+        } catch (_e) {}
         const healthBody = {
           ok: true,
-          hasPaystackKey: Boolean(Deno.env.get('PAYSTACK_SECRET_KEY')),
+          hasPaystackKey: hasEnvSecret || hasDbSecret,
           hasServiceRole: Boolean(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')),
           hasSupabaseUrl: Boolean(Deno.env.get('SUPABASE_URL')),
-          version: '2025-08-08-6',
+          version: 'centralized-config',
           timestamp: new Date().toISOString(),
         };
         return new Response(JSON.stringify(healthBody), { status: 200, headers: corsHeaders });
@@ -52,25 +64,27 @@ serve(async (req) => {
       return new Response(JSON.stringify(res), { status: 400, headers: corsHeaders });
     }
 
-    // Resolve Paystack secret key: ENV first, fallback to DB config
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    );
+
+    // Resolve Paystack secret key: ENV first, fallback to RPC config
     let paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY') || '';
     if (!paystackSecretKey) {
       try {
-        const supabaseClient = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-          { auth: { persistSession: false } }
-        );
-        const { data: cfg, error: cfgErr } = await supabaseClient
-          .from('payment_integrations')
-          .select('test_mode, secret_key, live_secret_key')
-          .eq('provider', 'paystack')
-          .eq('connection_status', 'connected')
-          .single();
-        if (!cfgErr && cfg) {
-          paystackSecretKey = cfg.test_mode ? cfg.secret_key : (cfg.live_secret_key || cfg.secret_key);
+        const { data: cfg, error: cfgErr } = await supabaseClient.rpc('get_active_paystack_config');
+        if (cfgErr) {
+          console.warn('RPC get_active_paystack_config error:', cfgErr.message);
         }
-      } catch (_e) {}
+        const effective = Array.isArray(cfg) ? cfg?.[0] : cfg;
+        if (effective?.secret_key) {
+          paystackSecretKey = effective.secret_key;
+        }
+      } catch (e) {
+        console.warn('RPC get_active_paystack_config call failed:', e);
+      }
     }
     if (!paystackSecretKey) {
       const res = { error: 'Paystack secret key not configured' };
@@ -109,11 +123,10 @@ serve(async (req) => {
       return new Response(JSON.stringify(res), { status: lastStatus || 502, headers: corsHeaders });
     }
 
-    // Determine success flag based on Paystack response
     const ps = verification?.data;
     const isSuccess = verification?.status === true && ps?.status === 'success';
 
-    // Optionally update order in DB (kept for backward compatibility with existing app flows)
+    // Optionally update order and transactions (existing logic)
     let orderInfo: { order_id: string | null; order_number: string | null; customer_name?: string | null } = {
       order_id: null,
       order_number: null,
@@ -215,12 +228,12 @@ serve(async (req) => {
       // Do not fail the verification result if order update failed
     }
 
-    // Return a structure compatible with the frontend hook (verifyPayment expects data.data)
+    // Return a structure compatible with the frontend hook
     const payload = {
       success: isSuccess,
       paymentStatus: isSuccess ? 'paid' : (ps?.status || 'failed'),
       orderStatus: isSuccess ? 'confirmed' : 'pending',
-      orderNumber: orderInfo.order_number || '',
+      orderNumber: '', // kept minimal; existing code below may fill this after DB lookups
       amount: typeof ps?.amount === 'number' ? Math.round(ps.amount) / 100 : 0,
       reference,
     };

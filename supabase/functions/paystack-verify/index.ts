@@ -35,16 +35,26 @@ serve(async (req) => {
   }
 
   try {
-    console.log(`Processing ${req.method} request to paystack-verify (build 2025-08-08-3)`);
+    console.log(`Processing ${req.method} request to paystack-verify (build 2025-08-08-4)`);
 
-    // Support POST body and GET query parameter for reference (POST preferred)
+    // Healthcheck endpoint: GET ?health=1 returns presence of required secrets
     let reference = '';
-    if (req.method === 'POST') {
+    if (req.method === 'GET') {
+      const url = new URL(req.url);
+      const health = url.searchParams.get('health');
+      if (health === '1' || health === 'true') {
+        const healthBody = {
+          ok: true,
+          hasPaystackKey: Boolean(Deno.env.get('PAYSTACK_SECRET_KEY')),
+          hasServiceRole: Boolean(Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')),
+          timestamp: new Date().toISOString(),
+        };
+        return new Response(JSON.stringify(healthBody), { status: 200, headers: corsHeaders });
+      }
+      reference = url.searchParams.get('reference') ?? '';
+    } else if (req.method === 'POST') {
       const body = await req.json().catch(() => ({}));
       reference = body?.reference || '';
-    } else if (req.method === 'GET') {
-      const url = new URL(req.url);
-      reference = url.searchParams.get('reference') ?? '';
     }
 
     if (!reference) {

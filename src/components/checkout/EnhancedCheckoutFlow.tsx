@@ -400,6 +400,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           if (!initErr && initResp?.status && (initResp.data?.authorization_url || initResp.authorization_url)) {
             authUrl = initResp.data?.authorization_url || initResp.authorization_url;
             paymentUrl = initResp.data?.authorization_url || initResp.authorization_url;
+            try { sessionStorage.setItem('paystack_last_reference', freshRef); } catch {}
           }
         }
         
@@ -436,6 +437,9 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           paymentUrl,
           reference: paymentObj.reference 
         });
+        
+        // Remember reference in case gateway omits it on callback
+        try { if (paymentObj?.reference) sessionStorage.setItem('paystack_last_reference', paymentObj.reference); } catch {}
         
         console.log('🚀 Redirecting to payment URL:', paymentUrl);
         try {

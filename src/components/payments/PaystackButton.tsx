@@ -108,6 +108,7 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
               }
             }
           });
+          try { sessionStorage.setItem('paystack_last_reference', reference); } catch {}
           
           handler.openIframe();
         } else {

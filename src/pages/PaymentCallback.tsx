@@ -56,6 +56,21 @@ export default function PaymentCallback() {
     console.log('PaymentCallback - All URL params:', allParams);
     console.log('PaymentCallback - Detected reference:', reference);
     
+    // Fallback: try session storage if reference is missing (some gateways omit it)
+    if (!reference) {
+      const storedRef = sessionStorage.getItem('paystack_last_reference') || localStorage.getItem('paystack_last_reference');
+      const storedOrder = sessionStorage.getItem('orderDetails');
+      const orderId = (() => { try { return storedOrder ? JSON.parse(storedOrder)?.orderId : null; } catch { return null; } })();
+      if (storedRef) {
+        const params = new URLSearchParams(window.location.search);
+        params.set('reference', storedRef);
+        if (orderId) params.set('order_id', orderId);
+        // Replace the URL so refresh keeps the reference
+        navigate(`${window.location.pathname}?${params.toString()}`, { replace: true });
+        return; // wait for next effect run with reference present
+      }
+    }
+    
     if (!reference) {
       console.error('PaymentCallback - No payment reference found in URL');
       setStatus('error');

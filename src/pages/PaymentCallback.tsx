@@ -33,7 +33,7 @@ export default function PaymentCallback() {
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
   const retryTimer = useRef<number | null>(null);
-
+  const [redirected, setRedirected] = useState(false);
   useEffect(() => {
     return () => {
       if (retryTimer.current) clearTimeout(retryTimer.current);
@@ -106,8 +106,38 @@ export default function PaymentCallback() {
 
   const reference = getPaymentReference();
   const paymentStatus = searchParams.get('status');
-
+  
+  // Fast path: if Paystack returned success in the URL, confirm in background and redirect immediately
   useEffect(() => {
+    const statusNorm = (paymentStatus || '').toLowerCase();
+    if (!reference || !(statusNorm === 'success' || statusNorm === 'successful')) return;
+
+    console.log('PaymentCallback - Success in URL, triggering background confirmation and redirect');
+
+    // Fire background verification (do not await)
+    supabase.functions
+      .invoke('paystack-verify', { body: { reference } })
+      .catch((e) => console.warn('Background verification dispatch failed:', e));
+
+    (async () => {
+      try { await clearCartAfterPayment(); } catch {}
+      clearCheckoutState();
+      try {
+        sessionStorage.removeItem('paystack_last_reference');
+        localStorage.removeItem('paystack_last_reference');
+      } catch {}
+
+      // Small delay to allow the background request to dispatch
+      setRedirected(true);
+      setTimeout(() => {
+        window.location.assign('https://startersmallchops.com/customer-profile');
+      }, 300);
+    })();
+  }, [reference, paymentStatus, clearCartAfterPayment, clearCheckoutState]);
+
+  // Fallback: full verification flow (when status not explicitly success)
+  useEffect(() => {
+    if (redirected) return;
     // Debug: Log all URL parameters for troubleshooting
     const allParams = Object.fromEntries(searchParams.entries());
     console.log('PaymentCallback - All URL params:', allParams);
@@ -295,7 +325,9 @@ export default function PaymentCallback() {
     }
   };
 
-  return (
+    if (redirected) return null;
+
+    return (
     <>
       <Helmet>
         <title>Paystack Payment Verification | Starters Small Chops</title>

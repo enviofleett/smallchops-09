@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -32,6 +32,13 @@ export default function PaymentCallback() {
   const [result, setResult] = useState<PaymentResult | null>(null);
   const [retryCount, setRetryCount] = useState(0);
   const maxRetries = 3;
+  const retryTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+    };
+  }, []);
 
   // Enhanced parameter detection with fallback handling
   const getPaymentReference = () => {
@@ -188,7 +195,8 @@ export default function PaymentCallback() {
           // Payment still pending, might need retry
           if (retryCount < maxRetries) {
             console.log(`Payment still pending, retrying in 3 seconds... (${retryCount + 1}/${maxRetries})`);
-            setTimeout(() => {
+            if (retryTimer.current) clearTimeout(retryTimer.current);
+            retryTimer.current = window.setTimeout(() => {
               setRetryCount(prev => prev + 1);
               verifyPayment(paymentReference);
             }, 3000);

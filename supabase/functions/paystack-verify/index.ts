@@ -111,14 +111,63 @@ serve(async (req) => {
           { auth: { persistSession: false } }
         );
 
-        // Try to find and update the order by reference or id
-        const { data: foundOrder, error: findOrderError } = await supabaseClient
-          .from('orders')
-          .select('id, order_number, customer_name, customer_email')
-          .or(`payment_reference.eq.${reference},id.eq.${reference}`)
-          .single();
+        // Prefer order_id from Paystack metadata returned by verification
+        const metadata = ps?.metadata || ps?.meta || {};
+        let targetOrderId: string | null = metadata?.order_id || metadata?.orderId || metadata?.order?.id || null;
 
-        if (!findOrderError && foundOrder) {
+        // Fallback 1: find order by stored reference or by assuming the reference is the order id
+        if (!targetOrderId) {
+          const { data: foundOrder, error: findOrderError } = await supabaseClient
+            .from('orders')
+            .select('id, order_number, customer_name, customer_email')
+            .or(`payment_reference.eq.${reference},id.eq.${reference}`)
+            .maybeSingle();
+
+          if (!findOrderError && foundOrder) {
+            targetOrderId = foundOrder.id;
+            orderInfo = {
+              order_id: foundOrder.id,
+              order_number: foundOrder.order_number,
+              customer_name: foundOrder.customer_name
+            };
+          }
+        }
+
+        // Fallback 2: look up a payment transaction row to resolve the order id
+        if (!targetOrderId) {
+          const { data: txnRow } = await supabaseClient
+            .from('payment_transactions')
+            .select('order_id')
+            .eq('provider_reference', reference)
+            .maybeSingle();
+          if (txnRow?.order_id) {
+            targetOrderId = txnRow.order_id as string;
+          }
+        }
+
+        // Record successful payment via RPC (updates transactions and also confirms order)
+        try {
+          const paidAt = ps?.paid_at || ps?.transaction_date || ps?.paidAt || new Date().toISOString();
+          const auth = ps?.authorization || {};
+          await supabaseClient.rpc('handle_successful_payment', {
+            p_reference: reference,
+            p_paid_at: new Date(paidAt).toISOString(),
+            p_gateway_response: ps?.gateway_response || verification?.message || 'Payment verified successfully',
+            p_fees: Number(ps?.fees ?? ps?.fees_charged ?? 0),
+            p_channel: ps?.channel || 'online',
+            p_authorization_code: auth?.authorization_code ?? null,
+            p_card_type: auth?.card_type ?? null,
+            p_last4: auth?.last4 ?? null,
+            p_exp_month: (auth?.exp_month ?? null) as any,
+            p_exp_year: (auth?.exp_year ?? null) as any,
+            p_bank: auth?.bank ?? null,
+          });
+        } catch (rpcErr) {
+          console.warn('RPC handle_successful_payment failed (non-fatal):', rpcErr);
+        }
+
+        // Ensure orders table reflects paid/confirmed even if RPC path above didnt resolve it
+        if (targetOrderId) {
           await supabaseClient
             .from('orders')
             .update({
@@ -126,14 +175,23 @@ serve(async (req) => {
               status: 'confirmed',
               updated_at: new Date().toISOString()
             })
-            .eq('id', foundOrder.id);
+            .eq('id', targetOrderId);
+
+          // Fetch basic order info for response consistency
+          const { data: ord } = await supabaseClient
+            .from('orders')
+            .select('id, order_number, customer_name')
+            .eq('id', targetOrderId)
+            .maybeSingle();
 
           orderInfo = {
-            order_id: foundOrder.id,
-            order_number: foundOrder.order_number,
-            customer_name: foundOrder.customer_name
+            order_id: ord?.id || targetOrderId,
+            order_number: ord?.order_number || null,
+            customer_name: ord?.customer_name || null,
           };
-          console.log('Order updated successfully:', orderInfo);
+          console.log('Order updated/confirmed successfully:', orderInfo);
+        } else {
+          console.warn('Could not resolve order id for reference:', reference);
         }
       }
     } catch (orderErr) {

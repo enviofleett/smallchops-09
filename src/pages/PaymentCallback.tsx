@@ -107,6 +107,7 @@ export default function PaymentCallback() {
   const reference = getPaymentReference();
   const paymentStatus = searchParams.get('status');
   const forceUi = ((searchParams.get('force') || '').toLowerCase() === 'ui');
+
   // Fast path: confirm in background and redirect immediately when success-like or missing status
   useEffect(() => {
     const statusNorm = (paymentStatus || '').toLowerCase();
@@ -116,10 +117,31 @@ export default function PaymentCallback() {
 
     console.log('PaymentCallback - Instant redirect path triggered', { reference, status: statusNorm });
 
-    // Fire background verification (do not await)
-    supabase.functions
-      .invoke('paystack-verify', { body: { reference } })
-      .catch((e) => console.warn('Background verification dispatch failed:', e));
+    // Fire background verification with keepalive to avoid abort on redirect
+    try {
+      const EDGE_URL = 'https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/paystack-verify';
+      const ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA';
+      // Important: keepalive ensures the request continues even if the page navigates away
+      fetch(EDGE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': ANON_KEY,
+          'Authorization': `Bearer ${ANON_KEY}`,
+        },
+        body: JSON.stringify({ reference }),
+        keepalive: true,
+        mode: 'cors',
+      }).then(async (res) => {
+        // Optional: log minimal outcome for diagnostics (non-blocking)
+        const text = await res.text().catch(() => '');
+        console.log('Background paystack-verify dispatched:', res.status, text?.slice(0, 200));
+      }).catch((e) => {
+        console.warn('Background verification dispatch failed:', e);
+      });
+    } catch (e) {
+      console.warn('Background verification setup failed:', e);
+    }
 
     (async () => {
       try { await clearCartAfterPayment(); } catch {}
@@ -129,7 +151,7 @@ export default function PaymentCallback() {
         localStorage.removeItem('paystack_last_reference');
       } catch {}
 
-      // Small delay to allow the background request to dispatch
+      // Small delay to allow the background request to start
       setRedirected(true);
       setTimeout(() => {
         const target = 'https://startersmallchops.com/customer-profile';
@@ -357,9 +379,9 @@ export default function PaymentCallback() {
     }
   };
 
-    if (redirected) return null;
+  if (redirected) return null;
 
-    return (
+  return (
     <>
       <Helmet>
         <title>Paystack Payment Verification | Starters Small Chops</title>

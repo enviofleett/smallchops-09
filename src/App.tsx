@@ -36,6 +36,7 @@ const Categories = withLazyLoading(() => import("./pages/Categories"));
 const CustomerFavorites = withLazyLoading(() => import("./pages/CustomerFavorites"));
 const PurchaseHistory = withLazyLoading(() => import("./pages/PurchaseHistory"));
 const PaymentCallback = withLazyLoading(() => import("./pages/PaymentCallback"));
+const PaymentCallbackRedirect = withLazyLoading(() => import("./pages/PaymentCallbackRedirect"));
 const Unsubscribe = withLazyLoading(() => import("./pages/Unsubscribe"));
 const AdminSetup = withLazyLoading(() => import("./pages/AdminSetup"));
 const CustomerRegister = withLazyLoading(() => import("./pages/CustomerRegister"));
@@ -124,7 +125,7 @@ const App = () => {
               <Route path="/payment/callback" element={<PaymentCallback />} />
               <Route path="/payment/success" element={<PaymentCallback />} />
               <Route path="/payment/failed" element={<PaymentCallback />} />
-              <Route path="/payment-callback" element={<Navigate to="/payment/callback" replace />} />
+              <Route path="/payment-callback" element={<PaymentCallbackRedirect />} />
               
               {/* Misc routes */}
               <Route path="/unsubscribe" element={<Unsubscribe />} />

@@ -242,7 +242,7 @@ export function PaystackTestingSuite() {
               amount: parseInt(testConfig.testAmount),
               currency: testConfig.currency,
               reference: `TEST_INIT_${Date.now()}`,
-              callback_url: `${window.location.origin}/payment-callback`
+              callback_url: `${window.location.origin}/payment/callback`
             }
           });
           

@@ -393,7 +393,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
               customer_name: sanitizedData.customer_name,
               order_number: orderNumber
             },
-            callback_url: `${window.location.origin}/payment-callback?order_id=${orderId}`
+            callback_url: `${window.location.origin}/payment/callback?order_id=${orderId}`
           };
           const { data: initResp, error: initErr } = await supabase.functions.invoke('paystack-secure', { body: initBody });
           console.log('🔁 Fallback init response:', { initResp, initErr });
@@ -497,7 +497,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
       description: "Your payment has been processed successfully.",
     });
     
-    window.location.href = `/payment-callback?reference=${reference}&status=success`;
+    window.location.href = `/payment/callback?reference=${reference}&status=success`;
   }, [markCheckoutInProgress, clearCart, markPaymentCompleted]);
 
   const handlePaymentError = useCallback((error: string) => {

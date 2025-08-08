@@ -85,7 +85,7 @@ export function ProductionTestingSuite() {
           amount: parseInt(testAmount),
           currency: 'NGN',
           reference: `TEST_${Date.now()}`,
-          callback_url: 'https://oknnklksdiqaifhxaccs.supabase.co/payment-callback'
+          callback_url: 'https://oknnklksdiqaifhxaccs.supabase.co/payment/callback'
         }
       });
 

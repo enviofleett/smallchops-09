@@ -132,7 +132,7 @@ export const PaymentDebugPanel: React.FC = () => {
         <div className="text-xs text-muted-foreground">
           <p>• Script loads from: js.paystack.co</p>
           <p>• Environment: Production</p>
-          <p>• Callback URL: /payment-callback</p>
+          <p>• Callback URL: /payment/callback</p>
         </div>
       </CardContent>
     </Card>

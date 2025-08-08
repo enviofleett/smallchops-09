@@ -101,7 +101,8 @@ export default function PaymentCallback() {
       const { data, error } = await supabase.functions.invoke('paystack-verify', {
         body: { 
           reference: paymentReference,
-          order_id: orderId 
+          order_id: orderId,
+          recover: true
         }
       });
 
@@ -298,7 +299,7 @@ export default function PaymentCallback() {
       <Helmet>
         <title>Paystack Payment Verification | Starters Small Chops</title>
         <meta name="description" content="Verify your Paystack payment and order status." />
-        <link rel="canonical" href={`${window.location.origin}/payment-callback`} />
+        <link rel="canonical" href={`${window.location.origin}/payment/callback`} />
       </Helmet>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">

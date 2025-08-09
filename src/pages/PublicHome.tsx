@@ -42,7 +42,7 @@ const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
           alt={product.name}
           width={300}
           height={300}
-          className="w-full h-full hover:scale-105 transition-transform"
+          className="w-full h-full hover:scale-105 transition-transform object-contain"
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />
         {(product.discount_percentage || 0) > 0 && (

@@ -6268,6 +6268,14 @@ export type Database = {
         Args: { p_email: string } | { p_email: string; p_ip_address?: unknown }
         Returns: Json
       }
+      check_payment_system_health: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          metric: string
+          value: number
+          description: string
+        }[]
+      }
       check_paystack_production_readiness: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -6537,6 +6545,22 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_order_payment_status: {
+        Args: { p_order_id: string }
+        Returns: {
+          order_id: string
+          payment_status: string
+          order_status: string
+          paid_at: string
+          final_paid: boolean
+          final_paid_at: string
+          payment_channel: string
+          computed_payment_method: string
+          needs_reconciliation: boolean
+          latest_tx_status: string
+          latest_tx_reference: string
+        }[]
+      }
       get_production_health_status: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -6790,6 +6814,10 @@ export type Database = {
         Args: { p_order_id: string; p_amount: number }
         Returns: Json
       }
+      order_needs_reconciliation: {
+        Args: { p_order_id: string }
+        Returns: boolean
+      }
       process_email_queue_manual: {
         Args: { batch_size?: number }
         Returns: Json
@@ -6801,6 +6829,25 @@ export type Database = {
       process_stuck_emails: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      reconcile_payment_status: {
+        Args: { p_order_id?: string }
+        Returns: {
+          order_id: string
+          was_updated: boolean
+          old_payment_status: string
+          new_payment_status: string
+          old_order_status: string
+          new_order_status: string
+        }[]
+      }
+      reconcile_payment_status_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          orders_processed: number
+          orders_updated: number
+          processing_time_ms: number
+        }[]
       }
       record_health_metric: {
         Args: {

@@ -373,9 +373,10 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
 
             if (updErr || (typeof count === 'number' && count === 0)) {
               // Insert new row as last resort
+              console.log('Inserting payment transaction as last resort with transaction_type "charge"');
               const { error: insErr } = await supabaseClient
                 .from('payment_transactions')
-                .insert({ ...txRow, transaction_type: 'payment' });
+                .insert({ ...txRow, transaction_type: 'charge' });
               if (insErr) {
                 console.error('Insert payment transaction failed:', insErr);
               }

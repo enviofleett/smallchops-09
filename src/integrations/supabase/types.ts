@@ -4051,7 +4051,7 @@ export type Database = {
           provider_response?: Json | null
           provider_transaction_id?: string | null
           status: string
-          transaction_type: string
+          transaction_type?: string
           updated_at?: string | null
         }
         Update: {

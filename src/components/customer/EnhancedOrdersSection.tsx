@@ -24,6 +24,11 @@ interface Order {
   order_time: string;
   customer_name: string;
   customer_email: string;
+  // Payment-related fields (may be missing in some responses)
+  payment_status?: string;
+  paid_at?: string | null;
+  payment_method?: string | null;
+  payment_reference?: string | null;
   order_items?: Array<{
     id: string;
     product_id: string;
@@ -90,30 +95,71 @@ export function EnhancedOrdersSection() {
     );
   }
 
-  // Auto-reconcile recent pending Paystack orders
-  useEffect(() => {
-    if (ordersLoading) return;
-    const list = Array.isArray(orders) ? orders : [];
-    const candidates = list.filter((o: any) => {
-      const pm = (o?.payment_method || '').toLowerCase();
-      const ps = (o?.payment_status || '').toLowerCase();
-      return pm === 'paystack' && ps !== 'paid' && !!o?.payment_reference;
-    });
-    if (candidates.length === 0) return;
+// Derived paid-state map from payment_transactions for current orders
+const [paidMap, setPaidMap] = React.useState<Record<string, boolean>>({});
 
-    (async () => {
-      try {
-        for (const o of candidates.slice(0, 3)) {
-          await supabase.functions.invoke('paystack-secure', {
-            body: { action: 'verify', reference: o.payment_reference }
-          });
+useEffect(() => {
+  const fetchPayments = async () => {
+    try {
+      const ids = (orders || []).map((o: any) => o.id);
+      if (!ids.length) return;
+      const { data, error } = await supabase
+        .from('payment_transactions')
+        .select('order_id,status,paid_at')
+        .in('order_id', ids);
+      if (error) throw error;
+      const map: Record<string, boolean> = {};
+      (data || []).forEach((tx: any) => {
+        const st = (tx?.status || '').toLowerCase();
+        if (st === 'success' || st === 'paid' || !!tx?.paid_at) {
+          map[tx.order_id] = true;
         }
-        await (refetch?.());
-      } catch (e) {
-        console.warn('Auto-reconcile verify failed:', e);
+      });
+      setPaidMap(map);
+    } catch (e) {
+      console.warn('Failed to fetch payment transactions for orders:', e);
+    }
+  };
+  fetchPayments();
+}, [orders]);
+
+// Realtime: refresh on payment transaction changes
+useEffect(() => {
+  const channel = supabase
+    .channel('ptx-customer-orders')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_transactions' }, () => {
+      refetch?.();
+    })
+    .subscribe();
+  return () => {
+    supabase.removeChannel(channel);
+  };
+}, [refetch]);
+
+// Auto-reconcile recent pending Paystack orders
+useEffect(() => {
+  if (ordersLoading) return;
+  const list = Array.isArray(orders) ? orders : [];
+  const candidates = list.filter((o: any) => {
+    const pm = (o?.payment_method || '').toLowerCase();
+    const ps = (o?.payment_status || '').toLowerCase();
+    return pm === 'paystack' && ps !== 'paid' && !!o?.payment_reference;
+  });
+  if (candidates.length === 0) return;
+
+  (async () => {
+    try {
+      for (const o of candidates.slice(0, 3)) {
+        await supabase.functions.invoke('paystack-secure', {
+          body: { action: 'verify', reference: o.payment_reference }
+        });
       }
-    })();
-  }, [ordersLoading, ordersData]);
+      await (refetch?.());
+    } catch (e) {
+      console.warn('Auto-reconcile verify failed:', e);
+    }
+  })();
+}, [ordersLoading, ordersData]);
 
   return (
     <div className="space-y-6">
@@ -127,12 +173,16 @@ export function EnhancedOrdersSection() {
         </Button>
       </div>
 
-      {/* Recent Orders */}
-      <div className="space-y-4">
-        {orders.map((order) => (
-          <OrderCard key={order.id} order={order} />
-        ))}
-      </div>
+{/* Recent Orders */}
+<div className="space-y-4">
+  {orders.map((order) => (
+    <OrderCard
+      key={order.id}
+      order={order}
+      paid={(order.payment_status === 'paid') || !!order.paid_at || !!paidMap[order.id]}
+    />
+  ))}
+</div>
 
       {/* Load More Button */}
       {orders.length >= 10 && (
@@ -147,7 +197,7 @@ export function EnhancedOrdersSection() {
 }
 
 // Enhanced Order Card component
-const OrderCard = React.memo(({ order }: { order: Order }) => {
+const OrderCard = React.memo(({ order, paid = false }: { order: Order; paid?: boolean }) => {
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'delivered':
@@ -263,11 +313,16 @@ const OrderCard = React.memo(({ order }: { order: Order }) => {
                 {orderItems.length > 1 && ` (+ ${orderItems.length - 1} more)`}
               </p>
               
-              <div className="flex justify-between items-center">
-                <span className="text-lg font-bold text-primary">
-                  ₦{(order.total_amount || 0).toLocaleString()}
-                </span>
-              </div>
+<div className="flex justify-between items-center">
+  <span className="text-lg font-bold text-primary">
+    ₦{(order.total_amount || 0).toLocaleString()}
+  </span>
+  {paid && (
+    <Badge className="px-2 py-0.5 text-xs border bg-green-100 text-green-800 border-green-200">
+      Paid
+    </Badge>
+  )}
+</div>
             </div>
           </div>
 

@@ -53,10 +53,10 @@ export function DiscountedProductCard({
             <img 
               src={product.image_url} 
               alt={product.name}
-              className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-200"
+              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-200"
               loading="lazy"
               style={{
-                objectFit: 'contain',
+                objectFit: 'cover',
                 objectPosition: 'center',
                 width: '100%',
                 height: '100%',

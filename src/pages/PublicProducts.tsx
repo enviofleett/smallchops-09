@@ -292,11 +292,11 @@ const PublicProducts = () => {
                         className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                         onClick={() => navigate(`/product/${product.id}`)}
                       >
-                        <div className="aspect-[4/3] sm:aspect-square overflow-hidden relative bg-muted">
+                        <div className="aspect-[4/3] sm:aspect-square overflow-hidden relative">
                           <img
                             src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
                             alt={product.name}
-                            className="w-full h-full object-contain hover:scale-105 transition-transform"
+                            className="w-full h-full object-cover object-center hover:scale-105 transition-transform"
                             loading="lazy"
                           />
                           {(product.discount_percentage || 0) > 0 && (

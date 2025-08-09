@@ -6576,6 +6576,14 @@ export type Database = {
           min_order_for_free_delivery: number
         }[]
       }
+      get_public_paystack_config: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          public_key: string
+          test_mode: boolean
+          environment: string
+        }[]
+      }
       get_queued_communication_events: {
         Args: { batch_size?: number }
         Returns: {

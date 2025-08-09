@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { CheckoutButton } from '@/components/ui/checkout-button';
@@ -52,7 +53,58 @@ const PaystackTest = () => {
     }
   };
 
-  const testEmailSystem = async () => {
+// Manual verification helpers
+const [reference, setReference] = useState('');
+const [verifying, setVerifying] = useState(false);
+const [verifyResponse, setVerifyResponse] = useState<any>(null);
+const [dbTx, setDbTx] = useState<any>(null);
+const [dbOrder, setDbOrder] = useState<any>(null);
+const [searchParams] = useSearchParams();
+
+React.useEffect(() => {
+  const ref = searchParams.get('ref') || searchParams.get('reference');
+  if (ref) setReference(ref);
+}, [searchParams]);
+
+const verifyByReference = async () => {
+  if (!reference) return;
+  setVerifying(true);
+  setVerifyResponse(null);
+  setDbTx(null);
+  setDbOrder(null);
+  try {
+    const { data, error } = await supabase.functions.invoke('paystack-secure', {
+      body: { action: 'verify', reference },
+    });
+    if (error) throw error;
+    setVerifyResponse(data);
+    toast({ title: 'Verification called', description: `Status: ${data?.status || data?.data?.status || 'unknown'}` });
+
+    const { data: tx } = await supabase
+      .from('payment_transactions')
+      .select('id,status,transaction_type,provider_reference,amount,channel,paid_at,order_id,created_at,updated_at')
+      .eq('provider_reference', reference)
+      .order('created_at', { ascending: false })
+      .maybeSingle();
+    setDbTx(tx);
+
+    if (tx?.order_id) {
+      const { data: order } = await supabase
+        .from('orders')
+        .select('id,order_number,payment_status,status,customer_email,updated_at')
+        .eq('id', tx.order_id)
+        .maybeSingle();
+      setDbOrder(order);
+    }
+  } catch (e: any) {
+    console.error('Verify error', e);
+    toast({ title: 'Verification failed', description: e?.message || 'Unknown error', variant: 'destructive' });
+  } finally {
+    setVerifying(false);
+  }
+};
+
+const testEmailSystem = async () => {
     try {
       console.log("Testing email system...");
       const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
@@ -340,6 +392,63 @@ const PaystackTest = () => {
                   <p className="mt-1">Check your email and spam folder</p>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+          {/* Manual Verify by Reference */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5" />
+                Manual Verify by Reference
+              </CardTitle>
+              <CardDescription>
+                Re-run verification and confirm DB order/transaction status
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Enter Paystack reference, e.g. pay_123..."
+                  value={reference}
+                  onChange={(e) => setReference(e.target.value)}
+                />
+                <Button onClick={verifyByReference} disabled={!reference || verifying}>
+                  {verifying ? 'Verifying...' : 'Verify Now'}
+                </Button>
+              </div>
+              {reference && (
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => navigate(`/payment/callback?reference=${encodeURIComponent(reference)}`)}>
+                    Open Payment Callback
+                  </Button>
+                </div>
+              )}
+              {verifyResponse && (
+                <div className="rounded-md border p-3">
+                  <p className="text-sm font-medium">Verification Response</p>
+                  <pre className="mt-2 text-xs overflow-auto">{JSON.stringify(verifyResponse, null, 2)}</pre>
+                </div>
+              )}
+              {dbTx && (
+                <div className="rounded-md border p-3">
+                  <p className="text-sm font-medium">DB Transaction</p>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    <p>Status: {dbTx.status} ({dbTx.transaction_type})</p>
+                    <p>Paid At: {dbTx.paid_at || '—'}</p>
+                    <p>Channel: {dbTx.channel || '—'}</p>
+                  </div>
+                </div>
+              )}
+              {dbOrder && (
+                <div className="rounded-md border p-3">
+                  <p className="text-sm font-medium">Order</p>
+                  <div className="text-xs text-muted-foreground mt-1">
+                    <p>Order: {dbOrder.order_number}</p>
+                    <p>Payment Status: {dbOrder.payment_status}</p>
+                    <p>Order Status: {dbOrder.status}</p>
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>

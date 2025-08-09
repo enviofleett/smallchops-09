@@ -86,14 +86,22 @@ async function initializePayment(supabaseClient: any, requestData: any) {
 
     const effective = Array.isArray(cfg) ? cfg[0] : cfg;
 
-    // Use effective secret key (RPC already selects live/test based on config)
-    const secretKey = effective.secret_key;
+    // Resolve secret key with safe fallback (prefer DB/RPC; fall back to ENV only if missing)
+    let secretKey = effective.secret_key as string | undefined;
+    let keySource = 'db';
+    if (!secretKey) {
+      const envKey = Deno.env.get('PAYSTACK_SECRET_KEY') || '';
+      if (envKey) {
+        secretKey = envKey;
+        keySource = 'env';
+      }
+    }
     
     if (!secretKey) {
       throw new Error('Paystack secret key not configured');
     }
 
-    console.log('🔑 Using secret key type:', effective.test_mode ? 'test' : 'live');
+    console.log(`🔑 Using secret key type: ${effective.test_mode ? 'test' : 'live'} | source: ${keySource}`);
 
     // Generate reference if not provided
     const transactionRef = reference || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -261,13 +269,22 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
     }
     const effective = Array.isArray(cfg) ? cfg[0] : cfg;
 
-    // Use effective secret key (RPC already selects live/test based on config)
-    const secretKey = effective.secret_key;
+    // Resolve secret key with safe fallback (prefer DB/RPC; fall back to ENV only if missing)
+    let secretKey = effective.secret_key as string | undefined;
+    let keySource = 'db';
+    if (!secretKey) {
+      const envKey = Deno.env.get('PAYSTACK_SECRET_KEY') || '';
+      if (envKey) {
+        secretKey = envKey;
+        keySource = 'env';
+      }
+    }
     
     if (!secretKey) {
       throw new Error('Paystack secret key not configured');
     }
 
+    console.log(`🔍 Mode: ${effective.test_mode ? 'test' : 'live'} | key source: ${keySource}`);
     console.log('Verifying Paystack payment:', reference);
 
     // Helper: retry wrapper for Paystack verify (3 attempts, backoff)

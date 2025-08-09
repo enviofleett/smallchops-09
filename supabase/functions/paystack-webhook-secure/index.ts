@@ -291,6 +291,7 @@ serve(async (req) => {
     // 3) PAYSTACK_SECRET_KEY env (valid fallback per Paystack docs)
     let secretForSignature = '';
     let effectiveConfig: any = null;
+    let secretSource = 'unknown';
 
     try {
       const { data: cfg, error: cfgErr } = await supabase.rpc('get_active_paystack_config');
@@ -302,12 +303,19 @@ serve(async (req) => {
       console.warn('RPC get_active_paystack_config call failed:', e);
     }
 
-    secretForSignature =
-      (effectiveConfig?.webhook_secret as string | undefined) ||
-      Deno.env.get('PAYSTACK_WEBHOOK_SECRET') ||
-      Deno.env.get('PAYSTACK_SECRET_KEY') ||
-      (effectiveConfig?.secret_key as string | undefined) ||
-      '';
+    if (effectiveConfig?.webhook_secret) {
+      secretForSignature = effectiveConfig.webhook_secret;
+      secretSource = 'db:webhook_secret';
+    } else if (Deno.env.get('PAYSTACK_WEBHOOK_SECRET')) {
+      secretForSignature = Deno.env.get('PAYSTACK_WEBHOOK_SECRET')!;
+      secretSource = 'env:PAYSTACK_WEBHOOK_SECRET';
+    } else if (Deno.env.get('PAYSTACK_SECRET_KEY')) {
+      secretForSignature = Deno.env.get('PAYSTACK_SECRET_KEY')!;
+      secretSource = 'env:PAYSTACK_SECRET_KEY';
+    } else if (effectiveConfig?.secret_key) {
+      secretForSignature = effectiveConfig.secret_key;
+      secretSource = 'db:secret_key';
+    }
 
     if (!secretForSignature) {
       console.error('No signature secret available (ignored)');
@@ -315,6 +323,8 @@ serve(async (req) => {
       // Return 200 to avoid repeated retries, but ignore processing
       return new Response('Signature secret missing (ignored)', { status: 200, headers: corsHeaders });
     }
+
+    console.log(`🔐 Webhook signature mode: ${(effectiveConfig?.environment) || (effectiveConfig?.test_mode ? 'test' : 'live') || 'unknown'} | source: ${secretSource}`);
 
     // Verify webhook signature
     const isValidSignature = await verifyWebhookSignature(payload, signature, secretForSignature);
@@ -382,19 +392,29 @@ serve(async (req) => {
     switch (webhookData.event) {
       case 'charge.success': {
         // Double-verify with Paystack before processing, use env first then RPC secret_key
-        let verifyKey =
-          Deno.env.get('PAYSTACK_SECRET_KEY') ||
-          (effectiveConfig?.secret_key as string | undefined) ||
-          '';
+        let verifyKey = '';
+        let verifyKeySource = 'unknown';
+        if (Deno.env.get('PAYSTACK_SECRET_KEY')) {
+          verifyKey = Deno.env.get('PAYSTACK_SECRET_KEY')!;
+          verifyKeySource = 'env:PAYSTACK_SECRET_KEY';
+        } else if (effectiveConfig?.secret_key) {
+          verifyKey = effectiveConfig.secret_key;
+          verifyKeySource = 'db:secret_key';
+        }
 
         if (!verifyKey && !effectiveConfig) {
           // Try RPC again if we didn't have it
           try {
             const { data: cfg2 } = await supabase.rpc('get_active_paystack_config');
             const eff2 = Array.isArray(cfg2) ? cfg2?.[0] : cfg2;
-            verifyKey = eff2?.secret_key || '';
+            if (eff2?.secret_key) {
+              verifyKey = eff2.secret_key;
+              verifyKeySource = 'db:secret_key (retry)';
+            }
           } catch (_e) {}
         }
+
+        console.log(`🔁 Double verify mode: ${(effectiveConfig?.environment) || (effectiveConfig?.test_mode ? 'test' : 'live') || 'unknown'} | key source: ${verifyKeySource}`);
 
         if (!verifyKey) {
           console.warn('No key available for double verification; skipping processing');

@@ -49,15 +49,22 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
           
           if (paymentStatus === 'success') {
             console.log('✅ Payment verified as successful');
+            // Force confirm in backend to ensure the order is marked as paid
+            try {
+              const { data: reconData, error: reconError } = await supabase.functions.invoke('payment-reconcile', {
+                body: { action: 'force_confirm_by_reference', reference }
+              });
+              if (reconError) {
+                console.error('⚠️ Reconcile error:', reconError);
+              } else {
+                console.log('🔁 Reconcile result:', reconData);
+              }
+            } catch (reconErr) {
+              console.error('💥 Reconcile invocation failed:', reconErr);
+            }
             setStatus('success');
             setIsMonitoring(false);
             onStatusUpdate('success', data.data);
-            return;
-          } else if (paymentStatus === 'failed' || paymentStatus === 'abandoned') {
-            console.log('❌ Payment verified as failed');
-            setStatus('failed');
-            setIsMonitoring(false);
-            onStatusUpdate('failed', data.data);
             return;
           }
         }

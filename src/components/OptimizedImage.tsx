@@ -61,13 +61,13 @@ export function OptimizedImage({
         alt={alt}
         className={`transition-opacity duration-300 ${
           isLoading ? 'opacity-0' : 'opacity-100'
-        } w-full h-full object-contain object-center`}
+        } w-full h-full object-cover object-center`}
         onLoad={handleLoad}
         onError={handleError}
         loading="lazy"
         decoding="async"
         style={{
-          objectFit: hasError ? 'contain' : 'contain',
+          objectFit: hasError ? 'contain' : 'cover',
           objectPosition: 'center',
           width: '100%',
           height: '100%',

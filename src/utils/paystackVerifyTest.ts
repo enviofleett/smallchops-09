@@ -6,7 +6,7 @@
  *   verifyPaystackTransaction('your_reference_here').then(console.log);
  */
 export async function verifyPaystackTransaction(reference: string) {
-  const endpoint = 'https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/paystack-secure';
+  const endpoint = 'https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/paystack-verify';
   try {
     const res = await fetch(endpoint, {
       method: 'POST',

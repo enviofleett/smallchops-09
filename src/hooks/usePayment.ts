@@ -110,17 +110,36 @@ export const usePayment = () => {
     provider: PaymentProvider = 'paystack'
   ): Promise<any> => {
     try {
-      const { data, error } = await supabase.functions.invoke('paystack-secure', {
+      // Prefer enhanced verification function first
+      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-verify', {
+        body: { reference }
+      });
+
+      const normalize = (res: any) => {
+        // paystack-verify: { success, data, message }
+        if (res?.success) {
+          return { success: true, ...res, data: res.data };
+        }
+        // paystack-secure: { status: true, data }
+        if (res?.status === true) {
+          return { success: true, ...res, data: res.data };
+        }
+        return { success: false, error: res?.error || res?.message || 'Payment verification failed' };
+      };
+
+      if (!primaryError && primaryData) {
+        const normalized = normalize(primaryData);
+        if (normalized.success) return normalized;
+      }
+
+      // Fallback to legacy verification
+      const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('paystack-secure', {
         body: { action: 'verify', reference }
       });
 
-      if (error) throw new Error(error.message);
+      if (fallbackError) throw new Error(fallbackError.message);
 
-      const res: any = data;
-      if (res?.status === true) {
-        return { success: true, ...res, data: res.data };
-      }
-      return { success: false, error: res?.error || 'Payment verification failed' };
+      return normalize(fallbackData);
     } catch (error) {
       console.error('Payment verification error:', error);
       const errorInfo = PaymentErrorHandler.formatErrorForUser(error);

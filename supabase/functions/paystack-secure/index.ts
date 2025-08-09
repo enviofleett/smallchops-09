@@ -333,18 +333,64 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
         metadataObj = tx.metadata || {};
       }
 
-      const orderId = metadataObj.order_id || metadataObj.orderId || null;
+      let orderId: string | null = metadataObj.order_id || metadataObj.orderId || null;
+      const orderNumber: string | null = metadataObj.order_number || metadataObj.orderNumber || metadataObj.order?.number || null;
       const paidAt = tx.paid_at || new Date().toISOString();
-      const channel = tx.channel || null;
+      const channel = tx.channel || 'online';
       const gatewayResponse = tx.gateway_response || null;
       const customerEmail = tx?.customer?.email || null;
-      const amountKobo = tx.amount; // Paystack amount is in kobo
-      const amount = typeof amountKobo === 'number' ? amountKobo / 100 : null;
+      const amount = typeof tx.amount === 'number' ? tx.amount / 100 : null;
 
-      // 1) Try to use the production-ready RPC that also updates the order and saves card if present
+      // Try to resolve order id by reference or order number if missing
+      if (!orderId) {
+        try {
+          const { data: foundByRef, error: findRefErr } = await supabaseClient
+            .from('orders')
+            .select('id')
+            .or(`payment_reference.eq.${requestData.reference},id.eq.${requestData.reference}`)
+            .maybeSingle();
+          if (!findRefErr && foundByRef?.id) orderId = foundByRef.id;
+        } catch (_) {}
+      }
+      if (!orderId && orderNumber) {
+        try {
+          const { data: foundByNumber } = await supabaseClient
+            .from('orders')
+            .select('id')
+            .eq('order_number', orderNumber)
+            .maybeSingle();
+          if (foundByNumber?.id) orderId = foundByNumber.id;
+        } catch (_) {}
+      }
+
+      // Upsert/seed transaction BEFORE RPC so it can find it
+      try {
+        const baseTx: any = {
+          provider_reference: requestData.reference,
+          transaction_type: 'charge',
+          status: 'paid',
+          amount,
+          currency: tx.currency || 'NGN',
+          channel,
+          gateway_response: gatewayResponse,
+          paid_at: new Date(paidAt).toISOString(),
+          customer_email: customerEmail,
+          processed_at: new Date().toISOString(),
+          provider_response: tx || null,
+        };
+        const txRow = orderId ? { ...baseTx, order_id: orderId } : baseTx;
+        const { error: upsertErr } = await supabaseClient
+          .from('payment_transactions')
+          .upsert(txRow, { onConflict: 'provider_reference' });
+        if (upsertErr) console.warn('Pre-RPC upsert failed:', upsertErr);
+      } catch (e) {
+        console.warn('Pre-RPC upsert crashed:', e);
+      }
+
+      // Call production RPC for full processing (card save, analytics, triggers)
       try {
         const { error: rpcError } = await supabaseClient.rpc('handle_successful_payment', {
-          p_reference: reference,
+          p_reference: requestData.reference,
           p_paid_at: paidAt,
           p_gateway_response: gatewayResponse,
           p_fees: tx.fees ?? 0,
@@ -356,70 +402,30 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
           p_exp_year: tx?.authorization?.exp_year ?? null,
           p_bank: tx?.authorization?.bank ?? null,
         });
+        if (rpcError) console.warn('handle_successful_payment RPC returned error:', rpcError);
+      } catch (e) {
+        console.warn('handle_successful_payment RPC crashed:', e);
+      }
 
-        if (rpcError) {
-          console.warn('handle_successful_payment RPC failed, falling back to manual updates:', rpcError);
-
-          // 2) Fallback: Upsert/Update transaction with correct schema
-          const txRow = {
-            provider_reference: reference,
-            transaction_type: 'charge',
-            status: 'paid',
-            amount: amount,
-            currency: tx.currency || 'NGN',
-            channel: channel,
-            gateway_response: gatewayResponse,
-            paid_at: paidAt ? new Date(paidAt).toISOString() : new Date().toISOString(),
-            customer_email: customerEmail,
-            processed_at: new Date().toISOString(),
-            provider_response: tx ? tx : null,
-          } as any;
-
-          // Try upsert first (works if provider_reference has a unique index)
-          const { error: upsertErr } = await supabaseClient
-            .from('payment_transactions')
-            .upsert(txRow, { onConflict: 'provider_reference' });
-
-          if (upsertErr) {
-            console.warn('Upsert failed, attempting update then insert:', upsertErr);
-            // Try update existing row
-            const { data: _upd, error: updErr, count } = await supabaseClient
-              .from('payment_transactions')
-              .update(txRow)
-              .eq('provider_reference', reference)
-              .select('id', { count: 'exact', head: true });
-
-            if (updErr || (typeof count === 'number' && count === 0)) {
-              // Insert new row as last resort
-              console.log('Inserting payment transaction as last resort with transaction_type "charge"');
-              const { error: insErr } = await supabaseClient
-                .from('payment_transactions')
-                .insert({ ...txRow, transaction_type: 'charge' });
-              if (insErr) {
-                console.error('Insert payment transaction failed:', insErr);
-              }
-            }
-          }
-
-          // 3) Fallback: Update order to paid/confirmed if we have the order id
-          if (orderId) {
-            const { error: orderErr } = await supabaseClient
-              .from('orders')
-              .update({ 
-                payment_status: 'paid', 
-                status: 'confirmed', 
-                payment_reference: reference,
-                paid_at: paidAt ? new Date(paidAt).toISOString() : new Date().toISOString(),
-                updated_at: new Date().toISOString() 
-              })
-              .eq('id', orderId);
-            if (orderErr) {
-              console.error('Failed to update order status for order:', orderId, orderErr);
-            }
-          }
+      // Ensure order is marked paid/confirmed even if RPC didn’t update it
+      if (orderId) {
+        try {
+          const { error: orderErr } = await supabaseClient
+            .from('orders')
+            .update({
+              payment_status: 'paid',
+              status: 'confirmed',
+              payment_reference: requestData.reference,
+              paid_at: new Date(paidAt).toISOString(),
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', orderId);
+          if (orderErr) console.error('Order update failed:', orderErr);
+        } catch (e) {
+          console.error('Order update crashed:', e);
         }
-      } catch (persistError) {
-        console.error('Error while persisting successful payment:', persistError);
+      } else {
+        console.warn('Could not resolve order id for reference:', requestData.reference);
       }
 
       // Audit log for successful verification
@@ -427,18 +433,10 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
         await supabaseClient.from('audit_logs').insert({
           action: 'payment_verified',
           category: 'Payment',
-          message: `Paystack verified and persisted: ${reference}`,
-          new_values: {
-            reference,
-            order_id: orderId,
-            amount,
-            channel,
-            gateway_response
-          }
+          message: `Paystack verified and persisted: ${requestData.reference}`,
+          new_values: { reference: requestData.reference, order_id: orderId, amount, channel, gateway_response }
         });
-      } catch (_) {
-        // ignore audit log errors
-      }
+      } catch (_) {}
     }
 
     // Return normalized verification payload for frontend compatibility

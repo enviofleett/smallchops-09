@@ -182,10 +182,37 @@ serve(async (req) => {
           }
         }
 
-        // Record successful payment via RPC (updates transactions and also confirms order)
+        // Upsert payment transaction first so RPC can find it
         try {
+          const amountNgn = typeof ps?.amount === 'number' ? ps.amount / 100 : null;
           const paidAt = ps?.paid_at || ps?.transaction_date || ps?.paidAt || new Date().toISOString();
           const auth = ps?.authorization || {};
+
+          const baseTx: any = {
+            provider_reference: reference,
+            transaction_type: 'charge',
+            status: 'paid',
+            amount: amountNgn,
+            currency: ps?.currency || 'NGN',
+            channel: ps?.channel || 'online',
+            gateway_response: ps?.gateway_response || verification?.message || 'Payment verified successfully',
+            paid_at: new Date(paidAt).toISOString(),
+            customer_email: ps?.customer?.email || null,
+            processed_at: new Date().toISOString(),
+            provider_response: ps || null,
+          };
+
+          const txRow = orderInfo.order_id ? { ...baseTx, order_id: orderInfo.order_id } : baseTx;
+
+          // Upsert by provider_reference if unique constraint exists
+          const { error: upsertErr } = await supabaseClient
+            .from('payment_transactions')
+            .upsert(txRow, { onConflict: 'provider_reference' });
+          if (upsertErr) {
+            console.warn('Upsert before RPC failed, will proceed to RPC anyway:', upsertErr);
+          }
+
+          // Call production RPC to ensure triggers/analytics
           await supabaseClient.rpc('handle_successful_payment', {
             p_reference: reference,
             p_paid_at: new Date(paidAt).toISOString(),
@@ -210,6 +237,8 @@ serve(async (req) => {
             .update({
               payment_status: 'paid',
               status: 'confirmed',
+              payment_reference: reference,
+              paid_at: new Date(ps?.paid_at || ps?.transaction_date || ps?.paidAt || new Date().toISOString()).toISOString(),
               updated_at: new Date().toISOString()
             })
             .eq('id', targetOrderId);

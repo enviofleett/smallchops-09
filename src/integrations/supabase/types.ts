@@ -1103,6 +1103,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "communication_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
         ]
       }
       communication_logs: {
@@ -2073,6 +2080,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -3356,6 +3370,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "order_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
@@ -4097,6 +4118,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payment_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
         ]
       }
       payment_verification_logs: {
@@ -4360,6 +4388,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -4724,6 +4759,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "promotion_usage_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "promotion_usage_promotion_id_fkey"
             columns: ["promotion_id"]
             isOneToOne: false
@@ -5060,6 +5102,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_order_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -6045,7 +6094,84 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      orders_with_payment: {
+        Row: {
+          assigned_rider_id: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_email: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          delivery_address: Json | null
+          delivery_fee: number | null
+          delivery_time: string | null
+          delivery_time_slot_id: string | null
+          delivery_zone_id: string | null
+          discount_amount: number | null
+          guest_session_id: string | null
+          id: string | null
+          order_number: string | null
+          order_time: string | null
+          order_type: Database["public"]["Enums"]["order_type"] | null
+          paid_at: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          payment_tx_paid_at: string | null
+          payment_tx_provider_reference: string | null
+          payment_tx_status: string | null
+          pickup_point_id: string | null
+          pickup_time: string | null
+          preferred_delivery_time: string | null
+          special_instructions: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          subtotal: number | null
+          subtotal_cost: number | null
+          tax_amount: number | null
+          total_amount: number | null
+          total_vat: number | null
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_assigned_rider_id_fkey"
+            columns: ["assigned_rider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_time_slot_id_fkey"
+            columns: ["delivery_time_slot_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_time_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_zone_id_fkey"
+            columns: ["delivery_zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_pickup_point_id_fkey"
+            columns: ["pickup_point_id"]
+            isOneToOne: false
+            referencedRelation: "pickup_points"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       bulk_safe_delete_products: {

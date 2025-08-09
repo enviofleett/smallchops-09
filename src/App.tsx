@@ -70,7 +70,9 @@ const queryClient = new QueryClient({
 if (typeof window !== 'undefined') {
   preloadRoute(() => import("./pages/PublicProducts"));
   preloadRoute(() => import("./pages/Cart"));
+  preloadRoute(() => import("./pages/Booking"));
 }
+
 
 const App = () => {
   PerformanceMonitor.startTiming('App Render');

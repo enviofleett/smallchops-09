@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useCustomerOrders } from '@/hooks/useCustomerOrders';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -14,6 +14,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { supabase } from '@/integrations/supabase/client';
 
 interface Order {
   id: string;
@@ -50,7 +51,7 @@ const ContentSkeleton = () => (
 );
 
 export function EnhancedOrdersSection() {
-  const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useCustomerOrders();
+  const { data: ordersData, isLoading: ordersLoading, error: ordersError, refetch } = useCustomerOrders() as any;
   const { handleError } = useErrorHandler();
 
   // Handle query errors
@@ -88,6 +89,31 @@ export function EnhancedOrdersSection() {
       </Card>
     );
   }
+
+  // Auto-reconcile recent pending Paystack orders
+  useEffect(() => {
+    if (ordersLoading) return;
+    const list = Array.isArray(orders) ? orders : [];
+    const candidates = list.filter((o: any) => {
+      const pm = (o?.payment_method || '').toLowerCase();
+      const ps = (o?.payment_status || '').toLowerCase();
+      return pm === 'paystack' && ps !== 'paid' && !!o?.payment_reference;
+    });
+    if (candidates.length === 0) return;
+
+    (async () => {
+      try {
+        for (const o of candidates.slice(0, 3)) {
+          await supabase.functions.invoke('paystack-secure', {
+            body: { action: 'verify', reference: o.payment_reference }
+          });
+        }
+        await (refetch?.());
+      } catch (e) {
+        console.warn('Auto-reconcile verify failed:', e);
+      }
+    })();
+  }, [ordersLoading, ordersData]);
 
   return (
     <div className="space-y-6">

@@ -327,7 +327,7 @@ export default function PaymentCallback() {
 
   const handleContinue = () => {
     if (status === 'success') {
-      navigate('/customer-portal?tab=orders');
+      navigate('/customer-profile');
     } else {
       navigate('/cart');
     }

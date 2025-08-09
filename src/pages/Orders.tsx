@@ -14,6 +14,7 @@ import { useToast } from '@/hooks/use-toast';
 import AbandonedCartsManager from '@/components/admin/AbandonedCartsManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OrdersErrorBoundary from '@/components/orders/OrdersErrorBoundary';
+import { supabase } from '@/integrations/supabase/client';
 
 const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
@@ -29,6 +30,20 @@ const Orders = () => {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Realtime: auto-refresh when orders change
+  React.useEffect(() => {
+    const channel = supabase
+      .channel('orders-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        queryClient.invalidateQueries({ queryKey: ['orders'] });
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient]);
 
   const { data, isLoading, isError, error } = useQuery<{
     orders: OrderWithItems[];

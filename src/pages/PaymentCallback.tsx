@@ -176,8 +176,8 @@ export default function PaymentCallback() {
       console.log(`🔍 Verifying payment (attempt ${retryCount + 1}):`, paymentReference);
       setStatus('verifying');
 
-      const { data, error } = await supabase.functions.invoke('paystack-verify', {
-        body: { reference: paymentReference }
+      const { data, error } = await supabase.functions.invoke('paystack-secure', {
+        body: { action: 'verify', reference: paymentReference }
       });
 
       if (error) {
@@ -187,7 +187,7 @@ export default function PaymentCallback() {
       console.log('✅ Payment verification response:', data);
 
       // Handle success response
-      if (data?.success === true) {
+      if (data?.success === true || data?.status === true || data?.data?.status === 'success') {
         console.log('🎉 Payment verification successful');
         setStatus('success');
         setResult({

@@ -38,7 +38,7 @@ export const usePayment = () => {
       const reference = paystackService.generateReference();
       const response = await paystackService.initializeTransaction({
         email: customerEmail || '',
-        amount,
+        amount: paystackService.formatAmount(amount),
         reference,
         callback_url: `${window.location.origin}/payment/callback`,
         metadata: { orderId }
@@ -110,13 +110,17 @@ export const usePayment = () => {
     provider: PaymentProvider = 'paystack'
   ): Promise<any> => {
     try {
-      const { data, error } = await supabase.functions.invoke('paystack-verify', {
-        body: { reference }
+      const { data, error } = await supabase.functions.invoke('paystack-secure', {
+        body: { action: 'verify', reference }
       });
 
       if (error) throw new Error(error.message);
 
-      return data; // paystack-verify returns top-level fields
+      const res: any = data;
+      if (res?.status === true) {
+        return { success: true, ...res, data: res.data };
+      }
+      return { success: false, error: res?.error || 'Payment verification failed' };
     } catch (error) {
       console.error('Payment verification error:', error);
       const errorInfo = PaymentErrorHandler.formatErrorForUser(error);

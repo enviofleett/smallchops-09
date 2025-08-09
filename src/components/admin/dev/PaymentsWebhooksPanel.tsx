@@ -90,8 +90,8 @@ export const PaymentsWebhooksPanel: React.FC = () => {
     setVerifying(true);
     setVerifyResult(null);
     try {
-      const { data, error } = await supabase.functions.invoke('paystack-verify', {
-        body: { reference: reference.trim() }
+      const { data, error } = await supabase.functions.invoke('paystack-secure', {
+        body: { action: 'verify', reference: reference.trim() }
       });
       if (error) throw error;
 

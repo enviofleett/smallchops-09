@@ -31,8 +31,9 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
         console.log(`🔍 Checking payment status for reference: ${reference} (attempt ${attempts + 1})`);
         
         // Use the enhanced paystack-verify function with better error handling
-        const { data, error } = await supabase.functions.invoke('paystack-verify', {
+        const { data, error } = await supabase.functions.invoke('paystack-secure', {
           body: {
+            action: 'verify',
             reference: reference
           }
         });

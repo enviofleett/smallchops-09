@@ -1,3 +1,4 @@
+
 import { useQuery } from '@tanstack/react-query';
 import { useCustomerAuth } from './useCustomerAuth';
 import { getCustomerOrderHistory } from '@/api/purchaseHistory';
@@ -33,11 +34,7 @@ export const useCustomerOrders = () => {
               product_id,
               product_name,
               quantity,
-              unit_price,
-              products (
-                name,
-                image_url
-              )
+              unit_price
             )
           `)
           .eq('customer_email', userEmail)
@@ -61,11 +58,7 @@ export const useCustomerOrders = () => {
                 product_id,
                 product_name,
                 quantity,
-                unit_price,
-                products (
-                  name,
-                  image_url
-                )
+                unit_price
               )
             `)
             .eq('customer_id', customerAccount.id)

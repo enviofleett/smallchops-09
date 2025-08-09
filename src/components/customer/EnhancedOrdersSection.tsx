@@ -233,10 +233,10 @@ const OrderCard = React.memo(({ order, paid = false }: { order: Order; paid?: bo
               <h3 className="text-lg font-bold">Order #{order.order_number}</h3>
               <p className="text-sm text-gray-500">{formatDate(order.order_time)}</p>
             </div>
-            <Badge className={`px-3 py-1 text-xs border ${getStatusColor(order.status)}`}>
+            <Badge className={`px-3 py-1 text-xs border ${paid ? 'bg-green-100 text-green-800 border-green-200' : getStatusColor(order.status)}`}>
               <div className="flex items-center gap-1">
-                {getStatusIcon(order.status)}
-                {order.status.replace('_', ' ').toUpperCase()}
+                {paid ? <CheckCircle className="w-4 h-4" /> : getStatusIcon(order.status)}
+                {paid ? 'PAID' : order.status.replace('_', ' ').toUpperCase()}
               </div>
             </Badge>
           </div>

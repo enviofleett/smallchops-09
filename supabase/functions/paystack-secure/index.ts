@@ -343,22 +343,44 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
         if (rpcError) {
           console.warn('handle_successful_payment RPC failed, falling back to manual updates:', rpcError);
 
-          // 2) Fallback: Upsert transaction
-          const upsertPayload = {
-            provider: 'paystack',
+          // 2) Fallback: Upsert/Update transaction with correct schema
+          const txRow = {
             provider_reference: reference,
             status: 'paid',
             amount: amount,
             currency: tx.currency || 'NGN',
             channel: channel,
             gateway_response: gatewayResponse,
-            paid_at: paidAt,
+            paid_at: paidAt ? new Date(paidAt).toISOString() : new Date().toISOString(),
             customer_email: customerEmail,
-            metadata: metadataObj,
             processed_at: new Date().toISOString(),
-          };
+            provider_response: tx ? tx : null,
+          } as any;
 
-          await supabaseClient.from('payment_transactions').upsert(upsertPayload, { onConflict: 'provider_reference' });
+          // Try upsert first (works if provider_reference has a unique index)
+          const { error: upsertErr } = await supabaseClient
+            .from('payment_transactions')
+            .upsert(txRow, { onConflict: 'provider_reference' });
+
+          if (upsertErr) {
+            console.warn('Upsert failed, attempting update then insert:', upsertErr);
+            // Try update existing row
+            const { data: _upd, error: updErr, count } = await supabaseClient
+              .from('payment_transactions')
+              .update(txRow)
+              .eq('provider_reference', reference)
+              .select('id', { count: 'exact', head: true });
+
+            if (updErr || (typeof count === 'number' && count === 0)) {
+              // Insert new row as last resort
+              const { error: insErr } = await supabaseClient
+                .from('payment_transactions')
+                .insert({ ...txRow, transaction_type: 'payment' });
+              if (insErr) {
+                console.error('Insert payment transaction failed:', insErr);
+              }
+            }
+          }
 
           // 3) Fallback: Update order to paid/confirmed if we have the order id
           if (orderId) {

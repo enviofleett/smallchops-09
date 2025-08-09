@@ -75,30 +75,25 @@ async function initializePayment(supabaseClient: any, requestData: any) {
       throw new Error('Minimum amount is 1 NGN (100 kobo)');
     }
 
-    // Get Paystack configuration
+    // Get Paystack configuration via centralized RPC (environment-aware)
     console.log('🔍 Fetching Paystack configuration...');
-    const { data: config, error: configError } = await supabaseClient
-      .from('payment_integrations')
-      .select('*')
-      .eq('provider', 'paystack')
-      .eq('connection_status', 'connected')
-      .single();
+    const { data: cfg, error: cfgErr } = await supabaseClient.rpc('get_active_paystack_config');
 
-    console.log('⚙️ Config result:', { config: config ? 'found' : 'not found', error: configError });
-
-    if (configError || !config) {
-      console.error('Paystack configuration error:', configError);
+    if (cfgErr || !cfg) {
+      console.error('Paystack configuration error:', cfgErr);
       throw new Error('Paystack not configured properly');
     }
 
-    // Use test or live secret key based on environment
-    const secretKey = config.test_mode ? config.secret_key : (config.live_secret_key || config.secret_key);
+    const effective = Array.isArray(cfg) ? cfg[0] : cfg;
+
+    // Use effective secret key (RPC already selects live/test based on config)
+    const secretKey = effective.secret_key;
     
     if (!secretKey) {
       throw new Error('Paystack secret key not configured');
     }
 
-    console.log('🔑 Using secret key type:', config.test_mode ? 'test' : 'live');
+    console.log('🔑 Using secret key type:', effective.test_mode ? 'test' : 'live');
 
     // Generate reference if not provided
     const transactionRef = reference || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -259,20 +254,15 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
       throw new Error('Payment reference is required');
     }
 
-    // Get Paystack configuration
-    const { data: config, error: configError } = await supabaseClient
-      .from('payment_integrations')
-      .select('*')
-      .eq('provider', 'paystack')
-      .eq('connection_status', 'connected')
-      .single();
-
-    if (configError || !config) {
+    // Get Paystack configuration via centralized RPC (environment-aware)
+    const { data: cfg, error: cfgErr } = await supabaseClient.rpc('get_active_paystack_config');
+    if (cfgErr || !cfg) {
       throw new Error('Paystack not configured properly');
     }
+    const effective = Array.isArray(cfg) ? cfg[0] : cfg;
 
-    // Use test or live secret key based on environment
-    const secretKey = config.test_mode ? config.secret_key : (config.live_secret_key || config.secret_key);
+    // Use effective secret key (RPC already selects live/test based on config)
+    const secretKey = effective.secret_key;
     
     if (!secretKey) {
       throw new Error('Paystack secret key not configured');

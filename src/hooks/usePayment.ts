@@ -40,7 +40,7 @@ export const usePayment = () => {
         email: customerEmail || '',
         amount: paystackService.formatAmount(amount),
         reference,
-        callback_url: `${window.location.origin}/payment/callback`,
+        callback_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`,
         metadata: { orderId }
       });
 
@@ -110,18 +110,18 @@ export const usePayment = () => {
     provider: PaymentProvider = 'paystack'
   ): Promise<any> => {
     try {
-      // Prefer enhanced verification function first
-      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-verify', {
-        body: { reference }
+      // Prefer secure verification first (updates orders + transactions)
+      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-secure', {
+        body: { action: 'verify', reference }
       });
 
       const normalize = (res: any) => {
-        // paystack-verify: { success, data, message }
-        if (res?.success) {
+        // paystack-secure: { status: true, ... }
+        if (res?.status === true) {
           return { success: true, ...res, data: res.data };
         }
-        // paystack-secure: { status: true, data }
-        if (res?.status === true) {
+        // paystack-verify: { success: true, ... }
+        if (res?.success === true) {
           return { success: true, ...res, data: res.data };
         }
         return { success: false, error: res?.error || res?.message || 'Payment verification failed' };
@@ -132,9 +132,9 @@ export const usePayment = () => {
         if (normalized.success) return normalized;
       }
 
-      // Fallback to legacy verification
-      const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference }
+      // Fallback to secondary verifier
+      const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('paystack-verify', {
+        body: { reference }
       });
 
       if (fallbackError) throw new Error(fallbackError.message);

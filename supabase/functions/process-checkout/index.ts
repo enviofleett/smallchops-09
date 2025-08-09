@@ -474,13 +474,29 @@ serve(async (req) => {
 
     console.log('📦 Final payment response:', JSON.stringify(paymentResponse, null, 2));
 
+    // Persist effective reference and create transaction record
+    const effectiveReference = (paymentResponse?.data?.reference ?? (paymentResponse as any)?.reference ?? paymentReference) as string;
+
+    // Persist the effective reference on the order for reliable reconciliation
+    try {
+      await supabaseClient
+        .from('orders')
+        .update({
+          payment_reference: effectiveReference,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+    } catch (e) {
+      console.warn('⚠️ Failed to update order with payment_reference:', e);
+    }
+
     // Create payment transaction record
     const { error: transactionError } = await supabaseClient
       .from('payment_transactions')
       .insert({
         order_id: orderId,
         provider: 'paystack',
-        provider_reference: paymentReference,
+        provider_reference: effectiveReference,
         amount: total_amount,
         currency: 'NGN',
         status: 'pending',
@@ -505,7 +521,7 @@ serve(async (req) => {
       payment: {
         payment_url: finalAuthUrl,
         authorization_url: finalAuthUrl,
-        reference: paymentReference,
+        reference: effectiveReference,
         access_code: finalAccessCode
       },
       message: 'Order created and payment initialized successfully'

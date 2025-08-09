@@ -201,8 +201,8 @@ export default function PaymentCallback() {
 
       const data = normalized.data;
 
-      // Handle success response
-      if (data?.success === true || data?.status === true || data?.data?.status === 'success') {
+      // Handle success response (only accept explicit success)
+      if (data?.success === true || data?.data?.status === 'success') {
         console.log('🎉 Payment verification successful');
         setStatus('success');
         setResult({

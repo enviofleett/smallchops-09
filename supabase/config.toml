@@ -57,3 +57,6 @@ verify_jwt = false
 
 [functions.paystack-batch-verify]
 verify_jwt = true
+
+[functions.payment-reconcile]
+verify_jwt = true

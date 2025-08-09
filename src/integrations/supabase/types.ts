@@ -4017,6 +4017,7 @@ export type Database = {
           gateway_response: string | null
           id: string
           last4: string | null
+          metadata: Json | null
           order_id: string | null
           paid_at: string | null
           payment_method: string | null
@@ -4046,6 +4047,7 @@ export type Database = {
           gateway_response?: string | null
           id?: string
           last4?: string | null
+          metadata?: Json | null
           order_id?: string | null
           paid_at?: string | null
           payment_method?: string | null
@@ -4075,6 +4077,7 @@ export type Database = {
           gateway_response?: string | null
           id?: string
           last4?: string | null
+          metadata?: Json | null
           order_id?: string | null
           paid_at?: string | null
           payment_method?: string | null

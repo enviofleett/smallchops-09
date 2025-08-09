@@ -47,20 +47,6 @@ const Orders = () => {
     };
   }, [queryClient]);
 
-  // Realtime: also refresh when payment transactions change
-  React.useEffect(() => {
-    const channel = supabase
-      .channel('payment-transactions-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_transactions' }, () => {
-        queryClient.invalidateQueries({ queryKey: ['orders'] });
-        queryClient.invalidateQueries({ queryKey: ['payment_tx_for_orders'] });
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [queryClient]);
 
   const { data, isLoading, isError, error } = useQuery<{
     orders: OrderWithItems[];
@@ -80,72 +66,7 @@ const Orders = () => {
   const totalCount = data?.count ?? 0;
 const totalPages = Math.ceil(totalCount / PAGE_SIZE);
 
-// Derive "paid" display from payment_transactions for currently loaded orders
-const orderIds = React.useMemo(() => orders.map(o => o.id), [orders]);
-const refs = React.useMemo(() => orders.map(o => (o as any).payment_reference).filter(Boolean) as string[], [orders]);
-
-const { data: txData } = useQuery({
-  queryKey: ['payment_tx_for_orders', orderIds],
-  enabled: orderIds.length > 0,
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from('payment_transactions')
-      .select('order_id,status,paid_at')
-      .in('order_id', orderIds);
-    if (error) throw new Error(error.message);
-    return data as Array<{ order_id: string; status: string | null; paid_at: string | null }>;
-  }
-});
-
-const { data: txByRef } = useQuery({
-  queryKey: ['payment_tx_by_ref', refs],
-  enabled: refs.length > 0,
-  queryFn: async () => {
-    const { data, error } = await supabase
-      .from('payment_transactions')
-      .select('provider_reference,status,paid_at')
-      .in('provider_reference', refs);
-    if (error) throw new Error(error.message);
-    return data as Array<{ provider_reference: string; status: string | null; paid_at: string | null }>;
-  }
-});
-
-const paidMap = React.useMemo(() => {
-  const m = new Map<string, boolean>();
-  (txData || []).forEach(tx => {
-    const st = (tx.status || '').toLowerCase();
-    if (st === 'success' || st === 'paid' || !!tx.paid_at) {
-      m.set(tx.order_id, true);
-    }
-  });
-  return m;
-}, [txData]);
-
-const paidByRefMap = React.useMemo(() => {
-  const m = new Map<string, boolean>();
-  (txByRef || []).forEach(tx => {
-    const st = (tx.status || '').toLowerCase();
-    if (st === 'success' || st === 'paid' || !!tx.paid_at) {
-      m.set(tx.provider_reference, true);
-    }
-  });
-  return m;
-}, [txByRef]);
-
-const adjustedOrders = React.useMemo(() => {
-  if (!orders?.length) return orders;
-  return orders.map(o => {
-    const finalPaidFlag = (o as any).final_paid as boolean | undefined;
-    if (typeof finalPaidFlag !== 'undefined') {
-      return finalPaidFlag ? { ...o, payment_status: 'paid' as any } : o;
-    }
-    return (
-      paidMap.get(o.id) || paidByRefMap.get((o as any).payment_reference) || o.payment_status === 'paid' || (o as any).paid_at
-        ? { ...o, payment_status: 'paid' as any }
-        : o
-    );
-  });
-}, [orders, paidMap, paidByRefMap]);
+const adjustedOrders = orders;
 
   const deleteOrderMutation = useMutation({
     mutationFn: deleteOrder,

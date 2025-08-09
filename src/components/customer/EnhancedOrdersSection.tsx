@@ -62,75 +62,13 @@ export function EnhancedOrdersSection() {
 // Safe data access with null checks (prepare before effects)
 const orders = Array.isArray(ordersData?.orders) ? (ordersData.orders as any[]) : [];
 
-// Derived paid-state map from payment_transactions for current orders
-const [paidMap, setPaidMap] = React.useState<Record<string, boolean>>({});
 
-useEffect(() => {
-  const fetchPayments = async () => {
-    try {
-      const ids = (orders || []).map((o: any) => o.id);
-      const refs = (orders || []).map((o: any) => o.payment_reference).filter(Boolean);
-      if (!ids.length && !refs.length) return;
-
-      // Query by order_id
-      let byOrder: any[] | undefined;
-      if (ids.length) {
-        const { data, error } = await supabase
-          .from('payment_transactions')
-          .select('order_id,status,paid_at')
-          .in('order_id', ids);
-        if (error) throw error;
-        byOrder = data as any[];
-      }
-
-      // Query by provider_reference
-      let byRef: any[] | undefined;
-      if (refs.length) {
-        const { data, error } = await supabase
-          .from('payment_transactions')
-          .select('provider_reference,status,paid_at')
-          .in('provider_reference', refs);
-        if (error) throw error;
-        byRef = data as any[];
-      }
-
-      const map: Record<string, boolean> = {};
-
-      (byOrder || []).forEach((tx: any) => {
-        const st = (tx?.status || '').toLowerCase();
-        if (st === 'success' || st === 'paid' || !!tx?.paid_at) {
-          map[tx.order_id] = true;
-        }
-      });
-
-      if (byRef) {
-        const refPaid = new Set<string>();
-        byRef.forEach((tx: any) => {
-          const st = (tx?.status || '').toLowerCase();
-          if (st === 'success' || st === 'paid' || !!tx?.paid_at) {
-            refPaid.add(tx.provider_reference);
-          }
-        });
-        (orders || []).forEach((o: any) => {
-          if (o?.payment_reference && refPaid.has(o.payment_reference)) {
-            map[o.id] = true;
-          }
-        });
-      }
-
-      setPaidMap(map);
-    } catch (e) {
-      console.warn('Failed to fetch payment transactions for orders:', e);
-    }
-  };
-  fetchPayments();
-}, [orders]);
 
 // Realtime: refresh on payment transaction changes
 useEffect(() => {
   const channel = supabase
-    .channel('ptx-customer-orders')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_transactions' }, () => {
+    .channel('orders-customer-realtime')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
       refetch?.();
     })
     .subscribe();
@@ -139,30 +77,6 @@ useEffect(() => {
   };
 }, [refetch]);
 
-// Auto-reconcile recent pending Paystack orders
-useEffect(() => {
-  if (ordersLoading) return;
-  const list = Array.isArray(orders) ? orders : [];
-  const candidates = list.filter((o: any) => {
-    const pm = (o?.payment_method || '').toLowerCase();
-    const ps = (o?.payment_status || '').toLowerCase();
-    return pm === 'paystack' && ps !== 'paid' && !!o?.payment_reference;
-  });
-  if (candidates.length === 0) return;
-
-  (async () => {
-    try {
-      for (const o of candidates.slice(0, 3)) {
-        await supabase.functions.invoke('paystack-secure', {
-          body: { action: 'verify', reference: o.payment_reference }
-        });
-      }
-      await (refetch?.());
-    } catch (e) {
-      console.warn('Auto-reconcile verify failed:', e);
-    }
-  })();
-}, [ordersLoading, ordersData]);
 
 // Handle query errors after effects are set up
 if (ordersError) {
@@ -217,7 +131,7 @@ return (
     <OrderCard
       key={order.id}
       order={order}
-      paid={(order.payment_status === 'paid') || !!order.paid_at || !!paidMap[order.id]}
+      paid={String((order as any).payment_status || '').toLowerCase() === 'paid' || !!(order as any).paid_at}
     />
   ))}
 </div>

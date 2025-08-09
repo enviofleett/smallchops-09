@@ -43,8 +43,7 @@ export const PaymentProvider: React.FC<PaymentProviderProps> = ({ children }) =>
       setLoading(true);
       setError(null);
 
-      // Get active payment configuration
-      const { data, error: configError } = await supabase.rpc('get_active_paystack_config');
+      const { data, error: configError } = await (supabase.rpc as any)('get_public_paystack_config');
       
       if (configError) {
         throw new Error(configError.message);
@@ -54,7 +53,7 @@ export const PaymentProvider: React.FC<PaymentProviderProps> = ({ children }) =>
         throw new Error('No payment configuration found');
       }
 
-      const configData = Array.isArray(data) ? data[0] : data;
+      const configData: any = Array.isArray(data) ? (data as any)[0] : (data as any);
 
       // Get environment configuration for webhook URL
       const { data: envData } = await supabase

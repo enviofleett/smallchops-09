@@ -124,7 +124,7 @@ export const PaymentSettingsTab: React.FC = () => {
       }
 
       if (provider === 'paystack') {
-        const { data: cfg, error } = await supabase.rpc('get_active_paystack_config');
+        const { data: cfg, error } = await (supabase.rpc as any)('get_public_paystack_config');
         if (error) throw error;
         if (!cfg) {
           toast.error('No active Paystack config found');

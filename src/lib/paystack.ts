@@ -3,8 +3,8 @@ import { PaymentValidator } from './payment-validators';
 
 export interface PaystackConfig {
   public_key: string;
-  secret_key: string;
-  webhook_secret: string;
+  secret_key?: string;
+  webhook_secret?: string;
   test_mode: boolean;
 }
 
@@ -44,7 +44,7 @@ class PaystackService {
   async getConfig(): Promise<PaystackConfig | null> {
     try {
       // Use the environment-aware configuration function
-      const { data, error } = await supabase.rpc('get_active_paystack_config');
+      const { data, error } = await (supabase.rpc as any)('get_public_paystack_config');
 
       if (error || !data) {
         console.error('Failed to get Paystack config:', error);
@@ -56,8 +56,6 @@ class PaystackService {
       
       return {
         public_key: configData.public_key,
-        secret_key: configData.secret_key,
-        webhook_secret: configData.webhook_secret,
         test_mode: configData.test_mode,
       };
     } catch (error) {

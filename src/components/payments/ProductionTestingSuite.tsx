@@ -200,8 +200,8 @@ export function ProductionTestingSuite() {
         message: 'Testing configuration retrieval...'
       });
 
-      const { data: configData, error: configError } = await supabase
-        .rpc('get_active_paystack_config');
+      const { data: configData, error: configError } = await (supabase.rpc as any)
+        ('get_public_paystack_config');
 
       await completeTest(suites, 2, 1, {
         test_name: 'Configuration Retrieval',

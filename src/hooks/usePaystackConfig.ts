@@ -26,7 +26,7 @@ export const usePaystackConfig = () => {
       setLoading(true);
       setError(null);
 
-      const { data, error: configError } = await supabase.rpc('get_active_paystack_config');
+      const { data, error: configError } = await (supabase.rpc as any)('get_public_paystack_config');
       
       if (configError) {
         throw new Error(`Configuration error: ${configError.message}`);
@@ -50,8 +50,6 @@ export const usePaystackConfig = () => {
         publicKey: configData.public_key,
         isTestMode: configData.test_mode || false,
         isValid: true,
-        secretKey: configData.secret_key,
-        webhookSecret: configData.webhook_secret,
         environment: configData.test_mode ? 'test' : 'live'
       });
 

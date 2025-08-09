@@ -280,7 +280,7 @@ export function PaystackTestingSuite() {
       {
         name: 'Configuration Validation',
         test: async () => {
-          const { data, error } = await supabase.rpc('get_active_paystack_config');
+          const { data, error } = await (supabase.rpc as any)('get_public_paystack_config');
           
           if (error) throw new Error(error.message);
           if (!data || data.length === 0) throw new Error('No active Paystack configuration found');

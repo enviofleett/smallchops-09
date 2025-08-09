@@ -21,7 +21,7 @@ export class ProductionValidator {
 
     try {
       // Check Paystack configuration
-      const { data: config, error } = await supabase.rpc('get_active_paystack_config');
+      const { data: config, error } = await (supabase.rpc as any)('get_public_paystack_config');
       
       if (error || !config) {
         checks.push({

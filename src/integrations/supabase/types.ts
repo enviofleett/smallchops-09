@@ -3973,6 +3973,13 @@ export type Database = {
             foreignKeyName: "payment_refunds_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["tx_id"]
+          },
+          {
+            foreignKeyName: "payment_refunds_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
             referencedRelation: "payment_transactions"
             referencedColumns: ["id"]
           },
@@ -4010,6 +4017,13 @@ export type Database = {
           transaction_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payment_status_tracking_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["tx_id"]
+          },
           {
             foreignKeyName: "payment_status_tracking_transaction_id_fkey"
             columns: ["transaction_id"]
@@ -6109,18 +6123,18 @@ export type Database = {
           delivery_time_slot_id: string | null
           delivery_zone_id: string | null
           discount_amount: number | null
+          final_paid: boolean | null
+          final_paid_at: string | null
           guest_session_id: string | null
           id: string | null
           order_number: string | null
           order_time: string | null
           order_type: Database["public"]["Enums"]["order_type"] | null
           paid_at: string | null
+          payment_channel: string | null
           payment_method: string | null
           payment_reference: string | null
           payment_status: Database["public"]["Enums"]["payment_status"] | null
-          payment_tx_paid_at: string | null
-          payment_tx_provider_reference: string | null
-          payment_tx_status: string | null
           pickup_point_id: string | null
           pickup_time: string | null
           preferred_delivery_time: string | null
@@ -6131,6 +6145,11 @@ export type Database = {
           tax_amount: number | null
           total_amount: number | null
           total_vat: number | null
+          tx_channel: string | null
+          tx_id: string | null
+          tx_paid_at: string | null
+          tx_provider_reference: string | null
+          tx_status: string | null
           updated_at: string | null
           updated_by: string | null
         }

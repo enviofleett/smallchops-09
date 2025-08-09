@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
 import OrdersHeader from '@/components/orders/OrdersHeader';
 import OrdersFilter from '@/components/orders/OrdersFilter';
 import OrdersTable from '@/components/orders/OrdersTable';
@@ -15,6 +16,7 @@ import AbandonedCartsManager from '@/components/admin/AbandonedCartsManager';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OrdersErrorBoundary from '@/components/orders/OrdersErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
+import { runPaystackBatchVerify } from '@/utils/paystackBatchVerify';
 
 const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
@@ -132,11 +134,17 @@ const paidByRefMap = React.useMemo(() => {
 
 const adjustedOrders = React.useMemo(() => {
   if (!orders?.length) return orders;
-  return orders.map(o => (
-    paidMap.get(o.id) || paidByRefMap.get((o as any).payment_reference) || o.payment_status === 'paid' || (o as any).paid_at
-      ? { ...o, payment_status: 'paid' as any }
-      : o
-  ));
+  return orders.map(o => {
+    const finalPaidFlag = (o as any).final_paid as boolean | undefined;
+    if (typeof finalPaidFlag !== 'undefined') {
+      return finalPaidFlag ? { ...o, payment_status: 'paid' as any } : o;
+    }
+    return (
+      paidMap.get(o.id) || paidByRefMap.get((o as any).payment_reference) || o.payment_status === 'paid' || (o as any).paid_at
+        ? { ...o, payment_status: 'paid' as any }
+        : o
+    );
+  });
 }, [orders, paidMap, paidByRefMap]);
 
   const deleteOrderMutation = useMutation({
@@ -217,6 +225,17 @@ const adjustedOrders = React.useMemo(() => {
     setBulkDeleteConfirmOpen(true);
   };
 
+  const handleReconcilePayments = async () => {
+    try {
+      const res = await runPaystackBatchVerify({ limit: 200, dryRun: false });
+      if ((res as any)?.error) throw new Error((res as any).error);
+      toast({ title: 'Reconcile started', description: 'Batch verify invoked. Refreshing orders…' });
+      queryClient.invalidateQueries({ queryKey: ['orders'] });
+    } catch (e: any) {
+      toast({ title: 'Reconcile failed', description: e.message || 'Unable to run batch verify', variant: 'destructive' });
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -273,6 +292,9 @@ const adjustedOrders = React.useMemo(() => {
               onStatusChange={handleStatusChange}
               onSearch={handleSearch}
             />
+            <div className="flex justify-end">
+              <Button onClick={handleReconcilePayments} variant="secondary">Reconcile Payments</Button>
+            </div>
 <OrdersTable 
   orders={adjustedOrders} 
   onViewOrder={handleViewOrder}

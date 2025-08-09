@@ -94,9 +94,36 @@ const handler = async (req: Request): Promise<Response> => {
 
         if (error) throw error;
 
+        // Merge latest successful/paid transaction to compute final payment fields
+        const orders = data || [];
+        let augmented = orders;
+        if (orders.length > 0) {
+          const orderIds = orders.map((o: any) => o.id);
+          const { data: txs, error: txError } = await supabase
+            .from('payment_transactions')
+            .select('id, order_id, status, paid_at, channel')
+            .in('order_id', orderIds)
+            .order('paid_at', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false });
+          if (txError) console.warn('TX fetch warning:', txError.message);
+          const latestByOrder = new Map<string, any>();
+          (txs || []).forEach((t: any) => {
+            if (!latestByOrder.has(t.order_id) && (t.status === 'success' || t.status === 'paid')) {
+              latestByOrder.set(t.order_id, t);
+            }
+          });
+          augmented = orders.map((o: any) => {
+            const tx = latestByOrder.get(o.id);
+            const final_paid = o.payment_status === 'paid' || (tx && (tx.status === 'success' || tx.status === 'paid'));
+            const final_paid_at = o.paid_at || (tx ? tx.paid_at : null);
+            const payment_channel = tx ? tx.channel : null;
+            return { ...o, final_paid, final_paid_at, payment_channel };
+          });
+        }
+
         return new Response(JSON.stringify({ 
           success: true, 
-          orders: data || [], 
+          orders: augmented, 
           count: count || 0 
         }), {
           status: 200,
@@ -119,7 +146,23 @@ const handler = async (req: Request): Promise<Response> => {
 
         if (error) throw error;
 
-        return new Response(JSON.stringify({ success: true, order: data }), {
+        // Compute final payment fields for single order
+        let orderWithPayment = data;
+        if (data) {
+          const { data: txs } = await supabase
+            .from('payment_transactions')
+            .select('id, order_id, status, paid_at, channel')
+            .eq('order_id', data.id)
+            .order('paid_at', { ascending: false, nullsFirst: false })
+            .order('created_at', { ascending: false });
+          const tx = (txs || []).find((t: any) => t.status === 'success' || t.status === 'paid') || null;
+          const final_paid = data.payment_status === 'paid' || !!tx;
+          const final_paid_at = data.paid_at || (tx ? tx.paid_at : null);
+          const payment_channel = tx ? tx.channel : null;
+          orderWithPayment = { ...data, final_paid, final_paid_at, payment_channel };
+        }
+
+        return new Response(JSON.stringify({ success: true, order: orderWithPayment }), {
           status: 200,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });

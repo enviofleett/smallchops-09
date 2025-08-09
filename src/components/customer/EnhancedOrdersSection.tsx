@@ -59,41 +59,8 @@ export function EnhancedOrdersSection() {
   const { data: ordersData, isLoading: ordersLoading, error: ordersError, refetch } = useCustomerOrders() as any;
   const { handleError } = useErrorHandler();
 
-  // Handle query errors
-  if (ordersError) {
-    console.error('Orders query error:', ordersError);
-    handleError(ordersError, 'loading orders');
-    return (
-      <Card className="p-8 text-center">
-        <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">Unable to load orders</h3>
-        <p className="text-gray-500 mb-4">There was a problem loading your orders. Please try again.</p>
-        <Button onClick={() => window.location.reload()}>
-          Refresh Page
-        </Button>
-      </Card>
-    );
-  }
-
-  if (ordersLoading) {
-    return <ContentSkeleton />;
-  }
-
-  // Safe data access with null checks
-  const orders = Array.isArray(ordersData?.orders) ? ordersData.orders as any[] : [];
-
-  if (orders.length === 0) {
-    return (
-      <Card className="p-8 text-center">
-        <ShoppingBag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
-        <p className="text-gray-500 mb-4">You haven't placed any orders yet</p>
-        <Button onClick={() => window.location.href = '/products'}>
-          Start Shopping
-        </Button>
-      </Card>
-    );
-  }
+// Safe data access with null checks (prepare before effects)
+const orders = Array.isArray(ordersData?.orders) ? (ordersData.orders as any[]) : [];
 
 // Derived paid-state map from payment_transactions for current orders
 const [paidMap, setPaidMap] = React.useState<Record<string, boolean>>({});
@@ -161,17 +128,52 @@ useEffect(() => {
   })();
 }, [ordersLoading, ordersData]);
 
+// Handle query errors after effects are set up
+if (ordersError) {
+  console.error('Orders query error:', ordersError);
+  handleError(ordersError, 'loading orders');
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold mb-2">My Orders</h2>
-          <p className="text-gray-500">Track and manage all your orders</p>
-        </div>
-        <Button variant="outline" size="sm">
-          Filter Orders
-        </Button>
+    <Card className="p-8 text-center">
+      <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+      <h3 className="text-lg font-semibold mb-2">Unable to load orders</h3>
+      <p className="text-gray-500 mb-4">There was a problem loading your orders. Please try again.</p>
+      <Button onClick={() => window.location.reload()}>
+        Refresh Page
+      </Button>
+    </Card>
+  );
+}
+
+// Loading state
+if (ordersLoading) {
+  return <ContentSkeleton />;
+}
+
+// Empty state
+if (orders.length === 0) {
+  return (
+    <Card className="p-8 text-center">
+      <ShoppingBag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+      <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
+      <p className="text-gray-500 mb-4">You haven't placed any orders yet</p>
+      <Button onClick={() => window.location.href = '/products'}>
+        Start Shopping
+      </Button>
+    </Card>
+  );
+}
+
+return (
+  <div className="space-y-6">
+    <div className="flex items-center justify-between">
+      <div>
+        <h2 className="text-2xl font-bold mb-2">My Orders</h2>
+        <p className="text-gray-500">Track and manage all your orders</p>
       </div>
+      <Button variant="outline" size="sm">
+        Filter Orders
+      </Button>
+    </div>
 
 {/* Recent Orders */}
 <div className="space-y-4">

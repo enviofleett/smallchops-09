@@ -48,7 +48,7 @@ export function DiscountedProductCard({
 
       <CardContent className="p-0 flex flex-col h-full">
         {/* Product Image */}
-        <div className="aspect-square relative overflow-hidden bg-muted">
+        <div className="aspect-[4/3] sm:aspect-square relative overflow-hidden bg-muted">
           {product.image_url ? (
             <img 
               src={product.image_url} 

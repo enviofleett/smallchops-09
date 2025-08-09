@@ -302,18 +302,94 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
 
     console.log('Paystack payment verified successfully:', reference);
 
+    // Attempt to persist successful payments to the database
+    const tx = paystackData.data || {};
+    const isSuccess = tx.status === 'success';
+
+    if (isSuccess) {
+      // Normalize metadata (it may be returned as a string)
+      let metadataObj: any = {};
+      try {
+        metadataObj = typeof tx.metadata === 'string' ? JSON.parse(tx.metadata) : (tx.metadata || {});
+      } catch (e) {
+        console.warn('Could not parse Paystack metadata string. Using raw value.');
+        metadataObj = tx.metadata || {};
+      }
+
+      const orderId = metadataObj.order_id || metadataObj.orderId || null;
+      const paidAt = tx.paid_at || new Date().toISOString();
+      const channel = tx.channel || null;
+      const gatewayResponse = tx.gateway_response || null;
+      const customerEmail = tx?.customer?.email || null;
+      const amountKobo = tx.amount; // Paystack amount is in kobo
+      const amount = typeof amountKobo === 'number' ? amountKobo / 100 : null;
+
+      // 1) Try to use the production-ready RPC that also updates the order and saves card if present
+      try {
+        const { error: rpcError } = await supabaseClient.rpc('handle_successful_payment', {
+          p_reference: reference,
+          p_paid_at: paidAt,
+          p_gateway_response: gatewayResponse,
+          p_fees: tx.fees ?? 0,
+          p_channel: channel,
+          p_authorization_code: tx?.authorization?.authorization_code ?? null,
+          p_card_type: tx?.authorization?.card_type ?? null,
+          p_last4: tx?.authorization?.last4 ?? null,
+          p_exp_month: tx?.authorization?.exp_month ?? null,
+          p_exp_year: tx?.authorization?.exp_year ?? null,
+          p_bank: tx?.authorization?.bank ?? null,
+        });
+
+        if (rpcError) {
+          console.warn('handle_successful_payment RPC failed, falling back to manual updates:', rpcError);
+
+          // 2) Fallback: Upsert transaction
+          const upsertPayload = {
+            provider: 'paystack',
+            provider_reference: reference,
+            status: 'paid',
+            amount: amount,
+            currency: tx.currency || 'NGN',
+            channel: channel,
+            gateway_response: gatewayResponse,
+            paid_at: paidAt,
+            customer_email: customerEmail,
+            metadata: metadataObj,
+            processed_at: new Date().toISOString(),
+          };
+
+          await supabaseClient.from('payment_transactions').upsert(upsertPayload, { onConflict: 'provider_reference' });
+
+          // 3) Fallback: Update order to paid/confirmed if we have the order id
+          if (orderId) {
+            const { error: orderErr } = await supabaseClient
+              .from('orders')
+              .update({ payment_status: 'paid', status: 'confirmed', updated_at: new Date().toISOString() })
+              .eq('id', orderId);
+            if (orderErr) {
+              console.error('Failed to update order status for order:', orderId, orderErr);
+            }
+          }
+        }
+      } catch (persistError) {
+        console.error('Error while persisting successful payment:', persistError);
+      }
+    }
+
+    // Return normalized verification payload for frontend compatibility
     return new Response(
       JSON.stringify({
         status: true,
+        success: isSuccess,
         data: {
-          status: paystackData.data.status,
-          amount: paystackData.data.amount,
-          currency: paystackData.data.currency,
-          customer: paystackData.data.customer,
-          metadata: paystackData.data.metadata,
-          paid_at: paystackData.data.paid_at,
-          channel: paystackData.data.channel,
-          gateway_response: paystackData.data.gateway_response
+          status: tx.status,
+          amount: tx.amount,
+          currency: tx.currency,
+          customer: tx.customer,
+          metadata: tx.metadata,
+          paid_at: tx.paid_at,
+          channel: tx.channel,
+          gateway_response: tx.gateway_response,
         }
       }),
       { 

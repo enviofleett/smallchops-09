@@ -6,12 +6,12 @@
  *   verifyPaystackTransaction('your_reference_here').then(console.log);
  */
 export async function verifyPaystackTransaction(reference: string) {
-  const endpoint = 'https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/paystack-verify';
+  const endpoint = 'https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/paystack-secure';
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ reference }),
+      body: JSON.stringify({ action: 'verify', reference }),
     });
     const json = await res.json();
     if (!res.ok) {

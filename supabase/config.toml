@@ -54,3 +54,6 @@ verify_jwt = false
 
 [functions.paystack-health]
 verify_jwt = false
+
+[functions.paystack-batch-verify]
+verify_jwt = true

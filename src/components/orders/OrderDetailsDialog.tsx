@@ -26,10 +26,14 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
   const [assignedRider, setAssignedRider] = useState<string | null>(order.assigned_rider_id);
   const [manualStatus, setManualStatus] = useState<OrderStatus | ''>('');
   const [verifying, setVerifying] = useState(false);
+  const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
+  const [verifyState, setVerifyState] = useState<'idle'|'success'|'failed'|'pending'>('idle');
 
   useEffect(() => {
     setSelectedStatus(order.status);
     setAssignedRider(order.assigned_rider_id);
+    setVerifyMessage(null);
+    setVerifyState('idle');
   }, [order]);
 
   const { data: riders, isLoading: isLoadingRiders } = useQuery<Profile[]>({
@@ -80,15 +84,17 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
       return;
     }
     setVerifying(true);
+    setVerifyState('pending');
+    setVerifyMessage(null);
     try {
       // Prefer enhanced function
-      const { data: primary, error: pErr } = await supabase.functions.invoke('paystack-verify', {
+      const { data: primary } = await supabase.functions.invoke('paystack-verify', {
         body: { reference: order.payment_reference }
       });
 
       const normalize = (res: any) => {
-        if (res?.success) return { ok: true, data: res?.data, message: res?.message };
-        if (res?.status === true) return { ok: true, data: res?.data, message: res?.message };
+        if (res?.success) return { ok: true, data: res?.data, message: res?.message || 'Payment verified successfully' };
+        if (res?.status === true) return { ok: true, data: res?.data, message: res?.message || 'Payment verified successfully' };
         return { ok: false, message: res?.error || res?.message || 'Verification failed' };
       };
 
@@ -102,16 +108,23 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
       }
 
       if (normalized.ok) {
+        setVerifyState('success');
+        setVerifyMessage(`Verified for ${order.order_number}.`);
         toast({ title: 'Verified', description: `Payment verified for ${order.order_number}.` });
         await queryClient.invalidateQueries({ queryKey: ['orders'] });
       } else {
+        setVerifyState('failed');
+        setVerifyMessage(normalized.message);
         toast({ title: 'Verification failed', description: normalized.message, variant: 'destructive' });
       }
     } catch (e: any) {
+      setVerifyState('failed');
+      setVerifyMessage(e?.message || 'Failed to verify payment');
       toast({ title: 'Verification error', description: e?.message || 'Failed to verify payment', variant: 'destructive' });
     } finally {
       setVerifying(false);
     }
+
   };
 
   return (
@@ -227,6 +240,11 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-between">
                   <div className="text-xs text-muted-foreground break-all sm:flex-1">
                     Ref: {order.payment_reference || '—'}
+                    {verifyState !== 'idle' && (
+                      <div className={`mt-1 text-[11px] ${verifyState === 'success' ? 'text-green-600' : verifyState === 'pending' ? 'text-amber-600' : 'text-red-600'}`}>
+                        {verifyState === 'pending' ? 'Verifying…' : verifyMessage}
+                      </div>
+                    )}
                   </div>
                   <Button 
                     onClick={handleVerifyWithPaystack}

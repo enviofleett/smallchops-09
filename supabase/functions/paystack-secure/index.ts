@@ -4,6 +4,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Max-Age': '86400',
 };
 
 serve(async (req) => {
@@ -446,7 +448,7 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
         success: isSuccess,
         data: {
           status: tx.status,
-          amount: tx.amount,
+          amount: typeof tx.amount === 'number' ? Math.round(tx.amount) / 100 : null,
           currency: tx.currency,
           customer: tx.customer,
           metadata: tx.metadata,

@@ -6399,6 +6399,10 @@ export type Database = {
         }
         Returns: string
       }
+      current_user_email: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       customer_purchased_product: {
         Args: { customer_uuid: string; product_uuid: string }
         Returns: boolean

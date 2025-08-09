@@ -429,6 +429,11 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           orderItems: sanitizedData.order_items
         };
         sessionStorage.setItem('orderDetails', JSON.stringify(orderDetails));
+        try {
+          if (orderNumber) sessionStorage.setItem('current_order_number', String(orderNumber));
+          if (orderId) sessionStorage.setItem('current_order_id', String(orderId));
+        } catch {}
+        
         
         // Clear cart and checkout state
         clearCart();

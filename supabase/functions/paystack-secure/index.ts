@@ -448,11 +448,16 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
       } catch (_) {}
     }
 
-    // Return normalized verification payload for frontend compatibility
+    // Return normalized verification payload for frontend compatibility with order context
     return new Response(
       JSON.stringify({
         status: true,
         success: isSuccess,
+        order_id: orderId || null,
+        order_number: orderNumber || null,
+        reference: requestData.reference,
+        amount: typeof tx.amount === 'number' ? Math.round(tx.amount) / 100 : null,
+        message: isSuccess ? 'Payment verified successfully' : undefined,
         data: {
           status: tx.status,
           amount: typeof tx.amount === 'number' ? Math.round(tx.amount) / 100 : null,

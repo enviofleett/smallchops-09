@@ -9,8 +9,9 @@ import { useToast } from '@/hooks/use-toast';
 import { Constants } from '@/integrations/supabase/types';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
-import { User, Phone, MapPin, Calendar, Hash, X } from 'lucide-react';
+import { User, Phone, MapPin, Calendar, Hash, X, RefreshCw, ShieldCheck } from 'lucide-react';
 import { formatAddressMultiline } from '@/utils/formatAddress';
+import { supabase } from '@/integrations/supabase/client';
 
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -24,6 +25,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(order.status);
   const [assignedRider, setAssignedRider] = useState<string | null>(order.assigned_rider_id);
   const [manualStatus, setManualStatus] = useState<OrderStatus | ''>('');
+  const [verifying, setVerifying] = useState(false);
 
   useEffect(() => {
     setSelectedStatus(order.status);
@@ -70,6 +72,46 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
+  };
+
+  const handleVerifyWithPaystack = async () => {
+    if (!order.payment_reference) {
+      toast({ title: 'No payment reference', description: 'This order has no payment reference to verify.', variant: 'destructive' });
+      return;
+    }
+    setVerifying(true);
+    try {
+      // Prefer enhanced function
+      const { data: primary, error: pErr } = await supabase.functions.invoke('paystack-verify', {
+        body: { reference: order.payment_reference }
+      });
+
+      const normalize = (res: any) => {
+        if (res?.success) return { ok: true, data: res?.data, message: res?.message };
+        if (res?.status === true) return { ok: true, data: res?.data, message: res?.message };
+        return { ok: false, message: res?.error || res?.message || 'Verification failed' };
+      };
+
+      let normalized = normalize(primary);
+      if (!normalized.ok) {
+        const { data: fallback, error: fErr } = await supabase.functions.invoke('paystack-secure', {
+          body: { action: 'verify', reference: order.payment_reference }
+        });
+        if (fErr) throw new Error(fErr.message);
+        normalized = normalize(fallback);
+      }
+
+      if (normalized.ok) {
+        toast({ title: 'Verified', description: `Payment verified for ${order.order_number}.` });
+        await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      } else {
+        toast({ title: 'Verification failed', description: normalized.message, variant: 'destructive' });
+      }
+    } catch (e: any) {
+      toast({ title: 'Verification error', description: e?.message || 'Failed to verify payment', variant: 'destructive' });
+    } finally {
+      setVerifying(false);
+    }
   };
 
   return (
@@ -177,6 +219,22 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                     className="w-full sm:w-auto min-h-[44px]"
                   >
                     {manualSendMutation.isPending ? 'Sending...' : 'Send'}
+                  </Button>
+                </div>
+              </div>
+              <div>
+                <label className="text-sm font-medium block mb-2">Payment Verification</label>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-between">
+                  <div className="text-xs text-muted-foreground break-all sm:flex-1">
+                    Ref: {order.payment_reference || '—'}
+                  </div>
+                  <Button 
+                    onClick={handleVerifyWithPaystack}
+                    disabled={verifying || !order.payment_reference}
+                    className="w-full sm:w-auto min-h-[44px]"
+                  >
+                    <ShieldCheck className="w-4 h-4 mr-2" />
+                    {verifying ? 'Verifying…' : 'Verify with Paystack'}
                   </Button>
                 </div>
               </div>

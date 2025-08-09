@@ -278,26 +278,43 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
 
     console.log('Verifying Paystack payment:', reference);
 
-    // Verify payment with Paystack
-    const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${secretKey}`,
-        'Content-Type': 'application/json',
+    // Helper: retry wrapper for Paystack verify (3 attempts, backoff)
+    const fetchWithRetries = async (url: string, opts: RequestInit, retries = 3) => {
+      let lastErr: any = null;
+      for (let i = 1; i <= retries; i++) {
+        try {
+          const res = await fetch(url, opts);
+          if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`HTTP ${res.status}: ${txt}`);
+          }
+          return await res.json();
+        } catch (e) {
+          lastErr = e;
+          const delay = Math.min(5000, 1000 * Math.pow(2, i - 1));
+          console.warn(`Paystack verify attempt ${i} failed, retrying in ${delay}ms...`, String(e));
+          if (i < retries) await new Promise(r => setTimeout(r, delay));
+        }
       }
-    });
+      throw lastErr;
+    };
 
-    if (!paystackResponse.ok) {
-      const errorText = await paystackResponse.text();
-      console.error('❌ Paystack verification HTTP error:', paystackResponse.status, errorText);
-      throw new Error(`Paystack verification failed (${paystackResponse.status}): ${errorText}`);
-    }
+    // Verify payment with Paystack (robust retries)
+    const paystackData = await fetchWithRetries(
+      `https://api.paystack.co/transaction/verify/${reference}`,
+      {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${secretKey}`,
+          'Content-Type': 'application/json',
+        }
+      },
+      3
+    );
 
-    const paystackData = await paystackResponse.json();
-
-    if (!paystackData.status) {
+    if (!paystackData?.status) {
       console.error('Paystack verification failed:', paystackData);
-      throw new Error(paystackData.message || 'Failed to verify payment');
+      throw new Error(paystackData?.message || 'Failed to verify payment');
     }
 
     console.log('Paystack payment verified successfully:', reference);
@@ -346,6 +363,7 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
           // 2) Fallback: Upsert/Update transaction with correct schema
           const txRow = {
             provider_reference: reference,
+            transaction_type: 'charge',
             status: 'paid',
             amount: amount,
             currency: tx.currency || 'NGN',
@@ -387,7 +405,13 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
           if (orderId) {
             const { error: orderErr } = await supabaseClient
               .from('orders')
-              .update({ payment_status: 'paid', status: 'confirmed', updated_at: new Date().toISOString() })
+              .update({ 
+                payment_status: 'paid', 
+                status: 'confirmed', 
+                payment_reference: reference,
+                paid_at: paidAt ? new Date(paidAt).toISOString() : new Date().toISOString(),
+                updated_at: new Date().toISOString() 
+              })
               .eq('id', orderId);
             if (orderErr) {
               console.error('Failed to update order status for order:', orderId, orderErr);
@@ -396,6 +420,24 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
         }
       } catch (persistError) {
         console.error('Error while persisting successful payment:', persistError);
+      }
+
+      // Audit log for successful verification
+      try {
+        await supabaseClient.from('audit_logs').insert({
+          action: 'payment_verified',
+          category: 'Payment',
+          message: `Paystack verified and persisted: ${reference}`,
+          new_values: {
+            reference,
+            order_id: orderId,
+            amount,
+            channel,
+            gateway_response
+          }
+        });
+      } catch (_) {
+        // ignore audit log errors
       }
     }
 
@@ -423,11 +465,24 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
 
   } catch (error) {
     console.error('Payment verification error:', error);
+
+    // Audit error path
+    try {
+      await supabaseClient.from('audit_logs').insert({
+        action: 'payment_verification_failed',
+        category: 'Payment',
+        message: `Verification failed: ${requestData?.reference || 'unknown'}`,
+        new_values: { error: String((error as any)?.message || error) }
+      });
+    } catch (_) {
+      // ignore audit errors
+    }
     
     return new Response(
       JSON.stringify({
         status: false,
-        error: error.message || 'Failed to verify payment'
+        success: false,
+        error: (error as any)?.message || 'Failed to verify payment'
       }),
       { 
         status: 500, 

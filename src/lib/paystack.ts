@@ -74,6 +74,13 @@ class PaystackService {
         },
       });
 
+      // 🔍 DEBUG: Log the complete response structure
+      try {
+        console.log('Complete Paystack response:', JSON.stringify(response.data, null, 2));
+      } catch {
+        console.log('Complete Paystack response (raw):', response.data);
+      }
+
       if (response.error) {
         throw new Error(response.error.message);
       }
@@ -81,6 +88,12 @@ class PaystackService {
       if (!response.data?.status) {
         throw new Error(response.data?.error || 'Failed to initialize payment');
       }
+
+      // ✅ Extract and log payment URL and reference for debugging
+      const paymentUrl = response.data?.data?.authorization_url;
+      const paymentRef = response.data?.data?.reference;
+      console.log('Extracted payment URL:', paymentUrl);
+      console.log('Payment reference:', paymentRef);
 
       return response.data.data;
     } catch (error) {
@@ -98,6 +111,13 @@ class PaystackService {
           reference,
         },
       });
+
+      // 🔍 DEBUG: Log verification response
+      try {
+        console.log('Verification result (paystack-secure):', JSON.stringify(response.data, null, 2));
+      } catch {
+        console.log('Verification result (raw):', response.data);
+      }
 
       if (response.error) {
         throw new Error(response.error.message);

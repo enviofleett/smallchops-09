@@ -173,103 +173,47 @@ export default function PaymentCallback() {
 
   const verifyPayment = async (paymentReference: string) => {
     try {
-      console.log(`🔍 Verifying payment (attempt ${retryCount + 1}):`, paymentReference);
       setStatus('verifying');
 
-      // Prefer enhanced verifier (ensures DB upsert + order update)
-      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-verify', {
-        body: { reference: paymentReference }
+      // Single definitive call: server completes all DB updates before responding
+      const { data, error } = await supabase.functions.invoke('paystack-secure', {
+        body: { action: 'verify', reference: paymentReference }
       });
 
-      const normalize = (res: any) => {
-        // paystack-secure: { status: true, data }
-        if (res?.status === true) return { ok: true, data: res };
-        // paystack-verify: { success: true, ... }
-        if (res?.success === true) return { ok: true, data: res };
-        return { ok: false, error: res?.error || res?.message || 'Payment verification failed' };
-      };
-
-      let normalized = !primaryError ? normalize(primaryData) : { ok: false, error: primaryError?.message };
-
-      if (!normalized.ok) {
-        // Fallback to secure verifier
-        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('paystack-secure', {
-          body: { action: 'verify', reference: paymentReference }
-        });
-        if (fallbackError) throw new Error(fallbackError.message || 'Verification failed');
-        normalized = normalize(fallbackData);
+      if (error || !data?.status) {
+        throw new Error((error as any)?.message || data?.error || 'Verification failed');
       }
 
-      const data = normalized.data;
+      const payload = data.data;
+      const isSuccess = payload?.status === 'success' || payload?.payment_status === 'paid';
 
-      // Handle success response
-      if (data?.success === true || data?.status === true || data?.data?.status === 'success') {
-        console.log('🎉 Payment verification successful');
+      if (isSuccess) {
         setStatus('success');
         setResult({
           success: true,
-          order_id: data.order_id,
-          order_number: data.order_number,
-          amount: data.data?.amount || data.amount,
-          message: data.message || 'Payment verified successfully! Your order has been confirmed.'
+          order_id: payload?.order_id,
+          order_number: payload?.order_number,
+          amount: typeof payload?.total_amount === 'number'
+            ? payload.total_amount
+            : (typeof payload?.amount === 'number' ? Math.round(payload.amount / 100) : undefined),
+          message: 'Payment verified successfully! Your order has been confirmed.'
         });
-        
-        // Stop retries on success
-        if (retryTimer.current) {
-          clearTimeout(retryTimer.current);
-          retryTimer.current = null;
-        }
-        retryRef.current = maxRetries;
-        
-        // Clear cart and refresh orders
-        console.log('🛒 Processing successful payment');
-        await clearCartAfterPayment(data.order_number);
+
+        // Clear client-side state and refresh orders once
+        await clearCartAfterPayment(payload?.order_number);
         clearCheckoutState();
-        try { 
-          sessionStorage.removeItem('paystack_last_reference'); 
-          localStorage.removeItem('paystack_last_reference'); 
-        } catch {}
-        
-        // Refresh orders
+        try { sessionStorage.removeItem('paystack_last_reference'); localStorage.removeItem('paystack_last_reference'); } catch {}
         if (refetchOrders) {
-          setTimeout(async () => {
-            try {
-              await refetchOrders();
-              console.log('🔄 Orders refreshed');
-            } catch (refreshError) {
-              console.warn('Failed to refresh orders:', refreshError);
-            }
-          }, 1500);
+          setTimeout(() => { refetchOrders().catch(() => {}); }, 500);
         }
-      } else if (data?.status === 'pending' && retryCount < maxRetries) {
-        // Payment still pending, retry
-        console.log(`Payment pending, retrying... (${retryRef.current + 1}/${maxRetries})`);
-        scheduleRetry(paymentReference);
-        return;
       } else {
-        // Payment failed or other error
-        const errorMsg = data?.error || data?.message || 'Payment verification failed';
-        throw new Error(errorMsg);
+        throw new Error(payload?.gateway_response || 'Payment not successful');
       }
-    } catch (error) {
-      console.error('Payment verification error:', error);
-      
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      const isRetryable = retryCount < maxRetries && 
-                         !errorMessage.includes('Access denied') && 
-                         !errorMessage.includes('Invalid');
-
-      if (isRetryable) {
-        console.log(`Retrying verification... (${retryRef.current + 1}/${maxRetries})`);
-        scheduleRetry(paymentReference);
-        return;
-      }
-
-      // Max retries reached or non-retryable error
+    } catch (err: any) {
       setStatus('failed');
       setResult({
         success: false,
-        error: errorMessage,
+        error: err?.message || 'Verification failed',
         message: 'Unable to verify payment. Please contact support with your payment reference.',
         retryable: false
       });

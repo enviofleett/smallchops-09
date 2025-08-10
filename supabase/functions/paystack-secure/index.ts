@@ -362,6 +362,28 @@ async function verifyPayment(requestData: any) {
       console.warn('Verification persistence warning:', e);
     }
 
+    // Fetch updated order details to return a definitive status and order info
+    let orderInfo: any = null;
+    try {
+      const { data: txWithOrder } = await supabaseClient
+        .from('payment_transactions')
+        .select(`
+          order_id,
+          order:orders(
+            id,
+            order_number,
+            status,
+            payment_status,
+            total_amount
+          )
+        `)
+        .eq('provider_reference', reference)
+        .maybeSingle();
+      orderInfo = txWithOrder?.order ? txWithOrder.order : null;
+    } catch (e) {
+      console.warn('Could not fetch order info after verification:', e);
+    }
+
     return new Response(JSON.stringify({
       status: true,
       data: {
@@ -372,7 +394,12 @@ async function verifyPayment(requestData: any) {
         metadata: tx.metadata,
         paid_at: tx.paid_at,
         channel: tx.channel,
-        gateway_response: tx.gateway_response
+        gateway_response: tx.gateway_response,
+        order_id: orderInfo?.id || null,
+        order_number: orderInfo?.order_number || null,
+        order_status: orderInfo?.status || null,
+        payment_status: orderInfo?.payment_status || null,
+        total_amount: orderInfo?.total_amount || null
       }
     }), {
       status: 200,

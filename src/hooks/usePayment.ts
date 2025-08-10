@@ -121,9 +121,9 @@ export const usePayment = () => {
     provider: PaymentProvider = 'paystack'
   ): Promise<any> => {
     try {
-      // Prefer secure verification first (updates orders + transactions)
-      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference }
+      // Prefer enhanced verifier first (ensures DB upsert + order update like backfill)
+      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-verify', {
+        body: { reference }
       });
 
       const normalize = (res: any) => {
@@ -143,13 +143,14 @@ export const usePayment = () => {
         if (normalized.success) return normalized;
       }
 
-      // Fallback to secondary verifier
-      const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('paystack-verify', {
-        body: { reference }
+      // Fallback to secure verifier
+      const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('paystack-secure', {
+        body: { action: 'verify', reference }
       });
 
       if (fallbackError) throw new Error(fallbackError.message);
 
+      // If secure returns success, still normalize and return
       return normalize(fallbackData);
     } catch (error) {
       console.error('Payment verification error:', error);

@@ -102,68 +102,58 @@ export class PaymentsAPI {
    */
   static async verifyPayment(reference: string): Promise<VerifyPaymentResponse> {
     try {
+      // Prefer enhanced verifier that also upserts transactions and updates orders
+      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-verify', {
+        body: { reference }
+      });
+
+      const normalize = (res: any): VerifyPaymentResponse => {
+        // paystack-verify returns { success, amount (NGN), ... }
+        if (res?.success === true) {
+          return {
+            success: true,
+            data: {
+              status: 'success',
+              amount: typeof res.amount === 'number' ? res.amount : 0,
+              customer: res.customer ?? null,
+              metadata: res.metadata ?? null,
+              paid_at: res.paid_at ?? '',
+              channel: res.channel ?? ''
+            }
+          };
+        }
+        // paystack-secure returns { status: true, data: {...} }
+        if (res?.status === true) {
+          return {
+            success: true,
+            data: {
+              status: res.data?.status || 'success',
+              amount: typeof res.data?.amount === 'number' ? res.data.amount / 100 : 0,
+              customer: res.data?.customer,
+              metadata: res.data?.metadata,
+              paid_at: res.data?.paid_at,
+              channel: res.data?.channel
+            }
+          };
+        }
+        return { success: false, error: res?.error || res?.message || 'Payment verification failed' };
+      };
+
+      if (!primaryError && primaryData) {
+        const normalized = normalize(primaryData);
+        if (normalized.success) return normalized;
+      }
+
+      // Fallback to secure verifier
       const { data, error } = await supabase.functions.invoke('paystack-secure', {
         body: { action: 'verify', reference }
       });
 
       if (error) {
-        return {
-          success: false,
-          error: error.message
-        };
+        return { success: false, error: error.message };
       }
 
-      const fnRes: any = data;
-
-      // Preferred shape (top-level success from paystack-verify)
-      if (typeof fnRes?.success === 'boolean') {
-        return {
-          success: true,
-          data: {
-            status: fnRes.success ? 'success' : 'failed',
-            amount: typeof fnRes.amount === 'number' ? fnRes.amount : 0,
-            customer: fnRes.customer ?? null,
-            metadata: fnRes.metadata ?? null,
-            paid_at: fnRes.paid_at ?? '',
-            channel: fnRes.channel ?? ''
-          }
-        };
-      }
-
-      // Backward-compatible wrapper: { data: { success, ... } }
-      if (fnRes?.data && typeof fnRes.data.success === 'boolean') {
-        return {
-          success: true,
-          data: {
-            status: fnRes.data.success ? 'success' : 'failed',
-            amount: typeof fnRes.data.amount === 'number' ? fnRes.data.amount : 0,
-            customer: fnRes.data.customer ?? null,
-            metadata: fnRes.data.metadata ?? null,
-            paid_at: fnRes.data.paid_at ?? '',
-            channel: fnRes.data.channel ?? ''
-          }
-        };
-      }
-
-      // Legacy/alternative shape: raw Paystack-like: { status: true, data: { amount, customer, metadata, paid_at, channel, ... } }
-      if (!fnRes?.status) {
-        return {
-          success: false,
-          error: fnRes?.error || 'Payment verification failed'
-        } as any;
-      }
-
-      return {
-        success: true,
-        data: {
-          status: fnRes.data?.status || (fnRes.status ? 'success' : 'failed'),
-          amount: typeof fnRes.data?.amount === 'number' ? fnRes.data.amount / 100 : 0, // Legacy path expects kobo conversion
-          customer: fnRes.data?.customer,
-          metadata: fnRes.data?.metadata,
-          paid_at: fnRes.data?.paid_at,
-          channel: fnRes.data?.channel
-        }
-      };
+      return normalize(data);
     } catch (error) {
       console.error('Payment verification error:', error);
       return {

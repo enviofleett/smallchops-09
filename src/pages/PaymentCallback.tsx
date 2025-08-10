@@ -176,9 +176,9 @@ export default function PaymentCallback() {
       console.log(`🔍 Verifying payment (attempt ${retryCount + 1}):`, paymentReference);
       setStatus('verifying');
 
-      // Prefer secure verification (updates orders + transactions)
-      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference: paymentReference }
+      // Prefer enhanced verifier (ensures DB upsert + order update)
+      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-verify', {
+        body: { reference: paymentReference }
       });
 
       const normalize = (res: any) => {
@@ -192,8 +192,9 @@ export default function PaymentCallback() {
       let normalized = !primaryError ? normalize(primaryData) : { ok: false, error: primaryError?.message };
 
       if (!normalized.ok) {
-        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('paystack-verify', {
-          body: { reference: paymentReference }
+        // Fallback to secure verifier
+        const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('paystack-secure', {
+          body: { action: 'verify', reference: paymentReference }
         });
         if (fallbackError) throw new Error(fallbackError.message || 'Verification failed');
         normalized = normalize(fallbackData);

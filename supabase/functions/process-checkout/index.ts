@@ -496,10 +496,8 @@ serve(async (req) => {
       .from('payment_transactions')
       .insert({
         order_id: orderId,
-        provider: 'paystack',
         provider_reference: effectiveReference,
         amount: total_amount,
-        currency: 'NGN',
         status: 'pending',
         metadata: {
           customer_id: customerId,

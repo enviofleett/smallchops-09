@@ -1,40 +1,8 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// Types
-interface OrderItem {
-  product_id: string; // can be uuid or bundle id string
-  product_name?: string;
-  quantity: number;
-  unit_price?: number;
-  price?: number;
-  discount_amount?: number;
-  customization_items?: Array<{
-    id: string;
-    name: string;
-    price: number;
-    quantity: number;
-  }>;
-}
-
-interface CheckoutBody {
-  customer_email: string;
-  customer_name: string;
-  customer_phone?: string;
-  fulfillment_type: 'delivery' | 'pickup';
-  delivery_address?: Record<string, unknown> | null;
-  pickup_point_id?: string | null;
-  order_items: OrderItem[];
-  total_amount: number; // NGN
-  delivery_fee?: number | null;
-  delivery_zone_id?: string | null;
-  payment_method: 'paystack';
-  guest_session_id?: string | null;
-  payment_reference?: string | null;
-  currency?: string | null; // default NGN
-}
-
-// Reusable CORS helper
+// Production-ready CORS configuration
 function getCorsHeaders(origin: string | null): Record<string, string> {
   const allowedOrigins = [
     'https://oknnklksdiqaifhxaccs.supabase.co',
@@ -47,362 +15,549 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   ];
 
   const customDomain = Deno.env.get('CUSTOM_DOMAIN');
-  if (customDomain) allowedOrigins.push(`https://${customDomain}`);
+  if (customDomain) {
+    allowedOrigins.push(`https://${customDomain}`);
+  }
 
   const isDev = Deno.env.get('DENO_ENV') === 'development';
   const isAllowed = origin && allowedOrigins.includes(origin);
 
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin! : (isDev ? '*' : allowedOrigins[0]),
+    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : allowedOrigins[0]),
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
     'Access-Control-Max-Age': '86400',
     'Access-Control-Allow-Credentials': 'true',
-    'Vary': 'Origin',
-    'Content-Type': 'application/json'
+    'Vary': 'Origin'
   };
 }
 
-// Simple HTTP error with status
-class HttpError extends Error {
-  status: number;
-  constructor(message: string, status = 400) {
-    super(message);
-    this.status = status;
-  }
-}
-
-// Strict validation and normalization
-export function validateCheckoutPayload(body: any): CheckoutBody {
-  if (!body || typeof body !== 'object') throw new HttpError('Invalid JSON payload', 400);
-
-  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-  const required = ['customer_email','customer_name','fulfillment_type','order_items','total_amount','payment_method'];
-  for (const k of required) if (body[k] === undefined || body[k] === null) throw new HttpError(`Missing required field: ${k}`, 422);
-
-  const customer_email = String(body.customer_email).trim().toLowerCase();
-  if (!emailRegex.test(customer_email)) throw new HttpError('Invalid customer_email', 422);
-
-  const customer_name = String(body.customer_name).trim();
-  if (customer_name.length < 2) throw new HttpError('customer_name too short', 422);
-
-  const payment_method = String(body.payment_method).toLowerCase();
-  if (payment_method !== 'paystack') throw new HttpError('Unsupported payment_method', 422);
-
-  const fulfillment_type = String(body.fulfillment_type) as CheckoutBody['fulfillment_type'];
-  if (!['delivery','pickup'].includes(fulfillment_type)) throw new HttpError('fulfillment_type must be "delivery" or "pickup"', 422);
-
-  const order_items = Array.isArray(body.order_items) ? body.order_items : [];
-  if (order_items.length === 0) throw new HttpError('order_items must contain at least one item', 422);
-
-  // Validate items
-  order_items.forEach((it: any, idx: number) => {
-    if (!it) throw new HttpError(`order_items[${idx}] is invalid`, 422);
-    if (it.product_id === undefined) throw new HttpError(`order_items[${idx}].product_id is required`, 422);
-    if (typeof it.quantity !== 'number' || it.quantity <= 0) throw new HttpError(`order_items[${idx}].quantity must be > 0`, 422);
-    const unit = typeof it.unit_price === 'number' ? it.unit_price : typeof it.price === 'number' ? it.price : NaN;
-    if (!Number.isFinite(unit) || unit <= 0) throw new HttpError(`order_items[${idx}].unit_price invalid`, 422);
-  });
-
-  const total_amount = Number(body.total_amount);
-  if (!Number.isFinite(total_amount) || total_amount <= 0) throw new HttpError('total_amount must be > 0', 422);
-
-  const currency = (body.currency ?? 'NGN').toString().toUpperCase();
-  if (!['NGN'].includes(currency)) throw new HttpError('Unsupported currency. Only NGN is supported', 422);
-
-  const delivery_address = body.delivery_address ?? null;
-  const pickup_point_id = body.pickup_point_id ?? null;
-
-  if (fulfillment_type === 'delivery' && !delivery_address) throw new HttpError('delivery_address is required for delivery orders', 422);
-  if (fulfillment_type === 'pickup' && !pickup_point_id) throw new HttpError('pickup_point_id is required for pickup orders', 422);
-  if (pickup_point_id && typeof pickup_point_id === 'string' && !uuidRegex.test(pickup_point_id)) {
-    throw new HttpError('pickup_point_id must be a valid UUID', 422);
-  }
-
-  // Normalize items
-  const normalizedItems: OrderItem[] = order_items.map((it: any) => ({
-    product_id: String(it.product_id),
-    product_name: it.product_name,
-    quantity: Number(it.quantity),
-    unit_price: typeof it.unit_price === 'number' ? it.unit_price : it.price,
-    discount_amount: typeof it.discount_amount === 'number' ? it.discount_amount : 0,
-    customization_items: it.customization_items
-  }));
-
-  const guest_session_id = typeof body.guest_session_id === 'string' && body.guest_session_id.trim().length > 0
-    ? body.guest_session_id.trim() : null;
-
-  const customer_phone = body.customer_phone ? String(body.customer_phone) : undefined;
-
-  const delivery_fee = body.delivery_fee === null || body.delivery_fee === undefined
-    ? null : Number(body.delivery_fee);
-
-  const delivery_zone_id = body.delivery_zone_id ?? null;
-
-  const payment_reference = body.payment_reference ? String(body.payment_reference) : null;
-
-  return {
-    customer_email,
-    customer_name,
-    customer_phone,
-    fulfillment_type,
-    delivery_address,
-    pickup_point_id,
-    order_items: normalizedItems,
-    total_amount,
-    delivery_fee,
-    delivery_zone_id,
-    payment_method: 'paystack',
-    guest_session_id,
-    payment_reference,
-    currency
-  };
-}
-
-// Upsert transaction idempotently by provider_reference
-export async function upsertTransaction(
-  supabase: SupabaseClient,
-  payload: { order_id: string; provider_reference: string; amount: number; metadata?: Record<string, unknown>; status?: string }
-) {
-  const toInsert = {
-    order_id: payload.order_id,
-    provider_reference: payload.provider_reference,
-    amount: payload.amount,
-    status: payload.status ?? 'pending',
-    metadata: payload.metadata ?? {}
-  } as any;
-
-  // Use upsert on provider_reference uniqueness
-  const { data, error } = await (supabase
-    .from('payment_transactions')
-    .upsert(toInsert, { onConflict: 'provider_reference' })
-    .select('*')
-    .single());
-
-  if (error) {
-    // If unique violation bubbles differently, treat as success (idempotent)
-    if (String(error.message).toLowerCase().includes('duplicate') ||
-        String(error.details || '').toLowerCase().includes('already exists') ) {
-      return { idempotent: true, data: null };
-    }
-    throw error;
-  }
-  return { idempotent: false, data };
-}
-
-// Paystack initialization via internal edge function
-async function initializePayment(
-  supabase: SupabaseClient,
-  args: { email: string; amountKobo: number; reference: string; callback_url: string; metadata: Record<string, unknown> }
-) {
-  const { data: response, error } = await supabase.functions.invoke('paystack-secure', {
-    body: {
-      action: 'initialize',
-      email: args.email,
-      amount: args.amountKobo,
-      reference: args.reference,
-      callback_url: args.callback_url,
-      metadata: args.metadata
-    }
-  });
-  if (error) throw new HttpError(`Payment init failed: ${error.message}`, 502);
-
-  // Normalize and extract authorization_url
-  let resp: any = response;
-  if (typeof resp === 'string') { try { resp = JSON.parse(resp); } catch (_) {} }
-  if (resp?.data && typeof resp.data === 'string') { try { resp.data = JSON.parse(resp.data); } catch (_) {} }
-  if (!resp?.status) throw new HttpError(`Payment provider returned failure`, 502);
-
-  const inner = resp?.data ?? resp;
-  const authorization_url = inner?.authorization_url ?? inner?.data?.authorization_url;
-  const access_code = inner?.access_code ?? inner?.data?.access_code ?? null;
-  const reference = inner?.reference ?? args.reference;
-
-  if (!authorization_url) throw new HttpError('Missing authorization_url from payment provider', 502);
-
-  // Validate URL
-  try { new URL(authorization_url); } catch { throw new HttpError('Invalid authorization_url from payment provider', 502); }
-
-  return { authorization_url, access_code, reference };
-}
-
-export async function handler(req: Request): Promise<Response> {
+serve(async (req) => {
+  // Get origin for CORS
   const origin = req.headers.get('origin');
-  const cors = getCorsHeaders(origin);
-
-  // CORS preflight
-  if (req.method === 'OPTIONS') return new Response(null, { headers: cors });
-  if (req.method !== 'POST') return new Response(JSON.stringify({ success: false, error: 'Method not allowed' }), { status: 405, headers: cors });
+  const corsHeaders = getCorsHeaders(origin);
+  
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
-    const supabaseAdmin = createClient(
+    console.log('🔄 Process checkout function called');
+    
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { persistSession: false } }
     );
 
-    const raw = await req.json().catch(() => ({}));
-    const body = validateCheckoutPayload(raw);
+    const requestBody = await req.json();
+    console.log('📥 Received checkout request:', JSON.stringify(requestBody, null, 2));
 
-    // Auth context (optional)
-    let authenticatedUserId: string | null = null;
+    // Get user context for debugging
     const authHeader = req.headers.get('authorization');
-    if (authHeader) {
+    const hasAuthHeader = !!authHeader;
+    
+    let authenticatedUser = null;
+    if (hasAuthHeader) {
       try {
-        const { data: { user } } = await supabaseAdmin.auth.getUser(authHeader.replace('Bearer ', ''));
-        authenticatedUserId = user?.id ?? null;
-      } catch (_) {}
+        const { data: { user } } = await supabaseClient.auth.getUser(authHeader.replace('Bearer ', ''));
+        authenticatedUser = user;
+      } catch (authError) {
+        console.log('🔓 No authenticated user found (this is normal for guest checkout)');
+      }
     }
 
-    // Enforce allow_guest_checkout setting
-    const { data: settingsRow } = await supabaseAdmin
+    console.log('👤 User context analysis:', {
+      hasUser: !!authenticatedUser,
+      userId: authenticatedUser?.id,
+      isGuest: !!requestBody.guest_session_id,
+      guestSessionId: requestBody.guest_session_id
+    });
+
+    // NEW: Enforce allow_guest_checkout from business settings
+    console.log('⚙️ Fetching business settings for guest checkout enforcement...');
+    const { data: settingsRow, error: settingsErr } = await supabaseClient
       .from('business_settings')
       .select('allow_guest_checkout')
       .order('updated_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (settingsRow?.allow_guest_checkout === false && !authenticatedUserId) {
-      throw new HttpError('Guest checkout is disabled. Please sign in to continue.', 403);
+    const allowGuest = settingsRow?.allow_guest_checkout !== false; // default to true if missing
+    if (settingsErr) {
+      console.warn('⚠️ Could not fetch business settings; defaulting allow_guest_checkout to true', settingsErr);
+    } else {
+      console.log('✅ Business settings loaded:', { allow_guest_checkout: allowGuest });
     }
 
-    // Ensure customer account exists (by email)
+    if (!allowGuest && !authenticatedUser) {
+      console.log('🚫 Guest checkout is disabled and user is not authenticated. Blocking request.');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Guest checkout is currently disabled. Please sign in to continue.',
+        requires_auth: true
+      }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+    
+    const {
+      customer_email,
+      customer_name,
+      customer_phone,
+      fulfillment_type,
+      delivery_address,
+      pickup_point_id,
+      order_items,
+      total_amount,
+      delivery_fee,
+      delivery_zone_id,
+      payment_method,
+      guest_session_id,
+      payment_reference
+    } = requestBody;
+
+    // Validate required fields
+    if (!customer_email || !customer_name || !order_items || order_items.length === 0 || !total_amount) {
+      throw new Error('Missing required fields: customer_email, customer_name, order_items, or total_amount');
+    }
+
+    if (!fulfillment_type || !['delivery', 'pickup'].includes(fulfillment_type)) {
+      throw new Error('fulfillment_type must be either "delivery" or "pickup"');
+    }
+
+    if (fulfillment_type === 'delivery' && !delivery_address) {
+      throw new Error('delivery_address is required for delivery orders');
+    }
+
+    if (fulfillment_type === 'pickup' && !pickup_point_id) {
+      throw new Error('pickup_point_id is required for pickup orders');
+    }
+
+    console.log('✅ Validation passed, creating order...');
+
+    // Process and validate order items for custom bundles
+    const processedOrderItems = order_items.map(item => {
+      // Check if this is a custom bundle (non-UUID product_id)
+      const isCustomBundle = !item.product_id.match(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i);
+      
+      console.log(`Processing item: ${item.product_name}, isCustomBundle: ${isCustomBundle}`);
+      
+      const processedItem = {
+        product_id: item.product_id,
+        product_name: item.product_name,
+        quantity: item.quantity,
+        unit_price: item.price || item.unit_price,
+        discount_amount: item.discount_amount || 0
+      };
+
+      // For custom bundles, add the customization_items if they exist
+      if (isCustomBundle) {
+        if (item.customization_items) {
+          processedItem.customization_items = item.customization_items;
+          console.log(`Added customization_items for bundle: ${item.customization_items.length} items`);
+        } else {
+          // If no customization_items, create mock ones to satisfy the database function
+          console.log('⚠️ Custom bundle missing customization_items, creating mock structure');
+          processedItem.customization_items = [{
+            id: '00000000-0000-0000-0000-000000000000', // Dummy UUID for validation
+            name: item.product_name,
+            price: item.price || item.unit_price,
+            quantity: item.quantity
+          }];
+        }
+      }
+
+      return processedItem;
+    });
+
+    console.log('Processed order items:', JSON.stringify(processedOrderItems, null, 2));
+
+    // Use guest_session_id directly as TEXT (no UUID parsing)
+    let processedGuestSessionId: string | null = null;
+    if (typeof guest_session_id === 'string' && guest_session_id.trim().length > 0) {
+      processedGuestSessionId = guest_session_id.trim();
+      console.log('✅ Using guest session ID as text:', processedGuestSessionId);
+    } else {
+      console.log('ℹ️ No valid guest_session_id provided; continuing without it');
+    }
+
+    // Find or create customer account
     let customerId: string | null = null;
-    {
-      const { data: existing } = await supabaseAdmin
+    
+    if (authenticatedUser) {
+      console.log('🔍 Processing authenticated user checkout...');
+      
+      // Check if customer account exists for authenticated user (by email)
+      const { data: existingCustomer } = await supabaseClient
         .from('customer_accounts')
         .select('id')
-        .eq('email', body.customer_email)
+        .eq('email', customer_email)
         .maybeSingle();
 
-      if (existing?.id) {
-        customerId = existing.id;
+      if (existingCustomer?.id) {
+        customerId = existingCustomer.id;
+        console.log('✅ Found existing customer account:', customerId);
       } else {
-        const { data: created, error: createErr } = await supabaseAdmin
+        // Create customer account for authenticated user
+        const { data: newCustomer, error: customerError } = await supabaseClient
           .from('customer_accounts')
           .insert({
-            name: body.customer_name,
-            email: body.customer_email,
-            phone: body.customer_phone ?? null,
-            user_id: authenticatedUserId,
-            email_verified: !!authenticatedUserId,
+            name: customer_name,
+            email: customer_email,
+            phone: customer_phone,
+            user_id: authenticatedUser.id,
+            email_verified: true,
             phone_verified: false
           })
           .select('id')
           .single();
-        if (createErr) throw new HttpError('Failed to create customer account', 500);
-        customerId = created.id;
+
+        if (customerError) {
+          console.error('❌ Failed to create customer account for authenticated user:', customerError);
+          throw new Error('Failed to create customer account');
+        }
+
+        customerId = newCustomer.id;
+        console.log('✅ Created customer account for authenticated user:', customerId);
+      }
+    } else {
+      console.log('👤 Processing guest checkout, resolving customer account by email');
+      // Resolve existing customer by email or create a new guest customer
+      const { data: existingGuestCustomer, error: findGuestErr } = await supabaseClient
+        .from('customer_accounts')
+        .select('id')
+        .eq('email', customer_email)
+        .maybeSingle();
+
+      if (findGuestErr) {
+        console.warn('⚠️ Error checking existing guest customer (continuing):', findGuestErr);
+      }
+
+      if (existingGuestCustomer?.id) {
+        customerId = existingGuestCustomer.id;
+        console.log('✅ Found existing customer account for guest:', customerId);
+      } else {
+        console.log('🆕 Creating customer account for guest checkout...');
+        const { data: guestCustomer, error: guestCustomerError } = await supabaseClient
+          .from('customer_accounts')
+          .insert({
+            name: customer_name,
+            email: customer_email,
+            phone: customer_phone,
+            user_id: null,
+            email_verified: false,
+            phone_verified: false
+          })
+          .select('id')
+          .single();
+
+        if (guestCustomerError) {
+          console.error('❌ Failed to create customer account for guest:', guestCustomerError);
+          throw new Error('Failed to create customer account for guest checkout');
+        }
+
+        customerId = guestCustomer.id;
+        console.log('✅ Created customer account for guest:', customerId);
       }
     }
 
-    // Prepare items for RPC (support custom bundles)
-    const processedItems = body.order_items.map((item) => {
-      const isUuid = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(item.product_id);
-      const out: any = {
-        product_id: item.product_id,
-        product_name: item.product_name,
-        quantity: item.quantity,
-        unit_price: item.unit_price ?? item.price,
-        discount_amount: item.discount_amount ?? 0
-      };
-      if (!isUuid) {
-        out.customization_items = item.customization_items && Array.isArray(item.customization_items)
-          ? item.customization_items
-          : [{ id: '00000000-0000-0000-0000-000000000000', name: item.product_name ?? 'Bundle', price: item.unit_price ?? item.price, quantity: item.quantity }];
+    // Generate unique order number
+    const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
+    
+    // Log the final data being sent to the database function
+    console.log('📦 Creating order with data:', {
+      customer_id: customerId,
+      customer_email: customer_email,
+      order_number: orderNumber,
+      total_amount: total_amount,
+      isGuest: !authenticatedUser,
+      processedGuestSessionId: processedGuestSessionId
+    });
+    
+    // Create order using the existing order creation function with processed items
+    const { data: orderId, error: orderError } = await supabaseClient
+      .rpc('create_order_with_items', {
+        p_customer_id: customerId,
+        p_fulfillment_type: fulfillment_type,
+        p_delivery_address: fulfillment_type === 'delivery' ? delivery_address : null,
+        p_pickup_point_id: fulfillment_type === 'pickup' ? pickup_point_id : null,
+        p_delivery_zone_id: delivery_zone_id || null,
+        p_guest_session_id: processedGuestSessionId, // Pass TEXT session ID now
+        p_items: processedOrderItems
+      });
+
+    if (orderError) {
+      console.error('❌ Order creation failed:', orderError);
+      
+      // Provide specific error messages for common issues
+      let userFriendlyMessage = 'Failed to create order';
+      if (orderError.message.includes('22P02') || orderError.message.includes('invalid input syntax for type uuid')) {
+        userFriendlyMessage = 'There was an issue processing your order items. Please try again or contact support.';
+      } else if (orderError.message.includes('customer')) {
+        userFriendlyMessage = 'There was an issue with customer information. Please check your details and try again.';
+      } else if (orderError.message.includes('delivery')) {
+        userFriendlyMessage = 'There was an issue with delivery information. Please check your address and try again.';
       }
-      return out;
-    });
+      
+      throw new Error(userFriendlyMessage + ' (Error: ' + orderError.message + ')');
+    }
 
-    // Create order via RPC
-    const { data: orderId, error: orderErr } = await supabaseAdmin.rpc('create_order_with_items', {
-      p_customer_id: customerId,
-      p_fulfillment_type: body.fulfillment_type,
-      p_delivery_address: body.fulfillment_type === 'delivery' ? body.delivery_address : null,
-      p_pickup_point_id: body.fulfillment_type === 'pickup' ? body.pickup_point_id : null,
-      p_delivery_zone_id: body.delivery_zone_id ?? null,
-      p_guest_session_id: body.guest_session_id ?? null,
-      p_items: processedItems
-    });
-    if (orderErr || !orderId) throw new HttpError(`Failed to create order: ${orderErr?.message ?? 'unknown'}`, 500);
+    console.log('✅ Order created successfully:', orderId);
 
-    // Retrieve order for number
-    const { data: order } = await supabaseAdmin.from('orders').select('order_number').eq('id', orderId).single();
+    // Get the created order details
+    const { data: orderDetails } = await supabaseClient
+      .from('orders')
+      .select('*')
+      .eq('id', orderId)
+      .single();
 
-    // Determine payment reference (idempotent if provided)
-    const reference = body.payment_reference || `pay_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    if (!orderDetails) {
+      throw new Error('Failed to retrieve created order');
+    }
 
-    // Persist reference on the order early
-    await supabaseAdmin.from('orders').update({ payment_reference: reference, updated_at: new Date().toISOString() }).eq('id', orderId);
-
-    // Initialize payment with retry (duplicate reference-safe inside the paystack-secure function)
+    // Initialize payment with Paystack (with retry mechanism)
+    console.log('💳 Initializing payment...');
+    
+    const paymentReference = payment_reference || `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    let paymentResponse: any = null;
+    let finalAuthUrl: string | null = null;
+    let finalAccessCode: string | null = null;
+    let lastError: string = '';
     const maxRetries = 2;
-    let authUrl: string | null = null;
-    let accessCode: string | null = null;
-    let lastErr: unknown = null;
-
+    
+    // Retry mechanism for payment initialization
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        const init = await initializePayment(supabaseAdmin, {
-          email: body.customer_email,
-          amountKobo: Math.round(body.total_amount * 100),
-          reference,
-          callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?order_id=${orderId}`,
-          metadata: {
-            order_id: orderId,
-            order_number: order?.order_number,
-            customer_name: body.customer_name,
-            fulfillment_type: body.fulfillment_type
+        console.log(`🔄 Payment initialization attempt ${attempt}/${maxRetries}`);
+        
+        const { data: response, error: paymentError } = await supabaseClient.functions.invoke('paystack-secure', {
+          body: {
+            action: 'initialize',
+            email: customer_email,
+            amount: Math.round(total_amount * 100), // Convert to kobo
+            reference: paymentReference,
+            callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?order_id=${orderId}`,
+            metadata: {
+              order_id: orderId,
+              customer_name: customer_name,
+              order_number: orderDetails.order_number,
+              fulfillment_type: fulfillment_type
+            }
           }
         });
-        authUrl = init.authorization_url;
-        accessCode = init.access_code;
+
+        console.log('📡 Raw response from paystack-secure:', JSON.stringify(response, null, 2));
+        console.log('🔍 Response structure analysis:', {
+          hasResponse: !!response,
+          responseType: typeof response,
+          hasStatus: response?.status !== undefined,
+          statusValue: response?.status,
+          hasData: !!response?.data,
+          dataKeys: response?.data ? Object.keys(response.data) : null,
+          hasAuthUrl: !!(response?.data?.authorization_url || response?.authorization_url),
+          errorDetails: paymentError
+        });
+
+        if (paymentError) {
+          lastError = `Supabase function error: ${paymentError.message}`;
+          console.error(`❌ Attempt ${attempt} - Paystack function call failed:`, paymentError);
+          
+          if (attempt === maxRetries) {
+            throw new Error(lastError);
+          }
+          
+          // Wait before retry (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+
+        if (!response) {
+          lastError = 'No response received from payment service';
+          console.error(`❌ Attempt ${attempt} - No response received`);
+          
+          if (attempt === maxRetries) {
+            throw new Error(lastError);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+
+        if (!response.status) {
+          lastError = `Payment service returned failure: ${response.error || 'Unknown error'}`;
+          console.error(`❌ Attempt ${attempt} - Payment service returned status false:`, response);
+          
+          if (attempt === maxRetries) {
+            throw new Error(lastError);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+
+        // Extract authorization URL with robust parsing and fallbacks
+        let authorizationUrl: string | null = null;
+        let accessCode: string | null = null;
+
+        // Some environments may return stringified JSON; normalize first
+        let resp: any = response;
+        if (typeof resp === 'string') {
+          try { resp = JSON.parse(resp); } catch (_) {}
+        }
+        if (resp?.data && typeof resp.data === 'string') {
+          try { resp.data = JSON.parse(resp.data); } catch (_) {}
+        }
+
+        // Prefer nested data, but support flat shape too
+        const inner = resp?.data ?? resp;
+        authorizationUrl = inner?.authorization_url ?? inner?.data?.authorization_url ?? null;
+        accessCode = inner?.access_code ?? inner?.data?.access_code ?? null;
+
+        if (!authorizationUrl) {
+          lastError = `Authorization URL missing from payment response. Response structure: ${JSON.stringify(response)}`;
+          console.error(`❌ Attempt ${attempt} - Authorization URL not found in response:`, response);
+          
+          if (attempt === maxRetries) {
+            throw new Error(lastError);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+
+        // Validate URL format
+        try {
+          new URL(authorizationUrl);
+        } catch (urlError) {
+          lastError = `Invalid authorization URL format: ${authorizationUrl}`;
+          console.error(`❌ Attempt ${attempt} - Invalid URL format:`, authorizationUrl);
+          
+          if (attempt === maxRetries) {
+            throw new Error(lastError);
+          }
+          
+          await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+          continue;
+        }
+
+        // Success! Store the response and break the retry loop
+        paymentResponse = {
+          status: true,
+          data: {
+            authorization_url: authorizationUrl,
+            access_code: accessCode,
+            reference: paymentReference
+          }
+        };
+        finalAuthUrl = authorizationUrl;
+        finalAccessCode = accessCode;
+        
+        console.log(`✅ Payment initialized successfully on attempt ${attempt}`);
         break;
-      } catch (e) {
-        lastErr = e;
-        if (attempt === maxRetries) throw e;
-        await new Promise((r) => setTimeout(r, attempt * 2000));
+
+      } catch (error) {
+        lastError = `Attempt ${attempt} failed: ${error.message}`;
+        console.error(`❌ Payment initialization attempt ${attempt} failed:`, error);
+        
+        if (attempt === maxRetries) {
+          throw new Error(`Payment initialization failed after ${maxRetries} attempts. Last error: ${lastError}`);
+        }
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, attempt * 2000));
       }
     }
 
-    // Idempotent transaction creation
-    try {
-      await upsertTransaction(supabaseAdmin, {
-        order_id: orderId,
-        provider_reference: reference,
-        amount: body.total_amount,
-        status: 'pending',
-        metadata: { customer_id: customerId, order_number: order?.order_number, user_id: authenticatedUserId }
-      });
-    } catch (e) {
-      // Do not fail the whole flow if a duplicate/upsert issue occurs
-      console.warn('payment_transactions upsert warning:', e);
+    if (!paymentResponse) {
+      throw new Error(`Failed to initialize payment after ${maxRetries} attempts. Last error: ${lastError}`);
     }
 
+    console.log('📦 Final payment response:', JSON.stringify(paymentResponse, null, 2));
+
+    // Persist effective reference and create transaction record
+    const effectiveReference = (paymentResponse?.data?.reference ?? (paymentResponse as any)?.reference ?? paymentReference) as string;
+
+    // Persist the effective reference on the order for reliable reconciliation
+    try {
+      await supabaseClient
+        .from('orders')
+        .update({
+          payment_reference: effectiveReference,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+    } catch (e) {
+      console.warn('⚠️ Failed to update order with payment_reference:', e);
+    }
+
+    // Create payment transaction record
+    const { error: transactionError } = await supabaseClient
+      .from('payment_transactions')
+      .insert({
+        order_id: orderId,
+        provider: 'paystack',
+        provider_reference: effectiveReference,
+        amount: total_amount,
+        currency: 'NGN',
+        status: 'pending',
+        metadata: {
+          customer_id: customerId,
+          user_id: customerId,
+          order_number: orderDetails.order_number
+        }
+      });
+
+    if (transactionError) {
+      console.error('⚠️ Failed to create payment transaction record:', transactionError);
+      // Don't throw error here as the order and payment initialization succeeded
+    }
+
+    // Return success response
     const response = {
       success: true,
       order_id: orderId,
-      order_number: order?.order_number,
-      total_amount: body.total_amount,
+      order_number: orderDetails.order_number,
+      total_amount: total_amount,
       payment: {
-        payment_url: authUrl,
-        authorization_url: authUrl,
-        reference,
-        access_code: accessCode
+        payment_url: finalAuthUrl,
+        authorization_url: finalAuthUrl,
+        reference: effectiveReference,
+        access_code: finalAccessCode
       },
       message: 'Order created and payment initialized successfully'
     };
 
-    return new Response(JSON.stringify(response), { status: 200, headers: cors });
-  } catch (err) {
-    const status = err instanceof HttpError ? err.status : 500;
-    const message = err instanceof HttpError ? err.message : 'Checkout process failed';
-    return new Response(JSON.stringify({ success: false, error: message }), { status, headers: cors });
-  }
-}
+    console.log('🎉 Checkout process completed successfully:', response);
+    console.log('📋 Payment response details:', {
+      hasPaymentResponse: !!paymentResponse,
+      hasData: !!paymentResponse?.data,
+      authUrl: paymentResponse?.data?.authorization_url,
+      accessCode: paymentResponse?.data?.access_code,
+      reference: paymentReference
+    });
 
-// Only start the server when executed by Deno Deploy/Edge runtime
-if (import.meta.main) {
-  serve(handler);
-}
+    return new Response(
+      JSON.stringify(response),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+
+  } catch (error) {
+    console.error('💥 Checkout process error:', error);
+    
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: (error as Error)?.message || 'Checkout process failed',
+        message: (error as Error)?.message || 'An error occurred during checkout'
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    );
+  }
+});

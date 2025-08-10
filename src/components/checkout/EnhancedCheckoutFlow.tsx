@@ -275,7 +275,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id ? formData.delivery_zone_id : null,
         payment_method: 'paystack',
         guest_session_id: !isAuthenticated ? guestSession?.sessionId : null,
-        
+        payment_reference: uniqueReference, // Add unique reference
         timestamp: new Date().toISOString()
       };
 
@@ -378,8 +378,34 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           paymentUrlLength: paymentUrl?.length
         });
         
-        // Fallback disabled: do not generate client references. Rely on server-initialized payment URL and reference.
-        // If paymentUrl is missing, we'll surface an error below.
+        // Fallback: if no URL but we have a reference, try to re-initialize payment to get the URL
+        if ((!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) && paymentObj.reference) {
+          console.warn('⚠️ Missing payment URL; attempting fallback initialization via paystack-secure...');
+          // Generate a fresh reference to avoid duplicate_reference errors
+          const freshRef = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+          const initBody = {
+            action: 'initialize',
+            email: sanitizedData.customer_email,
+            amount: Math.round((totalAmount || sanitizedData.total_amount) * 100),
+            reference: freshRef,
+            metadata: {
+              order_id: orderId,
+              customer_name: sanitizedData.customer_name,
+              order_number: orderNumber
+            },
+            callback_url: `${window.location.origin}/payment/callback?order_id=${orderId}`
+          };
+          const { data: initResp, error: initErr } = await supabase.functions.invoke('paystack-secure', { body: initBody });
+          console.log('🔁 Fallback init response:', { initResp, initErr });
+          if (!initErr && initResp?.status && (initResp.data?.authorization_url || initResp.authorization_url)) {
+            authUrl = initResp.data?.authorization_url || initResp.authorization_url;
+            paymentUrl = initResp.data?.authorization_url || initResp.authorization_url;
+            try { 
+              sessionStorage.setItem('paystack_last_reference', freshRef); 
+              localStorage.setItem('paystack_last_reference', freshRef);
+            } catch {}
+          }
+        }
         
         // Final validation for URL
         if (!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) {

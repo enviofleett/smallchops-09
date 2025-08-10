@@ -239,17 +239,71 @@ async function forceConfirmByReference(supabase: any, reference: string): Promis
   }
 
   // Find the transaction in our database
-  const { data: transaction, error: txError } = await supabase
+  // Find the transaction in our database (may not exist yet)
+  const { data: transactionMaybe, error: txError } = await supabase
     .from('payment_transactions')
     .select(`
       *,
       orders (*)
     `)
     .eq('provider_reference', reference)
-    .single();
+    .maybeSingle();
 
-  if (txError || !transaction) {
-    throw new Error('Transaction not found in database');
+  let transaction = transactionMaybe as any;
+
+  if (!transaction) {
+    // Try to resolve order by reference if missing
+    let resolvedOrderId: string | null = null;
+    let resolvedOrderNumber: string | null = null;
+
+    const { data: ord } = await supabase
+      .from('orders')
+      .select('id, order_number')
+      .or(`payment_reference.eq.${reference}`)
+      .maybeSingle();
+
+    if (ord?.id) {
+      resolvedOrderId = ord.id as string;
+      resolvedOrderNumber = ord.order_number as string;
+    }
+
+    // Create a backfilled PAID transaction using Paystack verified payload
+    const amountNgn = typeof paystackData?.data?.amount === 'number' ? paystackData.data.amount / 100 : null;
+    const paidAt = paystackData?.data?.paid_at || paystackData?.data?.transaction_date || new Date().toISOString();
+
+    const insertPayload: any = {
+      provider_reference: reference,
+      order_id: resolvedOrderId,
+      status: 'paid',
+      amount: amountNgn,
+      gateway_response: paystackData?.data?.gateway_response || 'Verified via force_confirm',
+      channel: paystackData?.data?.channel || 'online',
+      paid_at: new Date(paidAt).toISOString(),
+      metadata: {
+        source: 'force_confirm_backfill',
+        order_number: resolvedOrderNumber,
+      }
+    };
+
+    const { data: inserted, error: insErr } = await supabase
+      .from('payment_transactions')
+      .insert(insertPayload)
+      .select('*')
+      .maybeSingle();
+
+    if (insErr) {
+      throw new Error(`Failed to backfill payment transaction: ${insErr.message}`);
+    }
+
+    transaction = inserted;
+
+    // Ensure order stores this reference for future linkage
+    if (resolvedOrderId) {
+      await supabase
+        .from('orders')
+        .update({ payment_reference: reference, updated_at: new Date().toISOString() })
+        .eq('id', resolvedOrderId);
+    }
   }
 
   // Update transaction status if needed

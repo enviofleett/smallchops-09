@@ -53,6 +53,7 @@ const PaystackTest = withLazyLoading(() => import("./pages/PaystackTest"));
 const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"));
 const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"));
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"));
+const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
 
 // Optimized QueryClient with better defaults
 const queryClient = new QueryClient({
@@ -124,6 +125,7 @@ const App = () => {
               <Route path="/customer-profile" element={<CustomerProfile />} />
               <Route path="/customer-favorites" element={<CustomerFavorites />} />
               <Route path="/purchase-history" element={<PurchaseHistory />} />
+              <Route path="/orders/:id" element={<OrderDetails />} />
               
               {/* Payment routes */}
               <Route path="/payment/callback" element={<PaymentCallback />} />

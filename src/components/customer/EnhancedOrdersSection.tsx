@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
+import { useNavigate } from 'react-router-dom';
 
 interface Order {
   id: string;
@@ -201,15 +202,13 @@ if (orders.length === 0) {
 
 return (
   <div className="space-y-6">
-    <div className="flex items-center justify-between">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">My Orders</h2>
-        <p className="text-gray-500">Track and manage all your orders</p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-2xl font-bold mb-1">My Orders</h2>
+          <p className="text-gray-500">Track and manage all your orders</p>
+        </div>
+        {/* Optional filter button placeholder */}
       </div>
-      <Button variant="outline" size="sm">
-        Filter Orders
-      </Button>
-    </div>
 
 {/* Recent Orders */}
 <div className="space-y-4">
@@ -236,6 +235,8 @@ return (
 
 // Enhanced Order Card component
 const OrderCard = React.memo(({ order, paid = false }: { order: Order; paid?: boolean }) => {
+  const navigate = useNavigate();
+
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
       case 'delivered':
@@ -306,25 +307,48 @@ const OrderCard = React.memo(({ order, paid = false }: { order: Order; paid?: bo
     }
   };
 
+  // Payment badge display logic (priority)
+  const getPaymentBadge = () => {
+    const ps = (order.payment_status || '').toLowerCase();
+    const os = (order.status || '').toLowerCase();
+
+    if (ps === 'paid' || paid || !!order.paid_at) {
+      return { label: 'PAID', cls: 'bg-green-100 text-green-800 border-green-200' };
+    }
+    if (ps === 'failed') {
+      return { label: 'PAYMENT FAILED', cls: 'bg-red-100 text-red-800 border-red-200' };
+    }
+    if (ps === 'pending' && os === 'confirmed') {
+      return { label: 'CONFIRMED', cls: 'bg-blue-100 text-blue-800 border-blue-200' };
+    }
+    return { label: 'PENDING PAYMENT', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
+  };
+
   const orderItems = Array.isArray(order.order_items) ? order.order_items : [];
   const totalItems = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+  const paymentBadge = getPaymentBadge();
 
   return (
     <Card className="p-6 border border-gray-200 hover:shadow-md transition-shadow">
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
         <div className="flex-1">
           {/* Order Header */}
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center justify-between mb-3 gap-2">
             <div>
               <h3 className="text-lg font-bold">Order #{order.order_number}</h3>
               <p className="text-sm text-gray-500">{formatDate(order.order_time)}</p>
             </div>
-            <Badge className={`px-3 py-1 text-xs border ${getStatusColor(order.status)}`}>
-              <div className="flex items-center gap-1">
-                {getStatusIcon(order.status)}
-                {order.status.replace('_', ' ').toUpperCase()}
-              </div>
-            </Badge>
+            <div className="flex items-center gap-2">
+              <Badge className={`px-3 py-1 text-xs border ${getStatusColor(order.status)}`}>
+                <div className="flex items-center gap-1">
+                  {getStatusIcon(order.status)}
+                  {order.status.replace('_', ' ').toUpperCase()}
+                </div>
+              </Badge>
+              <Badge className={`px-3 py-1 text-xs border ${paymentBadge.cls}`}>
+                {paymentBadge.label}
+              </Badge>
+            </div>
           </div>
 
           {/* Order Items Preview */}
@@ -351,16 +375,21 @@ const OrderCard = React.memo(({ order, paid = false }: { order: Order; paid?: bo
                 {orderItems.length > 1 && ` (+ ${orderItems.length - 1} more)`}
               </p>
               
-<div className="flex justify-between items-center">
-  <span className="text-lg font-bold text-primary">
-    ₦{(order.total_amount || 0).toLocaleString()}
-  </span>
-  {paid && (
-    <Badge className="px-2 py-0.5 text-xs border bg-green-100 text-green-800 border-green-200">
-      Paid
-    </Badge>
-  )}
-</div>
+              <div className="flex justify-between items-center">
+                <div>
+                  <span className="text-lg font-bold text-primary block">
+                    ₦{(order.total_amount || 0).toLocaleString()}
+                  </span>
+                  {(order.paid_at || paid) && (
+                    <span className="text-xs text-gray-500">Paid at {formatDate(order.paid_at || '')}</span>
+                  )}
+                </div>
+                {paid && (
+                  <Badge className="px-2 py-0.5 text-xs border bg-green-100 text-green-800 border-green-200">
+                    Paid
+                  </Badge>
+                )}
+              </div>
             </div>
           </div>
 
@@ -396,7 +425,7 @@ const OrderCard = React.memo(({ order, paid = false }: { order: Order; paid?: bo
 
       {/* Action Buttons */}
       <div className="flex justify-between items-center mt-6 pt-4 border-t border-gray-100">
-        <Button variant="outline" size="sm">
+        <Button variant="outline" size="sm" onClick={() => navigate(`/orders/${order.id}`)}>
           View Details
         </Button>
         <div className="flex gap-2">

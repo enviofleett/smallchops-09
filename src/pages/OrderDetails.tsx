@@ -1,0 +1,240 @@
+import React from 'react';
+import { useParams, Navigate } from 'react-router-dom';
+import { Helmet } from 'react-helmet-async';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
+import { supabase } from '@/integrations/supabase/client';
+import { Clock, CheckCircle, CreditCard, Package, Truck } from 'lucide-react';
+import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+
+interface OrderDetailsData {
+  id: string;
+  order_number: string;
+  status: string;
+  payment_status?: string | null;
+  paid_at?: string | null;
+  total_amount: number;
+  order_time: string;
+  customer_id?: string | null;
+  customer_email?: string | null;
+  payment_method?: string | null;
+}
+
+interface PaymentTx {
+  provider_reference?: string | null;
+  status?: string | null;
+  amount?: number | null;
+  channel?: string | null;
+  gateway_response?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+  paid_at?: string | null;
+}
+
+const formatMoney = (value?: number | null) => {
+  const v = value || 0;
+  try {
+    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(v);
+  } catch {
+    return `₦${v.toLocaleString()}`;
+  }
+};
+
+const SectionSkeleton = () => (
+  <div className="space-y-4">
+    {[1, 2].map((i) => (
+      <Card key={i} className="p-6">
+        <Skeleton className="h-4 w-1/3 mb-3" />
+        <Skeleton className="h-4 w-2/3 mb-2" />
+        <Skeleton className="h-4 w-1/2" />
+      </Card>
+    ))}
+  </div>
+);
+
+export default function OrderDetails() {
+  const { id } = useParams();
+  const { isAuthenticated, customerAccount, user, isLoading } = useCustomerAuth();
+  const [order, setOrder] = React.useState<OrderDetailsData | null>(null);
+  const [tx, setTx] = React.useState<PaymentTx | null>(null);
+  const [isLoadingData, setIsLoadingData] = React.useState(true);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const canView = React.useMemo(() => {
+    if (!order) return false;
+    const email = (user?.email || customerAccount?.email || '').toLowerCase();
+    const orderEmail = (order.customer_email || '').toLowerCase();
+    return (
+      (!!customerAccount?.id && order.customer_id === customerAccount.id) ||
+      (!!email && !!orderEmail && email === orderEmail)
+    );
+  }, [order, customerAccount?.id, user?.email]);
+
+  React.useEffect(() => {
+    const fetchData = async () => {
+      if (!id) return;
+      try {
+        setIsLoadingData(true);
+        setError(null);
+        const { data: orderData, error: orderErr } = await supabase
+          .from('orders')
+          .select(`
+            id, order_number, status, payment_status, paid_at, total_amount, order_time,
+            customer_id, customer_email, payment_method
+          `)
+          .eq('id', id)
+          .maybeSingle();
+        if (orderErr) throw orderErr;
+        if (!orderData) throw new Error('Order not found');
+
+        setOrder(orderData as OrderDetailsData);
+
+        const { data: txData, error: txErr } = await supabase
+          .from('payment_transactions')
+          .select('provider_reference,status,amount,channel,gateway_response,created_at,updated_at,paid_at')
+          .eq('order_id', id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (txErr) {
+          // Not fatal; continue without tx
+          console.warn('Payment transaction fetch error:', txErr);
+        }
+        setTx((txData || null) as PaymentTx | null);
+      } catch (e: any) {
+        console.error(e);
+        setError(e.message || 'Failed to load order details');
+      } finally {
+        setIsLoadingData(false);
+      }
+    };
+    fetchData();
+  }, [id]);
+
+  if (isLoading || isLoadingData) return <SectionSkeleton />;
+  if (!isAuthenticated) return <Navigate to="/auth" replace />;
+  if (error) return <div className="container mx-auto p-6"><p className="text-destructive">{error}</p></div>;
+  if (!order) return <div className="container mx-auto p-6"><p>Order not found.</p></div>;
+  if (!canView) return <div className="container mx-auto p-6"><p>Access denied.</p></div>;
+
+  // Payment badge logic
+  const paymentStatus = (order.payment_status || '').toLowerCase();
+  const orderStatus = (order.status || '').toLowerCase();
+  let paymentBadge = { label: 'PENDING PAYMENT', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
+  if (paymentStatus === 'paid' || !!order.paid_at) paymentBadge = { label: 'PAID', cls: 'bg-green-100 text-green-800 border-green-200' };
+  else if (paymentStatus === 'failed') paymentBadge = { label: 'PAYMENT FAILED', cls: 'bg-red-100 text-red-800 border-red-200' };
+  else if (paymentStatus === 'pending' && orderStatus === 'confirmed') paymentBadge = { label: 'CONFIRMED', cls: 'bg-blue-100 text-blue-800 border-blue-200' };
+
+  const formatDateTime = (d?: string | null) => d ? new Date(d).toLocaleString() : undefined;
+
+  return (
+    <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Order {order.order_number} - Payment Status & Details</title>
+        <meta name="description" content={`View payment status and details for order ${order.order_number}.`} />
+        <link rel="canonical" href={`${window.location.origin}/orders/${order.id}`} />
+      </Helmet>
+
+      <div className="container mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold">Order {order.order_number}</h1>
+          <p className="text-muted-foreground">Placed on {formatDateTime(order.order_time)}</p>
+        </div>
+
+        {/* Status Row */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Card className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Package className="w-4 h-4" />
+              <span className="text-sm">Order Status</span>
+            </div>
+            <Badge className={`text-xs border ${paymentBadge.cls}`}>{paymentBadge.label}</Badge>
+          </Card>
+          <Card className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              <span className="text-sm">Amount</span>
+            </div>
+            <span className="font-semibold">{formatMoney(order.total_amount)}</span>
+          </Card>
+          <Card className="p-4 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              <span className="text-sm">Paid At</span>
+            </div>
+            <span className="text-sm">{formatDateTime(order.paid_at) || '-'}</span>
+          </Card>
+        </div>
+
+        {/* Payment Details */}
+        <Card className="p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Payment Details</h2>
+          {tx ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="text-muted-foreground">Reference</div>
+                <div className="font-mono">{tx.provider_reference || '-'}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Method</div>
+                <div>{tx.channel || order.payment_method || '-'}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Status</div>
+                <div>{(tx.status || '').toUpperCase() || '-'}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Paid Amount</div>
+                <div>{formatMoney(tx.amount || order.total_amount)}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Initiated</div>
+                <div>{formatDateTime(tx.created_at) || '-'}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Completed</div>
+                <div>{formatDateTime(tx.paid_at || tx.updated_at) || '-'}</div>
+              </div>
+              {tx.gateway_response && (
+                <div className="md:col-span-2">
+                  <div className="text-muted-foreground">Gateway Response</div>
+                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">{tx.gateway_response}</pre>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No payment transaction found for this order.</p>
+          )}
+        </Card>
+
+        {/* Timeline */}
+        <Card className="p-6">
+          <h2 className="text-lg font-semibold mb-4">Order Timeline</h2>
+          <div className="space-y-3 text-sm">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              <span>Ordered: {formatDateTime(order.order_time)}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CreditCard className="w-4 h-4" />
+              <span>Paid: {formatDateTime(order.paid_at || tx?.paid_at || tx?.updated_at) || '—'}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <CheckCircle className="w-4 h-4" />
+              <span>Confirmed: {order.status?.toLowerCase() === 'confirmed' ? (formatDateTime(order.paid_at || order.order_time) || '—') : '—'}</span>
+            </div>
+            {['out_for_delivery','shipped','delivered','completed'].includes((order.status || '').toLowerCase()) && (
+              <div className="flex items-center gap-2">
+                <Truck className="w-4 h-4" />
+                <span>Current Status: {order.status}</span>
+              </div>
+            )}
+          </div>
+        </Card>
+      </div>
+    </div>
+  );
+}

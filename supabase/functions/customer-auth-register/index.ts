@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { hash } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,11 +23,6 @@ interface RateLimitResponse {
 
 // Enhanced function to send OTP email with fallback
 async function sendOTPEmail(supabase: any, email: string, otp: string, name: string) {
-  console.log('=== Sending OTP Email ===');
-  console.log('Email:', email);
-  console.log('Name:', name);
-  console.log('OTP Code:', otp);
-
   try {
     // Create OTP email using standardized communication events
     const { data: emailEvent, error: emailError } = await supabase
@@ -104,6 +99,7 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, name: str
 }
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -179,53 +175,85 @@ serve(async (req) => {
       );
     }
 
-    // TESTING MODE: Bypass rate limiting
-    console.log('=== RATE LIMITING BYPASSED FOR TESTING ===');
-    console.log('Client IP:', clientIP);
-    console.log('Email:', email.toLowerCase());
-    // Proceed without checking rate limits
+    // Enforce rate limiting
+    const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc('check_otp_rate_limit', {
+      p_email: email.toLowerCase()
+    });
 
-// Generate OTP code
-const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
-
-// Hash the password for secure storage
-const hashedPassword = await hash(password);
-
-// Store registration data temporarily and OTP
-const { data: otpRecord, error: otpError } = await supabaseAdmin
-  .from('customer_otp_codes')
-  .insert({
-    email: email.toLowerCase(),
-    otp_code: otpCode,
-    otp_type: 'registration',
-    expires_at: expiresAt.toISOString(),
-    created_by_ip: clientIP,
-    verification_metadata: {
-      name: name,
-      phone: phone,
-      password_hash: hashedPassword // ✅ Now properly hashed
+    if (rateLimitError) {
+      console.error('Rate limit check error:', rateLimitError);
+      return new Response(
+        JSON.stringify({ error: "Rate limit check failed" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
     }
-  })
-  .select()
-  .single();
+
+    if (!rateLimitData?.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: rateLimitData?.reason || 'Rate limit exceeded',
+          retry_after_seconds: rateLimitData?.retry_after_seconds ?? 60
+        }),
+        {
+          status: 429,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
+    // Generate OTP code
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+
+    // Store registration data temporarily and OTP (no password stored)
+    const { data: otpRecord, error: otpError } = await supabaseAdmin
+      .from('customer_otp_codes')
+      .insert({
+        email: email.toLowerCase(),
+        otp_code: otpCode,
+        otp_type: 'registration',
+        expires_at: expiresAt.toISOString(),
+        created_by_ip: clientIP,
+        verification_metadata: {
+          name: name,
+          phone: phone
+        }
+      })
+      .select()
+      .single();
 
     if (otpError) {
       console.error('Error storing OTP:', otpError);
       return new Response(
         JSON.stringify({ error: "Failed to initiate registration process" }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
         }
       );
     }
 
-    // TESTING MODE: Skip email sending and log OTP details
-    console.log('🚨 EMAIL SENDING BYPASSED FOR TESTING 🚨');
-    console.log('📧 Email:', email.toLowerCase());
-    console.log('👤 Name:', name);
-    console.log('🔑 OTP CODE:', otpCode);
+    // Send OTP email
+    const emailSent = await sendOTPEmail(supabaseAdmin, email.toLowerCase(), otpCode, name);
+    if (!emailSent) {
+      // Clean up the OTP record if email fails
+      await supabaseAdmin
+        .from('customer_otp_codes')
+        .delete()
+        .eq('id', otpRecord.id);
+
+      return new Response(
+        JSON.stringify({ error: "Failed to send verification email" }),
+        {
+          status: 500,
+          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        }
+      );
+    }
+
     // Create customer account in pending state if it doesn't exist
     if (!existingCustomer) {
       const { error: customerError } = await supabaseAdmin
@@ -260,16 +288,14 @@ const { data: otpRecord, error: otpError } = await supabaseAdmin
     return new Response(
       JSON.stringify({
         success: true,
-        message: "Registration initiated. Check the server logs for your verification code (TESTING MODE).",
+        message: "Registration initiated. Please check your email for the verification code.",
         email: email.toLowerCase(),
         expires_in_minutes: 10,
-        requires_otp_verification: true,
-        testing_mode: true,
-        otp_hint: "Check the Edge Function logs for the 6-digit OTP code"
+        requires_otp_verification: true
       }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, "Content-Type": "application/json" } 
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" }
       }
     );
 

@@ -1,6 +1,8 @@
+
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { generateSecureToken } from '@/utils/crypto';
 
 export interface AdminInvitationWithToken {
   id: string;
@@ -30,8 +32,8 @@ export const useAdminInvitation = () => {
 
       if (fetchError) throw fetchError;
 
-      // Generate new token and update invitation
-      const newToken = btoa(Math.random().toString()).substring(0, 32);
+      // Generate new token and update invitation using cryptographically secure randomness
+      const newToken = generateSecureToken(64);
       const newExpiryDate = new Date();
       newExpiryDate.setDate(newExpiryDate.getDate() + 7);
 
@@ -108,20 +110,44 @@ export const useAdminInvitation = () => {
     }
   };
 
-  // Copy invitation link to clipboard
+  // Copy invitation link to clipboard with robust fallback
   const copyInvitationLink = async (invitationId: string) => {
     const link = await generateInvitationLink(invitationId);
-    if (link) {
-      await navigator.clipboard.writeText(link);
-      toast({
-        title: "Link Copied",
-        description: "Invitation link copied to clipboard.",
-      });
-    } else {
+    if (!link) {
       toast({
         title: "Error",
         description: "Failed to generate invitation link",
         variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(link);
+      } else {
+        // Fallback for insecure contexts or blocked clipboard
+        const textarea = document.createElement('textarea');
+        textarea.value = link;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'absolute';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      toast({
+        title: "Link Copied",
+        description: "Invitation link copied to clipboard.",
+      });
+    } catch (err) {
+      console.warn('Clipboard API failed, showing link for manual copy:', err);
+      // As a last resort, prompt the user
+      window.prompt('Copy the invitation link:', link);
+      toast({
+        title: "Link Ready",
+        description: "Copy the link from the prompt.",
       });
     }
   };

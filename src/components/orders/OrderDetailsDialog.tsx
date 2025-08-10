@@ -87,10 +87,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
     setVerifyState('pending');
     setVerifyMessage(null);
     try {
-      // Prefer enhanced function
-      const { data: primary } = await supabase.functions.invoke('paystack-verify', {
-        body: { reference: order.payment_reference }
+      const { data: primary, error: pErr } = await supabase.functions.invoke('paystack-secure', {
+        body: { action: 'verify', reference: order.payment_reference }
       });
+      if (pErr) throw new Error(pErr.message);
 
       const normalize = (res: any) => {
         if (res?.success) return { ok: true, data: res?.data, message: res?.message || 'Payment verified successfully' };
@@ -99,13 +99,6 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
       };
 
       let normalized = normalize(primary);
-      if (!normalized.ok) {
-        const { data: fallback, error: fErr } = await supabase.functions.invoke('paystack-secure', {
-          body: { action: 'verify', reference: order.payment_reference }
-        });
-        if (fErr) throw new Error(fErr.message);
-        normalized = normalize(fallback);
-      }
 
       if (normalized.ok) {
         setVerifyState('success');

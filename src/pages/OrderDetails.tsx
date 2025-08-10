@@ -141,11 +141,8 @@ const reconcileNow = async () => {
   }
   try {
     setIsReconciling(true);
-    const { data, error } = await supabase.functions.invoke('paystack-verify', { body: { reference: ref } });
-    if (error || !(data as any)?.success) {
-      const fb = await supabase.functions.invoke('paystack-secure', { body: { action: 'verify', reference: ref } });
-      if (fb.error) throw fb.error;
-    }
+    const fb = await supabase.functions.invoke('paystack-secure', { body: { action: 'verify', reference: ref } });
+    if (fb.error) throw fb.error;
     toast({ title: 'Verification triggered', description: 'Refreshing payment status…' });
     setTimeout(() => { loadData(); }, 1500);
   } catch (e: any) {

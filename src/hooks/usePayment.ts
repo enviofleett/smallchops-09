@@ -121,9 +121,9 @@ export const usePayment = () => {
     provider: PaymentProvider = 'paystack'
   ): Promise<any> => {
     try {
-      // Prefer enhanced verifier first (ensures DB upsert + order update like backfill)
-      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-verify', {
-        body: { reference }
+      // Prefer secure verifier first (ensures DB upsert + order update like backfill)
+      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-secure', {
+        body: { action: 'verify', reference }
       });
 
       const normalize = (res: any) => {

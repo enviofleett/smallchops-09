@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, AlertTriangle, RefreshCw } from "lucide-react";
+import { CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCart } from "@/hooks/useCart";
 import { useCustomerOrders } from "@/hooks/useCustomerOrders";
@@ -30,15 +30,9 @@ export default function PaymentCallback() {
   const { clearCartAfterPayment, clearCheckoutState } = useOrderProcessing();
   const [status, setStatus] = useState<PaymentStatus>('verifying');
   const [result, setResult] = useState<PaymentResult | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
-  const maxRetries = 3;
-  const retryTimer = useRef<number | null>(null);
   const [redirected, setRedirected] = useState(false);
-  useEffect(() => {
-    return () => {
-      if (retryTimer.current) clearTimeout(retryTimer.current);
-    };
-  }, []);
+  // Cleanup effect (no timers needed with single-call verify)
+  useEffect(() => { return () => {}; }, []);
 
   // One-time hard refresh to clear any stale Service Worker/CSP state
   useEffect(() => {
@@ -66,29 +60,7 @@ export default function PaymentCallback() {
     hardRefreshSW();
   }, []);
 
-  // Robust retry controller to prevent infinite loops
-  const retryRef = useRef(0);
-  const scheduleRetry = (paymentReference: string, delayMs?: number) => {
-    if (retryRef.current >= maxRetries) {
-      setStatus('failed');
-      setResult({
-        success: false,
-        error: 'Payment verification timeout',
-        message: 'Unable to verify payment status. Please contact support with your payment reference.',
-        retryable: true
-      });
-      return;
-    }
-    if (retryTimer.current) clearTimeout(retryTimer.current);
-    const next = retryRef.current + 1;
-    retryRef.current = next;
-    setRetryCount(next);
-    const delays = [2000, 3000, 5000];
-    const computedDelay = delayMs ?? delays[Math.min(next - 1, delays.length - 1)];
-    retryTimer.current = window.setTimeout(() => {
-      verifyPayment(paymentReference);
-    }, computedDelay);
-  };
+  // Single-call verification; no client-side retries to avoid race conditions
 
   // Enhanced parameter detection with fallback handling
   const getPaymentReference = () => {
@@ -220,12 +192,7 @@ export default function PaymentCallback() {
     }
   };
 
-  const handleRetry = () => {
-    if (reference) {
-      setRetryCount(0);
-      verifyPayment(reference);
-    }
-  };
+  // No retry handler needed with single-call verification
 
   const getStatusIcon = () => {
     switch (status) {
@@ -243,7 +210,7 @@ export default function PaymentCallback() {
   const getStatusTitle = () => {
     switch (status) {
       case 'verifying':
-        return retryCount > 0 ? `Verifying Payment... (Retry ${retryCount})` : 'Verifying Payment...';
+        return 'Verifying Payment...';
       case 'success':
         return 'Payment Successful!';
       case 'failed':
@@ -255,12 +222,9 @@ export default function PaymentCallback() {
 
   const getStatusMessage = () => {
     if (result?.message) return result.message;
-    
     switch (status) {
       case 'verifying':
-        return retryCount > 0 
-          ? 'Retrying payment verification...' 
-          : 'Please wait while we verify your payment...';
+        return 'Please wait while we verify your payment...';
       case 'success':
         return 'Your order has been confirmed and will be processed shortly.';
       case 'failed':
@@ -305,11 +269,6 @@ export default function PaymentCallback() {
               <Skeleton className="h-4 w-full" />
               <Skeleton className="h-4 w-3/4" />
               <Skeleton className="h-4 w-1/2" />
-              {retryCount > 0 && (
-                <div className="text-center text-sm text-muted-foreground">
-                  Attempt {retryCount} of {maxRetries}
-                </div>
-              )}
             </div>
           )}
 
@@ -348,17 +307,6 @@ export default function PaymentCallback() {
               {status === 'success' ? 'View Orders' : 'Back to Cart'}
             </Button>
             
-            {status !== 'verifying' && status !== 'success' && result?.retryable && (
-              <Button
-                onClick={handleRetry}
-                variant="outline"
-                className="w-full"
-                disabled={retryCount >= maxRetries}
-              >
-                <RefreshCw className="w-4 h-4 mr-2" />
-                {retryCount >= maxRetries ? 'Max Retries Reached' : 'Retry Verification'}
-              </Button>
-            )}
 
             {status !== 'verifying' && status !== 'success' && (
               <Button

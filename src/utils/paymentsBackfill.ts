@@ -9,18 +9,6 @@ export async function backfillPaystackRefs(refs: string[]) {
   const results: Array<{ reference: string; ok: boolean; message?: string }> = [];
   for (const reference of refs) {
     try {
-      // Prefer enhanced function
-      const { data, error } = await supabase.functions.invoke('paystack-verify', {
-        body: { reference }
-      });
-      if (error) throw new Error(error.message);
-
-      if (data?.success || data?.status === true) {
-        results.push({ reference, ok: true });
-        continue;
-      }
-
-      // Fallback to legacy
       const fb = await supabase.functions.invoke('paystack-secure', {
         body: { action: 'verify', reference }
       });

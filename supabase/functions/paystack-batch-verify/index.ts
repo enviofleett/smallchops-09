@@ -99,17 +99,17 @@ serve(async (req) => {
     for (const o of candidates) {
       const reference = o.payment_reference as string;
       try {
-        const verifyRes = await supabaseAdmin.functions.invoke("paystack-verify", {
-          body: { reference },
+        const verifyRes = await supabaseAdmin.functions.invoke("paystack-secure", {
+          body: { action: "verify", reference },
         });
 
         if (verifyRes.error) {
           results.push({ order_id: o.id, order_number: o.order_number, reference, status: "error", message: verifyRes.error.message });
         } else {
           const data: any = verifyRes.data;
-          if (data?.success === true) {
+          if (data?.status === true && (data?.data?.status === "success" || data?.data?.payment_status === "paid")) {
             results.push({ order_id: o.id, order_number: o.order_number, reference, status: "verified" });
-          } else if (data?.status === "pending") {
+          } else if (data?.status === true && data?.data?.status === "pending") {
             results.push({ order_id: o.id, order_number: o.order_number, reference, status: "pending", message: data?.message });
           } else {
             results.push({ order_id: o.id, order_number: o.order_number, reference, status: "failed", message: data?.error || data?.message });

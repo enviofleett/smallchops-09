@@ -1,20 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getCorsHeaders } from "../_shared/cors.ts";
 
-// Compute CORS headers per-request based on origin (use permissive wildcard for reliability across preview/prod)
-function buildCorsHeaders(_originHeader: string | null): Record<string, string> {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Max-Age': '86400',
-    'Vary': 'Origin',
-    'Content-Type': 'application/json'
-  };
-}
+// CORS headers are provided via shared getCorsHeaders utility
 
 serve(async (req) => {
-  const corsHeaders = buildCorsHeaders(req.headers.get('origin'));
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
 
   // Preflight handling
   if (req.method === 'OPTIONS') {
@@ -302,6 +293,6 @@ serve(async (req) => {
   } catch (error: any) {
     console.error('paystack-verify error:', error);
     const res = { error: error?.message || 'Payment verification failed' };
-    return new Response(JSON.stringify(res), { status: 500, headers: buildCorsHeaders(req.headers.get('origin')) });
+    return new Response(JSON.stringify(res), { status: 500, headers: getCorsHeaders(req.headers.get('origin')) });
   }
 });

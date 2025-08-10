@@ -2417,7 +2417,7 @@ export type Database = {
           {
             foreignKeyName: "drivers_profile_id_fkey"
             columns: ["profile_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
@@ -3540,6 +3540,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_assigned_rider_profile_fkey"
+            columns: ["assigned_rider_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["profile_id"]
           },
           {
             foreignKeyName: "orders_customer_id_fkey"
@@ -6160,6 +6167,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_assigned_rider_profile_fkey"
+            columns: ["assigned_rider_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["profile_id"]
           },
           {
             foreignKeyName: "orders_customer_id_fkey"

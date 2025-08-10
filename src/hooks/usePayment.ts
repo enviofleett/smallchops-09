@@ -35,23 +35,25 @@ export const usePayment = () => {
   ): Promise<PaymentResult> => {
     setLoading(true);
     try {
-      const reference = paystackService.generateReference();
-      // Persist reference on the order so verification can reliably link it back
-      try {
-        await supabase
-          .from('orders')
-          .update({ payment_reference: reference, payment_method: 'paystack' })
-          .eq('id', orderId);
-      } catch (e) {
-        console.warn('Could not persist payment_reference before init (will rely on metadata):', e);
-      }
+      const provisionalRef = paystackService.generateReference();
+
       const response = await paystackService.initializeTransaction({
         email: customerEmail || '',
         amount: paystackService.formatAmount(amount),
-        reference,
+        reference: provisionalRef,
         callback_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`,
         metadata: { order_id: orderId, orderId }
       });
+
+      // Persist the authoritative reference returned by the server
+      try {
+        await supabase
+          .from('orders')
+          .update({ payment_reference: response.reference, payment_method: 'paystack' })
+          .eq('id', orderId);
+      } catch (e) {
+        console.warn('Could not persist final payment_reference (will rely on metadata):', e);
+      }
 
       return {
         success: true,

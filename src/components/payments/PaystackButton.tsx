@@ -80,13 +80,20 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
         // Open Paystack popup or redirect
         const config = await paystackService.getConfig();
         
+        // Use the server-returned reference as the single source of truth
+        const serverRef = response.reference || reference;
+        try {
+          sessionStorage.setItem('paystack_last_reference', serverRef);
+          localStorage.setItem('paystack_last_reference', serverRef);
+        } catch {}
+        
         if (config?.public_key) {
           // Use Paystack inline popup
           const handler = window.PaystackPop.setup({
             key: config.public_key,
             email,
             amount: paystackService.formatAmount(amount),
-            ref: reference,
+            ref: serverRef,
             channels,
             currency: 'NGN',
             metadata: {
@@ -112,7 +119,6 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
               }
             }
           });
-          try { sessionStorage.setItem('paystack_last_reference', reference); } catch {}
           
           handler.openIframe();
         } else {

@@ -5,6 +5,7 @@ import { Loader2, CreditCard } from 'lucide-react';
 import { usePaystackConfig } from '@/hooks/usePaystackConfig';
 import { PaymentErrorHandler } from './PaymentErrorHandler';
 import { toast } from '@/hooks/use-toast';
+import { paystackService } from '@/lib/paystack';
 
 interface PaystackPaymentHandlerProps {
   amount: number;
@@ -174,126 +175,76 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
 
     setPaymentInProgress(true);
 
-    try {
-      // Generate fresh reference for this attempt
-      const freshReference = generateUniqueReference();
-      setCurrentReference(freshReference);
-
-      console.log('🚀 Starting Paystack payment initialization...', {
-        reference: freshReference,
-        amount: amount * 100,
-        email,
-        orderNumber,
-        paystackLoaded: !!window.PaystackPop
-      });
-
-      // Wait for Paystack to be available with timeout
-      let attempts = 0;
-      while (!window.PaystackPop && attempts < 30) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        attempts++;
-      }
-
-      if (!window.PaystackPop) {
-        throw new Error('Paystack failed to load after 3 seconds');
-      }
-
-      console.log('✅ Paystack available, initializing payment popup...');
-
-      // Improved callback URL with reference parameter
-      const callbackUrl = `${window.location.origin}/payment/callback?reference=${freshReference}&status=success&order_id=${orderNumber}`;
-      
-      console.log('🔗 Callback URL:', callbackUrl);
-
-      const handler = window.PaystackPop.setup({
-        key: config.publicKey,
-        email,
-        amount: amount * 100, // Convert to kobo
-        currency: 'NGN',
-        ref: freshReference,
-        callback_url: callbackUrl, // Explicit callback URL
-        channels: ['card', 'bank', 'ussd', 'mobile_money'],
-        metadata: {
-          order_number: orderNumber,
-          customer_email: email,
-          original_reference: initialReference,
-          callback_url: callbackUrl // Additional metadata
-        },
-        callback: function(response: any) {
-          console.log('✅ Paystack payment callback received:', response);
-          setPaymentInProgress(false);
-          
-          if (response.status === 'success') {
-            console.log('🎉 Payment successful, redirecting to verification...');
-            
-            // Ensure reference is included in redirect
-            const verificationUrl = `/payment/callback?reference=${response.reference || freshReference}&status=success&order_id=${orderNumber}`;
-            
-            console.log('🔗 Redirecting to:', verificationUrl);
-            
-            toast({
-              title: "Payment Successful!",
-              description: "Your payment has been processed. Redirecting...",
-            });
-            
-            // Add small delay to ensure toast shows
-            setTimeout(() => {
-              window.location.href = verificationUrl;
-            }, 1500);
-            
-          } else {
-            console.error('❌ Payment was not successful:', response);
-            toast({
-              title: "Payment Failed",
-              description: response.message || "Your payment was not successful. Please try again.",
-              variant: "destructive",
-            });
+      try {
+        // Initialize on server to get the authoritative reference
+        const callbackUrl = `${window.location.origin}/payment/callback?order_id=${orderNumber}`;
+        const init = await paystackService.initializeTransaction({
+          email,
+          amount: paystackService.formatAmount(amount),
+          reference: paystackService.generateReference(),
+          callback_url: callbackUrl,
+          channels: ['card', 'bank', 'ussd', 'mobile_money'],
+          metadata: {
+            order_number: orderNumber,
+            customer_email: email,
+            original_reference: initialReference
           }
-        },
-        onClose: function() {
-          console.log('🚪 Paystack popup closed by user');
-          setPaymentInProgress(false);
-          // Don't show error toast for user-initiated close
-        }
-      });
-
-      // Open the payment popup
-      console.log('🎬 Opening Paystack payment popup...');
-      handler.openIframe();
-
-    } catch (error) {
-      setPaymentInProgress(false);
-      console.error('💳 Paystack initialization failed:', error);
-      
-      // Check if it's a duplicate reference error
-      const errorMessage = error instanceof Error ? error.message : 'Failed to initialize payment';
-      if (errorMessage.includes('Duplicate Transaction Reference')) {
-        console.log('🔄 Duplicate reference detected, retrying with new reference');
-        toast({
-          title: "Retrying Payment",
-          description: "Generating new payment reference...",
         });
-        
-        // Automatically retry with new reference after delay
+
+        const serverRef = init.reference;
+        setCurrentReference(serverRef);
+        console.log('🎯 REFERENCE TRACKING [INIT]:', { received: serverRef, url: init.authorization_url });
+
+        // If inline available, use serverRef; otherwise redirect
+        if (window.PaystackPop && config?.publicKey) {
+          const handler = window.PaystackPop.setup({
+            key: config.publicKey,
+            email,
+            amount: paystackService.formatAmount(amount),
+            currency: 'NGN',
+            ref: serverRef,
+            callback_url: `${callbackUrl}&reference=${serverRef}`,
+            channels: ['card', 'bank', 'ussd', 'mobile_money'],
+            metadata: {
+              order_number: orderNumber,
+              customer_email: email,
+              original_reference: initialReference
+            },
+            callback: function(response: any) {
+              setPaymentInProgress(false);
+              if (response.status === 'success') {
+                const ref = response.reference || serverRef;
+                console.log('🎯 REFERENCE TRACKING [CALLBACK]:', { refFromPaystack: response.reference, serverRef: serverRef, match: (response.reference === serverRef) });
+                window.location.href = `/payment/callback?reference=${ref}&status=success&order_id=${orderNumber}`;
+              } else {
+                toast({
+                  title: "Payment Failed",
+                  description: response.message || "Your payment was not successful. Please try again.",
+                  variant: "destructive",
+                });
+              }
+            },
+            onClose: function() {
+              setPaymentInProgress(false);
+            }
+          });
+          handler.openIframe();
+        } else {
+          window.location.href = init.authorization_url;
+        }
+
+      } catch (error) {
+        setPaymentInProgress(false);
+        console.error('💳 Paystack initialization failed:', error);
+        toast({
+          title: "Payment Error",
+          description: "Failed to start payment. Redirecting to secure page...",
+          variant: "destructive",
+        });
         setTimeout(() => {
-          initializePayment();
+          window.location.href = paymentUrl;
         }, 1500);
-        return;
       }
-      
-      // Show error and fallback to redirect
-      toast({
-        title: "Payment Error",
-        description: "Failed to open payment popup. Redirecting to secure payment page...",
-        variant: "destructive",
-      });
-      
-      setTimeout(() => {
-        // Ensure callback URL is properly formatted
-        const fallbackUrl = `${paymentUrl}&callback_url=${encodeURIComponent(`${window.location.origin}/payment/callback?reference=${currentReference}`)}`;
-        window.location.href = fallbackUrl;
-      }, 2000);
-    }
   }, [config, paystackReady, amount, email, orderNumber, onSuccess, onError, onClose, initialReference, paymentInProgress, paymentUrl, currentReference]);
 
   const handleFallbackPayment = useCallback(() => {

@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getCorsHeaders } from "../_shared/cors.ts";
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -19,7 +19,6 @@ interface CustomerRegistrationRequest extends OTPVerificationRequest {
 }
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -79,41 +78,22 @@ serve(async (req) => {
     }
 
     // Handle registration flow - create Supabase auth user if needed
-    if (otpType === 'registration') {
+    if (otpType === 'registration' && password) {
       try {
-        // Get registration data from verification result metadata
-        const registrationData: any = (verificationResult && (verificationResult as any).metadata) || {};
-        const finalName = name || registrationData.name || email.split('@')[0];
-        const finalPhone = phone || registrationData.phone;
-        const finalPassword = password || registrationData.password_hash;
-
-        if (!finalPassword) {
-          return new Response(
-            JSON.stringify({ 
-              error: "Password is required for registration",
-              success: false 
-            }),
-            { 
-              status: 400, 
-              headers: { ...corsHeaders, "Content-Type": "application/json" } 
-            }
-          );
-        }
-
         // Create auth user with admin client
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: email.toLowerCase(),
-          password: finalPassword,
+          email: email,
+          password: password,
           email_confirm: true, // Mark email as confirmed since OTP was verified
           user_metadata: {
-            name: finalName,
-            phone: finalPhone,
+            name: name || email.split('@')[0],
+            phone: phone,
             registration_method: 'otp',
             email_verified_at: new Date().toISOString()
           }
         });
 
-        if (authError || !authData?.user) {
+        if (authError || !authData.user) {
           console.error('Auth user creation failed:', authError);
           return new Response(
             JSON.stringify({ 
@@ -134,8 +114,8 @@ serve(async (req) => {
           .update({ 
             user_id: authData.user.id,
             email_verified: true,
-            name: finalName,
-            phone: finalPhone
+            name: name || email.split('@')[0],
+            phone: phone
           })
           .eq('id', verificationResult.customer_id);
 
@@ -148,20 +128,20 @@ serve(async (req) => {
           body: {
             templateId: 'customer_welcome',
             recipient: {
-              email: email.toLowerCase(),
-              name: finalName
+              email: email,
+              name: name || email.split('@')[0]
             },
             variables: {
-              customerName: finalName,
-              customerEmail: email.toLowerCase(),
+              customerName: name || email.split('@')[0],
+              customerEmail: email,
               companyName: 'Starters'
             },
             emailType: 'transactional'
           }
         });
 
-        if ((welcomeEmailResult as any).error) {
-          console.warn('Welcome email failed:', (welcomeEmailResult as any).error);
+        if (welcomeEmailResult.error) {
+          console.warn('Welcome email failed:', welcomeEmailResult.error);
         }
 
         // Log successful registration
@@ -169,14 +149,14 @@ serve(async (req) => {
           .from('customer_auth_audit')
           .insert({
             customer_id: verificationResult.customer_id,
-            email: email.toLowerCase(),
+            email: email,
             action: 'registration',
             success: true,
             ip_address: clientIP,
             metadata: {
               auth_user_id: authData.user.id,
               registration_method: 'otp',
-              welcome_email_sent: !(welcomeEmailResult as any).error
+              welcome_email_sent: !welcomeEmailResult.error
             }
           });
 
@@ -187,7 +167,7 @@ serve(async (req) => {
             customer_id: verificationResult.customer_id,
             auth_user_id: authData.user.id,
             email_verified: true,
-            welcome_email_sent: !(welcomeEmailResult as any).error
+            welcome_email_sent: !welcomeEmailResult.error
           }),
           { 
             status: 200, 

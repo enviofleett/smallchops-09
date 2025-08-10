@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getCorsHeaders } from "../_shared/cors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,11 +10,7 @@ const corsHeaders = {
 async function sendOTPEmail(supabase: any, email: string, otp: string, type: 'login' | 'registration' | 'password_reset') {
   try {
     // Determine the correct template key based on the email type
-    const templateKey = type === 'password_reset' 
-      ? 'password_reset_otp' 
-      : type === 'login' 
-        ? 'login_otp' 
-        : 'customer_registration_otp'; // Fixed template key
+    const templateKey = type === 'password_reset' ? 'password_reset_otp' : type === 'login' ? 'login_otp' : 'registration_otp';
 
     // Directly invoke the SMTP sender function with the corrected payload
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
@@ -49,7 +44,6 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, type: 'lo
 }
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -68,9 +62,6 @@ serve(async (req) => {
       );
     }
 
-    // Normalize email to lowercase for consistency
-    const normalizedEmail = email.toLowerCase();
-
     // Create Supabase client with service role key
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -78,16 +69,9 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Get client IP for rate limiting and audit logging
-    const forwarded = req.headers.get('x-forwarded-for');
-    const realIP = req.headers.get('x-real-ip');
-    const clientIP = forwarded 
-      ? forwarded.split(',')[0].trim() 
-      : realIP || '127.0.0.1';
-
     // Check rate limit using database function
     const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc('check_otp_rate_limit', {
-      p_email: normalizedEmail
+      p_email: email
     });
 
     if (rateLimitError) {
@@ -106,16 +90,14 @@ serve(async (req) => {
       // Generate OTP code
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       
-      // FIXED: Store OTP in customer_otp_codes table (not otp_codes)
+      // Store OTP in database for verification
       const { error: otpInsertError } = await supabaseAdmin
-        .from('customer_otp_codes')  // ✅ Correct table
+        .from('otp_codes')
         .insert({
-          email: normalizedEmail,
+          email: email,
           otp_code: otpCode,
           otp_type: type,
-          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes from now
-          created_by_ip: clientIP,
-          verification_metadata: {} // Empty metadata for resends
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minutes from now
         });
 
       if (otpInsertError) {
@@ -130,16 +112,10 @@ serve(async (req) => {
       }
 
       // Send OTP email immediately
-      const emailSent = await sendOTPEmail(supabaseAdmin, normalizedEmail, otpCode, type);
+      const emailSent = await sendOTPEmail(supabaseAdmin, email, otpCode, type);
       
       if (!emailSent) {
-        // Clean up the OTP record if email fails
-        await supabaseAdmin
-          .from('customer_otp_codes')
-          .delete()
-          .eq('email', normalizedEmail)
-          .eq('otp_code', otpCode);
-
+        console.error('Failed to send OTP email');
         return new Response(
           JSON.stringify({ error: "Failed to send OTP email" }),
           { 
@@ -149,7 +125,7 @@ serve(async (req) => {
         );
       }
 
-      console.log('OTP generated and sent successfully for:', normalizedEmail);
+      console.log('OTP generated and sent successfully for:', email);
     }
 
     return new Response(
@@ -164,6 +140,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
+
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(

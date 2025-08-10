@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { getCorsHeaders } from "../_shared/cors.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -23,6 +22,11 @@ interface RateLimitResponse {
 
 // Enhanced function to send OTP email with fallback
 async function sendOTPEmail(supabase: any, email: string, otp: string, name: string) {
+  console.log('=== Sending OTP Email ===');
+  console.log('Email:', email);
+  console.log('Name:', name);
+  console.log('OTP Code:', otp);
+
   try {
     // Create OTP email using standardized communication events
     const { data: emailEvent, error: emailError } = await supabase
@@ -99,7 +103,6 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, name: str
 }
 
 serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -175,31 +178,37 @@ serve(async (req) => {
       );
     }
 
-    // Enforce rate limiting
-    const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc('check_otp_rate_limit', {
-      p_email: email.toLowerCase()
-    });
+    // Check rate limit for OTP generation
+    const { data: rateLimitCheck, error: rateLimitError } = await supabaseAdmin.rpc(
+      'check_otp_rate_limit',
+      { p_email: email.toLowerCase() }
+    );
 
     if (rateLimitError) {
       console.error('Rate limit check error:', rateLimitError);
       return new Response(
         JSON.stringify({ error: "Rate limit check failed" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
       );
     }
 
-    if (!rateLimitData?.allowed) {
+    const rateLimit = rateLimitCheck as unknown as RateLimitResponse;
+    if (!rateLimit.allowed) {
+      const message = rateLimit.reason === 'rate_limited' 
+        ? `Too many registration attempts. Please try again in ${Math.ceil((rateLimit.retry_after_seconds || 300) / 60)} minutes.`
+        : `Registration temporarily blocked. Please try again in ${Math.ceil((rateLimit.retry_after_seconds || 300) / 60)} minutes.`;
+      
       return new Response(
-        JSON.stringify({
-          error: rateLimitData?.reason || 'Rate limit exceeded',
-          retry_after_seconds: rateLimitData?.retry_after_seconds ?? 60
+        JSON.stringify({ 
+          error: message,
+          retry_after_seconds: rateLimit.retry_after_seconds 
         }),
-        {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        { 
+          status: 429, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
       );
     }
@@ -208,7 +217,7 @@ serve(async (req) => {
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
-    // Store registration data temporarily and OTP (no password stored)
+    // Store registration data temporarily and OTP
     const { data: otpRecord, error: otpError } = await supabaseAdmin
       .from('customer_otp_codes')
       .insert({
@@ -219,7 +228,8 @@ serve(async (req) => {
         created_by_ip: clientIP,
         verification_metadata: {
           name: name,
-          phone: phone
+          phone: phone,
+          password_hash: password // In production, this should be hashed
         }
       })
       .select()
@@ -229,15 +239,16 @@ serve(async (req) => {
       console.error('Error storing OTP:', otpError);
       return new Response(
         JSON.stringify({ error: "Failed to initiate registration process" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
       );
     }
 
     // Send OTP email
-    const emailSent = await sendOTPEmail(supabaseAdmin, email.toLowerCase(), otpCode, name);
+    const emailSent = await sendOTPEmail(supabaseAdmin, email, otpCode, name);
+    
     if (!emailSent) {
       // Clean up the OTP record if email fails
       await supabaseAdmin
@@ -247,9 +258,9 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ error: "Failed to send verification email" }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, "Content-Type": "application/json" }
+        { 
+          status: 500, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
         }
       );
     }
@@ -293,9 +304,9 @@ serve(async (req) => {
         expires_in_minutes: 10,
         requires_otp_verification: true
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" }
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
 

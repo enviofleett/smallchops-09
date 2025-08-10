@@ -159,26 +159,54 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         return;
       }
 
-      // New user - default to customer; do NOT auto-elevate based on email or metadata
-      const customerName = authUser.user_metadata?.full_name || 
+      // New user - determine type based on metadata or email
+      const isAdminEmail = authUser.email?.includes('admin') || authUser.user_metadata?.role;
+      
+      if (isAdminEmail) {
+        // Create admin profile
+        const { data: newProfile } = await supabase
+          .from('profiles')
+          .insert({
+            id: authUser.id,
+            name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Admin',
+            email: authUser.email,
+            role: 'admin'
+          })
+          .select()
+          .single();
+
+        if (newProfile) {
+          setUser({
+            id: newProfile.id,
+            name: newProfile.name,
+            role: newProfile.role,
+            avatar_url: newProfile.avatar_url,
+            email: authUser.email || '',
+          });
+          setUserType('admin');
+        }
+      } else {
+        // Create customer account with enhanced Google profile data
+        const customerName = authUser.user_metadata?.full_name || 
                            authUser.user_metadata?.name || 
                            `${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() ||
                            authUser.email?.split('@')[0] || 'Customer';
-                          
-      const { data: newCustomer } = await supabase
-        .from('customer_accounts')
-        .insert({
-          user_id: authUser.id,
-          name: customerName,
-          phone: authUser.user_metadata?.phone,
-          email: authUser.email
-        })
-        .select()
-        .single();
+                           
+        const { data: newCustomer } = await supabase
+          .from('customer_accounts')
+          .insert({
+            user_id: authUser.id,
+            name: customerName,
+            phone: authUser.user_metadata?.phone,
+            email: authUser.email
+          })
+          .select()
+          .single();
 
-      if (newCustomer) {
-        setCustomerAccount(newCustomer);
-        setUserType('customer');
+        if (newCustomer) {
+          setCustomerAccount(newCustomer);
+          setUserType('customer');
+        }
       }
     } catch (error) {
       console.error('Error loading user data:', error);

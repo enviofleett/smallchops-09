@@ -38,15 +38,6 @@ const getStatusBadge = (status: OrderStatus) => {
   return statusConfig[status] || { label: 'Unknown', className: 'bg-gray-100 text-gray-800' };
 };
 
-const isOrderPaid = (order: OrderWithItems) => ((order as any)?.payment_status === 'paid') || Boolean((order as any)?.paid_at);
-
-const getProminentStatus = (order: OrderWithItems) => {
-  if (isOrderPaid(order)) {
-    return { label: 'Paid', className: 'bg-green-100 text-green-800' };
-  }
-  return getStatusBadge(order.status);
-};
-
 const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSelectOrder, onSelectAll }: OrdersTableProps) => {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
@@ -85,8 +76,8 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                 <p className="text-sm text-gray-600">{order.customer_name}</p>
               </div>
             </div>
-            <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getProminentStatus(order).className}`}>
-              {getProminentStatus(order).label}
+            <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
+              {getStatusBadge(order.status).label}
             </span>
           </MobileCardHeader>
           
@@ -223,8 +214,8 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                   </div>
                 </td>
                 <td className="py-4 px-6">
-                  <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getProminentStatus(order).className}`}>
-                    {getProminentStatus(order).label}
+                  <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
+                    {getStatusBadge(order.status).label}
                   </span>
                 </td>
                 <td className="py-4 px-6">

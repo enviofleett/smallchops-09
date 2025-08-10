@@ -42,7 +42,7 @@ serve(async (req) => {
       // Get total stats with individual error handling - use safe customer counting
       const [productsResult, ordersResult, customersResult] = await Promise.allSettled([
         supabase.from('products').select('id', { count: 'exact', head: true }),
-        supabase.from('orders').select('id, total_amount', { count: 'exact' }).eq('payment_status', 'paid').neq('status', 'cancelled'),
+        supabase.from('orders').select('id, total_amount', { count: 'exact' }).neq('status', 'cancelled'),
         supabase.from('customer_accounts').select('id', { count: 'exact', head: true })
       ]);
 
@@ -91,7 +91,6 @@ serve(async (req) => {
         .from('orders')
         .select('order_time, total_amount')
         .gte('order_time', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-        .eq('payment_status', 'paid')
         .order('order_time', { ascending: true });
 
       if (revenueError) {
@@ -123,7 +122,6 @@ serve(async (req) => {
         .from('orders')
         .select('order_time')
         .gte('order_time', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-        .eq('payment_status', 'paid')
         .order('order_time', { ascending: true });
 
       if (orderTrendsError) {
@@ -153,7 +151,6 @@ serve(async (req) => {
       const { data: topCustomersByOrders, error: customersOrdersError } = await supabase
         .from('orders')
         .select('customer_name, customer_email')
-        .eq('payment_status', 'paid')
         .limit(100);
 
       if (customersOrdersError) {
@@ -190,7 +187,6 @@ serve(async (req) => {
       const { data: topCustomersBySpending, error: customersSpendingError } = await supabase
         .from('orders')
         .select('customer_name, customer_email, total_amount')
-        .eq('payment_status', 'paid')
         .limit(100);
 
       if (customersSpendingError) {
@@ -226,8 +222,7 @@ serve(async (req) => {
     try {
       const { data: recentOrdersData, error: recentOrdersError } = await supabase
         .from('orders')
-        .select('id, order_number, customer_name, total_amount, status, payment_status, order_time')
-        .eq('payment_status', 'paid')
+        .select('id, order_number, customer_name, total_amount, status, order_time')
         .order('order_time', { ascending: false })
         .limit(10);
 

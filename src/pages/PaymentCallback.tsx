@@ -180,7 +180,6 @@ export default function PaymentCallback() {
       const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-secure', {
         body: { action: 'verify', reference: paymentReference }
       });
-      console.log('🔍 Backend verify payload keys:', primaryData ? Object.keys(primaryData) : []);
 
       const normalize = (res: any) => {
         // paystack-secure: { status: true, data }
@@ -202,32 +201,15 @@ export default function PaymentCallback() {
 
       const data = normalized.data;
 
-      // Handle success response (only accept explicit success)
-      if (data?.success === true || data?.data?.status === 'success') {
+      // Handle success response
+      if (data?.success === true || data?.status === true || data?.data?.status === 'success') {
         console.log('🎉 Payment verification successful');
-
-        const orderNumberFromStorage = (() => {
-          try {
-            const od = sessionStorage.getItem('orderDetails');
-            return od ? JSON.parse(od)?.orderNumber : null;
-          } catch { return null; }
-        })();
-        const orderNumber =
-          data.order_number ||
-          data.data?.order_number ||
-          data.data?.metadata?.order_number ||
-          sessionStorage.getItem('current_order_number') ||
-          orderNumberFromStorage ||
-          null;
-
-        const resolvedAmount = data.data?.amount || data.amount;
-
         setStatus('success');
         setResult({
           success: true,
-          order_id: data.order_id || data.data?.order_id,
-          order_number: orderNumber || undefined,
-          amount: resolvedAmount,
+          order_id: data.order_id,
+          order_number: data.order_number,
+          amount: data.data?.amount || data.amount,
           message: data.message || 'Payment verified successfully! Your order has been confirmed.'
         });
         
@@ -239,8 +221,8 @@ export default function PaymentCallback() {
         retryRef.current = maxRetries;
         
         // Clear cart and refresh orders
-        console.log('🛒 Processing successful payment for order:', orderNumber || '(unknown)');
-        await clearCartAfterPayment(orderNumber || paymentReference);
+        console.log('🛒 Processing successful payment');
+        await clearCartAfterPayment(data.order_number);
         clearCheckoutState();
         try { 
           sessionStorage.removeItem('paystack_last_reference'); 

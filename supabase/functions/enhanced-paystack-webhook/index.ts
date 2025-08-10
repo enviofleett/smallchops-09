@@ -38,46 +38,23 @@ serve(async (req) => {
       }
 
       // Update payment status
-      const { error: txnUpdateError } = await supabaseAdmin
+      await supabaseAdmin
         .from('payment_transactions')
         .update({ 
           status: 'success',
           paid_at: new Date().toISOString(),
-          gateway_response: data
+          provider_response: data
         })
         .eq('id', transaction.id);
 
-      if (txnUpdateError) {
-        console.error('Failed to update payment transaction:', txnUpdateError);
-      }
-
       // Update order status
-      const orderUpdatePayload: Record<string, any> = {
-        payment_status: 'paid',
-        status: 'confirmed',
-        paid_at: new Date().toISOString(),
-        payment_verified_at: new Date().toISOString()
-      };
-
-      const { error: orderUpdateError } = await supabaseAdmin
+      await supabaseAdmin
         .from('orders')
-        .update(orderUpdatePayload)
+        .update({ 
+          payment_status: 'paid',
+          status: 'processing'
+        })
         .eq('id', transaction.order_id);
-
-      if (orderUpdateError) {
-        console.warn('Order update (with payment_verified_at) failed, retrying without it:', orderUpdateError);
-        const { error: orderFallbackError } = await supabaseAdmin
-          .from('orders')
-          .update({ 
-            payment_status: 'paid',
-            status: 'confirmed',
-            paid_at: new Date().toISOString()
-          })
-          .eq('id', transaction.order_id);
-        if (orderFallbackError) {
-          console.error('Order update failed:', orderFallbackError);
-        }
-      }
 
       // Send payment confirmation email using templates
       const order = transaction.orders;

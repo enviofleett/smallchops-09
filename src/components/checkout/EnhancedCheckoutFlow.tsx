@@ -358,29 +358,12 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           throw new Error('No payment object in response');
         }
         
-        // Extract order details with comprehensive fallbacks - FIXED VERSION
-        const orderNumber = workingData.order_number || 
-                           workingData.data?.order_number || 
-                           parsedData.order_number ||
-                           paymentObj.reference ||
-                           uniqueReference;
+        // Extract order details early for potential fallback
+        const orderNumber = workingData.order_number || workingData.data?.order_number;
+        const totalAmount = workingData.total_amount || workingData.data?.total_amount;
+        const orderId = workingData.order_id || workingData.data?.order_id;
         
-        const orderId = workingData.order_id || 
-                       workingData.data?.order_id || 
-                       parsedData.order_id;
-        
-        const totalAmount = workingData.total_amount || 
-                           workingData.data?.total_amount || 
-                           parsedData.total_amount || 
-                           sanitizedData.total_amount;
-        
-        console.log('✅ Order details extracted with fallbacks:', { 
-          orderNumber, 
-          orderId, 
-          totalAmount,
-          paymentRef: paymentObj.reference,
-          uniqueRef: uniqueReference
-        });
+        console.log('✅ Order details extracted:', { orderNumber, totalAmount, orderId });
         
         // Extract payment URL with fallbacks
         let authUrl = paymentObj.authorization_url;
@@ -410,7 +393,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
               customer_name: sanitizedData.customer_name,
               order_number: orderNumber
             },
-            callback_url: `${window.location.origin}/payment/callback?order_id=${orderId}&order_number=${orderNumber}`
+            callback_url: `${window.location.origin}/payment/callback?order_id=${orderId}`
           };
           const { data: initResp, error: initErr } = await supabase.functions.invoke('paystack-secure', { body: initBody });
           console.log('🔁 Fallback init response:', { initResp, initErr });
@@ -434,7 +417,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         
         console.log('✅ Valid payment URL found:', paymentUrl);
         
-        // Save order details for success page with enhanced storage - FIXED VERSION
+        // Save order details for success page
         const orderDetails = {
           orderId,
           orderNumber,
@@ -443,44 +426,9 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           customerName: sanitizedData.customer_name,
           fulfillmentType: sanitizedData.fulfillment_type,
           deliveryAddress: sanitizedData.delivery_address,
-          orderItems: sanitizedData.order_items,
-          paymentReference: paymentObj.reference,
-          uniqueReference: uniqueReference
+          orderItems: sanitizedData.order_items
         };
-
-        console.log('💾 Storing enhanced order details:', orderDetails);
-        
-        try {
-          sessionStorage.setItem('orderDetails', JSON.stringify(orderDetails));
-          
-          // Store multiple references with fallbacks - ENHANCED VERSION
-          const finalOrderRef = orderNumber || orderId || paymentObj.reference || uniqueReference;
-          const finalPaymentRef = paymentObj.reference || uniqueReference;
-          
-          sessionStorage.setItem('current_order_number', String(finalOrderRef));
-          sessionStorage.setItem('current_order_id', String(orderId || finalOrderRef));
-          sessionStorage.setItem('paystack_last_reference', String(finalPaymentRef));
-          localStorage.setItem('paystack_last_reference', String(finalPaymentRef));
-          
-          // Create payment-to-order mapping for callback
-          const mapping = {
-            [finalPaymentRef]: finalOrderRef,
-            [uniqueReference]: finalOrderRef
-          };
-          sessionStorage.setItem('payment_to_order_mapping', JSON.stringify(mapping));
-          
-          console.log('💾 Enhanced storage completed:', {
-            orderRef: finalOrderRef,
-            paymentRef: finalPaymentRef,
-            uniqueRef: uniqueReference,
-            orderId: orderId,
-            mapping: mapping
-          });
-          
-        } catch (storageError) {
-          console.error('💾 Storage error (non-critical):', storageError);
-        }
-        
+        sessionStorage.setItem('orderDetails', JSON.stringify(orderDetails));
         
         // Clear cart and checkout state
         clearCart();
@@ -492,6 +440,9 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           paymentUrl,
           reference: paymentObj.reference 
         });
+        
+        // Remember reference in case gateway omits it on callback
+        try { if (paymentObj?.reference) sessionStorage.setItem('paystack_last_reference', paymentObj.reference); } catch {}
         
         console.log('🚀 Redirecting to payment URL:', paymentUrl);
         try {

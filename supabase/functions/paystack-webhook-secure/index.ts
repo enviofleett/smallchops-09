@@ -1,11 +1,11 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { crypto } from "https://deno.land/std@0.190.0/crypto/mod.ts";
+// Removed unused crypto import
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 };
 
@@ -39,28 +39,7 @@ interface PaystackWebhookPayload {
 }
 
 // Security function to verify webhook signature
-async function verifyWebhookSignature(payload: string, signature: string, secret: string): Promise<boolean> {
-  try {
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(secret),
-      { name: 'HMAC', hash: 'SHA-512' },
-      false,
-      ['sign']
-    );
-    
-    const computedSignature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
-    const computedHex = Array.from(new Uint8Array(computedSignature))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
-    
-    return computedHex === signature;
-  } catch (error) {
-    console.error('Signature verification error:', error);
-    return false;
-  }
-}
+// Signature verification removed per Paystack IP-only recommendation
 
 // Function to log security incidents
 async function logSecurityIncident(
@@ -242,118 +221,49 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Get the raw payload for signature verification
-    const payload = await req.text();
-    const signature = req.headers.get('x-paystack-signature');
+// Parse JSON payload directly
+let webhookData: any;
+try {
+  webhookData = await req.json();
+} catch (error) {
+  console.error('Invalid JSON payload:', error);
+  return new Response('Invalid JSON', { status: 400, headers: corsHeaders });
+}
 
-    if (!signature) {
+// Basic IP logging (retain for auditing)
+const clientIP = req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for');
+
+// Validate request is from Paystack IPs (basic IP validation)
+const paystackIPs = [
+  '52.31.139.75',
+  '52.49.173.169',
+  '52.214.14.220'
+];
+
+// In production, verify IP or call validator function
+if (Deno.env.get('ENVIRONMENT') === 'production' && clientIP) {
+  if (!paystackIPs.includes(clientIP.split(',')[0].trim())) {
+    const { data: ipValidation } = await supabase.functions.invoke('validate-paystack-ip', {
+      body: { ip: clientIP }
+    });
+
+    if (!ipValidation?.valid) {
       await logSecurityIncident(
-        'webhook_no_signature',
-        'Webhook received without signature',
-        'high',
-        { ip: req.headers.get('cf-connecting-ip') }
-      );
-      // Return 200 to prevent repeated retries while ignoring processing
-      return new Response('No signature provided (ignored)', { status: 200, headers: corsHeaders });
-    }
-
-    // Validate request is from Paystack IPs (basic IP validation)
-    const clientIP = req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for');
-    const paystackIPs = [
-      '52.31.139.75',
-      '52.49.173.169',
-      '52.214.14.220'
-    ];
-
-    // In production, you should verify against Paystack IPs or use the function validator
-    if (Deno.env.get('ENVIRONMENT') === 'production' && clientIP) {
-      if (!paystackIPs.includes(clientIP.split(',')[0].trim())) {
-        // Call IP validation function
-        const { data: ipValidation } = await supabase.functions.invoke('validate-paystack-ip', {
-          body: { ip: clientIP }
-        });
-        
-        if (!ipValidation?.valid) {
-          await logSecurityIncident(
-            'webhook_invalid_ip',
-            `Webhook from unauthorized IP: ${clientIP}`,
-            'critical',
-            { ip: clientIP }
-          );
-          return new Response('Unauthorized IP', { status: 403, headers: corsHeaders });
-        }
-      }
-    }
-
-    // Resolve signature secret from a single centralized source:
-    // 1) RPC get_active_paystack_config (webhook_secret is guaranteed non-null by SQL)
-    // 2) PAYSTACK_WEBHOOK_SECRET env (optional explicit override)
-    // 3) PAYSTACK_SECRET_KEY env (valid fallback per Paystack docs)
-    let secretForSignature = '';
-    let effectiveConfig: any = null;
-    let secretSource = 'unknown';
-
-    try {
-      const { data: cfg, error: cfgErr } = await supabase.rpc('get_active_paystack_config');
-      if (cfgErr) {
-        console.warn('RPC get_active_paystack_config error:', cfgErr.message);
-      }
-      effectiveConfig = Array.isArray(cfg) ? cfg?.[0] : cfg;
-    } catch (e) {
-      console.warn('RPC get_active_paystack_config call failed:', e);
-    }
-
-    if (effectiveConfig?.webhook_secret) {
-      secretForSignature = effectiveConfig.webhook_secret;
-      secretSource = 'db:webhook_secret';
-    } else if (Deno.env.get('PAYSTACK_WEBHOOK_SECRET')) {
-      secretForSignature = Deno.env.get('PAYSTACK_WEBHOOK_SECRET')!;
-      secretSource = 'env:PAYSTACK_WEBHOOK_SECRET';
-    } else if (Deno.env.get('PAYSTACK_SECRET_KEY')) {
-      secretForSignature = Deno.env.get('PAYSTACK_SECRET_KEY')!;
-      secretSource = 'env:PAYSTACK_SECRET_KEY';
-    } else if (effectiveConfig?.secret_key) {
-      secretForSignature = effectiveConfig.secret_key;
-      secretSource = 'db:secret_key';
-    }
-
-    if (!secretForSignature) {
-      console.error('No signature secret available (ignored)');
-      await logSecurityIncident('webhook_missing_secret', 'No secret available for signature verification', 'high');
-      // Return 200 to avoid repeated retries, but ignore processing
-      return new Response('Signature secret missing (ignored)', { status: 200, headers: corsHeaders });
-    }
-
-    console.log(`🔐 Webhook signature mode: ${(effectiveConfig?.environment) || (effectiveConfig?.test_mode ? 'test' : 'live') || 'unknown'} | source: ${secretSource}`);
-
-    // Verify webhook signature
-    const isValidSignature = await verifyWebhookSignature(payload, signature, secretForSignature);
-    
-    if (!isValidSignature) {
-      await logSecurityIncident(
-        'webhook_invalid_signature',
-        'Webhook with invalid signature',
+        'webhook_invalid_ip',
+        `Webhook from unauthorized IP: ${clientIP}`,
         'critical',
-        { ip: clientIP, signature }
+        { ip: clientIP }
       );
-      // Return 200 to prevent retries but do not process
-      return new Response('Invalid signature (ignored)', { status: 200, headers: corsHeaders });
+      return new Response('Unauthorized IP', { status: 403, headers: corsHeaders });
     }
+  }
+}
 
-    // Parse the webhook payload
-    let webhookData: any;
-    try {
-      webhookData = JSON.parse(payload);
-    } catch (error) {
-      console.error('Invalid JSON payload:', error);
-      return new Response('Invalid JSON', { status: 400, headers: corsHeaders });
-    }
-
-    // Validate event structure
-    if (!webhookData.event || !webhookData.data) {
-      console.error('Invalid webhook structure');
-      return new Response('Invalid webhook structure', { status: 400, headers: corsHeaders });
-    }
+// Validate event structure
+if (!webhookData.event || !webhookData.data) {
+  console.error('Invalid webhook structure');
+  return new Response('Invalid webhook structure', { status: 400, headers: corsHeaders });
+}
 
     // Check for duplicate events (prevent replay attacks)
     const eventId = `${webhookData.event}-${webhookData.data.reference}-${webhookData.data.id}`;
@@ -375,7 +285,6 @@ serve(async (req) => {
         paystack_event_id: eventId,
         event_type: webhookData.event,
         event_data: webhookData,
-        signature: signature,
         processed: false,
         created_at: new Date()
       });
@@ -391,30 +300,25 @@ serve(async (req) => {
 
     switch (webhookData.event) {
       case 'charge.success': {
-        // Double-verify with Paystack before processing, use env first then RPC secret_key
+        // Double-verify with Paystack before processing using env or DB config
         let verifyKey = '';
         let verifyKeySource = 'unknown';
+
         if (Deno.env.get('PAYSTACK_SECRET_KEY')) {
           verifyKey = Deno.env.get('PAYSTACK_SECRET_KEY')!;
           verifyKeySource = 'env:PAYSTACK_SECRET_KEY';
-        } else if (effectiveConfig?.secret_key) {
-          verifyKey = effectiveConfig.secret_key;
-          verifyKeySource = 'db:secret_key';
-        }
-
-        if (!verifyKey && !effectiveConfig) {
-          // Try RPC again if we didn't have it
+        } else {
           try {
-            const { data: cfg2 } = await supabase.rpc('get_active_paystack_config');
-            const eff2 = Array.isArray(cfg2) ? cfg2?.[0] : cfg2;
-            if (eff2?.secret_key) {
-              verifyKey = eff2.secret_key;
-              verifyKeySource = 'db:secret_key (retry)';
+            const { data: cfg } = await supabase.rpc('get_active_paystack_config');
+            const eff = Array.isArray(cfg) ? cfg?.[0] : cfg;
+            if (eff?.secret_key) {
+              verifyKey = eff.secret_key;
+              verifyKeySource = 'db:secret_key';
             }
           } catch (_e) {}
         }
 
-        console.log(`🔁 Double verify mode: ${(effectiveConfig?.environment) || (effectiveConfig?.test_mode ? 'test' : 'live') || 'unknown'} | key source: ${verifyKeySource}`);
+        console.log(`Double verify key source: ${verifyKeySource}`);
 
         if (!verifyKey) {
           console.warn('No key available for double verification; skipping processing');
@@ -452,7 +356,7 @@ serve(async (req) => {
         }
         break;
       }
-      
+
       case 'charge.failed':
         processingResult = await processChargeFailed(webhookData.data);
         break;

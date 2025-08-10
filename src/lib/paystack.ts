@@ -146,8 +146,7 @@ class PaystackService {
       const response = await supabase.functions.invoke('paystack-secure', {
         body: {
           action: 'charge',
-          ...chargeData,
-          reference: chargeData.reference || this.generateReference()
+          ...chargeData
         },
       });
 
@@ -186,11 +185,11 @@ class PaystackService {
   }
 
   generateReference(): string {
-    // Use secure reference generation
+    // DEPRECATED: Do not use client-side references for payments
+    console.warn('generateReference() is deprecated. Use server-generated references from paystack-secure.');
     const timestamp = Date.now();
     const randomBytes = crypto.getRandomValues(new Uint8Array(8));
     const randomHex = Array.from(randomBytes, byte => byte.toString(16).padStart(2, '0')).join('');
-    
     return `PAY_${timestamp}_${randomHex}`;
   }
 

@@ -2,18 +2,7 @@ import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { paystackService } from '@/lib/paystack';
-import { toast } from 'sonner';
-
-// Extend window object for Paystack
-declare global {
-  interface Window {
-    PaystackPop: {
-      setup: (config: any) => {
-        openIframe: () => void;
-      };
-    };
-  }
-}
+import { toast } from '@/hooks/use-toast';
 
 interface PaystackButtonProps {
   email: string;
@@ -40,7 +29,6 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
   metadata = {},
   onSuccess,
   onError,
-  onClose,
   className,
   disabled,
   children,
@@ -50,18 +38,16 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
 
   const initializePayment = useCallback(async () => {
     if (!email || !amount || amount <= 0) {
-      toast.error('Invalid payment details');
+      toast({ title: 'Payment Error', description: 'Invalid payment details', variant: 'destructive' });
       return;
     }
 
     setLoading(true);
-    
+
     try {
-      // Generate secure reference
       const reference = paystackService.generateReference();
       const callbackUrl = `${window.location.origin}/payment/callback?order_id=${orderId}`;
-      
-      // Initialize transaction with backend
+
       const response = await paystackService.initializeTransaction({
         email,
         amount: paystackService.formatAmount(amount),
@@ -72,80 +58,40 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
           orderId,
           customerName,
           customerPhone,
-          ...metadata
-        }
+          ...metadata,
+        },
       });
 
-      if (response.authorization_url) {
-        // Open Paystack popup or redirect
-        const config = await paystackService.getConfig();
-        
-        if (config?.public_key) {
-          // Use Paystack inline popup
-          const handler = window.PaystackPop.setup({
-            key: config.public_key,
-            email,
-            amount: paystackService.formatAmount(amount),
-            ref: reference,
-            channels,
-            currency: 'NGN',
-            metadata: {
-              orderId,
-              customerName,
-              customerPhone,
-              ...metadata
-            },
-            onClose: () => {
-              setLoading(false);
-              onClose?.();
-            },
-            callback: (response: any) => {
-              setLoading(false);
-              if (response.status === 'success') {
-                try { 
-                  sessionStorage.setItem('paystack_last_reference', response.reference);
-                  localStorage.setItem('paystack_last_reference', response.reference);
-                } catch {}
-                onSuccess(response.reference, response);
-              } else {
-                onError('Payment was not completed');
-              }
-            }
-          });
-          try { sessionStorage.setItem('paystack_last_reference', reference); } catch {}
-          
-          handler.openIframe();
+      const url = response?.authorization_url || response?.data?.authorization_url;
+      if (!url) throw new Error('Authorization URL not returned');
+
+      try { sessionStorage.setItem('paystack_last_reference', reference); localStorage.setItem('paystack_last_reference', reference); } catch {}
+
+      // Direct redirect (no iframe) to avoid CORS/CSP issues
+      try {
+        if (window.top && window.top !== window.self) {
+          (window.top as Window).location.href = url;
         } else {
-          // Fallback to redirect (break out of preview iframe if needed)
-          const url = response.authorization_url;
-          try {
-            if (window.top && window.top !== window.self) {
-              (window.top as Window).location.href = url;
-            } else {
-              window.location.href = url;
-            }
-          } catch {
-            window.open(url, '_blank', 'noopener,noreferrer');
-          }
+          window.location.href = url;
         }
-      } else {
-        throw new Error('Failed to initialize payment');
+      } catch {
+        window.open(url, '_blank', 'noopener,noreferrer');
       }
+
+      // Optionally notify caller that we got an auth URL (no txn yet)
+      onSuccess(reference, { authorization_url: url });
     } catch (error) {
-      setLoading(false);
-      console.error('Payment initialization error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Payment initialization failed';
+      console.error('Payment initialization error:', errorMessage);
+      toast({ title: 'Payment Error', description: errorMessage, variant: 'destructive' });
       onError(errorMessage);
-      toast.error(errorMessage);
+    } finally {
+      setLoading(false);
     }
-  }, [email, amount, orderId, customerName, customerPhone, metadata, channels, onSuccess, onError, onClose]);
+  }, [email, amount, orderId, customerName, customerPhone, metadata, channels, onSuccess, onError]);
 
   return (
-    <Button
-      onClick={initializePayment}
-      disabled={disabled || loading}
-      className={className}
-    >
+    <Button onClick={initializePayment} disabled={disabled || loading} className={className}>
       {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
       {children || `Pay ${paystackService.formatCurrency(amount)}`}
     </Button>

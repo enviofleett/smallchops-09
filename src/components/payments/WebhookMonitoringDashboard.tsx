@@ -142,14 +142,34 @@ export function WebhookMonitoringDashboard() {
             Monitor Paystack webhook processing and performance
           </p>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={loadWebhookData}
-          disabled={refreshing}
-        >
-          <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          <a
+            href={`https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/functions/paystack-webhook-secure/logs`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs underline text-muted-foreground"
+            title="Open paystack-webhook-secure logs"
+          >
+            Webhook Logs
+          </a>
+          <a
+            href={`https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/functions/paystack-secure/logs`}
+            target="_blank"
+            rel="noreferrer"
+            className="text-xs underline text-muted-foreground"
+            title="Open paystack-secure logs"
+          >
+            Verify Logs
+          </a>
+          <Button 
+            variant="outline" 
+            onClick={loadWebhookData}
+            disabled={refreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
 
       {/* Metrics Overview */}

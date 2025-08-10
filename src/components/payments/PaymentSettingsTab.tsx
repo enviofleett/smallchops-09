@@ -11,6 +11,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Building2, Globe, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { PaymentDiagnostics } from '@/components/payments/PaymentDiagnostics';
 interface PaymentIntegration {
   id: string;
   provider: string;
@@ -337,6 +338,19 @@ export const PaymentSettingsTab: React.FC = () => {
                   </div>
                 </AlertDescription>
               </Alert>
+
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  <div className="space-y-2">
+                    <div className="font-medium">Webhook Configuration Tip</div>
+                    <p className="text-sm text-muted-foreground">
+                      Ensure your Paystack Dashboard points to the endpoint above. Avoid using other endpoints like
+                      <code className="mx-1">enhanced-paystack-webhook</code> as these may require JWT and will reject Paystack.
+                    </p>
+                  </div>
+                </AlertDescription>
+              </Alert>
             </>
           )}
         </CardContent>
@@ -362,5 +376,9 @@ export const PaymentSettingsTab: React.FC = () => {
           Never share your secret keys or webhook secrets publicly.
         </AlertDescription>
       </Alert>
+
+      <div className="grid gap-6">
+        <PaymentDiagnostics />
+      </div>
     </div>;
 };

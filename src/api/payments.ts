@@ -54,7 +54,6 @@ export class PaymentsAPI {
           action: 'initialize',
           email: request.email,
           amount: request.amount * 100, // Convert to kobo
-          reference: request.reference,
           channels: request.channels || ['card', 'bank', 'ussd', 'mobile_money'],
           metadata: {
             order_id: request.orderDetails.id,

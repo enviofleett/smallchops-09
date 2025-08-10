@@ -35,12 +35,9 @@ export const usePayment = () => {
   ): Promise<PaymentResult> => {
     setLoading(true);
     try {
-      const provisionalRef = paystackService.generateReference();
-
       const response = await paystackService.initializeTransaction({
         email: customerEmail || '',
         amount: paystackService.formatAmount(amount),
-        reference: provisionalRef,
         callback_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`,
         metadata: { order_id: orderId, orderId }
       });

@@ -12,7 +12,7 @@ export interface PaystackTransaction {
   email: string;
   amount: number;
   currency?: string;
-  reference: string;
+  reference?: string;
   callback_url?: string;
   metadata?: Record<string, any>;
   channels?: string[];

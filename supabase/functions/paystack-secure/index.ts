@@ -56,7 +56,7 @@ function parseMetadata(input: unknown): Record<string, any> {
 async function initializePayment(requestData: any) {
   try {
     // Ignore reference from frontend; always generate server reference
-    const { email, amount, channels, metadata, callback_url } = requestData || {};
+    const { email, amount, channels, metadata, callback_url, reference: client_reference } = requestData || {};
 
     if (!email || amount === undefined || amount === null) {
       throw new Error('Email and amount are required');
@@ -135,8 +135,12 @@ async function initializePayment(requestData: any) {
     try {
       const metaObj = parseMetadata(metadata);
       metaObjCache = metaObj;
-      let orderId: string | null = metaObj.order_id || metaObj.orderId || null;
-      const orderNumber: string | null = metaObj.order_number || metaObj.orderNumber || null;
+      // Persist any client-supplied provisional reference for later mapping
+      if (client_reference && !metaObj.client_reference) {
+        (metaObj as any).client_reference = client_reference;
+      }
+      let orderId: string | null = (metaObj as any).order_id || (metaObj as any).orderId || null;
+      const orderNumber: string | null = (metaObj as any).order_number || (metaObj as any).orderNumber || null;
 
       // Resolve order id by number if needed
       if (!orderId && orderNumber) {
@@ -166,7 +170,7 @@ async function initializePayment(requestData: any) {
         amount: amountInKobo / 100, // store in NGN
         currency: 'NGN',
         status: 'pending',
-        metadata: metaObj || {},
+        metadata: client_reference ? { ...metaObj, client_reference } : (metaObj || {}),
         customer_email: email,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
@@ -234,17 +238,72 @@ async function verifyPayment(requestData: any) {
       throw new Error(`Paystack ${mode} secret key not configured`);
     }
 
-    console.log('Verifying Paystack payment:', reference);
+    let effectiveRef = reference;
+    console.log('Verifying Paystack payment:', effectiveRef);
 
-    const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-      method: 'GET',
-      headers: { 'Authorization': `Bearer ${secretKey}`, 'Content-Type': 'application/json' }
-    });
+    async function verifyWithPaystack(ref: string) {
+      const resp = await fetch(`https://api.paystack.co/transaction/verify/${ref}`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${secretKey}`, 'Content-Type': 'application/json' }
+      });
+      return resp;
+    }
+
+    let paystackResponse = await verifyWithPaystack(effectiveRef);
 
     if (!paystackResponse.ok) {
       const errorText = await paystackResponse.text();
       console.error('❌ Paystack verification HTTP error:', paystackResponse.status, errorText);
-      throw new Error(`Paystack verification failed (${paystackResponse.status}): ${errorText}`);
+      // Try to map client-side provisional ref to server ref
+      let shouldMap = /transaction_not_found|not found/i.test(errorText) && /^(pay|PAY|Pay)[-_]/.test(reference);
+      if (shouldMap) {
+        try {
+          // 1) Find by metadata.client_reference
+          const { data: mappedTx } = await supabaseClient
+            .from('payment_transactions')
+            .select('provider_reference, order_id, metadata')
+            .contains('metadata', { client_reference: reference })
+            .order('created_at', { ascending: false })
+            .maybeSingle();
+
+          if (mappedTx?.provider_reference) {
+            effectiveRef = mappedTx.provider_reference as string;
+            console.log('🔁 Mapped client reference to server reference:', effectiveRef);
+            paystackResponse = await verifyWithPaystack(effectiveRef);
+          } else if (requestData?.order_id) {
+            // 2) Fallback by order_id
+            const { data: byOrder } = await supabaseClient
+              .from('payment_transactions')
+              .select('provider_reference')
+              .eq('order_id', requestData.order_id)
+              .order('created_at', { ascending: false })
+              .maybeSingle();
+            if (byOrder?.provider_reference) {
+              effectiveRef = byOrder.provider_reference as string;
+              console.log('🔁 Fallback mapped by order_id to reference:', effectiveRef);
+              paystackResponse = await verifyWithPaystack(effectiveRef);
+            } else {
+              const { data: orderRow } = await supabaseClient
+                .from('orders')
+                .select('payment_reference')
+                .eq('id', requestData.order_id)
+                .maybeSingle();
+              if (orderRow?.payment_reference) {
+                effectiveRef = orderRow.payment_reference as string;
+                console.log('🔁 Fallback mapped from orders.payment_reference:', effectiveRef);
+                paystackResponse = await verifyWithPaystack(effectiveRef);
+              }
+            }
+          }
+        } catch (mapErr) {
+          console.warn('Reference mapping attempt failed:', mapErr);
+        }
+      }
+
+      if (!paystackResponse.ok) {
+        // Still failing after mapping
+        throw new Error(`Paystack verification failed (${paystackResponse.status}): ${errorText}`);
+      }
     }
 
     const paystackData = await paystackResponse.json();
@@ -266,7 +325,7 @@ async function verifyPayment(requestData: any) {
         const { data: byRef } = await supabaseClient
           .from('orders')
           .select('id')
-          .or(`payment_reference.eq.${reference},id.eq.${reference}`)
+          .or(`payment_reference.eq.${effectiveRef},id.eq.${effectiveRef}`)
           .maybeSingle();
         if (byRef?.id) orderId = byRef.id;
       }
@@ -281,7 +340,7 @@ async function verifyPayment(requestData: any) {
 
       const isSuccess = tx.status === 'success';
       const baseUpdate: any = {
-        provider_reference: reference,
+        provider_reference: effectiveRef,
         transaction_type: 'charge',
         status: isSuccess ? 'paid' : tx.status || 'failed',
         amount: typeof tx.amount === 'number' ? tx.amount / 100 : null,
@@ -311,7 +370,7 @@ async function verifyPayment(requestData: any) {
         const { data: existing } = await supabaseClient
           .from('payment_transactions')
           .select('id')
-          .eq('provider_reference', reference)
+           .eq('provider_reference', effectiveRef)
           .maybeSingle();
         if (existing?.id) {
           await supabaseClient
@@ -326,7 +385,7 @@ async function verifyPayment(requestData: any) {
       // Call RPC to finalize (updates orders, saves cards, logs)
       try {
         const { error: rpcError } = await supabaseClient.rpc('handle_successful_payment', {
-          p_reference: reference,
+          p_reference: effectiveRef,
           p_paid_at: baseUpdate.paid_at,
           p_gateway_response: baseUpdate.gateway_response,
           p_fees: tx.fees ?? 0,
@@ -347,7 +406,7 @@ async function verifyPayment(requestData: any) {
       if (orderId) {
         await supabaseClient
           .from('orders')
-          .update({ payment_reference: reference, updated_at: new Date().toISOString() })
+          .update({ payment_reference: effectiveRef, updated_at: new Date().toISOString() })
           .eq('id', orderId);
       }
 
@@ -377,7 +436,7 @@ async function verifyPayment(requestData: any) {
             total_amount
           )
         `)
-        .eq('provider_reference', reference)
+        .eq('provider_reference', effectiveRef)
         .maybeSingle();
       orderInfo = txWithOrder?.order ? txWithOrder.order : null;
     } catch (e) {

@@ -77,6 +77,7 @@ export default function PaymentCallback() {
   };
 
   const reference = getPaymentReference();
+  const orderIdParam = searchParams.get('order_id');
   const paymentStatus = searchParams.get('status');
   const forceUi = ((searchParams.get('force') || '').toLowerCase() === 'ui');
 
@@ -149,7 +150,7 @@ export default function PaymentCallback() {
 
       // Single definitive call: server completes all DB updates before responding
       const { data, error } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference: paymentReference }
+        body: { action: 'verify', reference: paymentReference, order_id: orderIdParam }
       });
 
       if (error || !data?.status) {

@@ -3,6 +3,7 @@ import React from 'react';
 import { useEditor, EditorContent } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Placeholder from '@tiptap/extension-placeholder';
+import DOMPurify from 'dompurify';
 import { cn } from '@/lib/utils';
 import { RichTextToolbar } from './rich-text-toolbar';
 import { RichTextStyles } from './rich-text-styles';
@@ -38,16 +39,19 @@ export const RichTextEditor = ({
         placeholder: placeholder,
       }),
     ],
-    content: value,
+    content: DOMPurify.sanitize(value),
     onUpdate: ({ editor }) => {
-      onChange(editor.getHTML());
+      onChange(DOMPurify.sanitize(editor.getHTML()));
     },
     editable: !disabled,
   });
 
   React.useEffect(() => {
-    if (editor && value !== editor.getHTML()) {
-      editor.commands.setContent(value);
+    if (editor) {
+      const clean = DOMPurify.sanitize(value);
+      if (clean !== editor.getHTML()) {
+        editor.commands.setContent(clean);
+      }
     }
   }, [editor, value]);
 

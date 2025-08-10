@@ -1,5 +1,6 @@
 
 import { z } from "zod";
+import DOMPurify from 'dompurify';
 
 export const categorySchema = z.object({
   name: z.string().min(1, "Category name is required").max(100, "Category name must be less than 100 characters"),
@@ -19,9 +20,5 @@ export const generateSlug = (name: string): string => {
 
 // Sanitize HTML content to prevent XSS
 export const sanitizeHtml = (html: string): string => {
-  // Basic HTML sanitization - remove script tags and dangerous attributes
-  return html
-    .replace(/<script[^>]*>.*?<\/script>/gi, '')
-    .replace(/on\w+="[^"]*"/gi, '')
-    .replace(/javascript:/gi, '');
+  return DOMPurify.sanitize(html);
 };

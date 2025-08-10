@@ -1,13 +1,8 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-// Removed unused crypto import
+import { getCorsHeaders } from "../_shared/cors.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-};
 
 // Paystack webhook events that we handle
 interface PaystackWebhookPayload {
@@ -204,6 +199,8 @@ async function processTransferFailed(data: any): Promise<{ success: boolean; mes
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -221,12 +218,49 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-// Parse JSON payload directly
+// Verify Paystack signature (HMAC-SHA512 over raw body)
 let webhookData: any;
 try {
-  webhookData = await req.json();
+  const rawBody = await req.text();
+  const providedSig = req.headers.get('x-paystack-signature');
+  if (!providedSig) {
+    await logSecurityIncident('webhook_missing_signature', 'Missing x-paystack-signature header', 'critical', {});
+    return new Response('Unauthorized', { status: 401, headers: corsHeaders });
+  }
+
+  // Resolve secret key from ENV or DB config
+  let secretKey = Deno.env.get('PAYSTACK_SECRET_KEY') || '';
+  if (!secretKey) {
+    try {
+      const { data: cfg } = await supabase.rpc('get_active_paystack_config');
+      const eff = Array.isArray(cfg) ? cfg?.[0] : cfg;
+      if (eff?.secret_key) secretKey = eff.secret_key;
+    } catch (_) {}
+  }
+  if (!secretKey) {
+    await logSecurityIncident('webhook_secret_missing', 'No Paystack secret available for signature verification', 'critical', {});
+    return new Response('Server misconfigured', { status: 500, headers: corsHeaders });
+  }
+
+  const encoder = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    'raw',
+    encoder.encode(secretKey),
+    { name: 'HMAC', hash: 'SHA-512' },
+    false,
+    ['sign']
+  );
+  const sigBuf = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody));
+  const computedSig = Array.from(new Uint8Array(sigBuf)).map(b => b.toString(16).padStart(2, '0')).join('');
+
+  if (computedSig !== providedSig) {
+    await logSecurityIncident('webhook_invalid_signature', 'Invalid Paystack signature', 'critical', { providedSig });
+    return new Response('Invalid signature', { status: 401, headers: corsHeaders });
+  }
+
+  webhookData = JSON.parse(rawBody);
 } catch (error) {
-  console.error('Invalid JSON payload:', error);
+  console.error('Invalid webhook payload:', error);
   return new Response('Invalid JSON', { status: 400, headers: corsHeaders });
 }
 

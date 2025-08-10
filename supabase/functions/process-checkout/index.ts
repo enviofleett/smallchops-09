@@ -51,7 +51,13 @@ serve(async (req) => {
     );
 
     const requestBody = await req.json();
-    console.log('📥 Received checkout request:', JSON.stringify(requestBody, null, 2));
+    const sanitized = {
+      ...requestBody,
+      customer_email: requestBody?.customer_email ? String(requestBody.customer_email).replace(/(^.).+(@.*$)/, '$1***$2') : undefined,
+      customer_phone: requestBody?.customer_phone ? String(requestBody.customer_phone).replace(/\d(?=\d{2})/g, '*') : undefined,
+      order_items: Array.isArray(requestBody?.order_items) ? `items[x${requestBody.order_items.length}]` : requestBody?.order_items
+    };
+    console.log('📥 Received checkout request:', JSON.stringify(sanitized, null, 2));
 
     // Get user context for debugging
     const authHeader = req.headers.get('authorization');

@@ -24,7 +24,8 @@ serve(async (req) => {
     );
 
     const requestBody = await req.json();
-    console.log('📨 Request payload:', JSON.stringify(requestBody));
+    const sanitizedRequest = { ...requestBody, email: requestBody?.email ? String(requestBody.email).replace(/(^.).+(@.*$)/, '$1***$2') : undefined };
+    console.log('📨 Request payload:', JSON.stringify(sanitizedRequest));
     
     const { action, ...requestData } = requestBody;
 

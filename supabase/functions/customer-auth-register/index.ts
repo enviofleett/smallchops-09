@@ -1,5 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { hash } from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -213,27 +214,30 @@ serve(async (req) => {
       );
     }
 
-    // Generate OTP code
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
+// Generate OTP code
+const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
 
-    // Store registration data temporarily and OTP
-    const { data: otpRecord, error: otpError } = await supabaseAdmin
-      .from('customer_otp_codes')
-      .insert({
-        email: email.toLowerCase(),
-        otp_code: otpCode,
-        otp_type: 'registration',
-        expires_at: expiresAt.toISOString(),
-        created_by_ip: clientIP,
-        verification_metadata: {
-          name: name,
-          phone: phone,
-          password_hash: password // In production, this should be hashed
-        }
-      })
-      .select()
-      .single();
+// Hash the password for secure storage
+const hashedPassword = await hash(password);
+
+// Store registration data temporarily and OTP
+const { data: otpRecord, error: otpError } = await supabaseAdmin
+  .from('customer_otp_codes')
+  .insert({
+    email: email.toLowerCase(),
+    otp_code: otpCode,
+    otp_type: 'registration',
+    expires_at: expiresAt.toISOString(),
+    created_by_ip: clientIP,
+    verification_metadata: {
+      name: name,
+      phone: phone,
+      password_hash: hashedPassword // ✅ Now properly hashed
+    }
+  })
+  .select()
+  .single();
 
     if (otpError) {
       console.error('Error storing OTP:', otpError);

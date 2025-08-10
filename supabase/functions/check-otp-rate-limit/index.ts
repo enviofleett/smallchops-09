@@ -10,7 +10,11 @@ const corsHeaders = {
 async function sendOTPEmail(supabase: any, email: string, otp: string, type: 'login' | 'registration' | 'password_reset') {
   try {
     // Determine the correct template key based on the email type
-    const templateKey = type === 'password_reset' ? 'password_reset_otp' : type === 'login' ? 'login_otp' : 'registration_otp';
+    const templateKey = type === 'password_reset' 
+      ? 'password_reset_otp' 
+      : type === 'login' 
+        ? 'login_otp' 
+        : 'customer_registration_otp'; // Fixed template key
 
     // Directly invoke the SMTP sender function with the corrected payload
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
@@ -62,6 +66,9 @@ serve(async (req) => {
       );
     }
 
+    // Normalize email to lowercase for consistency
+    const normalizedEmail = email.toLowerCase();
+
     // Create Supabase client with service role key
     const supabaseAdmin = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -69,9 +76,16 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
+    // Get client IP for rate limiting and audit logging
+    const forwarded = req.headers.get('x-forwarded-for');
+    const realIP = req.headers.get('x-real-ip');
+    const clientIP = forwarded 
+      ? forwarded.split(',')[0].trim() 
+      : realIP || '127.0.0.1';
+
     // Check rate limit using database function
     const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc('check_otp_rate_limit', {
-      p_email: email
+      p_email: normalizedEmail
     });
 
     if (rateLimitError) {
@@ -90,14 +104,16 @@ serve(async (req) => {
       // Generate OTP code
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       
-      // Store OTP in database for verification
+      // FIXED: Store OTP in customer_otp_codes table (not otp_codes)
       const { error: otpInsertError } = await supabaseAdmin
-        .from('otp_codes')
+        .from('customer_otp_codes')  // ✅ Correct table
         .insert({
-          email: email,
+          email: normalizedEmail,
           otp_code: otpCode,
           otp_type: type,
-          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString() // 10 minutes from now
+          expires_at: new Date(Date.now() + 10 * 60 * 1000).toISOString(), // 10 minutes from now
+          created_by_ip: clientIP,
+          verification_metadata: {} // Empty metadata for resends
         });
 
       if (otpInsertError) {
@@ -112,10 +128,16 @@ serve(async (req) => {
       }
 
       // Send OTP email immediately
-      const emailSent = await sendOTPEmail(supabaseAdmin, email, otpCode, type);
+      const emailSent = await sendOTPEmail(supabaseAdmin, normalizedEmail, otpCode, type);
       
       if (!emailSent) {
-        console.error('Failed to send OTP email');
+        // Clean up the OTP record if email fails
+        await supabaseAdmin
+          .from('customer_otp_codes')
+          .delete()
+          .eq('email', normalizedEmail)
+          .eq('otp_code', otpCode);
+
         return new Response(
           JSON.stringify({ error: "Failed to send OTP email" }),
           { 
@@ -125,7 +147,7 @@ serve(async (req) => {
         );
       }
 
-      console.log('OTP generated and sent successfully for:', email);
+      console.log('OTP generated and sent successfully for:', normalizedEmail);
     }
 
     return new Response(
@@ -140,7 +162,6 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" } 
       }
     );
-
   } catch (error) {
     console.error('Unexpected error:', error);
     return new Response(

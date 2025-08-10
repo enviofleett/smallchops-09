@@ -78,22 +78,41 @@ serve(async (req) => {
     }
 
     // Handle registration flow - create Supabase auth user if needed
-    if (otpType === 'registration' && password) {
+    if (otpType === 'registration') {
       try {
+        // Get registration data from verification result metadata
+        const registrationData: any = (verificationResult && (verificationResult as any).metadata) || {};
+        const finalName = name || registrationData.name || email.split('@')[0];
+        const finalPhone = phone || registrationData.phone;
+        const finalPassword = password || registrationData.password_hash;
+
+        if (!finalPassword) {
+          return new Response(
+            JSON.stringify({ 
+              error: "Password is required for registration",
+              success: false 
+            }),
+            { 
+              status: 400, 
+              headers: { ...corsHeaders, "Content-Type": "application/json" } 
+            }
+          );
+        }
+
         // Create auth user with admin client
         const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
-          email: email,
-          password: password,
+          email: email.toLowerCase(),
+          password: finalPassword,
           email_confirm: true, // Mark email as confirmed since OTP was verified
           user_metadata: {
-            name: name || email.split('@')[0],
-            phone: phone,
+            name: finalName,
+            phone: finalPhone,
             registration_method: 'otp',
             email_verified_at: new Date().toISOString()
           }
         });
 
-        if (authError || !authData.user) {
+        if (authError || !authData?.user) {
           console.error('Auth user creation failed:', authError);
           return new Response(
             JSON.stringify({ 
@@ -114,8 +133,8 @@ serve(async (req) => {
           .update({ 
             user_id: authData.user.id,
             email_verified: true,
-            name: name || email.split('@')[0],
-            phone: phone
+            name: finalName,
+            phone: finalPhone
           })
           .eq('id', verificationResult.customer_id);
 
@@ -128,20 +147,20 @@ serve(async (req) => {
           body: {
             templateId: 'customer_welcome',
             recipient: {
-              email: email,
-              name: name || email.split('@')[0]
+              email: email.toLowerCase(),
+              name: finalName
             },
             variables: {
-              customerName: name || email.split('@')[0],
-              customerEmail: email,
+              customerName: finalName,
+              customerEmail: email.toLowerCase(),
               companyName: 'Starters'
             },
             emailType: 'transactional'
           }
         });
 
-        if (welcomeEmailResult.error) {
-          console.warn('Welcome email failed:', welcomeEmailResult.error);
+        if ((welcomeEmailResult as any).error) {
+          console.warn('Welcome email failed:', (welcomeEmailResult as any).error);
         }
 
         // Log successful registration
@@ -149,14 +168,14 @@ serve(async (req) => {
           .from('customer_auth_audit')
           .insert({
             customer_id: verificationResult.customer_id,
-            email: email,
+            email: email.toLowerCase(),
             action: 'registration',
             success: true,
             ip_address: clientIP,
             metadata: {
               auth_user_id: authData.user.id,
               registration_method: 'otp',
-              welcome_email_sent: !welcomeEmailResult.error
+              welcome_email_sent: !(welcomeEmailResult as any).error
             }
           });
 
@@ -167,7 +186,7 @@ serve(async (req) => {
             customer_id: verificationResult.customer_id,
             auth_user_id: authData.user.id,
             email_verified: true,
-            welcome_email_sent: !welcomeEmailResult.error
+            welcome_email_sent: !(welcomeEmailResult as any).error
           }),
           { 
             status: 200, 

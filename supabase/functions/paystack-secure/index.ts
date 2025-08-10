@@ -126,9 +126,15 @@ async function initializePayment(requestData: any) {
 
     const returnedRef: string = paystackData.data?.reference || transactionRef;
 
-    // Persist reference for consistency (best-effort, non-blocking errors)
+    // Track critical insert error across persistence block
+    let criticalInsertError: any = null;
+    let resolvedOrderIdForInsert: string | null = null;
+    let metaObjCache: any = {};
+
+    // Persist reference for consistency (best-effort for non-critical parts)
     try {
       const metaObj = parseMetadata(metadata);
+      metaObjCache = metaObj;
       let orderId: string | null = metaObj.order_id || metaObj.orderId || null;
       const orderNumber: string | null = metaObj.order_number || metaObj.orderNumber || null;
 
@@ -142,6 +148,8 @@ async function initializePayment(requestData: any) {
         if (orderByNumber?.id) orderId = orderByNumber.id;
       }
 
+      resolvedOrderIdForInsert = orderId;
+
       // Update order payment_reference when resolvable
       if (orderId) {
         const { error: orderErr } = await supabaseClient
@@ -154,7 +162,6 @@ async function initializePayment(requestData: any) {
       // Seed a pending transaction so verification can find it
       const txInsert: any = {
         order_id: orderId,
-        provider: 'paystack',
         provider_reference: returnedRef,
         amount: amountInKobo / 100, // store in NGN
         currency: 'NGN',
@@ -165,7 +172,10 @@ async function initializePayment(requestData: any) {
         updated_at: new Date().toISOString()
       };
       const { error: insertErr } = await supabaseClient.from('payment_transactions').insert(txInsert);
-      if (insertErr) console.warn('Pending transaction insert failed:', insertErr);
+      if (insertErr) {
+        console.error('❌ Failed to insert pending transaction:', insertErr);
+        criticalInsertError = insertErr;
+      }
 
       // Audit trail (best-effort)
       await supabaseClient.from('audit_logs').insert({
@@ -176,6 +186,11 @@ async function initializePayment(requestData: any) {
       });
     } catch (e) {
       console.warn('Initialization persistence warning:', e);
+    }
+
+    // Fail loudly if we could not record the pending transaction
+    if (criticalInsertError) {
+      throw new Error(`Failed to record pending transaction: ${criticalInsertError.message || criticalInsertError}`);
     }
 
     return new Response(JSON.stringify({

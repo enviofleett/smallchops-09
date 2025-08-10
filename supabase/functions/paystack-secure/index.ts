@@ -3,10 +3,15 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-  'Access-Control-Max-Age': '86400',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
 };
+
+// Create Supabase client once (service role)
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  { auth: { persistSession: false } }
+);
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -16,395 +21,301 @@ serve(async (req) => {
 
   try {
     console.log('🔄 Paystack secure function called');
-    
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { persistSession: false } }
-    );
-
     const requestBody = await req.json();
-    const sanitizedRequest = { ...requestBody, email: requestBody?.email ? String(requestBody.email).replace(/(^.).+(@.*$)/, '$1***$2') : undefined };
-    console.log('📨 Request payload:', JSON.stringify(sanitizedRequest));
-    
-    const { action, ...requestData } = requestBody;
+    const { action, ...requestData } = requestBody || {};
 
     if (action === 'initialize') {
-      return await initializePayment(supabaseClient, requestData);
+      return await initializePayment(requestData);
     } else if (action === 'verify') {
-      return await verifyPayment(supabaseClient, requestData);
+      return await verifyPayment(requestData);
     } else {
-      return new Response(
-        JSON.stringify({
-          status: false,
-          error: 'Invalid action specified'
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+      return new Response(JSON.stringify({ status: false, error: 'Invalid action specified' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
-
-  } catch (error) {
+  } catch (error: any) {
     console.error('Paystack secure operation error:', error);
-    
-    return new Response(
-      JSON.stringify({
-        status: false,
-        error: 'Operation failed',
-        message: error.message
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    return new Response(JSON.stringify({ status: false, error: 'Operation failed', message: error?.message || String(error) }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 });
 
-async function initializePayment(supabaseClient: any, requestData: any) {
+// Helper to parse metadata to object safely
+function parseMetadata(input: unknown): Record<string, any> {
+  if (!input) return {};
   try {
-    const { email, amount, reference, channels, metadata, callback_url } = requestData;
+    if (typeof input === 'string') return JSON.parse(input);
+    if (typeof input === 'object') return input as Record<string, any>;
+  } catch (_) {}
+  return {};
+}
 
-    // Input validation
-    if (!email || !amount) {
+async function initializePayment(requestData: any) {
+  try {
+    // Ignore reference from frontend; always generate server reference
+    const { email, amount, channels, metadata, callback_url } = requestData || {};
+
+    if (!email || amount === undefined || amount === null) {
       throw new Error('Email and amount are required');
     }
 
-    if (amount < 100) {
-      throw new Error('Minimum amount is 1 NGN (100 kobo)');
+    const amountInKobo = Math.round(parseFloat(String(amount)));
+    if (isNaN(amountInKobo) || amountInKobo < 100) {
+      throw new Error('Amount must be >= 100 kobo (₦1.00)');
     }
 
-    // Get Paystack configuration via centralized RPC (environment-aware)
-    console.log('🔍 Fetching Paystack configuration...');
-    const { data: cfg, error: cfgErr } = await supabaseClient.rpc('get_active_paystack_config');
+    // Load Paystack config directly from table (connected row)
+    const { data: config, error: configError } = await supabaseClient
+      .from('payment_integrations')
+      .select('*')
+      .eq('provider', 'paystack')
+      .eq('connection_status', 'connected')
+      .single();
 
-    if (cfgErr || !cfg) {
-      console.error('Paystack configuration error:', cfgErr);
+    if (configError || !config) {
+      console.error('Paystack configuration error:', configError);
       throw new Error('Paystack not configured properly');
     }
 
-    const effective = Array.isArray(cfg) ? cfg[0] : cfg;
-
-    // Resolve secret key with safe fallback (prefer DB/RPC; fall back to ENV only if missing)
-    let secretKey = effective.secret_key as string | undefined;
-    let keySource = 'db';
+    const secretKey: string | null = config.test_mode ? config.secret_key : (config.live_secret_key || config.secret_key);
     if (!secretKey) {
-      const envKey = Deno.env.get('PAYSTACK_SECRET_KEY') || '';
-      if (envKey) {
-        secretKey = envKey;
-        keySource = 'env';
-      }
-    }
-    
-    if (!secretKey) {
-      throw new Error('Paystack secret key not configured');
+      const mode = config.test_mode ? 'test' : 'live';
+      throw new Error(`Paystack ${mode} secret key not configured`);
     }
 
-    console.log(`🔑 Using secret key type: ${effective.test_mode ? 'test' : 'live'} | source: ${keySource}`);
+    const transactionRef = `txn_${Date.now()}_${crypto.randomUUID()}`;
+    console.log(`✅ Server-generated reference: ${transactionRef}`);
 
-    // Generate reference if not provided
-    const transactionRef = reference || `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
-    console.log('Initializing Paystack payment:', { email, amount, reference: transactionRef });
-
-    // Prepare Paystack payload according to API spec
-    // CRITICAL: Paystack expects metadata as STRINGIFIED JSON, not a plain object
     const paystackPayload: Record<string, any> = {
       email,
-      amount: Math.round(amount).toString(), // Paystack requires amount as STRING in kobo (integers only)
+      amount: amountInKobo.toString(),
       currency: 'NGN',
       reference: transactionRef,
-      channels: channels || ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
-      metadata: JSON.stringify(metadata || {}), // MUST be stringified JSON
+      channels: channels || ['card', 'bank_transfer', 'ussd'],
+      metadata: JSON.stringify(metadata || {}),
       ...(callback_url ? { callback_url } : {})
     };
-    console.log('🚀 Sending to Paystack:', JSON.stringify(paystackPayload, null, 2));
 
-    // Initialize payment with Paystack
+    console.log('🚀 Sending to Paystack initialize:', JSON.stringify({ ...paystackPayload, metadata: '[stringified]' }));
+
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${secretKey}`,
-        'Content-Type': 'application/json',
-      },
+      headers: { 'Authorization': `Bearer ${secretKey}`, 'Content-Type': 'application/json' },
       body: JSON.stringify(paystackPayload)
     });
 
-    console.log('📡 Paystack response status:', paystackResponse.status);
-    
     if (!paystackResponse.ok) {
       const errorText = await paystackResponse.text();
       console.error('❌ Paystack HTTP error:', paystackResponse.status, errorText);
-      
-      // Handle duplicate reference by retrying ONCE with a fresh reference
-      let parsed: any = null;
-      try {
-        parsed = JSON.parse(errorText);
-      } catch {}
-
-      const isDuplicate =
-        paystackResponse.status === 400 &&
-        (parsed?.code === 'duplicate_reference' ||
-         (typeof parsed?.message === 'string' && parsed.message.toLowerCase().includes('duplicate transaction reference')));
-
-      if (isDuplicate) {
-        const newRef = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        paystackPayload.reference = newRef;
-        console.warn('♻️ Duplicate reference detected. Retrying with new reference:', newRef);
-
-        const retryResponse = await fetch('https://api.paystack.co/transaction/initialize', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${secretKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(paystackPayload)
-        });
-
-        if (!retryResponse.ok) {
-          const retryText = await retryResponse.text();
-          console.error('❌ Paystack retry HTTP error:', retryResponse.status, retryText);
-          throw new Error(`Paystack API error (${retryResponse.status}): ${retryText}`);
-        }
-
-        const retriedData = await retryResponse.json();
-        if (!retriedData?.status) {
-          throw new Error(retriedData?.message || 'Failed to initialize payment after retry');
-        }
-
-        // Ensure the response contains the new reference
-        retriedData.data = { ...(retriedData.data || {}), reference: newRef };
-
-        return new Response(
-          JSON.stringify({ status: true, data: retriedData.data }),
-          { 
-            status: 200, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        );
-      }
-      
-      // Parse the error response if possible
-      let errorDetails = errorText;
       try {
         const errorJson = JSON.parse(errorText);
-        errorDetails = errorJson.message || errorJson.error || errorText;
-      } catch (e) {
-        // Use raw text if JSON parsing fails
+        throw new Error(`Paystack API error (${paystackResponse.status}): ${errorJson.message || errorText}`);
+      } catch (_) {
+        throw new Error(`Paystack API error (${paystackResponse.status}): ${errorText}`);
       }
-      
-      throw new Error(`Paystack API error (${paystackResponse.status}): ${errorDetails}`);
     }
 
     const paystackData = await paystackResponse.json();
-    console.log('📦 Paystack response data:', JSON.stringify(paystackData, null, 2));
-
-    if (!paystackData.status) {
+    if (!paystackData?.status) {
       console.error('❌ Paystack initialization failed:', paystackData);
-      throw new Error(paystackData.message || 'Failed to initialize payment');
+      throw new Error(paystackData?.message || 'Failed to initialize payment');
     }
 
-    console.log('Paystack payment initialized successfully:', paystackData.data.reference);
+    const returnedRef: string = paystackData.data?.reference || transactionRef;
 
-    // Validate response structure before returning
-    if (!paystackData.data || !paystackData.data.authorization_url) {
-      console.error('❌ Invalid Paystack response structure:', paystackData);
-      throw new Error('Paystack returned invalid response structure - missing authorization_url');
+    // Persist reference for consistency (best-effort, non-blocking errors)
+    try {
+      const metaObj = parseMetadata(metadata);
+      let orderId: string | null = metaObj.order_id || metaObj.orderId || null;
+      const orderNumber: string | null = metaObj.order_number || metaObj.orderNumber || null;
+
+      // Resolve order id by number if needed
+      if (!orderId && orderNumber) {
+        const { data: orderByNumber } = await supabaseClient
+          .from('orders')
+          .select('id')
+          .eq('order_number', orderNumber)
+          .maybeSingle();
+        if (orderByNumber?.id) orderId = orderByNumber.id;
+      }
+
+      // Update order payment_reference when resolvable
+      if (orderId) {
+        const { error: orderErr } = await supabaseClient
+          .from('orders')
+          .update({ payment_reference: returnedRef, updated_at: new Date().toISOString() })
+          .eq('id', orderId);
+        if (orderErr) console.warn('Order payment_reference update failed:', orderErr);
+      }
+
+      // Seed a pending transaction so verification can find it
+      const txInsert: any = {
+        order_id: orderId,
+        provider: 'paystack',
+        provider_reference: returnedRef,
+        amount: amountInKobo / 100, // store in NGN
+        currency: 'NGN',
+        status: 'pending',
+        metadata: metaObj || {},
+        customer_email: email,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      };
+      const { error: insertErr } = await supabaseClient.from('payment_transactions').insert(txInsert);
+      if (insertErr) console.warn('Pending transaction insert failed:', insertErr);
+
+      // Audit trail (best-effort)
+      await supabaseClient.from('audit_logs').insert({
+        action: 'payment_initialized',
+        category: 'Payment',
+        message: `Initialized Paystack payment: ${returnedRef}`,
+        new_values: { reference: returnedRef, order_id: orderId, amount_ngn: amountInKobo / 100 }
+      });
+    } catch (e) {
+      console.warn('Initialization persistence warning:', e);
     }
 
-    // Additional validation for required fields
-    if (!paystackData.data.access_code || !paystackData.data.reference) {
-      console.error('❌ Incomplete Paystack response:', paystackData);
-      throw new Error('Paystack response missing required fields (access_code or reference)');
-    }
-
-    const responseData = {
+    return new Response(JSON.stringify({
       status: true,
       data: {
         authorization_url: paystackData.data.authorization_url,
         access_code: paystackData.data.access_code,
-        reference: paystackData.data.reference
+        reference: returnedRef
       }
-    };
-
-    console.log('✅ Validated response structure:', JSON.stringify(responseData, null, 2));
-
-    return new Response(
-      JSON.stringify(responseData),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-
-  } catch (error) {
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error: any) {
     console.error('Payment initialization error:', error);
-    
-    return new Response(
-      JSON.stringify({
-        status: false,
-        error: error.message || 'Failed to initialize payment'
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
+    return new Response(JSON.stringify({ status: false, error: error?.message || 'Failed to initialize payment' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 }
 
-async function verifyPayment(supabaseClient: any, requestData: any) {
+async function verifyPayment(requestData: any) {
   try {
-    const { reference } = requestData;
+    const { reference } = requestData || {};
+    if (!reference) throw new Error('Payment reference is required');
 
-    if (!reference) {
-      throw new Error('Payment reference is required');
-    }
+    // Load Paystack config
+    const { data: config, error: configError } = await supabaseClient
+      .from('payment_integrations')
+      .select('*')
+      .eq('provider', 'paystack')
+      .eq('connection_status', 'connected')
+      .single();
 
-    // Get Paystack configuration via centralized RPC (environment-aware)
-    const { data: cfg, error: cfgErr } = await supabaseClient.rpc('get_active_paystack_config');
-    if (cfgErr || !cfg) {
-      throw new Error('Paystack not configured properly');
-    }
-    const effective = Array.isArray(cfg) ? cfg[0] : cfg;
+    if (configError || !config) throw new Error('Paystack not configured properly');
 
-    // Resolve secret key with safe fallback (prefer DB/RPC; fall back to ENV only if missing)
-    let secretKey = effective.secret_key as string | undefined;
-    let keySource = 'db';
+    const secretKey: string | null = config.test_mode ? config.secret_key : (config.live_secret_key || config.secret_key);
     if (!secretKey) {
-      const envKey = Deno.env.get('PAYSTACK_SECRET_KEY') || '';
-      if (envKey) {
-        secretKey = envKey;
-        keySource = 'env';
-      }
-    }
-    
-    if (!secretKey) {
-      throw new Error('Paystack secret key not configured');
+      const mode = config.test_mode ? 'test' : 'live';
+      throw new Error(`Paystack ${mode} secret key not configured`);
     }
 
-    console.log(`🔍 Mode: ${effective.test_mode ? 'test' : 'live'} | key source: ${keySource}`);
     console.log('Verifying Paystack payment:', reference);
 
-    // Helper: retry wrapper for Paystack verify (3 attempts, backoff)
-    const fetchWithRetries = async (url: string, opts: RequestInit, retries = 3) => {
-      let lastErr: any = null;
-      for (let i = 1; i <= retries; i++) {
-        try {
-          const res = await fetch(url, opts);
-          if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(`HTTP ${res.status}: ${txt}`);
-          }
-          return await res.json();
-        } catch (e) {
-          lastErr = e;
-          const delay = Math.min(5000, 1000 * Math.pow(2, i - 1));
-          console.warn(`Paystack verify attempt ${i} failed, retrying in ${delay}ms...`, String(e));
-          if (i < retries) await new Promise(r => setTimeout(r, delay));
-        }
-      }
-      throw lastErr;
-    };
+    const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+      method: 'GET',
+      headers: { 'Authorization': `Bearer ${secretKey}`, 'Content-Type': 'application/json' }
+    });
 
-    // Verify payment with Paystack (robust retries)
-    const paystackData = await fetchWithRetries(
-      `https://api.paystack.co/transaction/verify/${reference}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${secretKey}`,
-          'Content-Type': 'application/json',
-        }
-      },
-      3
-    );
+    if (!paystackResponse.ok) {
+      const errorText = await paystackResponse.text();
+      console.error('❌ Paystack verification HTTP error:', paystackResponse.status, errorText);
+      throw new Error(`Paystack verification failed (${paystackResponse.status}): ${errorText}`);
+    }
 
+    const paystackData = await paystackResponse.json();
     if (!paystackData?.status) {
       console.error('Paystack verification failed:', paystackData);
       throw new Error(paystackData?.message || 'Failed to verify payment');
     }
 
-    console.log('Paystack payment verified successfully:', reference);
-
-    // Attempt to persist successful payments to the database
     const tx = paystackData.data || {};
-    const isSuccess = tx.status === 'success';
 
-    if (isSuccess) {
-      // Normalize metadata (it may be returned as a string)
-      let metadataObj: any = {};
-      try {
-        metadataObj = typeof tx.metadata === 'string' ? JSON.parse(tx.metadata) : (tx.metadata || {});
-      } catch (e) {
-        console.warn('Could not parse Paystack metadata string. Using raw value.');
-        metadataObj = tx.metadata || {};
-      }
-
+    // Persist verification outcome (best-effort) and let DB triggers/RPC handle order updates
+    try {
+      let metadataObj = parseMetadata(tx.metadata);
       let orderId: string | null = metadataObj.order_id || metadataObj.orderId || null;
-      const orderNumber: string | null = metadataObj.order_number || metadataObj.orderNumber || metadataObj.order?.number || null;
-      const paidAt = tx.paid_at || new Date().toISOString();
-      const channel = tx.channel || 'online';
-      const gatewayResponse = tx.gateway_response || null;
-      const customerEmail = tx?.customer?.email || null;
-      const amount = typeof tx.amount === 'number' ? tx.amount / 100 : null;
+      const orderNumber: string | null = metadataObj.order_number || metadataObj.orderNumber || null;
 
-      // Try to resolve order id by reference or order number if missing
+      // Resolve order id by payment_reference or number if needed
       if (!orderId) {
-        try {
-          const { data: foundByRef, error: findRefErr } = await supabaseClient
-            .from('orders')
-            .select('id')
-            .or(`payment_reference.eq.${requestData.reference},id.eq.${requestData.reference}`)
-            .maybeSingle();
-          if (!findRefErr && foundByRef?.id) orderId = foundByRef.id;
-        } catch (_) {}
+        const { data: byRef } = await supabaseClient
+          .from('orders')
+          .select('id')
+          .or(`payment_reference.eq.${reference},id.eq.${reference}`)
+          .maybeSingle();
+        if (byRef?.id) orderId = byRef.id;
       }
       if (!orderId && orderNumber) {
-        try {
-          const { data: foundByNumber } = await supabaseClient
-            .from('orders')
-            .select('id')
-            .eq('order_number', orderNumber)
-            .maybeSingle();
-          if (foundByNumber?.id) orderId = foundByNumber.id;
-        } catch (_) {}
+        const { data: byNum } = await supabaseClient
+          .from('orders')
+          .select('id')
+          .eq('order_number', orderNumber)
+          .maybeSingle();
+        if (byNum?.id) orderId = byNum.id;
       }
 
-      // Upsert/seed transaction BEFORE RPC so it can find it
+      const isSuccess = tx.status === 'success';
+      const baseUpdate: any = {
+        provider_reference: reference,
+        transaction_type: 'charge',
+        status: isSuccess ? 'paid' : tx.status || 'failed',
+        amount: typeof tx.amount === 'number' ? tx.amount / 100 : null,
+        currency: tx.currency || 'NGN',
+        channel: tx.channel || 'online',
+        gateway_response: tx.gateway_response || null,
+        paid_at: tx.paid_at || new Date().toISOString(),
+        customer_email: tx?.customer?.email || null,
+        provider_response: tx || null,
+        updated_at: new Date().toISOString()
+      };
+      const payload = orderId ? { ...baseUpdate, order_id: orderId } : baseUpdate;
+
+      // Upsert by provider_reference when possible; if not, fallback to insert/update sequence
+      let upsertError: any = null;
       try {
-        const baseTx: any = {
-          provider_reference: requestData.reference,
-          transaction_type: 'charge',
-          status: 'paid',
-          amount,
-          currency: tx.currency || 'NGN',
-          channel,
-          gateway_response: gatewayResponse,
-          paid_at: new Date(paidAt).toISOString(),
-          customer_email: customerEmail,
-          processed_at: new Date().toISOString(),
-          provider_response: tx || null,
-        };
-        const txRow = orderId ? { ...baseTx, order_id: orderId } : baseTx;
-        const { error: upsertErr } = await supabaseClient
+        const { error } = await supabaseClient
           .from('payment_transactions')
-          .upsert(txRow, { onConflict: 'provider_reference' });
-        if (upsertErr) console.warn('Pre-RPC upsert failed:', upsertErr);
+          .upsert(payload, { onConflict: 'provider_reference' });
+        upsertError = error;
       } catch (e) {
-        console.warn('Pre-RPC upsert crashed:', e);
+        upsertError = e;
       }
 
-      // Call production RPC for full processing (card save, analytics, triggers)
+      if (upsertError) {
+        // Fallback: try to find and update
+        const { data: existing } = await supabaseClient
+          .from('payment_transactions')
+          .select('id')
+          .eq('provider_reference', reference)
+          .maybeSingle();
+        if (existing?.id) {
+          await supabaseClient
+            .from('payment_transactions')
+            .update(payload)
+            .eq('id', existing.id);
+        } else {
+          await supabaseClient.from('payment_transactions').insert({ ...payload, created_at: new Date().toISOString() });
+        }
+      }
+
+      // Call RPC to finalize (updates orders, saves cards, logs)
       try {
         const { error: rpcError } = await supabaseClient.rpc('handle_successful_payment', {
-          p_reference: requestData.reference,
-          p_paid_at: paidAt,
-          p_gateway_response: gatewayResponse,
+          p_reference: reference,
+          p_paid_at: baseUpdate.paid_at,
+          p_gateway_response: baseUpdate.gateway_response,
           p_fees: tx.fees ?? 0,
-          p_channel: channel,
+          p_channel: baseUpdate.channel,
           p_authorization_code: tx?.authorization?.authorization_code ?? null,
           p_card_type: tx?.authorization?.card_type ?? null,
           p_last4: tx?.authorization?.last4 ?? null,
@@ -417,85 +328,46 @@ async function verifyPayment(supabaseClient: any, requestData: any) {
         console.warn('handle_successful_payment RPC crashed:', e);
       }
 
-      // Ensure order is marked paid/confirmed even if RPC didn’t update it
+      // Ensure orders table has reference (idempotent)
       if (orderId) {
-        try {
-          const { error: orderErr } = await supabaseClient
-            .from('orders')
-            .update({
-              payment_status: 'paid',
-              status: 'confirmed',
-              payment_reference: requestData.reference,
-              paid_at: new Date(paidAt).toISOString(),
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', orderId);
-          if (orderErr) console.error('Order update failed:', orderErr);
-        } catch (e) {
-          console.error('Order update crashed:', e);
-        }
-      } else {
-        console.warn('Could not resolve order id for reference:', requestData.reference);
+        await supabaseClient
+          .from('orders')
+          .update({ payment_reference: reference, updated_at: new Date().toISOString() })
+          .eq('id', orderId);
       }
 
-      // Audit log for successful verification
-      try {
-        await supabaseClient.from('audit_logs').insert({
-          action: 'payment_verified',
-          category: 'Payment',
-          message: `Paystack verified and persisted: ${requestData.reference}`,
-          new_values: { reference: requestData.reference, order_id: orderId, amount, channel, gateway_response }
-        });
-      } catch (_) {}
-    }
-
-    // Return normalized verification payload for frontend compatibility
-    return new Response(
-      JSON.stringify({
-        status: true,
-        success: isSuccess,
-        data: {
-          status: tx.status,
-          amount: typeof tx.amount === 'number' ? Math.round(tx.amount) / 100 : null,
-          currency: tx.currency,
-          customer: tx.customer,
-          metadata: tx.metadata,
-          paid_at: tx.paid_at,
-          channel: tx.channel,
-          gateway_response: tx.gateway_response,
-        }
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    );
-
-  } catch (error) {
-    console.error('Payment verification error:', error);
-
-    // Audit error path
-    try {
+      // Audit
       await supabaseClient.from('audit_logs').insert({
-        action: 'payment_verification_failed',
+        action: 'payment_verified',
         category: 'Payment',
-        message: `Verification failed: ${requestData?.reference || 'unknown'}`,
-        new_values: { error: String((error as any)?.message || error) }
+        message: `Paystack verified: ${reference}`,
+        new_values: { order_id: orderId, status: tx.status }
       });
-    } catch (_) {
-      // ignore audit errors
+    } catch (e) {
+      console.warn('Verification persistence warning:', e);
     }
-    
-    return new Response(
-      JSON.stringify({
-        status: false,
-        success: false,
-        error: (error as any)?.message || 'Failed to verify payment'
-      }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+
+    return new Response(JSON.stringify({
+      status: true,
+      data: {
+        status: tx.status,
+        amount: tx.amount,
+        currency: tx.currency,
+        customer: tx.customer,
+        metadata: tx.metadata,
+        paid_at: tx.paid_at,
+        channel: tx.channel,
+        gateway_response: tx.gateway_response
       }
-    );
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  } catch (error: any) {
+    console.error('Payment verification error:', error);
+    return new Response(JSON.stringify({ status: false, error: error?.message || 'Failed to verify payment' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 }

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
@@ -475,7 +474,7 @@ serve(async (req) => {
 
     console.log('📦 Final payment response:', JSON.stringify(paymentResponse, null, 2));
 
-    // Persist effective reference and create transaction record
+    // 📌 Persist effective reference and create transaction record
     const effectiveReference = (paymentResponse?.data?.reference ?? (paymentResponse as any)?.reference ?? paymentReference) as string;
 
     // Persist the effective reference on the order for reliable reconciliation
@@ -491,7 +490,45 @@ serve(async (req) => {
       console.warn('⚠️ Failed to update order with payment_reference:', e);
     }
 
-    // Create payment transaction record
+    // NEW: Mark any previous pending initializations as superseded so the latest reference is the canonical one
+    let pendingCount = 0;
+    try {
+      const { count } = await supabaseClient
+        .from('payment_transactions')
+        .select('id', { count: 'exact', head: true })
+        .eq('order_id', orderId)
+        .eq('status', 'pending');
+
+      pendingCount = count ?? 0;
+      console.log('🔁 Existing pending transactions for this order before insert:', pendingCount);
+
+      if (pendingCount > 0) {
+        const { error: supersedeErr } = await supabaseClient
+          .from('payment_transactions')
+          .update({
+            status: 'superseded',
+            updated_at: new Date().toISOString(),
+            metadata: {
+              superseded_by_reference: effectiveReference,
+              superseded_at: new Date().toISOString(),
+              order_number: orderDetails.order_number,
+              note: 'Superseded by newer initialization'
+            }
+          })
+          .eq('order_id', orderId)
+          .eq('status', 'pending');
+
+        if (supersedeErr) {
+          console.warn('⚠️ Could not mark previous pending transactions as superseded:', supersedeErr);
+        } else {
+          console.log('✅ Marked previous pending transactions as superseded');
+        }
+      }
+    } catch (supersedeCatch) {
+      console.warn('⚠️ Supersede step skipped:', supersedeCatch);
+    }
+
+    // Create payment transaction record for the latest/canonical reference
     const { error: transactionError } = await supabaseClient
       .from('payment_transactions')
       .insert({
@@ -504,7 +541,9 @@ serve(async (req) => {
         metadata: {
           customer_id: customerId,
           user_id: customerId,
-          order_number: orderDetails.order_number
+          order_number: orderDetails.order_number,
+          init_version: (pendingCount ?? 0) + 1, // 1 for first init, 2 for second, etc.
+          canonical_reference: effectiveReference
         }
       });
 

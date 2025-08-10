@@ -10,6 +10,7 @@ interface OptimizedImageProps extends React.ImgHTMLAttributes<HTMLImageElement> 
   fallback?: string;
   showLoader?: boolean;
   sizes?: string;
+  fit?: 'cover' | 'contain';
 }
 
 export function OptimizedImage({
@@ -20,6 +21,7 @@ export function OptimizedImage({
   fallback = '/placeholder.svg',
   showLoader = true,
   sizes,
+  fit = 'cover',
   className = '',
   alt = '',
   ...props
@@ -61,13 +63,13 @@ export function OptimizedImage({
         alt={alt}
         className={`transition-opacity duration-300 ${
           isLoading ? 'opacity-0' : 'opacity-100'
-        } w-full h-full object-cover object-center`}
+        } w-full h-full`}
         onLoad={handleLoad}
         onError={handleError}
         loading="lazy"
         decoding="async"
         style={{
-          objectFit: hasError ? 'contain' : 'cover',
+          objectFit: hasError ? 'contain' : fit,
           objectPosition: 'center',
           width: '100%',
           height: '100%',

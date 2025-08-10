@@ -19,6 +19,7 @@ import { SEOHead } from '@/components/SEOHead';
 import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { PerformanceMonitor } from '@/utils/performance';
 import { OptimizedImage } from '@/components/OptimizedImage';
+import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 
 // Memoized components for better performance
 const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
@@ -36,13 +37,11 @@ const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
       className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
       onClick={() => navigate(`/product/${product.id}`)}
     >
-      <div className="aspect-[4/3] sm:aspect-square overflow-hidden relative bg-muted">
-        <OptimizedImage
-          src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop'}
+      <div className="relative">
+        <ProductImageGallery
+          images={(((product as any)?.images && (product as any).images.length ? (product as any).images : [product.image_url]).filter(Boolean))}
           alt={product.name}
-          width={300}
-          height={300}
-          className="w-full h-full hover:scale-105 transition-transform"
+          containerClassName="aspect-[4/3] sm:aspect-square"
           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
         />
         {(product.discount_percentage || 0) > 0 && (

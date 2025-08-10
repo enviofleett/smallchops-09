@@ -2,6 +2,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { ShoppingCart, Trash2 } from 'lucide-react';
 import { FavoriteProduct } from '@/api/favorites';
+import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 
 interface FavoriteProductCardProps {
   product: FavoriteProduct;
@@ -28,39 +29,12 @@ export const FavoriteProductCard = ({
     <Card className="h-full flex flex-col hover:shadow-md transition-shadow">
       <CardContent className="p-4 flex flex-col h-full">
         {/* Product Image */}
-        <div className="aspect-square mb-3 overflow-hidden rounded-lg bg-muted relative">
-          {product.image_url ? (
-            <>
-              <img 
-                src={product.image_url} 
-                alt={product.name}
-                loading="lazy"
-                onError={(e) => {
-                  const target = e.currentTarget;
-                  target.style.display = 'none';
-                  const fallback = target.parentElement?.querySelector('.fallback-content');
-                  if (fallback) {
-                    (fallback as HTMLElement).style.display = 'flex';
-                  }
-                }}
-                className="w-full h-full object-cover object-center"
-                style={{
-                  objectFit: 'cover',
-                  objectPosition: 'center',
-                  width: '100%',
-                  height: '100%',
-                  display: 'block'
-                }}
-              />
-              <div className="fallback-content w-full h-full flex items-center justify-center text-muted-foreground absolute inset-0" style={{ display: 'none' }}>
-                No Image
-              </div>
-            </>
-          ) : (
-            <div className="w-full h-full flex items-center justify-center text-muted-foreground">
-              No Image
-            </div>
-          )}
+        <div className="mb-3">
+          <ProductImageGallery
+            images={(((product as any)?.images && (product as any).images.length ? (product as any).images : [product.image_url]).filter(Boolean)) as string[]}
+            alt={product.name}
+            containerClassName="aspect-square rounded-lg"
+          />
         </div>
 
         {/* Product Info */}

@@ -18,6 +18,7 @@ import { useProductRatingSummary } from '@/hooks/useProductReviews';
 import { CustomizationProvider, useCustomizationContext } from '@/context/CustomizationContext';
 import { CustomizationOrderBuilder } from '@/components/customization/CustomizationOrderBuilder';
 import { ShoppingCart } from 'lucide-react';
+import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 
 const CategoryProductsContent = () => {
   const { categoryId } = useParams<{ categoryId: string }>();
@@ -269,24 +270,22 @@ const CategoryProductsContent = () => {
                       className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
                       onClick={() => navigate(`/product/${product.id}`)}
                     >
-                      <div className={`${isCustomizationCategory ? 'aspect-[3/2]' : 'aspect-square'} overflow-hidden relative`}>
-                         <img
-                           src={product.image_url || 'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=200&h=150&fit=crop'}
+                      <div className={`${isCustomizationCategory ? 'aspect-[3/2]' : 'aspect-square'} relative`}>
+                         <ProductImageGallery
+                           images={(((product as any)?.images && (product as any).images.length ? (product as any).images : [product.image_url]).filter(Boolean))}
                            alt={product.name}
-                           className={`w-full h-full object-cover hover:scale-105 transition-transform ${
-                             isCustomizationCategory ? 'scale-75' : ''
-                           }`}
-                          loading="lazy"
-                        />
-                        {(product.discount_percentage || 0) > 0 && (
-                          <div className="absolute top-1 sm:top-2 left-1 sm:left-2">
-                            <DiscountBadge 
-                              discountPercentage={product.discount_percentage || 0}
-                              size="sm"
-                            />
-                          </div>
-                        )}
-                      </div>
+                           containerClassName={`${isCustomizationCategory ? 'aspect-[3/2]' : 'aspect-square'}`}
+                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 33vw"
+                         />
+                         {(product.discount_percentage || 0) > 0 && (
+                           <div className="absolute top-1 sm:top-2 left-1 sm:left-2">
+                             <DiscountBadge 
+                               discountPercentage={product.discount_percentage || 0}
+                               size="sm"
+                             />
+                           </div>
+                         )}
+                       </div>
                       <CardContent className="p-2 sm:p-3 lg:p-4">
                         <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>
                         <div className="mb-1 sm:mb-2">

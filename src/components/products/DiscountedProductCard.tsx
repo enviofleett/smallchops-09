@@ -6,6 +6,7 @@ import { PriceDisplay } from '@/components/ui/price-display';
 import { DiscountBadge } from '@/components/ui/discount-badge';
 import { StarRating } from '@/components/ui/star-rating';
 import { useProductRatingSummary } from '@/hooks/useProductReviews';
+import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 
 interface DiscountedProductCardProps {
   product: ProductWithDiscount;
@@ -48,36 +49,12 @@ export function DiscountedProductCard({
 
       <CardContent className="p-0 flex flex-col h-full">
         {/* Product Image */}
-        <div className="aspect-[4/3] sm:aspect-square relative overflow-hidden bg-muted">
-          {product.image_url ? (
-            <img 
-              src={product.image_url} 
-              alt={product.name}
-              className="w-full h-full object-cover object-center group-hover:scale-105 transition-transform duration-200"
-              loading="lazy"
-              style={{
-                objectFit: 'cover',
-                objectPosition: 'center',
-                width: '100%',
-                height: '100%',
-                display: 'block'
-              }}
-              onError={(e) => {
-                const target = e.currentTarget;
-                target.style.display = 'none';
-                const fallback = target.parentElement?.querySelector('.fallback-content');
-                if (fallback) {
-                  (fallback as HTMLElement).style.display = 'flex';
-                }
-              }}
-            />
-          ) : null}
-          
-          {/* Fallback for missing images */}
-          <div className={`fallback-content w-full h-full flex items-center justify-center bg-muted text-muted-foreground ${product.image_url ? 'hidden' : 'flex'}`} style={{ display: product.image_url ? 'none' : 'flex' }}>
-            No Image
-          </div>
-          
+        <div className="relative">
+          <ProductImageGallery
+            images={((((product as any).images?.length ? (product as any).images : [product.image_url]) as string[]).filter(Boolean))}
+            alt={product.name}
+            containerClassName="aspect-[4/3] sm:aspect-square"
+          />
           {/* Promotion Info Overlay */}
           {product.has_discount && product.active_promotion && (
             <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2">

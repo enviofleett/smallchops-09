@@ -153,12 +153,33 @@ useEffect(() => {
 
   (async () => {
     try {
-      for (const o of candidates.slice(0, 3)) {
-        await supabase.functions.invoke('paystack-secure', {
-          body: { action: 'verify', reference: o.payment_reference }
-        });
+      const refs = candidates.slice(0, 10).map((o: any) => o.payment_reference);
+      for (const ref of refs) {
+        try {
+          const { data, error } = await supabase.functions.invoke('paystack-verify', {
+            body: { reference: ref }
+          });
+          if (error || !(data as any)?.success) {
+            await supabase.functions.invoke('paystack-secure', {
+              body: { action: 'verify', reference: ref }
+            });
+          }
+        } catch (inner) {
+          console.warn('Verify attempt failed for ref', ref, inner);
+        }
       }
       await (refetch?.());
+      // Retry once after 15s to catch late webhook/processing
+      setTimeout(async () => {
+        try {
+          for (const ref of refs) {
+            await supabase.functions.invoke('paystack-verify', { body: { reference: ref } });
+          }
+          await (refetch?.());
+        } catch (retryErr) {
+          console.warn('Retry reconcile failed:', retryErr);
+        }
+      }, 15000);
     } catch (e) {
       console.warn('Auto-reconcile verify failed:', e);
     }

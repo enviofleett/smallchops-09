@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
 import { Clock, CheckCircle, CreditCard, Package, Truck } from 'lucide-react';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-
+import { useToast } from '@/hooks/use-toast';
 interface OrderDetailsData {
   id: string;
   order_number: string;
@@ -20,6 +20,7 @@ interface OrderDetailsData {
   customer_id?: string | null;
   customer_email?: string | null;
   payment_method?: string | null;
+  payment_reference?: string | null;
 }
 
 interface PaymentTx {
@@ -55,12 +56,14 @@ const SectionSkeleton = () => (
 );
 
 export default function OrderDetails() {
-  const { id } = useParams();
-  const { isAuthenticated, customerAccount, user, isLoading } = useCustomerAuth();
-  const [order, setOrder] = React.useState<OrderDetailsData | null>(null);
-  const [tx, setTx] = React.useState<PaymentTx | null>(null);
-  const [isLoadingData, setIsLoadingData] = React.useState(true);
-  const [error, setError] = React.useState<string | null>(null);
+const { id } = useParams();
+const { isAuthenticated, customerAccount, user, isLoading } = useCustomerAuth();
+const { toast } = useToast();
+const [order, setOrder] = React.useState<OrderDetailsData | null>(null);
+const [tx, setTx] = React.useState<PaymentTx | null>(null);
+const [isLoadingData, setIsLoadingData] = React.useState(true);
+const [isReconciling, setIsReconciling] = React.useState(false);
+const [error, setError] = React.useState<string | null>(null);
 
   const canView = React.useMemo(() => {
     if (!order) return false;
@@ -72,46 +75,85 @@ export default function OrderDetails() {
     );
   }, [order, customerAccount?.id, user?.email]);
 
-  React.useEffect(() => {
-    const fetchData = async () => {
-      if (!id) return;
-      try {
-        setIsLoadingData(true);
-        setError(null);
-        const { data: orderData, error: orderErr } = await supabase
-          .from('orders')
-          .select(`
+React.useEffect(() => {}, []); // placeholder to keep effect order
+
+const loadData = React.useCallback(async () => {
+  if (!id) return;
+  try {
+    setIsLoadingData(true);
+    setError(null);
+    const { data: orderData, error: orderErr } = await supabase
+      .from('orders')
+      .select(`
             id, order_number, status, payment_status, paid_at, total_amount, order_time,
-            customer_id, customer_email, payment_method
+            customer_id, customer_email, payment_method, payment_reference
           `)
-          .eq('id', id)
-          .maybeSingle();
-        if (orderErr) throw orderErr;
-        if (!orderData) throw new Error('Order not found');
+      .eq('id', id)
+      .maybeSingle();
+    if (orderErr) throw orderErr;
+    if (!orderData) throw new Error('Order not found');
 
-        setOrder(orderData as OrderDetailsData);
+    setOrder(orderData as OrderDetailsData);
 
-        const { data: txData, error: txErr } = await supabase
-          .from('payment_transactions')
-          .select('provider_reference,status,amount,channel,gateway_response,created_at,updated_at,paid_at')
-          .eq('order_id', id)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-        if (txErr) {
-          // Not fatal; continue without tx
-          console.warn('Payment transaction fetch error:', txErr);
-        }
-        setTx((txData || null) as PaymentTx | null);
-      } catch (e: any) {
-        console.error(e);
-        setError(e.message || 'Failed to load order details');
-      } finally {
-        setIsLoadingData(false);
-      }
-    };
-    fetchData();
-  }, [id]);
+    const { data: txData, error: txErr } = await supabase
+      .from('payment_transactions')
+      .select('provider_reference,status,amount,channel,gateway_response,created_at,updated_at,paid_at')
+      .eq('order_id', id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (txErr) {
+      console.warn('Payment transaction fetch error:', txErr);
+    }
+    setTx((txData || null) as PaymentTx | null);
+  } catch (e: any) {
+    console.error(e);
+    setError(e.message || 'Failed to load order details');
+  } finally {
+    setIsLoadingData(false);
+  }
+}, [id]);
+
+React.useEffect(() => {
+  loadData();
+}, [loadData]);
+
+// Realtime refresh when order or payment transactions update
+React.useEffect(() => {
+  if (!id) return;
+  const channel = supabase
+    .channel(`order-details-${id}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, () => loadData())
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_transactions', filter: `order_id=eq.${id}` }, () => loadData())
+    .subscribe();
+  return () => { supabase.removeChannel(channel); };
+}, [id, loadData]);
+
+const refreshNow = async () => {
+  await loadData();
+};
+
+const reconcileNow = async () => {
+  const ref = tx?.provider_reference || (order as any)?.payment_reference;
+  if (!ref) {
+    toast({ title: 'No payment reference', description: 'Cannot reconcile without a payment reference.', variant: 'destructive' });
+    return;
+  }
+  try {
+    setIsReconciling(true);
+    const { data, error } = await supabase.functions.invoke('paystack-verify', { body: { reference: ref } });
+    if (error || !(data as any)?.success) {
+      const fb = await supabase.functions.invoke('paystack-secure', { body: { action: 'verify', reference: ref } });
+      if (fb.error) throw fb.error;
+    }
+    toast({ title: 'Verification triggered', description: 'Refreshing payment status…' });
+    setTimeout(() => { loadData(); }, 1500);
+  } catch (e: any) {
+    toast({ title: 'Reconciliation failed', description: e.message || 'Unable to verify payment', variant: 'destructive' });
+  } finally {
+    setIsReconciling(false);
+  }
+};
 
   if (isLoading || isLoadingData) return <SectionSkeleton />;
   if (!isAuthenticated) return <Navigate to="/auth" replace />;
@@ -139,10 +181,16 @@ export default function OrderDetails() {
 
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold">Order {order.order_number}</h1>
-          <p className="text-muted-foreground">Placed on {formatDateTime(order.order_time)}</p>
-        </div>
+<div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+  <div>
+    <h1 className="text-2xl font-bold">Order {order.order_number}</h1>
+    <p className="text-muted-foreground">Placed on {formatDateTime(order.order_time)}</p>
+  </div>
+  <div className="flex gap-2">
+    <Button variant="outline" onClick={refreshNow} disabled={isLoadingData}>Refresh status</Button>
+    <Button onClick={reconcileNow} disabled={isReconciling}>Reconcile payment</Button>
+  </div>
+</div>
 
         {/* Status Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">

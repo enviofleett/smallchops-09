@@ -18,13 +18,7 @@ interface PaystackPaymentHandlerProps {
   onClose?: () => void;
 }
 
-// Generate truly unique reference
-const generateUniqueReference = () => {
-  const timestamp = Date.now();
-  const randomBytes = crypto.getRandomValues(new Uint8Array(8));
-  const randomHex = Array.from(randomBytes, byte => byte.toString(16).padStart(2, '0')).join('');
-  return `PAY_${timestamp}_${randomHex}`;
-};
+// Client-side reference generation removed; server reference will be used exclusively
 
 export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
   amount,
@@ -48,15 +42,8 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
     setPaymentInProgress(false);
     setScriptError(null);
     
-    // Generate new reference if the initial one might be duplicate
-    const newReference = generateUniqueReference();
-    console.log('🆔 Reference validation:', {
-      initial: initialReference,
-      new: newReference,
-      timestamp: Date.now()
-    });
-    
-    setCurrentReference(newReference);
+    // Do not generate client references; will set after server init
+    setCurrentReference(initialReference || '');
   }, [initialReference]);
 
   // Load Paystack script with timeout and enhanced error handling
@@ -263,9 +250,8 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
     setScriptError(null);
     setPaymentInProgress(false);
     
-    // Generate new reference for retry
-    const newReference = generateUniqueReference();
-    setCurrentReference(newReference);
+    // No client reference generation; just retry server initialization
+    setCurrentReference('');
     
     // Small delay before retry
     setTimeout(() => {
@@ -358,7 +344,7 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
 
       {/* Debug info for development */}
       <div className="text-xs text-muted-foreground text-center">
-        Reference: {currentReference.slice(-8)}...
+        Reference: {currentReference ? currentReference.slice(-8) : '—'}...
       </div>
     </div>
   );

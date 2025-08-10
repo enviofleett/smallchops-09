@@ -181,7 +181,6 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
         const init = await paystackService.initializeTransaction({
           email,
           amount: paystackService.formatAmount(amount),
-          reference: paystackService.generateReference(),
           callback_url: callbackUrl,
           channels: ['card', 'bank', 'ussd', 'mobile_money'],
           metadata: {

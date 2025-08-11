@@ -103,12 +103,14 @@ export const useSMTPSettings = () => {
     },
   });
 
-  // Test SMTP connection with enhanced error handling
+  // Test email connection with Auth system fallback
   const testConnectionMutation = useMutation({
     mutationFn: async (testEmail: string) => {
       try {
-        // Use the standardized template-based approach
-        const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+        console.log('Testing email with Auth system first...');
+        
+        // Try Supabase Auth email system first (more reliable)
+        const { data, error } = await supabase.functions.invoke('supabase-auth-email-sender', {
           body: {
             templateId: 'smtp_test',
             recipient: {
@@ -117,7 +119,7 @@ export const useSMTPSettings = () => {
             },
             variables: {
               test_time: new Date().toLocaleString(),
-              smtp_host: 'Current SMTP Configuration',
+              smtp_host: 'Supabase Auth System',
               business_name: 'Starters Small Chops'
             },
             emailType: 'transactional'
@@ -125,45 +127,40 @@ export const useSMTPSettings = () => {
         });
 
         if (error) {
-          throw new Error(error.message || 'Failed to send test email');
+          throw new Error(error.message || 'Failed to send test email via Auth system');
         }
 
-        console.log('Test email sent successfully via smtp-email-sender');
+        console.log('Test email sent successfully via Supabase Auth');
         return data;
-      } catch (enhancedError) {
-        console.warn('SMTP sender failed, trying fallback:', enhancedError);
+      } catch (authError) {
+        console.warn('Auth email failed, trying SMTP fallback:', authError);
         
-        // Fallback to direct email approach if template fails
+        // Fallback to SMTP if Auth system fails
         try {
           const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
             body: {
-              to: testEmail,
-              subject: 'SMTP Test - Connection Successful',
-              html: `
-                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-                  <h2 style="color: #22c55e;">✅ SMTP Connection Test Successful!</h2>
-                  <p>Your SMTP configuration is working correctly.</p>
-                  <div style="background-color: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                    <h3>Connection Details:</h3>
-                    <p><strong>Test Time:</strong> ${new Date().toLocaleString()}</p>
-                    <p><strong>Status:</strong> <span style="color: #22c55e;">Connected Successfully</span></p>
-                  </div>
-                  <p style="color: #64748b;">You can now send emails reliably to your customers.</p>
-                </div>
-              `,
-              text: `SMTP Connection Test Successful! Your email configuration is working correctly. Test completed at ${new Date().toLocaleString()}.`,
+              templateId: 'smtp_test',
+              recipient: {
+                email: testEmail,
+                name: 'Test User'
+              },
+              variables: {
+                test_time: new Date().toLocaleString(),
+                smtp_host: 'SMTP Fallback System',
+                business_name: 'Starters Small Chops'
+              },
               emailType: 'transactional'
             }
           });
 
           if (error) {
-            throw new Error(error.message || 'Fallback email sender also failed');
+            throw new Error(error.message || 'SMTP fallback also failed');
           }
 
-          console.log('Test email sent successfully via smtp-email-sender fallback');
+          console.log('Test email sent successfully via SMTP fallback');
           return data;
-        } catch (fallbackError) {
-          throw new Error(`All email senders failed. SMTP error: ${enhancedError.message}, Fallback error: ${fallbackError.message}`);
+        } catch (smtpError) {
+          throw new Error(`All email systems failed. Auth error: ${authError.message}, SMTP error: ${smtpError.message}`);
         }
       }
     },

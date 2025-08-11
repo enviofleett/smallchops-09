@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { paystackService, validateReferenceForVerification } from '@/lib/paystack';
+import { paystackService, assertServerReference, validateReferenceForVerification } from '@/lib/paystack';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PaymentErrorHandler } from '@/lib/payment-error-handler';
@@ -42,20 +42,31 @@ export const usePayment = () => {
         metadata: { order_id: orderId, orderId }
       });
 
-      // Persist the authoritative reference returned by the server
+      // Validate server reference format but don't block redirect; we'll rely on backend mapping if needed
+      let validServerRef = true;
       try {
-        await supabase
-          .from('orders')
-          .update({ payment_reference: response.reference, payment_method: 'paystack' })
-          .eq('id', orderId);
+        assertServerReference(response.reference);
       } catch (e) {
-        console.warn('Could not persist final payment_reference (will rely on metadata):', e);
+        validServerRef = false;
+        console.warn('Server returned invalid reference format:', response.reference, e);
+      }
+
+      // Persist the authoritative reference only if valid
+      if (validServerRef) {
+        try {
+          await supabase
+            .from('orders')
+            .update({ payment_reference: response.reference, payment_method: 'paystack' })
+            .eq('id', orderId);
+        } catch (e) {
+          console.warn('Could not persist final payment_reference (will rely on metadata):', e);
+        }
       }
 
       return {
         success: true,
         url: response.authorization_url,
-        sessionId: response.reference
+        sessionId: validServerRef ? response.reference : undefined
       };
     } catch (error) {
       console.error('Payment initiation error:', error);
@@ -116,43 +127,33 @@ export const usePayment = () => {
   const verifyPayment = async (
     reference: string,
     provider: PaymentProvider = 'paystack'
-  ): Promise<any> => {
+  ): Promise<PaymentVerification> => {
     // Validate reference format (warn but block clearly invalid ones)
     if (!validateReferenceForVerification(reference)) {
       throw new Error('Invalid reference format for verification');
     }
     try {
-      // Prefer secure verifier first (ensures DB upsert + order update like backfill)
-      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-secure', {
+      const { data, error } = await supabase.functions.invoke('paystack-secure', {
         body: { action: 'verify', reference }
       });
 
-      const normalize = (res: any) => {
-        // paystack-secure: { status: true, ... }
-        if (res?.status === true) {
-          return { success: true, ...res, data: res.data };
-        }
-        // paystack-verify: { success: true, ... }
-        if (res?.success === true) {
-          return { success: true, ...res, data: res.data };
-        }
-        return { success: false, error: res?.error || res?.message || 'Payment verification failed' };
-      };
+      if (error) throw new Error(error.message);
 
-      if (!primaryError && primaryData) {
-        const normalized = normalize(primaryData);
-        if (normalized.success) return normalized;
+      const success = data?.status === true || data?.success === true;
+      if (!success) {
+        return { success: false };
       }
 
-      // Fallback to secure verifier
-      const { data: fallbackData, error: fallbackError } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference }
-      });
+      const d: any = data?.data || data;
+      const order = d?.order || data?.order;
 
-      if (fallbackError) throw new Error(fallbackError.message);
-
-      // If secure returns success, still normalize and return
-      return normalize(fallbackData);
+      return {
+        success: true,
+        paymentStatus: d?.payment_status || d?.status || (success ? 'paid' : undefined),
+        orderStatus: order?.status || d?.order_status,
+        orderNumber: order?.order_number || d?.order_number,
+        amount: typeof d?.amount === 'number' ? d.amount : undefined,
+      };
     } catch (error) {
       console.error('Payment verification error:', error);
       const errorInfo = PaymentErrorHandler.formatErrorForUser(error);

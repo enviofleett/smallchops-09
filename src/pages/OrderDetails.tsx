@@ -185,7 +185,6 @@ const reconcileNow = async () => {
   </div>
   <div className="flex gap-2">
     <Button variant="outline" onClick={refreshNow} disabled={isLoadingData}>Refresh status</Button>
-    <Button onClick={reconcileNow} disabled={isReconciling}>Reconcile payment</Button>
   </div>
 </div>
 

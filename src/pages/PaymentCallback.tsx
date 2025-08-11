@@ -19,6 +19,7 @@ import {
   logVerificationCompleted, 
   logReferenceMissing 
 } from "@/utils/paymentMonitoring";
+import { paymentCompletionCoordinator } from "@/utils/paymentCompletion";
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
 interface PaymentResult {
@@ -246,17 +247,32 @@ export default function PaymentCallback() {
         logPaymentVerification(paymentReference, true);
         logVerificationCompleted(paymentReference, true, { orderId: payload?.order_id });
 
-        // Clear client-side state ONLY after successful verification
-        await clearCartAfterPayment(payload?.order_number);
-        clearCheckoutState();
-        
-        // Clear payment progress flag and references
-        try { 
-          sessionStorage.removeItem('payment_in_progress');
-          sessionStorage.removeItem('paystack_last_reference'); 
-          localStorage.removeItem('paystack_last_reference'); 
-          localStorage.removeItem('pending_payment_reference');
-        } catch {}
+        // 🚀 COORDINATE 15-SECOND COMPLETION FLOW
+        paymentCompletionCoordinator.coordinatePaymentCompletion(
+          {
+            reference: paymentReference,
+            orderNumber: payload?.order_number,
+            orderId: payload?.order_id,
+            amount: typeof payload?.total_amount === 'number'
+              ? payload.total_amount
+              : (typeof payload?.amount === 'number' ? payload.amount / 100 : undefined)
+          },
+          {
+            onClearCart: () => {
+              console.log('🛒 Coordinated cart clearing triggered');
+              clearCart();
+              clearCheckoutState();
+            },
+            onStopMonitoring: () => {
+              console.log('🛑 Coordinated monitoring stop triggered');
+              // Will emit global event to stop PaymentStatusMonitor
+            },
+            onNavigate: () => {
+              console.log('🧭 Coordinated navigation triggered');
+              navigate('/customer-profile');
+            }
+          }
+        );
 
         // Emit global payment-confirmed event for listeners
         try {
@@ -264,9 +280,6 @@ export default function PaymentCallback() {
             detail: { orderId: payload?.order_id || orderIdParam, orderReference: paymentReference }
           }));
         } catch {}
-
-        // Friendly toast
-        toast.success('Payment confirmed successfully!');
 
         // Invalidate caches now and again after a short delay for replication safety
         await invalidateOrdersCaches();

@@ -10,20 +10,20 @@ export const useOrderProcessing = () => {
   const clearCartAfterPayment = useCallback(async (orderNumber?: string) => {
     try {
       console.log('🛒 Processing cart clear after payment for order:', orderNumber);
-      console.log('⏰ Waiting 10 seconds before clearing cart to allow background processes to complete...');
+      console.log('⏰ Waiting 15 seconds before clearing cart to allow background processes to complete...');
       
       // Show immediate success notification
       toast({
         title: "Payment Successful!",
         description: orderNumber 
-          ? `Order ${orderNumber} has been confirmed. Your cart will be cleared shortly.`
-          : "Your payment has been processed successfully. Cart will be cleared shortly.",
+          ? `Order ${orderNumber} has been confirmed. Your cart will be cleared in 15 seconds.`
+          : "Your payment has been processed successfully. Cart will be cleared in 15 seconds.",
       });
       
-      // 🔧 CRITICAL: Wait 10 seconds before clearing cart to prevent race conditions
-      await new Promise(resolve => setTimeout(resolve, 10000));
+      // 🔧 CRITICAL: Wait 15 seconds before clearing cart to prevent race conditions
+      await new Promise(resolve => setTimeout(resolve, 15000));
       
-      console.log('🛒 10-second delay completed, now clearing cart...');
+      console.log('🛒 15-second delay completed, now clearing cart...');
       
       // Clear cart after delay
       clearCart();
@@ -38,13 +38,13 @@ export const useOrderProcessing = () => {
       localStorage.removeItem('checkout_in_progress');
       localStorage.removeItem('pending_payment_reference');
       
-      console.log('🛒 Cart cleared and cleanup completed after 10-second delay');
+      console.log('🛒 Cart cleared and cleanup completed after 15-second delay');
       
     } catch (error) {
       console.error('Error during cart clearing process:', error);
       // Still clear cart even if notification fails, but with shorter delay
-      console.log('⚠️ Error occurred, using 5-second fallback delay...');
-      await new Promise(resolve => setTimeout(resolve, 5000));
+      console.log('⚠️ Error occurred, using 8-second fallback delay...');
+      await new Promise(resolve => setTimeout(resolve, 8000));
       clearCart();
     }
   }, [clearCart, toast]);

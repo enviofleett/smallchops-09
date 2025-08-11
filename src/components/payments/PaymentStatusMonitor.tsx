@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CheckCircle, AlertCircle, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { paymentCompletionCoordinator } from '@/utils/paymentCompletion';
 
 interface PaymentStatusMonitorProps {
   reference: string;
@@ -22,8 +23,33 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
   const [isMonitoring, setIsMonitoring] = useState(true);
   const [verificationLocked, setVerificationLocked] = useState(false);
 
+  // Listen for global payment completion events
+  useEffect(() => {
+    const handlePaymentComplete = (event: any) => {
+      const { reference: eventRef, success } = event.detail;
+      if (eventRef === reference && success) {
+        console.log('🌐 PaymentStatusMonitor received global completion event, stopping monitoring');
+        setVerificationLocked(true);
+        setStatus('success');
+        setIsMonitoring(false);
+      }
+    };
+
+    window.addEventListener('payment-verification-complete', handlePaymentComplete);
+    return () => window.removeEventListener('payment-verification-complete', handlePaymentComplete);
+  }, [reference]);
+
   useEffect(() => {
     if (!reference || !isMonitoring || attempts >= maxAttempts || verificationLocked) {
+      return;
+    }
+
+    // Check if coordinator is already processing this reference
+    if (paymentCompletionCoordinator.isProcessing(reference)) {
+      console.log('🔒 Payment completion coordinator is already processing this reference, stopping monitor');
+      setVerificationLocked(true);
+      setStatus('success');
+      setIsMonitoring(false);
       return;
     }
 
@@ -31,9 +57,9 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
       try {
         console.log(`🔍 Checking payment status for reference: ${reference} (attempt ${attempts + 1})`);
         
-        // Check if verification was already locked during this check
-        if (verificationLocked) {
-          console.log('🔒 Verification already locked, skipping check');
+        // Double-check if verification was already locked during this check
+        if (verificationLocked || paymentCompletionCoordinator.isProcessing(reference)) {
+          console.log('🔒 Verification already locked or being processed, skipping check');
           return;
         }
         
@@ -55,7 +81,7 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
           const paymentStatus = data.data.status;
           
           if (paymentStatus === 'success') {
-            console.log('✅ Payment verified as successful - LOCKING VERIFICATION');
+            console.log('✅ PaymentStatusMonitor: Payment verified as successful - IMMEDIATELY STOPPING');
             
             // 🔒 CRITICAL: Lock verification immediately to prevent race conditions
             setVerificationLocked(true);
@@ -77,6 +103,12 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
             }
             
             onStatusUpdate('success', data.data);
+            
+            // Emit global stop event to coordinate with other components
+            window.dispatchEvent(new CustomEvent('payment-verification-complete', {
+              detail: { reference, success: true, source: 'PaymentStatusMonitor' }
+            }));
+            
             return;
           }
         }

@@ -39,11 +39,11 @@ serve(async (req) => {
     let totalRevenue = 0;
 
     try {
-      // Get total stats with individual error handling - use safe customer counting
+      // Get total stats with individual error handling - only production data
       const [productsResult, ordersResult, customersResult] = await Promise.allSettled([
-        supabase.from('products').select('id', { count: 'exact', head: true }),
-        supabase.from('orders').select('id, total_amount', { count: 'exact' }).neq('status', 'cancelled'),
-        supabase.from('customer_accounts').select('id', { count: 'exact', head: true })
+        supabase.from('products').select('id', { count: 'exact', head: true }).not('name', 'ilike', '%test%'),
+        supabase.from('orders').select('id, total_amount', { count: 'exact' }).eq('payment_status', 'paid'),
+        supabase.from('customer_accounts').select('id', { count: 'exact', head: true }).not('email', 'in', '(pam@gmail.com,lizzi4200@gmail.com,akpanphilip1122@gmail.com)')
       ]);
 
       // Handle products count
@@ -54,29 +54,31 @@ serve(async (req) => {
         console.error("Products query failed:", productsResult.status === 'fulfilled' ? productsResult.value.error : productsResult.reason);
       }
 
-      // Handle orders count and revenue
+      // Handle orders count and revenue - only PAID orders for production metrics
       if (ordersResult.status === 'fulfilled' && !ordersResult.value.error) {
         totalOrders = ordersResult.value.count || 0;
         totalRevenue = ordersResult.value.data?.reduce((sum, order) => sum + (order.total_amount || 0), 0) || 0;
-        console.log(`Orders count: ${totalOrders}, Revenue: ${totalRevenue}`);
+        console.log(`Paid orders count: ${totalOrders}, Actual revenue: ${totalRevenue}`);
       } else {
         console.error("Orders query failed:", ordersResult.status === 'fulfilled' ? ordersResult.value.error : ordersResult.reason);
       }
 
-      // Handle customer accounts count (authenticated users only)
+      // Handle customer accounts count (real customers only)
       if (customersResult.status === 'fulfilled' && !customersResult.value.error) {
         const authenticatedCustomers = customersResult.value.count || 0;
         
-        // Add guest customers from orders
+        // Add real guest customers from PAID orders only
         const { data: guestOrdersData } = await supabase
           .from('orders')
           .select('customer_email')
+          .eq('payment_status', 'paid')
           .is('customer_id', null)
-          .not('customer_email', 'is', null);
+          .not('customer_email', 'is', null)
+          .not('customer_email', 'in', '(pam@gmail.com,lizzi4200@gmail.com,akpanphilip1122@gmail.com)');
         
         const guestCustomersCount = new Set(guestOrdersData?.map(o => o.customer_email) || []).size;
         totalCustomers = authenticatedCustomers + guestCustomersCount;
-        console.log(`Customers count: ${totalCustomers} (${authenticatedCustomers} authenticated + ${guestCustomersCount} guests)`);
+        console.log(`Real customers count: ${totalCustomers} (${authenticatedCustomers} authenticated + ${guestCustomersCount} paying guests)`);
       } else {
         console.error("Customer accounts query failed:", customersResult.status === 'fulfilled' ? customersResult.value.error : customersResult.reason);
       }

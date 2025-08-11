@@ -6256,6 +6256,15 @@ export type Database = {
         }
         Relationships: []
       }
+      production_metrics: {
+        Row: {
+          total_paid_orders: number | null
+          total_paying_customers: number | null
+          total_products: number | null
+          total_revenue: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       bulk_safe_delete_products: {

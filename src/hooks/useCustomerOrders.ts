@@ -1,5 +1,6 @@
 
 import { useQuery } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { useCustomerAuth } from './useCustomerAuth';
 import { getCustomerOrderHistory } from '@/api/purchaseHistory';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,7 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 export const useCustomerOrders = () => {
   const { isAuthenticated, customerAccount, user } = useCustomerAuth();
 
-  return useQuery({
+  const query = useQuery({
     queryKey: ['customer-orders', customerAccount?.id, user?.email],
     queryFn: async () => {
       // First, get the user's email for order lookup
@@ -97,9 +98,42 @@ export const useCustomerOrders = () => {
     refetchInterval: (data) => {
       const list = Array.isArray((data as any)?.orders) ? (data as any).orders : [];
       const hasPending = list.some((o: any) => (o?.payment_status || '').toLowerCase() !== 'paid');
-      return hasPending ? 30 * 1000 : false;
+      return hasPending ? 10 * 1000 : false;
     },
     retry: 2,
     retryDelay: 1000,
   });
+
+  // Realtime: refresh on customer-specific orders changes
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    const userEmail = user?.email || customerAccount?.email;
+    const custId = customerAccount?.id;
+    if (!userEmail && !custId) return;
+
+    const filter = custId ? `customer_id=eq.${custId}` : `customer_email=eq.${userEmail}`;
+    const channelName = `orders-${custId || userEmail}`;
+
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter }, (payload) => {
+        try { (query as any)?.refetch?.(); } catch {}
+        const oldStatus = (payload as any)?.old?.payment_status?.toLowerCase?.();
+        const newStatus = (payload as any)?.new?.payment_status?.toLowerCase?.();
+        if (oldStatus !== 'paid' && newStatus === 'paid') {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('payment-confirmed', {
+              detail: { orderId: (payload as any)?.new?.id, orderReference: (payload as any)?.new?.payment_reference }
+            }));
+          }
+        }
+      })
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAuthenticated, customerAccount?.id, user?.email]);
+
+  return query;
 };

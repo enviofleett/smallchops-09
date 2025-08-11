@@ -132,31 +132,7 @@ useEffect(() => {
   fetchPayments();
 }, [orders]);
 
-// Realtime: refresh on payment transaction changes
-useEffect(() => {
-  const channel = supabase
-    .channel('ptx-customer-orders')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_transactions' }, () => {
-      refetch?.();
-    })
-    .subscribe();
-  return () => {
-    supabase.removeChannel(channel);
-  };
-}, [refetch]);
 
-// Realtime: refresh on orders table changes
-useEffect(() => {
-  const ordersChannel = supabase
-    .channel('orders-customer-orders')
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
-      refetch?.();
-    })
-    .subscribe();
-  return () => {
-    supabase.removeChannel(ordersChannel);
-  };
-}, [refetch]);
 
 // Auto-reconcile recent pending Paystack orders
 useEffect(() => {

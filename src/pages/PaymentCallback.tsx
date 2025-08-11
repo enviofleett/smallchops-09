@@ -90,20 +90,7 @@ export default function PaymentCallback() {
     // Intentionally left blank to enforce verification-first flow
   }, []);
 
-  // If no reference, show error instead of redirecting
-  useEffect(() => {
-    if (redirected || forceUi) return;
-    if (!reference) {
-      console.warn('PaymentCallback - No reference; showing error UI');
-      setStatus('error');
-      setResult({
-        success: false,
-        error: 'No payment reference found',
-        message: 'We could not detect your payment reference. Please check your email for order status or contact support.',
-        retryable: false
-      });
-    }
-  }, [reference, forceUi, redirected]);
+  // Reference error UI handled after storage fallback in the verification effect
 
   // Fallback: full verification flow (when status not explicitly success)
   useEffect(() => {

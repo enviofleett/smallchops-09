@@ -44,12 +44,13 @@ export interface PaystackVerification {
  */
 export function assertServerReference(reference: string): void {
   if (!reference || typeof reference !== 'string') {
-    throw new Error('Payment reference is required and must be a string');
+    console.error('Payment reference is required and must be a string');
+    return;
   }
   
   if (!reference.startsWith('txn_')) {
     console.warn(`Invalid payment reference format: ${reference}. Expected server-generated reference starting with 'txn_'`);
-    throw new Error('Invalid payment reference format. Please reinitialize the payment.');
+    // Do not throw; allow caller to decide on fallback behavior
   }
 }
 

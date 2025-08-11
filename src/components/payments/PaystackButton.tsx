@@ -80,30 +80,32 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
         
         // Use the server-returned reference as the single source of truth
         const serverRef = response.reference;
-        
+
+        // Store reference immediately for callback recovery across tabs
+        try {
+          sessionStorage.setItem('paystack_last_reference', serverRef);
+          localStorage.setItem('paystack_last_reference', serverRef);
+        } catch {}
+
+        try {
+          assertServerReference(serverRef);
+        } catch (e) {
+          setLoading(false);
+          console.warn('Invalid server reference, redirecting to authorization URL:', serverRef, e);
+          // Fallback to redirect (break out of preview iframe if needed)
+          const url = response.authorization_url;
           try {
-            assertServerReference(serverRef);
-          } catch (e) {
-            setLoading(false);
-            console.warn('Invalid server reference, redirecting to authorization URL:', serverRef, e);
-            // Fallback to redirect (break out of preview iframe if needed)
-            const url = response.authorization_url;
-            try {
-              if (window.top && window.top !== window.self) {
-                (window.top as Window).location.href = url;
-              } else {
-                window.location.href = url;
-              }
-            } catch {
-              window.open(url, '_blank', 'noopener,noreferrer');
+            if (window.top && window.top !== window.self) {
+              (window.top as Window).location.href = url;
+            } else {
+              window.location.href = url;
             }
-            return;
+          } catch {
+            window.open(url, '_blank', 'noopener,noreferrer');
           }
-          try {
-            sessionStorage.setItem('paystack_last_reference', serverRef);
-            localStorage.setItem('paystack_last_reference', serverRef);
-          } catch {}
-          if (config?.public_key) {
+          return;
+        }
+        if (config?.public_key) {
           // Use Paystack inline popup
           const handler = window.PaystackPop.setup({
             key: config.public_key,

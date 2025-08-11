@@ -67,13 +67,15 @@ export default function PaymentCallback() {
   // Enhanced parameter detection with fallback handling
   const getPaymentReference = () => {
     // Try multiple parameter names that Paystack might use
-    const possibleRefs = [
-      searchParams.get('reference'),
-      searchParams.get('trxref'),
-      searchParams.get('transaction_id'),
-      searchParams.get('tx_ref'),
-      searchParams.get('txref')
-    ];
+      const possibleRefs = [
+        searchParams.get('reference'),
+        searchParams.get('trxref'),
+        searchParams.get('transaction_id'),
+        searchParams.get('tx_ref'),
+        searchParams.get('txref'),
+        searchParams.get('provider_reference'),
+        searchParams.get('payment_reference')
+      ];
     
     return possibleRefs.find(ref => ref && ref.length > 0) || null;
   };
@@ -114,12 +116,16 @@ export default function PaymentCallback() {
     // Fallback: try session storage if reference is missing (some gateways omit it)
     if (!reference) {
       const storedRef = sessionStorage.getItem('paystack_last_reference') || localStorage.getItem('paystack_last_reference');
-      const storedOrder = sessionStorage.getItem('orderDetails');
-      const orderId = (() => { try { return storedOrder ? JSON.parse(storedOrder)?.orderId : null; } catch { return null; } })();
+      const storedOrderRaw = sessionStorage.getItem('orderDetails') || localStorage.getItem('orderDetails');
+      let parsedDetails: any = null;
+      try { parsedDetails = storedOrderRaw ? JSON.parse(storedOrderRaw) : null; } catch {}
+      const orderId = parsedDetails?.orderId || null;
+      const orderNumber = parsedDetails?.orderNumber || null;
       if (storedRef) {
         const params = new URLSearchParams(window.location.search);
         params.set('reference', storedRef);
         if (orderId) params.set('order_id', orderId);
+        if (orderNumber) params.set('order_number', orderNumber);
         // Replace the URL so refresh keeps the reference
         navigate(`${window.location.pathname}?${params.toString()}`, { replace: true });
         return; // wait for next effect run with reference present

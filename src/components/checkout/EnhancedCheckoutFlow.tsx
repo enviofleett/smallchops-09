@@ -434,8 +434,16 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           reference: paymentObj.reference 
         });
         
-        // Remember reference in case gateway omits it on callback
-        try { if (paymentObj?.reference) sessionStorage.setItem('paystack_last_reference', paymentObj.reference); } catch {}
+        // Remember reference and order details for callback fallback across tabs
+        try {
+          if (paymentObj?.reference) {
+            sessionStorage.setItem('paystack_last_reference', paymentObj.reference);
+            localStorage.setItem('paystack_last_reference', paymentObj.reference);
+          }
+          const details = JSON.stringify({ orderId, orderNumber, reference: paymentObj?.reference });
+          sessionStorage.setItem('orderDetails', details);
+          localStorage.setItem('orderDetails', details);
+        } catch {}
         
         console.log('🚀 Redirecting to payment URL:', paymentUrl);
         try {

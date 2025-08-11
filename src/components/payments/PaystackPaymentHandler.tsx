@@ -164,7 +164,7 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
 
       try {
         // Initialize on server to get the authoritative reference
-        const callbackUrl = `${window.location.origin}/payment/callback?order_id=${orderNumber}`;
+        const callbackUrl = `${window.location.origin}/payment/callback?order_number=${encodeURIComponent(orderNumber)}&order_id=${encodeURIComponent(orderNumber)}`;
         const init = await paystackService.initializeTransaction({
           email,
           amount: paystackService.formatAmount(amount),
@@ -179,6 +179,15 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
 
         let serverRef = init.reference;
         setCurrentReference(serverRef);
+        try {
+          if (serverRef) {
+            sessionStorage.setItem('paystack_last_reference', serverRef);
+            localStorage.setItem('paystack_last_reference', serverRef);
+          }
+          const details = JSON.stringify({ orderNumber, reference: serverRef });
+          sessionStorage.setItem('orderDetails', details);
+          localStorage.setItem('orderDetails', details);
+        } catch {}
         console.log('🎯 REFERENCE TRACKING [INIT]:', { received: serverRef, url: init.authorization_url });
 
         // Validate server-generated reference and reinitialize if needed
@@ -221,7 +230,7 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
               if (response.status === 'success') {
                 const ref = response.reference || serverRef;
                 console.log('🎯 REFERENCE TRACKING [CALLBACK]:', { refFromPaystack: response.reference, serverRef: serverRef, match: (response.reference === serverRef) });
-                window.location.href = `/payment/callback?reference=${ref}&status=success&order_id=${orderNumber}`;
+                window.location.href = `/payment/callback?reference=${encodeURIComponent(ref)}&status=success&order_number=${encodeURIComponent(orderNumber)}&order_id=${encodeURIComponent(orderNumber)}`;
               } else {
                 toast({
                   title: "Payment Failed",

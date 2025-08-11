@@ -130,14 +130,17 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
             callback: (response: any) => {
               setLoading(false);
               if (response.status === 'success') {
+                const ref = response.reference || serverRef;
                 try { 
-                  sessionStorage.setItem('paystack_last_reference', response.reference);
-                  localStorage.setItem('paystack_last_reference', response.reference);
-                  const details = JSON.stringify({ orderId, reference: response.reference });
+                  sessionStorage.setItem('paystack_last_reference', ref);
+                  localStorage.setItem('paystack_last_reference', ref);
+                  const details = JSON.stringify({ orderId, reference: ref });
                   sessionStorage.setItem('orderDetails', details);
                   localStorage.setItem('orderDetails', details);
                 } catch {}
-                onSuccess(response.reference, response);
+                
+                // Navigate to callback page for unified verification (instead of inline)
+                window.location.href = `/payment/callback?reference=${encodeURIComponent(ref)}&status=success&order_id=${encodeURIComponent(orderId)}`;
               } else {
                 onError('Payment was not completed');
               }

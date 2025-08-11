@@ -19,6 +19,7 @@ import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
 import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
 import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
+import { generatePaymentReference } from "@/utils/paymentReference";
 import {
   Select,
   SelectContent,
@@ -232,10 +233,10 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     setIsSubmitting(true);
 
     try {
-      // Generate a unique reference for this checkout attempt
-      const uniqueReference = `checkout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Generate a unique reference for this checkout attempt using txn_ format
+      const uniqueReference = generatePaymentReference();
       
-      console.log('🚀 Processing checkout with unique reference:', uniqueReference);
+      console.log('🚀 Processing checkout with txn_ reference:', uniqueReference);
 
       const sanitizedData = {
         customer_email: formData.customer_email?.trim(),

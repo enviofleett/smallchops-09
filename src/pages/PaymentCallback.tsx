@@ -12,6 +12,7 @@ import { Helmet } from "react-helmet-async";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { logPaymentVerification } from "@/utils/paymentMetrics";
+import { isValidPaymentReference } from "@/utils/paymentReference";
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
 interface PaymentResult {
@@ -80,11 +81,14 @@ export default function PaymentCallback() {
     ];
     
     // Filter out null, empty, or very short values that are likely invalid
-    const validRef = possibleRefs.find(ref => ref && ref.trim().length > 10);
+    // Prefer txn_ format references when multiple are found
+    const txnRef = possibleRefs.find(ref => ref && isValidPaymentReference(ref));
+    const validRef = txnRef || possibleRefs.find(ref => ref && ref.trim().length > 10);
     
     console.log('🔍 Payment reference detection:', {
       foundReferences: possibleRefs.filter(r => r),
       selectedReference: validRef,
+      preferredTxnFormat: !!txnRef,
       allParams: Object.fromEntries(searchParams.entries())
     });
     
@@ -114,7 +118,7 @@ export default function PaymentCallback() {
     // Fallback: try session/local storage if reference is missing (some gateways omit it)
     if (!reference) {
       console.log('PaymentCallback - No reference in URL, checking storage...');
-      // Try multiple storage keys in priority order
+      // Try multiple storage keys in priority order, preferring txn_ format
       const refCandidates = [
         sessionStorage.getItem('paystack_last_reference'),
         localStorage.getItem('paystack_last_reference'),
@@ -125,7 +129,9 @@ export default function PaymentCallback() {
         sessionStorage.getItem('last_payment_reference'),
         localStorage.getItem('last_payment_reference')
       ];
-      const storedRef = refCandidates.find((v) => typeof v === 'string' && v.trim().length > 0) || null;
+      const validCandidates = refCandidates.filter((v) => typeof v === 'string' && v.trim().length > 0);
+      // Prefer txn_ format references
+      const storedRef = validCandidates.find(ref => isValidPaymentReference(ref!)) || validCandidates[0] || null;
       console.log('PaymentCallback - Found stored reference:', storedRef);
 
       // Order details for enriching URL (best-effort)

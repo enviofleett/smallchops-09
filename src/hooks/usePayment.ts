@@ -48,13 +48,14 @@ export const usePayment = () => {
         metadata: { order_id: orderId, orderId }
       });
 
-      // Validate server reference format but don't block redirect; we'll rely on backend mapping if needed
+      // Validate server reference format (should be txn_)
       let validServerRef = true;
       try {
         assertServerReference(response.reference);
+        console.log('✅ Server returned valid txn_ reference:', response.reference);
       } catch (e) {
         validServerRef = false;
-        console.warn('Server returned invalid reference format:', response.reference, e);
+        console.warn('⚠️ Server returned invalid reference format:', response.reference, e);
       }
 
       // Persist the authoritative reference only if valid
@@ -147,9 +148,10 @@ export const usePayment = () => {
     reference: string,
     provider: PaymentProvider = 'paystack'
   ): Promise<PaymentVerification> => {
-    // Validate reference format (warn but block clearly invalid ones)
+    // Validate reference format (warn but support both txn_ and legacy formats during transition)
     if (!validateReferenceForVerification(reference)) {
-      throw new Error('Invalid reference format for verification');
+      console.warn('⚠️ Unexpected reference format for verification:', reference);
+      // Don't throw error during transition period - let backend handle it
     }
     try {
       const { data, error } = await supabase.functions.invoke('paystack-secure', {

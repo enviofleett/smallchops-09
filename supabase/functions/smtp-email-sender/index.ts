@@ -33,9 +33,9 @@ async function sendSMTPEmail(config: any, emailData: any) {
       ? Deno.connectTls({ hostname: host, port: port })
       : Deno.connect({ hostname: host, port: port });
     
-    // Add connection timeout (30 seconds)
+    // Add connection timeout (15 seconds for better responsiveness)
     const timeoutPromise = new Promise((_, reject) => {
-      setTimeout(() => reject(new Error(`Connection timeout after 30s`)), 30000);
+      setTimeout(() => reject(new Error(`Connection timeout after 15s to ${host}:${port}`)), 15000);
     });
 
     conn = await Promise.race([connectPromise, timeoutPromise]) as Deno.TlsConn | Deno.Conn;

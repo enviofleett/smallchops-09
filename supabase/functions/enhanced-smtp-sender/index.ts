@@ -41,7 +41,7 @@ async function sendSMTPEmailWithFallback(config: any, emailData: any) {
 }
 
 // Enhanced SMTP implementation with timeout handling
-async function sendSMTPEmail(config: any, emailData: any, timeoutMs: number = 30000) {
+async function sendSMTPEmail(config: any, emailData: any, timeoutMs: number = 15000) {
   const { host, port, auth, secure } = config;
   const { from, to, subject, html, text } = emailData;
 
@@ -57,7 +57,7 @@ async function sendSMTPEmail(config: any, emailData: any, timeoutMs: number = 30
       : Deno.connect({ hostname: host, port: port });
     
     const timeoutPromise = new Promise((_, reject) => {
-      timeoutId = setTimeout(() => reject(new Error(`Connection timeout after ${timeoutMs}ms`)), timeoutMs);
+      timeoutId = setTimeout(() => reject(new Error(`Connection timeout after ${timeoutMs}ms to ${host}:${port}`)), timeoutMs);
     });
 
     conn = await Promise.race([connectPromise, timeoutPromise]) as Deno.TlsConn | Deno.Conn;
@@ -83,13 +83,13 @@ async function sendSMTPEmail(config: any, emailData: any, timeoutMs: number = 30
       await conn.write(encoder.encode(command + '\r\n'));
       
       // Read response with timeout
-      const buffer = new Uint8Array(1024);
+      const buffer = new Uint8Array(2048);
       const readPromise = conn.read(buffer);
-      const timeoutPromise = new Promise((_, reject) => {
+      const responseTimeout = new Promise((_, reject) => {
         setTimeout(() => reject(new Error('Response timeout')), 10000);
       });
       
-      const bytesRead = await Promise.race([readPromise, timeoutPromise]) as number | null;
+      const bytesRead = await Promise.race([readPromise, responseTimeout]) as number | null;
       
       if (bytesRead === null) {
         throw new Error('Connection closed unexpectedly');
@@ -102,7 +102,7 @@ async function sendSMTPEmail(config: any, emailData: any, timeoutMs: number = 30
     }
 
     // Read initial greeting
-    const buffer = new Uint8Array(1024);
+    const buffer = new Uint8Array(2048);
     const bytesRead = await conn.read(buffer);
     if (bytesRead === null) throw new Error('No greeting received');
     
@@ -121,6 +121,7 @@ async function sendSMTPEmail(config: any, emailData: any, timeoutMs: number = 30
 
     // STARTTLS for non-secure connections (port 587)
     if (!secure && port === 587) {
+      console.log('🔐 Initiating STARTTLS...');
       response = await sendCommand('STARTTLS');
       if (!response.startsWith('220')) {
         throw new Error(`STARTTLS failed: ${response}`);
@@ -129,300 +130,227 @@ async function sendSMTPEmail(config: any, emailData: any, timeoutMs: number = 30
       // Close current connection and create TLS connection
       conn.close();
       
-      conn = await Deno.connectTls({
-        hostname: host,
-        port: port,
-      });
+      console.log('🔄 Upgrading to TLS connection...');
+      conn = await Deno.connectTls({ hostname: host, port: port });
       
-      // Send EHLO again after TLS
+      // Send EHLO again after TLS upgrade
       response = await sendCommand(`EHLO ${host}`);
       if (!response.startsWith('250')) {
         throw new Error(`EHLO after STARTTLS failed: ${response}`);
       }
     }
 
-    // Authentication using AUTH PLAIN
-    const authString = btoa(`\0${auth.user}\0${auth.pass}`);
-    response = await sendCommand(`AUTH PLAIN ${authString}`);
-    
-    if (!response.startsWith('235')) {
-      throw new Error(`Authentication failed: ${response}`);
+    // Authentication
+    if (auth && auth.user && auth.pass) {
+      console.log('🔑 Authenticating...');
+      response = await sendCommand('AUTH LOGIN');
+      if (!response.startsWith('334')) {
+        throw new Error(`AUTH LOGIN failed: ${response}`);
+      }
+
+      // Send username
+      const username = btoa(auth.user);
+      response = await sendCommand(username);
+      if (!response.startsWith('334')) {
+        throw new Error(`Username authentication failed: ${response}`);
+      }
+
+      // Send password
+      const password = btoa(auth.pass);
+      response = await sendCommand(password);
+      if (!response.startsWith('235')) {
+        throw new Error(`Password authentication failed: ${response}`);
+      }
     }
 
-    // Send MAIL FROM
-    const fromEmail = from.includes('<') ? from.match(/<([^>]+)>/)?.[1] || from : from;
-    response = await sendCommand(`MAIL FROM:<${fromEmail}>`);
+    // Send email
+    console.log('📧 Sending email...');
+    
+    // MAIL FROM
+    response = await sendCommand(`MAIL FROM:<${from}>`);
     if (!response.startsWith('250')) {
       throw new Error(`MAIL FROM failed: ${response}`);
     }
 
-    // Send RCPT TO
+    // RCPT TO
     response = await sendCommand(`RCPT TO:<${to}>`);
     if (!response.startsWith('250')) {
       throw new Error(`RCPT TO failed: ${response}`);
     }
 
-    // Send DATA
+    // DATA
     response = await sendCommand('DATA');
     if (!response.startsWith('354')) {
-      throw new Error(`DATA failed: ${response}`);
+      throw new Error(`DATA command failed: ${response}`);
     }
 
-    // Construct and send email content
-    const messageId = `enhanced-smtp-${Date.now()}@${host}`;
+    // Email content
     const emailContent = [
-      `Message-ID: <${messageId}>`,
-      `Date: ${new Date().toUTCString()}`,
       `From: ${from}`,
       `To: ${to}`,
       `Subject: ${subject}`,
       'MIME-Version: 1.0',
-      html ? 'Content-Type: text/html; charset=UTF-8' : 'Content-Type: text/plain; charset=UTF-8',
+      'Content-Type: text/html; charset=UTF-8',
       '',
-      html || text || '',
+      html || text || 'Test email content',
       '.'
     ].join('\r\n');
 
-    await conn.write(encoder.encode(emailContent + '\r\n'));
-    
-    const dataBuffer = new Uint8Array(1024);
-    const dataRead = await conn.read(dataBuffer);
-    if (dataRead === null) throw new Error('No response to DATA');
-    
-    const dataResponse = decoder.decode(dataBuffer.slice(0, dataRead)).trim();
-    console.log(`SMTP < ${dataResponse}`);
-    
-    if (!dataResponse.startsWith('250')) {
-      throw new Error(`Email sending failed: ${dataResponse}`);
+    response = await sendCommand(emailContent);
+    if (!response.startsWith('250')) {
+      throw new Error(`Email sending failed: ${response}`);
     }
 
-    // Send QUIT
+    // QUIT
     await sendCommand('QUIT');
-    conn.close();
-    conn = null;
-
-    console.log('✅ Email sent successfully via enhanced SMTP');
     
-    return {
-      messageId,
-      accepted: [to],
-      rejected: [],
-      response: dataResponse,
-      port: port,
-      method: secure ? 'SSL' : 'STARTTLS'
-    };
+    console.log('✅ Email sent successfully!');
+    return { success: true, messageId: response };
 
   } catch (error) {
-    // Ensure connection is closed on error
-    if (conn) {
-      try {
-        conn.close();
-      } catch (closeError) {
-        console.error('Error closing connection:', closeError);
-      }
-    }
-    
+    console.error(`❌ SMTP Error on ${host}:${port}:`, error.message);
+    throw error;
+  } finally {
     if (timeoutId) {
       clearTimeout(timeoutId);
     }
-    
-    console.error(`❌ Enhanced SMTP error (${host}:${port}):`, error.message);
-    throw error;
+    if (conn) {
+      try {
+        conn.close();
+      } catch (e) {
+        console.warn('Error closing connection:', e.message);
+      }
+    }
   }
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { 
+      status: 405, 
+      headers: corsHeaders 
+    });
   }
 
   try {
-    const requestBody = await req.json();
-    console.log('=== Enhanced SMTP Email Request ===');
-    
-    // Support both template-based and direct email formats
-    let emailData;
-    
-    if (requestBody.templateId) {
-      // Template-based email processing
-      const { templateId, recipient, variables = {}, emailType = 'transactional' } = requestBody;
-      
-      if (!templateId || !recipient?.email) {
-        throw new Error('Missing required fields: templateId, recipient.email');
-      }
-
-      console.log('Processing template-based email:', templateId);
-
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      );
-
-      // Fetch email template
-      const { data: template, error: templateError } = await supabaseClient
-        .from('enhanced_email_templates')
-        .select('*')
-        .eq('template_key', templateId)
-        .eq('is_active', true)
-        .maybeSingle();
-
-      if (templateError) {
-        throw new Error(`Template fetch error: ${templateError.message}`);
-      }
-
-      if (!template) {
-        throw new Error(`Template not found: ${templateId}`);
-      }
-
-      // Get business settings
-      const { data: businessSettings } = await supabaseClient
-        .from('business_settings')
-        .select('name, email, website_url, primary_color, secondary_color')
-        .limit(1)
-        .maybeSingle();
-
-      // Process template variables
-      const allVariables = {
-        companyName: businessSettings?.name || 'Starters',
-        supportEmail: businessSettings?.email || 'support@starters.com',
-        websiteUrl: businessSettings?.website_url || 'https://starters.com',
-        primaryColor: businessSettings?.primary_color || '#3b82f6',
-        secondaryColor: businessSettings?.secondary_color || '#1e40af',
-        customerName: recipient.name || 'Valued Customer',
-        ...variables
-      };
-
-      // Replace template variables
-      function replaceVariables(template: string, variables: Record<string, string>): string {
-        let result = template;
-        Object.entries(variables).forEach(([key, value]) => {
-          const regex = new RegExp(`{{${key}}}`, 'g');
-          result = result.replace(regex, value || '');
-        });
-        return result;
-      }
-
-      const processedSubject = replaceVariables(template.subject_template, allVariables);
-      const processedHtml = replaceVariables(template.html_template, allVariables);
-
-      emailData = {
-        to: recipient.email,
-        subject: processedSubject,
-        html: processedHtml,
-        templateId,
-        emailType
-      };
-
-    } else {
-      // Direct email format
-      const { to, subject, html, text } = requestBody;
-      
-      if (!to || !subject) {
-        throw new Error('Missing required fields: to, subject');
-      }
-
-      emailData = { to, subject, html, text };
-    }
-
-    // Get enhanced SMTP configuration with fallback
-    const supabaseClient = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    console.log('=== Fetching Enhanced SMTP Configuration ===');
-    
-    const { data: smtpResult, error: funcError } = await supabaseClient
-      .rpc('get_smtp_config_with_fallback');
-
-    if (funcError) {
-      throw new Error(`SMTP config error: ${funcError.message}`);
-    }
-
-    if (!smtpResult) {
-      throw new Error('No SMTP configuration found');
-    }
-
-    const smtpConfig = smtpResult;
-    console.log('✅ Enhanced SMTP config loaded:', {
-      primary: `${smtpConfig.primary.host}:${smtpConfig.primary.port}`,
-      fallback: `${smtpConfig.fallback.host}:${smtpConfig.fallback.port}`
+    const requestData = await req.json();
+    console.log('📨 Enhanced SMTP sender request:', { 
+      to: requestData.to,
+      subject: requestData.subject,
+      templateId: requestData.templateId 
     });
 
-    // Prepare email data with sender information
-    const finalEmailData = {
-      from: smtpConfig.primary.sender_name 
-        ? `"${smtpConfig.primary.sender_name}" <${smtpConfig.primary.sender_email}>`
-        : smtpConfig.primary.sender_email,
+    let emailData = requestData;
+    
+    // Handle template-based emails
+    if (requestData.templateId) {
+      const { data: template } = await supabase
+        .from('email_templates')
+        .select('*')
+        .eq('template_key', requestData.templateId)
+        .eq('is_active', true)
+        .single();
+
+      if (template) {
+        // Replace variables in template
+        const variables = requestData.variables || {};
+        emailData = {
+          ...requestData,
+          subject: template.subject.replace(/{{(\w+)}}/g, (_, key) => variables[key] || ''),
+          html: template.html_template.replace(/{{(\w+)}}/g, (_, key) => variables[key] || ''),
+          text: template.text_template?.replace(/{{(\w+)}}/g, (_, key) => variables[key] || '') || ''
+        };
+      }
+    }
+
+    // Get SMTP configuration with fallback
+    const { data: configData, error: configError } = await supabase.rpc('get_smtp_config_with_fallback');
+    
+    if (configError) {
+      throw new Error(`Failed to get SMTP config: ${configError.message}`);
+    }
+
+    // Send email with fallback strategy
+    const result = await sendSMTPEmailWithFallback(configData, {
+      from: emailData.from || configData.primary.auth.user,
       to: emailData.to,
       subject: emailData.subject,
       html: emailData.html,
-      text: emailData.text || (emailData.html ? emailData.html.replace(/<[^>]*>/g, '') : ''),
-    };
-
-    console.log('=== Sending Email via Enhanced SMTP ===');
-    console.log('From:', finalEmailData.from);
-    console.log('To:', finalEmailData.to);
-
-    // Send email using enhanced SMTP with fallback
-    const result = await sendSMTPEmailWithFallback(smtpConfig, finalEmailData);
+      text: emailData.text
+    });
 
     // Log successful delivery
-    try {
-      await supabaseClient.from('smtp_delivery_logs').insert({
-        email_id: result.messageId,
-        recipient_email: emailData.to,
-        subject: emailData.subject,
-        delivery_status: 'sent',
-        provider: 'enhanced-smtp',
-        smtp_response: result.response,
-        email_type: emailData.emailType || 'transactional',
-        delivery_timestamp: new Date().toISOString(),
-        metadata: {
-          messageId: result.messageId,
-          method: result.method,
-          port: result.port,
-          timestamp: new Date().toISOString(),
-          templateUsed: emailData.templateId || null
-        }
-      });
-      console.log('📊 Email delivery logged successfully');
-    } catch (logError) {
-      console.warn('⚠️ Failed to log email delivery:', logError.message);
-    }
+    await supabase.from('smtp_delivery_logs').insert({
+      provider: 'enhanced-smtp',
+      status: 'sent',
+      recipient_email: emailData.to,
+      subject: emailData.subject,
+      response_data: result,
+      delivery_time: new Date().toISOString()
+    });
 
     return new Response(
       JSON.stringify({ 
         success: true, 
-        messageId: result.messageId,
         message: 'Email sent successfully via enhanced SMTP',
-        accepted: result.accepted,
-        rejected: result.rejected,
-        method: result.method,
-        port: result.port,
-        templateUsed: emailData.templateId || null
+        result: result
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      },
+      { 
+        status: 200, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...corsHeaders 
+        } 
+      }
     );
 
   } catch (error) {
-    console.error('=== Enhanced SMTP Email Error ===');
-    console.error('Error message:', error.message);
+    console.error('Enhanced SMTP sender error:', error);
     
+    // Log failed delivery
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      const requestData = await req.json().catch(() => ({}));
+      
+      await supabase.from('smtp_delivery_logs').insert({
+        provider: 'enhanced-smtp',
+        status: 'failed',
+        recipient_email: requestData.to || 'unknown',
+        subject: requestData.subject || 'unknown',
+        error_message: error.message,
+        delivery_time: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.error('Failed to log delivery error:', logError);
+    }
+
     return new Response(
       JSON.stringify({ 
+        success: false, 
         error: error.message,
-        success: false,
-        timestamp: new Date().toISOString(),
-        method: 'enhanced-smtp'
+        details: 'Enhanced SMTP sender failed - check logs for more details'
       }),
-      {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400,
-      },
+      { 
+        status: 500, 
+        headers: { 
+          'Content-Type': 'application/json',
+          ...corsHeaders 
+        } 
+      }
     );
   }
-})
+});

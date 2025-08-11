@@ -36,13 +36,13 @@ export const useSMTPSettings = () => {
       if (!data) {
         // No settings found, return default
         return {
-          smtp_host: '',
+          smtp_host: 'mail.startersmallchops.com',
           smtp_port: 587,
-          smtp_user: '',
+          smtp_user: 'store@startersmallchops.com',
           smtp_pass: '',
-          smtp_secure: true,
-          sender_email: '',
-          sender_name: '',
+          smtp_secure: false, // Use STARTTLS instead of direct SSL
+          sender_email: 'store@startersmallchops.com',
+          sender_name: 'Starters Small Chops',
           use_smtp: false
         };
       }
@@ -53,7 +53,7 @@ export const useSMTPSettings = () => {
         smtp_port: data.smtp_port || 587,
         smtp_user: data.smtp_user || '',
         smtp_pass: data.smtp_pass || '',
-        smtp_secure: data.smtp_secure !== false,
+        smtp_secure: data.smtp_secure === true, // Default to STARTTLS (false) for better compatibility
         sender_email: data.sender_email || '',
         sender_name: data.sender_name || '',
         use_smtp: data.use_smtp || false

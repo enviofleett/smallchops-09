@@ -6920,6 +6920,10 @@ export type Database = {
         Args: { p_payment_reference: string }
         Returns: Json
       }
+      manual_setup_store_admin: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       minimal_payment_test_insert: {
         Args: { p_order_id: string; p_amount: number }
         Returns: Json
@@ -7027,6 +7031,10 @@ export type Database = {
       safe_delete_product: {
         Args: { product_id: string }
         Returns: Json
+      }
+      setup_admin_permissions: {
+        Args: { admin_user_id: string }
+        Returns: undefined
       }
       sync_payment_to_order_status: {
         Args: {

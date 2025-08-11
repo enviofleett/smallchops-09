@@ -3448,9 +3448,11 @@ export type Database = {
           payment_method: string | null
           payment_reference: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
+          paystack_reference: string | null
           pickup_point_id: string | null
           pickup_time: string | null
           preferred_delivery_time: string | null
+          reference_updated_at: string | null
           special_instructions: string | null
           status: Database["public"]["Enums"]["order_status"]
           subtotal: number
@@ -3484,9 +3486,11 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          paystack_reference?: string | null
           pickup_point_id?: string | null
           pickup_time?: string | null
           preferred_delivery_time?: string | null
+          reference_updated_at?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
@@ -3520,9 +3524,11 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          paystack_reference?: string | null
           pickup_point_id?: string | null
           pickup_time?: string | null
           preferred_delivery_time?: string | null
+          reference_updated_at?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
           subtotal?: number
@@ -6238,6 +6244,18 @@ export type Database = {
           },
         ]
       }
+      payment_flow_health: {
+        Row: {
+          completed_orders: number | null
+          completion_rate_percent: number | null
+          paid_orders: number | null
+          payment_pending: number | null
+          pending_orders: number | null
+          period: string | null
+          total_orders: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       bulk_safe_delete_products: {
@@ -6313,6 +6331,10 @@ export type Database = {
       }
       check_otp_rate_limit: {
         Args: { p_email: string } | { p_email: string; p_ip_address?: unknown }
+        Returns: Json
+      }
+      check_payment_flow_health: {
+        Args: Record<PropertyKey, never>
         Returns: Json
       }
       check_payment_system_health: {
@@ -6489,6 +6511,10 @@ export type Database = {
         Args: { p_email: string }
         Returns: Json
       }
+      emergency_backfill_broken_orders: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       enhanced_security_check: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -6514,6 +6540,10 @@ export type Database = {
         Returns: string
       }
       generate_order_number: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_payment_reference: {
         Args: Record<PropertyKey, never>
         Returns: string
       }
@@ -6675,19 +6705,13 @@ export type Database = {
       }
       handle_successful_payment: {
         Args: {
-          p_reference: string
-          p_paid_at: string
-          p_gateway_response: string
-          p_fees: number
-          p_channel: string
-          p_authorization_code?: string
-          p_card_type?: string
-          p_last4?: string
-          p_exp_month?: string
-          p_exp_year?: string
-          p_bank?: string
+          p_paystack_reference: string
+          p_order_reference?: string
+          p_amount?: number
+          p_currency?: string
+          p_paystack_data?: Json
         }
-        Returns: undefined
+        Returns: Json
       }
       has_email_consent: {
         Args: { email_address: string; consent_type?: string }

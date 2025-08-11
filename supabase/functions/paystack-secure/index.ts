@@ -579,24 +579,28 @@ async function verifyPayment(requestData: any) {
         }
       }
 
-      // Call RPC to finalize (updates orders, saves cards, logs)
+      // Call NEW RPC to finalize (updates orders, creates payment transaction, logs)
       try {
-        const { error: rpcError } = await supabaseClient.rpc('handle_successful_payment', {
-          p_reference: effectiveRef,
-          p_paid_at: baseUpdate.paid_at,
-          p_gateway_response: baseUpdate.gateway_response,
-          p_fees: tx.fees ?? 0,
-          p_channel: baseUpdate.channel,
-          p_authorization_code: tx?.authorization?.authorization_code ?? null,
-          p_card_type: tx?.authorization?.card_type ?? null,
-          p_last4: tx?.authorization?.last4 ?? null,
-          p_exp_month: tx?.authorization?.exp_month ?? null,
-          p_exp_year: tx?.authorization?.exp_year ?? null,
-          p_bank: tx?.authorization?.bank ?? null,
+        console.log('🔄 Calling new handle_successful_payment RPC for:', effectiveRef);
+        const { data: rpcResult, error: rpcError } = await supabaseClient.rpc('handle_successful_payment', {
+          p_paystack_reference: effectiveRef,
+          p_order_reference: effectiveRef, // Same reference for consistency
+          p_amount: typeof tx.amount === 'number' ? tx.amount / 100 : 0,
+          p_currency: tx.currency || 'NGN',
+          p_paystack_data: tx || {}
         });
-        if (rpcError) console.warn('handle_successful_payment RPC returned error:', rpcError);
+        
+        if (rpcError) {
+          console.error('❌ handle_successful_payment RPC error:', rpcError);
+        } else {
+          console.log('✅ Payment processing result:', rpcResult);
+          // Update order ID from RPC result if available
+          if (rpcResult && typeof rpcResult === 'object' && rpcResult.order_id) {
+            orderId = rpcResult.order_id;
+          }
+        }
       } catch (e) {
-        console.warn('handle_successful_payment RPC crashed:', e);
+        console.error('❌ handle_successful_payment RPC crashed:', e);
       }
 
       // Ensure orders table has reference (idempotent)

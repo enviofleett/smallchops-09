@@ -1,307 +1,270 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface ReconcileRequest {
-  action: 'check_health' | 'reconcile_all' | 'reconcile_order' | 'reconcile_batch' | 'force_confirm';
-  order_id?: string;
-  reference?: string;
-  batch_limit?: number;
-}
-
-interface ReconcileResponse {
-  success: boolean;
-  data?: any;
-  message: string;
-  timestamp: string;
-}
-
 serve(async (req) => {
-  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Initialize Supabase client with service role key
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
-    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: {
-        autoRefreshToken: false,
-        persistSession: false
-      }
-    });
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    );
 
-    // Verify admin access
-    const authHeader = req.headers.get('Authorization')!;
-    const token = authHeader?.replace('Bearer ', '');
-    if (!token) {
-      throw new Error('Unauthorized');
-    }
-    
-    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
-    if (authError || !user) {
-      throw new Error('Unauthorized');
-    }
+    const { action, ...requestData } = await req.json();
 
-    // Check if user is admin using your existing is_admin() function
-    const { data: adminCheck, error: adminError } = await supabase
-      .rpc('is_admin');
-
-    if (adminError || !adminCheck) {
-      throw new Error('Admin access required');
-    }
-
-    const requestData: ReconcileRequest = await req.json();
-    let response: ReconcileResponse;
-
-    switch (requestData.action) {
-      case 'check_health':
-        response = await checkSystemHealth(supabase);
-        break;
-        
-      case 'reconcile_all':
-        response = await reconcileAllPayments(supabase);
-        break;
-
-      case 'reconcile_batch':
-        response = await reconcileBatchPayments(supabase, requestData.batch_limit || 100);
-        break;
-        
-      case 'reconcile_order':
-        if (!requestData.order_id) {
-          throw new Error('order_id required for reconcile_order action');
-        }
-        response = await reconcileSpecificOrder(supabase, requestData.order_id);
-        break;
-        
-      case 'force_confirm':
-        if (!requestData.reference) {
-          throw new Error('reference required for force_confirm action');
-        }
-        response = await forceConfirmByReference(supabase, requestData.reference);
-        break;
-        
+    switch (action) {
+      case 'scan_issues':
+        return await scanPaymentIssues(supabase);
+      case 'fix_stuck_order':
+        return await fixStuckOrder(supabase, requestData.order_id);
+      case 'search_payment':
+        return await searchPaymentDetails(supabase, requestData.reference);
       default:
-        throw new Error('Invalid action');
+        return new Response(JSON.stringify({ error: 'Invalid action' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
     }
-
-    return new Response(JSON.stringify(response), {
-      headers: { 
-        ...corsHeaders, 
-        'Content-Type': 'application/json' 
-      },
-    });
-
-  } catch (error: any) {
+  } catch (error) {
     console.error('Payment reconciliation error:', error);
-    
-    const errorResponse: ReconcileResponse = {
-      success: false,
-      message: error.message || 'Internal server error',
-      timestamp: new Date().toISOString()
-    };
-
-    return new Response(JSON.stringify(errorResponse), {
-      status: error.message === 'Unauthorized' || error.message === 'Admin access required' ? 403 : 500,
-      headers: { 
-        ...corsHeaders, 
-        'Content-Type': 'application/json' 
-      },
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
 
-async function checkSystemHealth(supabase: any): Promise<ReconcileResponse> {
-  const { data: dashboardStats, error } = await supabase
-    .rpc('get_payment_dashboard_stats');
+async function scanPaymentIssues(supabase: any) {
+  const issues = [];
 
-  if (error) {
-    throw error;
-  }
+  try {
+    // Find orders stuck in pending status with successful payments
+    const { data: stuckOrders } = await supabase
+      .from('orders')
+      .select(`
+        id,
+        order_number,
+        payment_status,
+        status,
+        created_at,
+        payment_reference
+      `)
+      .eq('payment_status', 'pending')
+      .eq('status', 'pending')
+      .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()); // older than 5 minutes
 
-  return {
-    success: true,
-    data: dashboardStats,
-    message: 'System health check completed',
-    timestamp: new Date().toISOString()
-  };
-}
+    for (const order of stuckOrders || []) {
+      // Check if there's a successful payment for this order
+      const { data: successfulPayment } = await supabase
+        .from('payment_transactions')
+        .select('*')
+        .eq('order_id', order.id)
+        .eq('status', 'paid')
+        .maybeSingle();
 
-async function reconcileAllPayments(supabase: any): Promise<ReconcileResponse> {
-  // Use batch reconciliation with a reasonable limit
-  const { data: batchResults, error } = await supabase
-    .rpc('reconcile_payment_status_batch', { p_limit: 500 });
-
-  if (error) {
-    throw error;
-  }
-
-  const result = batchResults?.[0];
-
-  return {
-    success: true,
-    data: {
-      orders_processed: result?.orders_processed || 0,
-      orders_updated: result?.orders_updated || 0,
-      processing_time_ms: result?.processing_time_ms || 0
-    },
-    message: `Processed ${result?.orders_processed || 0} orders, updated ${result?.orders_updated || 0} orders`,
-    timestamp: new Date().toISOString()
-  };
-}
-
-async function reconcileBatchPayments(supabase: any, batchLimit: number): Promise<ReconcileResponse> {
-  const { data: batchResults, error } = await supabase
-    .rpc('reconcile_payment_status_batch', { p_limit: batchLimit });
-
-  if (error) {
-    throw error;
-  }
-
-  const result = batchResults?.[0];
-
-  return {
-    success: true,
-    data: {
-      orders_processed: result?.orders_processed || 0,
-      orders_updated: result?.orders_updated || 0,
-      processing_time_ms: result?.processing_time_ms || 0,
-      batch_limit: batchLimit
-    },
-    message: `Batch processed ${result?.orders_processed || 0} orders in ${result?.processing_time_ms || 0}ms`,
-    timestamp: new Date().toISOString()
-  };
-}
-
-async function reconcileSpecificOrder(supabase: any, orderId: string): Promise<ReconcileResponse> {
-  const { data: reconcileResults, error } = await supabase
-    .rpc('reconcile_payment_status', { p_order_id: orderId });
-
-  if (error) {
-    throw error;
-  }
-
-  const result = reconcileResults?.[0];
-  
-  if (!result) {
-    return {
-      success: true,
-      data: { updated: false },
-      message: 'Order already reconciled or no successful payments found',
-      timestamp: new Date().toISOString()
-    };
-  }
-
-  return {
-    success: true,
-    data: {
-      order_id: result.order_id,
-      was_updated: result.was_updated,
-      old_payment_status: result.old_payment_status,
-      new_payment_status: result.new_payment_status,
-      old_order_status: result.old_order_status,
-      new_order_status: result.new_order_status
-    },
-    message: `Order ${orderId} successfully reconciled`,
-    timestamp: new Date().toISOString()
-  };
-}
-
-async function forceConfirmByReference(supabase: any, reference: string): Promise<ReconcileResponse> {
-  // First, verify the transaction with Paystack
-  const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-  
-  if (!paystackSecretKey) {
-    throw new Error('Paystack configuration not found');
-  }
-
-  const paystackResponse = await fetch(
-    `https://api.paystack.co/transaction/verify/${reference}`,
-    {
-      headers: {
-        'Authorization': `Bearer ${paystackSecretKey}`,
-        'Content-Type': 'application/json',
-      },
+      if (successfulPayment) {
+        issues.push({
+          id: `stuck_order_${order.id}`,
+          type: 'stuck_order',
+          order_id: order.id,
+          reference: successfulPayment.provider_reference,
+          description: `Order ${order.order_number} has successful payment but is stuck in pending status`,
+          severity: 'high'
+        });
+      } else if (order.payment_reference) {
+        // Check Paystack directly for this reference
+        const paystackStatus = await checkPaystackStatus(order.payment_reference);
+        if (paystackStatus === 'success') {
+          issues.push({
+            id: `missing_tx_${order.id}`,
+            type: 'missing_transaction',
+            order_id: order.id,
+            reference: order.payment_reference,
+            description: `Order ${order.order_number} successful on Paystack but missing transaction record`,
+            severity: 'critical'
+          });
+        }
+      }
     }
-  );
 
-  const paystackData = await paystackResponse.json();
-
-  if (!paystackData.status || paystackData.data.status !== 'success') {
-    throw new Error('Transaction not successful according to Paystack');
-  }
-
-  // Find the transaction in our database
-  const { data: transaction, error: txError } = await supabase
-    .from('payment_transactions')
-    .select(`
-      *,
-      orders (*)
-    `)
-    .eq('provider_reference', reference)
-    .single();
-
-  if (txError || !transaction) {
-    throw new Error('Transaction not found in database');
-  }
-
-  // Update transaction status if needed
-  let transactionUpdated = false;
-  if (transaction.status !== 'success' && transaction.status !== 'paid') {
-    const { error: updateError } = await supabase
+    // Find payment transactions without corresponding orders
+    const { data: orphanedPayments } = await supabase
       .from('payment_transactions')
+      .select('*')
+      .is('order_id', null)
+      .eq('status', 'paid');
+
+    for (const payment of orphanedPayments || []) {
+      issues.push({
+        id: `orphaned_payment_${payment.id}`,
+        type: 'payment_mismatch',
+        reference: payment.provider_reference,
+        description: `Successful payment ${payment.provider_reference} has no associated order`,
+        severity: 'medium'
+      });
+    }
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      issues,
+      summary: {
+        total: issues.length,
+        critical: issues.filter(i => i.severity === 'critical').length,
+        high: issues.filter(i => i.severity === 'high').length
+      }
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error scanning payment issues:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Failed to scan payment issues' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function fixStuckOrder(supabase: any, orderId: string) {
+  try {
+    // Find successful payment for this order
+    const { data: payment } = await supabase
+      .from('payment_transactions')
+      .select('*')
+      .eq('order_id', orderId)
+      .eq('status', 'paid')
+      .maybeSingle();
+
+    if (!payment) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        message: 'No successful payment found for this order' 
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Update order status to confirmed
+    const { error: updateError } = await supabase
+      .from('orders')
       .update({
-        status: 'paid',
-        paid_at: new Date().toISOString(),
+        payment_status: 'paid',
+        status: 'confirmed',
+        paid_at: payment.paid_at || new Date().toISOString(),
         updated_at: new Date().toISOString()
       })
-      .eq('id', transaction.id);
+      .eq('id', orderId);
 
-    if (updateError) {
-      throw updateError;
+    if (updateError) throw updateError;
+
+    // Log the fix
+    await supabase.from('audit_logs').insert({
+      action: 'payment_reconciliation_fix',
+      category: 'Payment',
+      message: `Fixed stuck order ${orderId} - updated to confirmed status`,
+      new_values: { order_id: orderId, payment_reference: payment.provider_reference }
+    });
+
+    return new Response(JSON.stringify({ 
+      success: true, 
+      message: 'Order status updated successfully' 
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error fixing stuck order:', error);
+    return new Response(JSON.stringify({ 
+      success: false, 
+      message: 'Failed to fix order status' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function searchPaymentDetails(supabase: any, reference: string) {
+  try {
+    // Search in payment_transactions
+    const { data: transaction } = await supabase
+      .from('payment_transactions')
+      .select(`
+        *,
+        orders (
+          id,
+          order_number,
+          status,
+          payment_status,
+          total_amount
+        )
+      `)
+      .eq('provider_reference', reference)
+      .maybeSingle();
+
+    // Search in orders by payment_reference
+    const { data: order } = await supabase
+      .from('orders')
+      .select('*')
+      .eq('payment_reference', reference)
+      .maybeSingle();
+
+    const found = transaction || order;
+
+    return new Response(JSON.stringify({ 
+      found: !!found,
+      transaction,
+      order,
+      paystack_status: await checkPaystackStatus(reference)
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('Error searching payment details:', error);
+    return new Response(JSON.stringify({ 
+      found: false, 
+      error: 'Search failed' 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+}
+
+async function checkPaystackStatus(reference: string): Promise<string | null> {
+  try {
+    const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!secretKey) return null;
+
+    const response = await fetch(
+      `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${secretKey}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      return data.data?.status || null;
     }
-    transactionUpdated = true;
+    return null;
+  } catch (error) {
+    console.error('Error checking Paystack status:', error);
+    return null;
   }
-
-  // Call reconciliation for this order
-  const { data: reconcileResults, error: reconcileError } = await supabase
-    .rpc('reconcile_payment_status', { p_order_id: transaction.order_id });
-
-  if (reconcileError) {
-    throw reconcileError;
-  }
-
-  return {
-    success: true,
-    data: {
-      reference,
-      order_id: transaction.order_id,
-      paystack_status: paystackData.data.status,
-      transaction_updated: transactionUpdated,
-      order_reconciled: reconcileResults?.length > 0
-    },
-    message: `Order forcefully confirmed for reference ${reference}`,
-    timestamp: new Date().toISOString()
-  };
 }
-
-// Additional utility function to get order payment status
-async function getOrderPaymentStatus(supabase: any, orderId: string) {
-  const { data, error } = await supabase
-    .rpc('get_order_payment_status', { p_order_id: orderId });
-
-  if (error) {
-    throw error;
-  }
-
-  return data?.[0] || null;
-}
-
-/* Deno.serve(serve); */

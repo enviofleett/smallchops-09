@@ -57,19 +57,20 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
     setLoading(true);
     
     try {
-      // Build callback URL
-      const callbackUrl = `${window.location.origin}/payment/callback?order_id=${orderId}`;
+      // Build callback URL with proper encoding
+      const callbackUrl = `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`;
       
-      // Initialize transaction with backend
+      // Initialize transaction with backend - this will create payment_transaction record
       const response = await paystackService.initializeTransaction({
         email,
         amount: paystackService.formatAmount(amount),
         callback_url: callbackUrl,
         channels,
         metadata: {
-          orderId,
-          customerName,
-          customerPhone,
+          order_id: orderId,
+          customer_name: customerName,
+          customer_phone: customerPhone,
+          order_number: metadata.order_number || `ORDER-${Date.now()}`,
           ...metadata
         }
       });

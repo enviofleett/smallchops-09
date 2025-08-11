@@ -102,6 +102,7 @@ export default function PaymentCallback() {
     
     // Fallback: try session/local storage if reference is missing (some gateways omit it)
     if (!reference) {
+      console.log('PaymentCallback - No reference in URL, checking storage...');
       // Try multiple storage keys in priority order
       const refCandidates = [
         sessionStorage.getItem('paystack_last_reference'),
@@ -114,6 +115,7 @@ export default function PaymentCallback() {
         localStorage.getItem('last_payment_reference')
       ];
       const storedRef = refCandidates.find((v) => typeof v === 'string' && v.trim().length > 0) || null;
+      console.log('PaymentCallback - Found stored reference:', storedRef);
 
       // Order details for enriching URL (best-effort)
       const orderDetailsRaw =

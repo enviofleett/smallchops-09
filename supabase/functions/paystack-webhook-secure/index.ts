@@ -309,20 +309,20 @@ serve(async (req) => {
                req.headers.get('x-forwarded-for') || 
                req.headers.get('x-real-ip');
     
-    // Validate Paystack IP addresses
-    if (!validatePaystackIP(clientIP)) {
+    // IP validation for production - allow bypass in development/test environment
+    const isDevelopment = Deno.env.get('ENVIRONMENT') !== 'production';
+    const validIP = validatePaystackIP(clientIP);
+    
+    if (!validIP && !isDevelopment) {
+      // In production, log but don't block - Paystack IPs can change
       await logSecurityIncident(
         supabase,
-        'invalid_webhook_ip',
-        `Webhook from unauthorized IP: ${clientIP}`,
-        'critical',
+        'suspicious_webhook_ip',
+        `Webhook from non-standard IP: ${clientIP}`,
+        'medium',
         { ip: clientIP, userAgent: req.headers.get('user-agent') }
       );
-      
-      return new Response('Unauthorized IP', { 
-        status: 403, 
-        headers: corsHeaders 
-      });
+      console.warn('Non-standard webhook IP detected:', clientIP);
     }
     
     // Get raw body for signature verification

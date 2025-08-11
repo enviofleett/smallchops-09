@@ -163,22 +163,32 @@ async function initializePayment(requestData: any) {
         if (orderErr) console.warn('Order payment_reference update failed:', orderErr);
       }
 
-      // Seed a pending transaction so verification can find it
+      // CRITICAL: Seed a pending transaction so verification can find it
       const txInsert: any = {
         order_id: orderId,
         provider_reference: returnedRef,
         amount: amountInKobo / 100, // store in NGN
         currency: 'NGN',
         status: 'pending',
-        metadata: client_reference ? { ...metaObj, client_reference } : (metaObj || {}),
+        metadata: {
+          ...metaObj,
+          ...(client_reference ? { client_reference } : {}),
+          user_id: null, // Will be populated from auth context if available
+          payment_method: 'paystack',
+          initialized_at: new Date().toISOString()
+        },
         customer_email: email,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       };
+      
+      console.log(`💾 Creating payment transaction for order ${orderId} with reference ${returnedRef}`);
       const { error: insertErr } = await supabaseClient.from('payment_transactions').insert(txInsert);
       if (insertErr) {
-        console.error('❌ Failed to insert pending transaction:', insertErr);
+        console.error('❌ CRITICAL: Failed to insert pending transaction:', insertErr);
         criticalInsertError = insertErr;
+      } else {
+        console.log('✅ Payment transaction created successfully');
       }
 
       // Audit trail (best-effort)

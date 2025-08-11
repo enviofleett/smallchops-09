@@ -20,15 +20,22 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
   const [attempts, setAttempts] = useState(0);
   const [status, setStatus] = useState<'pending' | 'success' | 'failed'>('pending');
   const [isMonitoring, setIsMonitoring] = useState(true);
+  const [verificationLocked, setVerificationLocked] = useState(false);
 
   useEffect(() => {
-    if (!reference || !isMonitoring || attempts >= maxAttempts) {
+    if (!reference || !isMonitoring || attempts >= maxAttempts || verificationLocked) {
       return;
     }
 
     const checkPaymentStatus = async () => {
       try {
         console.log(`🔍 Checking payment status for reference: ${reference} (attempt ${attempts + 1})`);
+        
+        // Check if verification was already locked during this check
+        if (verificationLocked) {
+          console.log('🔒 Verification already locked, skipping check');
+          return;
+        }
         
         // Use the enhanced paystack-verify function with better error handling
         const { data, error } = await supabase.functions.invoke('paystack-secure', {
@@ -48,7 +55,13 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
           const paymentStatus = data.data.status;
           
           if (paymentStatus === 'success') {
-            console.log('✅ Payment verified as successful');
+            console.log('✅ Payment verified as successful - LOCKING VERIFICATION');
+            
+            // 🔒 CRITICAL: Lock verification immediately to prevent race conditions
+            setVerificationLocked(true);
+            setStatus('success');
+            setIsMonitoring(false);
+            
             // Force confirm in backend to ensure the order is marked as paid
             try {
               const { data: reconData, error: reconError } = await supabase.functions.invoke('payment-reconcile', {
@@ -62,8 +75,7 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
             } catch (reconErr) {
               console.error('💥 Reconcile invocation failed:', reconErr);
             }
-            setStatus('success');
-            setIsMonitoring(false);
+            
             onStatusUpdate('success', data.data);
             return;
           }
@@ -78,18 +90,19 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
 
     const timeoutId = setTimeout(checkPaymentStatus, intervalMs);
     return () => clearTimeout(timeoutId);
-  }, [reference, attempts, isMonitoring, intervalMs, maxAttempts, onStatusUpdate]);
+  }, [reference, attempts, isMonitoring, intervalMs, maxAttempts, onStatusUpdate, verificationLocked]);
 
-  // Stop monitoring if max attempts reached
+  // Stop monitoring if max attempts reached (but not if verification is already locked)
   useEffect(() => {
-    if (attempts >= maxAttempts && isMonitoring) {
+    if (attempts >= maxAttempts && isMonitoring && !verificationLocked) {
       console.log('⏰ Payment monitoring timeout reached');
       setIsMonitoring(false);
       onStatusUpdate('failed', { timeout: true });
     }
-  }, [attempts, maxAttempts, isMonitoring, onStatusUpdate]);
+  }, [attempts, maxAttempts, isMonitoring, onStatusUpdate, verificationLocked]);
 
   const handleStopMonitoring = () => {
+    console.log('🛑 Manually stopping payment monitoring');
     setIsMonitoring(false);
   };
 
@@ -100,7 +113,16 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
         <AlertDescription>
           Payment verification timeout. Please check your payment status manually or contact support.
           <div className="mt-2">
-            <Button variant="outline" size="sm" onClick={() => setIsMonitoring(true)}>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => {
+                console.log('🔄 Retrying payment verification');
+                setVerificationLocked(false);
+                setIsMonitoring(true);
+                setAttempts(0);
+              }}
+            >
               Retry Verification
             </Button>
           </div>

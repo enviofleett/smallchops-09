@@ -68,9 +68,10 @@ export const checkOrderReferenceMigration = async (supabase: any) => {
   try {
     const { data: orders, error } = await supabase
       .from('orders')
-      .select('id, payment_reference')
+      .select('id, payment_reference, created_at, payment_status')
       .is('paystack_reference', null)
-      .like('payment_reference', 'checkout_%');
+      .or('payment_reference.like.checkout_%,payment_reference.like.pay_%')
+      .gte('created_at', new Date(Date.now() - 48 * 60 * 60 * 1000).toISOString()); // Last 48 hours
     
     if (error) throw error;
     

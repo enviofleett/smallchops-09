@@ -12,6 +12,7 @@ interface ReferenceStats {
   totalOrders: number;
   txnFormatOrders: number;
   checkoutFormatOrders: number;
+  payFormatOrders: number;
   otherFormatOrders: number;
   recentPaymentCompletionRate: number;
 }
@@ -40,7 +41,8 @@ export const PaymentReferenceMonitor: React.FC = () => {
       const totalOrders = orderStats?.length || 0;
       const txnFormatOrders = orderStats?.filter(o => o.payment_reference?.startsWith('txn_')).length || 0;
       const checkoutFormatOrders = orderStats?.filter(o => o.payment_reference?.startsWith('checkout_')).length || 0;
-      const otherFormatOrders = totalOrders - txnFormatOrders - checkoutFormatOrders;
+      const payFormatOrders = orderStats?.filter(o => o.payment_reference?.startsWith('pay_')).length || 0;
+      const otherFormatOrders = totalOrders - txnFormatOrders - checkoutFormatOrders - payFormatOrders;
       
       // Calculate recent completion rate
       const paidOrders = orderStats?.filter(o => o.payment_status === 'paid').length || 0;
@@ -49,6 +51,7 @@ export const PaymentReferenceMonitor: React.FC = () => {
       setStats({
         totalOrders,
         txnFormatOrders,
+        payFormatOrders,
         checkoutFormatOrders,
         otherFormatOrders,
         recentPaymentCompletionRate
@@ -154,7 +157,7 @@ export const PaymentReferenceMonitor: React.FC = () => {
           </Alert>
         )}
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold">{stats.totalOrders}</div>
             <div className="text-sm text-muted-foreground">Total Orders (7d)</div>
@@ -169,6 +172,11 @@ export const PaymentReferenceMonitor: React.FC = () => {
           <div className="text-center">
             <div className="text-2xl font-bold text-orange-600">{stats.checkoutFormatOrders}</div>
             <div className="text-sm text-muted-foreground">checkout_ Format</div>
+          </div>
+          
+          <div className="text-center">
+            <div className="text-2xl font-bold text-red-600">{stats.payFormatOrders}</div>
+            <div className="text-sm text-muted-foreground">pay_ Format (Legacy)</div>
           </div>
           
           <div className="text-center">

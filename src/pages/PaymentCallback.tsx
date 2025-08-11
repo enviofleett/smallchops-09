@@ -67,17 +67,27 @@ export default function PaymentCallback() {
   // Enhanced parameter detection with fallback handling
   const getPaymentReference = () => {
     // Try multiple parameter names that Paystack might use
-      const possibleRefs = [
-        searchParams.get('reference'),
-        searchParams.get('trxref'),
-        searchParams.get('transaction_id'),
-        searchParams.get('tx_ref'),
-        searchParams.get('txref'),
-        searchParams.get('provider_reference'),
-        searchParams.get('payment_reference')
-      ];
+    const possibleRefs = [
+      searchParams.get('reference'),
+      searchParams.get('trxref'),
+      searchParams.get('transaction_id'),
+      searchParams.get('tx_ref'),
+      searchParams.get('txref'),
+      searchParams.get('provider_reference'),
+      searchParams.get('payment_reference'),
+      searchParams.get('paystack_reference')
+    ];
     
-    return possibleRefs.find(ref => ref && ref.length > 0) || null;
+    // Filter out null, empty, or very short values that are likely invalid
+    const validRef = possibleRefs.find(ref => ref && ref.trim().length > 10);
+    
+    console.log('🔍 Payment reference detection:', {
+      foundReferences: possibleRefs.filter(r => r),
+      selectedReference: validRef,
+      allParams: Object.fromEntries(searchParams.entries())
+    });
+    
+    return validRef || null;
   };
 
   const reference = getPaymentReference();

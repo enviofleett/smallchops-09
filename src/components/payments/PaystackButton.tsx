@@ -57,8 +57,8 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
     setLoading(true);
     
     try {
-      // Build callback URL with proper encoding
-      const callbackUrl = `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`;
+      // Build callback URL with proper encoding - will be updated with reference after initialization
+      let callbackUrl = `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`;
       
       // Initialize transaction with backend - this will create payment_transaction record
       const response = await paystackService.initializeTransaction({
@@ -81,6 +81,9 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
         
         // Use the server-returned reference as the single source of truth
         const serverRef = response.reference;
+        
+        // Update callback URL to include the payment reference for more reliable recovery
+        callbackUrl = `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}&reference=${encodeURIComponent(serverRef)}`;
 
         // Store reference immediately for callback recovery across tabs
         try {

@@ -346,19 +346,38 @@ serve(async (req) => {
     }
     
     const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    console.log('🔍 Webhook environment check:', {
+      hasSecretKey: !!secretKey,
+      keyType: secretKey ? (secretKey.startsWith('sk_test_') ? 'test' : secretKey.startsWith('sk_live_') ? 'live' : 'unknown') : 'none'
+    });
+    
     if (!secretKey) {
-      console.error('Paystack secret key not configured');
+      console.error('❌ Paystack secret key not configured');
+      await logSecurityIncident(
+        supabase,
+        'missing_secret_key',
+        'PAYSTACK_SECRET_KEY environment variable not found',
+        'critical',
+        { ip: clientIP }
+      );
       return new Response('Server misconfigured', { 
         status: 500, 
         headers: corsHeaders 
       });
     }
     
+    console.log('🔐 Verifying webhook signature...');
     const isValidSignature = await verifyPaystackSignature(
       rawBody, 
       paystackSignature, 
       secretKey
     );
+    
+    console.log('✅ Signature validation result:', {
+      isValid: isValidSignature,
+      signatureLength: paystackSignature.length,
+      bodyLength: rawBody.length
+    });
     
     if (!isValidSignature) {
       await logSecurityIncident(

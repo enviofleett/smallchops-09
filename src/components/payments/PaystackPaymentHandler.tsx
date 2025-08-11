@@ -42,28 +42,34 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
     setPaymentInProgress(false);
     setScriptError(null);
     
-    // Clear all stored Paystack references to prevent persistent checkout dialogs
-    try {
-      localStorage.removeItem('paystack_last_reference');
-      sessionStorage.removeItem('paystack_last_reference');
-      localStorage.removeItem('paystack_reference');
-      sessionStorage.removeItem('paystack_reference');
-      localStorage.removeItem('last_payment_reference');
-      localStorage.removeItem('orderDetails');
-      localStorage.removeItem('checkout_in_progress');
-      localStorage.removeItem('pending_payment_reference');
-      console.log('✅ Cleared all Paystack references from storage');
-    } catch (error) {
-      console.warn('Failed to clear storage:', error);
+    // 🔧 PERSIST: Only clear storage if cart isn't being preserved during payment
+    const preserveCart = sessionStorage.getItem('payment_in_progress');
+    if (!preserveCart) {
+      try {
+        localStorage.removeItem('paystack_last_reference');
+        sessionStorage.removeItem('paystack_last_reference');
+        localStorage.removeItem('paystack_reference');
+        sessionStorage.removeItem('paystack_reference');
+        localStorage.removeItem('last_payment_reference');
+        localStorage.removeItem('orderDetails');
+        localStorage.removeItem('checkout_in_progress');
+        localStorage.removeItem('pending_payment_reference');
+        console.log('✅ Cleared all Paystack references from storage');
+      } catch (error) {
+        console.warn('Failed to clear storage:', error);
+      }
     }
+    
+    // Set payment in progress flag
+    sessionStorage.setItem('payment_in_progress', 'true');
     
     // Do not generate client references; will set after server init
     setCurrentReference(initialReference || '');
 
-    // Generate and store payment reference as backup for callback
+    // Generate and store standardized payment reference as backup for callback
     const paymentReference = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     localStorage.setItem('pending_payment_reference', paymentReference);
-    console.log('💾 Stored payment reference for callback:', paymentReference);
+    console.log('💾 Stored standardized payment reference for callback:', paymentReference);
   }, [initialReference]);
 
   // Load Paystack script with timeout and enhanced error handling

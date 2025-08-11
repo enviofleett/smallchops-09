@@ -13,6 +13,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { logPaymentVerification } from "@/utils/paymentMetrics";
 import { isValidPaymentReference } from "@/utils/paymentReference";
+import { 
+  logCallbackReceived, 
+  logVerificationStarted, 
+  logVerificationCompleted, 
+  logReferenceMissing 
+} from "@/utils/paymentMonitoring";
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
 interface PaymentResult {
@@ -136,6 +142,9 @@ export default function PaymentCallback() {
     console.log('PaymentCallback - All URL params:', allParams);
     console.log('PaymentCallback - Detected reference:', reference);
     
+    // Log callback received for monitoring
+    logCallbackReceived(reference || undefined, allParams);
+    
     // Fallback: try session/local storage if reference is missing (some gateways omit it)
     if (!reference) {
       console.log('PaymentCallback - No reference in URL, checking storage...');
@@ -180,6 +189,7 @@ export default function PaymentCallback() {
     
     if (!reference) {
       console.error('PaymentCallback - No payment reference found in URL');
+      logReferenceMissing('payment_callback', Object.keys(allParams));
       setStatus('error');
       setResult({
         success: false,
@@ -206,6 +216,7 @@ export default function PaymentCallback() {
     verifyingRef.current = true;
     try {
       setStatus('verifying');
+      logVerificationStarted(paymentReference);
 
       // Single definitive call: server completes all DB updates before responding
       const { data, error } = await supabase.functions.invoke('paystack-secure', {
@@ -233,11 +244,19 @@ export default function PaymentCallback() {
 
         // Log successful verification
         logPaymentVerification(paymentReference, true);
+        logVerificationCompleted(paymentReference, true, { orderId: payload?.order_id });
 
-        // Clear client-side state
+        // Clear client-side state ONLY after successful verification
         await clearCartAfterPayment(payload?.order_number);
         clearCheckoutState();
-        try { sessionStorage.removeItem('paystack_last_reference'); localStorage.removeItem('paystack_last_reference'); } catch {}
+        
+        // Clear payment progress flag and references
+        try { 
+          sessionStorage.removeItem('payment_in_progress');
+          sessionStorage.removeItem('paystack_last_reference'); 
+          localStorage.removeItem('paystack_last_reference'); 
+          localStorage.removeItem('pending_payment_reference');
+        } catch {}
 
         // Emit global payment-confirmed event for listeners
         try {
@@ -272,6 +291,7 @@ export default function PaymentCallback() {
 
       // Log failed verification
       logPaymentVerification(paymentReference, false, 1, err?.message);
+      logVerificationCompleted(paymentReference, false, { error: err?.message });
 
       // Clean the URL on error as well
       navigate('/payment/callback', { replace: true });

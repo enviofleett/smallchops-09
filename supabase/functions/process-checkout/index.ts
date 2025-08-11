@@ -269,6 +269,17 @@ serve(async (req) => {
     // Generate unique order number
     const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     
+    // 🔧 STANDARDIZE: Generate txn_ reference format consistently
+    const standardizedPaymentReference = payment_reference && payment_reference.startsWith('txn_') 
+      ? payment_reference 
+      : `txn_${Date.now()}_${crypto.randomUUID()}`;
+    
+    console.log('🔧 Reference standardization:', {
+      originalReference: payment_reference,
+      standardizedReference: standardizedPaymentReference,
+      wasConverted: payment_reference !== standardizedPaymentReference
+    });
+    
     // Log the final data being sent to the database function
     console.log('📦 Creating order with data:', {
       customer_id: customerId,
@@ -276,7 +287,8 @@ serve(async (req) => {
       order_number: orderNumber,
       total_amount: total_amount,
       isGuest: !authenticatedUser,
-      processedGuestSessionId: processedGuestSessionId
+      processedGuestSessionId: processedGuestSessionId,
+      paymentReference: standardizedPaymentReference
     });
     
     // Create order using the existing order creation function with processed items
@@ -323,8 +335,7 @@ serve(async (req) => {
     // Initialize payment with Paystack (with retry mechanism)
     console.log('💳 Initializing payment...');
     
-    const paymentReference = payment_reference || `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+    // 🔧 CRITICAL: Use standardized reference for payment initialization
     let paymentResponse: any = null;
     let finalAuthUrl: string | null = null;
     let finalAccessCode: string | null = null;
@@ -341,8 +352,8 @@ serve(async (req) => {
             action: 'initialize',
             email: customer_email,
             amount: Math.round(total_amount * 100), // Convert to kobo
-            reference: paymentReference,
-            callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?reference=${paymentReference}&order_id=${orderId}&source=process_checkout`,
+            reference: standardizedPaymentReference, // 🔧 Use standardized reference
+            callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?reference=${standardizedPaymentReference}&order_id=${orderId}&source=process_checkout`,
             metadata: {
               order_id: orderId,
               customer_name: customer_name,

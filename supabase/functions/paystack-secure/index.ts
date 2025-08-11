@@ -253,15 +253,79 @@ async function verifyPayment(requestData: any) {
     let mappingStrategy: string | null = null;
     console.log('Verifying Paystack payment:', effectiveRef);
 
-    async function verifyWithPaystack(ref: string) {
-      const resp = await fetch(`https://api.paystack.co/transaction/verify/${ref}`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${secretKey}`, 'Content-Type': 'application/json' }
-      });
-      return resp;
+    // Enhanced verification with retry logic and validation
+    function validateReference(reference: string): boolean {
+      if (!reference || typeof reference !== 'string') {
+        throw new Error('Invalid reference format: must be a non-empty string')
+      }
+      if (reference.length < 10) {
+        throw new Error('Invalid reference format: too short')
+      }
+      return true
     }
 
-    let paystackResponse = await verifyWithPaystack(effectiveRef);
+    function ensureEnvironmentConsistency(secretKey: string) {
+      const isTestKey = secretKey.startsWith('sk_test_')
+      const isProduction = Deno.env.get('DENO_DEPLOYMENT_ID') !== undefined
+      
+      if (isProduction && isTestKey) {
+        console.warn('⚠️  Using test key in production environment')
+      }
+      
+      console.log(`🔧 Environment: ${isProduction ? 'production' : 'development'}, Key type: ${isTestKey ? 'test' : 'live'}`)
+    }
+
+    async function verifyWithPaystackRetry(ref: string, maxRetries = 3) {
+      validateReference(ref)
+      ensureEnvironmentConsistency(secretKey)
+      
+      for (let attempt = 1; attempt <= maxRetries; attempt++) {
+        try {
+          console.log(`🔄 Verification attempt ${attempt}/${maxRetries} for reference: ${ref}`)
+          
+          const resp = await fetch(`https://api.paystack.co/transaction/verify/${ref}`, {
+            method: 'GET',
+            headers: { 'Authorization': `Bearer ${secretKey}`, 'Content-Type': 'application/json' }
+          });
+          
+          if (resp.status === 200) {
+            console.log(`✅ Verification successful on attempt ${attempt}`)
+            return resp
+          }
+          
+          if (resp.status === 400 && attempt < maxRetries) {
+            const errorData = await resp.text()
+            if (errorData.includes('Transaction reference not found')) {
+              console.log(`⏳ Transaction not found, retrying in ${Math.pow(2, attempt)}s...`)
+              // Wait before retry with exponential backoff
+              const delay = Math.pow(2, attempt) * 1000 // 2s, 4s, 8s
+              await new Promise(resolve => setTimeout(resolve, delay))
+              continue
+            }
+          }
+          
+          console.error(`❌ Verification failed: ${resp.status}`)
+          return resp
+          
+        } catch (error) {
+          console.error(`💥 Verification error on attempt ${attempt}:`, error)
+          if (attempt === maxRetries) {
+            throw error
+          }
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
+        }
+      }
+      
+      throw new Error('All verification attempts failed')
+    }
+
+    // Legacy function for backward compatibility
+    async function verifyWithPaystack(ref: string) {
+      return await verifyWithPaystackRetry(ref, 1) // Single attempt for existing logic
+    }
+
+    let paystackResponse = await verifyWithPaystackRetry(effectiveRef, 3); // Use retry logic by default
 
     if (!paystackResponse.ok) {
       const errorText = await paystackResponse.text();

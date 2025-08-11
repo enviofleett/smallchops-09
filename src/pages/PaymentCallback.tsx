@@ -11,6 +11,7 @@ import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import { Helmet } from "react-helmet-async";
 import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
+import { logPaymentVerification } from "@/utils/paymentMetrics";
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
 interface PaymentResult {
@@ -203,6 +204,9 @@ export default function PaymentCallback() {
           message: 'Payment verified successfully! Your order has been confirmed.'
         });
 
+        // Log successful verification
+        logPaymentVerification(paymentReference, true);
+
         // Clear client-side state
         await clearCartAfterPayment(payload?.order_number);
         clearCheckoutState();
@@ -238,6 +242,10 @@ export default function PaymentCallback() {
         message: 'Unable to verify payment. Please contact support with your payment reference.',
         retryable: false
       });
+
+      // Log failed verification
+      logPaymentVerification(paymentReference, false, 1, err?.message);
+
       // Clean the URL on error as well
       navigate('/payment/callback', { replace: true });
     } finally {

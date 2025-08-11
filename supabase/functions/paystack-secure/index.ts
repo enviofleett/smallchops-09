@@ -254,9 +254,12 @@ async function verifyPayment(requestData: any) {
     if (!paystackResponse.ok) {
       const errorText = await paystackResponse.text();
       console.error('❌ Paystack verification HTTP error:', paystackResponse.status, errorText);
-      // Try to map client-side provisional ref to server ref
-      let shouldMap = /transaction_not_found|not found/i.test(errorText) && /^(pay|PAY|Pay)[-_]/.test(reference);
-      if (shouldMap) {
+      // Try to map references when Paystack says not found
+      const notFound = /transaction_not_found|not found/i.test(errorText);
+
+      // A) Map client provisional refs like "pay_*" to server refs we generated
+      let shouldMapClient = notFound && /^(pay|PAY|Pay)[-_]/.test(reference);
+      if (shouldMapClient) {
         try {
           // 1) Find by metadata.client_reference
           const { data: mappedTx } = await supabaseClient
@@ -296,7 +299,43 @@ async function verifyPayment(requestData: any) {
             }
           }
         } catch (mapErr) {
-          console.warn('Reference mapping attempt failed:', mapErr);
+          console.warn('Reference mapping attempt (client->server) failed:', mapErr);
+        }
+      }
+
+      // B) Extra resilience for server-side refs: if user provided a truncated txn_ reference,
+      //    try to find a provider_reference that starts with the provided prefix and retry
+      if (notFound && !paystackResponse.ok && /^txn_/.test(reference)) {
+        try {
+          // 1) Look up in payment_transactions by prefix match
+          const { data: byPrefix } = await supabaseClient
+            .from('payment_transactions')
+            .select('provider_reference')
+            .ilike('provider_reference', `${reference}%`)
+            .order('created_at', { ascending: false })
+            .maybeSingle();
+          if (byPrefix?.provider_reference) {
+            effectiveRef = byPrefix.provider_reference as string;
+            console.log('🔁 Mapped truncated txn_ reference by prefix to:', effectiveRef);
+            paystackResponse = await verifyWithPaystack(effectiveRef);
+          }
+
+          // 2) If still not mapped, try orders.payment_reference by prefix
+          if (!paystackResponse.ok) {
+            const { data: orderByPrefix } = await supabaseClient
+              .from('orders')
+              .select('payment_reference')
+              .ilike('payment_reference', `${reference}%`)
+              .order('created_at', { ascending: false })
+              .maybeSingle();
+            if (orderByPrefix?.payment_reference) {
+              effectiveRef = orderByPrefix.payment_reference as string;
+              console.log('🔁 Mapped via orders.payment_reference prefix to:', effectiveRef);
+              paystackResponse = await verifyWithPaystack(effectiveRef);
+            }
+          }
+        } catch (e) {
+          console.warn('Prefix-based reference mapping failed:', e);
         }
       }
 

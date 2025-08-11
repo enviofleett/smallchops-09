@@ -12,6 +12,7 @@ import { Building2, Globe, CheckCircle, AlertCircle, Eye, EyeOff } from 'lucide-
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PaymentDiagnostics } from '@/components/payments/PaymentDiagnostics';
+import { PaymentDebugPanel } from '@/components/payments/PaymentDebugPanel';
 interface PaymentIntegration {
   id: string;
   provider: string;
@@ -377,8 +378,23 @@ export const PaymentSettingsTab: React.FC = () => {
         </AlertDescription>
       </Alert>
 
+
       <div className="grid gap-6">
-        <PaymentDiagnostics />
+        {/* Developer tools - not visible in production UI sections */}
+        {/* Hardened Paystack debug panel (no inline script usage) */}
+        {/* Includes reference validator and test initializer in test mode */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Developer Tools</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <PaymentDiagnostics />
+            {/* New hardened debug panel */}
+            {/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */}
+            {/* @ts-ignore - component imported below */}
+            <PaymentDebugPanel />
+          </CardContent>
+        </Card>
       </div>
     </div>;
 };

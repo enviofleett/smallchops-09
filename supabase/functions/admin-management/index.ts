@@ -1,459 +1,254 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+// Admin Management Edge Function
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
-// PRODUCTION CORS - No wildcards, environment-aware
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS')?.split(',') || [];
-  const isDev = Deno.env.get('DENO_ENV') === 'development';
-  
-  if (isDev) {
-    allowedOrigins.push('http://localhost:5173', 'http://localhost:3000');
-  }
-  
-  const isAllowed = origin && allowedOrigins.includes(origin);
-  
-  return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : 'null'),
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Max-Age': '86400',
-    'Vary': 'Origin'
-  };
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Rate limiting helper
-async function checkRateLimit(supabase: any, identifier: string, action: string, limit: number = 10): Promise<boolean> {
-  try {
-    const windowStart = new Date(Date.now() - 60000) // 1 minute window
-    
-    const { data, error } = await supabase
-      .from('rate_limits')
-      .select('count')
-      .eq('identifier', identifier)
-      .eq('action', action)
-      .gte('window_start', windowStart.toISOString())
-      .single()
+interface AdminInvitation {
+  email: string;
+  role: string;
+}
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Rate limit check error:', error)
-      return true // Allow on error
-    }
-
-    if (data && data.count >= limit) {
-      return false
-    }
-
-    // Update or insert rate limit record
-    await supabase
-      .from('rate_limits')
-      .upsert(
-        { 
-          identifier, 
-          action, 
-          count: (data?.count || 0) + 1,
-          window_start: windowStart.toISOString()
-        },
-        { onConflict: 'identifier,action,window_start' }
-      )
-
-    return true
-  } catch (err) {
-    console.error('Rate limiting error:', err)
-    return true // Allow on error
-  }
+interface AdminUpdate {
+  userId: string;
+  action: 'activate' | 'deactivate' | 'update_role';
+  role?: string;
 }
 
 serve(async (req) => {
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  
-  // Handle CORS preflight
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
+    });
 
-    // FIXED AUTH - Consistent validation
-    const authHeader = req.headers.get('authorization'); // lowercase only
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(
-        JSON.stringify({ error: 'Authentication required' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    // Get user from auth header
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      throw new Error('Missing authorization header');
     }
 
-    const token = authHeader.substring(7); // More secure than replace
-
-    const { data: user, error: userError } = await supabaseClient.auth.getUser(token)
-    if (userError || !user.user) {
-      console.error('Authentication failed:', userError?.message)
-      return new Response(
-        JSON.stringify({ error: 'Authentication failed' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    // Rate limiting check
-    const clientIP = req.headers.get('x-forwarded-for') || req.headers.get('cf-connecting-ip') || 'unknown'
-    const rateLimitPassed = await checkRateLimit(supabaseClient, `${user.user.id}:${clientIP}`, 'admin_action', 30)
-    if (!rateLimitPassed) {
-      console.error('Rate limit exceeded for user:', user.user.id)
-      return new Response(
-        JSON.stringify({ error: 'Too many requests. Please try again later.' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    
+    if (userError || !user) {
+      throw new Error('Invalid token');
     }
 
     // Check if user is admin
-    const { data: profile, error: profileError } = await supabaseClient
+    const { data: profile } = await supabase
       .from('profiles')
-      .select('role, status')
-      .eq('id', user.user.id)
-      .single()
+      .select('role, is_active')
+      .eq('id', user.id)
+      .single();
 
-    if (profileError || !profile) {
-      console.error('Profile fetch failed:', profileError?.message)
-      return new Response(
-        JSON.stringify({ error: 'User profile not found' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    if (!profile || profile.role !== 'admin' || !profile.is_active) {
+      throw new Error('Access denied - admin privileges required');
     }
 
-    if (profile.role !== 'admin') {
-      console.error('Non-admin user attempted admin action:', user.user.id)
-      return new Response(
-        JSON.stringify({ error: 'Admin access required' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    const url = new URL(req.url);
+    const action = url.searchParams.get('action');
+
+    switch (req.method) {
+      case 'GET':
+        return await handleGet(supabase, action);
+      case 'POST':
+        return await handlePost(supabase, req);
+      case 'PUT':
+        return await handlePut(supabase, req);
+      default:
+        throw new Error('Method not allowed');
     }
-
-    if (profile.status !== 'active') {
-      console.error('Inactive admin user attempted action:', user.user.id)
-      return new Response(
-        JSON.stringify({ error: 'Account is not active' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
-    }
-
-    if (req.method === 'POST') {
-      const body = await req.json()
-      const { action, email, role, userId, permissions } = body
-
-      if (action === 'create_admin') {
-        // Validate email format
-        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-          throw new Error('Valid email address is required')
-        }
-
-        // Check if user already exists
-        const { data: existingUser } = await supabaseClient.auth.admin.getUserByEmail(email)
-        
-        if (existingUser.user) {
-          // User exists, update their role
-          const { error: updateError } = await supabaseClient
-            .from('profiles')
-            .update({ role: role || 'admin' })
-            .eq('id', existingUser.user.id)
-
-          if (updateError) throw updateError
-
-          return new Response(
-            JSON.stringify({ 
-              success: true, 
-              message: 'User role updated successfully',
-              user: existingUser.user 
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        } else {
-          // Create invitation
-          const { data: invitation, error: inviteError } = await supabaseClient
-            .from('admin_invitations')
-            .insert({
-              email,
-              role: role || 'admin',
-              invited_by: user.user.id
-            })
-            .select()
-            .single()
-
-          if (inviteError) throw inviteError
-
-          return new Response(
-            JSON.stringify({ 
-              success: true, 
-              message: 'Admin invitation created successfully',
-              invitation 
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
-        }
-      }
-
-      if (action === 'update_permissions' && userId && permissions) {
-        // Validate inputs
-        if (!userId || typeof userId !== 'string') {
-          throw new Error('Valid user ID is required');
-        }
-        
-        if (!permissions || typeof permissions !== 'object') {
-          throw new Error('Valid permissions object is required');
-        }
-        
-        console.log(`Starting permission update for user ${userId}`);
-        console.log('Permissions data:', permissions);
-        
-        // Delete existing permissions
-        const { error: deleteError } = await supabaseClient
-          .from('user_permissions')
-          .delete()
-          .eq('user_id', userId)
-        
-        if (deleteError) {
-          console.error('Failed to delete existing permissions:', deleteError);
-          throw new Error(`Failed to clear existing permissions: ${deleteError.message}`);
-        }
-
-        // Get admin profile for audit logging
-        const { data: adminProfile } = await supabaseClient
-          .from('profiles')
-          .select('name')
-          .eq('id', user.id)
-          .single();
-
-        // Get valid enum values for menu_section
-        const { data: enumValues } = await supabaseClient
-          .rpc('health_check') // Just to test connection
-        
-        const validEnumValues = [
-          'dashboard', 'orders', 'categories', 'products', 'customers', 
-          'delivery_pickup', 'promotions', 'reports', 'settings', 
-          'audit_logs', 'delivery', 'payment'
-        ];
-
-        // Get menu structure to determine parent menu sections
-        const { data: menuStructure } = await supabaseClient
-          .from('menu_structure')
-          .select('key, parent_key')
-          .eq('is_active', true);
-
-        const menuMap = new Map(menuStructure?.map(m => [m.key, m.parent_key]) || []);
-
-        // Function to map menu key to valid enum value
-        function getValidMenuSection(menuKey: string): string {
-          const parentKey = menuMap.get(menuKey);
-          
-          // If parent exists and is a valid enum value, use it
-          if (parentKey && validEnumValues.includes(parentKey)) {
-            return parentKey;
-          }
-          
-          // If menuKey itself is a valid enum value, use it
-          if (validEnumValues.includes(menuKey)) {
-            return menuKey;
-          }
-          
-          // Try to extract section from key (split on -)
-          const section = menuKey.split('-')[0];
-          if (validEnumValues.includes(section)) {
-            return section;
-          }
-          
-          // Map common patterns
-          if (menuKey.includes('payment')) return 'payment';
-          if (menuKey.includes('setting')) return 'settings';
-          if (menuKey.includes('delivery')) return 'delivery';
-          if (menuKey.includes('order')) return 'orders';
-          if (menuKey.includes('product')) return 'products';
-          if (menuKey.includes('customer')) return 'customers';
-          if (menuKey.includes('report')) return 'reports';
-          if (menuKey.includes('audit')) return 'audit_logs';
-          if (menuKey.includes('promotion')) return 'promotions';
-          if (menuKey.includes('categor')) return 'categories';
-          
-          // Default fallback
-          return 'dashboard';
-        }
-
-        // Insert new permissions using menu_key
-        const permissionsToInsert = Object.entries(permissions)
-          .filter(([_, level]) => level !== 'none')
-          .map(([menuKey, permissionLevel]) => {
-            const menuSection = getValidMenuSection(menuKey);
-            
-            console.log(`Mapping permission: ${menuKey} -> section: ${menuSection}, level: ${permissionLevel}`);
-            
-            return {
-              user_id: userId,
-              menu_key: menuKey,
-              permission_level: permissionLevel,
-              menu_section: menuSection,
-            };
-          });
-
-        if (permissionsToInsert.length > 0) {
-          console.log(`Upserting ${permissionsToInsert.length} permissions for user ${userId}`);
-          
-          // Use upsert to handle any conflicts gracefully with the new (user_id, menu_key) constraint
-          const { error } = await supabaseClient
-            .from('user_permissions')
-            .upsert(permissionsToInsert, { 
-              onConflict: 'user_id,menu_key',
-              ignoreDuplicates: false 
-            });
-
-          if (error) {
-            console.error('Permission upsert error:', error);
-            
-            // Handle specific constraint violations with improved messages
-            if (error.code === '23505') {
-              const detail = error.details || '';
-              if (detail.includes('menu_key')) {
-                console.log('Duplicate menu_key constraint - this should not happen with upsert');
-                throw new Error('Permission conflict detected. The permissions have been updated.');
-              } else {
-                throw new Error('Permission conflict detected. Please refresh and try again.');
-              }
-            } else if (error.code === '23502') {
-              throw new Error('Required permission field is missing. Please contact support.');
-            } else if (error.code === '23503') {
-              throw new Error('Invalid user or permission reference. Please refresh and try again.');
-            } else if (error.message.includes('violates check constraint')) {
-              throw new Error('Invalid permission level provided. Please use "view" or "edit".');
-            } else {
-              throw new Error(`Permission update failed: ${error.message}`);
-            }
-          }
-          
-          console.log(`Successfully upserted permissions for user ${userId}`);
-        } else {
-          console.log(`No permissions to insert for user ${userId} (all set to 'none')`);
-        }
-
-        // Log the permission change
-        await supabaseClient.from('audit_logs').insert({
-          user_id: user.id,
-          action: 'UPDATE',
-          category: 'User Management',
-          entity_type: 'user_permissions',
-          entity_id: userId,
-          message: `${adminProfile?.name || 'Admin'} updated permissions for user ${userId}`,
-          new_values: permissions
-        });
-
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: 'Permissions updated successfully' 
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      throw new Error('Invalid action specified')
-    }
-
-    if (req.method === 'GET') {
-      // Extract action from query params for GET requests
-      const url = new URL(req.url)
-      const action = url.searchParams.get('action')
-      const userId = url.searchParams.get('userId')
-      
-      console.log(`[ADMIN-GET] Action: ${action}, UserId: ${userId}, URL: ${url.pathname}${url.search}`)
-      
-      if (!action) {
-        console.error('No action specified in GET request')
-        return new Response(
-          JSON.stringify({ error: 'Action parameter is required for GET requests' }),
-          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      if (action === 'get_admins') {
-        console.log('Fetching admin users...')
-        
-        // Log the admin action
-        await supabaseClient.rpc('log_admin_management_action', {
-          action_type: 'get_admins',
-          target_user_id: null,
-          target_email: null,
-          action_data: { requested_by: user.user.id }
-        })
-        const { data: admins, error } = await supabaseClient
-          .from('profiles')
-          .select('id, name, role, status, created_at')
-          .in('role', ['admin', 'manager'])
-          .order('created_at', { ascending: false })
-
-        if (error) throw error
-
-        return new Response(
-          JSON.stringify({ data: admins }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      if (action === 'get_invitations') {
-        console.log('Fetching admin invitations...')
-        
-        // Log the admin action
-        await supabaseClient.rpc('log_admin_management_action', {
-          action_type: 'get_invitations',
-          target_user_id: null,
-          target_email: null,
-          action_data: { requested_by: user.user.id }
-        })
-
-        const { data: invitations, error } = await supabaseClient
-          .from('admin_invitations')
-          .select('*')
-          .order('created_at', { ascending: false })
-
-        if (error) {
-          console.error('Failed to fetch invitations:', error)
-          throw error
-        }
-
-        console.log(`Successfully fetched ${invitations?.length || 0} invitations`)
-        return new Response(
-          JSON.stringify({ data: invitations }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      if (action === 'get_permissions' && url.searchParams.get('userId')) {
-        const userId = url.searchParams.get('userId')
-        const { data: permissions, error } = await supabaseClient
-          .from('user_permissions')
-          .select('menu_key, permission_level, menu_section, sub_menu_section')
-          .eq('user_id', userId)
-
-        if (error) throw error
-
-        return new Response(
-          JSON.stringify({ data: permissions }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        )
-      }
-
-      throw new Error('Invalid action specified')
-    }
-
-    return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
 
   } catch (error) {
-    console.error('Admin management error:', error)
+    console.error('Admin management error:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
   }
-})
+});
+
+async function handleGet(supabase: any, action: string | null) {
+  switch (action) {
+    case 'get_admins':
+      console.log('Fetching admin users...');
+      const { data: admins, error: adminsError } = await supabase
+        .from('profiles')
+        .select('id, name, email, role, status, created_at, is_active')
+        .eq('role', 'admin')
+        .order('created_at', { ascending: false });
+
+      if (adminsError) {
+        throw new Error(`Failed to fetch admins: ${adminsError.message}`);
+      }
+
+      console.log(`Successfully fetched ${admins?.length || 0} admins`);
+      return new Response(
+        JSON.stringify({ success: true, data: admins }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
+    case 'get_invitations':
+      console.log('Fetching admin invitations...');
+      const { data: invitations, error: invitationsError } = await supabase
+        .from('admin_invitations')
+        .select(`
+          id,
+          email,
+          role,
+          status,
+          expires_at,
+          created_at,
+          invited_by,
+          profiles!admin_invitations_invited_by_fkey(name)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (invitationsError) {
+        throw new Error(`Failed to fetch invitations: ${invitationsError.message}`);
+      }
+
+      console.log(`Successfully fetched ${invitations?.length || 0} invitations`);
+      return new Response(
+        JSON.stringify({ success: true, data: invitations }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+
+    default:
+      throw new Error('Invalid action for GET request');
+  }
+}
+
+async function handlePost(supabase: any, req: Request) {
+  const body: AdminInvitation = await req.json();
+  
+  console.log('Sending admin invitation to:', body.email);
+  
+  // Validate input
+  if (!body.email || !body.role) {
+    throw new Error('Email and role are required');
+  }
+
+  if (!body.email.includes('@')) {
+    throw new Error('Invalid email format');
+  }
+
+  if (!['admin', 'user'].includes(body.role)) {
+    throw new Error('Invalid role');
+  }
+
+  // Use the database function to send invitation
+  const { data, error } = await supabase.rpc('send_admin_invitation', {
+    p_email: body.email,
+    p_role: body.role
+  });
+
+  if (error) {
+    throw new Error(`Failed to send invitation: ${error.message}`);
+  }
+
+  if (!data.success) {
+    throw new Error(data.error);
+  }
+
+  // Send invitation email using Auth email system
+  try {
+    await supabase.functions.invoke('supabase-auth-email-sender', {
+      body: {
+        templateId: 'admin_invitation',
+        to: body.email,
+        variables: {
+          role: body.role,
+          companyName: 'Starters Small Chops',
+          invitation_url: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify?token=${data.invitation_token}&type=signup&redirect_to=${encodeURIComponent('https://startersmallchops.com/admin')}`
+        },
+        emailType: 'transactional'
+      }
+    });
+    console.log('Invitation email sent successfully');
+  } catch (emailError) {
+    console.warn('Failed to send invitation email:', emailError);
+    // Don't fail the whole request if email fails
+  }
+
+  return new Response(
+    JSON.stringify({ 
+      success: true, 
+      message: 'Invitation sent successfully',
+      data: { invitation_id: data.invitation_id }
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}
+
+async function handlePut(supabase: any, req: Request) {
+  const body: AdminUpdate = await req.json();
+  
+  console.log('Updating admin user:', body);
+  
+  // Validate input
+  if (!body.userId || !body.action) {
+    throw new Error('User ID and action are required');
+  }
+
+  let result;
+  switch (body.action) {
+    case 'activate':
+      result = await supabase.rpc('activate_admin_user', {
+        p_user_id: body.userId
+      });
+      break;
+      
+    case 'deactivate':
+      result = await supabase.rpc('deactivate_admin_user', {
+        p_user_id: body.userId
+      });
+      break;
+      
+    case 'update_role':
+      if (!body.role) {
+        throw new Error('Role is required for update_role action');
+      }
+      result = await supabase.rpc('update_admin_role', {
+        p_user_id: body.userId,
+        p_new_role: body.role
+      });
+      break;
+      
+    default:
+      throw new Error('Invalid action');
+  }
+
+  if (result.error) {
+    throw new Error(`Failed to ${body.action} user: ${result.error.message}`);
+  }
+
+  if (!result.data.success) {
+    throw new Error(result.data.error);
+  }
+
+  return new Response(
+    JSON.stringify({ 
+      success: true, 
+      message: result.data.message
+    }),
+    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+  );
+}

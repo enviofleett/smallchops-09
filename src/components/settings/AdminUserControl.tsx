@@ -37,7 +37,7 @@ interface AdminInvitation {
   id: string;
   email: string;
   status: string;
-  invited_at: string;
+  created_at: string;
   expires_at: string;
   invited_by: string;
 }
@@ -51,10 +51,9 @@ export const AdminUserControl = () => {
     invitations,
     isLoadingAdmins: loadingUsers,
     isLoadingInvitations: loadingInvitations,
-    deleteUser,
-    deleteInvitation,
-    isDeletingUser,
-    isDeletingInvitation,
+    updateAdmin,
+    isSendingInvitation,
+    isUpdatingAdmin,
   } = useAdminManagement();
 
   return (
@@ -149,8 +148,8 @@ export const AdminUserControl = () => {
                                 </AlertDialogHeader>
                                 <AlertDialogFooter>
                                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                  <AlertDialogAction onClick={() => deleteUser(user.id)} disabled={isDeletingUser}>
-                                    {isDeletingUser ? 'Deactivating...' : 'Deactivate'}
+                                  <AlertDialogAction onClick={() => updateAdmin({ userId: user.id, action: 'deactivate' })} disabled={isUpdatingAdmin}>
+                                    {isUpdatingAdmin ? 'Deactivating...' : 'Deactivate'}
                                   </AlertDialogAction>
                                 </AlertDialogFooter>
                               </AlertDialogContent>
@@ -198,7 +197,7 @@ export const AdminUserControl = () => {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          {new Date(invitation.invited_at).toLocaleDateString()}
+                          {new Date(invitation.created_at).toLocaleDateString()}
                         </TableCell>
                         <TableCell>
                           {new Date(invitation.expires_at).toLocaleDateString()}
@@ -220,8 +219,8 @@ export const AdminUserControl = () => {
                               </AlertDialogHeader>
                               <AlertDialogFooter>
                                 <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => deleteInvitation(invitation.id)} disabled={isDeletingInvitation}>
-                                  {isDeletingInvitation ? 'Deleting...' : 'Delete'}
+                                <AlertDialogAction onClick={() => console.log('Delete invitation not implemented')} disabled={false}>
+                                  Delete
                                 </AlertDialogAction>
                               </AlertDialogFooter>
                             </AlertDialogContent>

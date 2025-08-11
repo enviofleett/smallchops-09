@@ -4709,7 +4709,9 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          email: string | null
           id: string
+          is_active: boolean
           name: string | null
           phone: string | null
           role: Database["public"]["Enums"]["user_role"]
@@ -4719,7 +4721,9 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           id: string
+          is_active?: boolean
           name?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]
@@ -4729,7 +4733,9 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          email?: string | null
           id?: string
+          is_active?: boolean
           name?: string | null
           phone?: string | null
           role?: Database["public"]["Enums"]["user_role"]

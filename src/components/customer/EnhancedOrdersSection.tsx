@@ -16,7 +16,7 @@ import {
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-
+import { toast } from 'sonner';
 interface Order {
   id: string;
   order_number: string;
@@ -64,6 +64,29 @@ export function EnhancedOrdersSection() {
   useEffect(() => {
     refetch?.();
   }, [refetch]);
+
+  // Listen for payment confirmation events and show a toast
+  useEffect(() => {
+    const handler = (event: any) => {
+      try {
+        const { orderId } = event.detail || {};
+        const shortId = (orderId || '').toString().slice(-8);
+        toast.success('Payment confirmed', {
+          description: shortId ? `Order ${shortId} has been paid successfully` : 'Order has been paid successfully',
+          duration: 4000,
+        });
+      } catch {}
+    };
+
+    if (typeof window !== 'undefined') {
+      window.addEventListener('payment-confirmed', handler as unknown as EventListener);
+    }
+    return () => {
+      if (typeof window !== 'undefined') {
+        window.removeEventListener('payment-confirmed', handler as unknown as EventListener);
+      }
+    };
+  }, []);
 
 // Safe data access with null checks (prepare before effects)
 const orders = Array.isArray(ordersData?.orders) ? (ordersData.orders as any[]) : [];

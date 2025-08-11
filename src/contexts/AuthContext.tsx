@@ -160,7 +160,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       }
 
       // New user - determine type based on metadata or email
-      const isAdminEmail = authUser.email?.includes('admin') || authUser.user_metadata?.role;
+      const isAdminEmail = authUser.email === 'store@startersmallchops.com' || 
+                          authUser.email?.includes('admin') || 
+                          authUser.user_metadata?.role;
       
       if (isAdminEmail) {
         // Create admin profile

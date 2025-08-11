@@ -54,6 +54,7 @@ const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"));
 const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"));
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"));
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
+const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
 
 // Optimized QueryClient with better defaults
 const queryClient = new QueryClient({
@@ -103,6 +104,7 @@ const App = () => {
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/paystack-test" element={<PaystackTest />} />
+              <Route path="/emergency-fix" element={<EmergencyPaymentFix />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/category/:categoryId" element={<CategoryProducts />} />
               

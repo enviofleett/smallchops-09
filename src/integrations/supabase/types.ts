@@ -6989,6 +6989,10 @@ export type Database = {
         Args: { p_email: string }
         Returns: Json
       }
+      recover_stuck_payment: {
+        Args: { p_order_number: string; p_paystack_reference: string }
+        Returns: Json
+      }
       requeue_failed_welcome_emails: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -7004,6 +7008,10 @@ export type Database = {
           p_order_status?: string
         }
         Returns: undefined
+      }
+      sync_pending_payments: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       test_registration_system: {
         Args: Record<PropertyKey, never>

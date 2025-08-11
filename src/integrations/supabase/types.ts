@@ -1029,6 +1029,7 @@ export type Database = {
         Row: {
           created_at: string
           delivery_status: string | null
+          email_provider: string | null
           email_type: string | null
           error_message: string | null
           event_type: string
@@ -1052,6 +1053,7 @@ export type Database = {
         Insert: {
           created_at?: string
           delivery_status?: string | null
+          email_provider?: string | null
           email_type?: string | null
           error_message?: string | null
           event_type: string
@@ -1075,6 +1077,7 @@ export type Database = {
         Update: {
           created_at?: string
           delivery_status?: string | null
+          email_provider?: string | null
           email_type?: string | null
           error_message?: string | null
           event_type?: string
@@ -6679,6 +6682,7 @@ export type Database = {
         Returns: {
           created_at: string
           delivery_status: string | null
+          email_provider: string | null
           email_type: string | null
           error_message: string | null
           event_type: string

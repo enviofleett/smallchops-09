@@ -50,23 +50,44 @@ interface EmailDeliveryLog {
 export const useEmailService = () => {
   const { toast } = useToast();
 
-  // Send email mutation - only using SMTP
+  // Send email mutation with Auth system priority
   const sendEmailMutation = useMutation({
     mutationFn: async (emailRequest: EmailRequest) => {
-      const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
-        body: emailRequest
-      });
+      console.log('Sending email with Auth system priority:', emailRequest);
+      
+      try {
+        // Try Supabase Auth email system first (more reliable)
+        const { data, error } = await supabase.functions.invoke('supabase-auth-email-sender', {
+          body: emailRequest
+        });
 
-      if (error) {
-        throw new Error(`Email sending failed: ${error.message}`);
+        if (error) {
+          throw new Error(error.message || 'Failed to send email via Auth system');
+        }
+
+        console.log('Email sent successfully via Supabase Auth:', data);
+        return data;
+      } catch (authError) {
+        console.warn('Auth email failed, trying SMTP fallback:', authError);
+        
+        // Fallback to SMTP if Auth system fails
+        const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+          body: emailRequest
+        });
+
+        if (error) {
+          console.error('SMTP fallback also failed:', error);
+          throw new Error(`All email systems failed. Auth error: ${authError.message}, SMTP error: ${error.message}`);
+        }
+
+        console.log('Email sent successfully via SMTP fallback:', data);
+        return data;
       }
-
-      return data;
     },
     onSuccess: () => {
       toast({
         title: "Email sent successfully",
-        description: "Your email has been sent via SMTP",
+        description: "Your email has been sent via Auth system",
       });
     },
     onError: (error: any) => {

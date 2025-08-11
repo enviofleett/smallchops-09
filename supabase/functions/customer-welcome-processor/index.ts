@@ -22,22 +22,45 @@ serve(async (req) => {
 
     console.log('Processing welcome email for:', customer_email);
 
-    // Send welcome email using template service
-    await supabaseAdmin.functions.invoke('production-smtp-sender', {
-      body: {
-        to: customer_email,
-        template_key: 'customer_welcome',
-        variables: {
-          customer_name: customer_name,
-          customer_email: customer_email,
-          store_name: 'Your Store',
-          store_url: 'https://your-store.com',
-          support_email: 'support@your-store.com',
-          welcome_date: new Date().toLocaleDateString()
-        },
-        priority: 'normal'
-      }
-    });
+    // Send welcome email using Auth system with SMTP fallback
+    try {
+      await supabaseAdmin.functions.invoke('supabase-auth-email-sender', {
+        body: {
+          templateId: 'customer_welcome',
+          to: customer_email,
+          variables: {
+            customerName: customer_name,
+            customer_email: customer_email,
+            business_name: 'Starters Small Chops',
+            store_url: 'https://your-store.com',
+            support_email: 'support@your-store.com',
+            welcome_date: new Date().toLocaleDateString()
+          },
+          emailType: 'transactional'
+        }
+      });
+      console.log('Welcome email sent via Auth system to:', customer_email);
+    } catch (authError) {
+      console.warn('Auth email failed, trying SMTP fallback:', authError);
+      
+      // Fallback to SMTP if Auth system fails
+      await supabaseAdmin.functions.invoke('smtp-email-sender', {
+        body: {
+          templateId: 'customer_welcome',
+          to: customer_email,
+          variables: {
+            customerName: customer_name,
+            customer_email: customer_email,
+            business_name: 'Starters Small Chops',
+            store_url: 'https://your-store.com',
+            support_email: 'support@your-store.com',
+            welcome_date: new Date().toLocaleDateString()
+          },
+          emailType: 'transactional'
+        }
+      });
+      console.log('Welcome email sent via SMTP fallback to:', customer_email);
+    }
 
     console.log('Welcome email sent to:', customer_email);
 

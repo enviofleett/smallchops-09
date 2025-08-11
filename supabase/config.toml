@@ -31,6 +31,9 @@ verify_jwt = false
 [functions.smtp-email-sender]
 verify_jwt = true
 
+[functions.supabase-auth-email-sender]
+verify_jwt = false
+
 [functions.smtp-health-monitor]
 verify_jwt = false
 

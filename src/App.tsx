@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
-import EnhancedErrorBoundary from "./components/ui/enhanced-error-boundary";
+import EnhancedErrorBoundary from "./components/EnhancedErrorBoundary";
 import { withLazyLoading, preloadRoute } from "./utils/lazyLoad";
 import { FullPageLoader } from "./components/ui/page-loader";
 import { PerformanceMonitor } from "./utils/performance";
@@ -84,7 +84,7 @@ const App = () => {
   }, []);
 
   return (
-  <EnhancedErrorBoundary context="Main Application" showErrorDetails={true}>
+  <EnhancedErrorBoundary context="Main Application">
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />

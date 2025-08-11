@@ -16,18 +16,19 @@ serve(async (req) => {
 
   try {
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
-    const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY");
+    const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
-    if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
       console.error("Missing environment variables");
       throw new Error("Missing Supabase environment variables");
     }
 
     const authHeader = req.headers.get("authorization");
-    const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: {
-        headers: authHeader ? { Authorization: authHeader } : {},
-      },
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false
+      }
     });
 
     console.log("Fetching dashboard analytics data with enhanced error handling");
@@ -269,7 +270,7 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (e) {
-    console.error("Reports function critical error:", e);
+    console.error("Reports function critical error:", e.message || e);
     
     // Return fallback data structure to prevent frontend crashes
     const fallbackData = {

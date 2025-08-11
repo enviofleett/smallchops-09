@@ -72,3 +72,6 @@ verify_jwt = true
 
 [functions.admin-management]
 verify_jwt = false
+
+[functions.reports]
+verify_jwt = false

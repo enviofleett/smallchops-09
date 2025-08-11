@@ -175,7 +175,7 @@ export default function PaymentCallback() {
           order_number: payload?.order_number,
           amount: typeof payload?.total_amount === 'number'
             ? payload.total_amount
-            : (typeof payload?.amount === 'number' ? Math.round(payload.amount / 100) : undefined),
+            : (typeof payload?.amount === 'number' ? payload.amount / 100 : undefined),
           message: 'Payment verified successfully! Your order has been confirmed.'
         });
 
@@ -303,6 +303,7 @@ export default function PaymentCallback() {
         <meta name="description" content="Verify your Paystack payment and order status." />
         <link rel="canonical" href={`${window.location.origin}/payment/callback`} />
       </Helmet>
+      <h1 className="sr-only">Paystack Payment Verification</h1>
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center pb-4">

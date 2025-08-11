@@ -308,39 +308,103 @@ async function verifyPayment(requestData: any) {
         }
       }
 
-      // B) Extra resilience for server-side refs: if user provided a truncated txn_ reference,
-      //    try to find a provider_reference that starts with the provided prefix and retry
+      // B) Extra resilience for server-side refs and common input mistakes
+      //    - Try a prefixed variant if user omitted the `txn_` prefix
+      //    - Try DB prefix/contains lookups to recover truncated inputs
       if (notFound && !paystackResponse.ok) {
         try {
-          // 1) Look up in payment_transactions by prefix match
-          const { data: byPrefix } = await supabaseClient
-            .from('payment_transactions')
-            .select('provider_reference')
-            .ilike('provider_reference', `${reference}%`)
-            .order('created_at', { ascending: false })
-            .maybeSingle();
-          if (byPrefix?.provider_reference) {
-            effectiveRef = byPrefix.provider_reference as string;
-            console.log('🔁 Mapped truncated txn_ reference by prefix to:', effectiveRef);
-            paystackResponse = await verifyWithPaystack(effectiveRef);
+          // 0) If the provided reference is missing the txn_ prefix, try with it
+          if (!/^txn_/.test(reference)) {
+            const prefixed = `txn_${reference}`;
+            console.log('🔎 Trying prefixed variant:', prefixed);
+            mappingStrategy = 'prefix_added';
+            paystackResponse = await verifyWithPaystack(prefixed);
+            if (paystackResponse.ok) {
+              effectiveRef = prefixed;
+            }
           }
 
-          // 2) If still not mapped, try orders.payment_reference by prefix
+          // Only perform DB lookups if still not resolved
           if (!paystackResponse.ok) {
-            const { data: orderByPrefix } = await supabaseClient
-              .from('orders')
-              .select('payment_reference')
-              .ilike('payment_reference', `${reference}%`)
+            // 1) Look up in payment_transactions by prefix match (original and prefixed)
+            const tryPrefixes = [reference, /^txn_/.test(reference) ? reference : `txn_${reference}`];
+            let matchedRef: string | null = null;
+            for (const pfx of tryPrefixes) {
+              const { data: byPrefix } = await supabaseClient
+                .from('payment_transactions')
+                .select('provider_reference')
+                .ilike('provider_reference', `${pfx}%`)
+                .order('created_at', { ascending: false })
+                .maybeSingle();
+              if (byPrefix?.provider_reference) {
+                matchedRef = byPrefix.provider_reference as string;
+                mappingStrategy = 'tx_prefix_match';
+                console.log('🔁 Mapped by tx prefix to:', matchedRef);
+                break;
+              }
+            }
+            if (matchedRef) {
+              effectiveRef = matchedRef;
+              paystackResponse = await verifyWithPaystack(effectiveRef);
+            }
+          }
+
+          // 2) If still not mapped, try orders.payment_reference by prefix (original and prefixed)
+          if (!paystackResponse.ok) {
+            const tryPrefixes = [reference, /^txn_/.test(reference) ? reference : `txn_${reference}`];
+            let matchedRef: string | null = null;
+            for (const pfx of tryPrefixes) {
+              const { data: orderByPrefix } = await supabaseClient
+                .from('orders')
+                .select('payment_reference')
+                .ilike('payment_reference', `${pfx}%`)
+                .order('created_at', { ascending: false })
+                .maybeSingle();
+              if (orderByPrefix?.payment_reference) {
+                matchedRef = orderByPrefix.payment_reference as string;
+                mappingStrategy = 'orders_prefix_match';
+                console.log('🔁 Mapped via orders.payment_reference prefix to:', matchedRef);
+                break;
+              }
+            }
+            if (matchedRef) {
+              effectiveRef = matchedRef;
+              paystackResponse = await verifyWithPaystack(effectiveRef);
+            }
+          }
+
+          // 3) As a last resort, try contains match (handles truncated tails or missing prefix)
+          if (!paystackResponse.ok) {
+            const { data: byContains } = await supabaseClient
+              .from('payment_transactions')
+              .select('provider_reference')
+              .ilike('provider_reference', `%${reference}%`)
               .order('created_at', { ascending: false })
               .maybeSingle();
-            if (orderByPrefix?.payment_reference) {
-              effectiveRef = orderByPrefix.payment_reference as string;
-              console.log('🔁 Mapped via orders.payment_reference prefix to:', effectiveRef);
+            if (byContains?.provider_reference) {
+              effectiveRef = byContains.provider_reference as string;
+              mappingStrategy = 'tx_contains_match';
+              console.log('🔁 Mapped by tx contains-match to:', effectiveRef);
+              paystackResponse = await verifyWithPaystack(effectiveRef);
+            }
+          }
+
+          if (!paystackResponse.ok) {
+            const { data: orderContains } = await supabaseClient
+              .from('orders')
+              .select('payment_reference')
+              .ilike('payment_reference', `%${reference}%`)
+              .order('created_at', { ascending: false })
+              .maybeSingle();
+            if (orderContains?.payment_reference) {
+              effectiveRef = orderContains.payment_reference as string;
+              mappingStrategy = 'orders_contains_match';
+              console.log('🔁 Mapped via orders.payment_reference contains-match to:', effectiveRef);
               paystackResponse = await verifyWithPaystack(effectiveRef);
             }
           }
         } catch (e) {
-          console.warn('Prefix-based reference mapping failed:', e);
+          console.warn('Prefix/contains-based reference mapping failed:', e);
         }
       }
 

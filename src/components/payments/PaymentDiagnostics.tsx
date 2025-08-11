@@ -20,17 +20,29 @@ export const PaymentDiagnostics: React.FC = () => {
   const [reference, setReference] = useState("");
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<VerifyResult | null>(null);
+  const [hint, setHint] = useState<string | null>(null);
 
   const handleVerify = async () => {
-    if (!reference.trim()) {
+    const raw = reference.trim();
+    if (!raw) {
       toast.error("Enter a transaction reference");
       return;
     }
     setLoading(true);
     setResult(null);
     try {
+      // Normalize: if user omitted txn_ prefix, add it
+      let normalized = raw;
+      let localHint: string | null = null;
+      if (!/^txn_/.test(normalized)) {
+        normalized = `txn_${normalized}`;
+        localHint = "Auto-added txn_ prefix for verification";
+      }
+      setHint(localHint);
+      if (localHint) setReference(normalized);
+
       const { data, error } = await supabase.functions.invoke("paystack-secure", {
-        body: { action: "verify", reference: reference.trim() },
+        body: { action: "verify", reference: normalized },
       });
 
       if (error) throw new Error(error.message);
@@ -83,6 +95,9 @@ export const PaymentDiagnostics: React.FC = () => {
             {loading ? "Verifying..." : "Verify"}
           </Button>
         </div>
+        {hint && (
+          <p className="text-xs text-muted-foreground">{hint}</p>
+        )}
 
         {result && (
           <div className="border rounded-md p-3 space-y-2 text-sm">

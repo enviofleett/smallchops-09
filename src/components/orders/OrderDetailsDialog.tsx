@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { OrderWithItems, updateOrder, manuallyQueueCommunicationEvent } from '@/api/orders';
-import { getDispatchRiders, Profile } from '@/api/users';
+import { getDispatchRiders, DispatchRider } from '@/api/users';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -36,10 +36,27 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
     setVerifyState('idle');
   }, [order]);
 
-  const { data: riders, isLoading: isLoadingRiders } = useQuery<Profile[]>({
+  const { data: riders, isLoading: isLoadingRiders, error: ridersError } = useQuery<DispatchRider[]>({
     queryKey: ['dispatchRiders'],
     queryFn: getDispatchRiders,
+    retry: 2,
+    refetchOnWindowFocus: false,
   });
+
+  // Log any errors with dispatch riders
+  useEffect(() => {
+    if (ridersError) {
+      console.error('❌ Failed to load dispatch riders:', ridersError);
+      toast({ 
+        title: 'Warning', 
+        description: 'Failed to load dispatch riders. Please refresh the page.', 
+        variant: 'destructive' 
+      });
+    }
+    if (riders) {
+      console.log('✅ Loaded dispatch riders:', riders.length, 'active riders');
+    }
+  }, [ridersError, riders, toast]);
 
   const updateMutation = useMutation({
     mutationFn: (updates: { status?: OrderStatus; assigned_rider_id?: string | null }) => updateOrder(order.id, updates),
@@ -191,17 +208,30 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                   disabled={isLoadingRiders}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select a rider" />
+                    <SelectValue placeholder={isLoadingRiders ? "Loading riders..." : "Select a rider"} />
                   </SelectTrigger>
-                  <SelectContent>
+                  <SelectContent className="bg-background border shadow-lg z-50">
                     <SelectItem value="unassigned">Unassigned</SelectItem>
+                    {riders?.length === 0 && !isLoadingRiders && (
+                      <SelectItem value="" disabled>No active riders available</SelectItem>
+                    )}
                     {riders?.map((rider) => (
                       <SelectItem key={rider.id} value={rider.id}>
-                        {rider.name}
+                        <div className="flex flex-col">
+                          <span className="font-medium">{rider.name}</span>
+                          <span className="text-xs text-muted-foreground">
+                            {rider.vehicle_brand} {rider.vehicle_model} • {rider.license_plate}
+                          </span>
+                        </div>
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {riders?.length === 0 && !isLoadingRiders && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    ⚠️ No active dispatch riders found. Contact admin to add riders.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-sm font-medium block mb-2">Send Manual Notification</label>

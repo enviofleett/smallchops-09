@@ -9,7 +9,8 @@ import { useCart } from "@/hooks/useCart";
 import { useCustomerOrders } from "@/hooks/useCustomerOrders";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import { Helmet } from "react-helmet-async";
-
+import { useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
 interface PaymentResult {
@@ -31,9 +32,10 @@ export default function PaymentCallback() {
   const [status, setStatus] = useState<PaymentStatus>('verifying');
   const [result, setResult] = useState<PaymentResult | null>(null);
   const [redirected, setRedirected] = useState(false);
+  const queryClient = useQueryClient();
+  const verifyingRef = useRef(false);
   // Cleanup effect (no timers needed with single-call verify)
   useEffect(() => { return () => {}; }, []);
-
   // One-time hard refresh to clear any stale Service Worker/CSP state
   useEffect(() => {
     const hardRefreshSW = async () => {
@@ -141,10 +143,15 @@ export default function PaymentCallback() {
       console.log('PaymentCallback - Success indicated in URL, verifying...');
     }
 
-    verifyPayment(reference);
+    const trimmedRef = reference?.trim();
+    if (trimmedRef) {
+      verifyPayment(trimmedRef);
+    }
   }, [reference, paymentStatus]);
 
   const verifyPayment = async (paymentReference: string) => {
+    if (verifyingRef.current) return; // double-submit guard
+    verifyingRef.current = true;
     try {
       setStatus('verifying');
 
@@ -157,8 +164,8 @@ export default function PaymentCallback() {
         throw new Error((error as any)?.message || data?.error || 'Verification failed');
       }
 
-      const payload = data.data;
-      const isSuccess = payload?.status === 'success' || payload?.payment_status === 'paid';
+      const payload = data.data || data;
+      const isSuccess = payload?.status === 'success' || payload?.payment_status === 'paid' || data?.success === true;
 
       if (isSuccess) {
         setStatus('success');
@@ -172,14 +179,30 @@ export default function PaymentCallback() {
           message: 'Payment verified successfully! Your order has been confirmed.'
         });
 
-        // Clear client-side state and refresh orders once
+        // Clear client-side state
         await clearCartAfterPayment(payload?.order_number);
         clearCheckoutState();
         try { sessionStorage.removeItem('paystack_last_reference'); localStorage.removeItem('paystack_last_reference'); } catch {}
+
+        // Emit global payment-confirmed event for listeners
+        try {
+          window.dispatchEvent(new CustomEvent('payment-confirmed', {
+            detail: { orderId: payload?.order_id || orderIdParam, orderReference: paymentReference }
+          }));
+        } catch {}
+
+        // Friendly toast
+        toast.success('Payment confirmed successfully!');
+
+        // Invalidate caches now and again after a short delay for replication safety
+        await invalidateOrdersCaches();
         if (refetchOrders) {
           setTimeout(() => { refetchOrders().catch(() => {}); }, 500);
-          setTimeout(() => { refetchOrders().catch(() => {}); }, 2000);
         }
+        setTimeout(() => { invalidateOrdersCaches(); }, 2500);
+
+        // Clean the URL to remove sensitive query params
+        navigate('/payment/callback', { replace: true });
       } else {
         throw new Error(payload?.gateway_response || 'Payment not successful');
       }
@@ -191,7 +214,34 @@ export default function PaymentCallback() {
         message: 'Unable to verify payment. Please contact support with your payment reference.',
         retryable: false
       });
+      // Clean the URL on error as well
+      navigate('/payment/callback', { replace: true });
+    } finally {
+      verifyingRef.current = false;
     }
+  };
+
+  // Cache invalidation helper
+  const invalidateOrdersCaches = async () => {
+    try {
+      await queryClient.invalidateQueries({ queryKey: ['customer-orders'] });
+      await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      if (orderIdParam) {
+        await queryClient.invalidateQueries({ queryKey: ['order', orderIdParam] });
+        await queryClient.invalidateQueries({ queryKey: ['orders', orderIdParam] });
+      }
+      await queryClient.invalidateQueries({ queryKey: ['payment-verification'] });
+      await queryClient.invalidateQueries({ queryKey: ['payment'] });
+      await queryClient.invalidateQueries({ queryKey: ['customer-profile'] });
+    } catch (e) {
+      console.warn('Error invalidating caches:', e);
+    }
+  };
+
+  // Currency formatting
+  const formatCurrency = (amount?: number | null) => {
+    if (typeof amount !== 'number' || isNaN(amount)) return 'N/A';
+    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
   };
 
   // No retry handler needed with single-call verification
@@ -283,10 +333,10 @@ export default function PaymentCallback() {
                 </div>
               )}
               
-              {result.amount && (
+              {typeof result.amount === 'number' && (
                 <div className="flex justify-between">
                   <span className="text-muted-foreground">Amount:</span>
-                  <span className="font-medium">₦{result.amount.toLocaleString()}</span>
+                  <span className="font-medium">{formatCurrency(result.amount)}</span>
                 </div>
               )}
 

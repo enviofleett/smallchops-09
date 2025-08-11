@@ -1,7 +1,7 @@
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { paystackService } from '@/lib/paystack';
+import { paystackService, assertServerReference } from '@/lib/paystack';
 import { toast } from 'sonner';
 
 // Extend window object for Paystack
@@ -85,7 +85,25 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
           localStorage.setItem('paystack_last_reference', serverRef);
         } catch {}
         
-        if (config?.public_key) {
+          try {
+            assertServerReference(serverRef);
+          } catch (e) {
+            setLoading(false);
+            console.warn('Invalid server reference, redirecting to authorization URL:', serverRef, e);
+            // Fallback to redirect (break out of preview iframe if needed)
+            const url = response.authorization_url;
+            try {
+              if (window.top && window.top !== window.self) {
+                (window.top as Window).location.href = url;
+              } else {
+                window.location.href = url;
+              }
+            } catch {
+              window.open(url, '_blank', 'noopener,noreferrer');
+            }
+            return;
+          }
+          if (config?.public_key) {
           // Use Paystack inline popup
           const handler = window.PaystackPop.setup({
             key: config.public_key,

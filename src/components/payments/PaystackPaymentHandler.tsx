@@ -5,7 +5,7 @@ import { Loader2, CreditCard } from 'lucide-react';
 import { usePaystackConfig } from '@/hooks/usePaystackConfig';
 import { PaymentErrorHandler } from './PaymentErrorHandler';
 import { toast } from '@/hooks/use-toast';
-import { paystackService } from '@/lib/paystack';
+import { paystackService, assertServerReference } from '@/lib/paystack';
 
 interface PaystackPaymentHandlerProps {
   amount: number;
@@ -177,9 +177,29 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
           }
         });
 
-        const serverRef = init.reference;
+        let serverRef = init.reference;
         setCurrentReference(serverRef);
         console.log('🎯 REFERENCE TRACKING [INIT]:', { received: serverRef, url: init.authorization_url });
+
+        // Validate server-generated reference and reinitialize if needed
+        try {
+          assertServerReference(serverRef);
+        } catch (e) {
+          console.warn('Invalid reference detected, reinitializing payment with server:', serverRef, e);
+          const newRef = await paystackService.reinitializeIfNeeded(serverRef, {
+            email,
+            amount: paystackService.formatAmount(amount),
+            callback_url: callbackUrl,
+            channels: ['card', 'bank', 'ussd', 'mobile_money'],
+            metadata: {
+              order_number: orderNumber,
+              customer_email: email,
+              original_reference: initialReference
+            }
+          });
+          serverRef = newRef;
+          setCurrentReference(newRef);
+        }
 
         // If inline available, use serverRef; otherwise redirect
         if (window.PaystackPop && config?.publicKey) {

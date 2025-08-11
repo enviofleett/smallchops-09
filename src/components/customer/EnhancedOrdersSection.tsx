@@ -60,6 +60,11 @@ export function EnhancedOrdersSection() {
   const { data: ordersData, isLoading: ordersLoading, error: ordersError, refetch } = useCustomerOrders() as any;
   const { handleError } = useErrorHandler();
 
+  // Proactively refetch on mount to avoid stale states
+  useEffect(() => {
+    refetch?.();
+  }, [refetch]);
+
 // Safe data access with null checks (prepare before effects)
 const orders = Array.isArray(ordersData?.orders) ? (ordersData.orders as any[]) : [];
 
@@ -137,6 +142,19 @@ useEffect(() => {
     .subscribe();
   return () => {
     supabase.removeChannel(channel);
+  };
+}, [refetch]);
+
+// Realtime: refresh on orders table changes
+useEffect(() => {
+  const ordersChannel = supabase
+    .channel('orders-customer-orders')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+      refetch?.();
+    })
+    .subscribe();
+  return () => {
+    supabase.removeChannel(ordersChannel);
   };
 }, [refetch]);
 

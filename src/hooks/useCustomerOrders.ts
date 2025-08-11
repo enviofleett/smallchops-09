@@ -88,7 +88,17 @@ export const useCustomerOrders = () => {
       }
     },
     enabled: isAuthenticated && !!(user?.email || customerAccount?.email),
-    staleTime: 5 * 60 * 1000,
+    // Always refetch on mount and focus to avoid stale pending states
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    // Keep data fresh; payments may settle within seconds
+    staleTime: 10 * 1000,
+    // Poll only while there are pending payments
+    refetchInterval: (data) => {
+      const list = Array.isArray((data as any)?.orders) ? (data as any).orders : [];
+      const hasPending = list.some((o: any) => (o?.payment_status || '').toLowerCase() !== 'paid');
+      return hasPending ? 30 * 1000 : false;
+    },
     retry: 2,
     retryDelay: 1000,
   });

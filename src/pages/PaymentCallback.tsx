@@ -178,6 +178,7 @@ export default function PaymentCallback() {
         try { sessionStorage.removeItem('paystack_last_reference'); localStorage.removeItem('paystack_last_reference'); } catch {}
         if (refetchOrders) {
           setTimeout(() => { refetchOrders().catch(() => {}); }, 500);
+          setTimeout(() => { refetchOrders().catch(() => {}); }, 2000);
         }
       } else {
         throw new Error(payload?.gateway_response || 'Payment not successful');

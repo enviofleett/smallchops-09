@@ -85,6 +85,9 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
         try {
           sessionStorage.setItem('paystack_last_reference', serverRef);
           localStorage.setItem('paystack_last_reference', serverRef);
+          const details = JSON.stringify({ orderId, reference: serverRef });
+          sessionStorage.setItem('orderDetails', details);
+          localStorage.setItem('orderDetails', details);
         } catch {}
 
         try {
@@ -130,6 +133,9 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
                 try { 
                   sessionStorage.setItem('paystack_last_reference', response.reference);
                   localStorage.setItem('paystack_last_reference', response.reference);
+                  const details = JSON.stringify({ orderId, reference: response.reference });
+                  sessionStorage.setItem('orderDetails', details);
+                  localStorage.setItem('orderDetails', details);
                 } catch {}
                 onSuccess(response.reference, response);
               } else {

@@ -100,14 +100,33 @@ export default function PaymentCallback() {
     console.log('PaymentCallback - All URL params:', allParams);
     console.log('PaymentCallback - Detected reference:', reference);
     
-    // Fallback: try session storage if reference is missing (some gateways omit it)
+    // Fallback: try session/local storage if reference is missing (some gateways omit it)
     if (!reference) {
-      const storedRef = sessionStorage.getItem('paystack_last_reference') || localStorage.getItem('paystack_last_reference');
-      const storedOrderRaw = sessionStorage.getItem('orderDetails') || localStorage.getItem('orderDetails');
+      // Try multiple storage keys in priority order
+      const refCandidates = [
+        sessionStorage.getItem('paystack_last_reference'),
+        localStorage.getItem('paystack_last_reference'),
+        sessionStorage.getItem('paymentReference'),
+        localStorage.getItem('paymentReference'),
+        sessionStorage.getItem('paystack_reference'),
+        localStorage.getItem('paystack_reference'),
+        sessionStorage.getItem('last_payment_reference'),
+        localStorage.getItem('last_payment_reference')
+      ];
+      const storedRef = refCandidates.find((v) => typeof v === 'string' && v.trim().length > 0) || null;
+
+      // Order details for enriching URL (best-effort)
+      const orderDetailsRaw =
+        sessionStorage.getItem('orderDetails') ||
+        localStorage.getItem('orderDetails') ||
+        sessionStorage.getItem('payment_order_details') ||
+        localStorage.getItem('payment_order_details');
+
       let parsedDetails: any = null;
-      try { parsedDetails = storedOrderRaw ? JSON.parse(storedOrderRaw) : null; } catch {}
-      const orderId = parsedDetails?.orderId || null;
-      const orderNumber = parsedDetails?.orderNumber || null;
+      try { parsedDetails = orderDetailsRaw ? JSON.parse(orderDetailsRaw) : null; } catch {}
+      const orderId = parsedDetails?.orderId || parsedDetails?.order_id || null;
+      const orderNumber = parsedDetails?.orderNumber || parsedDetails?.order_number || null;
+
       if (storedRef) {
         const params = new URLSearchParams(window.location.search);
         params.set('reference', storedRef);

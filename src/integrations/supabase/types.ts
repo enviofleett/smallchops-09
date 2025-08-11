@@ -6270,6 +6270,10 @@ export type Database = {
       }
     }
     Functions: {
+      activate_admin_user: {
+        Args: { p_user_id: string }
+        Returns: Json
+      }
       bulk_safe_delete_products: {
         Args: { product_ids: string[] }
         Returns: Json
@@ -6487,6 +6491,10 @@ export type Database = {
       customer_purchased_product: {
         Args: { customer_uuid: string; product_uuid: string }
         Returns: boolean
+      }
+      deactivate_admin_user: {
+        Args: { p_user_id: string }
+        Returns: Json
       }
       debug_payment_transaction_insert: {
         Args: {
@@ -7033,6 +7041,10 @@ export type Database = {
           status: string
           message: string
         }[]
+      }
+      update_admin_role: {
+        Args: { p_user_id: string; p_new_role: string }
+        Returns: Json
       }
       update_customer_with_validation: {
         Args: {

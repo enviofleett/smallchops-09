@@ -84,7 +84,7 @@ serve(async (req) => {
             amount: Math.round(amount * 100), // Convert to kobo
             reference: txnReference, // Use consistent format
             currency: 'NGN',
-            callback_url: `${req.headers.get('origin')}/payment/callback`,
+            callback_url: `${req.headers.get('origin')}/payment/callback?reference=${txnReference}&order_ref=${order_reference || reference}`,
             metadata: {
               order_reference: order_reference || reference, // Store original order ref
               custom_fields: []

@@ -59,6 +59,11 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
     
     // Do not generate client references; will set after server init
     setCurrentReference(initialReference || '');
+
+    // Generate and store payment reference as backup for callback
+    const paymentReference = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem('pending_payment_reference', paymentReference);
+    console.log('💾 Stored payment reference for callback:', paymentReference);
   }, [initialReference]);
 
   // Load Paystack script with timeout and enhanced error handling

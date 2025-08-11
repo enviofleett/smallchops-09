@@ -26,10 +26,47 @@ const generateFallbackUUID = (): string => {
 };
 
 /**
- * Validate if a reference follows the expected txn_ format
+ * Enhanced validation for payment references with multiple format support
  */
 export const isValidPaymentReference = (reference: string): boolean => {
-  return reference.startsWith('txn_') && reference.length > 10;
+  if (!reference || typeof reference !== 'string') return false;
+  
+  // Valid formats:
+  // - txn_[timestamp]_[uuid] (server-generated)
+  // - pay_[timestamp]_[random] (client-generated backup)
+  // - Standard Paystack references (alphanumeric, 15+ chars)
+  const serverFormat = /^txn_\d+_[a-f0-9-]{36}$/;
+  const clientFormat = /^pay_\d+_[a-zA-Z0-9]{9,}$/;
+  const standardFormat = /^[a-zA-Z0-9_-]{15,}$/;
+  
+  return serverFormat.test(reference) || 
+         clientFormat.test(reference) || 
+         standardFormat.test(reference);
+};
+
+/**
+ * Generate client-side backup reference
+ */
+export const generateClientReference = (): string => {
+  return `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+};
+
+/**
+ * Extract timestamp from payment reference
+ */
+export const extractTimestamp = (reference: string): number | null => {
+  const match = reference.match(/^(?:txn|pay)_(\d+)_/);
+  return match ? parseInt(match[1], 10) : null;
+};
+
+/**
+ * Check if reference is recent (within max age)
+ */
+export const isRecentReference = (reference: string, maxAgeMs = 24 * 60 * 60 * 1000): boolean => {
+  const timestamp = extractTimestamp(reference);
+  if (!timestamp) return false;
+  
+  return Date.now() - timestamp <= maxAgeMs;
 };
 
 /**

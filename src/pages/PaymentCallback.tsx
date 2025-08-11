@@ -66,9 +66,9 @@ export default function PaymentCallback() {
 
   // Single-call verification; no client-side retries to avoid race conditions
 
-  // Enhanced parameter detection with fallback handling
+  // Enhanced parameter detection with multiple fallback sources
   const getPaymentReference = () => {
-    // Try multiple parameter names that Paystack might use
+    // Primary: Try URL parameters that Paystack uses
     const possibleRefs = [
       searchParams.get('reference'),
       searchParams.get('trxref'),
@@ -77,13 +77,34 @@ export default function PaymentCallback() {
       searchParams.get('txref'),
       searchParams.get('provider_reference'),
       searchParams.get('payment_reference'),
-      searchParams.get('paystack_reference')
+      searchParams.get('paystack_reference'),
+      searchParams.get('order_ref')
     ];
     
-    // Filter out null, empty, or very short values that are likely invalid
     // Prefer txn_ format references when multiple are found
     const txnRef = possibleRefs.find(ref => ref && isValidPaymentReference(ref));
     const validRef = txnRef || possibleRefs.find(ref => ref && ref.trim().length > 10);
+    
+    // Fallback: Check localStorage as last resort
+    if (!validRef) {
+      const storageKeys = [
+        'pending_payment_reference',
+        'paystack_last_reference',
+        'last_payment_reference',
+        'paymentReference',
+        'paystack_reference'
+      ];
+      
+      for (const key of storageKeys) {
+        const stored = localStorage.getItem(key) || sessionStorage.getItem(key);
+        if (stored && stored.trim().length > 10) {
+          console.log(`🔄 Using fallback reference from ${key}:`, stored);
+          localStorage.removeItem(key); // Clean up after use
+          sessionStorage.removeItem(key);
+          return stored;
+        }
+      }
+    }
     
     console.log('🔍 Payment reference detection:', {
       foundReferences: possibleRefs.filter(r => r),

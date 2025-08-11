@@ -342,7 +342,7 @@ serve(async (req) => {
             email: customer_email,
             amount: Math.round(total_amount * 100), // Convert to kobo
             reference: paymentReference,
-            callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?order_id=${orderId}`,
+            callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?reference=${paymentReference}&order_id=${orderId}&source=process_checkout`,
             metadata: {
               order_id: orderId,
               customer_name: customer_name,

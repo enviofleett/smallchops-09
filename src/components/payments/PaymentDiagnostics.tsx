@@ -14,6 +14,12 @@ interface VerifyResult {
   amount?: number;
   status?: string;
   message?: string;
+  diagnostics?: {
+    provided_reference?: string;
+    effective_reference?: string;
+    mapping_strategy?: string | null;
+    provider_status?: number | null;
+  };
 }
 
 export const PaymentDiagnostics: React.FC = () => {
@@ -58,12 +64,20 @@ export const PaymentDiagnostics: React.FC = () => {
         amount: typeof payload?.total_amount === "number"
           ? payload.total_amount
           : (typeof payload?.amount === "number" ? Math.round(payload.amount / 100) : undefined),
-        status: payload?.payment_status || payload?.status,
-        message: success ? "Payment verified and order updated" : (payload?.gateway_response || "Verification failed"),
+        status: payload?.payment_status || (typeof payload?.status === 'string' ? payload.status : undefined),
+        message: success
+          ? "Payment verified and order updated"
+          : (payload?.message || payload?.error || payload?.gateway_response || "Verification failed"),
+        diagnostics: !success && payload?.diagnostics ? {
+          provided_reference: payload.diagnostics.provided_reference,
+          effective_reference: payload.diagnostics.effective_reference,
+          mapping_strategy: payload.diagnostics.mapping_strategy ?? null,
+          provider_status: payload.diagnostics.provider_status ?? null,
+        } : undefined,
       });
 
       toast[success ? "success" : "error"](success ? "Verified" : "Not Verified", {
-        description: success ? "Order marked as paid (if successful)." : "See details below.",
+        description: success ? "Order marked as paid (if successful)." : (payload?.message || "See details below."),
       });
     } catch (e: any) {
       console.error("Diagnostics verify error", e);
@@ -123,6 +137,26 @@ export const PaymentDiagnostics: React.FC = () => {
               <div>
                 <span className="text-muted-foreground">Message: </span>
                 <span>{result.message}</span>
+              </div>
+            )}
+            {result.diagnostics && (
+              <div className="mt-2 rounded-md bg-muted p-2 text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Provided Ref</span>
+                  <span className="font-mono">{result.diagnostics.provided_reference || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Effective Ref</span>
+                  <span className="font-mono">{result.diagnostics.effective_reference || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Mapping</span>
+                  <span className="font-mono">{result.diagnostics.mapping_strategy || '-'}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Provider Status</span>
+                  <span className="font-mono">{typeof result.diagnostics.provider_status === 'number' ? result.diagnostics.provider_status : '-'}</span>
+                </div>
               </div>
             )}
           </div>

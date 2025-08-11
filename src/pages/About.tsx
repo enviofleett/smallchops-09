@@ -39,19 +39,25 @@ const About = () => {
           <div className="max-w-4xl mx-auto">
             <div className="grid md:grid-cols-2 gap-12 items-center">
               <div>
-                <h2 className="text-3xl font-bold text-foreground mb-6">Our Story</h2>
+                <h2 className="text-3xl font-bold text-foreground mb-6">How It All Began</h2>
                 <div className="space-y-4 text-muted-foreground leading-relaxed">
                   <p>
-                    Founded in 2005 by Gwendolyn Akogun, Starters Management Ltd is a renowned 
-                    finger food company based in Abuja, Nigeria. The company operates in Nigeria's 
-                    capital cities and is supported by a team of dedicated subject matter experts 
-                    with exceptional culinary skills.
+                    It was a sunny October day in 2005 when STARTERS first came to life in the buzzing city of Abuja. Our founder, Gwendolyn Akogun, had one big dream: to shake up the small chops scene with fresh ideas, bold flavors, and a sprinkle of love.
                   </p>
                   <p>
-                    Starters Management Ltd prides itself on offering a variety of high-quality 
-                    products that are 100% fresh, hygienic, and made with care. The company's 
-                    philosophy is to provide amazing food products backed by a unique customer 
-                    experience characterized by reliability, honesty, and integrity.
+                    With a knack for business, a deep passion for food, and a heart full of compassion, Gwen wanted to create more than just another finger food brand — she wanted an experience. One that delivers quality in every bite and leaves every customer with a smile (and maybe a craving for seconds!).
+                  </p>
+                  <p>
+                    But it's not just about the food — it's about people. At STARTERS, we invest in our team through education and growth opportunities, believing that empowered staff create extraordinary customer experiences.
+                  </p>
+                  <p>
+                    From the kitchen to your table, we pour our energy into making sure every event feels special. We train and grow our team because happy people make happy food — and trust us, you can taste the difference.
+                  </p>
+                  <p>
+                    Our goal? To be Nigeria's go-to for unforgettable small chops — the kind you remember long after the last bite.
+                  </p>
+                  <p className="font-medium text-foreground">
+                    At STARTERS, we don't just serve food. We serve joy… one delicious plate at a time.
                   </p>
                 </div>
               </div>

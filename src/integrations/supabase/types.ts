@@ -3908,6 +3908,39 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_polling_state: {
+        Row: {
+          created_at: string
+          id: string
+          last_polled: string | null
+          reference: string
+          retry_count: number
+          start_time: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          last_polled?: string | null
+          reference: string
+          retry_count?: number
+          start_time?: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          last_polled?: string | null
+          reference?: string
+          retry_count?: number
+          start_time?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       payment_rate_limits: {
         Row: {
           attempts: number | null
@@ -6843,6 +6876,10 @@ export type Database = {
       order_needs_reconciliation: {
         Args: { p_order_id: string }
         Returns: boolean
+      }
+      pg_notify: {
+        Args: { channel: string; payload: string }
+        Returns: undefined
       }
       process_email_queue_manual: {
         Args: { batch_size?: number }

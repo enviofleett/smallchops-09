@@ -17,7 +17,13 @@ export interface PaymentVerification {
   paymentStatus?: string;
   orderStatus?: string;
   orderNumber?: string;
+  orderId?: string;
   amount?: number;
+  amountNaira?: number;
+  paidAt?: string;
+  channel?: string;
+  reference?: string;
+  message?: string;
 }
 
 export type PaymentProvider = 'paystack';
@@ -61,6 +67,19 @@ export const usePayment = () => {
         } catch (e) {
           console.warn('Could not persist final payment_reference (will rely on metadata):', e);
         }
+      }
+
+      // Store last reference and order details for callback fallback
+      try {
+        if (response.reference) {
+          sessionStorage.setItem('paystack_last_reference', response.reference);
+          localStorage.setItem('paystack_last_reference', response.reference);
+        }
+        const details = JSON.stringify({ orderId, reference: response.reference });
+        sessionStorage.setItem('orderDetails', details);
+        localStorage.setItem('orderDetails', details);
+      } catch (e) {
+        console.warn('Failed to store payment reference locally:', e);
       }
 
       return {
@@ -147,12 +166,22 @@ export const usePayment = () => {
       const d: any = data?.data || data;
       const order = d?.order || data?.order;
 
+      const ref = d?.reference || d?.provider_reference || d?.payment_reference;
+      const rawAmount = typeof d?.total_amount === 'number' ? d.total_amount : (typeof d?.amount === 'number' ? d.amount : undefined);
+      const amountNaira = typeof rawAmount === 'number' ? (rawAmount > 10000 ? rawAmount / 100 : rawAmount) : undefined;
+
       return {
         success: true,
         paymentStatus: d?.payment_status || d?.status || (success ? 'paid' : undefined),
         orderStatus: order?.status || d?.order_status,
         orderNumber: order?.order_number || d?.order_number,
-        amount: typeof d?.amount === 'number' ? d.amount : undefined,
+        orderId: d?.order_id || order?.id,
+        amount: rawAmount,
+        amountNaira,
+        paidAt: d?.paid_at,
+        channel: d?.channel,
+        reference: ref,
+        message: d?.gateway_response || d?.message,
       };
     } catch (error) {
       console.error('Payment verification error:', error);

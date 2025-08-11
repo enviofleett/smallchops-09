@@ -60,3 +60,6 @@ verify_jwt = true
 
 [functions.payment-reconcile]
 verify_jwt = true
+
+[functions.paystack-webhook-test]
+verify_jwt = true

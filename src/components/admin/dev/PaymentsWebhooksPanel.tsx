@@ -3,6 +3,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -39,6 +40,8 @@ export const PaymentsWebhooksPanel: React.FC = () => {
   const [verifyResult, setVerifyResult] = useState<any>(null);
   const [events, setEvents] = useState<WebhookEventRow[]>([]);
   const [loadingEvents, setLoadingEvents] = useState(false);
+  const [testPayload, setTestPayload] = useState('');
+  const [testing, setTesting] = useState(false);
 
   const handleCopy = useCallback((text: string) => {
     navigator.clipboard.writeText(text);
@@ -110,6 +113,51 @@ export const PaymentsWebhooksPanel: React.FC = () => {
       setVerifying(false);
     }
   }, [reference, toast]);
+
+  const sendTestWebhookByReference = useCallback(async () => {
+    if (!reference.trim()) {
+      toast({ title: 'Reference required', description: 'Enter a Paystack reference to simulate', variant: 'destructive' });
+      return;
+    }
+    setVerifying(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('paystack-webhook-test', {
+        body: { mode: 'reference', reference: reference.trim() }
+      });
+      if (error) throw error;
+      toast({ title: 'Test event sent', description: 'Webhook event created and processed' });
+      await refreshEvents();
+    } catch (e: any) {
+      toast({ title: 'Webhook test failed', description: e?.message || 'See console for details', variant: 'destructive' });
+    } finally {
+      setVerifying(false);
+    }
+  }, [reference, refreshEvents, toast]);
+
+  const sendCustomWebhook = useCallback(async () => {
+    if (!testPayload.trim()) {
+      toast({ title: 'Payload required', description: 'Paste a webhook JSON payload', variant: 'destructive' });
+      return;
+    }
+    setTesting(true);
+    try {
+      let parsed: any;
+      try { parsed = JSON.parse(testPayload); } catch {
+        throw new Error('Invalid JSON payload');
+      }
+      const { data, error } = await supabase.functions.invoke('paystack-webhook-test', {
+        body: { mode: 'custom', payload: parsed }
+      });
+      if (error) throw error;
+      toast({ title: 'Custom event sent', description: 'Webhook event created' });
+      setTestPayload('');
+      await refreshEvents();
+    } catch (e: any) {
+      toast({ title: 'Webhook test failed', description: e?.message || 'Invalid payload', variant: 'destructive' });
+    } finally {
+      setTesting(false);
+    }
+  }, [testPayload, refreshEvents, toast]);
 
   useEffect(() => {
     refreshHealth();
@@ -207,6 +255,37 @@ export const PaymentsWebhooksPanel: React.FC = () => {
           {verifyResult && (
             <pre className="bg-muted p-3 rounded text-xs overflow-auto max-h-64">{JSON.stringify(verifyResult, null, 2)}</pre>
           )}
+        </div>
+
+        {/* Webhook test tools (admin) */}
+        <div className="space-y-3 p-4 rounded-lg border">
+          <div className="font-medium">Webhook test tools (admin-only)</div>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <div className="flex-1">
+              <Label htmlFor="test-ref">Simulate by reference</Label>
+              <Input id="test-ref" placeholder="e.g. txn_..." value={reference} onChange={(e) => setReference(e.target.value)} />
+            </div>
+            <div className="flex items-end gap-2">
+              <Button variant="secondary" onClick={sendTestWebhookByReference} disabled={verifying}>
+                {verifying ? 'Sending...' : 'Send test webhook'}
+              </Button>
+            </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="custom-payload">Custom payload</Label>
+            <Textarea
+              id="custom-payload"
+              value={testPayload}
+              onChange={(e) => setTestPayload(e.target.value)}
+              placeholder='{"event":"charge.success","data":{"reference":"txn_test","status":"success","amount":100000,"currency":"NGN"}}'
+              className="font-mono text-xs h-32"
+            />
+            <div className="flex">
+              <Button variant="outline" onClick={sendCustomWebhook} disabled={testing}>
+                {testing ? 'Sending...' : 'Send custom webhook'}
+              </Button>
+            </div>
+          </div>
         </div>
 
         {/* Recent webhook events */}

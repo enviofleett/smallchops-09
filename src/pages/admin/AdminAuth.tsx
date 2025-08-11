@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { usePasswordReset } from '@/hooks/usePasswordReset';
 import { useToast } from '@/hooks/use-toast';
@@ -8,19 +8,23 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Eye, EyeOff, Mail, Lock, Shield, Loader2, ArrowLeft } from 'lucide-react';
 
-type AdminView = 'login' | 'forgot-password';
+type AdminView = 'login' | 'signup' | 'forgot-password';
 
 const AdminAuth = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { toast } = useToast();
-  const { login: adminLogin, isLoading: isAdminLoading } = useAuth();
+  const { login: adminLogin, signUp: adminSignUp, isLoading: isAdminLoading } = useAuth();
   const { sendPasswordReset, isLoading: isPasswordResetLoading } = usePasswordReset();
   
-  const [view, setView] = useState<AdminView>('login');
+  const [view, setView] = useState<AdminView>(() => {
+    return searchParams.get('view') === 'signup' ? 'signup' : 'login';
+  });
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     email: '',
-    password: ''
+    password: '',
+    role: 'admin'
   });
 
   const handleInputChange = (field: string, value: string) => {
@@ -34,6 +38,25 @@ const AdminAuth = () => {
     
     if (result.success && result.redirect) {
       navigate(result.redirect);
+    }
+  };
+
+  const handleAdminSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    const result = await adminSignUp({ 
+      email: formData.email, 
+      password: formData.password,
+      name: '', // Optional for admin signup
+      phone: '' // Optional for admin signup
+    });
+    
+    if (result.success) {
+      toast({
+        title: "Account created successfully",
+        description: "You can now sign in with your credentials.",
+      });
+      setView('login');
     }
   };
 
@@ -57,7 +80,9 @@ const AdminAuth = () => {
   };
 
   const getCurrentLoadingState = () => {
-    return view === 'login' ? isAdminLoading : isPasswordResetLoading;
+    if (view === 'login') return isAdminLoading;
+    if (view === 'signup') return isAdminLoading;
+    return isPasswordResetLoading;
   };
 
   const renderLoginForm = () => (
@@ -110,8 +135,15 @@ const AdminAuth = () => {
         {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         Sign In to Admin Portal
       </Button>
-
-      <div className="flex justify-end text-sm">
+      
+      <div className="flex justify-between text-sm">
+        <button
+          type="button"
+          onClick={() => setView('signup')}
+          className="text-primary hover:underline"
+        >
+          Create admin account
+        </button>
         <button
           type="button"
           onClick={() => setView('forgot-password')}
@@ -160,6 +192,70 @@ const AdminAuth = () => {
     </form>
   );
 
+  const renderSignUpForm = () => (
+    <form onSubmit={handleAdminSignUp} className="space-y-4">
+      <div className="space-y-2">
+        <Label htmlFor="email">Email</Label>
+        <div className="relative">
+          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="email"
+            type="email"
+            value={formData.email}
+            onChange={(e) => handleInputChange('email', e.target.value)}
+            placeholder="Enter your admin email"
+            className="pl-10"
+            required
+            disabled={getCurrentLoadingState()}
+          />
+        </div>
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="password">Password</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="password"
+            type={showPassword ? 'text' : 'password'}
+            value={formData.password}
+            onChange={(e) => handleInputChange('password', e.target.value)}
+            placeholder="Enter your password"
+            className="pl-10 pr-10"
+            required
+            disabled={getCurrentLoadingState()}
+          />
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+            onClick={() => setShowPassword(!showPassword)}
+            disabled={getCurrentLoadingState()}
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+
+      <Button type="submit" className="w-full" disabled={getCurrentLoadingState()}>
+        {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        Create Admin Account
+      </Button>
+
+      <div className="flex justify-center">
+        <button
+          type="button"
+          onClick={() => setView('login')}
+          className="text-primary hover:underline text-sm flex items-center"
+        >
+          <ArrowLeft className="mr-1 h-3 w-3" />
+          Back to login
+        </button>
+      </div>
+    </form>
+  );
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4">
       <div className="w-full max-w-md">
@@ -170,18 +266,20 @@ const AdminAuth = () => {
               <Shield className="h-8 w-8 text-primary" />
             </div>
             <h1 className="text-2xl font-bold tracking-tight">
-              {view === 'login' ? 'Admin Portal' : 'Reset Password'}
+              {view === 'login' ? 'Admin Portal' : view === 'signup' ? 'Create Admin Account' : 'Reset Password'}
             </h1>
             <p className="text-muted-foreground mt-2">
               {view === 'login' 
                 ? 'Sign in to access the administration dashboard'
+                : view === 'signup'
+                ? 'Create a new admin account to access the dashboard'
                 : 'Enter your email to receive a password reset link'
               }
             </p>
           </div>
 
           {/* Form */}
-          {view === 'login' ? renderLoginForm() : renderForgotPasswordForm()}
+          {view === 'login' ? renderLoginForm() : view === 'signup' ? renderSignUpForm() : renderForgotPasswordForm()}
 
           {/* Footer */}
           <div className="mt-8 pt-6 border-t text-center">

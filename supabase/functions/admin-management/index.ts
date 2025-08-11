@@ -154,18 +154,40 @@ async function handlePost(supabase: any, req: Request) {
     throw new Error('Invalid role');
   }
 
-  // Use the database function to send invitation
-  const { data, error } = await supabase.rpc('send_admin_invitation', {
-    p_email: body.email,
-    p_role: body.role
-  });
-
-  if (error) {
-    throw new Error(`Failed to send invitation: ${error.message}`);
+  // Get the current user for invited_by field
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    throw new Error('Missing authorization header');
   }
 
-  if (!data.success) {
-    throw new Error(data.error);
+  const token = authHeader.replace('Bearer ', '');
+  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+  
+  if (userError || !user) {
+    throw new Error('Invalid token');
+  }
+
+  // Create admin invitation directly in the database
+  const invitationToken = crypto.randomUUID();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
+
+  const { data: invitation, error: invitationError } = await supabase
+    .from('admin_invitations')
+    .insert({
+      email: body.email,
+      role: body.role,
+      invitation_token: invitationToken,
+      expires_at: expiresAt.toISOString(),
+      status: 'pending',
+      invited_by: user.id,
+      invited_at: new Date().toISOString()
+    })
+    .select('id')
+    .single();
+
+  if (invitationError) {
+    throw new Error(`Failed to create invitation: ${invitationError.message}`);
   }
 
   // Send invitation email using Auth email system
@@ -177,7 +199,7 @@ async function handlePost(supabase: any, req: Request) {
         variables: {
           role: body.role,
           companyName: 'Starters Small Chops',
-          invitation_url: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify?token=${data.invitation_token}&type=signup&redirect_to=${encodeURIComponent('https://startersmallchops.com/admin')}`
+          invitation_url: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify?token=${invitationToken}&type=signup&redirect_to=${encodeURIComponent('https://startersmallchops.com/admin')}`
         },
         emailType: 'transactional'
       }
@@ -192,7 +214,7 @@ async function handlePost(supabase: any, req: Request) {
     JSON.stringify({ 
       success: true, 
       message: 'Invitation sent successfully',
-      data: { invitation_id: data.invitation_id }
+      data: { invitation_id: invitation.id }
     }),
     { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   );

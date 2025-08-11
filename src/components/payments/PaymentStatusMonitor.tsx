@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CheckCircle, AlertCircle, Clock } from 'lucide-react';
+import { CheckCircle, AlertCircle, Clock, XCircle } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { paymentCompletionCoordinator } from '@/utils/paymentCompletion';
 
@@ -16,12 +16,13 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
   reference,
   onStatusUpdate,
   intervalMs = 3000,
-  maxAttempts = 20
+  maxAttempts = 10 // Reduced from 20 to prevent overloading
 }) => {
   const [attempts, setAttempts] = useState(0);
   const [status, setStatus] = useState<'pending' | 'success' | 'failed'>('pending');
   const [isMonitoring, setIsMonitoring] = useState(true);
   const [verificationLocked, setVerificationLocked] = useState(false);
+  const [lastError, setLastError] = useState<string | null>(null);
 
   // Listen for global payment completion events
   useEffect(() => {
@@ -55,7 +56,7 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
 
     const checkPaymentStatus = async () => {
       try {
-        console.log(`🔍 Checking payment status for reference: ${reference} (attempt ${attempts + 1})`);
+        console.log(`🔍 PaymentStatusMonitor checking: ${reference} (attempt ${attempts + 1})`);
         
         // Double-check if verification was already locked during this check
         if (verificationLocked || paymentCompletionCoordinator.isProcessing(reference)) {
@@ -72,7 +73,8 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
         });
 
         if (error) {
-          console.error('❌ Error checking payment status:', error);
+          console.error('❌ PaymentStatusMonitor API error:', error);
+          setLastError(error.message || 'API call failed');
           setAttempts(prev => prev + 1);
           return;
         }
@@ -87,21 +89,9 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
             setVerificationLocked(true);
             setStatus('success');
             setIsMonitoring(false);
+            setLastError(null);
             
-            // Force confirm in backend to ensure the order is marked as paid
-            try {
-              const { data: reconData, error: reconError } = await supabase.functions.invoke('payment-reconcile', {
-                body: { action: 'force_confirm_by_reference', reference }
-              });
-              if (reconError) {
-                console.error('⚠️ Reconcile error:', reconError);
-              } else {
-                console.log('🔁 Reconcile result:', reconData);
-              }
-            } catch (reconErr) {
-              console.error('💥 Reconcile invocation failed:', reconErr);
-            }
-            
+            // Signal other components to stop
             onStatusUpdate('success', data.data);
             
             // Emit global stop event to coordinate with other components
@@ -110,12 +100,15 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
             }));
             
             return;
+          } else {
+            console.log(`🔄 PaymentStatusMonitor: Status is ${paymentStatus}, continuing...`);
           }
         }
 
         setAttempts(prev => prev + 1);
       } catch (error) {
-        console.error('💥 Payment status check error:', error);
+        console.error('💥 PaymentStatusMonitor check error:', error);
+        setLastError((error as Error).message || 'Unknown error');
         setAttempts(prev => prev + 1);
       }
     };
@@ -127,36 +120,53 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
   // Stop monitoring if max attempts reached (but not if verification is already locked)
   useEffect(() => {
     if (attempts >= maxAttempts && isMonitoring && !verificationLocked) {
-      console.log('⏰ Payment monitoring timeout reached');
+      console.log('⏰ PaymentStatusMonitor timeout reached');
       setIsMonitoring(false);
-      onStatusUpdate('failed', { timeout: true });
+      setStatus('failed');
+      onStatusUpdate('failed', { timeout: true, lastError });
     }
-  }, [attempts, maxAttempts, isMonitoring, onStatusUpdate, verificationLocked]);
+  }, [attempts, maxAttempts, isMonitoring, onStatusUpdate, verificationLocked, lastError]);
 
   const handleStopMonitoring = () => {
-    console.log('🛑 Manually stopping payment monitoring');
+    console.log('🛑 Manually stopping PaymentStatusMonitor');
     setIsMonitoring(false);
+  };
+
+  const handleRetryVerification = () => {
+    console.log('🔄 Manually retrying PaymentStatusMonitor verification');
+    setVerificationLocked(false);
+    setIsMonitoring(true);
+    setAttempts(0);
+    setLastError(null);
+    setStatus('pending');
   };
 
   if (!isMonitoring && status === 'pending') {
     return (
-      <Alert className="mb-4">
-        <AlertCircle className="h-4 w-4" />
-        <AlertDescription>
-          Payment verification timeout. Please check your payment status manually or contact support.
-          <div className="mt-2">
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => {
-                console.log('🔄 Retrying payment verification');
-                setVerificationLocked(false);
-                setIsMonitoring(true);
-                setAttempts(0);
-              }}
-            >
-              Retry Verification
-            </Button>
+      <Alert className="mb-4 border-orange-200 bg-orange-50">
+        <AlertCircle className="h-4 w-4 text-orange-600" />
+        <AlertDescription className="text-orange-800">
+          <div className="space-y-2">
+            <p>Payment verification timeout. Please check your payment status manually or contact support.</p>
+            {lastError && (
+              <p className="text-sm text-orange-600">Last error: {lastError}</p>
+            )}
+            <div className="flex gap-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleRetryVerification}
+              >
+                Retry Verification
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={() => window.location.href = '/customer-profile'}
+              >
+                Check Orders
+              </Button>
+            </div>
           </div>
         </AlertDescription>
       </Alert>
@@ -168,7 +178,7 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
       <Alert className="mb-4 border-green-200 bg-green-50">
         <CheckCircle className="h-4 w-4 text-green-600" />
         <AlertDescription className="text-green-800">
-          Payment verified successfully!
+          Payment verified successfully! Your order is being processed.
         </AlertDescription>
       </Alert>
     );
@@ -177,9 +187,21 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
   if (status === 'failed') {
     return (
       <Alert variant="destructive" className="mb-4">
-        <AlertCircle className="h-4 w-4" />
+        <XCircle className="h-4 w-4" />
         <AlertDescription>
-          Payment verification failed. Please try again or contact support.
+          <div className="space-y-2">
+            <p>Payment verification failed. Please try again or contact support.</p>
+            {lastError && (
+              <p className="text-sm">Error: {lastError}</p>
+            )}
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={handleRetryVerification}
+            >
+              Retry Verification
+            </Button>
+          </div>
         </AlertDescription>
       </Alert>
     );
@@ -190,7 +212,14 @@ export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
       <Clock className="h-4 w-4 text-blue-600" />
       <AlertDescription className="text-blue-800">
         <div className="flex items-center justify-between">
-          <span>Verifying payment... (Attempt {attempts + 1} of {maxAttempts})</span>
+          <div>
+            <span>Verifying payment... (Attempt {attempts + 1} of {maxAttempts})</span>
+            {lastError && (
+              <p className="text-sm text-blue-600 mt-1">
+                Last attempt: {lastError}
+              </p>
+            )}
+          </div>
           <Button variant="outline" size="sm" onClick={handleStopMonitoring}>
             Stop
           </Button>

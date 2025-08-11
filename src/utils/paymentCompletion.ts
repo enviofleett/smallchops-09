@@ -10,7 +10,7 @@ interface PaymentCompletionData {
 class PaymentCompletionCoordinator {
   private completionTimeouts: Map<string, NodeJS.Timeout> = new Map();
   private completedReferences: Set<string> = new Set();
-  private globalLock = false;
+  private processingReferences: Set<string> = new Set();
 
   /**
    * Coordinates the 15-second payment completion flow
@@ -29,14 +29,13 @@ class PaymentCompletionCoordinator {
     const { reference, orderNumber } = data;
     
     // Prevent duplicate processing
-    if (this.completedReferences.has(reference) || this.globalLock) {
+    if (this.completedReferences.has(reference) || this.processingReferences.has(reference)) {
       console.log('🔒 Payment completion already initiated for reference:', reference);
       return;
     }
 
-    // Lock this reference and set global lock
-    this.completedReferences.add(reference);
-    this.globalLock = true;
+    // Mark as processing
+    this.processingReferences.add(reference);
 
     console.log('🚀 Starting 15-second coordinated payment completion for:', reference);
 
@@ -98,7 +97,8 @@ class PaymentCompletionCoordinator {
       } finally {
         // Clean up timeout and release locks
         this.completionTimeouts.delete(reference);
-        this.globalLock = false;
+        this.processingReferences.delete(reference);
+        this.completedReferences.add(reference);
       }
     }, 15000);
 
@@ -128,14 +128,15 @@ class PaymentCompletionCoordinator {
       callbacks.onNavigate();
     }
 
-    this.globalLock = false;
+    this.processingReferences.delete(reference);
+    this.completedReferences.add(reference);
   }
 
   /**
-   * Check if a reference is already being processed
+   * Check if a reference is already being processed or completed
    */
   isProcessing(reference: string): boolean {
-    return this.completedReferences.has(reference) || this.globalLock;
+    return this.completedReferences.has(reference) || this.processingReferences.has(reference);
   }
 
   /**
@@ -149,7 +150,7 @@ class PaymentCompletionCoordinator {
       console.log('🛑 Cancelled completion for:', reference);
     }
     this.completedReferences.delete(reference);
-    this.globalLock = false;
+    this.processingReferences.delete(reference);
   }
 
   /**
@@ -187,8 +188,23 @@ class PaymentCompletionCoordinator {
     this.completionTimeouts.forEach(timeout => clearTimeout(timeout));
     this.completionTimeouts.clear();
     this.completedReferences.clear();
-    this.globalLock = false;
+    this.processingReferences.clear();
     console.log('🔄 Payment completion coordinator reset');
+  }
+
+  /**
+   * Get status for debugging
+   */
+  getStatus(): {
+    processing: string[];
+    completed: string[];
+    activeTimeouts: number;
+  } {
+    return {
+      processing: Array.from(this.processingReferences),
+      completed: Array.from(this.completedReferences),
+      activeTimeouts: this.completionTimeouts.size
+    };
   }
 }
 
@@ -199,4 +215,10 @@ export const paymentCompletionCoordinator = new PaymentCompletionCoordinator();
 window.addEventListener('payment-verification-complete', (event: any) => {
   const { reference, success } = event.detail;
   console.log('🌐 Global payment verification complete event:', { reference, success });
+});
+
+// Production error handling
+window.addEventListener('beforeunload', () => {
+  console.log('🧹 Cleaning up payment coordinator on page unload');
+  paymentCompletionCoordinator.reset();
 });

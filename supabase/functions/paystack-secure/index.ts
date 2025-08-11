@@ -45,12 +45,17 @@ serve(async (req) => {
   }
 
   try {
-    const { action, reference, amount, order_reference } = await req.json()
+    console.log('🔄 Paystack secure function called')
+    const requestBody = await req.json()
+    console.log('📨 Request payload:', JSON.stringify(requestBody))
+    
+    const { action, reference, amount, email, callback_url, metadata, order_id } = requestBody
     
     console.log(`🔄 Processing payment action: ${action}`, {
       reference,
-      order_reference,
       amount,
+      email,
+      order_id,
       timestamp: new Date().toISOString()
     })
 
@@ -70,8 +75,34 @@ serve(async (req) => {
       case 'initialize': {
         console.log('🚀 Initializing payment with Paystack')
         
+        // Validate required fields
+        if (!email || !amount) {
+          throw new Error('Email and amount are required for payment initialization')
+        }
+        
         // Generate consistent reference format
         const txnReference = `txn_${Date.now()}_${crypto.randomUUID()}`
+        
+        // Build proper callback URL with all necessary parameters
+        const baseUrl = callback_url ? new URL(callback_url).origin : 'https://startersmallchops.com'
+        const enhancedCallbackUrl = `${baseUrl}/payment/callback?reference=${txnReference}&order_id=${order_id || ''}&status=success`
+        
+        console.log('📞 Callback URL:', enhancedCallbackUrl)
+        
+        const paymentRequest = {
+          email,
+          amount: Math.round(Number(amount) * 100), // Convert to kobo
+          reference: txnReference,
+          currency: 'NGN',
+          callback_url: enhancedCallbackUrl,
+          metadata: {
+            order_id,
+            ...metadata,
+            custom_fields: []
+          }
+        }
+        
+        console.log('📤 Paystack request:', JSON.stringify(paymentRequest))
         
         const initializeResponse = await fetch('https://api.paystack.co/transaction/initialize', {
           method: 'POST',
@@ -79,17 +110,7 @@ serve(async (req) => {
             'Authorization': `Bearer ${paystackSecretKey}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            email: req.headers.get('x-user-email') || 'customer@example.com',
-            amount: Math.round(amount * 100), // Convert to kobo
-            reference: txnReference, // Use consistent format
-            currency: 'NGN',
-            callback_url: `${req.headers.get('origin')}/payment/callback?reference=${txnReference}&order_ref=${order_reference || reference}`,
-            metadata: {
-              order_reference: order_reference || reference, // Store original order ref
-              custom_fields: []
-            }
-          }),
+          body: JSON.stringify(paymentRequest),
         })
 
         const initData = await initializeResponse.json()
@@ -106,11 +127,11 @@ serve(async (req) => {
 
         return new Response(
           JSON.stringify({
-            success: true,
+            status: true,
             data: {
               authorization_url: initData.data.authorization_url,
               access_code: initData.data.access_code,
-              reference: txnReference // Return the txn_ reference
+              reference: txnReference
             }
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -118,142 +139,80 @@ serve(async (req) => {
       }
 
       case 'verify': {
-        console.log('🔍 Verifying payment with Paystack')
+        console.log(`Verifying Paystack payment: ${reference}`)
         
         if (!reference) {
           throw new Error('Payment reference is required for verification')
         }
 
-        // Verify with Paystack with retry logic
-        let verificationData: PaystackVerificationResponse | null = null
-        let retryCount = 0
-        const maxRetries = 3
+        try {
+          const verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${paystackSecretKey}`,
+              'Content-Type': 'application/json',
+            },
+          })
 
-        while (retryCount < maxRetries && !verificationData) {
-          try {
-            console.log(`🔄 Verification attempt ${retryCount + 1} for reference: ${reference}`)
+          if (!verifyResponse.ok) {
+            const errorText = await verifyResponse.text()
+            console.log(`❌ Paystack verification HTTP error: ${verifyResponse.status} ${errorText}`)
+            throw new Error(`Paystack verification failed (${verifyResponse.status}): ${errorText}`)
+          }
+
+          const verificationData = await verifyResponse.json()
+          
+          if (!verificationData.status) {
+            console.error('❌ Paystack verification failed:', verificationData)
+            throw new Error(`Paystack verification failed: ${verificationData.message}`)
+          }
+
+          console.log(`Paystack payment verified successfully: ${reference}`)
+          const paymentData = verificationData.data
+
+          // Process successful payment
+          if (paymentData.status === 'success') {
+            console.log('💰 Processing successful payment')
             
-            const verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${paystackSecretKey}`,
-                'Content-Type': 'application/json',
-              },
-            })
+            // Try to find and update order
+            const orderReference = paymentData.metadata?.order_id || order_id
+            console.log(`🔍 Looking for order with reference: ${orderReference}`)
 
-            if (verifyResponse.status === 200) {
-              verificationData = await verifyResponse.json()
-              break
-            } else if (verifyResponse.status === 400) {
-              console.warn(`⚠️ Transaction not found (attempt ${retryCount + 1}):`, reference)
-              if (retryCount < maxRetries - 1) {
-                // Wait with exponential backoff
-                const delay = Math.pow(2, retryCount) * 1000
-                await new Promise(resolve => setTimeout(resolve, delay))
+            if (orderReference) {
+              const { data: updateResult, error: updateError } = await supabase
+                .rpc('handle_successful_payment', {
+                  p_paystack_reference: paymentData.reference,
+                  p_order_reference: orderReference,
+                  p_amount: paymentData.amount / 100,
+                  p_currency: paymentData.currency || 'NGN',
+                  p_paystack_data: paymentData
+                })
+
+              if (updateError) {
+                console.error('❌ Order update failed:', updateError)
+              } else {
+                console.log('✅ Order updated successfully:', updateResult)
               }
-            } else {
-              throw new Error(`Paystack API error: ${verifyResponse.status}`)
             }
-          } catch (error) {
-            console.error(`❌ Verification attempt ${retryCount + 1} failed:`, error)
-            if (retryCount === maxRetries - 1) throw error
-          }
-          retryCount++
-        }
-
-        if (!verificationData || !verificationData.status) {
-          console.error('❌ Payment verification failed:', {
-            reference,
-            data: verificationData
-          })
-          
-          return new Response(
-            JSON.stringify({
-              success: false,
-              message: 'Payment verification failed',
-              reference
-            }),
-            { 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 400
-            }
-          )
-        }
-
-        const paymentData = verificationData.data
-
-        console.log('✅ Payment verified successfully:', {
-          reference: paymentData.reference,
-          status: paymentData.status,
-          amount: paymentData.amount / 100 // Convert from kobo
-        })
-
-        // Only process successful payments
-        if (paymentData.status === 'success') {
-          console.log('💰 Processing successful payment')
-          
-          // Extract order reference from metadata
-          const orderReference = paymentData.metadata?.order_reference || 
-                               paymentData.metadata?.custom_fields?.find((f: any) => f.variable_name === 'order_reference')?.value ||
-                               reference
-
-          // Call the fixed RPC function
-          console.log('🔗 Calling handle_successful_payment RPC:', {
-            paystack_reference: paymentData.reference,
-            order_reference: orderReference,
-            amount: paymentData.amount / 100,
-            currency: paymentData.currency
-          })
-
-          const { data: rpcResult, error: rpcError } = await supabase
-            .rpc('handle_successful_payment', {
-              p_paystack_reference: paymentData.reference,
-              p_order_reference: orderReference,
-              p_amount: paymentData.amount / 100, // Convert from kobo
-              p_currency: paymentData.currency || 'NGN',
-              p_paystack_data: paymentData
-            })
-
-          if (rpcError) {
-            console.error('❌ RPC function error:', rpcError)
-            throw new Error(`Database update failed: ${rpcError.message}`)
-          }
-
-          console.log('✅ RPC function result:', rpcResult)
-
-          if (!rpcResult?.success) {
-            console.warn('⚠️ RPC function reported failure:', rpcResult)
-          }
 
           return new Response(
             JSON.stringify({
-              success: true,
-              message: 'Payment verified and processed successfully',
+              status: true,
               data: {
                 reference: paymentData.reference,
                 amount: paymentData.amount / 100,
                 status: paymentData.status,
-                order_updated: rpcResult?.success || false,
-                order_id: rpcResult?.order_id,
-                payment_transaction_id: rpcResult?.payment_transaction_id
+                currency: paymentData.currency,
+                paid_at: paymentData.paid_at,
+                channel: paymentData.channel
               }
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           )
-        } else {
-          console.log('⚠️ Payment not successful:', paymentData.status)
-          
-          return new Response(
-            JSON.stringify({
-              success: false,
-              message: `Payment status: ${paymentData.status}`,
-              data: {
-                reference: paymentData.reference,
-                status: paymentData.status
-              }
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
+
+        } catch (error) {
+          console.error('Payment verification error:', error)
+          throw error
         }
       }
 
@@ -262,17 +221,12 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('❌ Edge function error:', {
-      message: error.message,
-      stack: error.stack,
-      timestamp: new Date().toISOString()
-    })
+    console.error('❌ Edge function error:', error)
 
     return new Response(
       JSON.stringify({
-        success: false,
-        error: error.message || 'An unexpected error occurred',
-        timestamp: new Date().toISOString()
+        status: false,
+        error: error.message || 'An unexpected error occurred'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },

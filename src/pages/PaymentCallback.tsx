@@ -189,7 +189,7 @@ export default function PaymentCallback() {
     }
     
     if (!reference) {
-      console.error('PaymentCallback - No payment reference found in URL');
+      console.error('❌ PaymentCallback - No payment reference found');
       logReferenceMissing('payment_callback', Object.keys(allParams));
       setStatus('error');
       setResult({
@@ -201,16 +201,13 @@ export default function PaymentCallback() {
       return;
     }
 
-    // If Paystack indicates success in URL params, verify immediately
-    if (paymentStatus === 'success' || paymentStatus === 'successful') {
-      console.log('PaymentCallback - Success indicated in URL, verifying...');
-    }
-
+    // If we have a reference, proceed with verification
+    console.log('✅ PaymentCallback - Reference found, proceeding with verification:', reference);
     const trimmedRef = reference?.trim();
     if (trimmedRef) {
       verifyPayment(trimmedRef);
     }
-  }, [reference, paymentStatus]);
+  }, [reference, paymentStatus, navigate]);
 
   const verifyPayment = async (paymentReference: string) => {
     if (verifyingRef.current) return; // double-submit guard
@@ -232,6 +229,7 @@ export default function PaymentCallback() {
       const isSuccess = payload?.status === 'success' || payload?.payment_status === 'paid' || data?.success === true;
 
       if (isSuccess) {
+        console.log('✅ PaymentCallback: Payment verification successful!');
         setStatus('success');
         setResult({
           success: true,
@@ -291,9 +289,11 @@ export default function PaymentCallback() {
         // Clean the URL to remove sensitive query params
         navigate('/payment/callback', { replace: true });
       } else {
-        throw new Error(payload?.gateway_response || 'Payment not successful');
+        console.log(`⚠️ PaymentCallback: Payment not successful - status: ${payload?.status}`);
+        throw new Error(payload?.gateway_response || `Payment status: ${payload?.status}`);
       }
     } catch (err: any) {
+      console.error('❌ PaymentCallback verification failed:', err);
       setStatus('failed');
       setResult({
         success: false,

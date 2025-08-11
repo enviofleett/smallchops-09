@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { paystackService } from '@/lib/paystack';
+import { paystackService, validateReferenceForVerification } from '@/lib/paystack';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PaymentErrorHandler } from '@/lib/payment-error-handler';
@@ -117,6 +117,10 @@ export const usePayment = () => {
     reference: string,
     provider: PaymentProvider = 'paystack'
   ): Promise<any> => {
+    // Validate reference format (warn but block clearly invalid ones)
+    if (!validateReferenceForVerification(reference)) {
+      throw new Error('Invalid reference format for verification');
+    }
     try {
       // Prefer secure verifier first (ensures DB upsert + order update like backfill)
       const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-secure', {

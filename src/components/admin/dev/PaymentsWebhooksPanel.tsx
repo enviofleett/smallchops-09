@@ -196,7 +196,7 @@ export const PaymentsWebhooksPanel: React.FC = () => {
           <div className="flex flex-col sm:flex-row gap-2">
             <div className="flex-1">
               <Label htmlFor="ps-ref">Reference</Label>
-              <Input id="ps-ref" placeholder="e.g. PAY_... or txn_..." value={reference} onChange={(e) => setReference(e.target.value)} />
+              <Input id="ps-ref" placeholder="e.g. txn_..." value={reference} onChange={(e) => setReference(e.target.value)} />
             </div>
             <div className="flex items-end">
               <Button onClick={runVerification} disabled={verifying}>

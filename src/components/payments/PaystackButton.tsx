@@ -80,10 +80,6 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
         
         // Use the server-returned reference as the single source of truth
         const serverRef = response.reference;
-        try {
-          sessionStorage.setItem('paystack_last_reference', serverRef);
-          localStorage.setItem('paystack_last_reference', serverRef);
-        } catch {}
         
           try {
             assertServerReference(serverRef);
@@ -103,6 +99,10 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
             }
             return;
           }
+          try {
+            sessionStorage.setItem('paystack_last_reference', serverRef);
+            localStorage.setItem('paystack_last_reference', serverRef);
+          } catch {}
           if (config?.public_key) {
           // Use Paystack inline popup
           const handler = window.PaystackPop.setup({

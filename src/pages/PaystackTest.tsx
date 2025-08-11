@@ -407,11 +407,11 @@ const testEmailSystem = async () => {
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex gap-2">
-                <Input
-                  placeholder="Enter Paystack reference, e.g. pay_123..."
-                  value={reference}
-                  onChange={(e) => setReference(e.target.value)}
-                />
+                  <Input
+                    placeholder="Enter Paystack reference, e.g. txn_abc123..."
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                  />
                 <Button onClick={verifyByReference} disabled={!reference || verifying}>
                   {verifying ? 'Verifying...' : 'Verify Now'}
                 </Button>

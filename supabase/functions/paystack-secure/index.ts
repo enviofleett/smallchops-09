@@ -220,6 +220,7 @@ async function initializePayment(requestData: any) {
 async function verifyPayment(requestData: any) {
   try {
     const { reference } = requestData || {};
+    console.log('📨 Request payload:', JSON.stringify({ action: 'verify', reference }));
     if (!reference) throw new Error('Payment reference is required');
 
     // Load Paystack config
@@ -239,6 +240,7 @@ async function verifyPayment(requestData: any) {
     }
 
     let effectiveRef = reference;
+    let mappingStrategy: string | null = null;
     console.log('Verifying Paystack payment:', effectiveRef);
 
     async function verifyWithPaystack(ref: string) {
@@ -271,6 +273,7 @@ async function verifyPayment(requestData: any) {
 
           if (mappedTx?.provider_reference) {
             effectiveRef = mappedTx.provider_reference as string;
+            mappingStrategy = 'client_metadata';
             console.log('🔁 Mapped client reference to server reference:', effectiveRef);
             paystackResponse = await verifyWithPaystack(effectiveRef);
           } else if (requestData?.order_id) {
@@ -283,6 +286,7 @@ async function verifyPayment(requestData: any) {
               .maybeSingle();
             if (byOrder?.provider_reference) {
               effectiveRef = byOrder.provider_reference as string;
+              mappingStrategy = 'by_order_id';
               console.log('🔁 Fallback mapped by order_id to reference:', effectiveRef);
               paystackResponse = await verifyWithPaystack(effectiveRef);
             } else {
@@ -293,6 +297,7 @@ async function verifyPayment(requestData: any) {
                 .maybeSingle();
               if (orderRow?.payment_reference) {
                 effectiveRef = orderRow.payment_reference as string;
+                mappingStrategy = 'orders_payment_reference';
                 console.log('🔁 Fallback mapped from orders.payment_reference:', effectiveRef);
                 paystackResponse = await verifyWithPaystack(effectiveRef);
               }
@@ -305,7 +310,7 @@ async function verifyPayment(requestData: any) {
 
       // B) Extra resilience for server-side refs: if user provided a truncated txn_ reference,
       //    try to find a provider_reference that starts with the provided prefix and retry
-      if (notFound && !paystackResponse.ok && /^txn_/.test(reference)) {
+      if (notFound && !paystackResponse.ok) {
         try {
           // 1) Look up in payment_transactions by prefix match
           const { data: byPrefix } = await supabaseClient
@@ -340,8 +345,23 @@ async function verifyPayment(requestData: any) {
       }
 
       if (!paystackResponse.ok) {
-        // Still failing after mapping
-        throw new Error(`Paystack verification failed (${paystackResponse.status}): ${errorText}`);
+        // Still failing after mapping — normalize to 200 with structured payload
+        console.warn('🔚 Verification still failing after mapping attempts', { reference, effectiveRef, mappingStrategy });
+        return new Response(JSON.stringify({
+          status: false,
+          error: `Paystack verification failed (${paystackResponse.status})`,
+          message: 'Transaction reference not found or mismatched',
+          data: null,
+          diagnostics: {
+            provided_reference: reference,
+            effective_reference: effectiveRef,
+            mapping_strategy: mappingStrategy,
+            provider_status: paystackResponse.status
+          }
+        }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
     }
 

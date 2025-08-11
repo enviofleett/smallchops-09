@@ -1,756 +1,304 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+// ========================================
+// 🚨 FIXED PAYSTACK EDGE FUNCTION
+// Production-Ready Payment Processing
+// ========================================
+
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
-};
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
 
-// Create Supabase client once (service role)
-const supabaseClient = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-  { auth: { persistSession: false } }
-);
+interface PaystackVerificationResponse {
+  status: boolean;
+  message: string;
+  data: {
+    id: number;
+    domain: string;
+    status: string;
+    reference: string;
+    amount: number;
+    message: string;
+    gateway_response: string;
+    paid_at: string;
+    created_at: string;
+    channel: string;
+    currency: string;
+    ip_address: string;
+    metadata: any;
+    fees_breakdown: any;
+    log: any;
+    fees: number;
+    customer: any;
+    authorization: any;
+    plan: any;
+  };
+}
 
 serve(async (req) => {
-  // Handle CORS preflight requests
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    console.log('🔄 Paystack secure function called');
-    const requestBody = await req.json();
-    const { action, ...requestData } = requestBody || {};
+    const { action, reference, amount, order_reference } = await req.json()
+    
+    console.log(`🔄 Processing payment action: ${action}`, {
+      reference,
+      order_reference,
+      amount,
+      timestamp: new Date().toISOString()
+    })
 
-    if (action === 'initialize') {
-      return await initializePayment(requestData);
-    } else if (action === 'verify') {
-      return await verifyPayment(requestData);
-    } else {
-      return new Response(JSON.stringify({ status: false, error: 'Invalid action specified' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-  } catch (error: any) {
-    console.error('Paystack secure operation error:', error);
-    return new Response(JSON.stringify({ status: false, error: 'Operation failed', message: error?.message || String(error) }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-});
+    // Initialize Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    )
 
-// Helper to parse metadata to object safely
-function parseMetadata(input: unknown): Record<string, any> {
-  if (!input) return {};
-  try {
-    if (typeof input === 'string') return JSON.parse(input);
-    if (typeof input === 'object') return input as Record<string, any>;
-  } catch (_) {}
-  return {};
-}
-
-async function initializePayment(requestData: any) {
-  try {
-    // Ignore reference from frontend; always generate server reference
-    const { email, amount, channels, metadata, callback_url, reference: client_reference } = requestData || {};
-
-    if (!email || amount === undefined || amount === null) {
-      throw new Error('Email and amount are required');
+    // Get Paystack secret key
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
+    if (!paystackSecretKey) {
+      throw new Error('PAYSTACK_SECRET_KEY not configured')
     }
 
-    const amountInKobo = Math.round(parseFloat(String(amount)));
-    if (isNaN(amountInKobo) || amountInKobo < 100) {
-      throw new Error('Amount must be >= 100 kobo (₦1.00)');
-    }
-
-    // Load Paystack config directly from table (connected row)
-    const { data: config, error: configError } = await supabaseClient
-      .from('payment_integrations')
-      .select('*')
-      .eq('provider', 'paystack')
-      .eq('connection_status', 'connected')
-      .single();
-
-    if (configError || !config) {
-      console.error('Paystack configuration error:', configError);
-      throw new Error('Paystack not configured properly');
-    }
-
-    const secretKey: string | null = config.test_mode ? config.secret_key : (config.live_secret_key || config.secret_key);
-    if (!secretKey) {
-      const mode = config.test_mode ? 'test' : 'live';
-      throw new Error(`Paystack ${mode} secret key not configured`);
-    }
-
-    const transactionRef = `txn_${Date.now()}_${crypto.randomUUID()}`;
-    console.log(`✅ Server-generated reference: ${transactionRef}`);
-
-    const paystackPayload: Record<string, any> = {
-      email,
-      amount: amountInKobo.toString(),
-      currency: 'NGN',
-      reference: transactionRef,
-      channels: channels || ['card', 'bank_transfer', 'ussd'],
-      metadata: JSON.stringify(metadata || {}),
-      ...(callback_url ? { callback_url } : {})
-    };
-
-    console.log('🚀 Sending to Paystack initialize:', JSON.stringify({ ...paystackPayload, metadata: '[stringified]' }));
-
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${secretKey}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify(paystackPayload)
-    });
-
-    if (!paystackResponse.ok) {
-      const errorText = await paystackResponse.text();
-      console.error('❌ Paystack HTTP error:', paystackResponse.status, errorText);
-      try {
-        const errorJson = JSON.parse(errorText);
-        throw new Error(`Paystack API error (${paystackResponse.status}): ${errorJson.message || errorText}`);
-      } catch (_) {
-        throw new Error(`Paystack API error (${paystackResponse.status}): ${errorText}`);
-      }
-    }
-
-    const paystackData = await paystackResponse.json();
-    if (!paystackData?.status) {
-      console.error('❌ Paystack initialization failed:', paystackData);
-      throw new Error(paystackData?.message || 'Failed to initialize payment');
-    }
-
-    const returnedRef: string = paystackData.data?.reference || transactionRef;
-
-    // Track critical insert error across persistence block
-    let criticalInsertError: any = null;
-    let resolvedOrderIdForInsert: string | null = null;
-    let metaObjCache: any = {};
-
-    // Persist reference for consistency (best-effort for non-critical parts)
-    try {
-      const metaObj = parseMetadata(metadata);
-      metaObjCache = metaObj;
-      // Persist any client-supplied provisional reference for later mapping
-      if (client_reference && !metaObj.client_reference) {
-        (metaObj as any).client_reference = client_reference;
-      }
-      let orderId: string | null = (metaObj as any).order_id || (metaObj as any).orderId || null;
-      const orderNumber: string | null = (metaObj as any).order_number || (metaObj as any).orderNumber || null;
-
-      // Resolve order id by number if needed
-      if (!orderId && orderNumber) {
-        const { data: orderByNumber } = await supabaseClient
-          .from('orders')
-          .select('id')
-          .eq('order_number', orderNumber)
-          .maybeSingle();
-        if (orderByNumber?.id) orderId = orderByNumber.id;
-      }
-
-      resolvedOrderIdForInsert = orderId;
-
-      // Update order payment_reference when resolvable
-      if (orderId) {
-        const { error: orderErr } = await supabaseClient
-          .from('orders')
-          .update({ payment_reference: returnedRef, updated_at: new Date().toISOString() })
-          .eq('id', orderId);
-        if (orderErr) console.warn('Order payment_reference update failed:', orderErr);
-      }
-
-      // CRITICAL: Seed a pending transaction so verification can find it
-      const txInsert: any = {
-        order_id: orderId,
-        provider_reference: returnedRef,
-        amount: amountInKobo / 100, // store in NGN
-        currency: 'NGN',
-        status: 'pending',
-        metadata: {
-          ...metaObj,
-          ...(client_reference ? { client_reference } : {}),
-          user_id: null, // Will be populated from auth context if available
-          payment_method: 'paystack',
-          initialized_at: new Date().toISOString()
-        },
-        customer_email: email,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      };
-      
-      console.log(`💾 Creating payment transaction for order ${orderId} with reference ${returnedRef}`);
-      const { error: insertErr } = await supabaseClient.from('payment_transactions').insert(txInsert);
-      if (insertErr) {
-        console.error('❌ CRITICAL: Failed to insert pending transaction:', insertErr);
-        criticalInsertError = insertErr;
-      } else {
-        console.log('✅ Payment transaction created successfully');
-      }
-
-      // Audit trail (best-effort)
-      await supabaseClient.from('audit_logs').insert({
-        action: 'payment_initialized',
-        category: 'Payment',
-        message: `Initialized Paystack payment: ${returnedRef}`,
-        new_values: { reference: returnedRef, order_id: orderId, amount_ngn: amountInKobo / 100 }
-      });
-    } catch (e) {
-      console.warn('Initialization persistence warning:', e);
-    }
-
-    // Fail loudly if we could not record the pending transaction
-    if (criticalInsertError) {
-      throw new Error(`Failed to record pending transaction: ${criticalInsertError.message || criticalInsertError}`);
-    }
-
-    return new Response(JSON.stringify({
-      status: true,
-      data: {
-        authorization_url: paystackData.data.authorization_url,
-        access_code: paystackData.data.access_code,
-        reference: returnedRef
-      }
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  } catch (error: any) {
-    console.error('Payment initialization error:', error);
-    return new Response(JSON.stringify({ status: false, error: error?.message || 'Failed to initialize payment' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
-}
-
-async function verifyPayment(requestData: any) {
-  try {
-    const { reference } = requestData || {};
-    console.log('📨 Request payload:', JSON.stringify({ action: 'verify', reference }));
-    if (!reference) throw new Error('Payment reference is required');
-
-    // Load Paystack config
-    const { data: config, error: configError } = await supabaseClient
-      .from('payment_integrations')
-      .select('*')
-      .eq('provider', 'paystack')
-      .eq('connection_status', 'connected')
-      .single();
-
-    if (configError || !config) throw new Error('Paystack not configured properly');
-
-    const secretKey: string | null = config.test_mode ? config.secret_key : (config.live_secret_key || config.secret_key);
-    if (!secretKey) {
-      const mode = config.test_mode ? 'test' : 'live';
-      throw new Error(`Paystack ${mode} secret key not configured`);
-    }
-
-    let effectiveRef = reference;
-    let mappingStrategy: string | null = null;
-    console.log('Verifying Paystack payment:', effectiveRef);
-
-    // Enhanced verification with retry logic and validation
-    function validateReference(reference: string): boolean {
-      if (!reference || typeof reference !== 'string') {
-        throw new Error('Invalid reference format: must be a non-empty string')
-      }
-      if (reference.length < 10) {
-        throw new Error('Invalid reference format: too short')
-      }
-      return true
-    }
-
-    function ensureEnvironmentConsistency(secretKey: string) {
-      const isTestKey = secretKey.startsWith('sk_test_')
-      const isProduction = Deno.env.get('DENO_DEPLOYMENT_ID') !== undefined
-      
-      if (isProduction && isTestKey) {
-        console.warn('⚠️  Using test key in production environment')
-      }
-      
-      console.log(`🔧 Environment: ${isProduction ? 'production' : 'development'}, Key type: ${isTestKey ? 'test' : 'live'}`)
-    }
-
-    async function verifyWithPaystackRetry(ref: string, maxRetries = 3) {
-      validateReference(ref)
-      ensureEnvironmentConsistency(secretKey)
-      
-      for (let attempt = 1; attempt <= maxRetries; attempt++) {
-        try {
-          console.log(`🔄 Verification attempt ${attempt}/${maxRetries} for reference: ${ref}`)
-          
-          const resp = await fetch(`https://api.paystack.co/transaction/verify/${ref}`, {
-            method: 'GET',
-            headers: { 'Authorization': `Bearer ${secretKey}`, 'Content-Type': 'application/json' }
-          });
-          
-          if (resp.status === 200) {
-            console.log(`✅ Verification successful on attempt ${attempt}`)
-            return resp
-          }
-          
-          if (resp.status === 400 && attempt < maxRetries) {
-            const errorData = await resp.text()
-            if (errorData.includes('Transaction reference not found')) {
-              console.log(`⏳ Transaction not found, retrying in ${Math.pow(2, attempt)}s...`)
-              // Wait before retry with exponential backoff
-              const delay = Math.pow(2, attempt) * 1000 // 2s, 4s, 8s
-              await new Promise(resolve => setTimeout(resolve, delay))
-              continue
-            }
-          }
-          
-          console.error(`❌ Verification failed: ${resp.status}`)
-          return resp
-          
-        } catch (error) {
-          console.error(`💥 Verification error on attempt ${attempt}:`, error)
-          if (attempt === maxRetries) {
-            throw error
-          }
-          // Wait before retry
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, attempt) * 1000))
-        }
-      }
-      
-      throw new Error('All verification attempts failed')
-    }
-
-    // Legacy function for backward compatibility
-    async function verifyWithPaystack(ref: string) {
-      return await verifyWithPaystackRetry(ref, 1) // Single attempt for existing logic
-    }
-
-    let paystackResponse = await verifyWithPaystackRetry(effectiveRef, 3); // Use retry logic by default
-
-    if (!paystackResponse.ok) {
-      const errorText = await paystackResponse.text();
-      console.error('❌ Paystack verification HTTP error:', paystackResponse.status, errorText);
-      // Try to map references when Paystack says not found
-      const notFound = /transaction_not_found|not found/i.test(errorText);
-
-      // A) Map client provisional refs like "pay_*" to server refs we generated
-      let shouldMapClient = notFound && /^(pay|PAY|Pay)[-_]/.test(reference);
-      if (shouldMapClient) {
-        try {
-          // 1) Find by metadata.client_reference
-          const { data: mappedTx } = await supabaseClient
-            .from('payment_transactions')
-            .select('provider_reference, order_id, metadata')
-            .contains('metadata', { client_reference: reference })
-            .order('created_at', { ascending: false })
-            .maybeSingle();
-
-          if (mappedTx?.provider_reference) {
-            effectiveRef = mappedTx.provider_reference as string;
-            mappingStrategy = 'client_metadata';
-            console.log('🔁 Mapped client reference to server reference:', effectiveRef);
-            paystackResponse = await verifyWithPaystack(effectiveRef);
-          } else if (requestData?.order_id) {
-            // 2) Fallback by order_id
-            const { data: byOrder } = await supabaseClient
-              .from('payment_transactions')
-              .select('provider_reference')
-              .eq('order_id', requestData.order_id)
-              .order('created_at', { ascending: false })
-              .maybeSingle();
-            if (byOrder?.provider_reference) {
-              effectiveRef = byOrder.provider_reference as string;
-              mappingStrategy = 'by_order_id';
-              console.log('🔁 Fallback mapped by order_id to reference:', effectiveRef);
-              paystackResponse = await verifyWithPaystack(effectiveRef);
-            } else {
-              const { data: orderRow } = await supabaseClient
-                .from('orders')
-                .select('payment_reference')
-                .eq('id', requestData.order_id)
-                .maybeSingle();
-              if (orderRow?.payment_reference) {
-                effectiveRef = orderRow.payment_reference as string;
-                mappingStrategy = 'orders_payment_reference';
-                console.log('🔁 Fallback mapped from orders.payment_reference:', effectiveRef);
-                paystackResponse = await verifyWithPaystack(effectiveRef);
-              }
-            }
-          }
-        } catch (mapErr) {
-          console.warn('Reference mapping attempt (client->server) failed:', mapErr);
-        }
-      }
-
-      // B) Extra resilience for server-side refs and common input mistakes
-      //    - Try a prefixed variant if user omitted the `txn_` prefix
-      //    - Try DB prefix/contains lookups to recover truncated inputs
-      if (notFound && !paystackResponse.ok) {
-        try {
-          // 0) If the provided reference is missing the txn_ prefix, try with it
-          if (!/^txn_/.test(reference)) {
-            const prefixed = `txn_${reference}`;
-            console.log('🔎 Trying prefixed variant:', prefixed);
-            mappingStrategy = 'prefix_added';
-            paystackResponse = await verifyWithPaystack(prefixed);
-            if (paystackResponse.ok) {
-              effectiveRef = prefixed;
-            }
-          }
-
-          // Only perform DB lookups if still not resolved
-          if (!paystackResponse.ok) {
-            // 1) Look up in payment_transactions by prefix match (original and prefixed)
-            const tryPrefixes = [reference, /^txn_/.test(reference) ? reference : `txn_${reference}`];
-            let matchedRef: string | null = null;
-            for (const pfx of tryPrefixes) {
-              const { data: byPrefix } = await supabaseClient
-                .from('payment_transactions')
-                .select('provider_reference')
-                .ilike('provider_reference', `${pfx}%`)
-                .order('created_at', { ascending: false })
-                .maybeSingle();
-              if (byPrefix?.provider_reference) {
-                matchedRef = byPrefix.provider_reference as string;
-                mappingStrategy = 'tx_prefix_match';
-                console.log('🔁 Mapped by tx prefix to:', matchedRef);
-                break;
-              }
-            }
-            if (matchedRef) {
-              effectiveRef = matchedRef;
-              paystackResponse = await verifyWithPaystack(effectiveRef);
-            }
-          }
-
-          // 2) If still not mapped, try orders.payment_reference by prefix (original and prefixed)
-          if (!paystackResponse.ok) {
-            const tryPrefixes = [reference, /^txn_/.test(reference) ? reference : `txn_${reference}`];
-            let matchedRef: string | null = null;
-            for (const pfx of tryPrefixes) {
-              const { data: orderByPrefix } = await supabaseClient
-                .from('orders')
-                .select('payment_reference')
-                .ilike('payment_reference', `${pfx}%`)
-                .order('created_at', { ascending: false })
-                .maybeSingle();
-              if (orderByPrefix?.payment_reference) {
-                matchedRef = orderByPrefix.payment_reference as string;
-                mappingStrategy = 'orders_prefix_match';
-                console.log('🔁 Mapped via orders.payment_reference prefix to:', matchedRef);
-                break;
-              }
-            }
-            if (matchedRef) {
-              effectiveRef = matchedRef;
-              paystackResponse = await verifyWithPaystack(effectiveRef);
-            }
-          }
-
-          // 3) As a last resort, try contains match (handles truncated tails or missing prefix)
-          if (!paystackResponse.ok) {
-            const { data: byContains } = await supabaseClient
-              .from('payment_transactions')
-              .select('provider_reference')
-              .ilike('provider_reference', `%${reference}%`)
-              .order('created_at', { ascending: false })
-              .maybeSingle();
-            if (byContains?.provider_reference) {
-              effectiveRef = byContains.provider_reference as string;
-              mappingStrategy = 'tx_contains_match';
-              console.log('🔁 Mapped by tx contains-match to:', effectiveRef);
-              paystackResponse = await verifyWithPaystack(effectiveRef);
-            }
-          }
-
-          if (!paystackResponse.ok) {
-            const { data: orderContains } = await supabaseClient
-              .from('orders')
-              .select('payment_reference')
-              .ilike('payment_reference', `%${reference}%`)
-              .order('created_at', { ascending: false })
-              .maybeSingle();
-            if (orderContains?.payment_reference) {
-              effectiveRef = orderContains.payment_reference as string;
-              mappingStrategy = 'orders_contains_match';
-              console.log('🔁 Mapped via orders.payment_reference contains-match to:', effectiveRef);
-              paystackResponse = await verifyWithPaystack(effectiveRef);
-            }
-          }
-        } catch (e) {
-          console.warn('Prefix/contains-based reference mapping failed:', e);
-        }
-      }
-
-      if (!paystackResponse.ok) {
-        // Still failing after mapping — normalize to 200 with structured payload
-        console.warn('🔚 Verification still failing after mapping attempts', { reference, effectiveRef, mappingStrategy });
-        return new Response(JSON.stringify({
-          status: false,
-          error: `Paystack verification failed (${paystackResponse.status})`,
-          message: 'Transaction reference not found or mismatched',
-          data: null,
-          diagnostics: {
-            provided_reference: reference,
-            effective_reference: effectiveRef,
-            mapping_strategy: mappingStrategy,
-            provider_status: paystackResponse.status
-          }
-        }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-    }
-
-    const paystackData = await paystackResponse.json();
-    if (!paystackData?.status) {
-      console.error('Paystack verification failed:', paystackData);
-      throw new Error(paystackData?.message || 'Failed to verify payment');
-    }
-
-    const tx = paystackData.data || {};
-
-    // Persist verification outcome (best-effort) and let DB triggers/RPC handle order updates
-    try {
-      let metadataObj = parseMetadata(tx.metadata);
-      let orderId: string | null = metadataObj.order_id || metadataObj.orderId || null;
-      const orderNumber: string | null = metadataObj.order_number || metadataObj.orderNumber || null;
-
-      // Resolve order id by payment_reference or number if needed
-      if (!orderId) {
-        const { data: byRef } = await supabaseClient
-          .from('orders')
-          .select('id')
-          .or(`payment_reference.eq.${effectiveRef},id.eq.${effectiveRef}`)
-          .maybeSingle();
-        if (byRef?.id) orderId = byRef.id;
-      }
-      if (!orderId && orderNumber) {
-        const { data: byNum } = await supabaseClient
-          .from('orders')
-          .select('id')
-          .eq('order_number', orderNumber)
-          .maybeSingle();
-        if (byNum?.id) orderId = byNum.id;
-      }
-
-      const isSuccess = tx.status === 'success';
-      const baseUpdate: any = {
-        provider_reference: effectiveRef,
-        transaction_type: 'charge',
-        status: isSuccess ? 'paid' : tx.status || 'failed',
-        amount: typeof tx.amount === 'number' ? tx.amount / 100 : null,
-        currency: tx.currency || 'NGN',
-        channel: tx.channel || 'online',
-        gateway_response: tx.gateway_response || null,
-        paid_at: tx.paid_at || new Date().toISOString(),
-        customer_email: tx?.customer?.email || null,
-        provider_response: tx || null,
-        updated_at: new Date().toISOString()
-      };
-      const payload = orderId ? { ...baseUpdate, order_id: orderId } : baseUpdate;
-
-      // Upsert by provider_reference when possible; if not, fallback to insert/update sequence
-      let upsertError: any = null;
-      try {
-        const { error } = await supabaseClient
-          .from('payment_transactions')
-          .upsert(payload, { onConflict: 'provider_reference' });
-        upsertError = error;
-      } catch (e) {
-        upsertError = e;
-      }
-
-      if (upsertError) {
-        // Fallback: try to find and update
-        const { data: existing } = await supabaseClient
-          .from('payment_transactions')
-          .select('id')
-           .eq('provider_reference', effectiveRef)
-          .maybeSingle();
-        if (existing?.id) {
-          await supabaseClient
-            .from('payment_transactions')
-            .update(payload)
-            .eq('id', existing.id);
-        } else {
-          await supabaseClient.from('payment_transactions').insert({ ...payload, created_at: new Date().toISOString() });
-        }
-      }
-
-      // Enhanced payment processing with better error handling
-      try {
-        console.log('🔄 Processing successful payment for:', effectiveRef);
+    switch (action) {
+      case 'initialize': {
+        console.log('🚀 Initializing payment with Paystack')
         
-        // First try the RPC for order processing
-        const { data: rpcResult, error: rpcError } = await supabaseClient.rpc('handle_successful_payment', {
-          p_paystack_reference: effectiveRef,
-          p_order_reference: effectiveRef,
-          p_amount: typeof tx.amount === 'number' ? tx.amount / 100 : 0,
-          p_currency: tx.currency || 'NGN',
-          p_paystack_data: tx || {}
-        });
+        // Generate consistent reference format
+        const txnReference = `txn_${Date.now()}_${crypto.randomUUID()}`
         
-        if (rpcError) {
-          console.error('❌ handle_successful_payment RPC error:', rpcError);
-          
-          // Fallback: Manual order processing if RPC fails
-          if (orderId) {
-            console.log('🔄 Fallback: Manually updating order status');
-            const { error: orderUpdateError } = await supabaseClient
-              .from('orders')
-              .update({
-                payment_status: 'paid',
-                status: 'confirmed',
-                paid_at: tx.paid_at || new Date().toISOString(),
-                payment_reference: effectiveRef,
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', orderId);
-            
-            if (orderUpdateError) {
-              console.error('❌ Fallback order update failed:', orderUpdateError);
-            } else {
-              console.log('✅ Fallback order update successful');
+        const initializeResponse = await fetch('https://api.paystack.co/transaction/initialize', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${paystackSecretKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: req.headers.get('x-user-email') || 'customer@example.com',
+            amount: Math.round(amount * 100), // Convert to kobo
+            reference: txnReference, // Use consistent format
+            currency: 'NGN',
+            callback_url: `${req.headers.get('origin')}/payment/callback`,
+            metadata: {
+              order_reference: order_reference || reference, // Store original order ref
+              custom_fields: []
             }
-          }
-        } else {
-          console.log('✅ Payment processing result:', rpcResult);
-          if (rpcResult && typeof rpcResult === 'object' && rpcResult.order_id) {
-            orderId = rpcResult.order_id;
-          }
-        }
+          }),
+        })
+
+        const initData = await initializeResponse.json()
         
-        // Ensure payment transaction is properly recorded
-        if (isSuccess) {
-          const { data: existingTx } = await supabaseClient
-            .from('payment_transactions')
-            .select('id')
-            .eq('provider_reference', effectiveRef)
-            .single();
-          
-          if (!existingTx) {
-            console.log('🔄 Creating missing payment transaction record');
-            const { error: txInsertError } = await supabaseClient
-              .from('payment_transactions')
-              .insert({
-                order_id: orderId,
-                provider_reference: effectiveRef,
-                amount: typeof tx.amount === 'number' ? tx.amount / 100 : 0,
-                currency: tx.currency || 'NGN',
-                status: 'paid',
-                channel: tx.channel,
-                customer_email: tx.customer?.email,
-                paid_at: tx.paid_at || new Date().toISOString(),
-                gateway_response: tx.gateway_response,
-                provider_response: tx,
-                metadata: {
-                  verification_fix: true,
-                  verified_at: new Date().toISOString()
-                },
-                created_at: new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              });
-            
-            if (txInsertError) {
-              console.error('❌ Payment transaction insert failed:', txInsertError);
-            } else {
-              console.log('✅ Payment transaction created successfully');
+        if (!initData.status) {
+          console.error('❌ Paystack initialization failed:', initData)
+          throw new Error(`Paystack initialization failed: ${initData.message}`)
+        }
+
+        console.log('✅ Payment initialized successfully:', {
+          reference: txnReference,
+          authorization_url: initData.data.authorization_url
+        })
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            data: {
+              authorization_url: initData.data.authorization_url,
+              access_code: initData.data.access_code,
+              reference: txnReference // Return the txn_ reference
             }
-          }
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      case 'verify': {
+        console.log('🔍 Verifying payment with Paystack')
+        
+        if (!reference) {
+          throw new Error('Payment reference is required for verification')
         }
-        
-      } catch (e) {
-        console.error('❌ Payment processing crashed:', e);
-        
-        // Emergency fallback for critical operations
-        if (isSuccess && orderId) {
+
+        // Verify with Paystack with retry logic
+        let verificationData: PaystackVerificationResponse | null = null
+        let retryCount = 0
+        const maxRetries = 3
+
+        while (retryCount < maxRetries && !verificationData) {
           try {
-            console.log('🚨 Emergency fallback: Updating order status directly');
-            await supabaseClient
-              .from('orders')
-              .update({
-                payment_status: 'paid',
-                status: 'confirmed',
-                paid_at: tx.paid_at || new Date().toISOString(),
-                updated_at: new Date().toISOString()
-              })
-              .eq('id', orderId);
-            console.log('✅ Emergency order update completed');
-          } catch (emergencyError) {
-            console.error('❌ Emergency order update failed:', emergencyError);
+            console.log(`🔄 Verification attempt ${retryCount + 1} for reference: ${reference}`)
+            
+            const verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${paystackSecretKey}`,
+                'Content-Type': 'application/json',
+              },
+            })
+
+            if (verifyResponse.status === 200) {
+              verificationData = await verifyResponse.json()
+              break
+            } else if (verifyResponse.status === 400) {
+              console.warn(`⚠️ Transaction not found (attempt ${retryCount + 1}):`, reference)
+              if (retryCount < maxRetries - 1) {
+                // Wait with exponential backoff
+                const delay = Math.pow(2, retryCount) * 1000
+                await new Promise(resolve => setTimeout(resolve, delay))
+              }
+            } else {
+              throw new Error(`Paystack API error: ${verifyResponse.status}`)
+            }
+          } catch (error) {
+            console.error(`❌ Verification attempt ${retryCount + 1} failed:`, error)
+            if (retryCount === maxRetries - 1) throw error
           }
+          retryCount++
+        }
+
+        if (!verificationData || !verificationData.status) {
+          console.error('❌ Payment verification failed:', {
+            reference,
+            data: verificationData
+          })
+          
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: 'Payment verification failed',
+              reference
+            }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            }
+          )
+        }
+
+        const paymentData = verificationData.data
+
+        console.log('✅ Payment verified successfully:', {
+          reference: paymentData.reference,
+          status: paymentData.status,
+          amount: paymentData.amount / 100 // Convert from kobo
+        })
+
+        // Only process successful payments
+        if (paymentData.status === 'success') {
+          console.log('💰 Processing successful payment')
+          
+          // Extract order reference from metadata
+          const orderReference = paymentData.metadata?.order_reference || 
+                               paymentData.metadata?.custom_fields?.find((f: any) => f.variable_name === 'order_reference')?.value ||
+                               reference
+
+          // Call the fixed RPC function
+          console.log('🔗 Calling handle_successful_payment RPC:', {
+            paystack_reference: paymentData.reference,
+            order_reference: orderReference,
+            amount: paymentData.amount / 100,
+            currency: paymentData.currency
+          })
+
+          const { data: rpcResult, error: rpcError } = await supabase
+            .rpc('handle_successful_payment', {
+              p_paystack_reference: paymentData.reference,
+              p_order_reference: orderReference,
+              p_amount: paymentData.amount / 100, // Convert from kobo
+              p_currency: paymentData.currency || 'NGN',
+              p_paystack_data: paymentData
+            })
+
+          if (rpcError) {
+            console.error('❌ RPC function error:', rpcError)
+            throw new Error(`Database update failed: ${rpcError.message}`)
+          }
+
+          console.log('✅ RPC function result:', rpcResult)
+
+          if (!rpcResult?.success) {
+            console.warn('⚠️ RPC function reported failure:', rpcResult)
+          }
+
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: 'Payment verified and processed successfully',
+              data: {
+                reference: paymentData.reference,
+                amount: paymentData.amount / 100,
+                status: paymentData.status,
+                order_updated: rpcResult?.success || false,
+                order_id: rpcResult?.order_id,
+                payment_transaction_id: rpcResult?.payment_transaction_id
+              }
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        } else {
+          console.log('⚠️ Payment not successful:', paymentData.status)
+          
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: `Payment status: ${paymentData.status}`,
+              data: {
+                reference: paymentData.reference,
+                status: paymentData.status
+              }
+            }),
+            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
         }
       }
 
-      // Ensure orders table has reference (idempotent)
-      if (orderId) {
-        await supabaseClient
-          .from('orders')
-          .update({ payment_reference: effectiveRef, updated_at: new Date().toISOString() })
-          .eq('id', orderId);
-      }
-
-      // Audit
-      await supabaseClient.from('audit_logs').insert({
-        action: 'payment_verified',
-        category: 'Payment',
-        message: `Paystack verified: ${reference}`,
-        new_values: { order_id: orderId, status: tx.status }
-      });
-    } catch (e) {
-      console.warn('Verification persistence warning:', e);
+      default:
+        throw new Error(`Unknown action: ${action}`)
     }
 
-    // Fetch updated order details to return a definitive status and order info
-    let orderInfo: any = null;
-    try {
-      const { data: txWithOrder } = await supabaseClient
-        .from('payment_transactions')
-        .select(`
-          order_id,
-          order:orders(
-            id,
-            order_number,
-            status,
-            payment_status,
-            total_amount
-          )
-        `)
-        .eq('provider_reference', effectiveRef)
-        .maybeSingle();
-      orderInfo = txWithOrder?.order ? txWithOrder.order : null;
-    } catch (e) {
-      console.warn('Could not fetch order info after verification:', e);
-    }
+  } catch (error) {
+    console.error('❌ Edge function error:', {
+      message: error.message,
+      stack: error.stack,
+      timestamp: new Date().toISOString()
+    })
 
-    return new Response(JSON.stringify({
-      status: true,
-      data: {
-        status: tx.status,
-        amount: tx.amount,
-        currency: tx.currency,
-        customer: tx.customer,
-        metadata: tx.metadata,
-        paid_at: tx.paid_at,
-        channel: tx.channel,
-        gateway_response: tx.gateway_response,
-        order_id: orderInfo?.id || null,
-        order_number: orderInfo?.order_number || null,
-        order_status: orderInfo?.status || null,
-        payment_status: orderInfo?.payment_status || null,
-        total_amount: orderInfo?.total_amount || null
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || 'An unexpected error occurred',
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500
       }
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  } catch (error: any) {
-    console.error('Payment verification error:', error);
-    return new Response(JSON.stringify({ status: false, error: error?.message || 'Failed to verify payment' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    )
   }
-}
+})
+
+// ========================================
+// 🚀 DEPLOYMENT CHECKLIST
+// ========================================
+
+// 1. Deploy this edge function:
+//    supabase functions deploy paystack-secure
+//
+// 2. Set environment variables:
+//    supabase secrets set PAYSTACK_SECRET_KEY=sk_test_xxx...
+//
+// 3. Update frontend to use txn_ references
+//
+// 4. Test payment flow end-to-end
+//
+// 5. Monitor logs for successful RPC calls
+//
+// 6. Run health check:
+//    SELECT check_payment_flow_health();
+//
+// ========================================

@@ -579,12 +579,14 @@ async function verifyPayment(requestData: any) {
         }
       }
 
-      // Call NEW RPC to finalize (updates orders, creates payment transaction, logs)
+      // Enhanced payment processing with better error handling
       try {
-        console.log('🔄 Calling new handle_successful_payment RPC for:', effectiveRef);
+        console.log('🔄 Processing successful payment for:', effectiveRef);
+        
+        // First try the RPC for order processing
         const { data: rpcResult, error: rpcError } = await supabaseClient.rpc('handle_successful_payment', {
           p_paystack_reference: effectiveRef,
-          p_order_reference: effectiveRef, // Same reference for consistency
+          p_order_reference: effectiveRef,
           p_amount: typeof tx.amount === 'number' ? tx.amount / 100 : 0,
           p_currency: tx.currency || 'NGN',
           p_paystack_data: tx || {}
@@ -592,15 +594,94 @@ async function verifyPayment(requestData: any) {
         
         if (rpcError) {
           console.error('❌ handle_successful_payment RPC error:', rpcError);
+          
+          // Fallback: Manual order processing if RPC fails
+          if (orderId) {
+            console.log('🔄 Fallback: Manually updating order status');
+            const { error: orderUpdateError } = await supabaseClient
+              .from('orders')
+              .update({
+                payment_status: 'paid',
+                status: 'confirmed',
+                paid_at: tx.paid_at || new Date().toISOString(),
+                payment_reference: effectiveRef,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', orderId);
+            
+            if (orderUpdateError) {
+              console.error('❌ Fallback order update failed:', orderUpdateError);
+            } else {
+              console.log('✅ Fallback order update successful');
+            }
+          }
         } else {
           console.log('✅ Payment processing result:', rpcResult);
-          // Update order ID from RPC result if available
           if (rpcResult && typeof rpcResult === 'object' && rpcResult.order_id) {
             orderId = rpcResult.order_id;
           }
         }
+        
+        // Ensure payment transaction is properly recorded
+        if (isSuccess) {
+          const { data: existingTx } = await supabaseClient
+            .from('payment_transactions')
+            .select('id')
+            .eq('provider_reference', effectiveRef)
+            .single();
+          
+          if (!existingTx) {
+            console.log('🔄 Creating missing payment transaction record');
+            const { error: txInsertError } = await supabaseClient
+              .from('payment_transactions')
+              .insert({
+                order_id: orderId,
+                provider_reference: effectiveRef,
+                amount: typeof tx.amount === 'number' ? tx.amount / 100 : 0,
+                currency: tx.currency || 'NGN',
+                status: 'paid',
+                channel: tx.channel,
+                customer_email: tx.customer?.email,
+                paid_at: tx.paid_at || new Date().toISOString(),
+                gateway_response: tx.gateway_response,
+                provider_response: tx,
+                metadata: {
+                  verification_fix: true,
+                  verified_at: new Date().toISOString()
+                },
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              });
+            
+            if (txInsertError) {
+              console.error('❌ Payment transaction insert failed:', txInsertError);
+            } else {
+              console.log('✅ Payment transaction created successfully');
+            }
+          }
+        }
+        
       } catch (e) {
-        console.error('❌ handle_successful_payment RPC crashed:', e);
+        console.error('❌ Payment processing crashed:', e);
+        
+        // Emergency fallback for critical operations
+        if (isSuccess && orderId) {
+          try {
+            console.log('🚨 Emergency fallback: Updating order status directly');
+            await supabaseClient
+              .from('orders')
+              .update({
+                payment_status: 'paid',
+                status: 'confirmed',
+                paid_at: tx.paid_at || new Date().toISOString(),
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', orderId);
+            console.log('✅ Emergency order update completed');
+          } catch (emergencyError) {
+            console.error('❌ Emergency order update failed:', emergencyError);
+          }
+        }
       }
 
       // Ensure orders table has reference (idempotent)

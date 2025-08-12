@@ -457,7 +457,7 @@ serve(async (req) => {
           data: {
             authorization_url: authorizationUrl,
             access_code: accessCode,
-            reference: paymentReference
+            reference: authoritativePaymentReference
           }
         };
         finalAuthUrl = authorizationUrl;

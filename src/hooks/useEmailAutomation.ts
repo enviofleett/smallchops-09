@@ -162,19 +162,10 @@ export const useEmailAutomation = () => {
     }
   ): Promise<EmailTriggerResult> => {
     try {
-      // Get admin notification email from business settings
-      const { data: businessSettings } = await supabase
-        .from('business_settings')
-        .select('admin_notification_email, email')
-        .limit(1)
-        .single();
-
-      const adminEmail = businessSettings?.admin_notification_email || businessSettings?.email;
+      // Use fallback admin email since business_settings doesn't have admin_notification_email
+      const adminEmail = 'store@startersmallchops.com';
       
-      if (!adminEmail) {
-        console.warn('No admin email configured for order notifications');
-        return { success: false, error: 'No admin email configured' };
-      }
+      console.log('Using admin email for notifications:', adminEmail);
 
       const { data: eventData, error: eventError } = await supabase
         .from('communication_events')

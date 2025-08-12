@@ -707,10 +707,56 @@ export type Database = {
         }
         Relationships: []
       }
+      business_sensitive_data: {
+        Row: {
+          admin_address: string | null
+          admin_email: string | null
+          admin_phone: string | null
+          api_keys: Json | null
+          business_settings_id: string
+          created_at: string
+          financial_info: Json | null
+          id: string
+          internal_notes: string | null
+          updated_at: string
+        }
+        Insert: {
+          admin_address?: string | null
+          admin_email?: string | null
+          admin_phone?: string | null
+          api_keys?: Json | null
+          business_settings_id: string
+          created_at?: string
+          financial_info?: Json | null
+          id?: string
+          internal_notes?: string | null
+          updated_at?: string
+        }
+        Update: {
+          admin_address?: string | null
+          admin_email?: string | null
+          admin_phone?: string | null
+          api_keys?: Json | null
+          business_settings_id?: string
+          created_at?: string
+          financial_info?: Json | null
+          id?: string
+          internal_notes?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_sensitive_data_business_settings_id_fkey"
+            columns: ["business_settings_id"]
+            isOneToOne: false
+            referencedRelation: "business_settings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_settings: {
         Row: {
           accent_color: string | null
-          address: string | null
           admin_notification_email: string | null
           admin_order_notifications: boolean | null
           admin_payment_notifications: boolean | null
@@ -719,7 +765,6 @@ export type Database = {
           business_hours: Json | null
           created_at: string
           default_vat_rate: number | null
-          email: string | null
           facebook_url: string | null
           favicon_url: string | null
           id: string
@@ -730,7 +775,6 @@ export type Database = {
           logo_url: string | null
           logo_usage_rules: string | null
           name: string
-          phone: string | null
           primary_color: string | null
           secondary_color: string | null
           seo_description: string | null
@@ -748,7 +792,6 @@ export type Database = {
         }
         Insert: {
           accent_color?: string | null
-          address?: string | null
           admin_notification_email?: string | null
           admin_order_notifications?: boolean | null
           admin_payment_notifications?: boolean | null
@@ -757,7 +800,6 @@ export type Database = {
           business_hours?: Json | null
           created_at?: string
           default_vat_rate?: number | null
-          email?: string | null
           facebook_url?: string | null
           favicon_url?: string | null
           id?: string
@@ -768,7 +810,6 @@ export type Database = {
           logo_url?: string | null
           logo_usage_rules?: string | null
           name: string
-          phone?: string | null
           primary_color?: string | null
           secondary_color?: string | null
           seo_description?: string | null
@@ -786,7 +827,6 @@ export type Database = {
         }
         Update: {
           accent_color?: string | null
-          address?: string | null
           admin_notification_email?: string | null
           admin_order_notifications?: boolean | null
           admin_payment_notifications?: boolean | null
@@ -795,7 +835,6 @@ export type Database = {
           business_hours?: Json | null
           created_at?: string
           default_vat_rate?: number | null
-          email?: string | null
           facebook_url?: string | null
           favicon_url?: string | null
           id?: string
@@ -806,7 +845,6 @@ export type Database = {
           logo_url?: string | null
           logo_usage_rules?: string | null
           name?: string
-          phone?: string | null
           primary_color?: string | null
           secondary_color?: string | null
           seo_description?: string | null

@@ -201,9 +201,10 @@ const handlePaymentRequest = async (req: Request) => {
             if (retryCount >= MAX_RETRIES) {
               console.error('Paystack API failed after retries:', error);
               return new Response(JSON.stringify({
-                status: false,
+                success: false,
                 error: 'Payment verification temporarily unavailable',
                 code: 'VERIFICATION_TIMEOUT',
+                retryable: true,
                 reference
               }), {
                 status: 503, // Service Unavailable instead of 500
@@ -269,9 +270,10 @@ const handlePaymentRequest = async (req: Request) => {
                   
                   // Other database errors
                   return new Response(JSON.stringify({
-                    status: false,
+                    success: false,
                     error: 'Database update failed',
                     code: 'DB_ERROR',
+                    retryable: true,
                     reference: paymentData.reference
                   }), {
                     status: 503,
@@ -284,9 +286,10 @@ const handlePaymentRequest = async (req: Request) => {
               } catch (dbError) {
                 logError('DB_CONNECTION_ERROR', dbError, { reference, orderReference });
                 return new Response(JSON.stringify({
-                  status: false,
+                  success: false,
                   error: 'Database temporarily unavailable',
                   code: 'DB_CONNECTION_ERROR',
+                  retryable: true,
                   reference: paymentData.reference
                 }), {
                   status: 503,

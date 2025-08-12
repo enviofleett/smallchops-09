@@ -1,9 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { CheckCircle, XCircle, Clock, AlertTriangle } from "lucide-react";
+import { CheckCircle, XCircle, Clock, AlertTriangle, RefreshCw } from "lucide-react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useCart } from "@/hooks/useCart";
 import { useCustomerOrders } from "@/hooks/useCustomerOrders";
@@ -20,6 +20,7 @@ import {
   logReferenceMissing 
 } from "@/utils/paymentMonitoring";
 import { paymentCompletionCoordinator } from "@/utils/paymentCompletion";
+
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
 interface PaymentResult {
@@ -30,6 +31,7 @@ interface PaymentResult {
   message?: string;
   error?: string;
   retryable?: boolean;
+  canRetry?: boolean;
 }
 
 export default function PaymentCallback() {
@@ -40,43 +42,27 @@ export default function PaymentCallback() {
   const { clearCartAfterPayment, clearCheckoutState } = useOrderProcessing();
   const [status, setStatus] = useState<PaymentStatus>('verifying');
   const [result, setResult] = useState<PaymentResult | null>(null);
-  const [redirected, setRedirected] = useState(false);
+  const [retryCount, setRetryCount] = useState(0);
   const queryClient = useQueryClient();
-  const verifyingRef = useRef(false);
-  // Cleanup effect (no timers needed with single-call verify)
-  useEffect(() => { return () => {}; }, []);
-  // One-time hard refresh to clear any stale Service Worker/CSP state
+  
+  // CRITICAL FIX: Single verification guard
+  const verificationRef = useRef(false);
+  const mountedRef = useRef(true);
+  const navigationHandledRef = useRef(false);
+
+  // Cleanup on unmount
   useEffect(() => {
-    const hardRefreshSW = async () => {
-      try {
-        if (sessionStorage.getItem('swHardRefreshed')) return;
-        if ('serviceWorker' in navigator) {
-          const regs = await navigator.serviceWorker.getRegistrations();
-          let didUnregister = false;
-          for (const reg of regs) {
-            if (reg.active) {
-              await reg.unregister();
-              didUnregister = true;
-            }
-          }
-          if (didUnregister) {
-            sessionStorage.setItem('swHardRefreshed', '1');
-            window.location.reload();
-          }
-        }
-      } catch (e) {
-        // no-op
-      }
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      verificationRef.current = false;
     };
-    hardRefreshSW();
   }, []);
 
-  // Single-call verification; no client-side retries to avoid race conditions
-
-  // Enhanced parameter detection with multiple fallback sources
-  const getPaymentReference = () => {
-    // Primary: Try URL parameters that Paystack uses
-    const possibleRefs = [
+  // FIXED: Enhanced parameter detection without race conditions
+  const getPaymentReference = useCallback(() => {
+    // Primary: URL parameters
+    const urlCandidates = [
       searchParams.get('reference'),
       searchParams.get('trxref'),
       searchParams.get('transaction_id'),
@@ -84,264 +70,287 @@ export default function PaymentCallback() {
       searchParams.get('txref'),
       searchParams.get('provider_reference'),
       searchParams.get('payment_reference'),
-      searchParams.get('paystack_reference'),
-      searchParams.get('order_ref')
+      searchParams.get('paystack_reference')
     ];
     
-    // Prefer txn_ format references when multiple are found
-    const txnRef = possibleRefs.find(ref => ref && isValidPaymentReference(ref));
-    const validRef = txnRef || possibleRefs.find(ref => ref && ref.trim().length > 10);
+    // Find valid URL reference first
+    const validUrlRef = urlCandidates.find(ref => 
+      ref && ref.trim().length > 8 && isValidPaymentReference(ref)
+    );
     
-    // Fallback: Check localStorage as last resort
-    if (!validRef) {
-      const storageKeys = [
-        'pending_payment_reference',
-        'paystack_last_reference',
-        'last_payment_reference',
-        'paymentReference',
-        'paystack_reference'
-      ];
-      
-      for (const key of storageKeys) {
-        const stored = localStorage.getItem(key) || sessionStorage.getItem(key);
-        if (stored && stored.trim().length > 10) {
-          console.log(`🔄 Using fallback reference from ${key}:`, stored);
-          localStorage.removeItem(key); // Clean up after use
-          sessionStorage.removeItem(key);
-          return stored;
-        }
+    if (validUrlRef) {
+      console.log('✅ Found valid reference in URL:', validUrlRef);
+      return validUrlRef.trim();
+    }
+    
+    // FIXED: Fallback to storage only if no URL reference
+    const storageKeys = [
+      'pending_payment_reference',
+      'paystack_last_reference',
+      'paymentReference'
+    ];
+    
+    for (const key of storageKeys) {
+      const stored = sessionStorage.getItem(key) || localStorage.getItem(key);
+      if (stored && stored.trim().length > 8) {
+        console.log('🔄 Using fallback reference from storage:', { key, reference: stored });
+        
+        // CRITICAL: Clean up immediately to prevent reuse
+        sessionStorage.removeItem(key);
+        localStorage.removeItem(key);
+        
+        return stored.trim();
       }
     }
     
-    console.log('🔍 Payment reference detection:', {
-      foundReferences: possibleRefs.filter(r => r),
-      selectedReference: validRef,
-      preferredTxnFormat: !!txnRef,
-      allParams: Object.fromEntries(searchParams.entries())
-    });
-    
-    return validRef || null;
-  };
+    return null;
+  }, [searchParams]);
 
-  const reference = getPaymentReference();
-  const orderIdParam = searchParams.get('order_id');
-  const paymentStatus = searchParams.get('status');
-  const forceUi = ((searchParams.get('force') || '').toLowerCase() === 'ui');
-
-  // Disabled instant redirect: always verify before navigating
+  // FIXED: Single verification effect - NO MORE RACE CONDITIONS
   useEffect(() => {
-    // Intentionally left blank to enforce verification-first flow
-  }, []);
-
-  // Reference error UI handled after storage fallback in the verification effect
-
-  // Fallback: full verification flow (when status not explicitly success)
-  useEffect(() => {
-    if (redirected) return;
-    // Debug: Log all URL parameters for troubleshooting
-    const allParams = Object.fromEntries(searchParams.entries());
-    console.log('PaymentCallback - All URL params:', allParams);
-    console.log('PaymentCallback - Detected reference:', reference);
-    
-    // Log callback received for monitoring
-    logCallbackReceived(reference || undefined, allParams);
-    
-    // Fallback: try session/local storage if reference is missing (some gateways omit it)
-    if (!reference) {
-      console.log('PaymentCallback - No reference in URL, checking storage...');
-      // Try multiple storage keys in priority order, preferring txn_ format
-      const refCandidates = [
-        sessionStorage.getItem('paystack_last_reference'),
-        localStorage.getItem('paystack_last_reference'),
-        sessionStorage.getItem('paymentReference'),
-        localStorage.getItem('paymentReference'),
-        sessionStorage.getItem('paystack_reference'),
-        localStorage.getItem('paystack_reference'),
-        sessionStorage.getItem('last_payment_reference'),
-        localStorage.getItem('last_payment_reference')
-      ];
-      const validCandidates = refCandidates.filter((v) => typeof v === 'string' && v.trim().length > 0);
-      // Prefer txn_ format references
-      const storedRef = validCandidates.find(ref => isValidPaymentReference(ref!)) || validCandidates[0] || null;
-      console.log('PaymentCallback - Found stored reference:', storedRef);
-
-      // Order details for enriching URL (best-effort)
-      const orderDetailsRaw =
-        sessionStorage.getItem('orderDetails') ||
-        localStorage.getItem('orderDetails') ||
-        sessionStorage.getItem('payment_order_details') ||
-        localStorage.getItem('payment_order_details');
-
-      let parsedDetails: any = null;
-      try { parsedDetails = orderDetailsRaw ? JSON.parse(orderDetailsRaw) : null; } catch {}
-      const orderId = parsedDetails?.orderId || parsedDetails?.order_id || null;
-      const orderNumber = parsedDetails?.orderNumber || parsedDetails?.order_number || null;
-
-      if (storedRef) {
-        const params = new URLSearchParams(window.location.search);
-        params.set('reference', storedRef);
-        if (orderId) params.set('order_id', orderId);
-        if (orderNumber) params.set('order_number', orderNumber);
-        // Replace the URL so refresh keeps the reference
-        navigate(`${window.location.pathname}?${params.toString()}`, { replace: true });
-        return; // wait for next effect run with reference present
-      }
-    }
-    
-    if (!reference) {
-      console.error('❌ PaymentCallback - No payment reference found');
-      logReferenceMissing('payment_callback', Object.keys(allParams));
-      setStatus('error');
-      setResult({
-        success: false,
-        error: 'No payment reference found',
-        message: 'Invalid payment callback URL - missing reference parameter. Please check the URL or contact support.',
-        retryable: false
-      });
+    // Prevent double execution
+    if (verificationRef.current || !mountedRef.current) {
       return;
     }
-
-    // If we have a reference, proceed with verification
-    console.log('✅ PaymentCallback - Reference found, proceeding with verification:', reference);
-    const trimmedRef = reference?.trim();
-    if (trimmedRef) {
-      verifyPayment(trimmedRef);
-    }
-  }, [reference, paymentStatus, navigate]);
-
-  const verifyPayment = async (paymentReference: string, maxRetries = 3) => {
-    if (verifyingRef.current) return; // double-submit guard
-    verifyingRef.current = true;
     
-    let retryCount = 0;
+    const reference = getPaymentReference();
+    const orderIdParam = searchParams.get('order_id');
+    const allParams = Object.fromEntries(searchParams.entries());
     
-    try {
-      while (retryCount < maxRetries) {
-        try {
-          setStatus('verifying');
-          logVerificationStarted(paymentReference);
-
-          // Call with retry logic
-          const { data, error } = await supabase.functions.invoke('paystack-secure', {
-            body: { action: 'verify', reference: paymentReference, order_id: orderIdParam }
-          });
-
-          if (error) {
-            throw new Error(error.message || 'Verification failed');
-          }
-
-          if (data?.status) {
-            // Success case - process the result
-            const payload = data.data || data;
-            const isSuccess = payload?.status === 'success' || payload?.payment_status === 'paid' || data?.success === true;
-
-            if (isSuccess) {
-              console.log('✅ PaymentCallback: Payment verification successful!');
-              setStatus('success');
-              setResult({
-                success: true,
-                order_id: payload?.order_id,
-                order_number: payload?.order_number,
-                amount: typeof payload?.total_amount === 'number'
-                  ? payload.total_amount
-                  : (typeof payload?.amount === 'number' ? payload.amount / 100 : undefined),
-                message: 'Payment verified successfully! Your order has been confirmed.'
-              });
-
-              // Log successful verification
-              logPaymentVerification(paymentReference, true);
-              logVerificationCompleted(paymentReference, true, { orderId: payload?.order_id });
-
-              // 🚀 COORDINATE 15-SECOND COMPLETION FLOW
-              paymentCompletionCoordinator.coordinatePaymentCompletion(
-                {
-                  reference: paymentReference,
-                  orderNumber: payload?.order_number,
-                  orderId: payload?.order_id,
-                  amount: typeof payload?.total_amount === 'number'
-                    ? payload.total_amount
-                    : (typeof payload?.amount === 'number' ? payload.amount / 100 : undefined)
-                },
-                {
-                  onClearCart: () => {
-                    console.log('🛒 Coordinated cart clearing triggered');
-                    clearCart();
-                    clearCheckoutState();
-                  },
-                  onStopMonitoring: () => {
-                    console.log('🛑 Coordinated monitoring stop triggered');
-                    // Will emit global event to stop PaymentStatusMonitor
-                  },
-                  onNavigate: () => {
-                    console.log('🧭 Coordinated navigation triggered');
-                    navigate('/customer-profile');
-                  }
-                }
-              );
-
-              // Emit global payment-confirmed event for listeners
-              try {
-                window.dispatchEvent(new CustomEvent('payment-confirmed', {
-                  detail: { orderId: payload?.order_id || orderIdParam, orderReference: paymentReference }
-                }));
-              } catch {}
-
-              // Invalidate caches now and again after a short delay for replication safety
-              await invalidateOrdersCaches();
-              if (refetchOrders) {
-                setTimeout(() => { refetchOrders().catch(() => {}); }, 500);
-              }
-              setTimeout(() => { invalidateOrdersCaches(); }, 2500);
-
-              // Clean the URL to remove sensitive query params
-              navigate('/payment/callback', { replace: true });
-              return; // Success - exit retry loop
-            } else {
-              console.log(`⚠️ PaymentCallback: Payment not successful - status: ${payload?.status}`);
-              throw new Error(payload?.gateway_response || `Payment status: ${payload?.status}`);
-            }
-          }
-
-          // Handle service errors that should trigger retry
-          if (data?.code === 'VERIFICATION_TIMEOUT' || data?.code === 'DB_ERROR') {
-            throw new Error('Service temporarily unavailable');
-          }
-
-          // Other errors that shouldn't retry
-          throw new Error(data?.error || 'Unknown verification error');
-
-        } catch (err: any) {
-          retryCount++;
-          console.error(`❌ Payment verification attempt ${retryCount} failed:`, err);
-          
-          if (retryCount >= maxRetries) {
-            console.error('❌ PaymentCallback verification failed after all retries:', err);
-            setStatus('failed');
-            setResult({
-              success: false,
-              error: err?.message || 'Verification failed',
-              message: 'Unable to verify payment after multiple attempts. Please contact support with your payment reference.',
-              retryable: true
-            });
-
-            // Log failed verification
-            logPaymentVerification(paymentReference, false, retryCount, err?.message);
-            logVerificationCompleted(paymentReference, false, { error: err?.message, attempts: retryCount });
-
-            // Clean the URL on error as well
-            navigate('/payment/callback', { replace: true });
-            return;
-          }
-          
-          // Wait before retry: 2s, 4s, 8s
-          await new Promise(resolve => 
-            setTimeout(resolve, 2000 * Math.pow(2, retryCount - 1))
-          );
-        }
+    console.log('🔍 PaymentCallback starting verification:', {
+      reference,
+      orderIdParam,
+      hasParams: Object.keys(allParams).length > 0
+    });
+    
+    // Log callback received
+    logCallbackReceived(reference || undefined, allParams);
+    
+    if (!reference) {
+      console.error('❌ No payment reference found');
+      logReferenceMissing('payment_callback', Object.keys(allParams));
+      
+      if (mountedRef.current) {
+        setStatus('error');
+        setResult({
+          success: false,
+          error: 'Missing payment reference',
+          message: 'Invalid payment callback - no reference found. Please contact support.',
+          retryable: false,
+          canRetry: false
+        });
       }
-    } finally {
-      verifyingRef.current = false;
+      return;
     }
+    
+    // Start verification - this prevents the race condition
+    verificationRef.current = true;
+    verifyPaymentWithRetry(reference, orderIdParam);
+    
+  }, [searchParams, getPaymentReference]); // Dependencies properly managed
+
+  // FIXED: Improved verification with better error handling
+  const verifyPaymentWithRetry = async (
+    paymentReference: string, 
+    orderIdParam: string | null,
+    maxRetries: number = 3
+  ) => {
+    let currentRetry = 0;
+    
+    while (currentRetry < maxRetries && mountedRef.current) {
+      try {
+        if (mountedRef.current) {
+          setStatus('verifying');
+          setRetryCount(currentRetry);
+        }
+        
+        console.log(`🔄 Payment verification attempt ${currentRetry + 1}/${maxRetries}`);
+        logVerificationStarted(paymentReference);
+
+        // FIXED: Better Edge Function error handling
+        const { data, error } = await supabase.functions.invoke('paystack-secure', {
+          body: { 
+            action: 'verify', 
+            reference: paymentReference, 
+            order_id: orderIdParam 
+          }
+        });
+
+        // CRITICAL FIX: Categorize errors properly
+        if (error) {
+          console.error('Edge Function Error:', error);
+          
+          // Network/timeout errors - should retry
+          const isNetworkError = error.message?.toLowerCase().includes('timeout') || 
+                                error.message?.toLowerCase().includes('network') ||
+                                error.message?.toLowerCase().includes('fetch') ||
+                                error.message?.toLowerCase().includes('cors');
+          
+          if (isNetworkError) {
+            throw new Error(`Network error (retry ${currentRetry + 1}): ${error.message}`);
+          }
+          
+          // Service errors - don't retry immediately
+          throw new Error(`Service error: ${error.message}`);
+        }
+
+        // FIXED: Better success detection
+        if (data) {
+          console.log('📦 Verification response:', data);
+          
+          // Handle service-level errors that should retry
+          if (data.code === 'VERIFICATION_TIMEOUT' || 
+              data.code === 'DB_ERROR' || 
+              data.code === 'DB_CONNECTION_ERROR') {
+            throw new Error(`Service temporarily unavailable: ${data.error}`);
+          }
+          
+          // Check for successful verification
+          const isSuccess = data.success === true || 
+                           data.status === 'success' || 
+                           data.data?.status === 'success' ||
+                           data.data?.payment_status === 'paid';
+
+          if (isSuccess) {
+            await handleVerificationSuccess(data, paymentReference);
+            return; // Success - exit retry loop
+          }
+          
+          // Payment failed (shouldn't retry)
+          await handleVerificationFailure(data, paymentReference, false);
+          return;
+        }
+
+        // No data and no error - unexpected
+        throw new Error('Empty response from verification service');
+
+      } catch (err: any) {
+        currentRetry++;
+        console.error(`❌ Verification attempt ${currentRetry} failed:`, err);
+        
+        const isRetryableError = err.message?.includes('Network error') ||
+                               err.message?.includes('Service temporarily unavailable') ||
+                               err.message?.includes('timeout');
+        
+        if (currentRetry >= maxRetries || !isRetryableError) {
+          console.error('❌ Verification failed after all attempts');
+          await handleVerificationFailure(
+            { error: err.message, code: 'MAX_RETRIES_EXCEEDED' },
+            paymentReference,
+            isRetryableError
+          );
+          return;
+        }
+        
+        // Exponential backoff with cap
+        const delay = Math.min(2000 * Math.pow(2, currentRetry - 1), 10000);
+        console.log(`⏳ Waiting ${delay}ms before retry...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+  };
+
+  const handleVerificationSuccess = async (data: any, reference: string) => {
+    if (!mountedRef.current || navigationHandledRef.current) return;
+    
+    const payload = data.data || data;
+    
+    console.log('✅ Payment verification successful!', payload);
+    
+    setStatus('success');
+    setResult({
+      success: true,
+      order_id: payload?.order_id,
+      order_number: payload?.order_number,
+      amount: payload?.total_amount || (payload?.amount ? payload.amount / 100 : undefined),
+      message: 'Payment verified successfully! Your order has been confirmed.'
+    });
+
+    // Log success
+    logPaymentVerification(reference, true);
+    logVerificationCompleted(reference, true, { orderId: payload?.order_id });
+
+    try {
+      // Coordinate completion flow
+      paymentCompletionCoordinator.coordinatePaymentCompletion(
+        {
+          reference,
+          orderNumber: payload?.order_number,
+          orderId: payload?.order_id,
+          amount: payload?.total_amount || (payload?.amount ? payload.amount / 100 : undefined)
+        },
+        {
+          onClearCart: () => {
+            clearCart();
+            clearCheckoutState();
+          },
+          onStopMonitoring: () => {
+            // Stop monitoring
+          },
+          onNavigate: () => {
+            // Will be handled separately
+          }
+        }
+      );
+
+      // Emit success event
+      window.dispatchEvent(new CustomEvent('payment-confirmed', {
+        detail: { orderId: payload?.order_id, orderReference: reference }
+      }));
+
+      // Invalidate caches
+      await invalidateOrdersCaches();
+      if (refetchOrders) {
+        setTimeout(() => refetchOrders().catch(() => {}), 500);
+      }
+
+    } catch (coordinationError) {
+      console.error('Coordination error (non-blocking):', coordinationError);
+    }
+
+    // FIXED: Clean URL without causing loops
+    navigationHandledRef.current = true;
+    setTimeout(() => {
+      if (mountedRef.current && !navigationHandledRef.current) {
+        navigate('/payment/callback', { replace: true });
+      }
+    }, 1000);
+  };
+
+  const handleVerificationFailure = async (
+    errorData: any, 
+    reference: string, 
+    isRetryable: boolean
+  ) => {
+    if (!mountedRef.current || navigationHandledRef.current) return;
+    
+    console.error('❌ Payment verification failed:', errorData);
+    
+    setStatus('failed');
+    setResult({
+      success: false,
+      error: errorData.error || 'Verification failed',
+      message: isRetryable 
+        ? 'Unable to verify payment due to temporary service issues. You can retry or contact support.'
+        : 'Payment verification failed. Please contact support with your payment reference.',
+      retryable: isRetryable,
+      canRetry: isRetryable
+    });
+
+    // Log failure
+    logPaymentVerification(reference, false, retryCount + 1, errorData.error);
+    logVerificationCompleted(reference, false, { 
+      error: errorData.error, 
+      attempts: retryCount + 1 
+    });
+
+    // FIXED: Clean URL without causing loops
+    navigationHandledRef.current = true;
+    setTimeout(() => {
+      if (mountedRef.current) {
+        navigate('/payment/callback', { replace: true });
+      }
+    }, 1000);
   };
 
   // Cache invalidation helper
@@ -349,25 +358,38 @@ export default function PaymentCallback() {
     try {
       await queryClient.invalidateQueries({ queryKey: ['customer-orders'] });
       await queryClient.invalidateQueries({ queryKey: ['orders'] });
+      const orderIdParam = searchParams.get('order_id');
       if (orderIdParam) {
         await queryClient.invalidateQueries({ queryKey: ['order', orderIdParam] });
-        await queryClient.invalidateQueries({ queryKey: ['orders', orderIdParam] });
       }
       await queryClient.invalidateQueries({ queryKey: ['payment-verification'] });
-      await queryClient.invalidateQueries({ queryKey: ['payment'] });
-      await queryClient.invalidateQueries({ queryKey: ['customer-profile'] });
     } catch (e) {
-      console.warn('Error invalidating caches:', e);
+      console.warn('Cache invalidation warning:', e);
     }
   };
 
-  // Currency formatting
-  const formatCurrency = (amount?: number | null) => {
-    if (typeof amount !== 'number' || isNaN(amount)) return 'N/A';
-    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
+  // FIXED: Manual retry function
+  const handleRetry = () => {
+    if (verificationRef.current) return;
+    
+    const reference = getPaymentReference();
+    if (reference && mountedRef.current) {
+      verificationRef.current = false;
+      navigationHandledRef.current = false;
+      setRetryCount(0);
+      setStatus('verifying');
+      verifyPaymentWithRetry(reference, searchParams.get('order_id'));
+    }
   };
 
-  // No retry handler needed with single-call verification
+  // UI helpers
+  const formatCurrency = (amount?: number | null) => {
+    if (typeof amount !== 'number' || isNaN(amount)) return 'N/A';
+    return new Intl.NumberFormat('en-NG', { 
+      style: 'currency', 
+      currency: 'NGN' 
+    }).format(amount);
+  };
 
   const getStatusIcon = () => {
     switch (status) {
@@ -385,7 +407,7 @@ export default function PaymentCallback() {
   const getStatusTitle = () => {
     switch (status) {
       case 'verifying':
-        return 'Verifying Payment...';
+        return `Verifying Payment... ${retryCount > 0 ? `(Attempt ${retryCount + 1})` : ''}`;
       case 'success':
         return 'Payment Successful!';
       case 'failed':
@@ -399,13 +421,15 @@ export default function PaymentCallback() {
     if (result?.message) return result.message;
     switch (status) {
       case 'verifying':
-        return 'Please wait while we verify your payment...';
+        return retryCount > 0 
+          ? 'Retrying verification due to service issues...'
+          : 'Please wait while we verify your payment...';
       case 'success':
         return 'Your order has been confirmed and will be processed shortly.';
       case 'failed':
-        return 'Your payment was not successful. Please try again.';
+        return 'Your payment verification encountered an issue.';
       case 'error':
-        return 'There was an error verifying your payment. Please contact support.';
+        return 'There was an error processing your payment verification.';
     }
   };
 
@@ -417,97 +441,121 @@ export default function PaymentCallback() {
     }
   };
 
-  if (redirected) return null;
+  const reference = getPaymentReference();
 
   return (
     <>
       <Helmet>
-        <title>Paystack Payment Verification | Starters Small Chops</title>
-        <meta name="description" content="Verify your Paystack payment and order status." />
+        <title>Payment Verification | Starters Small Chops</title>
+        <meta name="description" content="Verify your payment and order status." />
         <link rel="canonical" href={`${window.location.origin}/payment/callback`} />
       </Helmet>
-      <h1 className="sr-only">Paystack Payment Verification</h1>
+      
+      <h1 className="sr-only">Payment Verification</h1>
+      
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center pb-4">
             <div className="flex justify-center mb-4">
-            {getStatusIcon()}
-          </div>
-          <CardTitle className="text-2xl">{getStatusTitle()}</CardTitle>
-          <CardDescription className="text-center">
-            {getStatusMessage()}
-          </CardDescription>
-        </CardHeader>
-        
-        <CardContent className="space-y-4">
-          {status === 'verifying' && (
-            <div className="space-y-3">
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-4 w-3/4" />
-              <Skeleton className="h-4 w-1/2" />
+              {getStatusIcon()}
             </div>
-          )}
+            <CardTitle className="text-2xl">{getStatusTitle()}</CardTitle>
+            <CardDescription className="text-center">
+              {getStatusMessage()}
+            </CardDescription>
+          </CardHeader>
+          
+          <CardContent className="space-y-4">
+            {status === 'verifying' && (
+              <div className="space-y-3">
+                <Skeleton className="h-4 w-full" />
+                <Skeleton className="h-4 w-3/4" />
+                <Skeleton className="h-4 w-1/2" />
+                {retryCount > 0 && (
+                  <div className="text-center text-sm text-muted-foreground">
+                    Retry {retryCount}/3 - Please wait...
+                  </div>
+                )}
+              </div>
+            )}
 
-          {result && status !== 'verifying' && (
-            <div className="space-y-3 text-sm">
-              {result.order_number && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Order Number:</span>
-                  <span className="font-medium">{result.order_number}</span>
-                </div>
+            {result && status !== 'verifying' && (
+              <div className="space-y-3 text-sm">
+                {result.order_number && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Order Number:</span>
+                    <span className="font-medium">{result.order_number}</span>
+                  </div>
+                )}
+                
+                {typeof result.amount === 'number' && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Amount:</span>
+                    <span className="font-medium">{formatCurrency(result.amount)}</span>
+                  </div>
+                )}
+
+                {reference && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground">Reference:</span>
+                    <span className="font-mono text-xs bg-muted px-2 py-1 rounded">
+                      {reference.length > 20 ? `${reference.substring(0, 20)}...` : reference}
+                    </span>
+                  </div>
+                )}
+
+                {result.error && (
+                  <div className="p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <p className="text-sm text-red-700">{result.error}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            <div className="pt-4 space-y-2">
+              {result?.canRetry && status !== 'verifying' && (
+                <Button
+                  onClick={handleRetry}
+                  className="w-full"
+                  variant="outline"
+                  disabled={verificationRef.current}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" />
+                  Retry Verification
+                </Button>
               )}
               
-              {typeof result.amount === 'number' && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Amount:</span>
-                  <span className="font-medium">{formatCurrency(result.amount)}</span>
-                </div>
-              )}
-
-              {reference && (
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Reference:</span>
-                  <span className="font-mono text-xs">{reference}</span>
-                </div>
-              )}
-            </div>
-          )}
-
-          <div className="pt-4 space-y-2">
-            <Button
-              onClick={handleContinue}
-              className="w-full"
-              disabled={status === 'verifying'}
-              variant={status === 'success' ? 'default' : 'outline'}
-            >
-              {status === 'success' ? 'View Orders' : 'Back to Cart'}
-            </Button>
-            
-
-            {status !== 'verifying' && status !== 'success' && (
               <Button
-                onClick={() => navigate('/')}
-                variant="ghost"
+                onClick={handleContinue}
                 className="w-full"
+                disabled={status === 'verifying'}
+                variant={status === 'success' ? 'default' : 'outline'}
               >
-                Return to Home
+                {status === 'success' ? 'View Orders' : 'Back to Cart'}
               </Button>
-            )}
-          </div>
-
-          {(status === 'failed' || status === 'error') && (
-            <div className="text-center text-sm text-muted-foreground space-y-2">
-              <p>Need help? Contact our support team</p>
-              {reference && (
-                <p className="text-xs">
-                  Reference your payment with ID: <code className="bg-muted px-1 rounded">{reference}</code>
-                </p>
+              
+              {status !== 'verifying' && status !== 'success' && (
+                <Button
+                  onClick={() => navigate('/')}
+                  variant="ghost"
+                  className="w-full"
+                >
+                  Return to Home
+                </Button>
               )}
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+
+            {(status === 'failed' || status === 'error') && reference && (
+              <div className="text-center text-sm text-muted-foreground space-y-2 pt-4 border-t">
+                <p>Need help? Contact support with this reference:</p>
+                <code className="bg-muted px-2 py-1 rounded text-xs">
+                  {reference}
+                </code>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </>
   );
 }

@@ -72,57 +72,59 @@ export const useCart = () => {
   // Initialize cart tracking
   const { trackCart } = useCartTracking(cart);
 
-  // Initialize guest session when cart is first used
+  // Initialize guest session when cart is first used (PRODUCTION OPTIMIZED)
   useEffect(() => {
-    const initializeGuestSession = async () => {
-      if (!customerAccount && !guestSession && cart.items.length > 0) {
-        console.log('🛒 Initializing guest session for cart...');
-        await generateGuestSession();
-      }
-    };
+    if (!customerAccount && !guestSession && cart.items.length > 0 && isInitialized) {
+      console.log('🛒 Initializing guest session for cart...');
+      generateGuestSession().catch(console.error);
+    }
+  }, [cart.items.length, customerAccount, guestSession, generateGuestSession, isInitialized]);
 
-    initializeGuestSession();
-  }, [cart.items.length, customerAccount, guestSession, generateGuestSession]);
-
-  // Load cart from localStorage on mount
+  // Load cart from localStorage on mount (PRODUCTION OPTIMIZED)
   useEffect(() => {
     if (isInitialized) return; // Prevent double initialization
     
     console.log('🛒 useCart - Loading cart from localStorage...');
-    const savedCart = localStorage.getItem(CART_STORAGE_KEY);
-    console.log('🛒 useCart - Raw saved cart:', savedCart);
-    
-    if (savedCart) {
-      try {
+    try {
+      const savedCart = localStorage.getItem(CART_STORAGE_KEY);
+      console.log('🛒 useCart - Raw saved cart:', savedCart);
+      
+      if (savedCart) {
         const parsedCart = JSON.parse(savedCart);
-        console.log('🛒 useCart - Parsed cart from storage:', parsedCart);
-        console.log('🛒 useCart - Parsed cart items length:', parsedCart.items?.length);
         
         // Validate the parsed cart structure
         if (parsedCart && typeof parsedCart === 'object' && Array.isArray(parsedCart.items)) {
           setCart(parsedCart);
-          console.log('🛒 useCart - Cart state set from localStorage');
+          console.log('🛒 useCart - Cart restored from localStorage');
         } else {
-          console.warn('🛒 useCart - Invalid cart structure in localStorage, clearing...');
+          console.warn('🛒 useCart - Invalid cart structure, resetting...');
           localStorage.removeItem(CART_STORAGE_KEY);
         }
-      } catch (error) {
-        console.error('🛒 useCart - Error parsing cart from localStorage:', error);
-        localStorage.removeItem(CART_STORAGE_KEY);
+      } else {
+        console.log('🛒 useCart - No saved cart found in localStorage');
       }
-    } else {
-      console.log('🛒 useCart - No saved cart found in localStorage');
+    } catch (error) {
+      console.error('🛒 useCart - Error loading cart:', error);
+      localStorage.removeItem(CART_STORAGE_KEY);
     }
     
     setIsInitialized(true);
-  }, [isInitialized]);
+  }, []); // Remove isInitialized dependency to prevent loops
 
-  // Save cart to localStorage whenever it changes (only after initialization)
+  // Save cart to localStorage with debouncing for production stability
   useEffect(() => {
-    if (isInitialized) {
-      console.log('🛒 useCart - Saving cart to localStorage:', cart);
-      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
-    }
+    if (!isInitialized) return; // Don't save during initialization
+    
+    const timeoutId = setTimeout(() => {
+      try {
+        console.log('🛒 useCart - Saving cart to localStorage:', cart);
+        localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
+      } catch (error) {
+        console.error('🛒 useCart - Error saving cart:', error);
+      }
+    }, 100); // Debounce saves for performance
+
+    return () => clearTimeout(timeoutId);
   }, [cart, isInitialized]);
 
   const calculateCartSummary = (

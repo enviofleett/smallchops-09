@@ -8,56 +8,33 @@ import { initWebVitals } from "./utils/webVitals";
 // Initialize performance monitoring
 initWebVitals();
 
-// Production-safe payment cache management
-function clearPaymentCache() {
+// PRODUCTION-SAFE: Minimal cache management for stability
+function safeCacheCleanup() {
   try {
-    // Only clear payment-specific keys, not all storage
-    const paymentKeys = Object.keys(localStorage).filter(key => 
-      key.startsWith('payment_') || key.startsWith('pay_') || key.includes('reference') || key.includes('transaction')
-    );
-    
+    // Only clear potentially problematic payment data
+    const paymentKeys = ['payment_reference', 'payment_session', 'payment_tx'];
     paymentKeys.forEach(key => {
-      localStorage.removeItem(key);
+      if (localStorage.getItem(key)) {
+        localStorage.removeItem(key);
+      }
     });
+
+    // Version tracking for major updates only
+    const currentVersion = '1.1.0';
+    const lastVersion = localStorage.getItem('app_version');
     
-    const sessionKeys = Object.keys(sessionStorage).filter(key => 
-      key.startsWith('payment_') || key.startsWith('pay_') || key.includes('reference') || key.includes('transaction')
-    );
-    
-    sessionKeys.forEach(key => {
-      sessionStorage.removeItem(key);
-    });
-    
-    // Gentle version check - only clear if major version change
-    const currentVersion = '1.0.3';
-    const cachedVersion = localStorage.getItem('app_version');
-    
-    // Only clear on major version changes (not patch versions)
-    if (cachedVersion && !cachedVersion.startsWith('1.0')) {
-      console.info('Major version change detected, clearing caches');
-      localStorage.clear();
-      sessionStorage.clear();
+    if (!lastVersion) {
+      localStorage.setItem('app_version', currentVersion);
     }
     
-    localStorage.setItem('app_version', currentVersion);
+    console.info('✅ Cache cleanup completed safely');
   } catch (error) {
     console.warn('Cache cleanup failed:', error);
   }
 }
 
-// Safe cache cleanup
-clearPaymentCache();
-
-// Production-safe monitoring (logging only, no blocking)
-if (process.env.NODE_ENV === 'development') {
-  (window as any).validatePaymentReference = (reference: string) => {
-    if (reference && reference.startsWith('pay_')) {
-      console.warn('Frontend reference detected:', reference);
-      return false;
-    }
-    return true;
-  };
-}
+// Execute safe cleanup
+safeCacheCleanup();
 
 // Disable existing service workers to prevent stale asset caching that can break dynamic imports
 if ('serviceWorker' in navigator) {

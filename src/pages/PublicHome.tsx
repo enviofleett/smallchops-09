@@ -85,8 +85,7 @@ const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
 MemoizedProductCard.displayName = 'MemoizedProductCard';
 
 const PublicHome = () => {
-  PerformanceMonitor.startTiming('PublicHome Render');
-  
+  // Remove performance monitoring for production stability
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
@@ -96,26 +95,25 @@ const PublicHome = () => {
   const { addItem } = useCart();
   const { toast } = useToast();
 
-  // Preload critical images
+  // Preload critical images (reduced for performance)
   useImagePreloader([
-    'https://images.unsplash.com/photo-1618160702438-9b02ab6515c9?w=300&h=300&fit=crop',
     '/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png'
   ]);
 
-  React.useEffect(() => {
-    PerformanceMonitor.endTiming('PublicHome Render');
-  }, []);
-
-  // Fetch products with discounts
+  // Fetch products with discounts (PRODUCTION OPTIMIZED)
   const { data: products = [], isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
     queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (renamed from cacheTime)
   });
 
-  // Fetch categories
+  // Fetch categories (PRODUCTION OPTIMIZED)
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    gcTime: 30 * 60 * 1000, // 30 minutes (renamed from cacheTime)
   });
 
   // Filter products based on search
@@ -128,22 +126,31 @@ const PublicHome = () => {
   const startIndex = (currentPage - 1) * itemsPerPage;
   const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
 
-  const handleAddToCart = (product: any) => {
-    addItem({
-      id: product.id,
-      name: product.name,
-      price: product.discounted_price || product.price,
-      original_price: product.price,
-      discount_amount: product.discount_amount,
-      vat_rate: product.vat_rate || 7.5,
-      image_url: product.image_url,
-    });
-    
-    toast({
-      title: "Added to cart",
-      description: `${product.name} has been added to your cart.`,
-    });
-  };
+  const handleAddToCart = React.useCallback((product: any) => {
+    try {
+      addItem({
+        id: product.id,
+        name: product.name,
+        price: product.discounted_price || product.price,
+        original_price: product.price,
+        discount_amount: product.discount_amount,
+        vat_rate: product.vat_rate || 7.5,
+        image_url: product.image_url,
+      });
+      
+      toast({
+        title: "Added to cart",
+        description: `${product.name} has been added to your cart.`,
+      });
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      toast({
+        title: "Error",
+        description: "Failed to add item to cart. Please try again.",
+        variant: "destructive",
+      });
+    }
+  }, [addItem, toast]);
 
   const renderStars = React.useCallback((rating: number) => {
     return Array.from({ length: 5 }, (_, i) => (

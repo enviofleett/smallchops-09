@@ -209,105 +209,136 @@ export default function PaymentCallback() {
     }
   }, [reference, paymentStatus, navigate]);
 
-  const verifyPayment = async (paymentReference: string) => {
+  const verifyPayment = async (paymentReference: string, maxRetries = 3) => {
     if (verifyingRef.current) return; // double-submit guard
     verifyingRef.current = true;
-    try {
-      setStatus('verifying');
-      logVerificationStarted(paymentReference);
+    
+    let retryCount = 0;
+    
+    while (retryCount < maxRetries) {
+      try {
+        setStatus('verifying');
+        logVerificationStarted(paymentReference);
 
-      // Single definitive call: server completes all DB updates before responding
-      const { data, error } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference: paymentReference, order_id: orderIdParam }
-      });
-
-      if (error || !data?.status) {
-        throw new Error((error as any)?.message || data?.error || 'Verification failed');
-      }
-
-      const payload = data.data || data;
-      const isSuccess = payload?.status === 'success' || payload?.payment_status === 'paid' || data?.success === true;
-
-      if (isSuccess) {
-        console.log('✅ PaymentCallback: Payment verification successful!');
-        setStatus('success');
-        setResult({
-          success: true,
-          order_id: payload?.order_id,
-          order_number: payload?.order_number,
-          amount: typeof payload?.total_amount === 'number'
-            ? payload.total_amount
-            : (typeof payload?.amount === 'number' ? payload.amount / 100 : undefined),
-          message: 'Payment verified successfully! Your order has been confirmed.'
+        // Call with retry logic
+        const { data, error } = await supabase.functions.invoke('paystack-secure', {
+          body: { action: 'verify', reference: paymentReference, order_id: orderIdParam }
         });
 
-        // Log successful verification
-        logPaymentVerification(paymentReference, true);
-        logVerificationCompleted(paymentReference, true, { orderId: payload?.order_id });
-
-        // 🚀 COORDINATE 15-SECOND COMPLETION FLOW
-        paymentCompletionCoordinator.coordinatePaymentCompletion(
-          {
-            reference: paymentReference,
-            orderNumber: payload?.order_number,
-            orderId: payload?.order_id,
-            amount: typeof payload?.total_amount === 'number'
-              ? payload.total_amount
-              : (typeof payload?.amount === 'number' ? payload.amount / 100 : undefined)
-          },
-          {
-            onClearCart: () => {
-              console.log('🛒 Coordinated cart clearing triggered');
-              clearCart();
-              clearCheckoutState();
-            },
-            onStopMonitoring: () => {
-              console.log('🛑 Coordinated monitoring stop triggered');
-              // Will emit global event to stop PaymentStatusMonitor
-            },
-            onNavigate: () => {
-              console.log('🧭 Coordinated navigation triggered');
-              navigate('/customer-profile');
-            }
-          }
-        );
-
-        // Emit global payment-confirmed event for listeners
-        try {
-          window.dispatchEvent(new CustomEvent('payment-confirmed', {
-            detail: { orderId: payload?.order_id || orderIdParam, orderReference: paymentReference }
-          }));
-        } catch {}
-
-        // Invalidate caches now and again after a short delay for replication safety
-        await invalidateOrdersCaches();
-        if (refetchOrders) {
-          setTimeout(() => { refetchOrders().catch(() => {}); }, 500);
+        if (error) {
+          throw new Error(error.message || 'Verification failed');
         }
-        setTimeout(() => { invalidateOrdersCaches(); }, 2500);
 
-        // Clean the URL to remove sensitive query params
-        navigate('/payment/callback', { replace: true });
-      } else {
-        console.log(`⚠️ PaymentCallback: Payment not successful - status: ${payload?.status}`);
-        throw new Error(payload?.gateway_response || `Payment status: ${payload?.status}`);
+        if (data?.status) {
+          // Success case - process the result
+          const payload = data.data || data;
+          const isSuccess = payload?.status === 'success' || payload?.payment_status === 'paid' || data?.success === true;
+
+          if (isSuccess) {
+            console.log('✅ PaymentCallback: Payment verification successful!');
+            setStatus('success');
+            setResult({
+              success: true,
+              order_id: payload?.order_id,
+              order_number: payload?.order_number,
+              amount: typeof payload?.total_amount === 'number'
+                ? payload.total_amount
+                : (typeof payload?.amount === 'number' ? payload.amount / 100 : undefined),
+              message: 'Payment verified successfully! Your order has been confirmed.'
+            });
+
+            // Log successful verification
+            logPaymentVerification(paymentReference, true);
+            logVerificationCompleted(paymentReference, true, { orderId: payload?.order_id });
+
+            // 🚀 COORDINATE 15-SECOND COMPLETION FLOW
+            paymentCompletionCoordinator.coordinatePaymentCompletion(
+              {
+                reference: paymentReference,
+                orderNumber: payload?.order_number,
+                orderId: payload?.order_id,
+                amount: typeof payload?.total_amount === 'number'
+                  ? payload.total_amount
+                  : (typeof payload?.amount === 'number' ? payload.amount / 100 : undefined)
+              },
+              {
+                onClearCart: () => {
+                  console.log('🛒 Coordinated cart clearing triggered');
+                  clearCart();
+                  clearCheckoutState();
+                },
+                onStopMonitoring: () => {
+                  console.log('🛑 Coordinated monitoring stop triggered');
+                  // Will emit global event to stop PaymentStatusMonitor
+                },
+                onNavigate: () => {
+                  console.log('🧭 Coordinated navigation triggered');
+                  navigate('/customer-profile');
+                }
+              }
+            );
+
+            // Emit global payment-confirmed event for listeners
+            try {
+              window.dispatchEvent(new CustomEvent('payment-confirmed', {
+                detail: { orderId: payload?.order_id || orderIdParam, orderReference: paymentReference }
+              }));
+            } catch {}
+
+            // Invalidate caches now and again after a short delay for replication safety
+            await invalidateOrdersCaches();
+            if (refetchOrders) {
+              setTimeout(() => { refetchOrders().catch(() => {}); }, 500);
+            }
+            setTimeout(() => { invalidateOrdersCaches(); }, 2500);
+
+            // Clean the URL to remove sensitive query params
+            navigate('/payment/callback', { replace: true });
+            return; // Success - exit retry loop
+          } else {
+            console.log(`⚠️ PaymentCallback: Payment not successful - status: ${payload?.status}`);
+            throw new Error(payload?.gateway_response || `Payment status: ${payload?.status}`);
+          }
+        }
+
+        // Handle service errors that should trigger retry
+        if (data?.code === 'VERIFICATION_TIMEOUT' || data?.code === 'DB_ERROR') {
+          throw new Error('Service temporarily unavailable');
+        }
+
+        // Other errors that shouldn't retry
+        throw new Error(data?.error || 'Unknown verification error');
+
+      } catch (err: any) {
+        retryCount++;
+        console.error(`❌ Payment verification attempt ${retryCount} failed:`, err);
+        
+        if (retryCount >= maxRetries) {
+          console.error('❌ PaymentCallback verification failed after all retries:', err);
+          setStatus('failed');
+          setResult({
+            success: false,
+            error: err?.message || 'Verification failed',
+            message: 'Unable to verify payment after multiple attempts. Please contact support with your payment reference.',
+            retryable: true
+          });
+
+          // Log failed verification
+          logPaymentVerification(paymentReference, false, retryCount, err?.message);
+          logVerificationCompleted(paymentReference, false, { error: err?.message, attempts: retryCount });
+
+          // Clean the URL on error as well
+          navigate('/payment/callback', { replace: true });
+          return;
+        }
+        
+        // Wait before retry: 2s, 4s, 8s
+        await new Promise(resolve => 
+          setTimeout(resolve, 2000 * Math.pow(2, retryCount - 1))
+        );
       }
-    } catch (err: any) {
-      console.error('❌ PaymentCallback verification failed:', err);
-      setStatus('failed');
-      setResult({
-        success: false,
-        error: err?.message || 'Verification failed',
-        message: 'Unable to verify payment. Please contact support with your payment reference.',
-        retryable: false
-      });
+    }
 
-      // Log failed verification
-      logPaymentVerification(paymentReference, false, 1, err?.message);
-      logVerificationCompleted(paymentReference, false, { error: err?.message });
-
-      // Clean the URL on error as well
-      navigate('/payment/callback', { replace: true });
     } finally {
       verifyingRef.current = false;
     }

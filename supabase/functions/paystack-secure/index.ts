@@ -12,6 +12,23 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// Timeout configuration
+const PAYSTACK_TIMEOUT = 10000; // 10 seconds
+const MAX_RETRIES = 3;
+
+// Enhanced logging for debugging
+const logError = (context: string, error: any, metadata: any = {}) => {
+  const errorLog = {
+    timestamp: new Date().toISOString(),
+    context,
+    error: error.message || error,
+    stack: error.stack,
+    metadata,
+    request_id: crypto.randomUUID()
+  };
+  console.error('PAYMENT_ERROR:', JSON.stringify(errorLog));
+};
+
 interface PaystackVerificationResponse {
   status: boolean;
   message: string;
@@ -38,7 +55,7 @@ interface PaystackVerificationResponse {
   };
 }
 
-serve(async (req) => {
+const handlePaymentRequest = async (req: Request) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -104,6 +121,10 @@ serve(async (req) => {
         
         console.log('📤 Paystack request:', JSON.stringify(paymentRequest))
         
+        // Add timeout for initialization
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), PAYSTACK_TIMEOUT);
+        
         const initializeResponse = await fetch('https://api.paystack.co/transaction/initialize', {
           method: 'POST',
           headers: {
@@ -111,7 +132,10 @@ serve(async (req) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(paymentRequest),
-        })
+          signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
 
         const initData = await initializeResponse.json()
         
@@ -145,20 +169,52 @@ serve(async (req) => {
           throw new Error('Payment reference is required for verification')
         }
 
-        try {
-          const verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${paystackSecretKey}`,
-              'Content-Type': 'application/json',
-            },
-          })
-
-          if (!verifyResponse.ok) {
-            const errorText = await verifyResponse.text()
-            console.log(`❌ Paystack verification HTTP error: ${verifyResponse.status} ${errorText}`)
-            throw new Error(`Paystack verification failed (${verifyResponse.status}): ${errorText}`)
+        let retryCount = 0;
+        let verifyResponse;
+        
+        while (retryCount < MAX_RETRIES) {
+          try {
+            // Add AbortController for timeout
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), PAYSTACK_TIMEOUT);
+            
+            verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+              method: 'GET',
+              headers: {
+                'Authorization': `Bearer ${paystackSecretKey}`,
+                'Content-Type': 'application/json',
+              },
+              signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            
+            if (verifyResponse.ok) break; // Success, exit retry loop
+            
+            const errorText = await verifyResponse.text();
+            throw new Error(`Paystack API error (${verifyResponse.status}): ${errorText}`);
+            
+          } catch (error) {
+            retryCount++;
+            logError('PAYSTACK_VERIFY_ATTEMPT', error, { attempt: retryCount, reference });
+            
+            if (retryCount >= MAX_RETRIES) {
+              console.error('Paystack API failed after retries:', error);
+              return new Response(JSON.stringify({
+                status: false,
+                error: 'Payment verification temporarily unavailable',
+                code: 'VERIFICATION_TIMEOUT',
+                reference
+              }), {
+                status: 503, // Service Unavailable instead of 500
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              });
+            }
+            
+            // Exponential backoff: wait 1s, 2s, 4s
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount - 1)));
           }
+        }
 
           const verificationData = await verifyResponse.json()
           
@@ -179,19 +235,63 @@ serve(async (req) => {
             console.log(`🔍 Looking for order with reference: ${orderReference}`)
 
             if (orderReference) {
-              const { data: updateResult, error: updateError } = await supabase
-                .rpc('handle_successful_payment', {
-                  p_paystack_reference: paymentData.reference,
-                  p_order_reference: orderReference,
-                  p_amount: paymentData.amount / 100,
-                  p_currency: paymentData.currency || 'NGN',
-                  p_paystack_data: paymentData
-                })
+              try {
+                const { data: updateResult, error: updateError } = await supabase
+                  .rpc('handle_successful_payment', {
+                    p_paystack_reference: paymentData.reference,
+                    p_order_reference: orderReference,
+                    p_amount: paymentData.amount / 100,
+                    p_currency: paymentData.currency || 'NGN',
+                    p_paystack_data: paymentData
+                  });
 
-              if (updateError) {
-                console.error('❌ Order update failed:', updateError)
-              } else {
-                console.log('✅ Order updated successfully:', updateResult)
+                if (updateError) {
+                  logError('RPC_ERROR', updateError, { reference, orderReference });
+                  
+                  // Check if it's a duplicate processing attempt
+                  if (updateError.code === '23505' || updateError.message.includes('duplicate')) {
+                    return new Response(JSON.stringify({
+                      status: true,
+                      message: 'Payment already processed',
+                      reference: paymentData.reference,
+                      data: {
+                        reference: paymentData.reference,
+                        amount: paymentData.amount / 100,
+                        status: paymentData.status,
+                        currency: paymentData.currency,
+                        paid_at: paymentData.paid_at,
+                        channel: paymentData.channel
+                      }
+                    }), {
+                      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                    });
+                  }
+                  
+                  // Other database errors
+                  return new Response(JSON.stringify({
+                    status: false,
+                    error: 'Database update failed',
+                    code: 'DB_ERROR',
+                    reference: paymentData.reference
+                  }), {
+                    status: 503,
+                    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                  });
+                }
+
+                console.log('✅ Order updated successfully:', updateResult);
+                
+              } catch (dbError) {
+                logError('DB_CONNECTION_ERROR', dbError, { reference, orderReference });
+                return new Response(JSON.stringify({
+                  status: false,
+                  error: 'Database temporarily unavailable',
+                  code: 'DB_CONNECTION_ERROR',
+                  reference: paymentData.reference
+                }), {
+                  status: 503,
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+                });
               }
             }
 
@@ -221,20 +321,56 @@ serve(async (req) => {
     }
 
   } catch (error) {
-    console.error('❌ Edge function error:', error)
+    logError('PAYMENT_HANDLER', error, { url: req.url });
 
     return new Response(
       JSON.stringify({
         status: false,
-        error: error.message || 'An unexpected error occurred'
+        error: error.message || 'Payment service temporarily unavailable',
+        code: 'INTERNAL_ERROR'
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500
+        status: 503
       }
     )
   }
-})
+};
+
+// Main handler with request tracking
+serve(async (req: Request) => {
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+  
+  try {
+    const result = await handlePaymentRequest(req);
+    
+    // Log successful requests
+    console.log('PAYMENT_SUCCESS:', {
+      request_id: requestId,
+      duration: Date.now() - startTime,
+      timestamp: new Date().toISOString()
+    });
+    
+    return result;
+    
+  } catch (error) {
+    logError('PAYMENT_HANDLER', error, {
+      request_id: requestId,
+      duration: Date.now() - startTime,
+      url: req.url
+    });
+    
+    return new Response(JSON.stringify({
+      status: false,
+      error: 'Payment service temporarily unavailable',
+      request_id: requestId
+    }), {
+      status: 503,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
+});
 
 // ========================================
 // 🚀 DEPLOYMENT CHECKLIST

@@ -32,7 +32,7 @@ export const useAdminManagement = () => {
   const adminsQuery = useQuery({
     queryKey: ['admin-users'],
     queryFn: async (): Promise<AdminUser[]> => {
-      const { data, error } = await supabase.functions.invoke('admin-management', {
+      const { data, error } = await supabase.functions.invoke('admin-management?action=get_admins', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -57,7 +57,7 @@ export const useAdminManagement = () => {
   const invitationsQuery = useQuery({
     queryKey: ['admin-invitations'],
     queryFn: async (): Promise<AdminInvitation[]> => {
-      const { data, error } = await supabase.functions.invoke('admin-management', {
+      const { data, error } = await supabase.functions.invoke('admin-management?action=get_invitations', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -82,6 +82,7 @@ export const useAdminManagement = () => {
   const sendInvitationMutation = useMutation({
     mutationFn: async ({ email, role }: { email: string; role: string }) => {
       const { data, error } = await supabase.functions.invoke('admin-management', {
+        method: 'POST',
         body: { email, role },
         headers: {
           'Content-Type': 'application/json',

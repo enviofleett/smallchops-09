@@ -40,7 +40,7 @@ const Categories = withLazyLoading(() => import("./pages/Categories"));
 // Lazy load customer components
 const CustomerFavorites = withLazyLoading(() => import("./pages/CustomerFavorites"));
 const PurchaseHistory = withLazyLoading(() => import("./pages/PurchaseHistory"));
-const PaymentCallback = withLazyLoading(() => import("./pages/PaymentCallback"));
+const PaymentCallback = withLazyLoading(() => import("./pages/PaymentCallbackPage").then(m => ({ default: m.PaymentCallbackPage })));
 const PaymentCallbackRedirect = withLazyLoading(() => import("./pages/PaymentCallbackRedirect"));
 const Unsubscribe = withLazyLoading(() => import("./pages/Unsubscribe"));
 const AdminSetup = withLazyLoading(() => import("./pages/AdminSetup"));

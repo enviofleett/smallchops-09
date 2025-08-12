@@ -1,54 +1,51 @@
 // ========================================
-// 🔧 FRONTEND REFERENCE FORMAT FIX
-// Align with Backend txn_ Format
+// 🔧 EMERGENCY PAYMENT REFERENCE FIX
+// Frontend Reference Generation ELIMINATED
 // ========================================
 
-import { generateSecureToken } from './crypto';
-
 /**
- * Generate payment reference in txn_ format to match backend expectations
+ * CRITICAL: Frontend CANNOT generate references anymore
+ * Only backend has authority to generate txn_ references
  */
-export const generatePaymentReference = (): string => {
-  const timestamp = Date.now();
-  const uuid = crypto.randomUUID ? crypto.randomUUID() : generateFallbackUUID();
-  return `txn_${timestamp}_${uuid}`;
-};
 
 /**
- * Fallback UUID generation for older browsers
- */
-const generateFallbackUUID = (): string => {
-  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-    const r = Math.random() * 16 | 0;
-    const v = c == 'x' ? r : (r & 0x3 | 0x8);
-    return v.toString(16);
-  });
-};
-
-/**
- * Enhanced validation for payment references with multiple format support
+ * STRICT validation - only allows backend-generated txn_ references
  */
 export const isValidPaymentReference = (reference: string): boolean => {
   if (!reference || typeof reference !== 'string') return false;
   
-  // Valid formats:
-  // - txn_[timestamp]_[uuid] (server-generated)
-  // - pay_[timestamp]_[random] (client-generated backup)
-  // - Standard Paystack references (alphanumeric, 15+ chars)
-  const serverFormat = /^txn_\d+_[a-f0-9-]{36}$/;
-  const clientFormat = /^pay_\d+_[a-zA-Z0-9]{9,}$/;
-  const standardFormat = /^[a-zA-Z0-9_-]{15,}$/;
+  // ONLY backend txn_ format is allowed
+  const backendFormat = /^txn_\d+_[a-f0-9-]{36}$/;
+  const isValid = backendFormat.test(reference);
   
-  return serverFormat.test(reference) || 
-         clientFormat.test(reference) || 
-         standardFormat.test(reference);
+  // Log and reject any invalid format attempts
+  if (!isValid) {
+    console.error('🚨 INVALID REFERENCE FORMAT DETECTED:', {
+      reference,
+      expected: 'txn_[timestamp]_[uuid]',
+      source: 'frontend_validation'
+    });
+  }
+  
+  return isValid;
 };
 
 /**
- * Generate client-side backup reference
+ * Strict backend-only reference validation
  */
-export const generateClientReference = (): string => {
-  return `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+export const validateBackendReference = (reference: string): boolean => {
+  return isValidPaymentReference(reference);
+};
+
+/**
+ * Reject any pay_ references immediately
+ */
+export const rejectClientReference = (reference: string): boolean => {
+  if (reference?.startsWith('pay_')) {
+    console.error('🚨 CLIENT REFERENCE REJECTED:', reference);
+    throw new Error('Client-generated references are deprecated. Backend must generate all references.');
+  }
+  return true;
 };
 
 /**

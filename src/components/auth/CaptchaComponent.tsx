@@ -1,9 +1,10 @@
 import React, { useRef, useCallback, useState, useEffect } from 'react';
-import HCaptcha from '@hcaptcha/react-hcaptcha';
+import { Turnstile } from '@marsidev/react-turnstile';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { Shield, AlertTriangle, RefreshCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { CAPTCHA_CONFIG, getCaptchaSiteKey } from '@/config/captcha';
 
 interface CaptchaComponentProps {
   onVerify: (token: string) => void;
@@ -12,7 +13,7 @@ interface CaptchaComponentProps {
   className?: string;
   disabled?: boolean;
   size?: 'normal' | 'compact';
-  theme?: 'light' | 'dark';
+  theme?: 'light' | 'dark' | 'auto';
   showRetry?: boolean;
   required?: boolean;
 }
@@ -24,20 +25,32 @@ export const CaptchaComponent = ({
   className,
   disabled = false,
   size = 'normal',
-  theme = 'light',
+  theme = 'auto',
   showRetry = true,
   required = false
 }: CaptchaComponentProps) => {
-  const captchaRef = useRef<HCaptcha>(null);
+  const turnstileRef = useRef<any>(null);
   const [captchaError, setCaptchaError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
   const [retryCount, setRetryCount] = useState(0);
   const [isExpired, setIsExpired] = useState(false);
+  const [siteKey, setSiteKey] = useState<string>(CAPTCHA_CONFIG.SITE_KEY);
 
-  // Import production CAPTCHA config
-  const HCAPTCHA_SITE_KEY = '10000000-ffff-ffff-ffff-000000000001'; // Demo key - replace with production key
+  // Load production site key on mount
+  useEffect(() => {
+    const loadSiteKey = async () => {
+      try {
+        const key = await getCaptchaSiteKey();
+        setSiteKey(key);
+      } catch (error) {
+        console.warn('Failed to load Turnstile site key:', error);
+        // Keep default demo key
+      }
+    };
+    loadSiteKey();
+  }, []);
 
-  const handleVerify = useCallback((token: string) => {
+  const handleSuccess = useCallback((token: string) => {
     setCaptchaError(null);
     setIsExpired(false);
     setIsLoading(false);
@@ -45,15 +58,39 @@ export const CaptchaComponent = ({
   }, [onVerify]);
 
   const handleError = useCallback((error: string) => {
-    console.error('CAPTCHA Error:', error);
-    setCaptchaError(error);
+    console.error('Turnstile Error:', error);
+    
+    // Map Turnstile error codes to user-friendly messages
+    let errorMessage: string;
+    
+    switch (error) {
+      case 'network-error':
+        errorMessage = CAPTCHA_CONFIG.ERRORS.NETWORK_ERROR;
+        break;
+      case 'timeout-or-duplicate':
+        errorMessage = CAPTCHA_CONFIG.ERRORS.CHALLENGE_TIMEOUT;
+        break;
+      case 'internal-error':
+        errorMessage = CAPTCHA_CONFIG.ERRORS.INTERNAL_ERROR;
+        break;
+      case 'challenge-error':
+        errorMessage = CAPTCHA_CONFIG.ERRORS.INVALID_RESPONSE;
+        break;
+      case 'rate-limited':
+        errorMessage = CAPTCHA_CONFIG.ERRORS.RATE_LIMITED;
+        break;
+      default:
+        errorMessage = CAPTCHA_CONFIG.ERRORS.GENERIC_CLIENT_ERROR;
+    }
+    
+    setCaptchaError(errorMessage);
     setIsLoading(false);
-    onError?.(error);
+    onError?.(errorMessage);
   }, [onError]);
 
   const handleExpire = useCallback(() => {
     setIsExpired(true);
-    setCaptchaError('CAPTCHA expired. Please verify again.');
+    setCaptchaError(CAPTCHA_CONFIG.ERRORS.CHALLENGE_EXPIRED);
     onExpire?.();
   }, [onExpire]);
 
@@ -61,16 +98,22 @@ export const CaptchaComponent = ({
     setCaptchaError(null);
     setIsExpired(false);
     setRetryCount(prev => prev + 1);
-    captchaRef.current?.resetCaptcha();
+    setIsLoading(true);
+    
+    // Reset the Turnstile widget
+    if (turnstileRef.current) {
+      turnstileRef.current.reset();
+    }
   }, []);
 
   const handleLoad = useCallback(() => {
     setIsLoading(false);
   }, []);
 
+  // Reset when disabled
   useEffect(() => {
-    if (disabled) {
-      captchaRef.current?.resetCaptcha();
+    if (disabled && turnstileRef.current) {
+      turnstileRef.current.reset();
     }
   }, [disabled]);
 
@@ -82,23 +125,26 @@ export const CaptchaComponent = ({
         <span>Security Verification{required && ' *'}</span>
       </div>
 
-      {/* CAPTCHA Widget */}
+      {/* Turnstile Widget */}
       <div className="flex flex-col items-center space-y-3">
         <div className={cn(
-          "relative",
+          "relative w-full flex justify-center",
           isLoading && "opacity-50",
           disabled && "pointer-events-none opacity-30"
         )}>
-          <HCaptcha
-            ref={captchaRef}
-            sitekey={HCAPTCHA_SITE_KEY}
-            onVerify={handleVerify}
+          <Turnstile
+            ref={turnstileRef}
+            siteKey={siteKey}
+            onSuccess={handleSuccess}
             onError={handleError}
             onExpire={handleExpire}
             onLoad={handleLoad}
-            size={size}
-            theme={theme}
-            tabIndex={disabled ? -1 : 0}
+            options={{
+              theme: theme as any,
+              size: size as any,
+              appearance: CAPTCHA_CONFIG.UI.APPEARANCE as any,
+              language: CAPTCHA_CONFIG.PERFORMANCE.LANGUAGE,
+            }}
           />
           
           {isLoading && (
@@ -139,7 +185,7 @@ export const CaptchaComponent = ({
 
       {/* Helper Text */}
       <p className="text-xs text-muted-foreground text-center">
-        This helps protect against automated abuse.
+        Protected by Cloudflare Turnstile. This helps protect against automated abuse.
       </p>
     </div>
   );

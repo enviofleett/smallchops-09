@@ -30,7 +30,7 @@ export const useCustomerDirectAuth = () => {
         password,
       };
 
-      // Include CAPTCHA token if provided
+      // Include Turnstile CAPTCHA token if provided
       if (captchaToken) {
         signInOptions.options = {
           captchaToken
@@ -107,7 +107,7 @@ export const useCustomerDirectAuth = () => {
         }
       };
 
-      // Include CAPTCHA token if provided
+      // Include Turnstile CAPTCHA token if provided
       if (captchaToken) {
         signUpOptions.options.captchaToken = captchaToken;
       }
@@ -219,7 +219,7 @@ export const useCustomerDirectAuth = () => {
         }
       };
 
-      // Include CAPTCHA token if provided
+      // Include Turnstile CAPTCHA token if provided
       if (captchaToken) {
         oauthOptions.options.captchaToken = captchaToken;
       }

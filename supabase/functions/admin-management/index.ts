@@ -5,6 +5,66 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'GET, POST, PUT, OPTIONS',
+}
+
+// Utility: Safe JSON parsing with validation
+async function safeJsonParse(req: Request) {
+  const contentType = req.headers.get('content-type') || ''
+  if (!contentType.toLowerCase().includes('application/json')) {
+    return null
+  }
+  
+  try {
+    const text = await req.text()
+    if (!text.trim()) return null
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
+}
+
+// Utility: Standardized JSON response
+function jsonResponse(
+  body: { success: boolean; data?: any; error?: string; code?: string; message?: string },
+  status = 200
+) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+// Utility: Get authenticated admin user
+async function getAuthenticatedAdminUser(supabase: any, req: Request) {
+  const authHeader = req.headers.get('Authorization')
+  if (!authHeader) {
+    throw { status: 401, code: 'MISSING_AUTH', message: 'Missing authorization header' }
+  }
+
+  const token = authHeader.replace('Bearer ', '')
+  const { data: { user }, error: userError } = await supabase.auth.getUser(token)
+  
+  if (userError || !user) {
+    throw { status: 401, code: 'INVALID_TOKEN', message: 'Invalid token' }
+  }
+
+  // Check if user is admin
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('role, is_active')
+    .eq('id', user.id)
+    .single()
+
+  if (profileError || !profile) {
+    throw { status: 403, code: 'ACCESS_DENIED', message: 'Access denied - profile not found' }
+  }
+
+  if (profile.role !== 'admin' || !profile.is_active) {
+    throw { status: 403, code: 'ACCESS_DENIED', message: 'Access denied - admin privileges required' }
+  }
+
+  return user
 }
 
 interface AdminInvitation {
@@ -21,92 +81,97 @@ interface AdminUpdate {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    
+    if (!supabaseUrl || !supabaseServiceKey) {
+      console.error('[ADMIN] Missing Supabase environment variables')
+      return jsonResponse({ 
+        success: false, 
+        error: 'Server misconfiguration', 
+        code: 'SERVER_CONFIG' 
+      }, 500)
+    }
     
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
-    });
+    })
 
-    // Get user from auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('Missing authorization header');
-    }
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+    // Authenticate and authorize user (unified for all routes)
+    const user = await getAuthenticatedAdminUser(supabase, req)
     
-    if (userError || !user) {
-      throw new Error('Invalid token');
-    }
-
-    // Check if user is admin
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, is_active')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile || profile.role !== 'admin' || !profile.is_active) {
-      throw new Error('Access denied - admin privileges required');
-    }
-
-    const url = new URL(req.url);
-    const action = url.searchParams.get('action');
+    const url = new URL(req.url)
+    const action = url.searchParams.get('action')
 
     switch (req.method) {
       case 'GET':
-        return await handleGet(supabase, action);
+        return await handleGet(supabase, action)
       case 'POST':
-        return await handlePost(supabase, req);
+        return await handlePost(supabase, req, user)
       case 'PUT':
-        return await handlePut(supabase, req);
+        return await handlePut(supabase, req)
       default:
-        throw new Error('Method not allowed');
+        return jsonResponse({ 
+          success: false, 
+          error: 'Method not allowed', 
+          code: 'METHOD_NOT_ALLOWED' 
+        }, 405)
     }
 
-  } catch (error) {
-    console.error('Admin management error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      }
-    );
+  } catch (error: any) {
+    const status = error?.status || 500
+    const code = error?.code || 'UNEXPECTED_ERROR'
+    const message = error?.message || 'Unexpected error occurred'
+    
+    console.error('[ADMIN] Error:', { status, code, message, url: req.url })
+    
+    return jsonResponse({ 
+      success: false, 
+      error: message, 
+      code 
+    }, status)
   }
-});
+})
 
 async function handleGet(supabase: any, action: string | null) {
+  if (!action) {
+    console.warn('[ADMIN-GET] Missing action parameter')
+    throw { 
+      status: 400, 
+      code: 'MISSING_ACTION', 
+      message: 'Action parameter is required for GET requests' 
+    }
+  }
+
   switch (action) {
     case 'get_admins':
-      console.log('Fetching admin users...');
+      console.log('[ADMIN-GET] Fetching admin users...')
       const { data: admins, error: adminsError } = await supabase
         .from('profiles')
         .select('id, name, email, role, status, created_at, is_active')
         .eq('role', 'admin')
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
 
       if (adminsError) {
-        throw new Error(`Failed to fetch admins: ${adminsError.message}`);
+        throw { 
+          status: 500, 
+          code: 'DB_ERROR', 
+          message: `Failed to fetch admins: ${adminsError.message}` 
+        }
       }
 
-      console.log(`Successfully fetched ${admins?.length || 0} admins`);
-      return new Response(
-        JSON.stringify({ success: true, data: admins }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.log(`[ADMIN-GET] Successfully fetched ${admins?.length || 0} admins`)
+      return jsonResponse({ success: true, data: admins })
 
     case 'get_invitations':
-      console.log('Fetching admin invitations...');
+      console.log('[ADMIN-GET] Fetching admin invitations...')
       const { data: invitations, error: invitationsError } = await supabase
         .from('admin_invitations')
         .select(`
@@ -119,58 +184,73 @@ async function handleGet(supabase: any, action: string | null) {
           invited_by,
           profiles!admin_invitations_invited_by_fkey(name)
         `)
-        .order('created_at', { ascending: false });
+        .order('created_at', { ascending: false })
 
       if (invitationsError) {
-        throw new Error(`Failed to fetch invitations: ${invitationsError.message}`);
+        throw { 
+          status: 500, 
+          code: 'DB_ERROR', 
+          message: `Failed to fetch invitations: ${invitationsError.message}` 
+        }
       }
 
-      console.log(`Successfully fetched ${invitations?.length || 0} invitations`);
-      return new Response(
-        JSON.stringify({ success: true, data: invitations }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.log(`[ADMIN-GET] Successfully fetched ${invitations?.length || 0} invitations`)
+      return jsonResponse({ success: true, data: invitations })
 
     default:
-      throw new Error('Invalid action for GET request');
+      throw { 
+        status: 400, 
+        code: 'INVALID_ACTION', 
+        message: `Invalid action for GET request: ${action}` 
+      }
   }
 }
 
-async function handlePost(supabase: any, req: Request) {
-  const body: AdminInvitation = await req.json();
+async function handlePost(supabase: any, req: Request, user: any) {
+  // Safe JSON parsing
+  const body = await safeJsonParse(req)
   
-  console.log('Sending admin invitation to:', body.email);
+  if (!body) {
+    throw { 
+      status: 400, 
+      code: 'BAD_JSON', 
+      message: 'Invalid or empty JSON body' 
+    }
+  }
   
-  // Validate input
+  console.log('[ADMIN-POST] Sending admin invitation to:', body.email)
+  
+  // Enhanced input validation
   if (!body.email || !body.role) {
-    throw new Error('Email and role are required');
+    throw { 
+      status: 400, 
+      code: 'REQUIRED_FIELDS', 
+      message: 'Email and role are required' 
+    }
   }
 
-  if (!body.email.includes('@')) {
-    throw new Error('Invalid email format');
+  // More robust email validation
+  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+  if (!emailRegex.test(body.email)) {
+    throw { 
+      status: 400, 
+      code: 'INVALID_EMAIL', 
+      message: 'Invalid email format' 
+    }
   }
 
   if (!['admin', 'user'].includes(body.role)) {
-    throw new Error('Invalid role');
-  }
-
-  // Get the current user for invited_by field
-  const authHeader = req.headers.get('Authorization');
-  if (!authHeader) {
-    throw new Error('Missing authorization header');
-  }
-
-  const token = authHeader.replace('Bearer ', '');
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
-  
-  if (userError || !user) {
-    throw new Error('Invalid token');
+    throw { 
+      status: 400, 
+      code: 'INVALID_ROLE', 
+      message: 'Role must be either "admin" or "user"' 
+    }
   }
 
   // Create admin invitation directly in the database
-  const invitationToken = crypto.randomUUID();
-  const expiresAt = new Date();
-  expiresAt.setDate(expiresAt.getDate() + 7); // Expires in 7 days
+  const invitationToken = crypto.randomUUID()
+  const expiresAt = new Date()
+  expiresAt.setDate(expiresAt.getDate() + 7) // Expires in 7 days
 
   const { data: invitation, error: invitationError } = await supabase
     .from('admin_invitations')
@@ -184,13 +264,17 @@ async function handlePost(supabase: any, req: Request) {
       invited_at: new Date().toISOString()
     })
     .select('id')
-    .single();
+    .single()
 
   if (invitationError) {
-    throw new Error(`Failed to create invitation: ${invitationError.message}`);
+    throw { 
+      status: 500, 
+      code: 'DB_ERROR', 
+      message: `Failed to create invitation: ${invitationError.message}` 
+    }
   }
 
-  // Send invitation email using Auth email system
+  // Send invitation email using Auth email system (non-blocking)
   try {
     await supabase.functions.invoke('supabase-auth-email-sender', {
       body: {
@@ -203,74 +287,105 @@ async function handlePost(supabase: any, req: Request) {
         },
         emailType: 'transactional'
       }
-    });
-    console.log('Invitation email sent successfully');
+    })
+    console.log('[ADMIN-POST] Invitation email sent successfully')
   } catch (emailError) {
-    console.warn('Failed to send invitation email:', emailError);
+    console.warn('[ADMIN-POST] Failed to send invitation email:', emailError)
     // Don't fail the whole request if email fails
   }
 
-  return new Response(
-    JSON.stringify({ 
-      success: true, 
-      message: 'Invitation sent successfully',
-      data: { invitation_id: invitation.id }
-    }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
+  return jsonResponse({
+    success: true, 
+    message: 'Invitation sent successfully',
+    data: { invitation_id: invitation.id }
+  })
 }
 
 async function handlePut(supabase: any, req: Request) {
-  const body: AdminUpdate = await req.json();
+  // Safe JSON parsing
+  const body = await safeJsonParse(req)
   
-  console.log('Updating admin user:', body);
+  if (!body) {
+    throw { 
+      status: 400, 
+      code: 'BAD_JSON', 
+      message: 'Invalid or empty JSON body' 
+    }
+  }
   
-  // Validate input
+  console.log('[ADMIN-PUT] Updating admin user:', body)
+  
+  // Enhanced input validation
   if (!body.userId || !body.action) {
-    throw new Error('User ID and action are required');
+    throw { 
+      status: 400, 
+      code: 'REQUIRED_FIELDS', 
+      message: 'User ID and action are required' 
+    }
   }
 
-  let result;
+  if (!['activate', 'deactivate', 'update_role'].includes(body.action)) {
+    throw { 
+      status: 400, 
+      code: 'INVALID_ACTION', 
+      message: 'Action must be activate, deactivate, or update_role' 
+    }
+  }
+
+  let result
   switch (body.action) {
     case 'activate':
       result = await supabase.rpc('activate_admin_user', {
         p_user_id: body.userId
-      });
-      break;
+      })
+      break
       
     case 'deactivate':
       result = await supabase.rpc('deactivate_admin_user', {
         p_user_id: body.userId
-      });
-      break;
+      })
+      break
       
     case 'update_role':
       if (!body.role) {
-        throw new Error('Role is required for update_role action');
+        throw { 
+          status: 400, 
+          code: 'REQUIRED_FIELDS', 
+          message: 'Role is required for update_role action' 
+        }
       }
       result = await supabase.rpc('update_admin_role', {
         p_user_id: body.userId,
         p_new_role: body.role
-      });
-      break;
+      })
+      break
       
     default:
-      throw new Error('Invalid action');
+      throw { 
+        status: 400, 
+        code: 'INVALID_ACTION', 
+        message: 'Invalid action' 
+      }
   }
 
   if (result.error) {
-    throw new Error(`Failed to ${body.action} user: ${result.error.message}`);
+    throw { 
+      status: 500, 
+      code: 'RPC_ERROR', 
+      message: `Failed to ${body.action} user: ${result.error.message}` 
+    }
   }
 
-  if (!result.data.success) {
-    throw new Error(result.data.error);
+  if (!result.data?.success) {
+    throw { 
+      status: 400, 
+      code: 'OPERATION_FAILED', 
+      message: result.data?.error || 'Operation failed' 
+    }
   }
 
-  return new Response(
-    JSON.stringify({ 
-      success: true, 
-      message: result.data.message
-    }),
-    { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-  );
+  return jsonResponse({
+    success: true, 
+    message: result.data.message
+  })
 }

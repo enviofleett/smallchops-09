@@ -24,7 +24,9 @@ const AbandonedCartsManager = () => {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['abandoned-carts', filters],
     queryFn: () => getAbandonedCarts(filters),
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 5 * 60 * 1000,          // 5 minutes cache
+    refetchInterval: false,             // Disable auto-refresh
+    refetchOnWindowFocus: 'always',     // Only refresh when user returns
   });
 
   const handleFilterChange = (key: keyof AbandonedCartFilters, value: any) => {

@@ -56,14 +56,18 @@ const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPag
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
 
-// Optimized QueryClient with better defaults
+// Heavily optimized QueryClient to reduce Supabase usage
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000, // 5 minutes
-      gcTime: 10 * 60 * 1000, // 10 minutes (renamed from cacheTime)
-      retry: 1,
-      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000,        // 5 minutes default cache
+      gcTime: 15 * 60 * 1000,          // Keep in cache for 15 minutes
+      refetchOnWindowFocus: 'always',   // Only refetch when user returns
+      refetchIntervalInBackground: false, // Stop background refetching
+      refetchInterval: false,           // Disable auto-refetch by default
+      retry: 2,                         // Reduce retries
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 15000),
+      networkMode: 'online',            // Only query when online
     },
   },
 });

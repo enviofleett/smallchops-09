@@ -101,7 +101,7 @@ export const EmailHealthDashboard = () => {
     fetchHealthMetrics();
     
     // Auto-refresh every 5 minutes
-    const interval = setInterval(fetchHealthMetrics, 5 * 60 * 1000);
+    const interval = setInterval(fetchHealthMetrics, 15 * 60 * 1000); // Increased to 15 minutes
     return () => clearInterval(interval);
   }, []);
 

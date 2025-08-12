@@ -113,19 +113,22 @@ export const PromotionAnalyticsDashboard: React.FC = () => {
   const { data: analytics = [], isLoading, refetch } = useQuery({
     queryKey: ['promotion-analytics'],
     queryFn: fetchPromotionAnalytics,
-    refetchInterval: 30000, // Refresh every 30 seconds
+    staleTime: 10 * 60 * 1000,          // 10 minutes cache
+    refetchInterval: false,              // Disable auto-refresh
   });
 
   const { data: auditLogs = [] } = useQuery({
     queryKey: ['promotion-usage-audit'],
     queryFn: fetchPromotionUsageAudit,
-    refetchInterval: 60000,
+    staleTime: 15 * 60 * 1000,          // 15 minutes cache
+    refetchInterval: false,              // Disable auto-refresh
   });
 
   const { data: topPromotions = [] } = useQuery({
     queryKey: ['top-performing-promotions'],
     queryFn: fetchTopPerformingPromotions,
-    refetchInterval: 60000,
+    staleTime: 15 * 60 * 1000,          // 15 minutes cache
+    refetchInterval: false,              // Disable auto-refresh
   });
 
   const aggregatedStats = React.useMemo(() => {

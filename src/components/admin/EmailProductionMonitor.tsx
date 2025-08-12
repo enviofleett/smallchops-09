@@ -162,7 +162,7 @@ export const EmailProductionMonitor = () => {
   useEffect(() => {
     fetchSystemMetrics();
     
-    const interval = setInterval(fetchSystemMetrics, 30000); // Refresh every 30 seconds
+    const interval = setInterval(fetchSystemMetrics, 5 * 60 * 1000); // Reduced frequency to 5 minutes
     
     return () => clearInterval(interval);
   }, []);

@@ -15,8 +15,8 @@ interface PaymentStatusMonitorProps {
 export const PaymentStatusMonitor: React.FC<PaymentStatusMonitorProps> = ({
   reference,
   onStatusUpdate,
-  intervalMs = 3000,
-  maxAttempts = 10 // Reduced from 20 to prevent overloading
+  intervalMs = 5000, // Increased from 3s to 5s
+  maxAttempts = 8    // Further reduced to minimize API calls
 }) => {
   const [attempts, setAttempts] = useState(0);
   const [status, setStatus] = useState<'pending' | 'success' | 'failed'>('pending');

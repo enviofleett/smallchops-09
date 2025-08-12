@@ -158,7 +158,7 @@ export const EmailQueueProcessor = () => {
   useEffect(() => {
     fetchQueueStats();
     
-    const interval = setInterval(fetchQueueStats, 30000);
+    const interval = setInterval(fetchQueueStats, 3 * 60 * 1000); // Reduced to 3 minutes
     return () => clearInterval(interval);
   }, []);
 

@@ -54,7 +54,7 @@ export const PaymentHealthMonitor: React.FC = () => {
       if (error) throw error;
       return data;
     },
-    refetchInterval: autoRefresh ? 30000 : false // Refresh every 30 seconds if auto-refresh is on
+    refetchInterval: autoRefresh ? 3 * 60 * 1000 : false // Reduced to 3 minutes when auto-refresh is on
   });
 
   // Fetch stuck orders
@@ -68,7 +68,7 @@ export const PaymentHealthMonitor: React.FC = () => {
       if (error) throw error;
       return data.stuck_orders || [];
     },
-    refetchInterval: autoRefresh ? 60000 : false // Refresh every minute
+    refetchInterval: autoRefresh ? 5 * 60 * 1000 : false // Reduced to 5 minutes
   });
 
   // Auto-recovery function

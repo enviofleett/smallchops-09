@@ -92,7 +92,8 @@ export function calculateCartVATSummary(
 }
 
 export function formatCurrency(amount: number): string {
-  return `₦${amount.toFixed(2)}`;
+  // Convert from kobo to Naira for display (divide by 100)
+  return `₦${(amount / 100).toFixed(2)}`;
 }
 
 export function validateVATCalculation(

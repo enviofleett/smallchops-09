@@ -345,7 +345,7 @@ serve(async (req) => {
           body: {
             action: 'initialize',
             email: customer_email,
-            amount: Math.round(total_amount * 100), // Convert to kobo
+            amount: total_amount, // Amount already in kobo from database
             reference: authoritativePaymentReference, // 🔧 Use backend-generated reference
             callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?reference=${authoritativePaymentReference}&order_id=${orderId}&source=process_checkout`,
             metadata: {

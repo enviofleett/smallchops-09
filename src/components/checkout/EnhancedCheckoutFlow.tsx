@@ -19,7 +19,7 @@ import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
 import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
 import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
-import { generatePaymentReference } from "@/utils/paymentReference";
+
 import {
   Select,
   SelectContent,

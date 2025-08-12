@@ -75,3 +75,6 @@ verify_jwt = false
 
 [functions.reports]
 verify_jwt = false
+
+[functions.get-turnstile-key]
+verify_jwt = false

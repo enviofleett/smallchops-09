@@ -217,78 +217,62 @@ const handlePaymentRequest = async (req: Request) => {
           }
         }
 
-          const verificationData = await verifyResponse.json()
+        const verificationData = await verifyResponse.json()
+        
+        if (!verificationData.status) {
+          console.error('❌ Paystack verification failed:', verificationData)
+          throw new Error(`Paystack verification failed: ${verificationData.message}`)
+        }
+
+        console.log(`Paystack payment verified successfully: ${reference}`)
+        const paymentData = verificationData.data
+
+        // Process successful payment
+        if (paymentData.status === 'success') {
+          console.log('💰 Processing successful payment')
           
-          if (!verificationData.status) {
-            console.error('❌ Paystack verification failed:', verificationData)
-            throw new Error(`Paystack verification failed: ${verificationData.message}`)
-          }
+          // Try to find and update order
+          const orderReference = paymentData.metadata?.order_id || order_id
+          console.log(`🔍 Looking for order with reference: ${orderReference}`)
 
-          console.log(`Paystack payment verified successfully: ${reference}`)
-          const paymentData = verificationData.data
+          if (orderReference) {
+            try {
+              const { data: updateResult, error: updateError } = await supabase
+                .rpc('handle_successful_payment', {
+                  p_paystack_reference: paymentData.reference,
+                  p_order_reference: orderReference,
+                  p_amount: paymentData.amount / 100,
+                  p_currency: paymentData.currency || 'NGN',
+                  p_paystack_data: paymentData
+                });
 
-          // Process successful payment
-          if (paymentData.status === 'success') {
-            console.log('💰 Processing successful payment')
-            
-            // Try to find and update order
-            const orderReference = paymentData.metadata?.order_id || order_id
-            console.log(`🔍 Looking for order with reference: ${orderReference}`)
-
-            if (orderReference) {
-              try {
-                const { data: updateResult, error: updateError } = await supabase
-                  .rpc('handle_successful_payment', {
-                    p_paystack_reference: paymentData.reference,
-                    p_order_reference: orderReference,
-                    p_amount: paymentData.amount / 100,
-                    p_currency: paymentData.currency || 'NGN',
-                    p_paystack_data: paymentData
-                  });
-
-                if (updateError) {
-                  logError('RPC_ERROR', updateError, { reference, orderReference });
-                  
-                  // Check if it's a duplicate processing attempt
-                  if (updateError.code === '23505' || updateError.message.includes('duplicate')) {
-                    return new Response(JSON.stringify({
-                      status: true,
-                      message: 'Payment already processed',
-                      reference: paymentData.reference,
-                      data: {
-                        reference: paymentData.reference,
-                        amount: paymentData.amount / 100,
-                        status: paymentData.status,
-                        currency: paymentData.currency,
-                        paid_at: paymentData.paid_at,
-                        channel: paymentData.channel
-                      }
-                    }), {
-                      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-                    });
-                  }
-                  
-                  // Other database errors
+              if (updateError) {
+                logError('RPC_ERROR', updateError, { reference, orderReference });
+                
+                // Check if it's a duplicate processing attempt
+                if (updateError.code === '23505' || updateError.message.includes('duplicate')) {
                   return new Response(JSON.stringify({
-                    success: false,
-                    error: 'Database update failed',
-                    code: 'DB_ERROR',
-                    retryable: true,
-                    reference: paymentData.reference
+                    status: true,
+                    message: 'Payment already processed',
+                    reference: paymentData.reference,
+                    data: {
+                      reference: paymentData.reference,
+                      amount: paymentData.amount / 100,
+                      status: paymentData.status,
+                      currency: paymentData.currency,
+                      paid_at: paymentData.paid_at,
+                      channel: paymentData.channel
+                    }
                   }), {
-                    status: 503,
                     headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                   });
                 }
-
-                console.log('✅ Order updated successfully:', updateResult);
                 
-              } catch (dbError) {
-                logError('DB_CONNECTION_ERROR', dbError, { reference, orderReference });
+                // Other database errors
                 return new Response(JSON.stringify({
                   success: false,
-                  error: 'Database temporarily unavailable',
-                  code: 'DB_CONNECTION_ERROR',
+                  error: 'Database update failed',
+                  code: 'DB_ERROR',
                   retryable: true,
                   reference: paymentData.reference
                 }), {
@@ -296,27 +280,39 @@ const handlePaymentRequest = async (req: Request) => {
                   headers: { ...corsHeaders, 'Content-Type': 'application/json' }
                 });
               }
+
+              console.log('✅ Order updated successfully:', updateResult);
+              
+            } catch (dbError) {
+              logError('DB_CONNECTION_ERROR', dbError, { reference, orderReference });
+              return new Response(JSON.stringify({
+                success: false,
+                error: 'Database temporarily unavailable',
+                code: 'DB_CONNECTION_ERROR',
+                retryable: true,
+                reference: paymentData.reference
+              }), {
+                status: 503,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+              });
             }
-
-          return new Response(
-            JSON.stringify({
-              status: true,
-              data: {
-                reference: paymentData.reference,
-                amount: paymentData.amount / 100,
-                status: paymentData.status,
-                currency: paymentData.currency,
-                paid_at: paymentData.paid_at,
-                channel: paymentData.channel
-              }
-            }),
-            { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          );
-
-        } catch (error) {
-          console.error('Payment verification error:', error)
-          throw error
+          }
         }
+
+        return new Response(
+          JSON.stringify({
+            status: true,
+            data: {
+              reference: paymentData.reference,
+              amount: paymentData.amount / 100,
+              status: paymentData.status,
+              currency: paymentData.currency,
+              paid_at: paymentData.paid_at,
+              channel: paymentData.channel
+            }
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
       }
 
       default:

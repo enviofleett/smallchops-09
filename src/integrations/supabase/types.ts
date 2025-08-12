@@ -6706,9 +6706,77 @@ export type Database = {
           latest_tx_reference: string
         }[]
       }
+      get_orders_with_payment: {
+        Args: { p_order_id?: string; p_customer_email?: string }
+        Returns: {
+          id: string
+          order_number: string
+          customer_id: string
+          customer_name: string
+          customer_email: string
+          customer_phone: string
+          order_type: Database["public"]["Enums"]["order_type"]
+          status: Database["public"]["Enums"]["order_status"]
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          subtotal: number
+          tax_amount: number
+          delivery_fee: number
+          discount_amount: number
+          total_amount: number
+          delivery_address: Json
+          pickup_time: string
+          delivery_time: string
+          special_instructions: string
+          payment_method: string
+          payment_reference: string
+          assigned_rider_id: string
+          order_time: string
+          created_at: string
+          updated_at: string
+          created_by: string
+          updated_by: string
+          delivery_zone_id: string
+          preferred_delivery_time: string
+          pickup_point_id: string
+          delivery_time_slot_id: string
+          subtotal_cost: number
+          total_vat: number
+          guest_session_id: string
+          paid_at: string
+          tx_id: string
+          tx_status: string
+          tx_paid_at: string
+          tx_channel: string
+          tx_provider_reference: string
+          final_paid: boolean
+          final_paid_at: string
+          payment_channel: string
+        }[]
+      }
+      get_payment_flow_health: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          period: string
+          total_orders: number
+          completed_orders: number
+          pending_orders: number
+          paid_orders: number
+          payment_pending: number
+          completion_rate_percent: number
+        }[]
+      }
       get_production_health_status: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      get_production_metrics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_products: number
+          total_paid_orders: number
+          total_paying_customers: number
+          total_revenue: number
+        }[]
       }
       get_public_delivery_zones: {
         Args: Record<PropertyKey, never>

@@ -874,11 +874,11 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
               </div>
 
               <PaystackPaymentHandler
+                orderId={paymentData.orderId || paymentData.order_id}
                 amount={paymentData.amount}
                 email={paymentData.email}
-                reference={paymentData.reference}
                 orderNumber={paymentData.orderNumber}
-                paymentUrl={paymentData.paymentUrl}
+                successUrl={paymentData.paymentUrl}
                 onSuccess={handlePaymentSuccess}
                 onError={handlePaymentError}
                 onClose={() => setCheckoutStep('details')}

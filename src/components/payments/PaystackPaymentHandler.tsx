@@ -1,406 +1,189 @@
-
-import React, { useState, useCallback, useEffect } from 'react';
+import { useEffect, useState } from 'react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Loader2, CreditCard } from 'lucide-react';
-import { usePaystackConfig } from '@/hooks/usePaystackConfig';
-import { PaymentErrorHandler } from './PaymentErrorHandler';
-import { toast } from '@/hooks/use-toast';
-import { paystackService, assertServerReference } from '@/lib/paystack';
+import { Progress } from '@/components/ui/progress';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
+import { ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
+import { useSecurePayment } from '@/hooks/useSecurePayment';
 
 interface PaystackPaymentHandlerProps {
+  orderId: string;
   amount: number;
   email: string;
-  reference: string;
   orderNumber: string;
-  paymentUrl: string;
+  successUrl?: string;
+  cancelUrl?: string;
   onSuccess: (reference: string) => void;
   onError: (error: string) => void;
-  onClose?: () => void;
+  onClose: () => void;
 }
 
-// Client-side reference generation removed; server reference will be used exclusively
-
-export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
+export const PaystackPaymentHandler = ({
+  orderId,
   amount,
   email,
-  reference: initialReference,
   orderNumber,
-  paymentUrl,
+  successUrl,
+  cancelUrl,
   onSuccess,
   onError,
-  onClose
-}) => {
-  const { config, loading: configLoading, error: configError } = usePaystackConfig();
-  const [paymentInProgress, setPaymentInProgress] = useState(false);
-  const [paystackReady, setPaystackReady] = useState(false);
-  const [scriptError, setScriptError] = useState<string | null>(null);
-  const [currentReference, setCurrentReference] = useState(initialReference);
+  onClose,
+}: PaystackPaymentHandlerProps) => {
+  const [currentReference, setCurrentReference] = useState<string>('');
+  
+  const {
+    initializeSecurePayment,
+    openSecurePayment,
+    isLoading,
+    isProcessing,
+    error,
+    reference,
+    authorizationUrl,
+    resetState
+  } = useSecurePayment();
 
-  // Clear any previous payment state on mount
+  // Initialize secure payment on mount
   useEffect(() => {
-    console.log('🔄 PaystackPaymentHandler: Clearing previous payment state');
-    setPaymentInProgress(false);
-    setScriptError(null);
-    
-    // 🔧 PERSIST: Only clear storage if cart isn't being preserved during payment
-    const preserveCart = sessionStorage.getItem('payment_in_progress');
-    if (!preserveCart) {
-      try {
-        localStorage.removeItem('paystack_last_reference');
-        sessionStorage.removeItem('paystack_last_reference');
-        localStorage.removeItem('paystack_reference');
-        sessionStorage.removeItem('paystack_reference');
-        localStorage.removeItem('last_payment_reference');
-        localStorage.removeItem('orderDetails');
-        localStorage.removeItem('checkout_in_progress');
-        localStorage.removeItem('pending_payment_reference');
-        console.log('✅ Cleared all Paystack references from storage');
-      } catch (error) {
-        console.warn('Failed to clear storage:', error);
+    const initPayment = async () => {
+      const result = await initializeSecurePayment({
+        orderId,
+        amount,
+        customerEmail: email,
+        redirectUrl: successUrl || `${window.location.origin}/payment-callback`,
+        metadata: {
+          orderNumber,
+          cancelUrl
+        }
+      });
+
+      if (result.success && result.reference) {
+        setCurrentReference(result.reference);
       }
-    }
-    
-    // Set payment in progress flag
-    sessionStorage.setItem('payment_in_progress', 'true');
-    
-    // CRITICAL: NO client-side reference generation allowed
-    setCurrentReference(initialReference || '');
-
-    // Clear any cached frontend references to prevent confusion
-    localStorage.removeItem('pending_payment_reference');
-    sessionStorage.removeItem('checkout_reference');
-    console.log('🚫 Frontend reference generation DISABLED - backend only');
-  }, [initialReference]);
-
-  // Load Paystack script with timeout and enhanced error handling
-  useEffect(() => {
-    let timeoutId: NodeJS.Timeout;
-    
-    const loadPaystackScript = () => {
-      return new Promise<void>((resolve, reject) => {
-        // Set 10-second timeout for script loading
-        timeoutId = setTimeout(() => {
-          reject(new Error('Script loading timeout (10 seconds)'));
-        }, 10000);
-
-        if (window.PaystackPop) {
-          clearTimeout(timeoutId);
-          resolve();
-          return;
-        }
-
-        const existingScript = document.querySelector('script[src="https://js.paystack.co/v1/inline.js"]');
-        if (existingScript) {
-          const handleLoad = () => {
-            clearTimeout(timeoutId);
-            existingScript.removeEventListener('load', handleLoad);
-            existingScript.removeEventListener('error', handleError);
-            resolve();
-          };
-          
-          const handleError = () => {
-            clearTimeout(timeoutId);
-            existingScript.removeEventListener('load', handleLoad);
-            existingScript.removeEventListener('error', handleError);
-            reject(new Error('Script failed to load'));
-          };
-          
-          existingScript.addEventListener('load', handleLoad);
-          existingScript.addEventListener('error', handleError);
-          return;
-        }
-
-        const script = document.createElement('script');
-        script.src = 'https://js.paystack.co/v1/inline.js';
-        script.async = true;
-        
-        const handleScriptLoad = () => {
-          clearTimeout(timeoutId);
-          script.removeEventListener('load', handleScriptLoad);
-          script.removeEventListener('error', handleScriptError);
-          
-          // Verify PaystackPop is available
-          if (window.PaystackPop) {
-            resolve();
-          } else {
-            reject(new Error('PaystackPop not available after script load'));
-          }
-        };
-        
-        const handleScriptError = () => {
-          clearTimeout(timeoutId);
-          script.removeEventListener('load', handleScriptLoad);
-          script.removeEventListener('error', handleScriptError);
-          reject(new Error('Failed to load Paystack script'));
-        };
-        
-        script.addEventListener('load', handleScriptLoad);
-        script.addEventListener('error', handleScriptError);
-        document.head.appendChild(script);
-      });
     };
 
-    setScriptError(null);
-    setPaystackReady(false);
-    
-    loadPaystackScript()
-      .then(() => {
-        setPaystackReady(true);
-        setScriptError(null);
-      })
-      .catch((error) => {
-        setScriptError(error.message);
-        setPaystackReady(false);
-        
-        // Auto-retry once after 2 seconds for timeout errors
-        if (error.message.includes('timeout')) {
-          setTimeout(() => {
-            loadPaystackScript()
-              .then(() => {
-                setPaystackReady(true);
-                setScriptError(null);
-              })
-              .catch((retryError) => {
-                setScriptError(`Script loading failed: ${retryError.message}`);
-              });
-          }, 2000);
-        }
-      });
+    initPayment();
+  }, [orderId, amount, email, orderNumber, successUrl, cancelUrl, initializeSecurePayment]);
 
-    return () => {
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, []);
-
-  const initializePayment = useCallback(async () => {
-    if (!config || !paystackReady) {
-      toast({
-        title: "Payment Not Ready",
-        description: "Payment gateway is still loading. Please wait...",
-        variant: "destructive",
-      });
+  const handlePayment = async () => {
+    if (!authorizationUrl) {
+      onError('No payment URL available');
       return;
     }
 
-    // Clear any previous payment state
-    setPaymentInProgress(false);
-    await new Promise(resolve => setTimeout(resolve, 100));
+    try {
+      openSecurePayment(authorizationUrl);
+      onSuccess(currentReference);
+    } catch (error) {
+      onError(error instanceof Error ? error.message : 'Payment failed');
+    }
+  };
 
-    setPaymentInProgress(true);
+  const handleFallback = () => {
+    if (currentReference) {
+      const fallbackUrl = `https://paystack.com/pay/${currentReference}`;
+      window.open(fallbackUrl, '_blank');
+      toast.info('Payment opened in new tab');
+    }
+  };
 
-      try {
-        // Initialize on server to get the authoritative reference
-        const callbackUrl = `${window.location.origin}/payment/callback?order_number=${encodeURIComponent(orderNumber)}`;
-        const init = await paystackService.initializeTransaction({
-          email,
-          amount: paystackService.formatAmount(amount),
-          callback_url: callbackUrl,
-          channels: ['card', 'bank', 'ussd', 'mobile_money'],
-          metadata: {
-            order_number: orderNumber,
-            customer_email: email,
-            original_reference: initialReference
-          }
-        });
-
-        let serverRef = init.reference;
-        setCurrentReference(serverRef);
-        try {
-          if (serverRef) {
-            sessionStorage.setItem('paystack_last_reference', serverRef);
-            localStorage.setItem('paystack_last_reference', serverRef);
-          }
-          const details = JSON.stringify({ orderNumber, reference: serverRef });
-          sessionStorage.setItem('orderDetails', details);
-          localStorage.setItem('orderDetails', details);
-        } catch {}
-        console.log('🎯 REFERENCE TRACKING [INIT]:', { received: serverRef, url: init.authorization_url });
-
-        // Validate server-generated reference and reinitialize if needed
-        try {
-          assertServerReference(serverRef);
-        } catch (e) {
-          console.warn('Invalid reference detected, reinitializing payment with server:', serverRef, e);
-          const newRef = await paystackService.reinitializeIfNeeded(serverRef, {
-            email,
-            amount: paystackService.formatAmount(amount),
-            callback_url: callbackUrl,
-            channels: ['card', 'bank', 'ussd', 'mobile_money'],
-            metadata: {
-              order_number: orderNumber,
-              customer_email: email,
-              original_reference: initialReference
-            }
-          });
-          serverRef = newRef;
-          setCurrentReference(newRef);
-        }
-
-        // If inline available, use serverRef; otherwise redirect
-        if (window.PaystackPop && config?.publicKey) {
-          const handler = window.PaystackPop.setup({
-            key: config.publicKey,
-            email,
-            amount: paystackService.formatAmount(amount),
-            currency: 'NGN',
-            ref: serverRef,
-            callback_url: `${callbackUrl}&reference=${serverRef}`,
-            channels: ['card', 'bank', 'ussd', 'mobile_money'],
-            metadata: {
-              order_number: orderNumber,
-              customer_email: email,
-              original_reference: initialReference
-            },
-            callback: function(response: any) {
-              setPaymentInProgress(false);
-              if (response.status === 'success') {
-                const ref = response.reference || serverRef;
-                console.log('🎯 REFERENCE TRACKING [CALLBACK]:', { refFromPaystack: response.reference, serverRef: serverRef, match: (response.reference === serverRef) });
-                window.location.href = `/payment/callback?reference=${encodeURIComponent(ref)}&status=success&order_number=${encodeURIComponent(orderNumber)}`;
-              } else {
-                toast({
-                  title: "Payment Failed",
-                  description: response.message || "Your payment was not successful. Please try again.",
-                  variant: "destructive",
-                });
-              }
-            },
-            onClose: function() {
-              setPaymentInProgress(false);
-            }
-          });
-          handler.openIframe();
-        } else {
-          window.location.href = init.authorization_url;
-        }
-
-      } catch (error) {
-        setPaymentInProgress(false);
-        console.error('💳 Paystack initialization failed:', error);
-        toast({
-          title: "Payment Error",
-          description: "Failed to start payment. Redirecting to secure page...",
-          variant: "destructive",
-        });
-        setTimeout(() => {
-          window.location.href = paymentUrl;
-        }, 1500);
-      }
-  }, [config, paystackReady, amount, email, orderNumber, onSuccess, onError, onClose, initialReference, paymentInProgress, paymentUrl, currentReference]);
-
-  const handleFallbackPayment = useCallback(() => {
-    console.log('🔄 Using fallback payment method');
-    toast({
-      title: "Redirecting to Payment Page",
-      description: "Opening secure payment page in a new window...",
-    });
-    
-    setTimeout(() => {
-      window.open(paymentUrl, '_blank');
-    }, 1000);
-  }, [paymentUrl]);
-
-  const handleRetry = useCallback(() => {
-    console.log('🔄 Retrying payment initialization');
-    setScriptError(null);
-    setPaymentInProgress(false);
-    
-    // No client reference generation; just retry server initialization
-    setCurrentReference('');
-    
-    // Small delay before retry
-    setTimeout(() => {
-      initializePayment();
-    }, 500);
-  }, [initializePayment]);
-
-  // Show loading state
-  if (configLoading) {
-    return (
-      <div className="flex items-center justify-center p-4">
-        <Loader2 className="h-4 w-4 animate-spin mr-2" />
-        <span>Loading payment configuration...</span>
-      </div>
-    );
-  }
-
-  // Show configuration error
-  if (configError) {
-    return (
-      <PaymentErrorHandler
-        error={configError}
-        onRetry={handleRetry}
-        onFallback={handleFallbackPayment}
-      />
-    );
-  }
-
-  // Show script error
-  if (scriptError) {
-    return (
-      <PaymentErrorHandler
-        error={scriptError}
-        onRetry={handleRetry}
-        onFallback={handleFallbackPayment}
-      />
-    );
-  }
+  const handleRetry = () => {
+    resetState();
+    window.location.reload();
+  };
 
   return (
-    <div className="space-y-4">
-      <Button
-        onClick={initializePayment}
-        disabled={paymentInProgress || !paystackReady || !config}
-        className="w-full"
-        size="lg"
-      >
-        {paymentInProgress ? (
-          <>
-            <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            Processing Payment...
-          </>
-        ) : (
-          <>
-            <CreditCard className="h-4 w-4 mr-2" />
-            Pay ₦{amount.toLocaleString()}
-          </>
+    <Card className="w-full max-w-md mx-auto">
+      <CardHeader className="text-center">
+        <CardTitle className="flex items-center justify-center gap-2">
+          <span>Secure Payment</span>
+          <Badge variant="outline" className="text-xs">
+            ₦{amount.toLocaleString()}
+          </Badge>
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {error}
+            </AlertDescription>
+          </Alert>
         )}
-      </Button>
 
-      {!paystackReady && !scriptError && (
-        <div className="text-center text-sm text-muted-foreground">
-          <Loader2 className="h-3 w-3 animate-spin inline mr-1" />
-          Loading secure payment gateway...
-        </div>
-      )}
+        <div className="space-y-3">
+          <Button
+            onClick={handlePayment}
+            disabled={isLoading || isProcessing || !authorizationUrl}
+            className="w-full"
+            size="lg"
+          >
+            {isLoading ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                Initializing Secure Payment...
+              </div>
+            ) : isProcessing ? (
+              <div className="flex items-center gap-2">
+                <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
+                Processing Payment...
+              </div>
+            ) : (
+              `Pay ₦${amount.toLocaleString()}`
+            )}
+          </Button>
 
-      {/* Progress indicator for better UX */}
-      {paymentInProgress && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 text-center">
-          <div className="flex items-center justify-center space-x-2">
-            <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-            <span className="text-sm text-blue-800">
-              Secure payment in progress... Please do not close this window.
-            </span>
+          {isLoading && (
+            <div className="text-center text-sm text-muted-foreground">
+              Generating secure payment reference...
+            </div>
+          )}
+
+          {(isLoading || isProcessing) && (
+            <div className="space-y-2">
+              <Progress value={isLoading ? 50 : 85} className="w-full" />
+              <p className="text-xs text-center text-muted-foreground">
+                {isLoading ? 'Securing payment...' : 'Redirecting to payment gateway...'}
+              </p>
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleFallback}
+              disabled={!currentReference}
+              className="flex-1"
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Alternative
+            </Button>
+            
+            {error && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRetry}
+                className="flex-1"
+              >
+                <RefreshCw className="h-3 w-3 mr-1" />
+                Retry
+              </Button>
+            )}
           </div>
         </div>
-      )}
 
-      <div className="text-center">
-        <Button
-          variant="link"
-          size="sm"
-          onClick={handleFallbackPayment}
-          disabled={paymentInProgress}
-        >
-          Having trouble? Try alternative payment method
-        </Button>
-      </div>
-
-      {/* Debug info for development */}
-      <div className="text-xs text-muted-foreground text-center">
-        Reference: {currentReference ? currentReference.slice(-8) : '—'}...
-      </div>
-    </div>
+        <div className="text-xs text-center text-muted-foreground border-t pt-3">
+          {currentReference && (
+            <p>Reference: {currentReference.substring(0, 30)}...</p>
+          )}
+          <p>Order: {orderNumber}</p>
+          <p className="text-green-600 font-medium">✅ Backend-Secured Payment</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 };

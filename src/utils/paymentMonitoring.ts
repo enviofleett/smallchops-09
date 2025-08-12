@@ -1,161 +1,104 @@
+// ========================================
+// 🔧 PAYMENT REFERENCE MONITORING
+// ========================================
+
 /**
- * Payment flow monitoring utilities for production debugging
+ * Validate payment reference format and log violations
  */
-
-interface PaymentFlowEvent {
-  timestamp: number;
-  event: string;
-  reference?: string;
-  source: string;
-  data?: any;
-}
-
-class PaymentMonitor {
-  private events: PaymentFlowEvent[] = [];
-  private maxEvents = 50;
-
-  logEvent(event: string, reference?: string, source: string = 'unknown', data?: any) {
-    const flowEvent: PaymentFlowEvent = {
-      timestamp: Date.now(),
-      event,
-      reference,
-      source,
-      data
-    };
-
-    this.events.push(flowEvent);
-
-    // Keep only recent events
-    if (this.events.length > this.maxEvents) {
-      this.events = this.events.slice(-this.maxEvents);
-    }
-
-    // Console log for debugging
-    console.log(`🔍 [${source}] ${event}`, {
+export const validatePaymentReference = (reference: string): boolean => {
+  if (reference.startsWith('pay_')) {
+    console.error('🚨 CRITICAL: Frontend reference detected!', reference);
+    
+    // Log security incident
+    const incident = {
+      type: 'FRONTEND_REFERENCE_DETECTED',
       reference,
       timestamp: new Date().toISOString(),
-      ...data
-    });
-
-    // Store critical events in sessionStorage for cross-page debugging
-    if (this.isCriticalEvent(event)) {
-      this.storeCriticalEvent(flowEvent);
-    }
-  }
-
-  private isCriticalEvent(event: string): boolean {
-    const criticalEvents = [
-      'payment_initialized',
-      'reference_generated',
-      'callback_received',
-      'verification_started',
-      'verification_completed',
-      'payment_failed',
-      'reference_missing'
-    ];
-    return criticalEvents.includes(event);
-  }
-
-  private storeCriticalEvent(event: PaymentFlowEvent) {
-    try {
-      const stored = JSON.parse(sessionStorage.getItem('payment_critical_events') || '[]');
-      stored.push(event);
-      
-      // Keep only last 10 critical events
-      if (stored.length > 10) {
-        stored.splice(0, stored.length - 10);
-      }
-      
-      sessionStorage.setItem('payment_critical_events', JSON.stringify(stored));
-    } catch (error) {
-      console.warn('Failed to store critical payment event:', error);
-    }
-  }
-
-  getRecentEvents(count = 10): PaymentFlowEvent[] {
-    return this.events.slice(-count);
-  }
-
-  getCriticalEvents(): PaymentFlowEvent[] {
-    try {
-      return JSON.parse(sessionStorage.getItem('payment_critical_events') || '[]');
-    } catch {
-      return [];
-    }
-  }
-
-  generateDebugReport(): string {
-    const critical = this.getCriticalEvents();
-    const recent = this.getRecentEvents();
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
     
-    return `
-=== PAYMENT FLOW DEBUG REPORT ===
-Generated: ${new Date().toISOString()}
-
-CRITICAL EVENTS (${critical.length}):
-${critical.map(e => `${new Date(e.timestamp).toISOString()} [${e.source}] ${e.event} ${e.reference || ''}`).join('\n')}
-
-RECENT EVENTS (${recent.length}):
-${recent.map(e => `${new Date(e.timestamp).toISOString()} [${e.source}] ${e.event} ${e.reference || ''}`).join('\n')}
-
-REFERENCE TRACKING:
-- Current URL: ${window.location.href}
-- Session Storage Keys: ${Object.keys(sessionStorage).filter(k => k.includes('payment') || k.includes('paystack')).join(', ')}
-- Local Storage Keys: ${Object.keys(localStorage).filter(k => k.includes('payment') || k.includes('paystack')).join(', ')}
-`.trim();
+    // Store locally for debugging
+    const incidents = JSON.parse(localStorage.getItem('security_incidents') || '[]');
+    incidents.push(incident);
+    localStorage.setItem('security_incidents', JSON.stringify(incidents.slice(-10))); // Keep last 10
+    
+    // Send alert if fetch is available
+    if (typeof fetch !== 'undefined') {
+      fetch('/api/security-alert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(incident)
+      }).catch(err => console.warn('Failed to send security alert:', err));
+    }
+    
+    return false;
   }
+  return reference.startsWith('txn_');
+};
 
-  clearEvents() {
-    this.events = [];
-    try {
-      sessionStorage.removeItem('payment_critical_events');
-    } catch {}
+/**
+ * Force cache refresh for payment system
+ */
+export const forceCacheRefresh = (): void => {
+  const APP_VERSION = '2025.08.12.001';
+  const storedVersion = localStorage.getItem('app_version');
+  
+  if (storedVersion !== APP_VERSION) {
+    console.log('🔄 Forcing cache refresh for payment system');
+    
+    // Clear all payment-related cache
+    localStorage.removeItem('pending_payment_reference');
+    localStorage.removeItem('paystack_reference');
+    sessionStorage.removeItem('checkout_reference');
+    sessionStorage.removeItem('payment_in_progress');
+    
+    // Set new version
+    localStorage.setItem('app_version', APP_VERSION);
+    
+    // Force reload if old version detected and this isn't already a refresh
+    if (!sessionStorage.getItem('cache_refresh_done')) {
+      sessionStorage.setItem('cache_refresh_done', 'true');
+      window.location.reload();
+    }
   }
-}
-
-// Singleton instance
-export const paymentMonitor = new PaymentMonitor();
-
-// Helper functions for common monitoring scenarios
-export const logPaymentInitialized = (reference: string, source: string, data?: any) => {
-  paymentMonitor.logEvent('payment_initialized', reference, source, data);
 };
 
-export const logReferenceGenerated = (reference: string, format: string, source: string) => {
-  paymentMonitor.logEvent('reference_generated', reference, source, { format });
+/**
+ * Legacy payment monitoring functions for backward compatibility
+ */
+export const logCallbackReceived = (reference?: string, params?: any): void => {
+  console.log('📞 Payment callback received:', reference, params);
+  if (reference) validatePaymentReference(reference);
 };
 
-export const logCallbackReceived = (reference?: string, allParams?: Record<string, string>) => {
-  paymentMonitor.logEvent('callback_received', reference, 'payment_callback', { allParams });
+export const logVerificationStarted = (reference: string): void => {
+  console.log('🔍 Payment verification started:', reference);
+  validatePaymentReference(reference);
 };
 
-export const logVerificationStarted = (reference: string) => {
-  paymentMonitor.logEvent('verification_started', reference, 'payment_verification');
+export const logVerificationCompleted = (reference: string, success: boolean, metadata?: any): void => {
+  console.log('✅ Payment verification completed:', reference, success, metadata);
+  validatePaymentReference(reference);
 };
 
-export const logVerificationCompleted = (reference: string, success: boolean, data?: any) => {
-  paymentMonitor.logEvent('verification_completed', reference, 'payment_verification', { success, ...data });
+export const logReferenceMissing = (context?: string, params?: any): void => {
+  console.error('🚨 Payment reference missing from callback', context, params);
 };
 
-export const logPaymentFailed = (reference?: string, error?: string, source: string = 'payment_flow') => {
-  paymentMonitor.logEvent('payment_failed', reference, source, { error });
-};
-
-export const logReferenceMissing = (source: string, availableParams?: string[]) => {
-  paymentMonitor.logEvent('reference_missing', undefined, source, { availableParams });
-};
-
-// Global error handler for payment-related issues
-window.addEventListener('error', (event) => {
-  if (event.message && (
-    event.message.includes('paystack') || 
-    event.message.includes('payment') ||
-    event.message.includes('reference')
-  )) {
-    paymentMonitor.logEvent('payment_error', undefined, 'window_error', {
-      message: event.message,
-      filename: event.filename,
-      lineno: event.lineno
+/**
+ * Initialize payment monitoring
+ */
+export const initPaymentMonitoring = (): void => {
+  // Force cache refresh on load
+  forceCacheRefresh();
+  
+  // Clear service worker cache
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      registrations.forEach(registration => registration.unregister());
     });
   }
-});
+  
+  console.log('✅ Payment monitoring initialized - backend references only');
+};

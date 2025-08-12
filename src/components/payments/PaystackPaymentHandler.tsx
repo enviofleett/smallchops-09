@@ -63,13 +63,13 @@ export const PaystackPaymentHandler: React.FC<PaystackPaymentHandlerProps> = ({
     // Set payment in progress flag
     sessionStorage.setItem('payment_in_progress', 'true');
     
-    // Do not generate client references; will set after server init
+    // CRITICAL: NO client-side reference generation allowed
     setCurrentReference(initialReference || '');
 
-    // Generate and store standardized payment reference as backup for callback
-    const paymentReference = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem('pending_payment_reference', paymentReference);
-    console.log('💾 Stored standardized payment reference for callback:', paymentReference);
+    // Clear any cached frontend references to prevent confusion
+    localStorage.removeItem('pending_payment_reference');
+    sessionStorage.removeItem('checkout_reference');
+    console.log('🚫 Frontend reference generation DISABLED - backend only');
   }, [initialReference]);
 
   // Load Paystack script with timeout and enhanced error handling

@@ -11,7 +11,11 @@ import EnhancedErrorBoundary from "./components/EnhancedErrorBoundary";
 import { withLazyLoading, preloadRoute } from "./utils/lazyLoad";
 import { FullPageLoader } from "./components/ui/page-loader";
 import { PerformanceMonitor } from "./utils/performance";
+import { initPaymentMonitoring } from "./utils/paymentMonitoring";
 import DynamicFavicon from "./components/seo/DynamicFavicon";
+
+// Initialize payment monitoring and cache busting
+initPaymentMonitoring();
 
 // Immediate load critical components
 import NotFound from "./pages/NotFound";

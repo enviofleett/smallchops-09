@@ -121,6 +121,32 @@ serve(async (req) => {
       payment_reference
     } = requestBody;
 
+    // 🚨 CRITICAL: Block frontend-generated payment references
+    if (payment_reference && payment_reference.startsWith('pay_')) {
+      console.error('🚨 FRONTEND REFERENCE BLOCKED:', payment_reference);
+      return new Response(JSON.stringify({ 
+        error: 'Frontend-generated references are not allowed. Backend must generate all references.',
+        code: 'INVALID_REFERENCE_FORMAT',
+        blocked_reference: payment_reference 
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
+    // Ensure only txn_ references are accepted
+    if (payment_reference && !payment_reference.startsWith('txn_')) {
+      console.error('🚨 INVALID REFERENCE FORMAT:', payment_reference);
+      return new Response(JSON.stringify({ 
+        error: 'Reference must start with txn_',
+        code: 'INVALID_REFERENCE_PREFIX',
+        received_reference: payment_reference 
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
+    }
+
     // Validate required fields
     if (!customer_email || !customer_name || !order_items || order_items.length === 0 || !total_amount) {
       throw new Error('Missing required fields: customer_email, customer_name, order_items, or total_amount');

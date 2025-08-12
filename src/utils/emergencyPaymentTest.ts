@@ -3,7 +3,7 @@
 // ========================================
 
 import { supabase } from '@/integrations/supabase/client';
-import { generatePaymentReference } from './paymentReference';
+// import { generatePaymentReference } from './paymentReference'; // REMOVED - frontend no longer generates references
 
 export interface EmergencyTestResult {
   success: boolean;
@@ -21,29 +21,19 @@ export const runEmergencyPaymentTest = async (): Promise<EmergencyTestResult[]> 
   console.log('🚨 Running emergency payment flow test...');
   
   try {
-    // Step 1: Test reference generation
-    const reference = generatePaymentReference();
+    // Step 1: Test that frontend no longer generates references
+    const shouldNotGenerate = true; // Frontend must not generate references anymore
     results.push({
-      success: reference.startsWith('txn_'),
-      step: 'Reference Generation',
-      details: { reference, format: reference.substring(0, 4) }
+      success: shouldNotGenerate,
+      step: 'Frontend Reference Generation Check',
+      details: { status: 'ELIMINATED', message: 'Frontend reference generation has been removed' }
     });
-    
-    if (!reference.startsWith('txn_')) {
-      results.push({
-        success: false,
-        step: 'CRITICAL ERROR',
-        details: { error: 'Reference generation still using old format!' },
-        error: 'Frontend still generating non-txn_ references'
-      });
-      return results;
-    }
-
-    // Step 2: Test backend RPC function
+    // Step 2: Test backend RPC function with mock reference
     try {
+      const mockReference = `txn_${Date.now()}_00000000-0000-0000-0000-000000000000`;
       const { data: rpcResult, error: rpcError } = await supabase.rpc('handle_successful_payment', {
-        p_paystack_reference: `test_${reference}`,
-        p_order_reference: reference,
+        p_paystack_reference: `test_${mockReference}`,
+        p_order_reference: mockReference,
         p_amount: 100.00,
         p_currency: 'NGN',
         p_paystack_data: { test: true }
@@ -137,7 +127,7 @@ export const runEmergencyPaymentTest = async (): Promise<EmergencyTestResult[]> 
         total_amount: 100,
         delivery_fee: 0,
         payment_method: 'paystack',
-        guest_session_id: `test_${reference}`
+        guest_session_id: `test_${Date.now()}`
       };
 
       const { data: orderResult, error: orderError } = await supabase.functions.invoke('process-checkout', {

@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { generatePaymentReference } from './paymentReference';
+// import { generatePaymentReference } from './paymentReference'; // REMOVED - backend generates references
 
 interface OrderItem {
   product_id: string;
@@ -70,12 +70,19 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
     const order = data.data || data;
     console.log('✅ Order created successfully via process-checkout:', order);
 
-    // Initialize payment with Paystack
+    // Backend provides the payment reference - we don't generate it
+    const backendReference = order.payment_reference || order.reference;
+    
+    if (!backendReference) {
+      throw new Error('Backend did not provide payment reference');
+    }
+
+    // Initialize payment with backend-provided reference
     const { data: paymentData, error: paymentError } = await supabase.functions.invoke('paystack-secure', {
       body: {
         action: 'initialize',
-        reference: paymentReference, // Pass the txn_ reference
-        order_reference: paymentReference, // Same reference for consistency
+        reference: backendReference, // Use backend-provided reference
+        order_reference: backendReference, // Same reference for consistency
         email: params.customerInfo.email,
         amount: params.totalAmount * 100, // Convert to kobo
         metadata: {
@@ -97,7 +104,7 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
     return {
       order,
       paymentUrl: paymentData.data.authorization_url,
-      reference: paymentData.data.reference // This will be the txn_ reference
+      reference: backendReference // Backend-generated txn_ reference
     };
 
   } catch (error) {

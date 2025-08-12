@@ -233,10 +233,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     setIsSubmitting(true);
 
     try {
-      // Generate a unique reference for this checkout attempt using txn_ format
-      const uniqueReference = generatePaymentReference();
-      
-      console.log('🚀 Processing checkout with txn_ reference:', uniqueReference);
+      console.log('🚀 Processing checkout (backend will generate reference)');
 
       const sanitizedData = {
         customer_email: formData.customer_email?.trim(),
@@ -276,12 +273,11 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id ? formData.delivery_zone_id : null,
         payment_method: 'paystack',
         guest_session_id: !isAuthenticated ? guestSession?.sessionId : null,
-        payment_reference: uniqueReference, // Add unique reference
         timestamp: new Date().toISOString()
       };
 
       // Save pre-payment state
-      savePrePaymentState(formData, checkoutStep, deliveryFee, uniqueReference);
+      savePrePaymentState(formData, checkoutStep, deliveryFee, null);
 
       console.log('🚀 Processing checkout with enhanced debugging...');
       console.log('🔍 Sanitized data being sent:', sanitizedData);

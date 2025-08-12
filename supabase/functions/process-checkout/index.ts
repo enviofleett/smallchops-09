@@ -269,16 +269,10 @@ serve(async (req) => {
     // Generate unique order number
     const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     
-    // 🔧 STANDARDIZE: Generate txn_ reference format consistently
-    const standardizedPaymentReference = payment_reference && payment_reference.startsWith('txn_') 
-      ? payment_reference 
-      : `txn_${Date.now()}_${crypto.randomUUID()}`;
+    // 🔧 BACKEND GENERATES SINGLE SOURCE OF TRUTH REFERENCE
+    const authoritativePaymentReference = `txn_${Date.now()}_${crypto.randomUUID()}`;
     
-    console.log('🔧 Reference standardization:', {
-      originalReference: payment_reference,
-      standardizedReference: standardizedPaymentReference,
-      wasConverted: payment_reference !== standardizedPaymentReference
-    });
+    console.log('🔧 Backend-generated authoritative reference:', authoritativePaymentReference);
     
     // Log the final data being sent to the database function
     console.log('📦 Creating order with data:', {
@@ -288,7 +282,7 @@ serve(async (req) => {
       total_amount: total_amount,
       isGuest: !authenticatedUser,
       processedGuestSessionId: processedGuestSessionId,
-      paymentReference: standardizedPaymentReference
+      paymentReference: authoritativePaymentReference
     });
     
     // Create order using the existing order creation function with processed items
@@ -352,8 +346,8 @@ serve(async (req) => {
             action: 'initialize',
             email: customer_email,
             amount: Math.round(total_amount * 100), // Convert to kobo
-            reference: standardizedPaymentReference, // 🔧 Use standardized reference
-            callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?reference=${standardizedPaymentReference}&order_id=${orderId}&source=process_checkout`,
+            reference: authoritativePaymentReference, // 🔧 Use backend-generated reference
+            callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?reference=${authoritativePaymentReference}&order_id=${orderId}&source=process_checkout`,
             metadata: {
               order_id: orderId,
               customer_name: customer_name,
@@ -491,8 +485,8 @@ serve(async (req) => {
 
     console.log('📦 Final payment response:', JSON.stringify(paymentResponse, null, 2));
 
-    // 📌 Persist effective reference and create transaction record
-    const effectiveReference = (paymentResponse?.data?.reference ?? (paymentResponse as any)?.reference ?? paymentReference) as string;
+    // 📌 Use the backend-generated authoritative reference 
+    const effectiveReference = authoritativePaymentReference;
 
     // Persist the effective reference on the order for reliable reconciliation
     try {

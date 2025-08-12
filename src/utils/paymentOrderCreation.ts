@@ -30,10 +30,7 @@ interface CreateOrderParams {
  * Create order with consistent payment reference format
  */
 export const createOrderWithPayment = async (params: CreateOrderParams) => {
-  // Generate consistent reference format
-  const paymentReference = generatePaymentReference();
-  
-  console.log('🔄 Creating order with txn_ reference:', paymentReference);
+  console.log('🔄 Creating order - backend will generate txn_ reference');
   
   try {
     // Use the existing order creation function instead of direct insert

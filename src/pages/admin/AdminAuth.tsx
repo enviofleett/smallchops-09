@@ -208,13 +208,13 @@ const AdminAuth = () => {
         />
       )}
 
-      {/* Security Status Alert */}
+      {/* Security Status Alert - Only show after actual attempts */}
       {attemptCount > 0 && !isBlocked && (
         <Alert variant={attemptCount >= 2 ? "destructive" : "default"}>
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription>
-            {attemptCount === 1 && "1 failed attempt. CAPTCHA will be required after 1 more failed attempt."}
-            {attemptCount >= 2 && `${attemptCount} failed attempts. CAPTCHA verification required.`}
+            {attemptCount === 1 && "Security verification will be required after 1 more failed attempt."}
+            {attemptCount >= 2 && `${attemptCount} failed attempts. Please complete security verification.`}
           </AlertDescription>
         </Alert>
       )}

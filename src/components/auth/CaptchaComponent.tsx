@@ -119,19 +119,19 @@ export const CaptchaComponent = ({
   }, [disabled]);
 
   return (
-    <div className={cn("space-y-3", className)}>
+    <div className={cn("w-full max-w-md mx-auto space-y-4", className)}>
       {/* CAPTCHA Header */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Shield className="h-4 w-4" />
+      <div className="flex items-center justify-center gap-2 text-sm font-medium text-foreground">
+        <Shield className="h-4 w-4 text-primary" />
         <span>Security Verification{required && ' *'}</span>
       </div>
 
-      {/* Turnstile Widget */}
-      <div className="flex flex-col items-center space-y-3">
+      {/* Turnstile Widget Container */}
+      <div className="flex flex-col items-center space-y-4">
         <div className={cn(
-          "relative w-full flex justify-center",
-          isLoading && "opacity-50",
-          disabled && "pointer-events-none opacity-30"
+          "relative w-full min-h-[65px] flex justify-center items-center rounded-lg border bg-background/50 transition-all duration-200",
+          isLoading && "animate-pulse",
+          disabled && "pointer-events-none opacity-50"
         )}>
           <Turnstile
             ref={turnstileRef}
@@ -149,24 +149,36 @@ export const CaptchaComponent = ({
           />
           
           {isLoading && (
-            <div className="absolute inset-0 flex items-center justify-center bg-background/80 backdrop-blur-sm rounded">
-              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary"></div>
+            <div className="absolute inset-0 flex flex-col items-center justify-center bg-background/95 backdrop-blur-sm rounded-lg border z-10">
+              <div className="animate-spin rounded-full h-6 w-6 border-2 border-primary border-t-transparent"></div>
+              <span className="text-xs text-muted-foreground mt-2 font-medium">Loading verification...</span>
             </div>
           )}
         </div>
 
         {/* Error Display */}
         {captchaError && (
-          <Alert variant="destructive" className="w-full max-w-sm">
+          <Alert variant="destructive" className="w-full">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription className="text-sm">
-              {captchaError}
+            <AlertDescription className="text-sm flex items-center justify-between">
+              <span>{captchaError}</span>
+              {showRetry && !disabled && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleRetry}
+                  className="ml-2 h-7 text-xs"
+                >
+                  <RefreshCw className="h-3 w-3 mr-1" />
+                  Retry
+                </Button>
+              )}
             </AlertDescription>
           </Alert>
         )}
 
-        {/* Retry Button */}
-        {showRetry && (captchaError || isExpired) && !disabled && (
+        {/* Standalone Retry Button for expired state */}
+        {showRetry && isExpired && !captchaError && !disabled && (
           <Button
             variant="outline"
             size="sm"
@@ -177,7 +189,7 @@ export const CaptchaComponent = ({
             Retry Verification
             {retryCount > 0 && (
               <span className="text-xs text-muted-foreground">
-                ({retryCount + 1})
+                (Attempt {retryCount + 1})
               </span>
             )}
           </Button>
@@ -185,8 +197,8 @@ export const CaptchaComponent = ({
       </div>
 
       {/* Helper Text */}
-      <p className="text-xs text-muted-foreground text-center">
-        Protected by Cloudflare Turnstile. This helps protect against automated abuse.
+      <p className="text-xs text-muted-foreground text-center opacity-75">
+        Protected by Cloudflare Turnstile
       </p>
     </div>
   );

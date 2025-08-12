@@ -39,6 +39,9 @@ export const useCaptcha = (config: CaptchaConfig = {}) => {
   const shouldRequireCaptcha = useCallback(() => {
     const now = Date.now();
     
+    // Only require CAPTCHA if there have been actual failed attempts
+    if (attemptsRef.current === 0) return false;
+    
     // Check if we're in cooldown period
     if (lastAttemptRef.current && (now - lastAttemptRef.current) < cooldownPeriod) {
       return true;
@@ -153,8 +156,8 @@ export const useCaptcha = (config: CaptchaConfig = {}) => {
     // State
     captchaToken: captchaState.token,
     isCaptchaVerified: captchaState.isVerified,
-    isCaptchaRequired: captchaState.isRequired || shouldRequireCaptcha(),
-    attemptCount: captchaState.attempts,
+    isCaptchaRequired: shouldRequireCaptcha(),
+    attemptCount: attemptsRef.current,
     isBlocked: isBlocked(),
     timeUntilUnblock: getTimeUntilUnblock(),
     

@@ -12,11 +12,18 @@ import { supabase } from '@/integrations/supabase/client';
 // Get Turnstile site key from environment or use demo key
 const getTurnstileSiteKey = async (): Promise<string> => {
   try {
-    // In production, get from Supabase secrets
-    if (process.env.NODE_ENV === 'production') {
-      const { data } = await supabase.functions.invoke('get-turnstile-key');
-      return data?.siteKey || '1x00000000000000000000AA'; // Visible demo key
+    // In production, get from Supabase secrets via edge function
+    if (window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+      console.log('Production environment detected, fetching Turnstile site key...');
+      const { data, error } = await supabase.functions.invoke('get-turnstile-key');
+      if (error) {
+        console.warn('Error fetching production site key:', error);
+        return '1x00000000000000000000AA'; // Visible demo key fallback
+      }
+      console.log('Production site key loaded successfully');
+      return data?.siteKey || '1x00000000000000000000AA';
     }
+    console.log('Development environment, using demo key');
     return '1x00000000000000000000AA'; // Always-visible demo key for development
   } catch (error) {
     console.warn('Failed to load Turnstile site key, using demo key:', error);

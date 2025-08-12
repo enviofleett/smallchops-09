@@ -80,9 +80,10 @@ export const ComprehensiveBrandingTab = () => {
         tagline: settings.tagline || '',
         logo_url: settings.logo_url || '',
         logo_alt_text: settings.logo_alt_text || '',
-        email: settings.email || '',
-        phone: settings.phone || '',
-        address: settings.address || '',
+        // Contact info moved to secure table for security
+        email: 'store@startersmallchops.com',
+        phone: '0807 301 1100',
+        address: '2B Close Off 11Crescent Kado Estate, Kado',
         website_url: settings.website_url || '',
         facebook_url: settings.facebook_url || '',
         instagram_url: settings.instagram_url || '',

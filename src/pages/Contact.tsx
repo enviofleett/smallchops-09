@@ -66,7 +66,7 @@ const Contact = () => {
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Our Location</h3>
                         <p className="text-gray-600">
-                          {settings?.address || '2B Close Off 11Crescent Kado Estate, Kado'}
+                          2B Close Off 11Crescent Kado Estate, Kado
                         </p>
                       </div>
                     </div>
@@ -83,7 +83,7 @@ const Contact = () => {
                       <div>
                         <h3 className="text-lg font-semibold text-gray-900 mb-2">Phone</h3>
                         <p className="text-gray-600">
-                          {settings?.phone || '0807 301 1100'}
+                          0807 301 1100
                         </p>
                         <p className="text-sm text-gray-500 mt-1">
                           Call us for orders and inquiries

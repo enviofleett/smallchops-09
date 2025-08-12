@@ -33,6 +33,7 @@ import { StarRating } from '@/components/ui/star-rating';
 import { FavoriteButton } from '@/components/ui/favorite-button';
 import { DiscountBadge } from '@/components/ui/discount-badge';
 import { ProductWithDiscount, formatCurrency } from '@/lib/discountCalculations';
+import { sanitizeHtml } from '@/utils/htmlSanitizer';
 
 // Remove the mock Review interface since we're using the real one from API
 
@@ -341,7 +342,7 @@ const ProductDetail = () => {
 
             {/* Description */}
             <div>
-              <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: product.description }} />
+              <p className="text-muted-foreground" dangerouslySetInnerHTML={{ __html: sanitizeHtml(product.description || '') }} />
             </div>
 
             {/* Features */}

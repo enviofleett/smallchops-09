@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { Mail, Send, Eye, Save, Plus, Edit } from 'lucide-react';
+import { sanitizeHtml } from '@/utils/htmlSanitizer';
 
 interface EmailTemplate {
   id: string;
@@ -340,7 +341,7 @@ export const EmailTemplateManager = () => {
                   
                   <TabsContent value="preview">
                     <div className="border rounded-lg p-4 bg-background">
-                      <div dangerouslySetInnerHTML={{ __html: selectedTemplate.html_template }} />
+                      <div dangerouslySetInnerHTML={{ __html: sanitizeHtml(selectedTemplate.html_template) }} />
                     </div>
                   </TabsContent>
                   

@@ -9,9 +9,6 @@ export interface BusinessSettings {
   id: string;
   name: string;
   tagline?: string;
-  email?: string;
-  phone?: string;
-  address?: string;
   website_url?: string;
   logo_url?: string;
   facebook_url?: string;
@@ -35,7 +32,8 @@ export interface BusinessSettings {
   logo_usage_rules?: string;
   created_at: string;
   updated_at: string;
-  allow_guest_checkout?: boolean; // NEW
+  allow_guest_checkout?: boolean;
+  // Sensitive fields moved to business_sensitive_data table
 }
 
 export const useBusinessSettings = () => {

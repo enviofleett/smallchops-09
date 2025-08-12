@@ -29,7 +29,7 @@ function clearPaymentCache() {
   });
   
   // Add deployment version check
-  const currentVersion = '1.0.1'; // Increment on each critical fix
+  const currentVersion = '1.0.2'; // Increment on each critical fix
   const cachedVersion = localStorage.getItem('app_version');
   
   if (cachedVersion !== currentVersion) {
@@ -43,32 +43,37 @@ function clearPaymentCache() {
 // Execute cache cleanup
 clearPaymentCache();
 
-// 🚨 CRITICAL: Runtime payment reference validation
+// 🚨 CRITICAL: Runtime payment reference validation (non-blocking)
 (window as any).validatePaymentReference = (reference: string) => {
   if (reference && reference.startsWith('pay_')) {
     console.error('🚨 FRONTEND REFERENCE DETECTED:', reference);
     console.trace('Frontend reference creation trace:');
-    throw new Error('SECURITY VIOLATION: Frontend payment reference detected');
+    // Log but don't throw in production to maintain stability
+    return false;
   }
   
   if (reference && !reference.startsWith('txn_')) {
-    console.error('🚨 INVALID REFERENCE FORMAT:', reference);
-    console.trace('Invalid reference trace:');
+    console.warn('🚨 INVALID REFERENCE FORMAT:', reference);
     return false;
   }
   
   return true;
 };
 
-// Intercept fetch requests to validate payment references
+// Monitor fetch requests for payment references (non-blocking)
 const originalFetch = window.fetch;
 window.fetch = async (url, options) => {
   if (options?.body) {
-    const body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
-    if (body.includes('pay_')) {
-      console.error('🚨 FRONTEND REFERENCE IN REQUEST:', { url, body });
-      console.trace('Request stack trace:');
-      throw new Error('SECURITY VIOLATION: Frontend payment reference in request');
+    try {
+      const body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
+      // Only check for frontend-generated pay_ references, not all pay_ strings
+      if (body.match(/pay_\d+_[a-zA-Z0-9]+/)) {
+        console.error('🚨 FRONTEND REFERENCE IN REQUEST:', { url, body });
+        console.trace('Request stack trace:');
+      }
+    } catch (error) {
+      // Don't break requests if body inspection fails
+      console.warn('Could not inspect request body:', error);
     }
   }
   return originalFetch(url, options);

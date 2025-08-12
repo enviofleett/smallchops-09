@@ -8,76 +8,56 @@ import { initWebVitals } from "./utils/webVitals";
 // Initialize performance monitoring
 initWebVitals();
 
-// 🚨 CRITICAL: Clear payment-related cache and validate backend references
+// Production-safe payment cache management
 function clearPaymentCache() {
-  const paymentKeys = Object.keys(localStorage).filter(key => 
-    key.includes('payment') || key.includes('pay_') || key.includes('reference')
-  );
-  
-  paymentKeys.forEach(key => {
-    console.warn('🚨 Clearing cached payment data:', key);
-    localStorage.removeItem(key);
-  });
-  
-  const sessionKeys = Object.keys(sessionStorage).filter(key => 
-    key.includes('payment') || key.includes('pay_') || key.includes('reference')
-  );
-  
-  sessionKeys.forEach(key => {
-    console.warn('🚨 Clearing cached session payment data:', key);
-    sessionStorage.removeItem(key);
-  });
-  
-  // Add deployment version check
-  const currentVersion = '1.0.2'; // Increment on each critical fix
-  const cachedVersion = localStorage.getItem('app_version');
-  
-  if (cachedVersion !== currentVersion) {
-    console.warn('🚨 App version changed, clearing all caches:', cachedVersion, '→', currentVersion);
-    localStorage.clear();
-    sessionStorage.clear();
+  try {
+    // Only clear payment-specific keys, not all storage
+    const paymentKeys = Object.keys(localStorage).filter(key => 
+      key.startsWith('payment_') || key.startsWith('pay_') || key.includes('reference') || key.includes('transaction')
+    );
+    
+    paymentKeys.forEach(key => {
+      localStorage.removeItem(key);
+    });
+    
+    const sessionKeys = Object.keys(sessionStorage).filter(key => 
+      key.startsWith('payment_') || key.startsWith('pay_') || key.includes('reference') || key.includes('transaction')
+    );
+    
+    sessionKeys.forEach(key => {
+      sessionStorage.removeItem(key);
+    });
+    
+    // Gentle version check - only clear if major version change
+    const currentVersion = '1.0.3';
+    const cachedVersion = localStorage.getItem('app_version');
+    
+    // Only clear on major version changes (not patch versions)
+    if (cachedVersion && !cachedVersion.startsWith('1.0')) {
+      console.info('Major version change detected, clearing caches');
+      localStorage.clear();
+      sessionStorage.clear();
+    }
+    
     localStorage.setItem('app_version', currentVersion);
+  } catch (error) {
+    console.warn('Cache cleanup failed:', error);
   }
 }
 
-// Execute cache cleanup
+// Safe cache cleanup
 clearPaymentCache();
 
-// 🚨 CRITICAL: Runtime payment reference validation (non-blocking)
-(window as any).validatePaymentReference = (reference: string) => {
-  if (reference && reference.startsWith('pay_')) {
-    console.error('🚨 FRONTEND REFERENCE DETECTED:', reference);
-    console.trace('Frontend reference creation trace:');
-    // Log but don't throw in production to maintain stability
-    return false;
-  }
-  
-  if (reference && !reference.startsWith('txn_')) {
-    console.warn('🚨 INVALID REFERENCE FORMAT:', reference);
-    return false;
-  }
-  
-  return true;
-};
-
-// Monitor fetch requests for payment references (non-blocking)
-const originalFetch = window.fetch;
-window.fetch = async (url, options) => {
-  if (options?.body) {
-    try {
-      const body = typeof options.body === 'string' ? options.body : JSON.stringify(options.body);
-      // Only check for frontend-generated pay_ references, not all pay_ strings
-      if (body.match(/pay_\d+_[a-zA-Z0-9]+/)) {
-        console.error('🚨 FRONTEND REFERENCE IN REQUEST:', { url, body });
-        console.trace('Request stack trace:');
-      }
-    } catch (error) {
-      // Don't break requests if body inspection fails
-      console.warn('Could not inspect request body:', error);
+// Production-safe monitoring (logging only, no blocking)
+if (process.env.NODE_ENV === 'development') {
+  (window as any).validatePaymentReference = (reference: string) => {
+    if (reference && reference.startsWith('pay_')) {
+      console.warn('Frontend reference detected:', reference);
+      return false;
     }
-  }
-  return originalFetch(url, options);
-};
+    return true;
+  };
+}
 
 // Disable existing service workers to prevent stale asset caching that can break dynamic imports
 if ('serviceWorker' in navigator) {

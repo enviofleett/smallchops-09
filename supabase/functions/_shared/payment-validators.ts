@@ -349,7 +349,7 @@ export class PaymentValidator {
   }
 
   // CRITICAL: Generate cryptographically secure payment reference
-  static generateSecureReference(prefix: string = 'PAY'): string {
+  static generateSecureReference(prefix: string = 'txn'): string {
     try {
       // Use crypto.getRandomValues for cryptographic security
       const array = new Uint8Array(16);

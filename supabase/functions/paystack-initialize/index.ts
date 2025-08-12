@@ -131,8 +131,8 @@ serve(async (req) => {
       });
     }
 
-    // Generate secure transaction reference
-    const transactionRef = reference || PaymentValidator.generateSecureReference('INIT');
+    // Generate secure transaction reference with txn prefix for consistency
+    const transactionRef = reference || PaymentValidator.generateSecureReference('txn');
     
     const { data: transaction, error: dbError } = await supabaseClient
       .from('payment_transactions')

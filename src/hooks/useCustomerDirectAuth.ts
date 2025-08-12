@@ -21,14 +21,23 @@ export const useCustomerDirectAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const login = async (email: string, password: string) => {
+  const login = async (email: string, password: string, captchaToken?: string) => {
     try {
       setIsLoading(true);
       
-      const { data, error } = await supabase.auth.signInWithPassword({
+      const signInOptions: any = {
         email,
         password,
-      });
+      };
+
+      // Include CAPTCHA token if provided
+      if (captchaToken) {
+        signInOptions.options = {
+          captchaToken
+        };
+      }
+      
+      const { data, error } = await supabase.auth.signInWithPassword(signInOptions);
 
       if (error) {
         toast({
@@ -58,7 +67,7 @@ export const useCustomerDirectAuth = () => {
     }
   };
 
-  const register = async (data: RegistrationData) => {
+  const register = async (data: RegistrationData, captchaToken?: string) => {
     try {
       setIsLoading(true);
       
@@ -85,8 +94,8 @@ export const useCustomerDirectAuth = () => {
         return { success: false, error: message };
       }
 
-      // Use secure signUp with password (not signInWithOtp)
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Prepare signup options with CAPTCHA token
+      const signUpOptions: any = {
         email: data.email,
         password: data.password,
         options: {
@@ -96,7 +105,15 @@ export const useCustomerDirectAuth = () => {
             phone: data.phone
           }
         }
-      });
+      };
+
+      // Include CAPTCHA token if provided
+      if (captchaToken) {
+        signUpOptions.options.captchaToken = captchaToken;
+      }
+
+      // Use secure signUp with password (not signInWithOtp)
+      const { data: authData, error: authError } = await supabase.auth.signUp(signUpOptions);
 
       if (authError) {
         toast({
@@ -191,16 +208,23 @@ export const useCustomerDirectAuth = () => {
     }
   };
 
-  const signUpWithGoogle = async () => {
+  const signUpWithGoogle = async (captchaToken?: string) => {
     try {
       setIsLoading(true);
       
-      const { error } = await supabase.auth.signInWithOAuth({
+      const oauthOptions: any = {
         provider: 'google',
         options: {
           redirectTo: `${window.location.origin}/auth-callback`
         }
-      });
+      };
+
+      // Include CAPTCHA token if provided
+      if (captchaToken) {
+        oauthOptions.options.captchaToken = captchaToken;
+      }
+      
+      const { error } = await supabase.auth.signInWithOAuth(oauthOptions);
 
       if (error) {
         toast({

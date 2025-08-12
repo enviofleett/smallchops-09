@@ -17,6 +17,7 @@
     "analyze": "npx vite-bundle-analyzer"
   },
   "dependencies": {
+    "@hcaptcha/react-hcaptcha": "^1.12.1",
     "@hookform/resolvers": "^3.9.0",
     "@huggingface/transformers": "^3.7.0",
     "@maptiler/sdk": "^2.5.1",

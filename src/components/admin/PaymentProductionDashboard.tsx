@@ -3,6 +3,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { PaymentReconciliation } from './PaymentReconciliation';
 import { PaymentHealthMonitor } from './PaymentHealthMonitor';
 import { PaymentDiagnostics } from '../payments/PaymentDiagnostics';
+import { PaymentEmergencyPanel } from './PaymentEmergencyPanel';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Helmet } from 'react-helmet-async';
 import { 
@@ -29,7 +30,7 @@ export const PaymentProductionDashboard: React.FC = () => {
         </div>
 
         <Tabs defaultValue="health" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="health" className="flex items-center gap-2">
               <Activity className="h-4 w-4" />
               Health Monitor
@@ -41,6 +42,10 @@ export const PaymentProductionDashboard: React.FC = () => {
             <TabsTrigger value="diagnostics" className="flex items-center gap-2">
               <Search className="h-4 w-4" />
               Diagnostics
+            </TabsTrigger>
+            <TabsTrigger value="emergency" className="flex items-center gap-2 text-orange-600">
+              <AlertTriangle className="h-4 w-4" />
+              Emergency
             </TabsTrigger>
           </TabsList>
 
@@ -67,6 +72,10 @@ export const PaymentProductionDashboard: React.FC = () => {
                 <PaymentDiagnostics />
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="emergency" className="space-y-6">
+            <PaymentEmergencyPanel />
           </TabsContent>
         </Tabs>
 

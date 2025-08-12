@@ -149,6 +149,37 @@ const handlePaymentRequest = async (req: Request) => {
           authorization_url: initData.data.authorization_url
         })
 
+        // CRITICAL FIX: Create payment transaction record during initialization
+        try {
+          console.log('💾 Creating payment transaction record')
+          const { error: transactionError } = await supabase
+            .from('payment_transactions')
+            .insert({
+              provider_reference: txnReference,
+              order_id: order_id,
+              amount: Math.round(Number(amount)),
+              currency: 'NGN',
+              status: 'pending',
+              gateway_response: 'Payment initialized',
+              metadata: {
+                order_id,
+                ...metadata,
+                paystack_access_code: initData.data.access_code
+              },
+              created_at: new Date().toISOString()
+            })
+          
+          if (transactionError) {
+            console.error('❌ Failed to create payment transaction:', transactionError)
+            // Don't fail the payment initialization, but log for monitoring
+          } else {
+            console.log('✅ Payment transaction record created successfully')
+          }
+        } catch (dbError) {
+          console.error('❌ Database error creating transaction:', dbError)
+          // Continue with payment initialization
+        }
+
         return new Response(
           JSON.stringify({
             status: true,

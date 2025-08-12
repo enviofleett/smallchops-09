@@ -25,16 +25,53 @@ serve(async (req) => {
     console.log('Webhook received:', event, 'for reference:', data.reference);
 
     if (event === 'charge.success') {
-      // Get payment transaction
-      const { data: transaction, error: transactionError } = await supabaseAdmin
+      // Get payment transaction with fallback creation
+      let { data: transaction, error: transactionError } = await supabaseAdmin
         .from('payment_transactions')
         .select('*, orders(*)')
         .eq('provider_reference', data.reference)
         .single();
 
       if (transactionError || !transaction) {
-        console.error('Transaction not found:', data.reference);
-        return new Response('Transaction not found', { status: 404, headers: corsHeaders });
+        console.log('🔍 Transaction not found, attempting to find order by reference:', data.reference);
+        
+        // Try to find order by payment reference and create transaction record
+        const { data: order, error: orderError } = await supabaseAdmin
+          .from('orders')
+          .select('*')
+          .eq('payment_reference', data.reference)
+          .single();
+        
+        if (order && !orderError) {
+          console.log('📝 Creating missing payment transaction record for order:', order.order_number);
+          
+          // Create the missing transaction record
+          const { data: newTransaction, error: createError } = await supabaseAdmin
+            .from('payment_transactions')
+            .insert({
+              provider_reference: data.reference,
+              order_id: order.id,
+              amount: data.amount / 100, // Convert from kobo
+              currency: data.currency || 'NGN',
+              status: 'pending',
+              gateway_response: 'Transaction created via webhook',
+              metadata: data.metadata,
+              created_at: new Date().toISOString()
+            })
+            .select('*, orders(*)')
+            .single();
+          
+          if (!createError && newTransaction) {
+            transaction = newTransaction;
+            console.log('✅ Payment transaction record created successfully');
+          } else {
+            console.error('❌ Failed to create transaction record:', createError);
+            return new Response('Failed to create transaction record', { status: 500, headers: corsHeaders });
+          }
+        } else {
+          console.error('❌ Order not found for reference:', data.reference);
+          return new Response('Order not found', { status: 404, headers: corsHeaders });
+        }
       }
 
       // Update payment status

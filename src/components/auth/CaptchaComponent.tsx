@@ -42,6 +42,7 @@ export const CaptchaComponent = ({
       try {
         const key = await getCaptchaSiteKey();
         setSiteKey(key);
+        console.log('Turnstile site key loaded:', key);
       } catch (error) {
         console.warn('Failed to load Turnstile site key:', error);
         // Keep default demo key

@@ -16,8 +16,11 @@ export interface AuthState {
 export interface LoginCredentials {
   email: string;
   password: string;
+  captchaToken?: string;
 }
 
 export interface SignUpCredentials extends LoginCredentials {
   name: string;
+  phone?: string;
+  captchaToken?: string;
 }

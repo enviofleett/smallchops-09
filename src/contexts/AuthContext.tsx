@@ -286,9 +286,16 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const login = async ({ email, password }: LoginCredentials) => {
+  const login = async ({ email, password, captchaToken }: LoginCredentials) => {
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      const signInOptions: any = { email, password };
+      
+      // Include CAPTCHA token if provided
+      if (captchaToken) {
+        signInOptions.options = { captchaToken };
+      }
+      
+      const { data, error } = await supabase.auth.signInWithPassword(signInOptions);
       
       if (error) {
         console.error('Login error:', error);
@@ -322,7 +329,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const signUp = async ({ email, password, name, phone }: LoginCredentials & { name: string; phone?: string }) => {
+  const signUp = async ({ email, password, name, phone, captchaToken }: LoginCredentials & { name: string; phone?: string }) => {
     try {
       const redirectUrl = `${window.location.origin}/auth/callback`;
       const userData: Record<string, any> = { 
@@ -335,14 +342,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         userData.phone = phone;
       }
 
-      const { data, error } = await supabase.auth.signUp({
+      const signUpOptions: any = {
         email,
         password,
         options: {
           emailRedirectTo: redirectUrl,
           data: userData,
         },
-      });
+      };
+
+      // Include CAPTCHA token if provided
+      if (captchaToken) {
+        signUpOptions.options.captchaToken = captchaToken;
+      }
+
+      const { data, error } = await supabase.auth.signUp(signUpOptions);
 
       if (error) {
         console.error('Sign up error:', error);

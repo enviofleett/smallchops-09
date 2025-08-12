@@ -311,7 +311,7 @@ const handlePaymentRequest = async (req: Request) => {
               }
             }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-          )
+          );
 
         } catch (error) {
           console.error('Payment verification error:', error)

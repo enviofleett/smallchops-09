@@ -19,6 +19,12 @@ enable_email_autoconfirm = false
 enable_phone_confirmations = false
 enable_phone_autoconfirm = false
 
+[functions.secure-payment-processor]
+verify_jwt = false
+
+[functions.verify-payment]
+verify_jwt = false
+
 [functions.enhanced-smtp-sender]
 verify_jwt = false
 

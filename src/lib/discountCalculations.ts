@@ -387,12 +387,12 @@ export function calculateOrderDiscount(
 }
 
 export function formatCurrency(amount: number): string {
-  // Convert from kobo to Naira for display (divide by 100)
+  // Format amount directly as Naira (amount is already in Naira, not kobo)
   return new Intl.NumberFormat('en-NG', {
     style: 'currency',
     currency: 'NGN',
     minimumFractionDigits: 2,
-  }).format(amount / 100);
+  }).format(amount);
 }
 
 export function formatDiscount(discountPercentage: number): string {

@@ -149,30 +149,20 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     [cart?.summary?.total_amount, currentDeliveryFee]
   );
 
-  // Recovery and initialization effect
+  // Initialization effect - skip recovery UI completely
   useEffect(() => {
     if (isOpen) {
-      // Check for recoverable state when checkout opens
-      if (hasRecoverableState()) {
-        const recovered = recoverState();
-        if (recovered) {
-          const retryInfo = getRetryInfo();
-          console.log('🔄 Checkout state recovery available:', {
-            step: recovered.checkoutStep,
-            retryCount: retryInfo.retryCount,
-            canRetry: retryInfo.canRetry
-          });
-          
-          if (retryInfo.canRetry) {
-            setShowRecoveryOption(true);
-            setLastPaymentError(retryInfo.lastError?.message || 'Previous payment attempt failed');
-          } else {
-            clearState(); // Clear if max retries exceeded
-          }
-        }
+      // Clear any previous state without showing recovery UI
+      clearState();
+      
+      // Force user to sign in if not authenticated
+      if (!isAuthenticated) {
+        setCheckoutStep('choice');
+      } else {
+        setCheckoutStep('details');
       }
     }
-  }, [isOpen]);
+  }, [isOpen, isAuthenticated]);
 
   // Clear payment state when component mounts or step changes
   useEffect(() => {
@@ -189,12 +179,10 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     }
   }, [formData, checkoutStep, deliveryFee]);
 
-  const handleContinueAsGuest = useCallback(async () => {
-    if (!guestSession) {
-      await generateGuestSession();
-    }
-    setCheckoutStep('details');
-  }, [guestSession, generateGuestSession]);
+  // Guest checkout completely disabled - this function now just redirects to login
+  const handleContinueAsGuest = useCallback(() => {
+    handleLogin();
+  }, []);
 
   const handleLogin = useCallback(() => {
     storeRedirectUrl(window.location.pathname + window.location.search);
@@ -203,10 +191,12 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
   }, [onClose, navigate]);
 
   React.useEffect(() => {
-    if (isAuthenticated && checkoutStep === 'choice') {
+    if (isAuthenticated) {
       setCheckoutStep('details');
+    } else {
+      setCheckoutStep('choice');
     }
-  }, [isAuthenticated, checkoutStep]);
+  }, [isAuthenticated]);
 
   React.useEffect(() => {
     if (session?.user || authCustomerAccount) {
@@ -272,7 +262,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         delivery_fee: formData.fulfillment_type === 'delivery' ? deliveryFee : 0,
         delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id ? formData.delivery_zone_id : null,
         payment_method: 'paystack',
-        guest_session_id: !isAuthenticated ? guestSession?.sessionId : null,
+        guest_session_id: null, // Guest checkout disabled
         timestamp: new Date().toISOString()
       };
 
@@ -559,39 +549,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         </CardHeader>
         
         <CardContent>
-          {/* Recovery Option Banner */}
-          {showRecoveryOption && (
-            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div className="flex-1">
-                  <h4 className="font-medium text-amber-800">Previous Checkout Found</h4>
-                  <p className="text-sm text-amber-700 mt-1">
-                    {lastPaymentError || 'Your previous checkout attempt was interrupted.'}
-                  </p>
-                  <div className="flex gap-2 mt-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleRecoverCheckout}
-                      className="border-amber-300 text-amber-700 hover:bg-amber-100"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-1" />
-                      Recover & Retry
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleDiscardRecovery}
-                      className="text-amber-600"
-                    >
-                      Start Fresh
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="space-y-4 mb-6">
             <div className="flex items-center justify-between">

@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { CalendarIcon, Clock, AlertTriangle } from 'lucide-react';
 import { deliverySchedulingService, DeliverySlot, DeliveryTimeSlot } from '@/utils/deliveryScheduling';
 import { isAfter, addDays } from 'date-fns';
+import { useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
@@ -24,6 +25,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
   onScheduleChange,
   className
 }) => {
+  console.log('🚀 DeliveryScheduler component initializing');
   const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
   const [selectedDateSlots, setSelectedDateSlots] = useState<DeliveryTimeSlot[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,24 +48,30 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
     }
   }, [calendarDate, availableSlots]);
 
-  const loadAvailableSlots = async () => {
+  const loadAvailableSlots = useCallback(async () => {
     try {
+      console.log('📋 Loading delivery slots...');
       setLoading(true);
       setError(null);
-      const slots = await deliverySchedulingService.getAvailableDeliverySlots();
+      
+      const endDate = addDays(new Date(), 30);
+      console.log('🕐 Getting slots from service...');
+      const slots = await deliverySchedulingService.getAvailableDeliverySlots(new Date(), endDate);
+      console.log('✅ Delivery slots loaded:', slots.length);
+      
       setAvailableSlots(slots);
       
       if (slots.length === 0) {
         setError('No delivery slots available. Please contact support.');
       }
     } catch (err) {
+      console.error('❌ Failed to load delivery slots:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load available delivery slots';
       setError(errorMessage);
-      console.error('Error loading delivery slots:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
   const isDateDisabled = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');

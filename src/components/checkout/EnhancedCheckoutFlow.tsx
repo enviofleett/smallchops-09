@@ -711,27 +711,20 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                  <p className="text-sm text-muted-foreground">
                    Choose your preferred delivery date and time window
                  </p>
-                  {(() => {
-                    console.log('🔍 Delivery Scheduler section is rendering');
-                    return null;
-                  })()}
-                 <div className="min-h-[200px] border border-dashed border-gray-300 rounded p-4">
-                   <p className="text-center text-gray-500 mb-4">Loading delivery scheduler...</p>
-                   <DeliveryScheduler
-                     selectedDate={formData.delivery_date}
-                     selectedTimeSlot={formData.delivery_time_slot}
-                     onScheduleChange={(date, timeSlot) => {
-                       console.log('📅 Schedule changed:', { date, timeSlot });
-                       setFormData(prev => ({ 
-                         ...prev, 
-                         delivery_date: date, 
-                         delivery_time_slot: timeSlot,
-                         fulfillment_type: 'delivery'
-                       }));
-                     }}
-                     className="w-full"
-                   />
-                 </div>
+                 <DeliveryScheduler
+                   selectedDate={formData.delivery_date}
+                   selectedTimeSlot={formData.delivery_time_slot}
+                   onScheduleChange={(date, timeSlot) => {
+                     console.log('📅 Schedule changed:', { date, timeSlot });
+                     setFormData(prev => ({ 
+                       ...prev, 
+                       delivery_date: date, 
+                       delivery_time_slot: timeSlot,
+                       fulfillment_type: 'delivery'
+                     }));
+                   }}
+                   className="w-full"
+                 />
                </div>
 
                <div className="space-y-4">

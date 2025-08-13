@@ -1,190 +1,211 @@
-import React from 'react';
-import { NavLink, useLocation } from 'react-router-dom';
+import React, { Suspense } from "react";
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Layout from "./components/Layout";
+import ErrorBoundaryWrapper from "./components/ErrorBoundaryWrapper";
+import { withLazyLoading, preloadRoute } from "./utils/lazyLoad";
+import { FullPageLoader } from "./components/ui/page-loader";
+import { PerformanceMonitor } from "./utils/performance";
+import { initPaymentMonitoring } from "./utils/paymentMonitoring";
+import DynamicFavicon from "./components/seo/DynamicFavicon";
 import { 
-  LayoutDashboard, 
-  ShoppingCart, 
-  Package, 
-  Tag, 
-  User, 
-  Truck, 
-  Trophy,
-  Calendar,
-  BarChart3, 
-  FileSearch, 
-  Settings
-} from 'lucide-react';
-import { useBusinessSettings } from '@/hooks/useBusinessSettings';
-import startersLogo from '@/assets/starters-logo.png';
-import {
-  Sidebar,
-  SidebarContent,
-  SidebarGroup,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  useSidebar,
-} from "@/components/ui/sidebar";
+  initializeConsoleCleanup, 
+  validatePaystackCSP, 
+  suppressWebSocketErrors 
+} from "./utils/consoleCleanup";
+import { 
+  logEnvironmentStatus, 
+  validateEnvironment 
+} from "./utils/environmentValidator";
 
-interface MenuItem {
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  path: string;
-  end?: boolean;
+// Initialize monitoring systems
+initPaymentMonitoring();
+
+// Immediate load critical components
+const NotFound = React.lazy(() => import("./pages/NotFound"));
+const PublicHome = React.lazy(() => import("./pages/PublicHome"));
+
+// Type for lazy-loaded components
+interface LazyComponent {
+  default: React.ComponentType;
 }
 
-const coreOperations: MenuItem[] = [
-  {
-    icon: LayoutDashboard,
-    label: 'Dashboard',
-    path: '/dashboard',
-    end: true
-  },
-  {
-    icon: ShoppingCart,
-    label: 'Orders',
-    path: '/admin/orders'
-  },
-  {
-    icon: Tag,
-    label: 'Categories',
-    path: '/categories'
-  },
-  {
-    icon: Package,
-    label: 'Products',
-    path: '/admin/products'
-  }
-];
+// Lazy load components with proper typing
+const lazyLoad = <T extends LazyComponent>(
+  factory: () => Promise<T>,
+  fallback?: React.ReactNode
+) => {
+  const LazyComponent = React.lazy(factory);
+  return (props: React.ComponentProps<typeof LazyComponent>) => (
+    <Suspense fallback={fallback || <FullPageLoader />}>
+      <LazyComponent {...props} />
+    </Suspense>
+  );
+};
 
-const management: MenuItem[] = [
-  {
-    icon: User,
-    label: 'Customers',
-    path: '/customers'
-  },
-  {
-    icon: Calendar,
-    label: 'Catering Bookings',
-    path: '/bookings'
-  },
-  {
-    icon: Truck,
-    label: 'Delivery Management',
-    path: '/admin/delivery'
-  },
-  {
-    icon: Trophy,
-    label: 'Promotions & Loyalty',
-    path: '/promotions'
-  }
-];
+// Admin components
+const AdminOrders = lazyLoad(() => import("./pages/admin/AdminOrders"));
+const AdminDelivery = lazyLoad(() => import("./pages/admin/AdminDelivery"));
+const Products = lazyLoad(() => import("./pages/Products"));
+const Categories = lazyLoad(() => import("./pages/Categories"));
 
-const administration: MenuItem[] = [
-  {
-    icon: BarChart3,
-    label: 'Reports',
-    path: '/reports'
-  },
-  {
-    icon: FileSearch,
-    label: 'Audit Logs',
-    path: '/audit-logs'
-  },
-  {
-    icon: Settings,
-    label: 'Settings',
-    path: '/settings'
-  }
-];
+// Customer components
+const CustomerProfile = lazyLoad(() => import("./pages/CustomerProfile"));
+const Cart = lazyLoad(() => import("./pages/Cart"));
+const Booking = lazyLoad(() => import("./pages/Booking"));
 
-export function AppSidebar() {
-  const { state } = useSidebar();
-  const location = useLocation();
-  const { data: settings } = useBusinessSettings();
+// Optimized QueryClient configuration
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 2 * 60 * 1000,
+      gcTime: 10 * 60 * 1000,
+      refetchOnWindowFocus: false,
+      retry: (failureCount, error: any) => {
+        if (error?.status >= 400 && error?.status < 500) return false;
+        return failureCount < 3;
+      },
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 5000),
+    },
+  },
+});
+
+// Preload critical customer-facing routes
+if (typeof window !== 'undefined') {
+  preloadRoute(() => import("./pages/Cart"));
+  preloadRoute(() => import("./pages/Booking"));
+}
+
+const App = () => {
+  const [envReady, setEnvReady] = React.useState(true);
   
-  const collapsed = state === "collapsed";
-
-  const isActive = React.useCallback((path: string, end?: boolean) => {
-    if (path === '/dashboard') {
-      return location.pathname === '/dashboard' || location.pathname === '/admin';
+  React.useEffect(() => {
+    PerformanceMonitor.startTiming('App Mount');
+    
+    // Validate environment
+    const envStatus = validateEnvironment();
+    if (!envStatus.isProductionReady) {
+      console.error('Environment issues:', envStatus.checks);
+      setEnvReady(false);
     }
-    return end 
-      ? location.pathname === path
-      : location.pathname.startsWith(path);
-  }, [location.pathname]);
 
-  const renderMenuGroup = React.useCallback((items: MenuItem[], groupLabel: string) => (
-    <SidebarGroup>
-      {!collapsed && (
-        <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/70 uppercase tracking-wider">
-          {groupLabel}
-        </SidebarGroupLabel>
-      )}
-      <SidebarGroupContent>
-        <SidebarMenu>
-          {items.map((item) => (
-            <SidebarMenuItem key={item.path}>
-              <SidebarMenuButton 
-                asChild 
-                isActive={isActive(item.path, item.end)}
-                tooltip={collapsed ? item.label : undefined}
-                className="w-full justify-start"
-                aria-label={item.label}
-              >
-                <NavLink 
-                  to={item.path} 
-                  end={item.end}
-                  className={({ isActive }) => 
-                    isActive ? 'active-nav-link' : 'nav-link'
-                  }
-                >
-                  <item.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
-                  {!collapsed && (
-                    <span className="truncate ml-2">{item.label}</span>
-                  )}
-                </NavLink>
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          ))}
-        </SidebarMenu>
-      </SidebarGroupContent>
-    </SidebarGroup>
-  ), [collapsed, isActive]);
+    // Initialize production optimizations
+    if (import.meta.env.PROD) {
+      initializeConsoleCleanup();
+      suppressWebSocketErrors();
+      validatePaystackCSP();
+    }
+
+    PerformanceMonitor.endTiming('App Mount');
+    return () => PerformanceMonitor.clear('App Mount');
+  }, []);
+
+  if (!envReady) {
+    return (
+      <div className="grid place-items-center h-screen bg-background text-foreground p-4">
+        <div className="max-w-md text-center">
+          <h1 className="text-2xl font-bold mb-4">System Maintenance</h1>
+          <p className="mb-4">
+            We're currently performing system checks. Please try again shortly.
+          </p>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded"
+          >
+            Retry
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <Sidebar 
-      collapsible="icon" 
-      className="border-sidebar-border"
-      aria-label="Main navigation"
-    >
-      <SidebarHeader className="border-b border-sidebar-border px-4 md:px-6 py-4 min-h-[73px] flex items-center">
-        <div className="flex items-center gap-3">
-          <div className="w-14 h-14 rounded-lg flex items-center justify-center overflow-hidden bg-sidebar-accent">
-            <img 
-              src={startersLogo} 
-              alt="Starters Logo" 
-              className="w-full h-full object-contain p-1.5" 
-              loading="lazy" 
-              width={56}
-              height={56}
-            />
+    <ErrorBoundaryWrapper 
+      context="Main Application"
+      fallback={
+        <div className="grid place-items-center h-screen">
+          <div className="text-center p-6 max-w-md">
+            <h1 className="text-xl font-bold mb-2">Something went wrong</h1>
+            <p className="mb-4">Please try refreshing the page</p>
+            {import.meta.env.DEV && (
+              <details className="text-left text-sm">
+                <summary>Technical Details</summary>
+                <div className="mt-2 p-2 bg-muted rounded">
+                  Check browser console for error details
+                </div>
+              </details>
+            )}
           </div>
-          {!collapsed && (
-            <h1 className="text-2xl font-bold text-sidebar-foreground tracking-tight">
-              Starters
-            </h1>
-          )}
         </div>
-      </SidebarHeader>
+      }
+    >
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider delayDuration={300}>
+          <Toaster />
+          <Sonner position="top-center" />
+          <DynamicFavicon />
+          <AuthProvider>
+            <BrowserRouter>
+              <Routes>
+                {/* Public routes */}
+                <Route path="/" element={
+                  <Suspense fallback={<FullPageLoader />}>
+                    <PublicHome />
+                  </Suspense>
+                } />
+                
+                <Route path="/products" element={
+                  <ErrorBoundaryWrapper context="Public Products">
+                    <Suspense fallback={<FullPageLoader />}>
+                      <PublicProducts />
+                    </Suspense>
+                  </ErrorBoundaryWrapper>
+                } />
 
-      <SidebarContent className="px-2 py-2">
-        {renderMenuGroup(coreOperations, "Core")}
-        {renderMenuGroup(management, "Management")}
-        {renderMenuGroup(administration, "Administration")}
-      </SidebarContent>
-    </Sidebar>
+                {/* Customer routes */}
+                <Route path="/cart" element={
+                  <ErrorBoundaryWrapper context="Cart">
+                    <Cart />
+                  </ErrorBoundaryWrapper>
+                } />
+
+                {/* Admin routes */}
+                <Route element={
+                  <ProtectedRoute>
+                    <Layout />
+                  </ProtectedRoute>
+                }>
+                  <Route path="/admin" element={
+                    <ErrorBoundaryWrapper context="Dashboard">
+                      <Index />
+                    </ErrorBoundaryWrapper>
+                  } />
+                  
+                  <Route path="/admin/products" element={
+                    <ErrorBoundaryWrapper context="Admin Products">
+                      <Products />
+                    </ErrorBoundaryWrapper>
+                  } />
+                </Route>
+
+                {/* 404 */}
+                <Route path="*" element={
+                  <Suspense fallback={<FullPageLoader />}>
+                    <NotFound />
+                  </Suspense>
+                } />
+              </Routes>
+            </BrowserRouter>
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ErrorBoundaryWrapper>
   );
-}
+};
+
+export default React.memo(App);

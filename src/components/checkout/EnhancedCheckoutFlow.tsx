@@ -218,6 +218,16 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Validate required fields
+    if (!formData.delivery_date || !formData.delivery_time_slot) {
+      toast({
+        title: "Delivery Schedule Required",
+        description: "Please select a delivery date and time before proceeding.",
+        variant: "destructive",
+      });
+      return;
+    }
+    
     // Clear any previous payment state and errors
     setIsSubmitting(false);
     setPaymentData(null);

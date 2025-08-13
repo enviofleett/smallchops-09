@@ -9,6 +9,7 @@ import { deliverySchedulingService, DeliverySlot, DeliveryTimeSlot } from '@/uti
 import { isAfter, addDays } from 'date-fns';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
 
 interface DeliverySchedulerProps {
   selectedDate?: string;
@@ -51,8 +52,13 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
       setError(null);
       const slots = await deliverySchedulingService.getAvailableDeliverySlots();
       setAvailableSlots(slots);
+      
+      if (slots.length === 0) {
+        setError('No delivery slots available. Please contact support.');
+      }
     } catch (err) {
-      setError('Failed to load available delivery slots');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load available delivery slots';
+      setError(errorMessage);
       console.error('Error loading delivery slots:', err);
     } finally {
       setLoading(false);
@@ -100,24 +106,27 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
 
   if (loading) {
     return (
-      <Card className={className}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5" />
-            Choose Delivery Date & Time
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-center p-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-          </div>
-        </CardContent>
-      </Card>
+      <DeliverySchedulingErrorBoundary>
+        <Card className={className}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              Choose Delivery Date & Time
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center p-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+          </CardContent>
+        </Card>
+      </DeliverySchedulingErrorBoundary>
     );
   }
 
   return (
-    <Card className={className}>
+    <DeliverySchedulingErrorBoundary>
+      <Card className={className}>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
           <CalendarIcon className="h-5 w-5" />
@@ -128,7 +137,17 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         {error && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>{error}</AlertDescription>
+            <AlertDescription>
+              {error}
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={loadAvailableSlots}
+                className="ml-2"
+              >
+                Retry
+              </Button>
+            </AlertDescription>
           </Alert>
         )}
 
@@ -222,17 +241,21 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         {selectedDate && selectedTimeSlot && (
           <div className="pt-4 border-t">
             <h4 className="font-medium mb-2">Delivery Schedule Summary</h4>
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+              <Badge variant="secondary" className="whitespace-nowrap">
                 {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')}
               </Badge>
-              <Badge variant="secondary">
+              <Badge variant="secondary" className="whitespace-nowrap">
                 {selectedTimeSlot.start_time} - {selectedTimeSlot.end_time}
               </Badge>
             </div>
+            <p className="text-sm text-muted-foreground mt-2">
+              Please ensure someone is available to receive the delivery during this time window.
+            </p>
           </div>
         )}
       </CardContent>
-    </Card>
+      </Card>
+    </DeliverySchedulingErrorBoundary>
   );
 };

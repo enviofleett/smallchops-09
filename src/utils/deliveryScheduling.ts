@@ -51,8 +51,17 @@ class DeliverySchedulingService {
   private holidays: PublicHoliday[] = [];
 
   async initialize(): Promise<void> {
-    await this.loadConfiguration();
-    await this.loadHolidays();
+    try {
+      await Promise.all([
+        this.loadConfiguration(),
+        this.loadHolidays()
+      ]);
+    } catch (error) {
+      console.error('Failed to initialize delivery scheduling service:', error);
+      // Use default config to ensure service remains functional
+      this.config = this.getDefaultConfig();
+      this.holidays = [];
+    }
   }
 
   private async loadConfiguration(): Promise<void> {
@@ -62,7 +71,9 @@ class DeliverySchedulingService {
         .select('delivery_scheduling_config')
         .single();
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') { // Not found is acceptable
+        throw error;
+      }
 
       this.config = (data?.delivery_scheduling_config as unknown as DeliverySchedulingConfig) || this.getDefaultConfig();
     } catch (error) {
@@ -76,9 +87,13 @@ class DeliverySchedulingService {
       const { data, error } = await supabase
         .from('public_holidays')
         .select('*')
-        .eq('is_active', true);
+        .eq('is_active', true)
+        .gte('date', format(new Date(), 'yyyy-MM-dd')); // Only future holidays
 
-      if (error) throw error;
+      if (error && error.code !== 'PGRST116') { // Not found is acceptable
+        throw error;
+      }
+      
       this.holidays = data || [];
     } catch (error) {
       console.error('Failed to load holidays:', error);
@@ -105,12 +120,18 @@ class DeliverySchedulingService {
   }
 
   getMinimumDeliveryTime(): Date {
-    if (!this.config) return addMinutes(new Date(), 90);
+    if (!this.config) {
+      console.warn('Delivery config not loaded, using default 90 minutes');
+      return addMinutes(new Date(), 90);
+    }
     return addMinutes(new Date(), this.config.minimum_lead_time_minutes);
   }
 
   getMaximumDeliveryDate(): Date {
-    if (!this.config) return addDays(new Date(), 30);
+    if (!this.config) {
+      console.warn('Delivery config not loaded, using default 30 days');
+      return addDays(new Date(), 30);
+    }
     return addDays(new Date(), this.config.max_advance_booking_days);
   }
 
@@ -214,30 +235,39 @@ class DeliverySchedulingService {
   }
 
   async getAvailableDeliverySlots(startDate?: Date, endDate?: Date): Promise<DeliverySlot[]> {
-    await this.initialize();
+    try {
+      await this.initialize();
 
-    const start = startDate || new Date();
-    const end = endDate || this.getMaximumDeliveryDate();
-    const slots: DeliverySlot[] = [];
+      const start = startDate || new Date();
+      const end = endDate || this.getMaximumDeliveryDate();
+      const slots: DeliverySlot[] = [];
 
-    let currentDate = startOfDay(start);
-    while (!isAfter(currentDate, end)) {
-      const availability = this.isDateAvailable(currentDate);
-      const holiday = this.holidays.find(h => h.date === format(currentDate, 'yyyy-MM-dd'));
-      
-      const slot: DeliverySlot = {
-        date: format(currentDate, 'yyyy-MM-dd'),
-        time_slots: availability.available ? this.generateTimeSlots(currentDate) : [],
-        is_holiday: !!holiday,
-        holiday_name: holiday?.name,
-        is_business_day: availability.available
-      };
+      let currentDate = startOfDay(start);
+      const maxIterations = 100; // Prevent infinite loops
+      let iterations = 0;
 
-      slots.push(slot);
-      currentDate = addDays(currentDate, 1);
+      while (!isAfter(currentDate, end) && iterations < maxIterations) {
+        const availability = this.isDateAvailable(currentDate);
+        const holiday = this.holidays.find(h => h.date === format(currentDate, 'yyyy-MM-dd'));
+        
+        const slot: DeliverySlot = {
+          date: format(currentDate, 'yyyy-MM-dd'),
+          time_slots: availability.available ? this.generateTimeSlots(currentDate) : [],
+          is_holiday: !!holiday,
+          holiday_name: holiday?.name,
+          is_business_day: availability.available
+        };
+
+        slots.push(slot);
+        currentDate = addDays(currentDate, 1);
+        iterations++;
+      }
+
+      return slots;
+    } catch (error) {
+      console.error('Failed to get available delivery slots:', error);
+      return [];
     }
-
-    return slots;
   }
 
   validateDeliverySlot(date: string, startTime: string, endTime: string): { valid: boolean; error?: string } {

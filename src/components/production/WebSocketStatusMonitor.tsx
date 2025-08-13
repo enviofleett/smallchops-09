@@ -12,27 +12,9 @@ export const WebSocketStatusMonitor: React.FC = () => {
   
   const { status, connect, disconnect } = useWebSocketMonitor(wsUrl);
 
+  // Completely hide in development - no UI clutter
   if (!isProduction) {
-    return (
-      <Card className="w-full">
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wifi className="w-5 h-5" />
-            WebSocket Status
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Badge variant="secondary">Development Mode</Badge>
-              <span className="text-sm text-muted-foreground">
-                WebSocket monitoring disabled in development
-              </span>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-    );
+    return null;
   }
 
   const getStatusIcon = () => {

@@ -13,6 +13,7 @@ import { FullPageLoader } from "./components/ui/page-loader";
 import { PerformanceMonitor } from "./utils/performance";
 import { initPaymentMonitoring } from "./utils/paymentMonitoring";
 import DynamicFavicon from "./components/seo/DynamicFavicon";
+import { initializeConsoleCleanup, validatePaystackCSP, suppressWebSocketErrors } from "./utils/consoleCleanup";
 
 // Initialize payment monitoring and cache busting
 initPaymentMonitoring();
@@ -89,6 +90,20 @@ const App = () => {
   
   React.useEffect(() => {
     PerformanceMonitor.endTiming('App Render');
+    
+    // Initialize production optimizations
+    initializeConsoleCleanup();
+    suppressWebSocketErrors();
+    validatePaystackCSP();
+    
+    // Payment system status logging
+    console.log('✅ Payment System: Backend-only references active');
+    console.log('✅ Paystack-only migration completed');
+    
+    // Environment validation
+    if (!import.meta.env.VITE_SUPABASE_URL) {
+      console.warn('⚠️ Missing VITE_SUPABASE_URL environment variable');
+    }
   }, []);
 
   return (

@@ -19,26 +19,10 @@ export const WebSocketStabilityMonitor = () => {
   
   const { status, connect, disconnect } = useWebSocketMonitor(wsUrl);
 
-  useEffect(() => {
-    // Suppress WebSocket console errors in development
-    if (process.env.NODE_ENV === 'development') {
-      const originalConsoleError = console.error;
-      console.error = (...args) => {
-        // Filter out WebSocket connection errors for localhost:8098
-        if (args.some(arg => 
-          typeof arg === 'string' && 
-          (arg.includes('WebSocket') || arg.includes('localhost:8098'))
-        )) {
-          return; // Suppress these errors
-        }
-        originalConsoleError.apply(console, args);
-      };
-      
-      return () => {
-        console.error = originalConsoleError;
-      };
-    }
-  }, []);
+  // Return null in development - completely hide WebSocket monitoring  
+  if (process.env.NODE_ENV !== 'production') {
+    return null;
+  }
 
   const getStatusColor = () => {
     if (!shouldConnect) return 'bg-gray-100 text-gray-800';

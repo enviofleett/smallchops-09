@@ -13,6 +13,7 @@ import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle } from "lucide-
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
+import { DeliveryScheduler } from "./DeliveryScheduler";
 import { PaystackPaymentHandler } from "@/components/payments/PaystackPaymentHandler";
 import { storeRedirectUrl } from "@/utils/redirect";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
@@ -55,6 +56,11 @@ interface CheckoutData {
   delivery_zone_id?: string;
   fulfillment_type: 'delivery' | 'pickup';
   pickup_point_id?: string;
+  delivery_date?: string;
+  delivery_time_slot?: {
+    start_time: string;
+    end_time: string;
+  };
 }
 
 interface EnhancedCheckoutFlowProps {
@@ -261,6 +267,11 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         total_amount: total,
         delivery_fee: formData.fulfillment_type === 'delivery' ? deliveryFee : 0,
         delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id ? formData.delivery_zone_id : null,
+        delivery_schedule: {
+          delivery_date: formData.delivery_date,
+          delivery_time_start: formData.delivery_time_slot?.start_time,
+          delivery_time_end: formData.delivery_time_slot?.end_time
+        },
         payment_method: 'paystack',
         guest_session_id: null, // Guest checkout disabled
         timestamp: new Date().toISOString()
@@ -651,6 +662,20 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                 </div>
               </div>
 
+              {/* Delivery Scheduling Section */}
+              <DeliveryScheduler
+                selectedDate={formData.delivery_date}
+                selectedTimeSlot={formData.delivery_time_slot}
+                onScheduleChange={(date, timeSlot) => 
+                  setFormData(prev => ({ 
+                    ...prev, 
+                    delivery_date: date, 
+                    delivery_time_slot: timeSlot 
+                  }))
+                }
+                className="w-full"
+              />
+
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <Truck className="h-5 w-5" />
@@ -812,7 +837,17 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={isSubmitting || items.length === 0} 
+                  disabled={
+                    isSubmitting || 
+                    items.length === 0 || 
+                    !formData.delivery_date || 
+                    !formData.delivery_time_slot ||
+                    !formData.customer_email ||
+                    !formData.customer_name ||
+                    !formData.customer_phone ||
+                    (formData.fulfillment_type === 'delivery' && !formData.delivery_zone_id) ||
+                    (formData.fulfillment_type === 'pickup' && !formData.pickup_point_id)
+                  } 
                   className="flex-1"
                 >
                   {isSubmitting ? "Processing..." : "Continue to Payment"}

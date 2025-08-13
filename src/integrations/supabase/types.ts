@@ -765,6 +765,7 @@ export type Database = {
           business_hours: Json | null
           created_at: string
           default_vat_rate: number | null
+          delivery_scheduling_config: Json | null
           facebook_url: string | null
           favicon_url: string | null
           id: string
@@ -801,6 +802,7 @@ export type Database = {
           business_hours?: Json | null
           created_at?: string
           default_vat_rate?: number | null
+          delivery_scheduling_config?: Json | null
           facebook_url?: string | null
           favicon_url?: string | null
           id?: string
@@ -837,6 +839,7 @@ export type Database = {
           business_hours?: Json | null
           created_at?: string
           default_vat_rate?: number | null
+          delivery_scheduling_config?: Json | null
           facebook_url?: string | null
           favicon_url?: string | null
           id?: string
@@ -3359,6 +3362,60 @@ export type Database = {
         }
         Relationships: []
       }
+      order_delivery_schedule: {
+        Row: {
+          created_at: string
+          delivery_date: string
+          delivery_time_end: string
+          delivery_time_start: string
+          id: string
+          is_flexible: boolean
+          order_id: string
+          requested_at: string
+          special_instructions: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_date: string
+          delivery_time_end: string
+          delivery_time_start: string
+          id?: string
+          is_flexible?: boolean
+          order_id: string
+          requested_at?: string
+          special_instructions?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_date?: string
+          delivery_time_end?: string
+          delivery_time_start?: string
+          id?: string
+          is_flexible?: boolean
+          order_id?: string
+          requested_at?: string
+          special_instructions?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_delivery_schedule_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_delivery_schedule_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_items: {
         Row: {
           cost_price: number | null
@@ -4994,6 +5051,39 @@ export type Database = {
           valid_from?: string
           valid_until?: string | null
           value?: number
+        }
+        Relationships: []
+      }
+      public_holidays: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date: string
+          description: string | null
+          id: string
+          is_active: boolean
+          name: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date?: string
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          updated_at?: string
         }
         Relationships: []
       }

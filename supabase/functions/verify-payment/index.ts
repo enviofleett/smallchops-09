@@ -301,7 +301,7 @@ serve(async (req) => {
     }
 
     // Update order status with atomic transaction
-    const newStatus = isSuccessful ? 'confirmed' : 'payment_failed'
+    const newStatus = isSuccessful ? 'confirmed' : 'failed'
     const paymentStatus = isSuccessful ? 'paid' : 'failed'
     
     const updateData = {

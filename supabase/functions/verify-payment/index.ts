@@ -51,27 +51,44 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // CRITICAL FIX: Enhanced secret key validation
+    // CRITICAL FIX: Enhanced Paystack secret key validation  
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
     if (!paystackSecretKey) {
       console.error('[VERIFY-PAYMENT] ERROR - PAYSTACK_SECRET_KEY not configured')
       
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Payment service configuration error',
-          code: 'CONFIG_ERROR',
-          details: 'Secret key not configured'
-        }),
-        { 
-          status: 503, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      // Try to get from Supabase configuration as fallback
+      const { data: configData, error: configError } = await supabaseClient
+        .rpc('get_active_paystack_config')
+      
+      if (configError || !configData?.secret_key) {
+        console.error('[VERIFY-PAYMENT] ERROR - No Paystack configuration found anywhere')
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Payment service configuration error',
+            code: 'PAYSTACK_KEY_MISSING',
+            details: 'Paystack secret key not configured'
+          }),
+          { 
+            status: 503, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+      
+      // Use secret key from database configuration
+      console.log('[VERIFY-PAYMENT] Using Paystack key from database configuration')
+      const paystackKey = configData.secret_key
+    } else {
+      console.log('[VERIFY-PAYMENT] Using Paystack key from environment variables')
+      const paystackKey = paystackSecretKey
     }
 
+    // Get the final secret key to use
+    const finalSecretKey = paystackSecretKey || paystackKey
+    
     // Validate secret key format
-    if (!paystackSecretKey.startsWith('sk_test_') && !paystackSecretKey.startsWith('sk_live_')) {
+    if (!finalSecretKey || (!finalSecretKey.startsWith('sk_test_') && !finalSecretKey.startsWith('sk_live_'))) {
       console.error('[VERIFY-PAYMENT] ERROR - Invalid PAYSTACK_SECRET_KEY format')
       
       return new Response(
@@ -87,7 +104,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('[VERIFY-PAYMENT] Secret key validation passed')
+    console.log('[VERIFY-PAYMENT] Secret key validation passed:', finalSecretKey.substring(0, 10) + '...')
 
     const { reference, order_id } = await req.json() as VerificationRequest
 
@@ -137,7 +154,7 @@ serve(async (req) => {
         {
           method: 'GET',
           headers: {
-            'Authorization': `Bearer ${paystackSecretKey}`,
+            'Authorization': `Bearer ${finalSecretKey}`,
             'Content-Type': 'application/json',
           }
         }

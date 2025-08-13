@@ -98,7 +98,7 @@ export class PaymentsAPI {
   }
 
   /**
-   * Verify a payment transaction
+   * Verify a payment transaction with enhanced error handling
    */
   static async verifyPayment(reference: string): Promise<VerifyPaymentResponse> {
     try {

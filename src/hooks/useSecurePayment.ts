@@ -118,56 +118,105 @@ export const useSecurePayment = () => {
   const verifySecurePayment = useCallback(async (reference: string, orderId?: string) => {
     updateState({ isProcessing: true, error: null });
 
-    try {
-      console.log('🔍 Verifying secure payment:', reference);
+    // Enhanced retry logic with exponential backoff
+    const maxRetries = 3;
+    let attempt = 0;
 
-      // 🚨 SECURITY: Validate reference format before sending to backend
-      if (reference.startsWith('pay_')) {
-        throw new Error('Cannot verify frontend-generated payment references');
-      }
+    while (attempt < maxRetries) {
+      try {
+        console.log(`🔍 Verifying secure payment (attempt ${attempt + 1}):`, reference);
 
-      if (!reference.startsWith('txn_')) {
-        throw new Error('Invalid payment reference format');
-      }
-
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
-        body: {
-          reference,
-          order_id: orderId
+        // 🚨 SECURITY: Validate reference format before sending to backend
+        if (reference.startsWith('pay_')) {
+          throw new Error('Cannot verify frontend-generated payment references');
         }
-      });
 
-      if (error) throw error;
+        if (!reference.startsWith('txn_')) {
+          throw new Error('Invalid payment reference format');
+        }
 
-      updateState({ isProcessing: false });
-
-      if (data.success) {
-        toast.success('Payment verified successfully!');
-        console.log('✅ Payment verification successful:', {
-          reference: data.reference,
-          orderId: data.order_id,
-          amount: data.amount
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
+          body: {
+            reference,
+            order_id: orderId
+          }
         });
-      } else {
-        toast.error('Payment verification failed');
-        console.log('❌ Payment verification failed:', data);
+
+        if (error) {
+          // Check if error is retryable
+          if (error.message?.includes('503') || error.message?.includes('timeout') || error.message?.includes('unavailable')) {
+            throw new Error(`RETRYABLE: ${error.message}`);
+          }
+          throw error;
+        }
+
+        updateState({ isProcessing: false });
+
+        if (data.success) {
+          toast.success('Payment verified successfully!');
+          console.log('✅ Payment verification successful:', {
+            reference: data.reference,
+            orderId: data.order_id,
+            amount: data.amount
+          });
+        } else {
+          // Check if error suggests retrying
+          if (data?.code === 'CONFIG_ERROR' || data?.retryable) {
+            throw new Error(`RETRYABLE: ${data?.error || 'Payment verification failed'}`);
+          }
+          
+          toast.error(data?.error || 'Payment verification failed');
+          console.log('❌ Payment verification failed:', data);
+        }
+
+        return data as PaymentVerificationResult;
+
+      } catch (error: any) {
+        attempt++;
+        const errorMessage = error.message || 'Payment verification failed';
+        
+        // Check if this is a retryable error
+        const isRetryable = errorMessage.includes('RETRYABLE:') || 
+                           errorMessage.includes('503') || 
+                           errorMessage.includes('timeout') ||
+                           errorMessage.includes('unavailable') ||
+                           errorMessage.includes('CONFIG_ERROR');
+
+        if (isRetryable && attempt < maxRetries) {
+          console.log(`🔄 Retryable error, attempt ${attempt}/${maxRetries}: ${errorMessage}`);
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Non-retryable error or max retries reached
+        console.error('❌ Payment verification error after retries:', errorMessage);
+        
+        const finalError = errorMessage.replace('RETRYABLE: ', '');
+        updateState({ isProcessing: false, error: finalError });
+        
+        // Show user-friendly error message
+        if (finalError.includes('CONFIG_ERROR') || finalError.includes('Secret key not configured')) {
+          toast.error('Payment service is temporarily unavailable. Please try again later.');
+        } else if (finalError.includes('ORDER_NOT_FOUND')) {
+          toast.error('Payment reference not found. Please contact support.');
+        } else {
+          toast.error(finalError);
+        }
+        
+        return {
+          success: false,
+          error: finalError
+        };
       }
-
-      return data as PaymentVerificationResult;
-
-    } catch (error: any) {
-      console.error('❌ Payment verification error:', error);
-      
-      const errorMessage = error.message || 'Payment verification failed';
-      updateState({ isProcessing: false, error: errorMessage });
-      
-      toast.error(errorMessage);
-      
-      return {
-        success: false,
-        error: errorMessage
-      };
     }
+
+    // This should never be reached, but TypeScript requires it
+    return {
+      success: false,
+      error: 'Payment verification failed after all retry attempts'
+    };
   }, [updateState]);
 
   const openSecurePayment = useCallback((authorizationUrl: string) => {

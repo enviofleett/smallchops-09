@@ -1,197 +1,186 @@
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-interface EnvironmentConfig {
-  environment: string;
-  isLiveMode: boolean;
-  paystackLivePublicKey?: string;
-  paystackLiveSecretKey?: string;
-  paystackTestPublicKey?: string;
-  paystackTestSecretKey?: string;
-  webhookUrl?: string;
+interface EnvironmentCheckResult {
+  paystack_configured: boolean
+  secret_key_format: 'test' | 'live' | 'invalid' | 'missing'
+  database_connectivity: boolean
+  edge_functions_accessible: boolean
+  recommended_actions: string[]
+  critical_issues: string[]
+  warnings: string[]
 }
 
-Deno.serve(async (req) => {
-  // Handle CORS preflight requests
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const supabaseClient = createClient(
+    console.log('[ENV-MANAGER] Starting environment audit')
+    
+    const result: EnvironmentCheckResult = {
+      paystack_configured: false,
+      secret_key_format: 'missing',
+      database_connectivity: false,
+      edge_functions_accessible: false,
+      recommended_actions: [],
+      critical_issues: [],
+      warnings: []
+    }
+
+    // Initialize Supabase client
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    )
 
-    // Verify authentication
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
+    // Test database connectivity
+    try {
+      const { data, error } = await supabase
+        .from('orders')
+        .select('id')
+        .limit(1)
+
+      if (!error) {
+        result.database_connectivity = true
+        console.log('[ENV-MANAGER] Database connectivity: OK')
+      } else {
+        result.critical_issues.push('Database connectivity failed')
+        console.error('[ENV-MANAGER] Database error:', error)
+      }
+    } catch (dbError) {
+      result.critical_issues.push('Database connection error')
+      console.error('[ENV-MANAGER] Database connection error:', dbError)
     }
 
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
+    // Check Paystack configuration
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
     
-    if (authError || !user) {
-      throw new Error('Authentication failed');
+    if (!paystackSecretKey) {
+      result.secret_key_format = 'missing'
+      result.critical_issues.push('PAYSTACK_SECRET_KEY environment variable not set')
+      result.recommended_actions.push('Set PAYSTACK_SECRET_KEY in Supabase Edge Functions secrets')
+    } else {
+      result.paystack_configured = true
+      
+      if (paystackSecretKey.startsWith('sk_test_')) {
+        result.secret_key_format = 'test'
+        result.warnings.push('Using test Paystack key - ensure this is correct for your environment')
+        console.log('[ENV-MANAGER] Paystack test key detected')
+      } else if (paystackSecretKey.startsWith('sk_live_')) {
+        result.secret_key_format = 'live'
+        console.log('[ENV-MANAGER] Paystack live key detected')
+      } else {
+        result.secret_key_format = 'invalid'
+        result.critical_issues.push('Invalid PAYSTACK_SECRET_KEY format - must start with sk_test_ or sk_live_')
+      }
     }
 
-    // Check admin role
-    const { data: profile, error: profileError } = await supabaseClient
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || profile?.role !== 'admin') {
-      throw new Error('Admin access required');
-    }
-
-    if (req.method === 'GET') {
-      // Get current environment configuration
-      const { data: envConfig, error: envError } = await supabaseClient
-        .from('environment_config')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (envError) {
-        console.error('Error fetching environment config:', envError);
-        throw new Error('Failed to fetch environment configuration');
-      }
-
-      // Get payment integration settings
-      const { data: paymentConfig, error: paymentError } = await supabaseClient
-        .from('payment_integrations')
-        .select('*')
-        .eq('provider', 'paystack')
-        .eq('connection_status', 'connected')
-        .order('updated_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (paymentError) {
-        console.error('Error fetching payment config:', paymentError);
-        throw new Error('Failed to fetch payment configuration');
-      }
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: {
-            environment: envConfig,
-            paymentIntegration: paymentConfig,
-            activeKeys: paymentConfig ? {
-              publicKey: envConfig?.is_live_mode 
-                ? (paymentConfig.live_public_key || paymentConfig.public_key)
-                : paymentConfig.public_key,
-              testMode: !envConfig?.is_live_mode,
-              environment: envConfig?.environment || 'development'
-            } : null
+    // Test Paystack API connectivity
+    if (result.paystack_configured && result.secret_key_format !== 'invalid') {
+      try {
+        const testResponse = await fetch('https://api.paystack.co/bank', {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${paystackSecretKey}`,
+            'Content-Type': 'application/json',
           }
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        })
+
+        if (testResponse.ok) {
+          console.log('[ENV-MANAGER] Paystack API connectivity: OK')
+          result.recommended_actions.push('Paystack API connectivity verified')
+        } else {
+          result.critical_issues.push('Paystack API authentication failed')
+          console.error('[ENV-MANAGER] Paystack API error:', testResponse.status)
         }
-      );
+      } catch (apiError) {
+        result.warnings.push('Could not verify Paystack API connectivity')
+        console.error('[ENV-MANAGER] Paystack API test error:', apiError)
+      }
     }
 
-    if (req.method === 'POST') {
-      const body = await req.json();
-      const config: EnvironmentConfig = body;
-
-      // Validate required fields
-      if (!config.environment) {
-        throw new Error('Environment is required');
-      }
-
-      // Update environment configuration
-      const { data: envData, error: envError } = await supabaseClient
-        .from('environment_config')
-        .upsert({
-          environment: config.environment,
-          is_live_mode: config.isLiveMode,
-          paystack_live_public_key: config.paystackLivePublicKey,
-          paystack_live_secret_key: config.paystackLiveSecretKey,
-          paystack_test_public_key: config.paystackTestPublicKey,
-          paystack_test_secret_key: config.paystackTestSecretKey,
-          webhook_url: config.webhookUrl,
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (envError) {
-        console.error('Error updating environment config:', envError);
-        throw new Error('Failed to update environment configuration');
-      }
-
-      // Update payment integration if keys provided
-      if (config.paystackLivePublicKey || config.paystackLiveSecretKey || 
-          config.paystackTestPublicKey || config.paystackTestSecretKey) {
-        
-        const updateData: any = {};
-        if (config.paystackLivePublicKey) updateData.live_public_key = config.paystackLivePublicKey;
-        if (config.paystackLiveSecretKey) updateData.live_secret_key = config.paystackLiveSecretKey;
-        if (config.paystackTestPublicKey) updateData.public_key = config.paystackTestPublicKey;
-        if (config.paystackTestSecretKey) updateData.secret_key = config.paystackTestSecretKey;
-        updateData.environment = config.isLiveMode ? 'live' : 'test';
-        updateData.test_mode = !config.isLiveMode;
-
-        const { error: paymentError } = await supabaseClient
-          .from('payment_integrations')
-          .update(updateData)
-          .eq('provider', 'paystack');
-
-        if (paymentError) {
-          console.error('Error updating payment integration:', paymentError);
-          // Don't throw here, environment config was successful
+    // Check edge functions accessibility
+    try {
+      const functionsCheck = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-environment-manager`, {
+        method: 'OPTIONS',
+        headers: {
+          'apikey': Deno.env.get('SUPABASE_ANON_KEY') ?? ''
         }
-      }
+      })
 
-      // Log the environment change
-      await supabaseClient
+      if (functionsCheck.ok) {
+        result.edge_functions_accessible = true
+        console.log('[ENV-MANAGER] Edge functions accessibility: OK')
+      }
+    } catch (funcError) {
+      result.warnings.push('Could not verify edge functions accessibility')
+      console.error('[ENV-MANAGER] Edge functions check error:', funcError)
+    }
+
+    // Generate recommendations
+    if (result.critical_issues.length === 0 && result.secret_key_format !== 'missing') {
+      result.recommended_actions.push('Environment appears healthy for payment processing')
+      
+      if (result.secret_key_format === 'test') {
+        result.recommended_actions.push('Consider switching to live keys for production')
+      }
+    }
+
+    if (result.database_connectivity && result.paystack_configured) {
+      result.recommended_actions.push('Run payment flow health check to verify end-to-end functionality')
+    }
+
+    // Log environment audit results
+    try {
+      await supabase
         .from('audit_logs')
         .insert({
-          user_id: user.id,
-          action: 'UPDATE',
-          category: 'Environment Management',
-          entity_type: 'environment_config',
-          entity_id: envData.id,
-          message: `Environment switched to ${config.environment} (Live: ${config.isLiveMode})`,
-          new_values: config
-        });
-
-      return new Response(
-        JSON.stringify({
-          success: true,
-          data: envData,
-          message: 'Environment configuration updated successfully'
-        }),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      );
+          action: 'environment_audit',
+          category: 'Payment Configuration',
+          message: 'Payment environment audit completed',
+          new_values: result
+        })
+      
+      console.log('[ENV-MANAGER] Audit results logged to database')
+    } catch (logError) {
+      console.error('[ENV-MANAGER] Failed to log audit results:', logError)
     }
 
-    throw new Error('Method not allowed');
+    console.log('[ENV-MANAGER] Environment audit completed:', result)
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        timestamp: new Date().toISOString(),
+        environment_status: result,
+        overall_health: result.critical_issues.length === 0 ? 'healthy' : 'critical',
+        ready_for_payments: result.paystack_configured && 
+                           result.database_connectivity && 
+                           result.secret_key_format !== 'invalid' && 
+                           result.secret_key_format !== 'missing'
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
 
   } catch (error) {
-    console.error('Environment manager error:', error);
+    console.error('[ENV-MANAGER] Environment audit error:', error)
+    
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: 'Environment audit failed',
+        code: 'AUDIT_ERROR',
+        message: error.message
       }),
       { 
-        status: 400,
+        status: 500, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
-    );
+    )
   }
-});
+})

@@ -5258,7 +5258,7 @@ export type Database = {
           last_used_at?: string | null
           last4?: string | null
           nickname?: string | null
-          provider: string
+          provider?: string
           usage_count?: number | null
           user_id?: string | null
         }
@@ -6630,6 +6630,10 @@ export type Database = {
         Returns: string
       }
       generate_payment_reference: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
+      generate_secure_payment_reference: {
         Args: Record<PropertyKey, never>
         Returns: string
       }

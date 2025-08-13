@@ -118,7 +118,7 @@ class PublicAPIService {
     return response.json();
   }
 
-  // Stripe payment endpoints removed in favor of Paystack integration
+  // PAYSTACK-ONLY: All payment processing uses secure backend-generated references
 
 
   // Send email

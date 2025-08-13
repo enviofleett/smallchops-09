@@ -513,7 +513,7 @@ const order = await placeOrder(
                       <div className="bg-muted/50 p-3 rounded text-sm">
                         <pre>{`const { processPayment } = usePayment();
 
-// Process payment (opens Stripe checkout)
+// Process payment (opens Paystack checkout)
 const success = await processPayment(
   orderId,
   cart.summary.total_amount,
@@ -854,7 +854,7 @@ if (!paymentSuccess) {
                         <li>• <strong>30 Products:</strong> Full menu with prices and descriptions</li>
                         <li>• <strong>15 Sample Customers:</strong> For testing customer registration</li>
                         <li>• <strong>4 Active Promotions:</strong> Including WELCOME10, FREEDEL, PIZZA20, WEEKEND15</li>
-                        <li>• <strong>Payment Testing:</strong> Use Stripe test cards (4242 4242 4242 4242)</li>
+                        <li>• <strong>Payment Testing:</strong> Use Paystack test cards for secure transactions</li>
                       </ul>
                     </div>
                   </div>
@@ -1415,7 +1415,7 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                         <h4 className="font-medium">Rate Limits</h4>
                         <ul className="text-sm mt-2 space-y-1">
                           <li>• Public APIs: No authentication required</li>
-                          <li>• Payment APIs: Stripe rate limits apply</li>
+                          <li>• Payment APIs: Paystack rate limits apply</li>
                           <li>• Email APIs: SMTP rate limits apply</li>
                           <li>• Real-time updates via Supabase realtime</li>
                         </ul>

@@ -188,15 +188,10 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const formatCurrency = (amount: number) => {
-    if (selectedProvider === 'paystack') {
-      return new Intl.NumberFormat('en-NG', {
-        style: 'currency',
-        currency: 'NGN',
-      }).format(amount);
-    }
-    return new Intl.NumberFormat('en-US', {
+    // PAYSTACK-ONLY: Always format as Nigerian Naira
+    return new Intl.NumberFormat('en-NG', {
       style: 'currency',
-      currency: 'USD',
+      currency: 'NGN',
     }).format(amount);
   };
 
@@ -215,30 +210,12 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
 
           {/* Payment Provider Selection */}
-          {availableProviders.length > 1 && (
-            <div className="space-y-2">
-              <Label className="text-sm font-medium">Payment Provider</Label>
-              <RadioGroup
-                value={selectedProvider}
-                onValueChange={(value) => setSelectedProvider(value as PaymentProvider)}
-                className="grid grid-cols-2 gap-2"
-              >
-                {availableProviders.map((provider) => (
-                  <div key={provider.provider} className="flex items-center space-x-2">
-                    <RadioGroupItem value={provider.provider} id={provider.provider} />
-                    <Label 
-                      htmlFor={provider.provider}
-                      className="flex items-center space-x-2 cursor-pointer"
-                    >
-                      {provider.provider === 'stripe' && <Globe className="h-4 w-4" />}
-                      {provider.provider === 'paystack' && <Building2 className="h-4 w-4" />}
-                      <span className="capitalize">{provider.provider}</span>
-                    </Label>
-                  </div>
-                ))}
-              </RadioGroup>
-            </div>
-          )}
+          {/* PAYSTACK-ONLY: Provider selection removed */}
+          <div className="flex items-center space-x-2 p-3 bg-muted/50 rounded-lg">
+            <Building2 className="h-5 w-5 text-primary" />
+            <span className="font-medium text-sm">Powered by Paystack</span>
+            <Badge variant="secondary" className="ml-auto">Secure</Badge>
+          </div>
 
           {/* Saved Payment Methods */}
           {savedMethods.length > 0 && (
@@ -321,16 +298,15 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
             )}
           </div>
 
-          {/* Payment Info */}
-          {selectedProvider === 'paystack' && (
-            <div className="text-xs text-muted-foreground p-3 bg-muted rounded">
-              <p>• Secure payments powered by Paystack</p>
-              <p>• Supports Nigerian banks and mobile money</p>
-              <p>• No hidden fees</p>
-            </div>
-          )}
+          {/* Payment Info - PAYSTACK-ONLY */}
+          <div className="text-xs text-muted-foreground p-3 bg-muted rounded">
+            <p>• Secure payments powered by Paystack</p>
+            <p>• Supports Nigerian banks and mobile money</p>
+            <p>• No hidden fees</p>
+            <p>• Backend-secured transactions</p>
+          </div>
 
-          {selectedProvider === 'paystack' && paymentMethod === 'new_card' ? (
+          {paymentMethod === 'new_card' ? (
             <PaystackButton
               email={orderData.customer_email}
               amount={orderData.total}

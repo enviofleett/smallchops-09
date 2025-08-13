@@ -200,17 +200,19 @@ const App = () => {
               {/* Legacy customer registration route */}
               <Route path="/customer-register" element={<CustomerRegister />} />
               
+              {/* Legacy admin redirects for seamless transition */}
+              <Route path="/orders" element={<Navigate to="/admin/orders" replace />} />
+              <Route path="/delivery-pickup" element={<Navigate to="/admin/delivery" replace />} />
+
               {/* Protected admin routes */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                 <Route path="/admin" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
                 <Route path="/dashboard" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
-                <Route path="/orders" element={<ErrorBoundaryWrapper context="Orders"><Orders /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/orders" element={<ErrorBoundaryWrapper context="Admin Orders"><AdminOrders /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/delivery" element={<ErrorBoundaryWrapper context="Admin Delivery"><AdminDelivery /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/products" element={<ErrorBoundaryWrapper context="Products"><Products /></ErrorBoundaryWrapper>} />
                 <Route path="/categories" element={<ErrorBoundaryWrapper context="Categories"><Categories /></ErrorBoundaryWrapper>} />
                 <Route path="/customers" element={<ErrorBoundaryWrapper context="Customers"><Customers /></ErrorBoundaryWrapper>} />
-                <Route path="/delivery-pickup" element={<ErrorBoundaryWrapper context="Delivery"><DeliveryPickup /></ErrorBoundaryWrapper>} />
                 <Route path="/reports" element={<ErrorBoundaryWrapper context="Reports"><Reports /></ErrorBoundaryWrapper>} />
                 <Route path="/promotions" element={<ErrorBoundaryWrapper context="Promotions"><Promotions /></ErrorBoundaryWrapper>} />
                 <Route path="/bookings" element={<ErrorBoundaryWrapper context="Catering Bookings"><BookingManagement /></ErrorBoundaryWrapper>} />

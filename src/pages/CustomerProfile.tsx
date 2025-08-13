@@ -33,7 +33,7 @@ import { EnhancedWishlistSection } from '@/components/customer/EnhancedWishlistS
 import { TransactionHistoryTab } from '@/components/purchase-history/TransactionHistoryTab';
 import { CustomerBookingsSection } from '@/components/customer/CustomerBookingsSection';
 
-type ProfileSection = 'orders' | 'wishlist' | 'payment' | 'address' | 'help' | 'bookings';
+type ProfileSection = 'orders' | 'tracking' | 'wishlist' | 'payment' | 'address' | 'help' | 'bookings';
 
 // Loading skeleton component
 const ContentSkeleton = () => (
@@ -59,9 +59,10 @@ export default function CustomerProfile() {
 
   // Memoize sidebar items to prevent unnecessary re-renders
   const sidebarItems = useMemo(() => [
-    { id: 'orders' as const, label: 'My Orders', icon: ShoppingBag },
+    { id: 'orders' as const, label: 'My Orders', icon: ShoppingBag, path: '/purchase-history' },
+    { id: 'tracking' as const, label: 'Track Orders', icon: MapPin, path: '/track-order' },
     { id: 'bookings' as const, label: 'Catering Bookings', icon: Calendar },
-    { id: 'wishlist' as const, label: 'Wishlist', icon: Heart },
+    { id: 'wishlist' as const, label: 'Wishlist', icon: Heart, path: '/customer-favorites' },
     { id: 'payment' as const, label: 'Payment Method', icon: CreditCard },
     { id: 'address' as const, label: 'Delivery Address', icon: MapPin },
     { id: 'help' as const, label: 'Help', icon: HelpCircle },
@@ -123,6 +124,9 @@ export default function CustomerProfile() {
     switch (activeSection) {
       case 'orders':
         return <EnhancedOrdersSection />;
+      case 'tracking':
+        // This will be handled by navigation, fallback to orders
+        return <EnhancedOrdersSection />;
       case 'bookings':
         return <CustomerBookingsSection />;
       case 'wishlist':
@@ -153,7 +157,13 @@ export default function CustomerProfile() {
               {sidebarItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setActiveSection(item.id)}
+                  onClick={() => {
+                    if (item.path) {
+                      navigate(item.path);
+                    } else {
+                      setActiveSection(item.id);
+                    }
+                  }}
                   className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
                     activeSection === item.id
                       ? 'bg-orange-50 text-orange-600 border border-orange-200'
@@ -164,7 +174,11 @@ export default function CustomerProfile() {
                     <item.icon className="w-5 h-5" />
                     <span className="font-medium">{item.label}</span>
                   </div>
-                  <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                  {item.path ? (
+                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                  ) : (
+                    <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                  )}
                 </button>
               ))}
               

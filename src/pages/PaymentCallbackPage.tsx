@@ -141,7 +141,7 @@ export const PaymentCallbackPage: React.FC = () => {
                   {/* Action Buttons */}
                   <div className="space-y-3 pt-4">
                     <Button 
-                      onClick={() => navigate('/orders')} 
+                      onClick={() => navigate('/customer-profile')} 
                       size="lg"
                       className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"
                     >

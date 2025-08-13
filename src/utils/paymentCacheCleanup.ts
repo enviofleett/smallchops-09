@@ -52,7 +52,6 @@ export const cleanupPaymentCache = (): void => {
   
   if (cleanedCount > 0) {
     console.log(`✅ Payment cache cleanup completed: ${cleanedCount} items removed`);
-    toast.success(`Cleaned ${cleanedCount} legacy payment references`);
   } else {
     console.log('✅ Payment cache is clean');
   }

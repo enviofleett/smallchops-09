@@ -223,8 +223,8 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields
-    if (!formData.delivery_date || !formData.delivery_time_slot) {
+    // Validate required fields only for delivery orders
+    if (formData.fulfillment_type === 'delivery' && (!formData.delivery_date || !formData.delivery_time_slot)) {
       toast({
         title: "Delivery Schedule Required",
         description: "Please select a delivery date and time before proceeding.",
@@ -700,31 +700,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                 </div>
               </div>
 
-              {/* Delivery Scheduling Section - Moved to top for better UX */}
-              <div className="space-y-4 border-2 border-primary/20 rounded-lg p-6 bg-primary/5">
-                <h3 className="font-semibold text-lg flex items-center gap-2 text-primary">
-                  <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                  Schedule Your Delivery
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Choose your preferred delivery date and time window
-                </p>
-                <DeliveryScheduler
-                  selectedDate={formData.delivery_date}
-                  selectedTimeSlot={formData.delivery_time_slot}
-                  onScheduleChange={(date, timeSlot) => 
-                    setFormData(prev => ({ 
-                      ...prev, 
-                      delivery_date: date, 
-                      delivery_time_slot: timeSlot 
-                    }))
-                  }
-                  className="w-full"
-                />
-              </div>
-
               <div className="space-y-4">
                 <h3 className="font-semibold text-lg flex items-center gap-2">
                   <Truck className="h-5 w-5" />
@@ -769,11 +744,37 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
               </div>
 
               {formData.fulfillment_type === 'delivery' && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-lg flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    Delivery Address
-                  </h3>
+                <>
+                  {/* Delivery Scheduling Section - Shows first for delivery */}
+                  <div className="space-y-4 border-2 border-primary/20 rounded-lg p-6 bg-primary/5">
+                    <h3 className="font-semibold text-lg flex items-center gap-2 text-primary">
+                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                      </svg>
+                      Schedule Your Delivery
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      Choose your preferred delivery date and time window
+                    </p>
+                    <DeliveryScheduler
+                      selectedDate={formData.delivery_date}
+                      selectedTimeSlot={formData.delivery_time_slot}
+                      onScheduleChange={(date, timeSlot) => 
+                        setFormData(prev => ({ 
+                          ...prev, 
+                          delivery_date: date, 
+                          delivery_time_slot: timeSlot 
+                        }))
+                      }
+                      className="w-full"
+                    />
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <MapPin className="h-5 w-5" />
+                      Delivery Address
+                    </h3>
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <Label htmlFor="address_line_1">Street Address *</Label>
@@ -856,11 +857,12 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                       setDeliveryFee(fee);
                     }}
                     orderSubtotal={cart?.summary?.subtotal || 0}
-                  />
-                </div>
-              )}
+                   />
+                 </div>
+                 </>
+               )}
 
-              {formData.fulfillment_type === 'pickup' && (
+               {formData.fulfillment_type === 'pickup' && (
                 <div className="space-y-4">
                   <PickupPointSelector
                     selectedPointId={formData.pickup_point_id}
@@ -889,14 +891,12 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                   disabled={
                     isSubmitting || 
                     items.length === 0 || 
-                    !formData.delivery_date || 
-                    !formData.delivery_time_slot ||
                     !formData.customer_email ||
                     !formData.customer_name ||
                     !formData.customer_phone ||
-                    (formData.fulfillment_type === 'delivery' && !formData.delivery_zone_id) ||
+                    (formData.fulfillment_type === 'delivery' && (!formData.delivery_date || !formData.delivery_time_slot || !formData.delivery_zone_id)) ||
                     (formData.fulfillment_type === 'pickup' && !formData.pickup_point_id)
-                  } 
+                  }
                   className="flex-1"
                 >
                   {isSubmitting ? "Processing..." : "Continue to Payment"}

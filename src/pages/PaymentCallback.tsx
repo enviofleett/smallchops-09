@@ -20,6 +20,7 @@ import {
   logReferenceMissing 
 } from "@/utils/paymentMonitoring";
 import { paymentCompletionCoordinator } from "@/utils/paymentCompletion";
+import { verifyPayment } from "@/utils/paymentVerification";
 
 type PaymentStatus = 'verifying' | 'success' | 'failed' | 'error';
 
@@ -167,59 +168,32 @@ export default function PaymentCallback() {
         console.log(`🔄 Payment verification attempt ${currentRetry + 1}/${maxRetries}`);
         logVerificationStarted(paymentReference);
 
-        // FIXED: Better Edge Function error handling
-        const { data, error } = await supabase.functions.invoke('paystack-secure', {
-          body: { 
-            action: 'verify', 
-            reference: paymentReference, 
-            order_id: orderIdParam 
-          }
-        });
+        // ENHANCED: Use improved verification with recovery
+        const verificationResult = await verifyPayment(paymentReference);
 
-        // CRITICAL FIX: Categorize errors properly
-        if (error) {
-          console.error('Edge Function Error:', error);
-          
-          // Network/timeout errors - should retry
-          const isNetworkError = error.message?.toLowerCase().includes('timeout') || 
-                                error.message?.toLowerCase().includes('network') ||
-                                error.message?.toLowerCase().includes('fetch') ||
-                                error.message?.toLowerCase().includes('cors');
-          
-          if (isNetworkError) {
-            throw new Error(`Network error (retry ${currentRetry + 1}): ${error.message}`);
-          }
-          
-          // Service errors - don't retry immediately
-          throw new Error(`Service error: ${error.message}`);
+        if (verificationResult.success) {
+          await handleVerificationSuccess(verificationResult, paymentReference);
+          return; // Success - exit retry loop
         }
 
-        // FIXED: Better success detection
-        if (data) {
-          console.log('📦 Verification response:', data);
-          
-          // Handle service-level errors that should retry
-          if (data.code === 'VERIFICATION_TIMEOUT' || 
-              data.code === 'DB_ERROR' || 
-              data.code === 'DB_CONNECTION_ERROR') {
-            throw new Error(`Service temporarily unavailable: ${data.error}`);
-          }
-          
-          // Check for successful verification
-          const isSuccess = data.success === true || 
-                           data.status === 'success' || 
-                           data.data?.status === 'success' ||
-                           data.data?.payment_status === 'paid';
+        // Handle verification failure
+        const errorData = {
+          error: verificationResult.message,
+          code: 'VERIFICATION_FAILED'
+        };
 
-          if (isSuccess) {
-            await handleVerificationSuccess(data, paymentReference);
-            return; // Success - exit retry loop
-          }
-          
-          // Payment failed (shouldn't retry)
-          await handleVerificationFailure(data, paymentReference, false);
-          return;
+        // Check if error is retryable
+        const isRetryableError = verificationResult.message?.toLowerCase().includes('temporarily unavailable') ||
+                               verificationResult.message?.toLowerCase().includes('timeout') ||
+                               verificationResult.message?.toLowerCase().includes('network');
+
+        if (isRetryableError) {
+          throw new Error(`Service temporarily unavailable: ${verificationResult.message}`);
         }
+
+        // Payment failed (shouldn't retry)
+        await handleVerificationFailure(errorData, paymentReference, false);
+        return;
 
         // No data and no error - unexpected
         throw new Error('Empty response from verification service');
@@ -250,10 +224,10 @@ export default function PaymentCallback() {
     }
   };
 
-  const handleVerificationSuccess = async (data: any, reference: string) => {
+  const handleVerificationSuccess = async (verificationResult: any, reference: string) => {
     if (!mountedRef.current || navigationHandledRef.current) return;
     
-    const payload = data.data || data;
+    const payload = verificationResult.data || verificationResult;
     
     console.log('✅ Payment verification successful!', payload);
     
@@ -262,7 +236,7 @@ export default function PaymentCallback() {
       success: true,
       order_id: payload?.order_id,
       order_number: payload?.order_number,
-      amount: payload?.total_amount || (payload?.amount ? payload.amount / 100 : undefined),
+      amount: payload?.amount,
       message: 'Payment verified successfully! Your order has been confirmed.'
     });
 
@@ -277,7 +251,7 @@ export default function PaymentCallback() {
           reference,
           orderNumber: payload?.order_number,
           orderId: payload?.order_id,
-          amount: payload?.total_amount || (payload?.amount ? payload.amount / 100 : undefined)
+          amount: payload?.amount
         },
         {
           onClearCart: () => {

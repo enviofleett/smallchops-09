@@ -1,0 +1,418 @@
+import React, { useState } from 'react';
+import { Helmet } from 'react-helmet-async';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useQuery } from '@tanstack/react-query';
+import { getOrders } from '@/api/orders';
+import { getRoutes } from '@/api/routes';
+import { useDeliveryZones } from '@/hooks/useDeliveryTracking';
+import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
+import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
+import { 
+  MapPin, 
+  Truck, 
+  Clock,
+  Users,
+  Package,
+  TrendingUp,
+  Navigation,
+  Route,
+  Timer,
+  CheckCircle
+} from 'lucide-react';
+import { format } from 'date-fns';
+
+export default function AdminDelivery() {
+  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [activeTab, setActiveTab] = useState('overview');
+
+  // Fetch delivery orders for today
+  const { data: deliveryOrdersData, isLoading: ordersLoading } = useQuery({
+    queryKey: ['delivery-orders', selectedDate],
+    queryFn: () => getOrders({
+      page: 1,
+      pageSize: 100,
+      status: undefined,
+    }),
+    refetchInterval: 30000,
+  });
+
+  // Filter for delivery orders only
+  const deliveryOrders = deliveryOrdersData?.orders?.filter(order => 
+    order.order_type === 'delivery' && 
+    ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
+  ) || [];
+
+  // Fetch delivery routes
+  const { data: routes, isLoading: routesLoading } = useQuery({
+    queryKey: ['delivery-routes', selectedDate],
+    queryFn: () => getRoutes(selectedDate),
+  });
+
+  // Fetch delivery zones
+  const { zones, loading: zonesLoading } = useDeliveryZones();
+
+  // Calculate delivery metrics
+  const deliveryMetrics = {
+    totalDeliveries: deliveryOrders.length,
+    inProgress: deliveryOrders.filter(o => ['preparing', 'ready'].includes(o.status)).length,
+    outForDelivery: deliveryOrders.filter(o => o.status === 'out_for_delivery').length,
+    activeRoutes: routes?.filter(r => r.status === 'active').length || 0,
+  };
+
+  return (
+    <>
+      <Helmet>
+        <title>Delivery Management - Admin Dashboard</title>
+        <meta name="description" content="Manage delivery operations, track routes, and monitor delivery performance." />
+      </Helmet>
+
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold">Delivery Management</h1>
+            <p className="text-muted-foreground">
+              Monitor delivery operations, routes, and performance metrics
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Select value={selectedDate} onValueChange={setSelectedDate}>
+              <SelectTrigger className="w-40">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={format(new Date(), 'yyyy-MM-dd')}>Today</SelectItem>
+                <SelectItem value={format(new Date(Date.now() + 86400000), 'yyyy-MM-dd')}>Tomorrow</SelectItem>
+                <SelectItem value={format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')}>Yesterday</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button>
+              <Route className="w-4 h-4 mr-2" />
+              Plan Routes
+            </Button>
+          </div>
+        </div>
+
+        {/* Delivery Metrics */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
+                  <Package className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Deliveries</p>
+                  <p className="text-2xl font-bold">{deliveryMetrics.totalDeliveries}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
+                  <Clock className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">In Progress</p>
+                  <p className="text-2xl font-bold">{deliveryMetrics.inProgress}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
+                  <Truck className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Out for Delivery</p>
+                  <p className="text-2xl font-bold">{deliveryMetrics.outForDelivery}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-green-100 text-green-600 rounded-lg">
+                  <Route className="w-5 h-5" />
+                </div>
+                <div>
+                  <p className="text-sm text-muted-foreground">Active Routes</p>
+                  <p className="text-2xl font-bold">{deliveryMetrics.activeRoutes}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Main Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="grid w-full grid-cols-4">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="orders">Delivery Orders</TabsTrigger>
+            <TabsTrigger value="routes">Routes</TabsTrigger>
+            <TabsTrigger value="zones">Delivery Zones</TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview" className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Recent Delivery Orders */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Package className="w-5 h-5" />
+                    Recent Delivery Orders
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {ordersLoading ? (
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="animate-pulse space-y-2">
+                          <div className="h-4 bg-muted rounded w-3/4"></div>
+                          <div className="h-3 bg-muted rounded w-1/2"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {deliveryOrders.slice(0, 5).map((order) => (
+                        <DeliveryOrderItem key={order.id} order={order} />
+                      ))}
+                      {deliveryOrders.length === 0 && (
+                        <p className="text-center text-muted-foreground py-4">
+                          No delivery orders for today
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Active Routes */}
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Route className="w-5 h-5" />
+                    Active Routes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {routesLoading ? (
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => (
+                        <div key={i} className="animate-pulse space-y-2">
+                          <div className="h-4 bg-muted rounded w-3/4"></div>
+                          <div className="h-3 bg-muted rounded w-1/2"></div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {routes?.slice(0, 5).map((route) => (
+                        <div key={route.id} className="flex items-center justify-between p-3 border rounded-lg">
+                          <div>
+                            <p className="font-medium">Route #{route.id.slice(0, 8)}</p>
+                            <p className="text-sm text-muted-foreground">
+                              {route.total_orders} orders • {route.total_distance?.toFixed(1)} km
+                            </p>
+                          </div>
+                          <Badge variant={route.status === 'active' ? 'default' : 'secondary'}>
+                            {route.status}
+                          </Badge>
+                        </div>
+                      )) || (
+                        <p className="text-center text-muted-foreground py-4">
+                          No active routes
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          {/* Delivery Orders Tab */}
+          <TabsContent value="orders" className="space-y-4">
+            <div className="grid gap-4">
+              {ordersLoading ? (
+                [...Array(5)].map((_, i) => (
+                  <Card key={i} className="p-6">
+                    <div className="animate-pulse space-y-3">
+                      <div className="h-4 bg-muted rounded w-1/4"></div>
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
+                      <div className="h-4 bg-muted rounded w-1/3"></div>
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                deliveryOrders.map((order) => (
+                  <DeliveryOrderCard key={order.id} order={order} />
+                ))
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Routes Tab */}
+          <TabsContent value="routes" className="space-y-4">
+            <div className="grid gap-4">
+              {routesLoading ? (
+                [...Array(3)].map((_, i) => (
+                  <Card key={i} className="p-6">
+                    <div className="animate-pulse space-y-3">
+                      <div className="h-4 bg-muted rounded w-1/4"></div>
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                routes?.map((route) => (
+                  <RouteCard key={route.id} route={route} />
+                )) || (
+                  <Card className="p-6">
+                    <p className="text-center text-muted-foreground">No routes found</p>
+                  </Card>
+                )
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Delivery Zones Tab */}
+          <TabsContent value="zones" className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {zonesLoading ? (
+                [...Array(6)].map((_, i) => (
+                  <Card key={i} className="p-4">
+                    <div className="animate-pulse space-y-3">
+                      <div className="h-4 bg-muted rounded w-3/4"></div>
+                      <div className="h-3 bg-muted rounded w-1/2"></div>
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                zones.map((zone: any) => (
+                  <Card key={zone.id}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center gap-3 mb-3">
+                        <MapPin className="w-5 h-5 text-primary" />
+                        <h3 className="font-semibold">{zone.name}</h3>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Coverage:</span>
+                          <span>{zone.coverage_area || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Base Fee:</span>
+                          <span>₦{zone.delivery_fees?.[0]?.base_fee || 'N/A'}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Status:</span>
+                          <Badge variant={zone.is_active ? 'default' : 'secondary'}>
+                            {zone.is_active ? 'Active' : 'Inactive'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </>
+  );
+}
+
+// Helper components
+function DeliveryOrderItem({ order }: { order: any }) {
+  return (
+    <div className="flex items-center justify-between p-3 border rounded-lg">
+      <div>
+        <p className="font-medium">#{order.order_number}</p>
+        <p className="text-sm text-muted-foreground">{order.customer_name}</p>
+      </div>
+      <Badge variant={order.status === 'out_for_delivery' ? 'default' : 'secondary'}>
+        {order.status.replace('_', ' ')}
+      </Badge>
+    </div>
+  );
+}
+
+function DeliveryOrderCard({ order }: { order: any }) {
+  const { data: deliverySchedule } = useQuery({
+    queryKey: ['delivery-schedule', order.id],
+    queryFn: () => getDeliveryScheduleByOrderId(order.id),
+  });
+
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold">Order #{order.order_number}</h3>
+            <p className="text-sm text-muted-foreground">{order.customer_name}</p>
+          </div>
+          <Badge variant={order.status === 'out_for_delivery' ? 'default' : 'secondary'}>
+            {order.status.replace('_', ' ').toUpperCase()}
+          </Badge>
+        </div>
+
+        {deliverySchedule && (
+          <DeliveryScheduleDisplay schedule={deliverySchedule} />
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function RouteCard({ route }: { route: any }) {
+  return (
+    <Card>
+      <CardContent className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-semibold">Route #{route.id.slice(0, 8)}</h3>
+            <p className="text-sm text-muted-foreground">
+              {format(new Date(route.route_date), 'PPP')}
+            </p>
+          </div>
+          <Badge variant={route.status === 'active' ? 'default' : 'secondary'}>
+            {route.status}
+          </Badge>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 text-sm">
+          <div>
+            <p className="text-muted-foreground">Orders</p>
+            <p className="font-medium">{route.total_orders}</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Distance</p>
+            <p className="font-medium">{route.total_distance?.toFixed(1)} km</p>
+          </div>
+          <div>
+            <p className="text-muted-foreground">Duration</p>
+            <p className="font-medium">
+              {route.estimated_duration ? `${Math.round(route.estimated_duration / 60)}h` : 'N/A'}
+            </p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}

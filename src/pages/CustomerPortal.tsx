@@ -15,6 +15,7 @@ import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
 import { getCustomerOrderHistory } from '@/api/purchaseHistory';
 import { OrderWithItems } from '@/api/orders';
+import { UpcomingDeliveries } from '@/components/customer/UpcomingDeliveries';
 
 export default function CustomerPortal() {
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -234,11 +235,15 @@ export default function CustomerPortal() {
               </Card>
             </div>
 
-            <Card>
-              <CardHeader>
-                <CardTitle>Recent Orders</CardTitle>
-                <CardDescription>Your latest order activity</CardDescription>
-              </CardHeader>
+            {/* Upcoming Deliveries Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+              <UpcomingDeliveries />
+              
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recent Orders</CardTitle>
+                  <CardDescription>Your latest order activity</CardDescription>
+                </CardHeader>
               <CardContent>
                 {loadingOrders ? (
                   <div className="text-center py-4">
@@ -284,9 +289,10 @@ export default function CustomerPortal() {
                     )}
                   </div>
                 )}
-              </CardContent>
-            </Card>
-          </TabsContent>
+               </CardContent>
+               </Card>
+             </div>
+           </TabsContent>
 
           <TabsContent value="orders" className="space-y-6">
             <Card>

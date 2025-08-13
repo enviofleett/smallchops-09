@@ -8,9 +8,8 @@ export const CheckoutButton: React.FC = () => {
   const { cart } = useCart();
   const [showCheckout, setShowCheckout] = useState(false);
 
-  if (cart.items.length === 0) {
-    return null;
-  }
+  // Show different button states based on cart content
+  const isEmpty = cart.items.length === 0;
 
   return (
     <>
@@ -20,9 +19,18 @@ export const CheckoutButton: React.FC = () => {
         size="lg"
       >
         <ShoppingCart className="mr-2 h-4 w-4" />
-        <span className="hidden sm:inline">Checkout</span>
-        <span className="sm:hidden">Cart</span>
-        <span className="ml-1">({cart.itemCount})</span>
+        {isEmpty ? (
+          <>
+            <span className="hidden sm:inline">Start Shopping</span>
+            <span className="sm:hidden">Shop</span>
+          </>
+        ) : (
+          <>
+            <span className="hidden sm:inline">Checkout & Schedule Delivery</span>
+            <span className="sm:hidden">Cart</span>
+            <span className="ml-1">({cart.itemCount})</span>
+          </>
+        )}
       </Button>
 
       <EnhancedCheckoutFlow

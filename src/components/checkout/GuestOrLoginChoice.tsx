@@ -10,6 +10,8 @@ interface GuestOrLoginChoiceProps {
   onContinueAsGuest: () => void;
   onLogin: () => void;
   totalAmount: number;
+  isEmpty?: boolean;
+  onBrowseProducts?: () => void;
 }
 
 export const GuestOrLoginChoice: React.FC<GuestOrLoginChoiceProps> = ({

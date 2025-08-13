@@ -2,7 +2,9 @@ import React from 'react';
 import { OrderWithItems } from '@/api/orders';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
-import { Eye, Printer, Package, Truck, Trash2 } from 'lucide-react';
+import { Eye, Printer, Package, Truck, Trash2, Calendar, Clock } from 'lucide-react';
+import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
+import { MiniCountdownTimer } from './MiniCountdownTimer';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
@@ -39,8 +41,38 @@ const getStatusBadge = (status: OrderStatus) => {
 };
 
 const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSelectOrder, onSelectAll }: OrdersTableProps) => {
+  const orderIds = orders.map(order => order.id);
+  const { schedules, loading: schedulesLoading } = useOrderDeliverySchedules(orderIds);
+  
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
+  };
+
+  const renderDeliverySchedule = (orderId: string, orderStatus: OrderStatus) => {
+    const schedule = schedules[orderId];
+    
+    if (!schedule) {
+      return (
+        <div className="flex items-center gap-2 text-gray-500">
+          <Calendar className="h-3 w-3" />
+          <span className="text-xs">No schedule</span>
+        </div>
+      );
+    }
+
+    return (
+      <div className="space-y-1">
+        <MiniCountdownTimer
+          deliveryDate={schedule.delivery_date}
+          deliveryTimeStart={schedule.delivery_time_start}
+          deliveryTimeEnd={schedule.delivery_time_end}
+          orderStatus={orderStatus}
+        />
+        <div className="text-xs text-gray-500">
+          {format(new Date(schedule.delivery_date), 'MMM d')} • {format(new Date(`2000-01-01T${schedule.delivery_time_start}`), 'h:mm a')}
+        </div>
+      </div>
+    );
   };
 
   const mobileComponent = (
@@ -113,6 +145,10 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                 value={(order as any).delivery_zones.name} 
               />
             )}
+            <MobileCardRow 
+              label="Delivery Schedule" 
+              value={renderDeliverySchedule(order.id, order.status)} 
+            />
           </MobileCardContent>
           
           <MobileCardActions>
@@ -169,6 +205,7 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
               <th className="text-left py-4 px-6 font-medium text-gray-600">Order Time</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Amount</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Type/Zone</th>
+              <th className="text-left py-4 px-6 font-medium text-gray-600">Delivery Schedule</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Payment</th>
               <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
@@ -212,12 +249,15 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                       )}
                     </div>
                   </div>
-                </td>
-                <td className="py-4 px-6">
-                  <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
-                    {getStatusBadge(order.status).label}
-                  </span>
-                </td>
+                 </td>
+                 <td className="py-4 px-6">
+                   {renderDeliverySchedule(order.id, order.status)}
+                 </td>
+                 <td className="py-4 px-6">
+                   <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
+                     {getStatusBadge(order.status).label}
+                   </span>
+                 </td>
                 <td className="py-4 px-6">
                   <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${
                     order.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 

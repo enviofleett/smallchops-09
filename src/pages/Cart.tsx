@@ -98,12 +98,10 @@ export default function Cart() {
         )}
       </div>
 
-      {/* Floating Checkout Button for Mobile */}
-      {cart.items.length > 0 && (
-        <div className="lg:hidden">
-          <CheckoutButton />
-        </div>
-      )}
+      {/* Floating Checkout Button - Always visible */}
+      <div className="lg:hidden">
+        <CheckoutButton />
+      </div>
 
       {/* Public Footer */}
       <PublicFooter />

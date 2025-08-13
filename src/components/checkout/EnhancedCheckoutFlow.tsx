@@ -161,14 +161,19 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
       // Clear any previous state without showing recovery UI
       clearState();
       
-      // Force user to sign in if not authenticated
-      if (!isAuthenticated) {
+      // For empty cart, redirect to browse products first
+      if (isEmpty && isAuthenticated) {
+        setCheckoutStep('choice'); // Show options to browse or continue
+      } else if (!isAuthenticated) {
         setCheckoutStep('choice');
       } else {
         setCheckoutStep('details');
       }
     }
   }, [isOpen, isAuthenticated]);
+
+  // Check if cart is empty
+  const isEmpty = !cart?.items?.length;
 
   // Clear payment state when component mounts or step changes
   useEffect(() => {
@@ -611,7 +616,30 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
               totalAmount={total}
               onContinueAsGuest={handleContinueAsGuest}
               onLogin={handleLogin}
+              isEmpty={isEmpty}
+              onBrowseProducts={() => {
+                onClose();
+                navigate('/');
+              }}
             />
+          )}
+
+          {checkoutStep === 'choice' && isAuthenticated && isEmpty && (
+            <div className="text-center space-y-4 py-8">
+              <div className="text-6xl mb-4">🛍️</div>
+              <h3 className="text-xl font-semibold">Your cart is empty</h3>
+              <p className="text-muted-foreground">
+                Add some delicious items to get started with delivery scheduling!
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button onClick={() => { onClose(); navigate('/'); }}>
+                  Browse Products
+                </Button>
+                <Button variant="outline" onClick={onClose}>
+                  Close
+                </Button>
+              </div>
+            </div>
           )}
 
           {checkoutStep === 'details' && (

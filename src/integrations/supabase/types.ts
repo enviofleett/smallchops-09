@@ -6532,6 +6532,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      check_rate_limit: {
+        Args: {
+          p_identifier: string
+          p_limit_type?: string
+          p_max_requests?: number
+          p_window_minutes?: number
+        }
+        Returns: Json
+      }
       check_rate_limit_with_reputation: {
         Args: { p_identifier: string; p_identifier_type?: string }
         Returns: Json
@@ -6547,6 +6556,10 @@ export type Database = {
           required_level_param?: string
         }
         Returns: boolean
+      }
+      clean_expired_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       cleanup_email_processing_data: {
         Args: Record<PropertyKey, never>
@@ -7059,9 +7072,9 @@ export type Database = {
       }
       log_customer_operation: {
         Args: {
-          p_action: string
+          p_operation: string
           p_customer_id: string
-          p_details: Json
+          p_details?: Json
           p_admin_id?: string
           p_ip_address?: unknown
           p_user_agent?: string
@@ -7126,12 +7139,22 @@ export type Database = {
         Returns: string
       }
       log_security_event: {
-        Args: {
-          p_event_type: string
-          p_description: string
-          p_severity?: string
-          p_metadata?: Json
-        }
+        Args:
+          | {
+              p_event_type: string
+              p_description: string
+              p_severity?: string
+              p_metadata?: Json
+            }
+          | {
+              p_event_type: string
+              p_severity?: string
+              p_description?: string
+              p_user_id?: string
+              p_ip_address?: unknown
+              p_user_agent?: string
+              p_metadata?: Json
+            }
         Returns: string
       }
       log_security_incident: {
@@ -7317,6 +7340,10 @@ export type Database = {
       }
       validate_admin_permission: {
         Args: { required_permission?: string }
+        Returns: boolean
+      }
+      validate_admin_permissions: {
+        Args: { p_user_id: string; p_required_permission: string }
         Returns: boolean
       }
       validate_admin_session: {

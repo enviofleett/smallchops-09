@@ -217,5 +217,86 @@ export const useCustomerAddresses = () => {
   };
 };
 
-// Other hooks (Preferences, Analytics, Activity, Completion) follow similar patterns
-// ... [rest of the hooks implementation]
+export const useCustomerPreferences = () => {
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const showError = useErrorToast();
+
+  const preferencesQuery = useQuery<CustomerPreferences>({
+    queryKey: [QUERY_KEYS.PREFERENCES],
+    queryFn: getCustomerPreferences,
+    staleTime: DEFAULT_STALE_TIME,
+    retry: DEFAULT_RETRY,
+  });
+
+  const updatePreferencesMutation = useMutation({
+    mutationFn: updateCustomerPreferences,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.PREFERENCES] });
+      toast({
+        title: "Preferences updated",
+        description: "Your preferences have been saved",
+      });
+    },
+    onError: (error: Error) => {
+      showError(error, "Update failed");
+    },
+  });
+
+  return {
+    preferences: preferencesQuery.data,
+    isLoading: preferencesQuery.isLoading,
+    isError: preferencesQuery.isError,
+    error: preferencesQuery.error,
+    updatePreferences: updatePreferencesMutation.mutate,
+    isUpdating: updatePreferencesMutation.isPending,
+  };
+};
+
+export const useCustomerAnalytics = () => {
+  const analyticsQuery = useQuery({
+    queryKey: [QUERY_KEYS.ANALYTICS],
+    queryFn: getCustomerAnalytics,
+    staleTime: DEFAULT_STALE_TIME,
+    retry: DEFAULT_RETRY,
+  });
+
+  return {
+    analytics: analyticsQuery.data,
+    isLoading: analyticsQuery.isLoading,
+    isError: analyticsQuery.isError,
+    error: analyticsQuery.error,
+  };
+};
+
+export const useProfileActivity = () => {
+  const activityQuery = useQuery({
+    queryKey: [QUERY_KEYS.ACTIVITY],
+    queryFn: getProfileActivity,
+    staleTime: DEFAULT_STALE_TIME,
+    retry: DEFAULT_RETRY,
+  });
+
+  return {
+    activity: activityQuery.data || [],
+    isLoading: activityQuery.isLoading,
+    isError: activityQuery.isError,
+    error: activityQuery.error,
+  };
+};
+
+export const useProfileCompletion = () => {
+  const completionQuery = useQuery({
+    queryKey: [QUERY_KEYS.COMPLETION],
+    queryFn: calculateProfileCompletion,
+    staleTime: DEFAULT_STALE_TIME,
+    retry: DEFAULT_RETRY,
+  });
+
+  return {
+    completion: completionQuery.data,
+    isLoading: completionQuery.isLoading,
+    isError: completionQuery.isError,
+    error: completionQuery.error,
+  };
+};

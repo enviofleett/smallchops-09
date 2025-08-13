@@ -310,11 +310,39 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                 </div>
               </div>
             </div>
-             <div className="mt-6 border-t pt-4">
-                <h4 className="font-semibold">Order Total</h4>
-                <p className="text-2xl font-bold">{formatCurrency(order.total_amount)}</p>
-            </div>
-          </div>
+             
+             {/* Order Items Breakdown */}
+             {order.order_items && order.order_items.length > 0 && (
+               <div className="mt-6">
+                 <h4 className="font-semibold mb-3">Order Items ({order.order_items.length})</h4>
+                 <div className="space-y-2 max-h-60 overflow-y-auto">
+                   {order.order_items.map((item: any, index: number) => (
+                     <div key={item.id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                       <div className="flex-1 min-w-0">
+                         <h5 className="font-medium text-sm break-words">{item.product_name}</h5>
+                         <p className="text-xs text-gray-500">Qty: {item.quantity} × {formatCurrency(item.unit_price)}</p>
+                         {item.special_instructions && (
+                           <p className="text-xs text-orange-600 italic mt-1">{item.special_instructions}</p>
+                         )}
+                       </div>
+                       <div className="text-right">
+                         <span className="font-medium text-sm">{formatCurrency(item.total_price)}</span>
+                         {item.vat_amount > 0 && (
+                           <p className="text-xs text-gray-500">VAT: {formatCurrency(item.vat_amount)}</p>
+                         )}
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               </div>
+             )}
+             
+             <div className="mt-6 pt-4 border-t">
+               <h4 className="font-semibold">Order Total</h4>
+               <p className="text-2xl font-bold">{formatCurrency(order.total_amount)}</p>
+             </div>
+           </div>
+         </div>
         </div>
         <DialogFooter className="flex flex-col sm:flex-row gap-3 sm:gap-0">
           <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Cancel</Button>

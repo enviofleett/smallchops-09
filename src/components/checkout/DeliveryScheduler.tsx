@@ -168,6 +168,28 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
               onSelect={handleDateSelect}
               disabled={(date) => isDateDisabled(date) || isAfter(date, addDays(new Date(), 30))}
               className="w-full mx-auto rounded-md border pointer-events-auto scale-90 sm:scale-100 origin-top"
+              classNames={{
+                months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
+                month: "space-y-4",
+                caption: "flex justify-center pt-1 relative items-center text-sm sm:text-base",
+                caption_label: "text-sm sm:text-base font-medium",
+                nav: "space-x-1 flex items-center",
+                nav_button: "h-7 w-7 bg-transparent p-0 hover:bg-accent hover:text-accent-foreground border rounded-md",
+                nav_button_previous: "absolute left-1",
+                nav_button_next: "absolute right-1",
+                table: "w-full border-collapse space-y-1",
+                head_row: "flex",
+                head_cell: "text-muted-foreground rounded-md w-8 sm:w-9 font-normal text-xs sm:text-sm",
+                row: "flex w-full mt-2",
+                cell: "text-center text-xs sm:text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
+                day: "h-8 w-8 sm:h-9 sm:w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors text-xs sm:text-sm touch-manipulation",
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
+                day_today: "bg-accent text-accent-foreground",
+                day_outside: "text-muted-foreground opacity-50",
+                day_disabled: "text-muted-foreground opacity-50",
+                day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                day_hidden: "invisible"
+              }}
               modifiers={{
                 holiday: (date) => getDateModifiers(date) === 'holiday',
                 closed: (date) => getDateModifiers(date) === 'closed'
@@ -198,8 +220,11 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         {/* Time Slots Section */}
         {calendarDate && selectedDateSlots.length > 0 && (
           <div className="space-y-4">
-            <h3 className="font-medium">Select Delivery Time</h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <h3 className="font-medium text-sm sm:text-base flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              Select Delivery Time for {format(calendarDate, 'EEEE, MMMM d')}
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
               {selectedDateSlots.map((timeSlot, index) => (
                 <Button
                   key={index}
@@ -212,19 +237,22 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
                   disabled={!timeSlot.available}
                   onClick={() => handleTimeSlotSelect(timeSlot)}
                   className={cn(
-                    "h-auto min-h-[60px] p-4 flex flex-col items-center justify-center gap-1 text-center touch-manipulation",
-                    "hover:scale-105 transition-transform active:scale-95",
+                    "h-auto min-h-[64px] p-3 sm:p-4 flex flex-col items-center justify-center gap-1 text-center touch-manipulation",
+                    "hover:scale-105 transition-all duration-200 active:scale-95",
                     !timeSlot.available && "opacity-50 cursor-not-allowed",
-                    "sm:min-h-[70px]"
+                    "sm:min-h-[72px] rounded-lg border-2"
                   )}
                 >
                   <span className="font-medium text-sm sm:text-base">
                     {timeSlot.start_time} - {timeSlot.end_time}
                   </span>
                   {!timeSlot.available && timeSlot.reason && (
-                    <span className="text-xs text-muted-foreground text-center leading-tight">
+                    <span className="text-xs text-red-500 text-center leading-tight">
                       {timeSlot.reason}
                     </span>
+                  )}
+                  {timeSlot.available && (
+                    <span className="text-xs text-green-600">Available</span>
                   )}
                 </Button>
               ))}

@@ -21,6 +21,7 @@ import { PerformanceMonitor } from '@/utils/performance';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import { ProgressiveLoader } from '@/components/ui/progressive-loader';
+import { CheckoutButton } from '@/components/ui/checkout-button';
 
 // Memoized components for better performance
 const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
@@ -383,6 +384,9 @@ const PublicHome = () => {
 
       {/* Footer */}
       <PublicFooter />
+      
+      {/* Floating Checkout Button */}
+      <CheckoutButton />
     </div>
     </>
   );

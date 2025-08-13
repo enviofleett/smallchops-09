@@ -700,11 +700,37 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <Truck className="h-5 w-5" />
-                  Fulfillment Options
-                </h3>
+               {/* Delivery Scheduling Section - Always visible */}
+               <div className="space-y-4 border-2 border-primary/20 rounded-lg p-6 bg-primary/5">
+                 <h3 className="font-semibold text-lg flex items-center gap-2 text-primary">
+                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
+                   </svg>
+                   Schedule Your Delivery
+                 </h3>
+                 <p className="text-sm text-muted-foreground">
+                   Choose your preferred delivery date and time window
+                 </p>
+                 <DeliveryScheduler
+                   selectedDate={formData.delivery_date}
+                   selectedTimeSlot={formData.delivery_time_slot}
+                   onScheduleChange={(date, timeSlot) => {
+                     setFormData(prev => ({ 
+                       ...prev, 
+                       delivery_date: date, 
+                       delivery_time_slot: timeSlot,
+                       fulfillment_type: 'delivery' // Auto-select delivery when scheduling
+                     }));
+                   }}
+                   className="w-full"
+                 />
+               </div>
+
+               <div className="space-y-4">
+                 <h3 className="font-semibold text-lg flex items-center gap-2">
+                   <Truck className="h-5 w-5" />
+                   Fulfillment Options
+                 </h3>
                 <RadioGroup
                   value={formData.fulfillment_type}
                   onValueChange={(value: 'delivery' | 'pickup') => {
@@ -745,30 +771,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
 
               {formData.fulfillment_type === 'delivery' && (
                 <>
-                  {/* Delivery Scheduling Section - Shows first for delivery */}
-                  <div className="space-y-4 border-2 border-primary/20 rounded-lg p-6 bg-primary/5">
-                    <h3 className="font-semibold text-lg flex items-center gap-2 text-primary">
-                      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                      </svg>
-                      Schedule Your Delivery
-                    </h3>
-                    <p className="text-sm text-muted-foreground">
-                      Choose your preferred delivery date and time window
-                    </p>
-                    <DeliveryScheduler
-                      selectedDate={formData.delivery_date}
-                      selectedTimeSlot={formData.delivery_time_slot}
-                      onScheduleChange={(date, timeSlot) => 
-                        setFormData(prev => ({ 
-                          ...prev, 
-                          delivery_date: date, 
-                          delivery_time_slot: timeSlot 
-                        }))
-                      }
-                      className="w-full"
-                    />
-                  </div>
 
                   <div className="space-y-4">
                     <h3 className="font-semibold text-lg flex items-center gap-2">

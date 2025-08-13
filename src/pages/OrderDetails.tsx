@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Clock, CheckCircle, CreditCard, Package, Truck } from 'lucide-react';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
+import { PublicHeader } from '@/components/layout/PublicHeader';
 interface OrderDetailsData {
   id: string;
   order_number: string;
@@ -176,6 +177,8 @@ const reconcileNow = async () => {
         <link rel="canonical" href={`${window.location.origin}/orders/${order.id}`} />
       </Helmet>
 
+      <PublicHeader />
+
       <div className="container mx-auto px-4 py-6">
         {/* Header */}
 <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -213,46 +216,6 @@ const reconcileNow = async () => {
           </Card>
         </div>
 
-        {/* Payment Details */}
-        <Card className="p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4">Payment Details</h2>
-          {tx ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div>
-                <div className="text-muted-foreground">Reference</div>
-                <div className="font-mono">{tx.provider_reference || '-'}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Method</div>
-                <div>{tx.channel || order.payment_method || '-'}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Status</div>
-                <div>{(tx.status || '').toUpperCase() || '-'}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Paid Amount</div>
-                <div>{formatMoney(tx.amount || order.total_amount)}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Initiated</div>
-                <div>{formatDateTime(tx.created_at) || '-'}</div>
-              </div>
-              <div>
-                <div className="text-muted-foreground">Completed</div>
-                <div>{formatDateTime(tx.paid_at || tx.updated_at) || '-'}</div>
-              </div>
-              {tx.gateway_response && (
-                <div className="md:col-span-2">
-                  <div className="text-muted-foreground">Gateway Response</div>
-                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">{tx.gateway_response}</pre>
-                </div>
-              )}
-            </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No payment transaction found for this order.</p>
-          )}
-        </Card>
 
         {/* Timeline */}
         <Card className="p-6">

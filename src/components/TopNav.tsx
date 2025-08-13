@@ -1,10 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Bell, User, LogOut, Menu } from 'lucide-react';
+import { Search, Bell, User, LogOut, Menu, Home, Package, Users, BarChart3, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
+import {
+  NavigationMenu,
+  NavigationMenuContent,
+  NavigationMenuItem,
+  NavigationMenuLink,
+  NavigationMenuList,
+  NavigationMenuTrigger,
+} from "@/components/ui/navigation-menu";
 const TopNav = () => {
   const {
     user,
@@ -25,6 +33,76 @@ const TopNav = () => {
         {/* Mobile menu trigger */}
         <div className="flex items-center gap-4">
           <SidebarTrigger className="md:hidden" />
+          
+          {/* Navigation Menu - Desktop */}
+          {!isMobile && (
+            <NavigationMenu>
+              <NavigationMenuList>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="bg-transparent hover:bg-accent">
+                    Dashboard
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <div className="grid gap-3 p-6 w-80">
+                      <div className="grid grid-cols-2 gap-3">
+                        <NavigationMenuLink 
+                          onClick={() => navigate('/')}
+                          className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
+                        >
+                          <Home className="h-4 w-4" />
+                          <span>Overview</span>
+                        </NavigationMenuLink>
+                        <NavigationMenuLink 
+                          onClick={() => navigate('/orders')}
+                          className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
+                        >
+                          <Package className="h-4 w-4" />
+                          <span>Orders</span>
+                        </NavigationMenuLink>
+                        <NavigationMenuLink 
+                          onClick={() => navigate('/customers')}
+                          className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
+                        >
+                          <Users className="h-4 w-4" />
+                          <span>Customers</span>
+                        </NavigationMenuLink>
+                        <NavigationMenuLink 
+                          onClick={() => navigate('/analytics')}
+                          className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
+                        >
+                          <BarChart3 className="h-4 w-4" />
+                          <span>Analytics</span>
+                        </NavigationMenuLink>
+                      </div>
+                    </div>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+                <NavigationMenuItem>
+                  <NavigationMenuTrigger className="bg-transparent hover:bg-accent">
+                    Products
+                  </NavigationMenuTrigger>
+                  <NavigationMenuContent>
+                    <div className="grid gap-3 p-6 w-80">
+                      <NavigationMenuLink 
+                        onClick={() => navigate('/products')}
+                        className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
+                      >
+                        <Package className="h-4 w-4" />
+                        <span>All Products</span>
+                      </NavigationMenuLink>
+                      <NavigationMenuLink 
+                        onClick={() => navigate('/products/categories')}
+                        className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
+                      >
+                        <Settings className="h-4 w-4" />
+                        <span>Categories</span>
+                      </NavigationMenuLink>
+                    </div>
+                  </NavigationMenuContent>
+                </NavigationMenuItem>
+              </NavigationMenuList>
+            </NavigationMenu>
+          )}
           
           {/* Search - responsive */}
           <div className="flex-1 max-w-md">

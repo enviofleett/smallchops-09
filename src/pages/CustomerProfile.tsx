@@ -507,83 +507,21 @@ function WishlistSection() {
   );
 }
 
-// Payment Section Component
+// Payment Section - simplified without payment details column
 function PaymentSection() {
   const { customerAccount, user } = useCustomerAuth();
-  const [activeTab, setActiveTab] = useState<'methods' | 'transactions'>('methods');
-  
-  const mockPaymentMethods = [
-    { id: '1', type: 'card', last4: '4532', brand: 'Visa', isDefault: true },
-    { id: '2', type: 'card', last4: '8901', brand: 'Mastercard', isDefault: false }
-  ];
-
   const customerEmail = user?.email || customerAccount?.email || '';
 
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-2xl font-bold mb-2">Payment & Transactions</h2>
-        <p className="text-gray-500">Manage your payment methods and view transaction history</p>
+        <h2 className="text-2xl font-bold mb-2">Transaction History</h2>
+        <p className="text-gray-500">View your purchase and payment history</p>
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex space-x-1 bg-muted p-1 rounded-lg w-fit">
-        <button
-          onClick={() => setActiveTab('methods')}
-          className={`px-4 py-2 rounded-md font-medium transition-colors ${
-            activeTab === 'methods'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Payment Methods
-        </button>
-        <button
-          onClick={() => setActiveTab('transactions')}
-          className={`px-4 py-2 rounded-md font-medium transition-colors ${
-            activeTab === 'transactions'
-              ? 'bg-background text-foreground shadow-sm'
-              : 'text-muted-foreground hover:text-foreground'
-          }`}
-        >
-          Transaction History
-        </button>
-      </div>
-
-      {/* Tab Content */}
-      {activeTab === 'methods' ? (
-        <div className="space-y-4">
-          {mockPaymentMethods.map((method) => (
-            <Card key={method.id} className="p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <CreditCard className="w-6 h-6 text-gray-400" />
-                  <div>
-                    <p className="font-medium">{method.brand} ending in {method.last4}</p>
-                    {method.isDefault && (
-                      <Badge variant="secondary" className="mt-1">Default</Badge>
-                    )}
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm">Edit</Button>
-                  <Button variant="outline" size="sm">Remove</Button>
-                </div>
-              </div>
-            </Card>
-          ))}
-          
-          <Card className="p-4 border-dashed">
-            <Button variant="ghost" className="w-full h-16 text-gray-500">
-              + Add New Payment Method
-            </Button>
-          </Card>
-        </div>
-      ) : (
-        <Suspense fallback={<ContentSkeleton />}>
-          <TransactionHistorySection customerEmail={customerEmail} />
-        </Suspense>
-      )}
+      <Suspense fallback={<ContentSkeleton />}>
+        <TransactionHistorySection customerEmail={customerEmail} />
+      </Suspense>
     </div>
   );
 }

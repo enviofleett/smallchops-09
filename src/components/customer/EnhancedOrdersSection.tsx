@@ -3,6 +3,7 @@ import { useCustomerOrders } from '@/hooks/useCustomerOrders';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
+import { OrderDetailsModal } from './OrderDetailsModal';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,8 @@ const ContentSkeleton = () => (
 export function EnhancedOrdersSection() {
   const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useCustomerOrders();
   const { handleError } = useErrorHandler();
+  const [selectedOrder, setSelectedOrder] = React.useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
   
   // Get delivery schedules for all orders
   const orders = Array.isArray(ordersData?.orders) ? ordersData.orders : [];
@@ -79,12 +82,20 @@ export function EnhancedOrdersSection() {
           {orders.slice(0, 3).map((order) => {
             try {
               return (
-                <EnhancedOrderCard
+                <div 
                   key={order?.id || Math.random()}
-                  order={order}
-                  deliverySchedule={schedules[order.id]}
-                  showExpandedByDefault={false}
-                />
+                  onClick={() => {
+                    setSelectedOrder(order);
+                    setIsModalOpen(true);
+                  }}
+                  className="cursor-pointer transition-transform hover:scale-[1.02]"
+                >
+                  <EnhancedOrderCard
+                    order={order}
+                    deliverySchedule={schedules[order.id]}
+                    showExpandedByDefault={false}
+                  />
+                </div>
               );
             } catch (error) {
               console.error('Error rendering order card:', error);
@@ -155,6 +166,16 @@ export function EnhancedOrdersSection() {
           )}
         </div>
       </div>
+
+      <OrderDetailsModal
+        order={selectedOrder}
+        deliverySchedule={selectedOrder ? schedules[selectedOrder.id] : null}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedOrder(null);
+        }}
+      />
     </div>
   );
 }

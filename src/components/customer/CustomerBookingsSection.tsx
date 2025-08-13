@@ -4,6 +4,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { BookingDetailsModal } from './BookingDetailsModal';
 import { 
   Calendar, 
   Users, 
@@ -46,6 +47,8 @@ const BookingSkeleton = () => (
 export function CustomerBookingsSection() {
   const { data: bookingsData, isLoading, error, refetch } = useCustomerBookings();
   const navigate = useNavigate();
+  const [selectedBooking, setSelectedBooking] = React.useState<any>(null);
+  const [isModalOpen, setIsModalOpen] = React.useState(false);
 
   const bookings = bookingsData?.bookings || [];
 
@@ -211,7 +214,14 @@ export function CustomerBookingsSection() {
       {/* Bookings List */}
       <div className="space-y-4">
         {bookings.map((booking) => (
-          <Card key={booking.id} className="border border-gray-200 hover:border-gray-300 transition-colors">
+          <Card 
+            key={booking.id} 
+            className="border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
+            onClick={() => {
+              setSelectedBooking(booking);
+              setIsModalOpen(true);
+            }}
+          >
             <CardHeader>
               <div className="flex justify-between items-start">
                 <div>
@@ -306,6 +316,15 @@ export function CustomerBookingsSection() {
           </Card>
         ))}
       </div>
+
+      <BookingDetailsModal
+        booking={selectedBooking}
+        isOpen={isModalOpen}
+        onClose={() => {
+          setIsModalOpen(false);
+          setSelectedBooking(null);
+        }}
+      />
     </div>
   );
 }

@@ -7,7 +7,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
-import EnhancedErrorBoundary from "./components/EnhancedErrorBoundary";
+import ErrorBoundaryWrapper from "./components/ErrorBoundaryWrapper";
 import { withLazyLoading, preloadRoute } from "./utils/lazyLoad";
 import { FullPageLoader } from "./components/ui/page-loader";
 import { PerformanceMonitor } from "./utils/performance";
@@ -62,18 +62,24 @@ const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPag
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
 
-// Heavily optimized QueryClient to reduce Supabase usage
+// Optimized QueryClient for better stability
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,        // 5 minutes default cache
-      gcTime: 15 * 60 * 1000,          // Keep in cache for 15 minutes
-      refetchOnWindowFocus: 'always',   // Only refetch when user returns
-      refetchIntervalInBackground: false, // Stop background refetching
-      refetchInterval: false,           // Disable auto-refetch by default
-      retry: 2,                         // Reduce retries
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 15000),
-      networkMode: 'online',            // Only query when online
+      staleTime: 2 * 60 * 1000,         // 2 minutes - reduced for fresher data
+      gcTime: 10 * 60 * 1000,           // 10 minutes cache
+      refetchOnWindowFocus: false,       // Prevent unnecessary refetches
+      refetchIntervalInBackground: false,
+      refetchInterval: false,
+      retry: (failureCount, error: any) => {
+        // Smart retry logic
+        if (error?.status >= 400 && error?.status < 500) {
+          return false; // Don't retry client errors
+        }
+        return failureCount < 3;
+      },
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 5000),
+      networkMode: 'online',
     },
   },
 });
@@ -124,12 +130,10 @@ const App = () => {
   }
 
   return (
-  <EnhancedErrorBoundary 
+  <ErrorBoundaryWrapper 
     context="Main Application"
     showErrorDetails={import.meta.env.DEV}
-    maxRetries={3}
     onError={(error, errorInfo) => {
-      // Additional error tracking could go here
       console.error('App-level error:', { error, errorInfo, timestamp: new Date().toISOString() });
     }}
   >
@@ -192,19 +196,19 @@ const App = () => {
               
               {/* Protected admin routes */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
-                <Route path="/admin" element={<EnhancedErrorBoundary context="Dashboard"><Index /></EnhancedErrorBoundary>} />
-                <Route path="/dashboard" element={<EnhancedErrorBoundary context="Dashboard"><Index /></EnhancedErrorBoundary>} />
-                <Route path="/orders" element={<EnhancedErrorBoundary context="Orders"><Orders /></EnhancedErrorBoundary>} />
-                <Route path="/admin/products" element={<EnhancedErrorBoundary context="Products"><Products /></EnhancedErrorBoundary>} />
-                <Route path="/categories" element={<EnhancedErrorBoundary context="Categories"><Categories /></EnhancedErrorBoundary>} />
-                <Route path="/customers" element={<EnhancedErrorBoundary context="Customers"><Customers /></EnhancedErrorBoundary>} />
-                <Route path="/delivery-pickup" element={<EnhancedErrorBoundary context="Delivery"><DeliveryPickup /></EnhancedErrorBoundary>} />
-                <Route path="/reports" element={<EnhancedErrorBoundary context="Reports"><Reports /></EnhancedErrorBoundary>} />
-                <Route path="/promotions" element={<EnhancedErrorBoundary context="Promotions"><Promotions /></EnhancedErrorBoundary>} />
-                <Route path="/bookings" element={<EnhancedErrorBoundary context="Catering Bookings"><BookingManagement /></EnhancedErrorBoundary>} />
-                <Route path="/audit-logs" element={<EnhancedErrorBoundary context="Audit Logs"><AuditLogs /></EnhancedErrorBoundary>} />
-                <Route path="/settings" element={<EnhancedErrorBoundary context="Settings"><Settings /></EnhancedErrorBoundary>} />
-                <Route path="/payment-settings" element={<EnhancedErrorBoundary context="Payment Settings"><PaymentSettings /></EnhancedErrorBoundary>} />
+                <Route path="/admin" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
+                <Route path="/dashboard" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
+                <Route path="/orders" element={<ErrorBoundaryWrapper context="Orders"><Orders /></ErrorBoundaryWrapper>} />
+                <Route path="/admin/products" element={<ErrorBoundaryWrapper context="Products"><Products /></ErrorBoundaryWrapper>} />
+                <Route path="/categories" element={<ErrorBoundaryWrapper context="Categories"><Categories /></ErrorBoundaryWrapper>} />
+                <Route path="/customers" element={<ErrorBoundaryWrapper context="Customers"><Customers /></ErrorBoundaryWrapper>} />
+                <Route path="/delivery-pickup" element={<ErrorBoundaryWrapper context="Delivery"><DeliveryPickup /></ErrorBoundaryWrapper>} />
+                <Route path="/reports" element={<ErrorBoundaryWrapper context="Reports"><Reports /></ErrorBoundaryWrapper>} />
+                <Route path="/promotions" element={<ErrorBoundaryWrapper context="Promotions"><Promotions /></ErrorBoundaryWrapper>} />
+                <Route path="/bookings" element={<ErrorBoundaryWrapper context="Catering Bookings"><BookingManagement /></ErrorBoundaryWrapper>} />
+                <Route path="/audit-logs" element={<ErrorBoundaryWrapper context="Audit Logs"><AuditLogs /></ErrorBoundaryWrapper>} />
+                <Route path="/settings" element={<ErrorBoundaryWrapper context="Settings"><Settings /></ErrorBoundaryWrapper>} />
+                <Route path="/payment-settings" element={<ErrorBoundaryWrapper context="Payment Settings"><PaymentSettings /></ErrorBoundaryWrapper>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
@@ -212,7 +216,7 @@ const App = () => {
         </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
-  </EnhancedErrorBoundary>
+  </ErrorBoundaryWrapper>
   );
 };
 

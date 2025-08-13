@@ -68,14 +68,22 @@ class DeliverySchedulingService {
     try {
       const { data, error } = await supabase
         .from('business_settings')
-        .select('delivery_scheduling_config')
+        .select('delivery_scheduling_config, business_hours')
         .single();
 
       if (error && error.code !== 'PGRST116') { // Not found is acceptable
         throw error;
       }
 
-      this.config = (data?.delivery_scheduling_config as unknown as DeliverySchedulingConfig) || this.getDefaultConfig();
+      // Merge business hours from settings with delivery config
+      let config = (data?.delivery_scheduling_config as unknown as DeliverySchedulingConfig) || this.getDefaultConfig();
+      
+      // Use business hours from database if available
+      if (data?.business_hours) {
+        config.business_hours = data.business_hours as any;
+      }
+
+      this.config = config;
     } catch (error) {
       console.error('Failed to load delivery scheduling config:', error);
       this.config = this.getDefaultConfig();

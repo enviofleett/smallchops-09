@@ -161,27 +161,29 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         {/* Calendar Section */}
         <div className="space-y-4">
           <h3 className="font-medium">Select Delivery Date</h3>
-          <Calendar
-            mode="single"
-            selected={calendarDate}
-            onSelect={handleDateSelect}
-            disabled={(date) => isDateDisabled(date) || isAfter(date, addDays(new Date(), 30))}
-            className="rounded-md border pointer-events-auto"
-            modifiers={{
-              holiday: (date) => getDateModifiers(date) === 'holiday',
-              closed: (date) => getDateModifiers(date) === 'closed'
-            }}
-            modifiersStyles={{
-              holiday: { 
-                backgroundColor: 'hsl(var(--destructive))', 
-                color: 'hsl(var(--destructive-foreground))' 
-              },
-              closed: { 
-                backgroundColor: 'hsl(var(--muted))', 
-                color: 'hsl(var(--muted-foreground))' 
-              }
-            }}
-          />
+          <div className="w-full overflow-hidden">
+            <Calendar
+              mode="single"
+              selected={calendarDate}
+              onSelect={handleDateSelect}
+              disabled={(date) => isDateDisabled(date) || isAfter(date, addDays(new Date(), 30))}
+              className="w-full mx-auto rounded-md border pointer-events-auto scale-90 sm:scale-100 origin-top"
+              modifiers={{
+                holiday: (date) => getDateModifiers(date) === 'holiday',
+                closed: (date) => getDateModifiers(date) === 'closed'
+              }}
+              modifiersStyles={{
+                holiday: { 
+                  backgroundColor: 'hsl(var(--destructive))', 
+                  color: 'hsl(var(--destructive-foreground))' 
+                },
+                closed: { 
+                  backgroundColor: 'hsl(var(--muted))', 
+                  color: 'hsl(var(--muted-foreground))' 
+                }
+              }}
+            />
+          </div>
 
           {selectedSlot?.is_holiday && (
             <Alert variant="destructive">
@@ -197,7 +199,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         {calendarDate && selectedDateSlots.length > 0 && (
           <div className="space-y-4">
             <h3 className="font-medium">Select Delivery Time</h3>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {selectedDateSlots.map((timeSlot, index) => (
                 <Button
                   key={index}
@@ -210,15 +212,17 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
                   disabled={!timeSlot.available}
                   onClick={() => handleTimeSlotSelect(timeSlot)}
                   className={cn(
-                    "h-auto p-3 flex flex-col items-center gap-1",
-                    !timeSlot.available && "opacity-50 cursor-not-allowed"
+                    "h-auto min-h-[60px] p-4 flex flex-col items-center justify-center gap-1 text-center touch-manipulation",
+                    "hover:scale-105 transition-transform active:scale-95",
+                    !timeSlot.available && "opacity-50 cursor-not-allowed",
+                    "sm:min-h-[70px]"
                   )}
                 >
-                  <span className="font-medium">
+                  <span className="font-medium text-sm sm:text-base">
                     {timeSlot.start_time} - {timeSlot.end_time}
                   </span>
                   {!timeSlot.available && timeSlot.reason && (
-                    <span className="text-xs text-muted-foreground text-center">
+                    <span className="text-xs text-muted-foreground text-center leading-tight">
                       {timeSlot.reason}
                     </span>
                   )}

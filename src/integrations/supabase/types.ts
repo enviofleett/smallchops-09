@@ -7056,6 +7056,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      migrate_pay_to_txn_reference: {
+        Args: { pay_ref: string }
+        Returns: string
+      }
       minimal_payment_test_insert: {
         Args: { p_order_id: string; p_amount: number }
         Returns: Json

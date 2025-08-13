@@ -341,8 +341,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                <h4 className="font-semibold">Order Total</h4>
                <p className="text-2xl font-bold">{formatCurrency(order.total_amount)}</p>
              </div>
-           </div>
-         </div>
+          </div>
         </div>
         <DialogFooter className="flex flex-col sm:flex-row gap-3 sm:gap-0">
           <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Cancel</Button>

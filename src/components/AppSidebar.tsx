@@ -28,11 +28,19 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 
-const coreOperations = [
+interface MenuItem {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  path: string;
+  end?: boolean;
+}
+
+const coreOperations: MenuItem[] = [
   {
     icon: LayoutDashboard,
     label: 'Dashboard',
-    path: '/dashboard'
+    path: '/dashboard',
+    end: true
   },
   {
     icon: ShoppingCart,
@@ -51,7 +59,7 @@ const coreOperations = [
   }
 ];
 
-const management = [
+const management: MenuItem[] = [
   {
     icon: User,
     label: 'Customers',
@@ -74,7 +82,7 @@ const management = [
   }
 ];
 
-const administration = [
+const administration: MenuItem[] = [
   {
     icon: BarChart3,
     label: 'Reports',
@@ -99,31 +107,44 @@ export function AppSidebar() {
   
   const collapsed = state === "collapsed";
 
-  const isActive = (path: string) => {
+  const isActive = React.useCallback((path: string, end?: boolean) => {
     if (path === '/dashboard') {
       return location.pathname === '/dashboard' || location.pathname === '/admin';
     }
-    return location.pathname.startsWith(path);
-  };
+    return end 
+      ? location.pathname === path
+      : location.pathname.startsWith(path);
+  }, [location.pathname]);
 
-  const renderMenuGroup = (items: typeof coreOperations, groupLabel: string) => (
+  const renderMenuGroup = React.useCallback((items: MenuItem[], groupLabel: string) => (
     <SidebarGroup>
-      <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/70 uppercase tracking-wider">
-        {groupLabel}
-      </SidebarGroupLabel>
+      {!collapsed && (
+        <SidebarGroupLabel className="text-xs font-medium text-sidebar-foreground/70 uppercase tracking-wider">
+          {groupLabel}
+        </SidebarGroupLabel>
+      )}
       <SidebarGroupContent>
         <SidebarMenu>
           {items.map((item) => (
             <SidebarMenuItem key={item.path}>
               <SidebarMenuButton 
                 asChild 
-                isActive={isActive(item.path)}
+                isActive={isActive(item.path, item.end)}
                 tooltip={collapsed ? item.label : undefined}
                 className="w-full justify-start"
+                aria-label={item.label}
               >
-                <NavLink to={item.path} end={item.path === '/dashboard'}>
-                  <item.icon className="w-4 h-4 shrink-0" />
-                  {!collapsed && <span className="truncate">{item.label}</span>}
+                <NavLink 
+                  to={item.path} 
+                  end={item.end}
+                  className={({ isActive }) => 
+                    isActive ? 'active-nav-link' : 'nav-link'
+                  }
+                >
+                  <item.icon className="w-4 h-4 shrink-0" aria-hidden="true" />
+                  {!collapsed && (
+                    <span className="truncate ml-2">{item.label}</span>
+                  )}
                 </NavLink>
               </SidebarMenuButton>
             </SidebarMenuItem>
@@ -131,24 +152,30 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
-  );
+  ), [collapsed, isActive]);
 
   return (
-    <Sidebar collapsible="icon" className="border-sidebar-border">
+    <Sidebar 
+      collapsible="icon" 
+      className="border-sidebar-border"
+      aria-label="Main navigation"
+    >
       <SidebarHeader className="border-b border-sidebar-border px-4 md:px-6 py-4 min-h-[73px] flex items-center">
         <div className="flex items-center gap-3">
           <div className="w-14 h-14 rounded-lg flex items-center justify-center overflow-hidden bg-sidebar-accent">
             <img 
               src={startersLogo} 
-              alt="Starters" 
+              alt="Starters Logo" 
               className="w-full h-full object-contain p-1.5" 
               loading="lazy" 
+              width={56}
+              height={56}
             />
           </div>
           {!collapsed && (
-            <span className="text-2xl font-bold text-sidebar-foreground tracking-tight">
+            <h1 className="text-2xl font-bold text-sidebar-foreground tracking-tight">
               Starters
-            </span>
+            </h1>
           )}
         </div>
       </SidebarHeader>

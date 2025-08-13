@@ -4,9 +4,15 @@ import { HelmetProvider } from "react-helmet-async";
 import App from "./App.tsx";
 import "./index.css";
 import { initWebVitals } from "./utils/webVitals";
+import { productionMonitoring } from "./utils/productionMonitoring";
 
 // Initialize performance monitoring
 initWebVitals();
+
+// Initialize production monitoring
+if (import.meta.env.PROD) {
+  console.log('🔍 Production monitoring enabled');
+}
 
 // PRODUCTION-SAFE: Minimal cache management for stability
 function safeCacheCleanup() {

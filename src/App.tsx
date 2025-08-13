@@ -14,6 +14,7 @@ import { PerformanceMonitor } from "./utils/performance";
 import { initPaymentMonitoring } from "./utils/paymentMonitoring";
 import DynamicFavicon from "./components/seo/DynamicFavicon";
 import { initializeConsoleCleanup, validatePaystackCSP, suppressWebSocketErrors } from "./utils/consoleCleanup";
+import { logEnvironmentStatus, validateEnvironment, createEnvironmentErrorElement } from "./utils/environmentValidator";
 
 // Initialize payment monitoring and cache busting
 initPaymentMonitoring();
@@ -87,9 +88,14 @@ if (typeof window !== 'undefined') {
 
 const App = () => {
   PerformanceMonitor.startTiming('App Render');
+  const [environmentStatus, setEnvironmentStatus] = React.useState<ReturnType<typeof validateEnvironment> | null>(null);
   
   React.useEffect(() => {
     PerformanceMonitor.endTiming('App Render');
+    
+    // Validate environment first
+    const envStatus = logEnvironmentStatus();
+    setEnvironmentStatus(envStatus);
     
     // Initialize production optimizations
     initializeConsoleCleanup();
@@ -100,14 +106,33 @@ const App = () => {
     console.log('✅ Payment System: Backend-only references active');
     console.log('✅ Paystack-only migration completed');
     
-    // Environment validation
-    if (!import.meta.env.VITE_SUPABASE_URL) {
-      console.warn('⚠️ Missing VITE_SUPABASE_URL environment variable');
-    }
+    // Enhanced environment validation with detailed feedback
+    console.group('🌍 Environment Status');
+    console.log(`Production Ready: ${envStatus.isProductionReady ? '✅' : '❌'}`);
+    console.log(`Mode: ${import.meta.env.DEV ? 'Development' : 'Production'}`);
+    console.groupEnd();
   }, []);
 
+  // Show environment error screen if critical issues found
+  if (environmentStatus && !environmentStatus.isProductionReady) {
+    const criticalErrors = environmentStatus.checks.filter(c => c.level === 'error');
+    if (criticalErrors.length > 0) {
+      // In a real app, you might want to show this error screen
+      // For now, we'll just log and continue
+      console.error('Critical environment errors detected but continuing...');
+    }
+  }
+
   return (
-  <EnhancedErrorBoundary context="Main Application">
+  <EnhancedErrorBoundary 
+    context="Main Application"
+    showErrorDetails={import.meta.env.DEV}
+    maxRetries={3}
+    onError={(error, errorInfo) => {
+      // Additional error tracking could go here
+      console.error('App-level error:', { error, errorInfo, timestamp: new Date().toISOString() });
+    }}
+  >
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />

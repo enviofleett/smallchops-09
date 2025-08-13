@@ -24,6 +24,7 @@ import {
   Plus
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -103,6 +104,9 @@ export default function AdminOrders() {
       </Helmet>
 
       <div className="space-y-6">
+        {/* System Status Check */}
+        <SystemStatusChecker />
+        
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

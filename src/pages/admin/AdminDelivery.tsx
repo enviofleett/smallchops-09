@@ -24,6 +24,7 @@ import {
   CheckCircle
 } from 'lucide-react';
 import { format } from 'date-fns';
+import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 
 export default function AdminDelivery() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
@@ -71,6 +72,9 @@ export default function AdminDelivery() {
       </Helmet>
 
       <div className="space-y-6">
+        {/* System Status Check */}
+        <SystemStatusChecker />
+        
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>

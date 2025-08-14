@@ -117,20 +117,7 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
   };
 
   private getErrorSuggestion = (error: Error): string => {
-    const category = this.getErrorCategory(error);
-    
-    switch (category) {
-      case 'Network Error':
-        return 'Please check your internet connection and try again.';
-      case 'Loading Error':
-        return 'There was a problem loading this page. Please refresh or try again.';
-      case 'Permission Error':
-        return 'You may not have permission to access this content. Please log in again.';
-      case 'Code Error':
-        return 'A technical error occurred. Our team has been notified.';
-      default:
-        return 'Something went wrong. Please try again or contact support if the problem persists.';
-    }
+    return 'Ouch please refresh your page to continue';
   };
 
   render() {
@@ -166,33 +153,13 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
                 </p>
               )}
 
-              <div className="flex flex-col sm:flex-row gap-2">
-                {canRetry && (
-                  <Button 
-                    onClick={this.handleRetry}
-                    className="flex items-center gap-2"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                    Try Again ({this.maxRetries - this.state.retryCount} left)
-                  </Button>
-                )}
-                
+              <div className="flex justify-center">
                 <Button 
-                  variant="outline"
                   onClick={this.handleRefresh}
                   className="flex items-center gap-2"
                 >
                   <RefreshCw className="h-4 w-4" />
                   Refresh Page
-                </Button>
-                
-                <Button 
-                  variant="outline"
-                  onClick={this.handleGoHome}
-                  className="flex items-center gap-2"
-                >
-                  <Home className="h-4 w-4" />
-                  Go Home
                 </Button>
               </div>
 

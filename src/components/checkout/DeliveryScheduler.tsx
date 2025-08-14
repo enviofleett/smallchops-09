@@ -259,11 +259,11 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
             </h3>
             <TimeSlotSelect
               slots={selectedDateSlots}
-              selectedSlot={selectedTimeSlot ? {
-                start_time: selectedTimeSlot.start_time,
-                end_time: selectedTimeSlot.end_time,
-                available: true
-              } : undefined}
+              selectedSlot={selectedTimeSlot ? 
+                selectedDateSlots.find(slot => 
+                  slot.start_time === selectedTimeSlot.start_time && 
+                  slot.end_time === selectedTimeSlot.end_time
+                ) : undefined}
               onSelect={handleTimeSlotSelect}
               placeholder="Choose your preferred delivery time"
             />

@@ -5,7 +5,8 @@ import { Badge } from '@/components/ui/badge';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { OrderItemsBreakdown } from './OrderItemsBreakdown';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
-import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
+import { ComprehensiveDeliveryInfo } from './ComprehensiveDeliveryInfo';
+import { useOrderDeliveryInfo } from '@/hooks/useOrderDeliveryInfo';
 import { ProductDetailCard } from './ProductDetailCard';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { 
@@ -36,6 +37,7 @@ export function EnhancedOrderCard({
 }: EnhancedOrderCardProps) {
   const [isExpanded, setIsExpanded] = useState(showExpandedByDefault);
   const { data: detailedOrderData, isLoading: isLoadingDetails } = useDetailedOrderData(order.id);
+  const { data: deliveryInfo, isLoading: loadingDelivery } = useOrderDeliveryInfo(order.id);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
@@ -198,13 +200,20 @@ export function EnhancedOrderCard({
                 totalAmount={order.total_amount}
               />
 
-              {/* Delivery Schedule */}
-              {order.order_type === 'delivery' && deliverySchedule && (
+              {/* Comprehensive Delivery Information */}
+              {deliveryInfo && (
                 <div className="space-y-4">
-                  <DeliveryScheduleDisplay 
-                    schedule={deliverySchedule} 
-                    className="h-fit"
-                  />
+                   <ComprehensiveDeliveryInfo 
+                     deliveryInfo={deliveryInfo as any} 
+                     className="h-fit"
+                   />
+                </div>
+              )}
+              
+              {loadingDelivery && (
+                <div className="bg-muted/50 rounded-lg p-4 animate-pulse">
+                  <div className="h-4 bg-muted rounded mb-2"></div>
+                  <div className="h-3 bg-muted rounded w-2/3"></div>
                 </div>
               )}
             </div>

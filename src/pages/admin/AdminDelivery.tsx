@@ -9,8 +9,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getOrders } from '@/api/orders';
 import { getRoutes } from '@/api/routes';
 import { useDeliveryZones } from '@/hooks/useDeliveryTracking';
-import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
-import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
+import { ComprehensiveDeliveryInfo } from '@/components/orders/ComprehensiveDeliveryInfo';
+import { useOrderDeliveryInfo } from '@/hooks/useOrderDeliveryInfo';
 import { 
   MapPin, 
   Truck, 
@@ -358,10 +358,7 @@ function DeliveryOrderItem({ order }: { order: any }) {
 }
 
 function DeliveryOrderCard({ order }: { order: any }) {
-  const { data: deliverySchedule } = useQuery({
-    queryKey: ['delivery-schedule', order.id],
-    queryFn: () => getDeliveryScheduleByOrderId(order.id),
-  });
+  const { data: deliveryInfo } = useOrderDeliveryInfo(order.id);
 
   return (
     <Card>
@@ -376,8 +373,8 @@ function DeliveryOrderCard({ order }: { order: any }) {
           </Badge>
         </div>
 
-        {deliverySchedule && (
-          <DeliveryScheduleDisplay schedule={deliverySchedule} />
+        {deliveryInfo && (
+          <ComprehensiveDeliveryInfo deliveryInfo={deliveryInfo as any} showTitle={false} />
         )}
       </CardContent>
     </Card>

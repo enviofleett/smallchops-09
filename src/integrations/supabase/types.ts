@@ -2364,6 +2364,62 @@ export type Database = {
         }
         Relationships: []
       }
+      dispatch_analytics: {
+        Row: {
+          average_completion_time_minutes: number | null
+          cancelled_assignments: number
+          completed_assignments: number
+          created_at: string
+          customer_rating: number | null
+          date: string
+          earnings: number | null
+          fuel_cost: number | null
+          id: string
+          rider_id: string
+          total_assignments: number
+          total_distance_km: number | null
+          updated_at: string
+        }
+        Insert: {
+          average_completion_time_minutes?: number | null
+          cancelled_assignments?: number
+          completed_assignments?: number
+          created_at?: string
+          customer_rating?: number | null
+          date?: string
+          earnings?: number | null
+          fuel_cost?: number | null
+          id?: string
+          rider_id: string
+          total_assignments?: number
+          total_distance_km?: number | null
+          updated_at?: string
+        }
+        Update: {
+          average_completion_time_minutes?: number | null
+          cancelled_assignments?: number
+          completed_assignments?: number
+          created_at?: string
+          customer_rating?: number | null
+          date?: string
+          earnings?: number | null
+          fuel_cost?: number | null
+          id?: string
+          rider_id?: string
+          total_assignments?: number
+          total_distance_km?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dispatch_analytics_rider_id_fkey"
+            columns: ["rider_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_delivery_analytics: {
         Row: {
           average_customer_rating: number | null
@@ -2416,6 +2472,42 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      driver_invitations: {
+        Row: {
+          accepted_at: string | null
+          created_at: string
+          driver_data: Json
+          email: string
+          expires_at: string
+          id: string
+          invitation_token: string
+          invited_by: string | null
+          status: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          created_at?: string
+          driver_data?: Json
+          email: string
+          expires_at?: string
+          id?: string
+          invitation_token?: string
+          invited_by?: string | null
+          status?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          created_at?: string
+          driver_data?: Json
+          email?: string
+          expires_at?: string
+          id?: string
+          invitation_token?: string
+          invited_by?: string | null
+          status?: string
+        }
+        Relationships: []
       }
       driver_location_tracking: {
         Row: {
@@ -3414,6 +3506,73 @@ export type Database = {
           variables?: Json | null
         }
         Relationships: []
+      }
+      order_assignments: {
+        Row: {
+          accepted_at: string | null
+          actual_delivery_time: string | null
+          assigned_at: string
+          assigned_by: string | null
+          cancelled_at: string | null
+          completed_at: string | null
+          estimated_delivery_time: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          rider_id: string
+          status: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          actual_delivery_time?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          estimated_delivery_time?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          rider_id: string
+          status?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          actual_delivery_time?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          estimated_delivery_time?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          rider_id?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_assignments_rider_id_fkey"
+            columns: ["rider_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       order_delivery_schedule: {
         Row: {
@@ -6572,6 +6731,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      assign_rider_to_order: {
+        Args: { p_assigned_by?: string; p_order_id: string; p_rider_id: string }
+        Returns: string
+      }
       bulk_safe_delete_products: {
         Args: { product_ids: string[] }
         Returns: Json
@@ -6774,6 +6937,14 @@ export type Database = {
           p_phone?: string
           p_send_welcome_email?: boolean
           p_user_agent?: string
+        }
+        Returns: Json
+      }
+      create_driver_with_profile: {
+        Args: {
+          p_create_profile?: boolean
+          p_driver_data: Json
+          p_send_invitation?: boolean
         }
         Returns: Json
       }

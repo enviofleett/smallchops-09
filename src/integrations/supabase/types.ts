@@ -7334,6 +7334,10 @@ export type Database = {
         Args: { product_id: string }
         Returns: Json
       }
+      safe_get_order_details: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       setup_admin_permissions: {
         Args: { admin_user_id: string }
         Returns: undefined

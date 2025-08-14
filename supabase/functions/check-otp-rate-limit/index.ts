@@ -69,8 +69,8 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Check rate limit using database function
-    const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc('check_otp_rate_limit', {
+    // Check rate limit using secure database function
+    const { data: rateLimitData, error: rateLimitError } = await supabaseAdmin.rpc('check_otp_rate_limit_secure', {
       p_email: email
     });
 

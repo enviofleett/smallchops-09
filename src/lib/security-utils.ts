@@ -2,6 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Enhanced security utilities for production monitoring and threat detection
+ * Updated with secure password handling and centralized auth validation
  */
 
 export interface SecurityEvent {
@@ -9,6 +10,14 @@ export interface SecurityEvent {
   severity: 'low' | 'medium' | 'high' | 'critical';
   description: string;
   metadata?: Record<string, any>;
+}
+
+export interface SecureCustomerAuth {
+  success: boolean;
+  customer_id?: string;
+  email_verified?: boolean;
+  error?: string;
+  details?: string[];
 }
 
 export interface RateLimitCheck {
@@ -291,6 +300,95 @@ export function useSecurityMonitoring() {
 }
 
 /**
+ * Secure customer authentication functions using edge functions
+ */
+export async function secureCustomerAuth(
+  action: 'register' | 'verify_otp' | 'check_rate_limit',
+  params: {
+    email: string;
+    password?: string;
+    name?: string;
+    phone?: string;
+    otpCode?: string;
+  }
+): Promise<SecureCustomerAuth> {
+  try {
+    const { data, error } = await supabase.functions.invoke('secure-customer-auth', {
+      body: {
+        action,
+        ...params
+      }
+    });
+
+    if (error) {
+      console.error('Secure customer auth error:', error);
+      return {
+        success: false,
+        error: 'Authentication service error'
+      };
+    }
+
+    return data;
+  } catch (error) {
+    console.error('Secure customer auth exception:', error);
+    return {
+      success: false,
+      error: 'Network error during authentication'
+    };
+  }
+}
+
+/**
+ * Check OTP rate limit using secure function
+ */
+export async function checkOTPRateLimit(email: string): Promise<{
+  allowed: boolean;
+  remaining?: number;
+  retry_after_seconds?: number;
+  reason?: string;
+}> {
+  try {
+    const { data, error } = await supabase.rpc('check_otp_rate_limit_secure', {
+      p_email: email
+    });
+
+    if (error) {
+      console.error('OTP rate limit check failed:', error);
+      return { allowed: false, reason: 'Rate limit check failed' };
+    }
+
+    return data as {
+      allowed: boolean;
+      remaining?: number;
+      retry_after_seconds?: number;
+      reason?: string;
+    };
+  } catch (error) {
+    console.error('OTP rate limit check error:', error);
+    return { allowed: false, reason: 'Network error' };
+  }
+}
+
+/**
+ * Validate admin access using centralized secure function
+ */
+export async function validateSecureAdminAccess(): Promise<boolean> {
+  try {
+    const { data, error } = await supabase.rpc('validate_admin_access');
+
+    if (error) {
+      console.error('Admin access validation failed:', error);
+      return false;
+    }
+
+    return data as boolean;
+  } catch (error) {
+    console.error('Admin access validation error:', error);
+    return false;
+  }
+}
+
+/**
  * Security context for application-wide monitoring
  */
 export const SecurityMonitor = {
@@ -298,5 +396,8 @@ export const SecurityMonitor = {
   checkRateLimit,
   validateAdminPermissions,
   monitorAPIRequest,
-  detectSuspiciousActivity
+  detectSuspiciousActivity,
+  secureCustomerAuth,
+  checkOTPRateLimit,
+  validateSecureAdminAccess
 };

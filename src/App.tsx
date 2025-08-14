@@ -50,7 +50,7 @@ const PaymentCallbackRedirect = withLazyLoading(() => import("./pages/PaymentCal
 const Unsubscribe = withLazyLoading(() => import("./pages/Unsubscribe"));
 const AdminSetup = withLazyLoading(() => import("./pages/AdminSetup"));
 const CustomerRegister = withLazyLoading(() => import("./pages/CustomerRegister"));
-const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfile"));
+const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfileProduction"));
 const AuthPage = withLazyLoading(() => import("./pages/AuthPage"));
 const AdminAuth = withLazyLoading(() => import("./pages/admin/AdminAuth"));
 const Cart = withLazyLoading(() => import("./pages/Cart"));

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-import ProductionOrdersList from '@/components/customer/ProductionOrdersList';
+import OrdersSection from '@/components/customer/OrdersSection';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 import ProductionMonitoring from '@/components/ProductionMonitoring';
 import ProductionOrdersErrorBoundary from '@/components/customer/ProductionOrdersErrorBoundary';
@@ -10,6 +10,16 @@ import { Button } from '@/components/ui/button';
 
 const CustomerProfileProduction = () => {
   const { user, logout, isLoading, error, customerAccount, refetch } = useCustomerAuth();
+  
+  // PRODUCTION DEBUGGING: Log current state
+  console.log('CustomerProfile State:', {
+    hasUser: !!user,
+    userEmail: user?.email,
+    isLoading,
+    error,
+    hasCustomerAccount: !!customerAccount,
+    timestamp: new Date().toISOString()
+  });
   
   const handleSignOut = async () => {
     try {
@@ -120,20 +130,7 @@ const CustomerProfileProduction = () => {
             
             {/* Main content */}
             <div className="lg:col-span-3">
-              <ProductionOrdersErrorBoundary 
-                customerEmail={user.email}
-                onError={(error, errorInfo) => {
-                  console.error('Orders component error for customer:', {
-                    email: user.email,
-                    customerId: customerAccount?.id,
-                    error: error.message,
-                    errorInfo,
-                    timestamp: new Date().toISOString()
-                  });
-                }}
-              >
-                <ProductionOrdersList customerEmail={user.email} />
-              </ProductionOrdersErrorBoundary>
+              <OrdersSection />
             </div>
           </div>
         </div>

@@ -723,7 +723,7 @@ const promotions = await publicAPI.getActivePromotions();
 
 // Validate promotion code
 const discount = await publicAPI.validatePromotion(
-  'WELCOME10', 
+  promotionCode, 
   cart.summary.subtotal
 );
 
@@ -861,7 +861,7 @@ if (!paymentSuccess) {
                         <li>• <strong>8 Categories:</strong> Pizza, Burgers, Pasta, Salads, Appetizers, Desserts, Beverages, Seafood</li>
                         <li>• <strong>30 Products:</strong> Full menu with prices and descriptions</li>
                         <li>• <strong>15 Sample Customers:</strong> For testing customer registration</li>
-                        <li>• <strong>4 Active Promotions:</strong> Including WELCOME10, FREEDEL, PIZZA20, WEEKEND15</li>
+                        <li>• <strong>Production-Ready Promotions:</strong> Percentage, Fixed Amount, BOGO, and Free Delivery types</li>
                         <li>• <strong>Payment Testing:</strong> Use Paystack test cards for secure transactions</li>
                       </ul>
                     </div>

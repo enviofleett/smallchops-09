@@ -22,7 +22,7 @@ import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, Aler
 import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { format, isToday, isTomorrow, isWithinInterval, subDays, addDays } from 'date-fns';
-import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
+
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -230,8 +230,6 @@ export default function AdminOrders() {
         }} orderCounts={orderMetrics} />
         </div>
 
-        {/* Performance Debugger */}
-        {import.meta.env.DEV && <PerformanceDebugger />}
 
         {/* Orders Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>

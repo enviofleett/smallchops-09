@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/hooks/use-toast';
+import { DeliveryErrorBoundary } from './DeliveryErrorBoundary';
+import { useDeliveryMonitoring } from '@/hooks/useDeliveryMonitoring';
 import { 
   Package, 
   Clock, 
@@ -40,7 +42,10 @@ export function DeliveryScheduleDashboard() {
     setLocalOrders(orders);
   }, [orders]);
 
-  // Real-time updates
+  // Delivery monitoring for alerts and performance
+  useDeliveryMonitoring();
+
+  // Enhanced real-time updates
   const { connectionStatus, lastUpdate } = useDeliveryRealtime(
     localOrders,
     (updatedOrder) => {
@@ -107,15 +112,16 @@ export function DeliveryScheduleDashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl sm:text-3xl font-bold">Delivery Schedule</h1>
-          <p className="text-muted-foreground">
-            Manage and track delivery orders with scheduled delivery times
-          </p>
-        </div>
+    <DeliveryErrorBoundary>
+      <div className="space-y-6">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold">Delivery Schedule</h1>
+            <p className="text-muted-foreground">
+              Manage and track delivery orders with real-time updates
+            </p>
+          </div>
         <div className="flex items-center gap-2">
           <Button 
             variant="outline" 
@@ -235,5 +241,6 @@ export function DeliveryScheduleDashboard() {
         </div>
       )}
     </div>
+    </DeliveryErrorBoundary>
   );
 }

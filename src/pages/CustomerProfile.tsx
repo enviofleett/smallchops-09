@@ -1,7 +1,5 @@
-import React, { useState, useMemo, Suspense } from 'react';
+import React, { useState, useMemo, Suspense, useCallback } from 'react';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-import { useCustomerFavorites } from '@/hooks/useCustomerFavorites';
-import { useCustomerOrders } from '@/hooks/useCustomerOrders';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -26,15 +24,18 @@ import { Navigate, useNavigate } from 'react-router-dom';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
-import { AddressManager } from '@/components/customer/AddressManager';
-import { ErrorBoundary } from '@/components/ui/error-boundary';
+import { ProductionReadyErrorBoundary } from '@/components/ui/production-ready-error-boundary';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { EnhancedOrdersSection } from '@/components/customer/EnhancedOrdersSection';
-import { EnhancedWishlistSection } from '@/components/customer/EnhancedWishlistSection';
-import { TransactionHistoryTab } from '@/components/purchase-history/TransactionHistoryTab';
-import { CustomerBookingsSection } from '@/components/customer/CustomerBookingsSection';
+import { useProductionMonitoring } from '@/hooks/useProductionMonitoring';
 
 type ProfileSection = 'orders' | 'tracking' | 'wishlist' | 'payment' | 'address' | 'help' | 'bookings';
+
+// Lazy load components to prevent initial bundle size issues
+const LazyEnhancedOrdersSection = React.lazy(() => import('@/components/customer/EnhancedOrdersSection').then(m => ({ default: m.EnhancedOrdersSection })));
+const LazyEnhancedWishlistSection = React.lazy(() => import('@/components/customer/EnhancedWishlistSection').then(m => ({ default: m.EnhancedWishlistSection })));
+const LazyCustomerBookingsSection = React.lazy(() => import('@/components/customer/CustomerBookingsSection').then(m => ({ default: m.CustomerBookingsSection })));
+const LazyAddressManager = React.lazy(() => import('@/components/customer/AddressManager').then(m => ({ default: m.AddressManager })));
+const LazyTransactionHistoryTab = React.lazy(() => import('@/components/purchase-history/TransactionHistoryTab').then(m => ({ default: m.TransactionHistoryTab })));
 
 // Loading skeleton component
 const ContentSkeleton = () => (
@@ -55,6 +56,7 @@ export default function CustomerProfile() {
   const { isAuthenticated, customerAccount, isLoading: authLoading, logout, error: authError } = useCustomerAuth();
   const { data: settings } = useBusinessSettings();
   const { handleError } = useErrorHandler();
+  const { reportError } = useProductionMonitoring();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<ProfileSection>('orders');
 
@@ -121,56 +123,100 @@ export default function CustomerProfile() {
     );
   }
 
-  const renderContent = React.useCallback(() => {
+  const renderContent = useCallback(() => {
     try {
       switch (activeSection) {
         case 'orders':
           return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="orders" />}>
-              <EnhancedOrdersSection />
-            </ErrorBoundary>
+            <ProductionReadyErrorBoundary 
+              context="Customer Orders" 
+              fallback={<SectionErrorFallback section="orders" />}
+              onError={(error, errorInfo) => handleError(error, 'customer-orders')}
+            >
+              <Suspense fallback={<ContentSkeleton />}>
+                <LazyEnhancedOrdersSection />
+              </Suspense>
+            </ProductionReadyErrorBoundary>
           );
         case 'tracking':
           return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="tracking" />}>
-              <EnhancedOrdersSection />
-            </ErrorBoundary>
+            <ProductionReadyErrorBoundary 
+              context="Order Tracking" 
+              fallback={<SectionErrorFallback section="tracking" />}
+              onError={(error, errorInfo) => handleError(error, 'order-tracking')}
+            >
+              <Suspense fallback={<ContentSkeleton />}>
+                <LazyEnhancedOrdersSection />
+              </Suspense>
+            </ProductionReadyErrorBoundary>
           );
         case 'bookings':
           return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="bookings" />}>
-              <CustomerBookingsSection />
-            </ErrorBoundary>
+            <ProductionReadyErrorBoundary 
+              context="Customer Bookings" 
+              fallback={<SectionErrorFallback section="bookings" />}
+              onError={(error, errorInfo) => handleError(error, 'customer-bookings')}
+            >
+              <Suspense fallback={<ContentSkeleton />}>
+                <LazyCustomerBookingsSection />
+              </Suspense>
+            </ProductionReadyErrorBoundary>
           );
         case 'wishlist':
           return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="wishlist" />}>
-              <EnhancedWishlistSection />
-            </ErrorBoundary>
+            <ProductionReadyErrorBoundary 
+              context="Customer Wishlist" 
+              fallback={<SectionErrorFallback section="wishlist" />}
+              onError={(error, errorInfo) => handleError(error, 'customer-wishlist')}
+            >
+              <Suspense fallback={<ContentSkeleton />}>
+                <LazyEnhancedWishlistSection />
+              </Suspense>
+            </ProductionReadyErrorBoundary>
           );
         case 'payment':
           return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="payment" />}>
+            <ProductionReadyErrorBoundary 
+              context="Payment History" 
+              fallback={<SectionErrorFallback section="payment" />}
+              onError={(error, errorInfo) => handleError(error, 'payment-history')}
+            >
               <PaymentSection />
-            </ErrorBoundary>
+            </ProductionReadyErrorBoundary>
           );
         case 'address':
           return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="address" />}>
-              <AddressManager />
-            </ErrorBoundary>
+            <ProductionReadyErrorBoundary 
+              context="Address Management" 
+              fallback={<SectionErrorFallback section="address" />}
+              onError={(error, errorInfo) => handleError(error, 'address-management')}
+            >
+              <Suspense fallback={<ContentSkeleton />}>
+                <LazyAddressManager />
+              </Suspense>
+            </ProductionReadyErrorBoundary>
           );
         case 'help':
           return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="help" />}>
+            <ProductionReadyErrorBoundary 
+              context="Help Section" 
+              fallback={<SectionErrorFallback section="help" />}
+              onError={(error, errorInfo) => handleError(error, 'help-section')}
+            >
               <HelpSection settings={settings} />
-            </ErrorBoundary>
+            </ProductionReadyErrorBoundary>
           );
         default:
           return (
-            <ErrorBoundary fallback={<SectionErrorFallback section="orders" />}>
-              <EnhancedOrdersSection />
-            </ErrorBoundary>
+            <ProductionReadyErrorBoundary 
+              context="Default Orders View" 
+              fallback={<SectionErrorFallback section="orders" />}
+              onError={(error, errorInfo) => handleError(error, 'default-orders')}
+            >
+              <Suspense fallback={<ContentSkeleton />}>
+                <LazyEnhancedOrdersSection />
+              </Suspense>
+            </ProductionReadyErrorBoundary>
           );
       }
     } catch (error) {
@@ -180,71 +226,84 @@ export default function CustomerProfile() {
   }, [activeSection, settings]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <PublicHeader />
-      
-      <div className="container mx-auto px-4 py-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar */}
-          <div className="lg:w-80 bg-white rounded-lg shadow-sm border border-border p-6">
-            <h1 className="text-xl font-bold mb-6">Account</h1>
-            
-            {/* Navigation */}
-            <nav className="space-y-1">
-              {sidebarItems.map((item) => (
-                <button
-                  key={item.id}
-                  onClick={() => {
-                    if (item.path) {
-                      navigate(item.path);
-                    } else {
-                      setActiveSection(item.id);
-                    }
-                  }}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
-                    activeSection === item.id
-                      ? 'bg-orange-50 text-orange-600 border border-orange-200'
-                      : 'hover:bg-gray-50 text-gray-700'
-                  }`}
-                >
-                  <div className="flex items-center gap-3">
-                    <item.icon className="w-5 h-5" />
-                    <span className="font-medium">{item.label}</span>
-                  </div>
-                  {item.path ? (
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
-                  ) : (
-                    <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                  )}
-                </button>
-              ))}
+    <ProductionReadyErrorBoundary 
+      context="Customer Profile Page" 
+      onError={(error, errorInfo) => {
+        reportError(error, 'customer-profile-page', errorInfo);
+        handleError(error, 'customer-profile');
+      }}
+    >
+      <div className="min-h-screen bg-background">
+        <PublicHeader />
+        
+        <div className="container mx-auto px-4 py-6">
+          <div className="flex flex-col lg:flex-row gap-6">
+            {/* Sidebar */}
+            <div className="lg:w-80 bg-white rounded-lg shadow-sm border border-border p-6">
+              <h1 className="text-xl font-bold mb-6">Account</h1>
               
-              <div className="pt-4 border-t border-gray-200 mt-4">
-                <button
-                  onClick={handleLogout}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors hover:bg-gray-50 text-gray-700"
-                >
-                  <div className="flex items-center gap-3">
-                    <LogOut className="w-5 h-5" />
-                    <span className="font-medium">Logout</span>
-                  </div>
-                  <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                </button>
-              </div>
-            </nav>
-          </div>
+              {/* Navigation */}
+              <nav className="space-y-1">
+                {sidebarItems.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      try {
+                        if (item.path) {
+                          navigate(item.path);
+                        } else {
+                          setActiveSection(item.id);
+                        }
+                      } catch (error) {
+                        console.error('Navigation error:', error);
+                        reportError(error as Error, 'customer-profile-navigation', { itemId: item.id, path: item.path });
+                      }
+                    }}
+                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
+                      activeSection === item.id
+                        ? 'bg-orange-50 text-orange-600 border border-orange-200'
+                        : 'hover:bg-gray-50 text-gray-700'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-medium">{item.label}</span>
+                    </div>
+                    {item.path ? (
+                      <ChevronRight className="w-4 h-4 text-gray-400" />
+                    ) : (
+                      <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                    )}
+                  </button>
+                ))}
+                
+                <div className="pt-4 border-t border-gray-200 mt-4">
+                  <button
+                    onClick={handleLogout}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors hover:bg-gray-50 text-gray-700"
+                  >
+                    <div className="flex items-center gap-3">
+                      <LogOut className="w-5 h-5" />
+                      <span className="font-medium">Logout</span>
+                    </div>
+                    <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                  </button>
+                </div>
+              </nav>
+            </div>
 
-          {/* Main Content */}
-          <div className="flex-1">
-            <Suspense fallback={<ContentSkeleton />}>
-              {renderContent()}
-            </Suspense>
+            {/* Main Content */}
+            <div className="flex-1">
+              <Suspense fallback={<ContentSkeleton />}>
+                {renderContent()}
+              </Suspense>
+            </div>
           </div>
         </div>
-      </div>
 
-      <PublicFooter />
-    </div>
+        <PublicFooter />
+      </div>
+    </ProductionReadyErrorBoundary>
   );
 }
 
@@ -459,5 +518,9 @@ function TransactionHistorySection({ customerEmail }: { customerEmail: string })
     );
   }
 
-  return <TransactionHistoryTab customerEmail={customerEmail} />;
+  return (
+    <Suspense fallback={<ContentSkeleton />}>
+      <LazyTransactionHistoryTab customerEmail={customerEmail} />
+    </Suspense>
+  );
 }

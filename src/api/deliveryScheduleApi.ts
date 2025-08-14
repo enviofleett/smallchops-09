@@ -33,6 +33,9 @@ export interface OrderWithDeliverySchedule {
   total_amount: number;
   delivery_address: any;
   order_time: string;
+  order_type: string;
+  created_at: string;
+  order_items: any[];
   delivery_schedule?: DeliverySchedule;
 }
 
@@ -71,16 +74,17 @@ export const getOrdersWithDeliverySchedule = async (filters: {
   let query = supabase
     .from('orders')
     .select(`
-      id,
-      order_number,
-      customer_name,
-      customer_email,
-      customer_phone,
-      status,
-      payment_status,
-      total_amount,
-      delivery_address,
-      order_time,
+      *,
+      order_items (
+        id,
+        product_id,
+        product_name,
+        quantity,
+        unit_price,
+        total_price,
+        customizations,
+        special_instructions
+      ),
       order_delivery_schedule (
         id,
         delivery_date,
@@ -93,14 +97,15 @@ export const getOrdersWithDeliverySchedule = async (filters: {
         updated_at
       )
     `)
-    .eq('order_type', 'delivery')
-    .not('order_delivery_schedule', 'is', null);
+    .eq('order_type', 'delivery');
 
-  // Date filtering
-  if (filters.startDate) {
+  // Date filtering - now works with both scheduled and unscheduled orders
+  if (filters.startDate && filters.endDate) {
+    // Only filter by delivery schedule dates if date filters are specifically applied
+    query = query.or(`order_delivery_schedule.delivery_date.gte.${filters.startDate},order_delivery_schedule.delivery_date.lte.${filters.endDate}`);
+  } else if (filters.startDate) {
     query = query.gte('order_delivery_schedule.delivery_date', filters.startDate);
-  }
-  if (filters.endDate) {
+  } else if (filters.endDate) {
     query = query.lte('order_delivery_schedule.delivery_date', filters.endDate);
   }
 
@@ -117,11 +122,8 @@ export const getOrdersWithDeliverySchedule = async (filters: {
 
   query = query.range(start, end);
 
-  // Order by delivery date and time
-  query = query.order('delivery_date', { 
-    referencedTable: 'order_delivery_schedule',
-    ascending: true 
-  });
+  // Order by created date for consistent ordering (supports both scheduled and unscheduled)
+  query = query.order('created_at', { ascending: false });
 
   const { data, error, count } = await query;
 
@@ -129,16 +131,8 @@ export const getOrdersWithDeliverySchedule = async (filters: {
 
   // Transform data to include delivery_schedule as a direct property
   const transformedData = data?.map(order => ({
-    id: order.id,
-    order_number: order.order_number,
-    customer_name: order.customer_name,
-    customer_email: order.customer_email,
-    customer_phone: order.customer_phone,
-    status: order.status,
-    payment_status: order.payment_status,
-    total_amount: order.total_amount,
-    delivery_address: order.delivery_address,
-    order_time: order.order_time,
+    ...order,
+    order_items: order.order_items || [],
     delivery_schedule: order.order_delivery_schedule?.[0] ? {
       ...order.order_delivery_schedule[0],
       order_id: order.id

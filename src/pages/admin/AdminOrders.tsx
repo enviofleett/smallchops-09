@@ -426,14 +426,19 @@ function AdminOrderCard({ order }: { order: OrderWithItems }) {
   const { data: detailedOrderData, isLoading: isLoadingDetails } = useDetailedOrderData(order.id);
   const [showProductDetails, setShowProductDetails] = useState(false);
 
-  // Determine if delivery is urgent (within next 2 hours)
+  // Determine if delivery is urgent (within next 2 hours) - with error handling
   const isUrgentDelivery = deliverySchedule ? (() => {
-    const now = new Date();
-    const deliveryDateTime = new Date(deliverySchedule.delivery_date);
-    const [startHours, startMinutes] = deliverySchedule.delivery_time_start.split(':').map(Number);
-    deliveryDateTime.setHours(startHours, startMinutes, 0, 0);
-    const hoursUntilDelivery = (deliveryDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    return hoursUntilDelivery <= 2 && hoursUntilDelivery > 0;
+    try {
+      const now = new Date();
+      const deliveryDateTime = new Date(deliverySchedule.delivery_date);
+      const [startHours, startMinutes] = deliverySchedule.delivery_time_start.split(':').map(Number);
+      deliveryDateTime.setHours(startHours, startMinutes, 0, 0);
+      const hoursUntilDelivery = (deliveryDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+      return hoursUntilDelivery <= 2 && hoursUntilDelivery > 0;
+    } catch (error) {
+      console.error('Error calculating delivery urgency:', error);
+      return false;
+    }
   })() : false;
 
   const formatCurrency = (amount: number) => {
@@ -558,49 +563,61 @@ function AdminOrderCard({ order }: { order: OrderWithItems }) {
         )}
 
         {/* Enhanced Delivery Schedule Display */}
-        {deliverySchedule && (
+        {order.order_type === 'delivery' && (
           <div className="mt-4 space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
               <Calendar className="w-4 h-4" />
               Delivery Schedule
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Delivery Details */}
-              <div className="p-3 bg-muted rounded-lg">
-                <div className="space-y-1">
-                  <p className="text-sm font-medium">
-                    {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                  </p>
-                  {deliverySchedule.is_flexible && (
-                    <Badge variant="outline" className="text-xs">
-                      Flexible Time
-                    </Badge>
-                  )}
-                  {deliverySchedule.special_instructions && (
-                    <p className="text-xs text-muted-foreground mt-2">
-                      Note: {deliverySchedule.special_instructions}
+            {deliverySchedule ? (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Delivery Details */}
+                <div className="p-3 bg-muted rounded-lg">
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium">
+                      {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
                     </p>
-                  )}
-                </div>
-              </div>
+                     <p className="text-sm text-muted-foreground">
+                       {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                     </p>
+                     {deliverySchedule.is_flexible && (
+                       <Badge variant="outline" className="text-xs">
+                         Flexible Time
+                       </Badge>
+                     )}
+                     {deliverySchedule.special_instructions && (
+                       <p className="text-xs text-muted-foreground mt-2">
+                         Note: {deliverySchedule.special_instructions}
+                       </p>
+                     )}
+                   </div>
+                 </div>
 
-              {/* Countdown Timer */}
-              <div className="min-h-[100px]">
-                <CountdownTimer
-                  deliveryDate={deliverySchedule.delivery_date}
-                  deliveryTimeStart={deliverySchedule.delivery_time_start}
-                  deliveryTimeEnd={deliverySchedule.delivery_time_end}
-                  isFlexible={deliverySchedule.is_flexible}
-                  className="h-full"
-                />
-              </div>
-            </div>
-          </div>
-        )}
+                 {/* Countdown Timer */}
+                 <div className="p-3 bg-primary/5 rounded-lg">
+                   <CountdownTimer
+                     deliveryDate={deliverySchedule.delivery_date}
+                     deliveryTimeStart={deliverySchedule.delivery_time_start}
+                     deliveryTimeEnd={deliverySchedule.delivery_time_end}
+                     isFlexible={deliverySchedule.is_flexible}
+                     className="text-sm"
+                   />
+                 </div>
+               </div>
+             ) : (
+               <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                 <div className="flex items-center gap-2 text-orange-800">
+                   <Clock className="w-4 h-4" />
+                   <p className="text-sm font-medium">Schedule Pending</p>
+                 </div>
+                 <p className="text-xs text-orange-700 mt-1">
+                   Delivery schedule will be assigned soon
+                 </p>
+               </div>
+             )}
+           </div>
+         )}
 
         {/* Pickup Information */}
         {order.order_type === 'pickup' && (

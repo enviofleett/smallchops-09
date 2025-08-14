@@ -15,10 +15,8 @@ interface DeliveryFilters {
 }
 
 export const useDeliveryOrdersWithFiltering = (filters: DeliveryFilters) => {
-  const useDeliveryFiltering = 
-    filters.dateRange !== 'all' || 
-    filters.timeSlot !== 'all' || 
-    filters.urgency !== 'all';
+  // Always use delivery filtering for production readiness - includes orders with and without schedules
+  const useDeliveryFiltering = true;
 
   const getFilterDates = () => {
     const today = new Date();
@@ -62,45 +60,30 @@ export const useDeliveryOrdersWithFiltering = (filters: DeliveryFilters) => {
       filters.pageSize
     ],
     queryFn: async () => {
-      if (useDeliveryFiltering) {
-        const { startDate, endDate } = getFilterDates();
-        
-        const result = await getOrdersWithDeliverySchedule({
-          startDate,
-          endDate,
-          status: filters.status === 'all' ? undefined : [filters.status],
-          searchQuery: filters.searchQuery || undefined,
-          timeSlot: filters.timeSlot === 'all' ? undefined : filters.timeSlot,
-          urgency: filters.urgency === 'all' ? undefined : filters.urgency,
-          page: filters.page,
-          pageSize: filters.pageSize
-        });
+      const { startDate, endDate } = getFilterDates();
+      
+      const result = await getOrdersWithDeliverySchedule({
+        startDate,
+        endDate,
+        status: filters.status === 'all' ? undefined : [filters.status],
+        searchQuery: filters.searchQuery || undefined,
+        timeSlot: filters.timeSlot === 'all' ? undefined : filters.timeSlot,
+        urgency: filters.urgency === 'all' ? undefined : filters.urgency,
+        page: filters.page,
+        pageSize: filters.pageSize
+      });
 
-        // Transform to match expected format
-        return {
-          orders: result.orders.map((order: any) => ({
-            ...order,
-            order_items: order.order_items || [],
-            order_type: 'delivery',
-            delivery_schedule: order.delivery_schedule
-          })),
-          count: result.total,
-          hasDeliverySchedule: true
-        };
-      } else {
-        const result = await getOrders({
-          page: filters.page,
-          pageSize: filters.pageSize,
-          status: filters.status === 'all' ? undefined : filters.status,
-          searchQuery: filters.searchQuery || undefined
-        });
-
-        return {
-          orders: result.orders,
-          count: result.count,
-          hasDeliverySchedule: false
-        };
-      }
+      // Transform to match expected format with proper delivery schedule handling
+      return {
+        orders: result.orders.map((order: any) => ({
+          ...order,
+          order_items: order.order_items || [],
+          order_type: order.order_type || 'delivery',
+          delivery_schedule: order.delivery_schedule || null
+        })),
+        count: result.total,
+        hasDeliverySchedule: true
+      };
     },
     refetchInterval: 30000, // Refresh every 30 seconds
     staleTime: 10000 // Consider data stale after 10 seconds

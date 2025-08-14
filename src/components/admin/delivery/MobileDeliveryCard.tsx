@@ -142,36 +142,55 @@ export const MobileDeliveryCard: React.FC<MobileDeliveryCardProps> = ({
         </div>
 
         {/* Delivery Schedule */}
-        {deliverySchedule && (
+        {order.order_type === 'delivery' && (
           <div className="space-y-3">
             <div className="flex items-center gap-2 text-sm font-medium">
               <Calendar className="w-4 h-4 text-blue-600" />
               <span>Delivery Schedule</span>
             </div>
             
-            {/* Date and Time */}
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <div className="text-sm font-medium text-blue-900">
-                {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMM d')}
-              </div>
-              <div className="text-sm text-blue-700 mt-1">
-                {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                {deliverySchedule.is_flexible && (
-                  <Badge variant="outline" className="ml-2 text-xs">
-                    Flexible
-                  </Badge>
-                )}
-              </div>
-            </div>
+            {deliverySchedule ? (
+              <>
+                {/* Date and Time */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="text-sm font-medium text-blue-900">
+                    {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMM d')}
+                  </div>
+                  <div className="text-sm text-blue-700 mt-1">
+                    {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                    {deliverySchedule.is_flexible && (
+                      <Badge variant="outline" className="ml-2 text-xs">
+                        Flexible
+                      </Badge>
+                    )}
+                  </div>
+                  {deliverySchedule.special_instructions && (
+                    <div className="text-xs text-blue-600 mt-2 italic">
+                      {deliverySchedule.special_instructions}
+                    </div>
+                  )}
+                </div>
 
-            {/* Countdown Timer */}
-            <CountdownTimer
-              deliveryDate={deliverySchedule.delivery_date}
-              deliveryTimeStart={deliverySchedule.delivery_time_start}
-              deliveryTimeEnd={deliverySchedule.delivery_time_end}
-              isFlexible={deliverySchedule.is_flexible}
-              className="text-sm"
-            />
+                {/* Countdown Timer */}
+                <CountdownTimer
+                  deliveryDate={deliverySchedule.delivery_date}
+                  deliveryTimeStart={deliverySchedule.delivery_time_start}
+                  deliveryTimeEnd={deliverySchedule.delivery_time_end}
+                  isFlexible={deliverySchedule.is_flexible}
+                  className="text-sm"
+                />
+              </>
+            ) : (
+              <div className="bg-orange-50 border border-orange-200 rounded-lg p-3">
+                <div className="flex items-center gap-2 text-orange-800">
+                  <Clock className="w-4 h-4" />
+                  <span className="text-sm font-medium">Schedule Pending</span>
+                </div>
+                <div className="text-xs text-orange-700 mt-1">
+                  Will be assigned soon
+                </div>
+              </div>
+            )}
           </div>
         )}
 

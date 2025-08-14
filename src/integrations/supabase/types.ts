@@ -6837,6 +6837,10 @@ export type Database = {
           total_revenue: number
         }[]
       }
+      get_detailed_order_with_products: {
+        Args: { p_order_id: string }
+        Returns: Json
+      }
       get_email_health_status: {
         Args: Record<PropertyKey, never>
         Returns: Json

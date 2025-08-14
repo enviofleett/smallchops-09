@@ -22,8 +22,11 @@ import {
   CheckCircle,
   AlertCircle,
   Plus,
-  Activity
+  Activity,
+  ChevronDown
 } from 'lucide-react';
+import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
+import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { format } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
@@ -350,6 +353,9 @@ function AdminOrderCard({ order }: { order: OrderWithItems }) {
     queryFn: () => getDeliveryScheduleByOrderId(order.id),
     enabled: order.order_type === 'delivery',
   });
+  
+  const { data: detailedOrderData, isLoading: isLoadingDetails } = useDetailedOrderData(order.id);
+  const [showProductDetails, setShowProductDetails] = useState(false);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -409,12 +415,51 @@ function AdminOrderCard({ order }: { order: OrderWithItems }) {
           
           <div>
             <p className="text-sm text-muted-foreground">Items & Payment</p>
-            <p className="font-medium">{order.order_items?.length || 0} items</p>
+            <div className="flex items-center gap-2">
+              <span className="font-medium">{order.order_items?.length || 0} items</span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowProductDetails(!showProductDetails);
+                }}
+                className="h-6 px-2 text-xs"
+              >
+                <ChevronDown className={`w-3 h-3 transition-transform ${showProductDetails ? 'rotate-180' : ''}`} />
+                Products
+              </Button>
+            </div>
             <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
               {order.payment_status}
             </Badge>
           </div>
         </div>
+
+        {/* Product Details Expansion */}
+        {showProductDetails && (
+          <div className="mt-4 border-t pt-4">
+            {isLoadingDetails ? (
+              <div className="space-y-2">
+                <div className="h-4 bg-muted animate-pulse rounded" />
+                <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
+              </div>
+            ) : detailedOrderData?.items ? (
+              <div className="space-y-2">
+                <h4 className="font-medium text-sm mb-2">Product Details</h4>
+                {detailedOrderData.items.map((item: any) => (
+                  <ProductDetailCard 
+                    key={item.id}
+                    item={item}
+                    showReorderButton={false}
+                  />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Product details not available</p>
+            )}
+          </div>
+        )}
 
         {deliverySchedule && (
           <div className="mt-4 p-3 bg-muted rounded-lg">

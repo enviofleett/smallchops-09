@@ -6,6 +6,8 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { OrderItemsBreakdown } from './OrderItemsBreakdown';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
 import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
+import { ProductDetailCard } from './ProductDetailCard';
+import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { 
   ChevronDown, 
   ChevronUp, 
@@ -28,11 +30,12 @@ interface EnhancedOrderCardProps {
 
 export function EnhancedOrderCard({ 
   order, 
-  deliverySchedule,
+  deliverySchedule, 
   showExpandedByDefault = false,
-  className = ""
+  className = "" 
 }: EnhancedOrderCardProps) {
   const [isExpanded, setIsExpanded] = useState(showExpandedByDefault);
+  const { data: detailedOrderData, isLoading: isLoadingDetails } = useDetailedOrderData(order.id);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);

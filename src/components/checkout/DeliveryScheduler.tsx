@@ -134,14 +134,17 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
 
   return (
     <DeliverySchedulingErrorBoundary>
-      <Card className={className}>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CalendarIcon className="h-5 w-5" />
-          Choose Delivery Date & Time
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6">
+      <Card className={`border-primary/20 ${className}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarIcon className="h-5 w-5 text-primary" />
+            Schedule Your Delivery
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            Choose your preferred delivery date and time
+          </p>
+        </CardHeader>
+        <CardContent className="space-y-6">
         {error && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />

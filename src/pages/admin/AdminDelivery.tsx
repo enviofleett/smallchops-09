@@ -6,8 +6,8 @@ export default function AdminDelivery() {
   return (
     <>
       <Helmet>
-        <title>Delivery Schedule - Admin Dashboard</title>
-        <meta name="description" content="Manage delivery schedules, track orders with delivery times, and monitor delivery performance." />
+        <title>Ready Orders - Delivery Management</title>
+        <meta name="description" content="Manage ready orders for delivery dispatch, assign drivers, and track delivery performance." />
       </Helmet>
 
       <DeliveryScheduleDashboard />

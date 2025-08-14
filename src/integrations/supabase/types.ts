@@ -2364,6 +2364,59 @@ export type Database = {
         }
         Relationships: []
       }
+      driver_delivery_analytics: {
+        Row: {
+          average_customer_rating: number | null
+          created_at: string | null
+          date: string
+          deliveries_completed: number | null
+          deliveries_failed: number | null
+          delivery_fees_collected: number | null
+          driver_id: string
+          fuel_cost: number | null
+          id: string
+          total_delivery_time_minutes: number | null
+          total_distance_km: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          average_customer_rating?: number | null
+          created_at?: string | null
+          date: string
+          deliveries_completed?: number | null
+          deliveries_failed?: number | null
+          delivery_fees_collected?: number | null
+          driver_id: string
+          fuel_cost?: number | null
+          id?: string
+          total_delivery_time_minutes?: number | null
+          total_distance_km?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          average_customer_rating?: number | null
+          created_at?: string | null
+          date?: string
+          deliveries_completed?: number | null
+          deliveries_failed?: number | null
+          delivery_fees_collected?: number | null
+          driver_id?: string
+          fuel_cost?: number | null
+          id?: string
+          total_delivery_time_minutes?: number | null
+          total_distance_km?: number | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_delivery_analytics_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       driver_location_tracking: {
         Row: {
           accuracy: number | null
@@ -6334,6 +6387,50 @@ export type Database = {
         }
         Relationships: []
       }
+      zone_delivery_analytics: {
+        Row: {
+          average_delivery_time_minutes: number | null
+          created_at: string | null
+          date: string
+          id: string
+          successful_deliveries: number | null
+          total_deliveries: number | null
+          total_delivery_fees: number | null
+          updated_at: string | null
+          zone_id: string
+        }
+        Insert: {
+          average_delivery_time_minutes?: number | null
+          created_at?: string | null
+          date: string
+          id?: string
+          successful_deliveries?: number | null
+          total_deliveries?: number | null
+          total_delivery_fees?: number | null
+          updated_at?: string | null
+          zone_id: string
+        }
+        Update: {
+          average_delivery_time_minutes?: number | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          successful_deliveries?: number | null
+          total_deliveries?: number | null
+          total_delivery_fees?: number | null
+          updated_at?: string | null
+          zone_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "zone_delivery_analytics_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       orders_with_payment: {
@@ -6490,6 +6587,10 @@ export type Database = {
       calculate_brand_consistency_score: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      calculate_daily_delivery_analytics: {
+        Args: { target_date?: string }
+        Returns: undefined
       }
       calculate_daily_email_metrics: {
         Args: Record<PropertyKey, never> | { target_date?: string }
@@ -6840,6 +6941,10 @@ export type Database = {
           total_products: number
           total_revenue: number
         }[]
+      }
+      get_delivery_reports: {
+        Args: { end_date?: string; start_date?: string }
+        Returns: Json
       }
       get_detailed_order_with_products: {
         Args: { p_order_id: string }

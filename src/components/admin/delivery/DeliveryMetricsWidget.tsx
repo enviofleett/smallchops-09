@@ -14,10 +14,13 @@ import { PriceDisplay } from '@/components/ui/price-display';
 
 interface DeliveryMetrics {
   totalOrders: number;
-  pendingOrders: number;
-  preparingOrders: number;
-  outForDelivery: number;
-  completedOrders: number;
+  readyOrders?: number;
+  assignedOrders?: number;
+  unassignedOrders?: number;
+  pendingOrders?: number;
+  preparingOrders?: number;
+  outForDelivery?: number;
+  completedOrders?: number;
   urgentOrders: number;
   totalRevenue: number;
   onTimeDeliveryRate?: number;
@@ -37,35 +40,28 @@ export function DeliveryMetricsWidget({ metrics, isLoading, className }: Deliver
       value: metrics.totalOrders,
       icon: Package,
       color: 'bg-blue-100 text-blue-600',
-      description: 'All delivery orders'
+      description: 'All ready orders'
     },
     {
-      title: 'Pending',
-      value: metrics.pendingOrders,
+      title: 'Ready Orders',
+      value: metrics.readyOrders || metrics.totalOrders,
       icon: Clock,
-      color: 'bg-orange-100 text-orange-600',
-      description: 'Awaiting preparation'
+      color: 'bg-blue-100 text-blue-600',
+      description: 'Ready for dispatch'
     },
     {
-      title: 'Preparing',
-      value: metrics.preparingOrders,
-      icon: Package,
-      color: 'bg-yellow-100 text-yellow-600',
-      description: 'Being prepared'
-    },
-    {
-      title: 'Out for Delivery',
-      value: metrics.outForDelivery,
+      title: 'Assigned',
+      value: metrics.assignedOrders || 0,
       icon: Truck,
-      color: 'bg-purple-100 text-purple-600',
-      description: 'En route to customer'
+      color: 'bg-green-100 text-green-600',
+      description: 'Assigned to riders'
     },
     {
-      title: 'Completed',
-      value: metrics.completedOrders,
-      icon: CheckCircle,
-      color: 'bg-green-100 text-green-600',
-      description: 'Successfully delivered'
+      title: 'Unassigned',
+      value: metrics.unassignedOrders || 0,
+      icon: Package,
+      color: 'bg-orange-100 text-orange-600',
+      description: 'Awaiting assignment'
     },
     {
       title: 'Urgent',

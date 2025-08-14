@@ -67,7 +67,7 @@ export const useDeliveryScheduleDashboard = (filters: DashboardFilters) => {
     queryFn: () => getOrdersWithDeliverySchedule({
       startDate,
       endDate,
-      status: filters.status.length > 0 ? filters.status : undefined,
+      // Remove status filtering since we only want "ready" orders
       pageSize: 100
     }),
     refetchInterval: 30000,
@@ -92,13 +92,12 @@ export const useDeliveryScheduleDashboard = (filters: DashboardFilters) => {
     }
   }) || [];
 
-  // Calculate dashboard metrics
+  // Calculate dashboard metrics - all orders are "ready" status
   const metrics = {
     totalOrders: filteredOrders.length,
-    pendingOrders: filteredOrders.filter(o => o.status === 'pending' || o.status === 'confirmed').length,
-    preparingOrders: filteredOrders.filter(o => o.status === 'preparing' || o.status === 'ready').length,
-    outForDelivery: filteredOrders.filter(o => o.status === 'out_for_delivery').length,
-    completedOrders: filteredOrders.filter(o => o.status === 'delivered' || o.status === 'completed').length,
+    readyOrders: filteredOrders.length, // All orders are ready
+    assignedOrders: filteredOrders.filter(o => o.assigned_rider_id).length,
+    unassignedOrders: filteredOrders.filter(o => !o.assigned_rider_id).length,
     urgentOrders: filteredOrders.filter(order => {
       if (!order.delivery_schedule) return false;
       const deliveryTime = new Date(`${order.delivery_schedule.delivery_date} ${order.delivery_schedule.delivery_time_start}`);

@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MapPin, BarChart3, Calendar } from "lucide-react";
 import { DriverManagement } from "@/components/delivery/DriverManagement";
 import { DeliveryZonesManager } from "@/components/delivery/DeliveryZonesManager";
+import { DeliveryReports } from "@/components/delivery/DeliveryReports";
 export default function DeliveryPickupPage() {
   const [activeTab, setActiveTab] = useState("overview");
   return <div className="w-full min-h-[calc(100vh-110px)] p-4 md:p-6">
@@ -17,7 +18,7 @@ export default function DeliveryPickupPage() {
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <div className="overflow-x-auto pb-2">
-            <TabsList className="grid w-full min-w-[480px] grid-cols-4 md:min-w-0">
+            <TabsList className="grid w-full min-w-[600px] grid-cols-5 md:min-w-0">
               <TabsTrigger value="overview" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
                 <BarChart3 className="w-3 h-3 md:w-4 md:h-4" />
                 <span className="hidden sm:inline">Overview</span>
@@ -32,6 +33,11 @@ export default function DeliveryPickupPage() {
                 <MapPin className="w-3 h-3 md:w-4 md:h-4" />
                 <span className="hidden sm:inline">Zones</span>
                 <span className="sm:hidden">Zone</span>
+              </TabsTrigger>
+              <TabsTrigger value="reports" className="flex items-center gap-1 md:gap-2 text-xs md:text-sm">
+                <BarChart3 className="w-3 h-3 md:w-4 md:h-4" />
+                <span className="hidden sm:inline">Reports</span>
+                <span className="sm:hidden">Rep</span>
               </TabsTrigger>
               
             </TabsList>
@@ -95,17 +101,8 @@ export default function DeliveryPickupPage() {
           </TabsContent>
 
 
-          <TabsContent value="schedule">
-            <Card>
-              <CardHeader>
-                <CardTitle>Delivery Schedule</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  Delivery scheduling will be implemented here.
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="reports">
+            <DeliveryReports />
           </TabsContent>
         </Tabs>
       </div>

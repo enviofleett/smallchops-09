@@ -35,6 +35,7 @@ export interface OrderWithDeliverySchedule {
   order_time: string;
   order_type: string;
   created_at: string;
+  assigned_rider_id?: string;
   order_items: any[];
   delivery_schedule?: DeliverySchedule;
 }
@@ -97,7 +98,8 @@ export const getOrdersWithDeliverySchedule = async (filters: {
         updated_at
       )
     `)
-    .eq('order_type', 'delivery');
+    .eq('order_type', 'delivery')
+    .eq('status', 'ready'); // CRITICAL: Only show orders with "ready" status
 
   // Date filtering - properly filter by delivery schedule dates
   if (filters.startDate || filters.endDate) {

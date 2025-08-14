@@ -1,12 +1,15 @@
 import React from 'react';
-import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Package, Clock, CheckCircle } from 'lucide-react';
 
-export const SimpleOrdersSection = () => {
-  const { user, customerAccount } = useCustomerAuth();
+interface SimpleOrdersSectionProps {
+  user?: any;
+  customerAccount?: any;
+}
+
+export const SimpleOrdersSection = ({ user, customerAccount }: SimpleOrdersSectionProps) => {
 
   // Mock orders data for now - replace with actual API call
   const mockOrders = [

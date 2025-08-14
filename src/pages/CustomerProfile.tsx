@@ -197,7 +197,10 @@ const CustomerProfileComponent = () => {
         );
       case 'tracking':
         return (
-          <ProductionSafeErrorBoundary context="Order Tracking" fallback={SimpleOrdersSection}>
+          <ProductionSafeErrorBoundary 
+            context="Order Tracking" 
+            fallback={() => <SimpleOrdersSection user={user} customerAccount={customerAccount} />}
+          >
             <LazyEnhancedOrdersSection />
           </ProductionSafeErrorBoundary>
         );

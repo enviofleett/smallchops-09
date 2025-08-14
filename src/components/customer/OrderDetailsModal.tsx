@@ -90,7 +90,18 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   const [orderStatus, setOrderStatus] = useState(order?.status);
   const [loading, setLoading] = useState(false);
 
-  if (!order) return null;
+  // Initialize orderStatus when order changes
+  useEffect(() => {
+    if (order) {
+      console.log('🔄 Initializing order status:', order.status);
+      setOrderStatus(order.status);
+    }
+  }, [order]);
+
+  if (!order) {
+    console.log('❌ No order provided to OrderDetailsModal');
+    return null;
+  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -138,35 +149,50 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     const fetchDeliveryInfo = async () => {
       if (!order) return;
       
+      console.log('🔍 Fetching delivery info for order:', order.id);
       setLoading(true);
+      
       try {
         // Fetch delivery zone if available
         if (order.delivery_zone_id) {
+          console.log('📍 Fetching delivery zone:', order.delivery_zone_id);
           const { data: zoneData, error: zoneError } = await supabase
             .from('delivery_zones')
             .select('*')
             .eq('id', order.delivery_zone_id)
-            .single();
+            .maybeSingle();
           
-          if (!zoneError && zoneData) {
+          if (zoneError) {
+            console.warn('⚠️ Delivery zone fetch error:', zoneError);
+          } else if (zoneData) {
+            console.log('✅ Delivery zone loaded:', zoneData);
             setDeliveryZone(zoneData);
+          } else {
+            console.log('ℹ️ No delivery zone found for ID:', order.delivery_zone_id);
           }
         }
 
         // Fetch dispatch rider if assigned
         if (order.assigned_rider_id) {
+          console.log('🚚 Fetching dispatch rider:', order.assigned_rider_id);
           const { data: riderData, error: riderError } = await supabase
             .from('drivers')
             .select('*')
             .eq('id', order.assigned_rider_id)
-            .single();
+            .maybeSingle();
           
-          if (!riderError && riderData) {
+          if (riderError) {
+            console.warn('⚠️ Dispatch rider fetch error:', riderError);
+          } else if (riderData) {
+            console.log('✅ Dispatch rider loaded:', riderData);
             setDispatchRider(riderData);
+          } else {
+            console.log('ℹ️ No dispatch rider found for ID:', order.assigned_rider_id);
           }
         }
       } catch (error) {
-        console.error('Error fetching delivery info:', error);
+        console.error('❌ Critical error fetching delivery info:', error);
+        // Don't break the modal, just log the error
       } finally {
         setLoading(false);
       }
@@ -179,6 +205,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   useEffect(() => {
     if (!order?.id) return;
 
+    console.log('📡 Setting up real-time subscription for order:', order.id);
+    
     const channel = supabase
       .channel('order-status-updates')
       .on(
@@ -190,6 +218,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           filter: `id=eq.${order.id}`
         },
         (payload) => {
+          console.log('📦 Order status update received:', payload);
           setOrderStatus(payload.new.status);
           if (payload.new.status === 'delivered') {
             toast.success('Your order has been delivered!');
@@ -199,6 +228,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
       .subscribe();
 
     return () => {
+      console.log('🔌 Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
   }, [order?.id]);

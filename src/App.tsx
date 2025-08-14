@@ -65,23 +65,28 @@ const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"));
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
 
-// Optimized QueryClient for better stability
+// Optimized QueryClient for better stability and reduced flickering
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 2 * 60 * 1000,         // 2 minutes - reduced for fresher data
-      gcTime: 10 * 60 * 1000,           // 10 minutes cache
+      staleTime: 5 * 60 * 1000,         // 5 minutes - more stable caching
+      gcTime: 30 * 60 * 1000,           // 30 minutes cache retention
       refetchOnWindowFocus: false,       // Prevent unnecessary refetches
       refetchIntervalInBackground: false,
       refetchInterval: false,
+      refetchOnMount: 'always',          // Always fresh data on mount
       retry: (failureCount, error: any) => {
         // Smart retry logic
         if (error?.status >= 400 && error?.status < 500) {
           return false; // Don't retry client errors
         }
-        return failureCount < 3;
+        return failureCount < 2; // Reduced retries for faster failures
       },
-      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 5000),
+      retryDelay: attemptIndex => Math.min(500 * 2 ** attemptIndex, 3000), // Faster retry delays
+      networkMode: 'online',
+    },
+    mutations: {
+      retry: 1,
       networkMode: 'online',
     },
   },

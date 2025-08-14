@@ -31,9 +31,26 @@ export function EnhancedOrdersSection() {
   const [selectedOrder, setSelectedOrder] = React.useState<any>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   
-  // Get delivery schedules for all orders
-  const orders = Array.isArray(ordersData?.orders) ? ordersData.orders : [];
-  const orderIds = orders.map(order => order.id);
+  // Debug logging for order data
+  React.useEffect(() => {
+    console.log('📊 EnhancedOrdersSection - Orders data:', {
+      ordersData,
+      loading: ordersLoading,
+      error: ordersError,
+      ordersCount: ordersData?.orders?.length || 0,
+    });
+  }, [ordersData, ordersLoading, ordersError]);
+  
+  // Get delivery schedules for all orders - with null safety
+  const orders = React.useMemo(() => {
+    if (!ordersData?.orders || !Array.isArray(ordersData.orders)) {
+      console.log('⚠️ No valid orders data found');
+      return [];
+    }
+    return ordersData.orders.filter(order => order && order.id);
+  }, [ordersData]);
+  
+  const orderIds = React.useMemo(() => orders.map(order => order.id), [orders]);
   const { schedules } = useOrderDeliverySchedules(orderIds);
 
   // Handle query errors

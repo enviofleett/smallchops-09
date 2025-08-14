@@ -8,25 +8,64 @@ import { getDrivers } from '@/api/drivers';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
 
 export function SystemStatusChecker() {
-  // Test API connections
+  // Test API connections with enhanced error handling
   const { data: ordersData, error: ordersError, isLoading: ordersLoading } = useQuery({
     queryKey: ['system-test-orders'],
-    queryFn: () => getOrders({ page: 1, pageSize: 1 }),
+    queryFn: async () => {
+      try {
+        console.log('🔍 Testing Orders API...');
+        const result = await getOrders({ page: 1, pageSize: 1 });
+        console.log('✅ Orders API success:', result);
+        return result;
+      } catch (error) {
+        console.error('❌ Orders API failed:', error);
+        throw error;
+      }
+    },
+    retry: 1,
+    staleTime: 30000, // 30 seconds
   });
 
   const { data: routes, error: routesError, isLoading: routesLoading } = useQuery({
     queryKey: ['system-test-routes'],
-    queryFn: () => getRoutes(),
+    queryFn: async () => {
+      try {
+        console.log('🔍 Testing Routes API...');
+        const result = await getRoutes();
+        console.log('✅ Routes API success:', result);
+        return result;
+      } catch (error) {
+        console.error('❌ Routes API failed:', error);
+        throw error;
+      }
+    },
+    retry: 1,
+    staleTime: 30000,
   });
 
   const { data: drivers, error: driversError, isLoading: driversLoading } = useQuery({
     queryKey: ['system-test-drivers'],
-    queryFn: () => getDrivers(),
+    queryFn: async () => {
+      try {
+        console.log('🔍 Testing Drivers API...');
+        const result = await getDrivers();
+        console.log('✅ Drivers API success:', result);
+        return result;
+      } catch (error) {
+        console.error('❌ Drivers API failed:', error);
+        throw error;
+      }
+    },
+    retry: 1,
+    staleTime: 30000,
   });
 
-  const getStatusBadge = (loading: boolean, error: any, data: any) => {
+  const getStatusBadge = (loading: boolean, error: any, data: any, apiName: string) => {
     if (loading) return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />Loading</Badge>;
-    if (error) return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Error</Badge>;
+    if (error) {
+      console.error(`❌ ${apiName} API Error:`, error);
+      return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" />Error</Badge>;
+    }
     return <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />OK</Badge>;
   };
 
@@ -39,21 +78,29 @@ export function SystemStatusChecker() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="flex items-center justify-between">
             <span>Orders API</span>
-            {getStatusBadge(ordersLoading, ordersError, ordersData)}
+            {getStatusBadge(ordersLoading, ordersError, ordersData, 'Orders')}
           </div>
           <div className="flex items-center justify-between">
             <span>Routes API</span>
-            {getStatusBadge(routesLoading, routesError, routes)}
+            {getStatusBadge(routesLoading, routesError, routes, 'Routes')}
           </div>
           <div className="flex items-center justify-between">
             <span>Drivers API</span>
-            {getStatusBadge(driversLoading, driversError, drivers)}
+            {getStatusBadge(driversLoading, driversError, drivers, 'Drivers')}
           </div>
         </div>
         {(ordersError || routesError || driversError) && (
           <div className="mt-4 p-3 bg-destructive/10 rounded-lg">
-            <p className="text-sm text-destructive">
-              Errors detected: Check console for details
+            <p className="text-sm text-destructive font-medium mb-2">
+              API Connection Issues Detected:
+            </p>
+            <div className="space-y-1 text-xs">
+              {ordersError && <div>• Orders API: {ordersError.message || 'Connection failed'}</div>}
+              {routesError && <div>• Routes API: {routesError.message || 'Connection failed'}</div>}
+              {driversError && <div>• Drivers API: {driversError.message || 'Connection failed'}</div>}
+            </div>
+            <p className="text-xs mt-2 opacity-75">
+              Check browser console for detailed error information
             </p>
           </div>
         )}

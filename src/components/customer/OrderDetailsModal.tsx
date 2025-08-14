@@ -149,13 +149,11 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     const fetchDeliveryInfo = async () => {
       if (!order || !isMounted) return;
       
-      console.log('🔍 Fetching delivery info for order:', order.id);
       setLoading(true);
       
       try {
         // Fetch delivery zone if available
         if (order.delivery_zone_id && isMounted) {
-          console.log('📍 Fetching delivery zone:', order.delivery_zone_id);
           const { data: zoneData, error: zoneError } = await supabase
             .from('delivery_zones')
             .select('*')
@@ -164,19 +162,13 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           
           if (abortController.signal.aborted || !isMounted) return;
           
-          if (zoneError) {
-            console.warn('⚠️ Delivery zone fetch error:', zoneError);
-          } else if (zoneData) {
-            console.log('✅ Delivery zone loaded:', zoneData);
+          if (!zoneError && zoneData) {
             setDeliveryZone(zoneData);
-          } else {
-            console.log('ℹ️ No delivery zone found for ID:', order.delivery_zone_id);
           }
         }
 
         // Fetch dispatch rider if assigned
         if (order.assigned_rider_id && isMounted) {
-          console.log('🚚 Fetching dispatch rider:', order.assigned_rider_id);
           const { data: riderData, error: riderError } = await supabase
             .from('drivers')
             .select('*')
@@ -185,19 +177,14 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           
           if (abortController.signal.aborted || !isMounted) return;
           
-          if (riderError) {
-            console.warn('⚠️ Dispatch rider fetch error:', riderError);
-          } else if (riderData) {
-            console.log('✅ Dispatch rider loaded:', riderData);
+          if (!riderError && riderData) {
             setDispatchRider(riderData);
-          } else {
-            console.log('ℹ️ No dispatch rider found for ID:', order.assigned_rider_id);
           }
         }
       } catch (error) {
-        if (!abortController.signal.aborted && isMounted) {
-          console.error('❌ Critical error fetching delivery info:', error);
-          // Don't break the modal, just log the error
+        // Silently handle errors in production
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Error fetching delivery info:', error);
         }
       } finally {
         if (isMounted) {
@@ -218,7 +205,6 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   useEffect(() => {
     if (!order?.id) return;
 
-    console.log('📡 Setting up real-time subscription for order:', order.id);
     let isMounted = true;
     
     const channel = supabase
@@ -233,7 +219,6 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         },
         (payload) => {
           if (isMounted) {
-            console.log('📦 Order status update received:', payload);
             setOrderStatus(payload.new.status);
             if (payload.new.status === 'delivered') {
               toast.success('Your order has been delivered!');
@@ -241,13 +226,10 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           }
         }
       )
-      .subscribe((status) => {
-        console.log('📡 Real-time subscription status:', status);
-      });
+      .subscribe();
 
     return () => {
       isMounted = false;
-      console.log('🔌 Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };
   }, [order?.id]);

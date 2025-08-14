@@ -19,7 +19,8 @@ import {
   Phone,
   Mail,
   AlertTriangle,
-  Calendar
+  Calendar,
+  Package
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -60,7 +61,7 @@ export default function CustomerProfile() {
   // Memoize sidebar items to prevent unnecessary re-renders
   const sidebarItems = useMemo(() => [
     { id: 'orders' as const, label: 'My Orders', icon: ShoppingBag, path: '/purchase-history' },
-    { id: 'tracking' as const, label: 'Track Orders', icon: MapPin, path: '/track-order' },
+    { id: 'tracking' as const, label: 'Order Summary', icon: Package, path: '/order-summary' },
     { id: 'bookings' as const, label: 'Catering Bookings', icon: Calendar },
     { id: 'wishlist' as const, label: 'Wishlist', icon: Heart, path: '/customer-favorites' },
     { id: 'payment' as const, label: 'Payment Method', icon: CreditCard },

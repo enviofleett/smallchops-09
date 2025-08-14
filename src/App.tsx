@@ -64,6 +64,7 @@ const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerific
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"));
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"));
+const OrderSummaryPage = withLazyLoading(() => import("./pages/OrderSummaryPage"));
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
 
 // Optimized QueryClient for better stability and reduced flickering
@@ -191,7 +192,7 @@ const App = () => {
               <Route path="/purchase-history" element={<PurchaseHistory />} />
               <Route path="/purchase-history/:customerEmail" element={<PurchaseHistory />} />
               <Route path="/orders/:id" element={<OrderDetails />} />
-              <Route path="/track-order" element={<TrackOrder />} />
+              <Route path="/order-summary" element={<OrderSummaryPage />} />
               <Route path="/track/:orderNumber" element={<TrackOrder />} />
               
               {/* Payment routes */}

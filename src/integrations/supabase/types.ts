@@ -6495,6 +6495,10 @@ export type Database = {
         Args: Record<PropertyKey, never> | { target_date?: string }
         Returns: Json
       }
+      calculate_delivery_metrics: {
+        Args: { target_date?: string }
+        Returns: undefined
+      }
       calculate_profile_completion: {
         Args: { customer_uuid: string }
         Returns: number

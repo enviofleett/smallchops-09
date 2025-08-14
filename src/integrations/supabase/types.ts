@@ -2298,50 +2298,39 @@ export type Database = {
       }
       delivery_time_slots: {
         Row: {
-          created_at: string
-          current_bookings: number | null
-          day_of_week: number
+          created_at: string | null
+          current_bookings: number
+          date: string
           end_time: string
           id: string
-          is_active: boolean | null
-          max_capacity: number | null
+          is_available: boolean | null
+          max_capacity: number
           start_time: string
-          updated_at: string
-          zone_id: string | null
+          updated_at: string | null
         }
         Insert: {
-          created_at?: string
-          current_bookings?: number | null
-          day_of_week: number
+          created_at?: string | null
+          current_bookings?: number
+          date: string
           end_time: string
           id?: string
-          is_active?: boolean | null
-          max_capacity?: number | null
+          is_available?: boolean | null
+          max_capacity?: number
           start_time: string
-          updated_at?: string
-          zone_id?: string | null
+          updated_at?: string | null
         }
         Update: {
-          created_at?: string
-          current_bookings?: number | null
-          day_of_week?: number
+          created_at?: string | null
+          current_bookings?: number
+          date?: string
           end_time?: string
           id?: string
-          is_active?: boolean | null
-          max_capacity?: number | null
+          is_available?: boolean | null
+          max_capacity?: number
           start_time?: string
-          updated_at?: string
-          zone_id?: string | null
+          updated_at?: string | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "delivery_time_slots_zone_id_fkey"
-            columns: ["zone_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_zones"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       delivery_tracking: {
         Row: {
@@ -3962,13 +3951,6 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customer_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_delivery_time_slot_id_fkey"
-            columns: ["delivery_time_slot_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_time_slots"
             referencedColumns: ["id"]
           },
           {
@@ -6708,13 +6690,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "orders_delivery_time_slot_id_fkey"
-            columns: ["delivery_time_slot_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_time_slots"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "orders_delivery_zone_id_fkey"
             columns: ["delivery_zone_id"]
             isOneToOne: false
@@ -7165,6 +7140,19 @@ export type Database = {
           registration_date: string
         }[]
       }
+      get_available_delivery_slots: {
+        Args: { p_end_date?: string; p_start_date?: string }
+        Returns: {
+          available_spots: number
+          current_bookings: number
+          date: string
+          end_time: string
+          is_available: boolean
+          max_capacity: number
+          slot_id: string
+          start_time: string
+        }[]
+      }
       get_best_smtp_provider: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -7595,6 +7583,10 @@ export type Database = {
         Args: { channel: string; payload: string }
         Returns: undefined
       }
+      populate_delivery_slots: {
+        Args: { end_date: string; start_date: string }
+        Returns: undefined
+      }
       process_email_queue_manual: {
         Args: { batch_size?: number }
         Returns: Json
@@ -7683,9 +7675,17 @@ export type Database = {
         Args: { p_order_number: string; p_paystack_reference: string }
         Returns: Json
       }
+      release_delivery_slot: {
+        Args: { p_order_id?: string; p_slot_id: string }
+        Returns: Json
+      }
       requeue_failed_welcome_emails: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      reserve_delivery_slot: {
+        Args: { p_order_id?: string; p_slot_id: string }
+        Returns: Json
       }
       safe_delete_product: {
         Args: { product_id: string }

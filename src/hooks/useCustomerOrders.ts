@@ -12,57 +12,45 @@ export const useCustomerOrders = () => {
   const query = useQuery({
     queryKey: ['customer-orders', customerAccount?.id, user?.email],
     queryFn: async ({ signal }) => {
-      // Create abort controller for this request
-      abortControllerRef.current = new AbortController();
-      const abortSignal = abortControllerRef.current.signal;
-      
+      // PRODUCTION FIX: Simplified abort controller to prevent conflicts
       const userEmail = user?.email || customerAccount?.email;
+      
+      console.log('🔍 Starting order query for:', { 
+        customerEmail: userEmail, 
+        customerId: customerAccount?.id,
+        isAuthenticated 
+      });
+      
       if (!userEmail) {
-        console.log('🔍 No user email found for order lookup');
+        console.log('⚠️ No user email found for order lookup');
+        return { orders: [], count: 0 };
+      }
+      
+      if (!isAuthenticated) {
+        console.log('⚠️ User not authenticated, returning empty orders');
         return { orders: [], count: 0 };
       }
       
       try {
-        console.log('🔍 Fetching orders for customer:', customerAccount?.id, userEmail);
+        console.log('🔍 Fetching orders for customer:', { 
+          customerId: customerAccount?.id, 
+          email: userEmail,
+          timestamp: new Date().toISOString()
+        });
         
-        if (signal?.aborted || abortSignal.aborted) {
+        // PRODUCTION FIX: Check for abort signal only once per query section
+        if (signal?.aborted) {
+          console.log('🔄 Query aborted by React Query');
           throw new Error('Query aborted');
         }
 
         let allOrders: any[] = [];
+        let hasEmailOrders = false;
+        let hasCustomerIdOrders = false;
         
-        // Approach 1: Get orders by email (safer join without !inner)
-        const { data: emailOrders, error: emailError } = await supabase
-          .from('orders')
-          .select(`
-            *,
-            order_items (
-              id,
-              product_id,
-              product_name,
-              quantity,
-              unit_price,
-              total_price
-            )
-          `)
-          .eq('customer_email', userEmail)
-          .order('order_time', { ascending: false });
-
-        if (signal?.aborted || abortSignal.aborted) {
-          throw new Error('Query aborted');
-        }
-
-        if (emailError) {
-          console.error('❌ Error in email orders query:', emailError);
-          // Don't throw, try fallback approach
-        } else {
-          console.log('✅ Email-based orders found:', emailOrders?.length || 0);
-          allOrders.push(...(emailOrders || []));
-        }
-
-        // Approach 2: If customer account exists, also try direct customer_id match
-        if (customerAccount?.id && !abortSignal.aborted) {
-          const { data: directOrders, error: directError } = await supabase
+        // Approach 1: Get orders by email with comprehensive error handling
+        try {
+          const { data: emailOrders, error: emailError } = await supabase
             .from('orders')
             .select(`
               *,
@@ -75,22 +63,67 @@ export const useCustomerOrders = () => {
                 total_price
               )
             `)
-            .eq('customer_id', customerAccount.id)
+            .eq('customer_email', userEmail.toLowerCase())
             .order('order_time', { ascending: false });
 
-          if (directError) {
-            console.error('❌ Error in direct orders query:', directError);
+          if (emailError) {
+            console.error('❌ Email orders query error:', {
+              error: emailError,
+              code: emailError.code,
+              message: emailError.message,
+              hint: emailError.hint
+            });
           } else {
-            console.log('✅ Direct customer_id orders found:', directOrders?.length || 0);
-            // Only add orders not already found by email to avoid duplicates
-            const newOrders = directOrders?.filter(order => 
-              !allOrders.some(existing => existing.id === order.id)
-            ) || [];
-            allOrders.push(...newOrders);
+            console.log('✅ Email-based orders found:', emailOrders?.length || 0);
+            allOrders.push(...(emailOrders || []));
+            hasEmailOrders = (emailOrders?.length || 0) > 0;
+          }
+        } catch (emailQueryError) {
+          console.error('❌ Email orders query exception:', emailQueryError);
+        }
+
+        // Approach 2: If customer account exists, also try direct customer_id match
+        if (customerAccount?.id && !signal?.aborted) {
+          try {
+            const { data: directOrders, error: directError } = await supabase
+              .from('orders')
+              .select(`
+                *,
+                order_items (
+                  id,
+                  product_id,
+                  product_name,
+                  quantity,
+                  unit_price,
+                  total_price
+                )
+              `)
+              .eq('customer_id', customerAccount.id)
+              .order('order_time', { ascending: false });
+
+            if (directError) {
+              console.error('❌ Customer ID orders query error:', {
+                error: directError,
+                customerId: customerAccount.id,
+                code: directError.code,
+                message: directError.message
+              });
+            } else {
+              console.log('✅ Direct customer_id orders found:', directOrders?.length || 0);
+              // Only add orders not already found by email to avoid duplicates
+              const newOrders = directOrders?.filter(order => 
+                !allOrders.some(existing => existing.id === order.id)
+              ) || [];
+              allOrders.push(...newOrders);
+              hasCustomerIdOrders = (directOrders?.length || 0) > 0;
+            }
+          } catch (customerQueryError) {
+            console.error('❌ Customer ID orders query exception:', customerQueryError);
           }
         }
 
-        if (signal?.aborted || abortSignal.aborted) {
+        // Final abort check before processing
+        if (signal?.aborted) {
           throw new Error('Query aborted');
         }
 
@@ -106,36 +139,78 @@ export const useCustomerOrders = () => {
           }))
         }));
 
-        console.log(`✅ Total orders processed: ${processedOrders.length} for customer: ${userEmail}`);
+        console.log(`✅ Orders processing complete:`, {
+          totalOrders: processedOrders.length,
+          customerEmail: userEmail,
+          customerId: customerAccount?.id,
+          hasEmailOrders,
+          hasCustomerIdOrders,
+          timestamp: new Date().toISOString()
+        });
         
         return {
           orders: processedOrders,
-          count: processedOrders.length
+          count: processedOrders.length,
+          sources: {
+            email: hasEmailOrders,
+            customerId: hasCustomerIdOrders
+          }
         };
       } catch (error) {
         if (error instanceof Error && error.message === 'Query aborted') {
-          console.log('🔄 Order query aborted - component unmounted');
+          console.log('🔄 Order query aborted - component unmounted or cancelled');
           throw error;
         }
-        console.error('❌ Critical error fetching orders:', error);
-        throw new Error(error instanceof Error ? error.message : 'Failed to fetch orders');
+        
+        console.error('❌ Critical error fetching orders:', {
+          error,
+          customerEmail: userEmail,
+          customerId: customerAccount?.id,
+          isAuthenticated,
+          errorMessage: error instanceof Error ? error.message : 'Unknown error',
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString()
+        });
+        
+        // PRODUCTION FIX: More descriptive error messages
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        if (errorMessage.includes('permission') || errorMessage.includes('policy')) {
+          throw new Error('Authentication issue detected. Please refresh the page and try again.');
+        }
+        
+        throw new Error(`Unable to load orders: ${errorMessage}`);
       }
     },
     enabled: isAuthenticated && !!(user?.email || customerAccount?.email),
-    staleTime: 5 * 60 * 1000, // 5 minutes for production stability
+    staleTime: 2 * 60 * 1000, // 2 minutes for faster updates in production
     refetchOnMount: 'always',
     refetchOnWindowFocus: false,
     refetchInterval: (data) => {
       if (!isMountedRef.current) return false;
       const list = Array.isArray((data as any)?.orders) ? (data as any).orders : [];
       const hasPending = list.some((o: any) => (o?.payment_status || '').toLowerCase() !== 'paid');
-      return hasPending ? 60 * 1000 : false; // Check every minute for pending orders
+      return hasPending ? 30 * 1000 : false; // Check every 30 seconds for pending orders
     },
     retry: (failureCount, error) => {
-      if (error instanceof Error && error.message === 'Query aborted') return false;
-      return failureCount < 3;
+      if (error instanceof Error && error.message === 'Query aborted') {
+        console.log('🔄 Not retrying aborted query');
+        return false;
+      }
+      
+      const shouldRetry = failureCount < 3;
+      console.log(`🔄 Order query retry decision:`, {
+        failureCount,
+        shouldRetry,
+        errorMessage: error instanceof Error ? error.message : 'Unknown error'
+      });
+      
+      return shouldRetry;
     },
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
+    retryDelay: (attemptIndex) => {
+      const delay = Math.min(1000 * 2 ** attemptIndex, 5000); // Max 5 second delay
+      console.log(`🔄 Retrying order query in ${delay}ms (attempt ${attemptIndex + 1})`);
+      return delay;
+    },
   });
 
   // Realtime subscription with proper cleanup
@@ -190,6 +265,7 @@ export const useCustomerOrders = () => {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
+      console.log('🔌 Cleaning up useCustomerOrders hook');
       isMountedRef.current = false;
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();

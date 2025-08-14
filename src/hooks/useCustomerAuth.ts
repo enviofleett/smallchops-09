@@ -30,12 +30,39 @@ export const useCustomerAuth = () => {
     error: null,
   });
 
-  useEffect(() => {
-    let mounted = true;
-    let subscription: any;
+  // Move helper functions outside useEffect so they can be reused
+  const createCustomerAccount = async (userId: string, userEmail: string) => {
+    try {
+      console.log('🔄 Creating customer account for:', { userId, userEmail });
+      
+      const { data, error } = await supabase
+        .from('customer_accounts')
+        .insert({
+          user_id: userId,
+          email: userEmail.toLowerCase(),
+          name: userEmail.split('@')[0], // Basic name from email
+          email_verified: true
+        })
+        .select()
+        .single();
 
-    const loadCustomerAccount = async (userId: string) => {
+      if (error) {
+        console.error('❌ Failed to create customer account:', error);
+        return null;
+      }
+
+      console.log('✅ Customer account created successfully:', data);
+      return data;
+    } catch (error) {
+      console.error('❌ Error creating customer account:', error);
+      return null;
+    }
+  };
+
+  const loadCustomerAccount = async (userId: string, userEmail?: string) => {
       try {
+        console.log('🔍 Loading customer account for user:', { userId, userEmail });
+        
         const { data, error } = await supabase
           .from('customer_accounts')
           .select('*')
@@ -43,17 +70,38 @@ export const useCustomerAuth = () => {
           .maybeSingle();
         
         if (error) {
-          console.error('Error fetching customer account:', error);
+          console.error('❌ Error fetching customer account:', error);
+          
+          // If account not found, try to create one if we have user data
+          if (error.code === 'PGRST116' && userEmail) {
+            console.log('🔄 Customer account not found, attempting to create one...');
+            return await createCustomerAccount(userId, userEmail);
+          }
           return null;
         }
         
-        console.log('🔍 Customer account data:', data);
+        if (!data && userEmail) {
+          console.log('🔄 No customer account found, creating new one...');
+          return await createCustomerAccount(userId, userEmail);
+        }
+        
+        console.log('✅ Customer account loaded:', data);
         return data;
       } catch (error) {
-        console.error('Customer account fetch error:', error);
+        console.error('❌ Customer account fetch error:', error);
+        
+        // Fallback: Try to create account if we have email
+        if (userEmail) {
+          console.log('🔄 Fallback: Attempting to create customer account...');
+          return await createCustomerAccount(userId, userEmail);
+        }
         return null;
       }
     };
+
+  useEffect(() => {
+    let mounted = true;
+    let subscription: any;
 
     const initializeAuth = async () => {
       try {
@@ -62,31 +110,41 @@ export const useCustomerAuth = () => {
           if (!mounted) return;
           
           if (session?.user) {
-            // Use setTimeout to prevent potential Supabase deadlocks
-            setTimeout(async () => {
-              if (!mounted) return;
-              
-              setAuthState(prev => ({ 
-                ...prev, 
-                user: session.user, 
-                session, 
-                isLoading: true,
-                error: null
-              }));
+            // PRODUCTION FIX: Remove setTimeout to eliminate race conditions
+            if (!mounted) return;
+            
+            console.log('🔄 Auth state change - user session detected:', session.user.email);
+            
+            setAuthState(prev => ({ 
+              ...prev, 
+              user: session.user, 
+              session, 
+              isLoading: true,
+              error: null
+            }));
 
-              // Load customer account
-              const customerAccount = await loadCustomerAccount(session.user.id);
+            // Load customer account with email fallback
+            const customerAccount = await loadCustomerAccount(session.user.id, session.user.email);
+            
+            if (mounted) {
+              const isAuthenticated = !!customerAccount;
+              const error = customerAccount ? null : 'Unable to load customer profile. Please try refreshing the page.';
               
-              if (mounted) {
-                setAuthState(prev => ({
-                  ...prev,
-                  customerAccount,
-                  isLoading: false,
-                  isAuthenticated: !!customerAccount,
-                  error: customerAccount ? null : 'Customer account not found'
-                }));
-              }
-            }, 0);
+              console.log('🔄 Customer account load result:', { 
+                hasAccount: !!customerAccount, 
+                isAuthenticated, 
+                userId: session.user.id,
+                email: session.user.email 
+              });
+              
+              setAuthState(prev => ({
+                ...prev,
+                customerAccount,
+                isLoading: false,
+                isAuthenticated,
+                error
+              }));
+            }
           } else {
             setAuthState({
               user: null,
@@ -107,6 +165,8 @@ export const useCustomerAuth = () => {
         if (!mounted) return;
 
         if (initialSession?.user) {
+          console.log('🔄 Initial session detected:', initialSession.user.email);
+          
           setAuthState(prev => ({ 
             ...prev, 
             user: initialSession.user, 
@@ -114,15 +174,25 @@ export const useCustomerAuth = () => {
             isLoading: true 
           }));
 
-          const customerAccount = await loadCustomerAccount(initialSession.user.id);
+          const customerAccount = await loadCustomerAccount(initialSession.user.id, initialSession.user.email);
           
           if (mounted) {
+            const isAuthenticated = !!customerAccount;
+            const error = customerAccount ? null : 'Unable to load customer profile. Please try refreshing the page.';
+            
+            console.log('🔄 Initial customer account load result:', { 
+              hasAccount: !!customerAccount, 
+              isAuthenticated, 
+              userId: initialSession.user.id,
+              email: initialSession.user.email 
+            });
+            
             setAuthState(prev => ({
               ...prev,
               customerAccount,
               isLoading: false,
-              isAuthenticated: !!customerAccount,
-              error: customerAccount ? null : 'Customer account not found'
+              isAuthenticated,
+              error
             }));
           }
         } else {
@@ -151,25 +221,42 @@ export const useCustomerAuth = () => {
   }, []);
 
   const refreshAccount = async () => {
-    if (!authState.session?.user) return;
+    if (!authState.session?.user) {
+      console.log('🔄 Refresh attempted but no session found');
+      return;
+    }
+    
+    console.log('🔄 Refreshing customer account for:', authState.session.user.email);
     
     try {
-      const { data, error } = await supabase
-        .from('customer_accounts')
-        .select('*')
-        .eq('user_id', authState.session.user.id)
-        .maybeSingle();
+      const customerAccount = await loadCustomerAccount(
+        authState.session.user.id, 
+        authState.session.user.email
+      );
       
-      if (!error && data) {
+      if (customerAccount) {
+        console.log('✅ Account refresh successful');
         setAuthState(prev => ({
           ...prev,
-          customerAccount: data,
+          customerAccount,
           isAuthenticated: true,
           error: null
         }));
+      } else {
+        console.log('❌ Account refresh failed - no account found/created');
+        setAuthState(prev => ({
+          ...prev,
+          customerAccount: null,
+          isAuthenticated: false,
+          error: 'Unable to load customer profile. Please contact support.'
+        }));
       }
     } catch (error) {
-      console.error('Error refreshing customer account:', error);
+      console.error('❌ Error refreshing customer account:', error);
+      setAuthState(prev => ({
+        ...prev,
+        error: 'Failed to refresh account. Please try again.'
+      }));
     }
   };
 

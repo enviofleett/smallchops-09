@@ -29,6 +29,7 @@ import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { AddressManager } from '@/components/customer/AddressManager';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
+import OrderErrorBoundary from '@/components/customer/OrderErrorBoundary';
 import { EnhancedOrdersSection } from '@/components/customer/EnhancedOrdersSection';
 import { EnhancedWishlistSection } from '@/components/customer/EnhancedWishlistSection';
 import { TransactionHistoryTab } from '@/components/purchase-history/TransactionHistoryTab';
@@ -52,11 +53,14 @@ const ContentSkeleton = () => (
 );
 
 export default function CustomerProfile() {
-  const { isAuthenticated, customerAccount, isLoading: authLoading, logout, error: authError } = useCustomerAuth();
+  const { isAuthenticated, customerAccount, user, isLoading: authLoading, logout, error: authError } = useCustomerAuth();
   const { data: settings } = useBusinessSettings();
   const { handleError } = useErrorHandler();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<ProfileSection>('orders');
+  
+  // Get customer email for error reporting
+  const customerEmail = user?.email || customerAccount?.email;
 
   // Memoize sidebar items to prevent unnecessary re-renders
   const sidebarItems = useMemo(() => [
@@ -124,10 +128,18 @@ export default function CustomerProfile() {
   const renderContent = () => {
     switch (activeSection) {
       case 'orders':
-        return <EnhancedOrdersSection />;
+        return (
+          <OrderErrorBoundary customerEmail={customerEmail}>
+            <EnhancedOrdersSection />
+          </OrderErrorBoundary>
+        );
       case 'tracking':
         // This will be handled by navigation, fallback to orders
-        return <EnhancedOrdersSection />;
+        return (
+          <OrderErrorBoundary customerEmail={customerEmail}>
+            <EnhancedOrdersSection />
+          </OrderErrorBoundary>
+        );
       case 'bookings':
         return <CustomerBookingsSection />;
       case 'wishlist':
@@ -139,7 +151,11 @@ export default function CustomerProfile() {
       case 'help':
         return <HelpSection settings={settings} />;
       default:
-        return <EnhancedOrdersSection />;
+        return (
+          <OrderErrorBoundary customerEmail={customerEmail}>
+            <EnhancedOrdersSection />
+          </OrderErrorBoundary>
+        );
     }
   };
 

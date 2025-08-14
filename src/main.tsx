@@ -5,6 +5,8 @@ import App from "./App.tsx";
 import "./index.css";
 import { initWebVitals } from "./utils/webVitals";
 import { productionMonitoring } from "./utils/productionMonitoring";
+import { HydrationSafeRoot } from "./components/HydrationSafeRoot";
+import { ErrorTracker } from "./utils/errorTracking";
 
 // Initialize performance monitoring
 initWebVitals();
@@ -61,7 +63,9 @@ if ('serviceWorker' in navigator) {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <HelmetProvider>
-      <App />
+      <HydrationSafeRoot>
+        <App />
+      </HydrationSafeRoot>
     </HelmetProvider>
   </StrictMode>,
 );

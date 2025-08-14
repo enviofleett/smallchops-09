@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+import { safeStorage } from '@/utils/safeStorage';
 
 interface CustomerAccount {
   id: string;
@@ -47,7 +48,6 @@ export const useCustomerAuth = () => {
           return null;
         }
         
-        console.log('🔍 Customer account data:', data);
         return data;
       } catch (error) {
         console.error('Customer account fetch error:', error);
@@ -55,27 +55,23 @@ export const useCustomerAuth = () => {
       }
     };
 
-  const initializeAuth = async () => {
-    try {
-      // Set up auth state listener - simplified to prevent deadlocks
-      const { data } = supabase.auth.onAuthStateChange((event, session) => {
-        if (!mounted) return;
-        
-        console.log('🔄 Auth state change:', event, !!session);
-        
-        if (session?.user) {
-          setAuthState(prev => ({ 
-            ...prev, 
-            user: session.user, 
-            session, 
-            isLoading: true,
-            error: null
-          }));
+    const initializeAuth = async () => {
+      try {
+        // Set up auth state listener
+        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
+          if (!mounted) return;
+          
+          console.log('🔄 Auth state change:', event, !!session);
+          
+          if (session?.user) {
+            setAuthState(prev => ({ 
+              ...prev, 
+              user: session.user, 
+              session, 
+              isLoading: true,
+              error: null
+            }));
 
-          // Defer customer account loading to prevent auth state conflicts
-          setTimeout(async () => {
-            if (!mounted) return;
-            
             const customerAccount = await loadCustomerAccount(session.user.id);
             
             if (mounted) {
@@ -83,43 +79,38 @@ export const useCustomerAuth = () => {
                 ...prev,
                 customerAccount,
                 isLoading: false,
-                isAuthenticated: true, // Simplified: authenticated if user exists
+                isAuthenticated: true,
                 error: null
               }));
             }
-          }, 100);
-        } else {
-          setAuthState({
-            user: null,
-            session: null,
-            customerAccount: null,
-            isLoading: false,
-            isAuthenticated: false,
-            error: null,
-          });
-        }
-      });
+          } else {
+            setAuthState({
+              user: null,
+              session: null,
+              customerAccount: null,
+              isLoading: false,
+              isAuthenticated: false,
+              error: null,
+            });
+          }
+        });
 
         subscription = data.subscription;
 
-      // Check for existing session
-      const { data: { session: initialSession } } = await supabase.auth.getSession();
-      
-      if (!mounted) return;
+        // Check for existing session
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        
+        if (!mounted) return;
 
-      if (initialSession?.user) {
-        console.log('🚀 Initial session found:', initialSession.user.email);
-        setAuthState(prev => ({ 
-          ...prev, 
-          user: initialSession.user, 
-          session: initialSession, 
-          isLoading: true 
-        }));
+        if (initialSession?.user) {
+          console.log('🚀 Initial session found:', initialSession.user.email);
+          setAuthState(prev => ({ 
+            ...prev, 
+            user: initialSession.user, 
+            session: initialSession, 
+            isLoading: true 
+          }));
 
-        // Load customer account with retry logic
-        setTimeout(async () => {
-          if (!mounted) return;
-          
           const customerAccount = await loadCustomerAccount(initialSession.user.id);
           
           if (mounted) {
@@ -127,17 +118,16 @@ export const useCustomerAuth = () => {
               ...prev,
               customerAccount,
               isLoading: false,
-              isAuthenticated: true, // Simplified: user exists = authenticated
+              isAuthenticated: true,
               error: null
             }));
           }
-        }, 50);
-      } else {
-        console.log('🔍 No initial session found');
-        if (mounted) {
-          setAuthState(prev => ({ ...prev, isLoading: false }));
+        } else {
+          console.log('🔍 No initial session found');
+          if (mounted) {
+            setAuthState(prev => ({ ...prev, isLoading: false }));
+          }
         }
-      }
       } catch (error) {
         console.error('Customer auth initialization error:', error);
         if (mounted) {
@@ -150,7 +140,10 @@ export const useCustomerAuth = () => {
       }
     };
 
-    initializeAuth();
+    // Only initialize after hydration on client
+    if (typeof window !== 'undefined') {
+      initializeAuth();
+    }
 
     return () => {
       mounted = false;
@@ -183,9 +176,9 @@ export const useCustomerAuth = () => {
 
   const logout = async () => {
     // Clear cart and shopping data before signing out
-    localStorage.removeItem('restaurant_cart');
-    localStorage.removeItem('guest_session');
-    localStorage.removeItem('cart_abandonment_tracking');
+    safeStorage.removeItem('restaurant_cart');
+    safeStorage.removeItem('guest_session');
+    safeStorage.removeItem('cart_abandonment_tracking');
     
     // Clear React Query cache (if available)
     try {

@@ -1,9 +1,7 @@
-import React, { useState, useMemo, Suspense, useCallback } from 'react';
+import React, { useState, useMemo, Suspense, useCallback, useEffect } from 'react';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { Skeleton } from '@/components/ui/skeleton';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { 
   ShoppingBag, 
   Heart, 
@@ -20,20 +18,23 @@ import {
   Calendar,
   Package
 } from 'lucide-react';
-import { Navigate, useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Skeleton } from '@/components/ui/skeleton';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
-import { ProductionReadyErrorBoundary } from '@/components/ui/production-ready-error-boundary';
-import { useErrorHandler } from '@/hooks/useErrorHandler';
-import { useProductionMonitoring } from '@/hooks/useProductionMonitoring';
+import { ProductionSafeErrorBoundary } from '@/components/ProductionSafeErrorBoundary';
+import { HydrationSafeRoot } from '@/components/HydrationSafeRoot';
+import { AssetLoader } from '@/utils/assetLoader';
 
 type ProfileSection = 'orders' | 'tracking' | 'wishlist' | 'payment' | 'address' | 'help' | 'bookings';
 
 // Import simple fallback component directly
 import SimpleOrdersSection from '@/components/customer/SimpleOrdersSection';
 
-// ✅ PHASE 1: Fixed lazy loading - removed .catch() anti-pattern
+// Simplified lazy loading without error handling - let error boundaries handle
 const LazyEnhancedOrdersSection = React.lazy(() => 
   import('@/components/customer/EnhancedOrdersSection')
     .then(m => ({ default: m.EnhancedOrdersSection }))
@@ -59,7 +60,32 @@ const LazyTransactionHistoryTab = React.lazy(() =>
     .then(m => ({ default: m.TransactionHistoryTab }))
 );
 
-// Loading skeleton component
+// Hydration-safe component wrapper
+function withHydration<P extends object>(Component: React.ComponentType<P>) {
+  return function HydratedComponent(props: P) {
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+      setMounted(true);
+      AssetLoader.preloadCriticalAssets();
+    }, []);
+
+    if (!mounted) {
+      // Return SSR-compatible loading state
+      return (
+        <div className="min-h-screen bg-background">
+          <div className="flex items-center justify-center min-h-screen">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+          </div>
+        </div>
+      );
+    }
+
+    return <Component {...props} />;
+  };
+}
+
+// Content skeleton for loading states - SSR-safe
 const ContentSkeleton = () => (
   <div className="space-y-4">
     {[1, 2, 3].map(i => (
@@ -74,23 +100,24 @@ const ContentSkeleton = () => (
   </div>
 );
 
-export default function CustomerProfile() {
+const CustomerProfileComponent = () => {
   const { isAuthenticated, user, customerAccount, isLoading: authLoading, logout, error: authError } = useCustomerAuth();
   const { data: settings } = useBusinessSettings();
   const { handleError } = useErrorHandler();
-  const { reportError } = useProductionMonitoring();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<ProfileSection>('orders');
 
-  // Debug logging for production
-  React.useEffect(() => {
-    console.log('🏠 CustomerProfile render:', {
-      isAuthenticated,
-      hasUser: !!user,
-      hasCustomerAccount: !!customerAccount,
-      authLoading,
-      authError
-    });
+  // SSR-safe effect
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      console.log('CustomerProfile mounted on client:', {
+        isAuthenticated,
+        hasUser: !!user,
+        hasCustomerAccount: !!customerAccount,
+        authLoading,
+        authError
+      });
+    }
   }, [isAuthenticated, user, customerAccount, authLoading, authError]);
 
   // Memoize sidebar items to prevent unnecessary re-renders
@@ -113,18 +140,14 @@ export default function CustomerProfile() {
     }
   }, [logout, navigate, handleError]);
 
+  // Loading state - must match SSR
   if (authLoading) {
     return (
       <div className="min-h-screen bg-background">
         <PublicHeader />
         <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col lg:flex-row gap-6">
-            <div className="lg:w-80">
-              <Skeleton className="h-32 w-full rounded-lg" />
-            </div>
-            <div className="flex-1">
-              <ContentSkeleton />
-            </div>
+          <div className="flex justify-center items-center min-h-96">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
           </div>
         </div>
         <PublicFooter />
@@ -132,224 +155,160 @@ export default function CustomerProfile() {
     );
   }
 
-  // Simplified authentication check - redirect if no user and not loading
-  if (!user && !authLoading) {
-    console.log('🔒 No user found, redirecting to auth');
+  // Redirect if not authenticated
+  if (!isAuthenticated && !authLoading) {
     return <Navigate to="/auth" replace />;
   }
 
-  // Show error state if authentication failed
-  if (authError && !authLoading) {
+  // Error state
+  if (authError) {
     return (
       <div className="min-h-screen bg-background">
         <PublicHeader />
         <div className="container mx-auto px-4 py-6">
-          <Card className="p-8 text-center">
-            <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <div className="max-w-md mx-auto bg-card rounded-lg shadow-lg p-8 text-center">
+            <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto mb-4">
+              <svg className="w-8 h-8 text-destructive" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
             <h2 className="text-xl font-semibold mb-2">Authentication Error</h2>
-            <p className="text-gray-600 mb-4">{authError}</p>
+            <p className="text-muted-foreground mb-4">{authError}</p>
             <Button onClick={() => navigate('/auth')}>
               Return to Login
             </Button>
-          </Card>
+          </div>
         </div>
         <PublicFooter />
       </div>
     );
   }
 
-  // ✅ PHASE 2: Fixed useCallback dependencies and simplified Suspense wrapping
   const renderContent = useCallback(() => {
     switch (activeSection) {
       case 'orders':
         return (
-          <ProductionReadyErrorBoundary 
-            context="Customer Orders" 
-            fallback={<SimpleOrdersSection />}
-            onError={(error, errorInfo) => {
-              reportError(error, 'customer-orders', errorInfo);
-              handleError(error, 'customer-orders');
-            }}
-          >
+          <ProductionSafeErrorBoundary context="Customer Orders" fallback={SimpleOrdersSection}>
             <LazyEnhancedOrdersSection />
-          </ProductionReadyErrorBoundary>
+          </ProductionSafeErrorBoundary>
         );
       case 'tracking':
         return (
-          <ProductionReadyErrorBoundary 
-            context="Order Tracking" 
-            fallback={<SimpleOrdersSection />}
-            onError={(error, errorInfo) => {
-              reportError(error, 'order-tracking', errorInfo);
-              handleError(error, 'order-tracking');
-            }}
-          >
+          <ProductionSafeErrorBoundary context="Order Tracking" fallback={SimpleOrdersSection}>
             <LazyEnhancedOrdersSection />
-          </ProductionReadyErrorBoundary>
+          </ProductionSafeErrorBoundary>
         );
       case 'bookings':
         return (
-          <ProductionReadyErrorBoundary 
-            context="Customer Bookings" 
-            fallback={<SectionErrorFallback section="bookings" />}
-            onError={(error, errorInfo) => {
-              reportError(error, 'customer-bookings', errorInfo);
-              handleError(error, 'customer-bookings');
-            }}
-          >
+          <ProductionSafeErrorBoundary context="Customer Bookings" fallback={() => <SectionErrorFallback section="bookings" />}>
             <LazyCustomerBookingsSection />
-          </ProductionReadyErrorBoundary>
+          </ProductionSafeErrorBoundary>
         );
       case 'wishlist':
         return (
-          <ProductionReadyErrorBoundary 
-            context="Customer Wishlist" 
-            fallback={<SectionErrorFallback section="wishlist" />}
-            onError={(error, errorInfo) => {
-              reportError(error, 'customer-wishlist', errorInfo);
-              handleError(error, 'customer-wishlist');
-            }}
-          >
+          <ProductionSafeErrorBoundary context="Customer Wishlist" fallback={() => <SectionErrorFallback section="wishlist" />}>
             <LazyEnhancedWishlistSection />
-          </ProductionReadyErrorBoundary>
+          </ProductionSafeErrorBoundary>
         );
       case 'payment':
         return (
-          <ProductionReadyErrorBoundary 
-            context="Payment History" 
-            fallback={<SectionErrorFallback section="payment" />}
-            onError={(error, errorInfo) => {
-              reportError(error, 'payment-history', errorInfo);
-              handleError(error, 'payment-history');
-            }}
-          >
+          <ProductionSafeErrorBoundary context="Payment History" fallback={() => <SectionErrorFallback section="payment" />}>
             <PaymentSection />
-          </ProductionReadyErrorBoundary>
+          </ProductionSafeErrorBoundary>
         );
       case 'address':
         return (
-          <ProductionReadyErrorBoundary 
-            context="Address Management" 
-            fallback={<SectionErrorFallback section="address" />}
-            onError={(error, errorInfo) => {
-              reportError(error, 'address-management', errorInfo);
-              handleError(error, 'address-management');
-            }}
-          >
+          <ProductionSafeErrorBoundary context="Address Management" fallback={() => <SectionErrorFallback section="address" />}>
             <LazyAddressManager />
-          </ProductionReadyErrorBoundary>
+          </ProductionSafeErrorBoundary>
         );
       case 'help':
         return (
-          <ProductionReadyErrorBoundary 
-            context="Help Section" 
-            fallback={<SectionErrorFallback section="help" />}
-            onError={(error, errorInfo) => {
-              reportError(error, 'help-section', errorInfo);
-              handleError(error, 'help-section');
-            }}
-          >
+          <ProductionSafeErrorBoundary context="Help Section" fallback={() => <SectionErrorFallback section="help" />}>
             <HelpSection settings={settings} />
-          </ProductionReadyErrorBoundary>
+          </ProductionSafeErrorBoundary>
         );
       default:
         return (
-          <ProductionReadyErrorBoundary 
-            context="Default Orders View" 
-            fallback={<SimpleOrdersSection />}
-            onError={(error, errorInfo) => {
-              reportError(error, 'default-orders', errorInfo);
-              handleError(error, 'default-orders');
-            }}
-          >
+          <ProductionSafeErrorBoundary context="Default Orders View" fallback={SimpleOrdersSection}>
             <LazyEnhancedOrdersSection />
-          </ProductionReadyErrorBoundary>
+          </ProductionSafeErrorBoundary>
         );
     }
-  }, [activeSection, settings, handleError, reportError]);
+  }, [activeSection, settings, handleError]);
 
   return (
-    <ProductionReadyErrorBoundary 
-      context="Customer Profile Page" 
-      onError={(error, errorInfo) => {
-        reportError(error, 'customer-profile-page', errorInfo);
-        handleError(error, 'customer-profile');
-      }}
-    >
-      <div className="min-h-screen bg-background">
-        <PublicHeader />
-        
-        <div className="container mx-auto px-4 py-6">
-          <div className="flex flex-col lg:flex-row gap-6">
-            {/* Sidebar */}
-            <div className="lg:w-80 bg-white rounded-lg shadow-sm border border-border p-6">
-              <h1 className="text-xl font-bold mb-6">Account</h1>
-              
-              {/* Navigation */}
-              <nav className="space-y-1">
-                {sidebarItems.map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      try {
-                        if (item.path) {
-                          // ✅ PHASE 2: Fix sidebar navigation state sync
-                          setActiveSection(item.id); // Keep activeSection in sync
-                          navigate(item.path);
-                        } else {
-                          setActiveSection(item.id);
-                        }
-                      } catch (error) {
-                        console.error('Navigation error:', error);
-                        reportError(error as Error, 'customer-profile-navigation', { itemId: item.id, path: item.path });
+    <div className="min-h-screen bg-background">
+      <PublicHeader />
+      
+      <div className="container mx-auto px-4 py-6">
+        <div className="flex flex-col lg:flex-row gap-6">
+          {/* Sidebar */}
+          <div className="lg:w-80 bg-card rounded-lg shadow-sm border border-border p-6">
+            <h1 className="text-xl font-bold mb-6">Account</h1>
+            
+            {/* Navigation */}
+            <nav className="space-y-1">
+              {sidebarItems.map((item) => (
+                <button
+                  key={item.id}
+                  onClick={() => {
+                    try {
+                      if (item.path) {
+                        setActiveSection(item.id); // Keep activeSection in sync
+                        navigate(item.path);
+                      } else {
+                        setActiveSection(item.id);
                       }
-                    }}
-                    className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
-                      activeSection === item.id
-                        ? 'bg-orange-50 text-orange-600 border border-orange-200'
-                        : 'hover:bg-gray-50 text-gray-700'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-medium">{item.label}</span>
-                    </div>
-                    {item.path ? (
-                      <ChevronRight className="w-4 h-4 text-gray-400" />
-                    ) : (
-                      <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                    )}
-                  </button>
-                ))}
-                
-                <div className="pt-4 border-t border-gray-200 mt-4">
-                  <button
-                    onClick={handleLogout}
-                    className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors hover:bg-gray-50 text-gray-700"
-                  >
-                    <div className="flex items-center gap-3">
-                      <LogOut className="w-5 h-5" />
-                      <span className="font-medium">Logout</span>
-                    </div>
-                    <MoreHorizontal className="w-4 h-4 text-gray-400" />
-                  </button>
-                </div>
-              </nav>
-            </div>
+                    } catch (error) {
+                      console.error('Navigation error:', error);
+                      handleError(error, 'customer-profile-navigation');
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
+                    activeSection === item.id
+                      ? 'bg-primary/10 text-primary border border-primary/20'
+                      : 'hover:bg-muted text-foreground'
+                  }`}
+                >
+                  <div className="flex items-center gap-3">
+                    <item.icon className="w-5 h-5" />
+                    <span className="font-medium">{item.label}</span>
+                  </div>
+                  {item.path ? (
+                    <ChevronRight className="w-4 h-4 text-muted-foreground" />
+                  ) : (
+                    <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </button>
+              ))}
+              
+              <div className="pt-4 border-t border-border mt-4">
+                <button
+                  onClick={handleLogout}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors hover:bg-muted text-foreground"
+                >
+                  <div className="flex items-center gap-3">
+                    <LogOut className="w-5 h-5" />
+                    <span className="font-medium">Logout</span>
+                  </div>
+                  <MoreHorizontal className="w-4 h-4 text-muted-foreground" />
+                </button>
+              </div>
+            </nav>
+          </div>
 
-            {/* Main Content */}
-            <div className="flex-1">
-              {/* ✅ PHASE 1: Removed double Suspense wrapping - handled in ProductionReadyErrorBoundary */}
-              <Suspense fallback={<ContentSkeleton />}>
-                {renderContent()}
-              </Suspense>
-            </div>
+          {/* Main Content */}
+          <div className="flex-1">
+            <Suspense fallback={<ContentSkeleton />}>
+              {renderContent()}
+            </Suspense>
           </div>
         </div>
-
-        <PublicFooter />
       </div>
-    </ProductionReadyErrorBoundary>
+
+      <PublicFooter />
+    </div>
   );
 }
 
@@ -571,3 +530,12 @@ function TransactionHistorySection({ customerEmail }: { customerEmail: string })
     </Suspense>
   );
 }
+
+// Export wrapped component
+export default withHydration(() => (
+  <HydrationSafeRoot>
+    <ProductionSafeErrorBoundary>
+      <CustomerProfileComponent />
+    </ProductionSafeErrorBoundary>
+  </HydrationSafeRoot>
+));

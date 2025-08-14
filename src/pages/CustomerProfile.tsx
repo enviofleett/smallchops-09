@@ -106,6 +106,9 @@ const CustomerProfileComponent = () => {
   const { handleError } = useErrorHandler();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<ProfileSection>('orders');
+  
+  // Extract customer data at top level to pass down to avoid hook order issues
+  const customerEmail = user?.email || customerAccount?.email || '';
 
   // SSR-safe effect
   useEffect(() => {
@@ -213,7 +216,7 @@ const CustomerProfileComponent = () => {
       case 'payment':
         return (
           <ProductionSafeErrorBoundary context="Payment History" fallback={() => <SectionErrorFallback section="payment" />}>
-            <PaymentSection />
+            <PaymentSection customerEmail={customerEmail} />
           </ProductionSafeErrorBoundary>
         );
       case 'address':
@@ -458,10 +461,7 @@ OrderCard.displayName = 'OrderCard';
 
 
 // Payment Section - simplified without payment details column
-function PaymentSection() {
-  const { customerAccount, user } = useCustomerAuth();
-  const customerEmail = user?.email || customerAccount?.email || '';
-
+function PaymentSection({ customerEmail }: { customerEmail: string }) {
   return (
     <div className="space-y-6">
       <div>

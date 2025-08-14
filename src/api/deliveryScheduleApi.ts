@@ -68,8 +68,8 @@ export const getOrdersWithDeliverySchedule = async (filters: {
   page?: number;
   pageSize?: number;
   searchQuery?: string;
-  timeSlot?: 'morning' | 'afternoon' | 'evening';
-  urgency?: 'urgent' | 'due_today' | 'upcoming';
+  timeSlot?: 'all' | 'morning' | 'afternoon' | 'evening';
+  urgency?: 'all' | 'urgent' | 'due_today' | 'upcoming';
 }): Promise<{ orders: OrderWithDeliverySchedule[]; total: number }> => {
   let query = supabase
     .from('orders')
@@ -99,19 +99,36 @@ export const getOrdersWithDeliverySchedule = async (filters: {
     `)
     .eq('order_type', 'delivery');
 
-  // Date filtering - now works with both scheduled and unscheduled orders
-  if (filters.startDate && filters.endDate) {
-    // Only filter by delivery schedule dates if date filters are specifically applied
-    query = query.or(`order_delivery_schedule.delivery_date.gte.${filters.startDate},order_delivery_schedule.delivery_date.lte.${filters.endDate}`);
-  } else if (filters.startDate) {
-    query = query.gte('order_delivery_schedule.delivery_date', filters.startDate);
-  } else if (filters.endDate) {
-    query = query.lte('order_delivery_schedule.delivery_date', filters.endDate);
+  // Date filtering - properly filter by delivery schedule dates
+  if (filters.startDate || filters.endDate) {
+    // Apply date filters to delivery schedule when specified
+    if (filters.startDate && filters.endDate) {
+      // Range filter (e.g., today, tomorrow, this week)
+      if (filters.startDate === filters.endDate) {
+        // Single day filter
+        query = query.eq('order_delivery_schedule.delivery_date', filters.startDate);
+      } else {
+        // Date range filter
+        query = query
+          .gte('order_delivery_schedule.delivery_date', filters.startDate)
+          .lte('order_delivery_schedule.delivery_date', filters.endDate);
+      }
+    } else if (filters.startDate) {
+      query = query.gte('order_delivery_schedule.delivery_date', filters.startDate);
+    } else if (filters.endDate) {
+      query = query.lte('order_delivery_schedule.delivery_date', filters.endDate);
+    }
   }
 
   // Status filtering
   if (filters.status && filters.status.length > 0) {
     query = query.in('status', filters.status as any);
+  }
+
+  // Search query filtering
+  if (filters.searchQuery) {
+    const searchTerm = `%${filters.searchQuery.toLowerCase()}%`;
+    query = query.or(`order_number.ilike.${searchTerm},customer_name.ilike.${searchTerm},customer_email.ilike.${searchTerm}`);
   }
 
   // Pagination
@@ -130,7 +147,7 @@ export const getOrdersWithDeliverySchedule = async (filters: {
   if (error) throw error;
 
   // Transform data to include delivery_schedule as a direct property
-  const transformedData = data?.map(order => ({
+  let transformedData = data?.map(order => ({
     ...order,
     order_items: order.order_items || [],
     delivery_schedule: order.order_delivery_schedule?.[0] ? {
@@ -139,9 +156,92 @@ export const getOrdersWithDeliverySchedule = async (filters: {
     } : null
   })) || [];
 
+  // Apply client-side filtering for time slot and urgency (more precise control)
+  if (filters.timeSlot && filters.timeSlot !== 'all') {
+    transformedData = transformedData.filter(order => {
+      // Include orders without delivery schedules when no specific time filtering
+      if (!order.delivery_schedule?.delivery_time_start) return false;
+      
+      try {
+        const startHour = parseInt(order.delivery_schedule.delivery_time_start.split(':')[0]);
+        
+        switch (filters.timeSlot) {
+          case 'morning':
+            return startHour >= 6 && startHour < 12;
+          case 'afternoon':
+            return startHour >= 12 && startHour < 18;
+          case 'evening':
+            return startHour >= 18 && startHour <= 22;
+          default:
+            return true;
+        }
+      } catch (error) {
+        console.warn('Error parsing delivery time:', order.delivery_schedule.delivery_time_start);
+        return false; // Exclude malformed time data
+      }
+    });
+  }
+
+  // Apply urgency filtering based on delivery time
+  if (filters.urgency && filters.urgency !== 'all') {
+    const now = new Date();
+    
+    transformedData = transformedData.filter(order => {
+      if (!order.delivery_schedule) return false;
+      
+      try {
+        const deliveryDate = new Date(order.delivery_schedule.delivery_date);
+        
+        // Validate date
+        if (isNaN(deliveryDate.getTime())) {
+          console.warn('Invalid delivery date:', order.delivery_schedule.delivery_date);
+          return false;
+        }
+        
+        const [startHours, startMinutes] = order.delivery_schedule.delivery_time_start.split(':').map(Number);
+        
+        // Validate time components
+        if (isNaN(startHours) || isNaN(startMinutes)) {
+          console.warn('Invalid delivery time:', order.delivery_schedule.delivery_time_start);
+          return false;
+        }
+        
+        deliveryDate.setHours(startHours, startMinutes, 0, 0);
+        
+        const hoursUntilDelivery = (deliveryDate.getTime() - now.getTime()) / (1000 * 60 * 60);
+        const isToday = deliveryDate.toDateString() === now.toDateString();
+        
+        switch (filters.urgency) {
+          case 'urgent':
+            return hoursUntilDelivery <= 2 && hoursUntilDelivery > 0;
+          case 'due_today':
+            return isToday;
+          case 'upcoming':
+            return hoursUntilDelivery > 2;
+          default:
+            return true;
+        }
+      } catch (error) {
+        console.warn('Error processing delivery schedule for urgency filter:', error);
+        return false; // Exclude orders with malformed schedule data
+      }
+    });
+  }
+
+  // For filtered results, we need to get the correct total count
+  let totalCount = transformedData.length;
+  
+  // If we applied client-side filters, the total should be the filtered count
+  // Otherwise use the database count for unfiltered results
+  if (!filters.timeSlot || filters.timeSlot === 'all') {
+    if (!filters.urgency || filters.urgency === 'all') {
+      totalCount = count || 0; // Use database count when no client-side filtering
+    }
+  }
+
   return {
     orders: transformedData,
-    total: count || 0
+    total: totalCount
   };
 };
 

@@ -64,13 +64,13 @@ export default function AdminOrders() {
     pageSize: 20
   });
 
-  // Calculate order metrics for display
-  const orderMetrics = ordersData ? calculateOrderMetrics(ordersData.orders) : {
+  // Use calculated metrics from the API response or fallback to manual calculation
+  const orderMetrics = ordersData?.metrics || (ordersData ? calculateOrderMetrics(ordersData.orders) : {
     total: 0,
     urgent: 0,
     dueToday: 0,
     upcoming: 0
-  };
+  });
 
   const orders = ordersData?.orders || [];
   const totalCount = ordersData?.count || 0;
@@ -251,14 +251,17 @@ export default function AdminOrders() {
               setDateFilter(filters.dateRange);
               setTimeSlotFilter(filters.timeSlot);
               setDeliveryUrgency(filters.urgency);
-              setCurrentPage(1);
+              setCurrentPage(1); // Reset to first page when filters change
+              // Trigger refetch automatically via query invalidation
             }}
             onClearFilters={() => {
               setDateFilter('all');
               setTimeSlotFilter('all');
               setDeliveryUrgency('all');
               setSearchQuery('');
+              setStatusFilter('all');
               setCurrentPage(1);
+              // Clear all filters and reset to default view
             }}
             orderCounts={orderMetrics}
           />

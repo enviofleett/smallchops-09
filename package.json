@@ -67,7 +67,7 @@
     "maplibre-gl-draw": "^1.6.9",
     "next-themes": "^0.3.0",
     "react": "^18.3.1",
-    "react-day-picker": "^8.10.1",
+    "react-day-picker": "^9.8.1",
     "react-dom": "^18.3.1",
     "react-dropzone": "^14.3.8",
     "react-helmet-async": "^2.0.5",

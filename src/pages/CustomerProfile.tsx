@@ -33,35 +33,30 @@ type ProfileSection = 'orders' | 'tracking' | 'wishlist' | 'payment' | 'address'
 // Import simple fallback component directly
 import SimpleOrdersSection from '@/components/customer/SimpleOrdersSection';
 
-// Simplified lazy loading with better error handling
+// ✅ PHASE 1: Fixed lazy loading - removed .catch() anti-pattern
 const LazyEnhancedOrdersSection = React.lazy(() => 
   import('@/components/customer/EnhancedOrdersSection')
     .then(m => ({ default: m.EnhancedOrdersSection }))
-    .catch(() => ({ default: SimpleOrdersSection }))
 );
 
 const LazyEnhancedWishlistSection = React.lazy(() => 
   import('@/components/customer/EnhancedWishlistSection')
     .then(m => ({ default: m.EnhancedWishlistSection }))
-    .catch(() => ({ default: () => <div>Wishlist section unavailable</div> }))
 );
 
 const LazyCustomerBookingsSection = React.lazy(() => 
   import('@/components/customer/CustomerBookingsSection')
     .then(m => ({ default: m.CustomerBookingsSection }))
-    .catch(() => ({ default: () => <div>Bookings section unavailable</div> }))
 );
 
 const LazyAddressManager = React.lazy(() => 
   import('@/components/customer/AddressManager')
     .then(m => ({ default: m.AddressManager }))
-    .catch(() => ({ default: () => <div>Address manager unavailable</div> }))
 );
 
 const LazyTransactionHistoryTab = React.lazy(() => 
   import('@/components/purchase-history/TransactionHistoryTab')
     .then(m => ({ default: m.TransactionHistoryTab }))
-    .catch(() => ({ default: () => <div>Transaction history unavailable</div> }))
 );
 
 // Loading skeleton component
@@ -163,107 +158,115 @@ export default function CustomerProfile() {
     );
   }
 
+  // ✅ PHASE 2: Fixed useCallback dependencies and simplified Suspense wrapping
   const renderContent = useCallback(() => {
-    try {
-      switch (activeSection) {
-        case 'orders':
-          return (
-            <ProductionReadyErrorBoundary 
-              context="Customer Orders" 
-              fallback={<SimpleOrdersSection />}
-              onError={(error, errorInfo) => handleError(error, 'customer-orders')}
-            >
-              <Suspense fallback={<ContentSkeleton />}>
-                <LazyEnhancedOrdersSection />
-              </Suspense>
-            </ProductionReadyErrorBoundary>
-          );
-        case 'tracking':
-          return (
-            <ProductionReadyErrorBoundary 
-              context="Order Tracking" 
-              fallback={<SimpleOrdersSection />}
-              onError={(error, errorInfo) => handleError(error, 'order-tracking')}
-            >
-              <Suspense fallback={<ContentSkeleton />}>
-                <LazyEnhancedOrdersSection />
-              </Suspense>
-            </ProductionReadyErrorBoundary>
-          );
-        case 'bookings':
-          return (
-            <ProductionReadyErrorBoundary 
-              context="Customer Bookings" 
-              fallback={<SectionErrorFallback section="bookings" />}
-              onError={(error, errorInfo) => handleError(error, 'customer-bookings')}
-            >
-              <Suspense fallback={<ContentSkeleton />}>
-                <LazyCustomerBookingsSection />
-              </Suspense>
-            </ProductionReadyErrorBoundary>
-          );
-        case 'wishlist':
-          return (
-            <ProductionReadyErrorBoundary 
-              context="Customer Wishlist" 
-              fallback={<SectionErrorFallback section="wishlist" />}
-              onError={(error, errorInfo) => handleError(error, 'customer-wishlist')}
-            >
-              <Suspense fallback={<ContentSkeleton />}>
-                <LazyEnhancedWishlistSection />
-              </Suspense>
-            </ProductionReadyErrorBoundary>
-          );
-        case 'payment':
-          return (
-            <ProductionReadyErrorBoundary 
-              context="Payment History" 
-              fallback={<SectionErrorFallback section="payment" />}
-              onError={(error, errorInfo) => handleError(error, 'payment-history')}
-            >
-              <PaymentSection />
-            </ProductionReadyErrorBoundary>
-          );
-        case 'address':
-          return (
-            <ProductionReadyErrorBoundary 
-              context="Address Management" 
-              fallback={<SectionErrorFallback section="address" />}
-              onError={(error, errorInfo) => handleError(error, 'address-management')}
-            >
-              <Suspense fallback={<ContentSkeleton />}>
-                <LazyAddressManager />
-              </Suspense>
-            </ProductionReadyErrorBoundary>
-          );
-        case 'help':
-          return (
-            <ProductionReadyErrorBoundary 
-              context="Help Section" 
-              fallback={<SectionErrorFallback section="help" />}
-              onError={(error, errorInfo) => handleError(error, 'help-section')}
-            >
-              <HelpSection settings={settings} />
-            </ProductionReadyErrorBoundary>
-          );
-        default:
-          return (
-            <ProductionReadyErrorBoundary 
-              context="Default Orders View" 
-              fallback={<SimpleOrdersSection />}
-              onError={(error, errorInfo) => handleError(error, 'default-orders')}
-            >
-              <Suspense fallback={<ContentSkeleton />}>
-                <LazyEnhancedOrdersSection />
-              </Suspense>
-            </ProductionReadyErrorBoundary>
-          );
-      }
-    } catch (error) {
-      console.error('Error rendering content:', error);
-      return <SectionErrorFallback section={activeSection} />;
+    switch (activeSection) {
+      case 'orders':
+        return (
+          <ProductionReadyErrorBoundary 
+            context="Customer Orders" 
+            fallback={<SimpleOrdersSection />}
+            onError={(error, errorInfo) => {
+              reportError(error, 'customer-orders', errorInfo);
+              handleError(error, 'customer-orders');
+            }}
+          >
+            <LazyEnhancedOrdersSection />
+          </ProductionReadyErrorBoundary>
+        );
+      case 'tracking':
+        return (
+          <ProductionReadyErrorBoundary 
+            context="Order Tracking" 
+            fallback={<SimpleOrdersSection />}
+            onError={(error, errorInfo) => {
+              reportError(error, 'order-tracking', errorInfo);
+              handleError(error, 'order-tracking');
+            }}
+          >
+            <LazyEnhancedOrdersSection />
+          </ProductionReadyErrorBoundary>
+        );
+      case 'bookings':
+        return (
+          <ProductionReadyErrorBoundary 
+            context="Customer Bookings" 
+            fallback={<SectionErrorFallback section="bookings" />}
+            onError={(error, errorInfo) => {
+              reportError(error, 'customer-bookings', errorInfo);
+              handleError(error, 'customer-bookings');
+            }}
+          >
+            <LazyCustomerBookingsSection />
+          </ProductionReadyErrorBoundary>
+        );
+      case 'wishlist':
+        return (
+          <ProductionReadyErrorBoundary 
+            context="Customer Wishlist" 
+            fallback={<SectionErrorFallback section="wishlist" />}
+            onError={(error, errorInfo) => {
+              reportError(error, 'customer-wishlist', errorInfo);
+              handleError(error, 'customer-wishlist');
+            }}
+          >
+            <LazyEnhancedWishlistSection />
+          </ProductionReadyErrorBoundary>
+        );
+      case 'payment':
+        return (
+          <ProductionReadyErrorBoundary 
+            context="Payment History" 
+            fallback={<SectionErrorFallback section="payment" />}
+            onError={(error, errorInfo) => {
+              reportError(error, 'payment-history', errorInfo);
+              handleError(error, 'payment-history');
+            }}
+          >
+            <PaymentSection />
+          </ProductionReadyErrorBoundary>
+        );
+      case 'address':
+        return (
+          <ProductionReadyErrorBoundary 
+            context="Address Management" 
+            fallback={<SectionErrorFallback section="address" />}
+            onError={(error, errorInfo) => {
+              reportError(error, 'address-management', errorInfo);
+              handleError(error, 'address-management');
+            }}
+          >
+            <LazyAddressManager />
+          </ProductionReadyErrorBoundary>
+        );
+      case 'help':
+        return (
+          <ProductionReadyErrorBoundary 
+            context="Help Section" 
+            fallback={<SectionErrorFallback section="help" />}
+            onError={(error, errorInfo) => {
+              reportError(error, 'help-section', errorInfo);
+              handleError(error, 'help-section');
+            }}
+          >
+            <HelpSection settings={settings} />
+          </ProductionReadyErrorBoundary>
+        );
+      default:
+        return (
+          <ProductionReadyErrorBoundary 
+            context="Default Orders View" 
+            fallback={<SimpleOrdersSection />}
+            onError={(error, errorInfo) => {
+              reportError(error, 'default-orders', errorInfo);
+              handleError(error, 'default-orders');
+            }}
+          >
+            <LazyEnhancedOrdersSection />
+          </ProductionReadyErrorBoundary>
+        );
     }
-  }, [activeSection, settings]);
+  }, [activeSection, settings, handleError, reportError]);
 
   return (
     <ProductionReadyErrorBoundary 
@@ -290,6 +293,8 @@ export default function CustomerProfile() {
                     onClick={() => {
                       try {
                         if (item.path) {
+                          // ✅ PHASE 2: Fix sidebar navigation state sync
+                          setActiveSection(item.id); // Keep activeSection in sync
                           navigate(item.path);
                         } else {
                           setActiveSection(item.id);
@@ -334,6 +339,7 @@ export default function CustomerProfile() {
 
             {/* Main Content */}
             <div className="flex-1">
+              {/* ✅ PHASE 1: Removed double Suspense wrapping - handled in ProductionReadyErrorBoundary */}
               <Suspense fallback={<ContentSkeleton />}>
                 {renderContent()}
               </Suspense>
@@ -400,12 +406,13 @@ const OrderCard = React.memo(({ order }: { order: any }) => {
     }
   };
 
-  // Safe data extraction with defaults
+  // ✅ PHASE 3: Fixed business logic placeholders
   const orderNumber = order?.order_number || 'N/A';
-  const displayName = `Order${orderNumber !== 'N/A' ? orderNumber.slice(-1) : ''}`;
+  const displayName = orderNumber !== 'N/A' ? `Order #${orderNumber}` : 'Order';
   const totalAmount = typeof order?.total_amount === 'number' ? order.total_amount : 0;
-  const originalPrice = totalAmount * 1.2; // Simulate original price
-  const discount = originalPrice - totalAmount;
+  // Use real original price from order data, fallback to total if not available
+  const originalPrice = typeof order?.original_amount === 'number' ? order.original_amount : totalAmount;
+  const discount = originalPrice > totalAmount ? originalPrice - totalAmount : 0;
   const status = order?.status || 'unknown';
   const orderItems = Array.isArray(order?.order_items) ? order.order_items : [];
 

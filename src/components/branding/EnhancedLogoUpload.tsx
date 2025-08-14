@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { useApiWithRetry } from '@/hooks/useApiWithRetry';
 import { toast } from 'sonner';
-import EnhancedErrorBoundary from '@/components/ui/enhanced-error-boundary';
+import { EnhancedErrorBoundary } from '@/components/ui/enhanced-error-boundary';
 
 interface ValidationResult {
   isValid: boolean;
@@ -265,7 +265,7 @@ export const EnhancedLogoUpload = ({
   }
 
   return (
-    <EnhancedErrorBoundary context="Logo Upload Component">
+    <EnhancedErrorBoundary title="Logo Upload Error" description="There was an issue with the logo upload component.">
       <div className="space-y-4">
         <Card
           {...getRootProps()}

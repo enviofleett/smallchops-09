@@ -57,10 +57,7 @@ export const useOrderSummary = (filters: OrderSummaryFilters = {}) => {
 
         console.log('✅ User authenticated:', user.email);
 
-        // Get recent orders (last 30 days) instead of older orders
-        const thirtyDaysAgo = new Date();
-        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
+        // Remove the 30-day restriction to show ALL orders
         let orderQuery = supabase
           .from('orders')
           .select(`
@@ -74,7 +71,7 @@ export const useOrderSummary = (filters: OrderSummaryFilters = {}) => {
             order_time,
             delivery_address,
             special_instructions,
-            order_items!inner (
+            order_items (
               id,
               product_name,
               quantity,
@@ -88,7 +85,6 @@ export const useOrderSummary = (filters: OrderSummaryFilters = {}) => {
             )
           `, { count: 'exact' })
           .eq('customer_email', user.email)
-          .gte('order_time', thirtyDaysAgo.toISOString()) // Recent orders, not old ones
           .order('order_time', { ascending: false });
 
         // Apply filters

@@ -146,29 +146,60 @@ const OrdersList: React.FC = () => {
       console.log('🔍 Fetching detailed order data for:', order.id);
       setSelectedOrder(order);
       
-      // Get detailed order data
+      // Try to get detailed order data, but fallback gracefully
       const { data: detailedOrder, error: detailError } = await supabase
-        .rpc('get_detailed_order_with_products', {
-          p_order_id: order.id
-        });
+        .from('orders')
+        .select(`
+          *,
+          order_items (
+            id,
+            product_id,
+            product_name,
+            quantity,
+            unit_price,
+            total_price,
+            customizations,
+            products (
+              name,
+              image_url,
+              description,
+              price
+            )
+          )
+        `)
+        .eq('id', order.id)
+        .maybeSingle();
 
-      if (detailError) {
-        console.error('❌ Error fetching detailed order:', detailError);
-        // Fallback to basic order data
-        setModalOrder({
-          ...order,
-          order_type: 'delivery', // Default to delivery
-          order_items: order.order_items || []
-        });
-      } else if (detailedOrder && typeof detailedOrder === 'object' && 'order' in detailedOrder) {
-        console.log('✅ Detailed order data loaded:', detailedOrder);
-        setModalOrder((detailedOrder as any).order || order);
-      } else {
-        // Fallback to basic order data
+      if (detailError || !detailedOrder) {
+        console.warn('⚠️ Could not fetch detailed order, using basic data:', detailError?.message);
+        // Use the order data we already have
         setModalOrder({
           ...order,
           order_type: 'delivery',
-          order_items: order.order_items || []
+          order_items: order.order_items?.map(item => ({
+            ...item,
+            products: item.products || {
+              name: item.product_name,
+              image_url: null,
+              description: null,
+              price: item.unit_price
+            }
+          })) || []
+        });
+      } else {
+        console.log('✅ Detailed order data loaded successfully');
+        setModalOrder({
+          ...detailedOrder,
+          order_type: detailedOrder.order_type || 'delivery',
+          order_items: detailedOrder.order_items?.map((item: any) => ({
+            ...item,
+            products: item.products || {
+              name: item.product_name,
+              image_url: null,
+              description: null,
+              price: item.unit_price
+            }
+          })) || []
         });
       }
       

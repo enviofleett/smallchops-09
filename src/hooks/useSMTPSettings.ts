@@ -103,23 +103,20 @@ export const useSMTPSettings = () => {
     },
   });
 
-  // Test email connection with Auth system fallback
+  // Test email connection using production email processor
   const testConnectionMutation = useMutation({
     mutationFn: async (testEmail: string) => {
       try {
-        console.log('Testing email with Auth system first...');
+        console.log('Testing email with Production Email Processor...');
         
-        // Try Supabase Auth email system first (more reliable)
-        const { data, error } = await supabase.functions.invoke('supabase-auth-email-sender', {
+        const { data, error } = await supabase.functions.invoke('production-email-processor', {
           body: {
-            templateId: 'smtp_test',
-            recipient: {
-              email: testEmail,
-              name: 'Test User'
-            },
+            to: testEmail,
+            subject: 'SMTP Test - Connection Successful',
+            templateKey: 'smtp_test',
             variables: {
               test_time: new Date().toLocaleString(),
-              smtp_host: 'Supabase Auth System',
+              smtp_host: 'Production SMTP System',
               business_name: 'Starters Small Chops'
             },
             emailType: 'transactional'
@@ -127,41 +124,14 @@ export const useSMTPSettings = () => {
         });
 
         if (error) {
-          throw new Error(error.message || 'Failed to send test email via Auth system');
+          throw new Error(error.message || 'Failed to send test email');
         }
 
-        console.log('Test email sent successfully via Supabase Auth');
+        console.log('Test email sent successfully via Production Email Processor');
         return data;
-      } catch (authError) {
-        console.warn('Auth email failed, trying SMTP fallback:', authError);
-        
-        // Fallback to SMTP if Auth system fails
-        try {
-          const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
-            body: {
-              templateId: 'smtp_test',
-              recipient: {
-                email: testEmail,
-                name: 'Test User'
-              },
-              variables: {
-                test_time: new Date().toLocaleString(),
-                smtp_host: 'SMTP Fallback System',
-                business_name: 'Starters Small Chops'
-              },
-              emailType: 'transactional'
-            }
-          });
-
-          if (error) {
-            throw new Error(error.message || 'SMTP fallback also failed');
-          }
-
-          console.log('Test email sent successfully via SMTP fallback');
-          return data;
-        } catch (smtpError) {
-          throw new Error(`All email systems failed. Auth error: ${authError.message}, SMTP error: ${smtpError.message}`);
-        }
+      } catch (error) {
+        console.error('Production email test failed:', error);
+        throw new Error(`Email test failed: ${error.message}`);
       }
     },
     onSuccess: () => {

@@ -53,41 +53,28 @@ export const useEmailService = () => {
   // Send email mutation with Auth system priority
   const sendEmailMutation = useMutation({
     mutationFn: async (emailRequest: EmailRequest) => {
-      console.log('Sending email with Auth system priority:', emailRequest);
+      console.log('Sending email via Production Email Processor:', emailRequest);
       
       try {
-        // Try Supabase Auth email system first (more reliable)
-        const { data, error } = await supabase.functions.invoke('supabase-auth-email-sender', {
+        const { data, error } = await supabase.functions.invoke('production-email-processor', {
           body: emailRequest
         });
 
         if (error) {
-          throw new Error(error.message || 'Failed to send email via Auth system');
+          throw new Error(`Email sending failed: ${error.message}`);
         }
 
-        console.log('Email sent successfully via Supabase Auth:', data);
+        console.log('Email sent successfully via Production Email Processor:', data);
         return data;
-      } catch (authError) {
-        console.warn('Auth email failed, trying SMTP fallback:', authError);
-        
-        // Fallback to SMTP if Auth system fails
-        const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
-          body: emailRequest
-        });
-
-        if (error) {
-          console.error('SMTP fallback also failed:', error);
-          throw new Error(`All email systems failed. Auth error: ${authError.message}, SMTP error: ${error.message}`);
-        }
-
-        console.log('Email sent successfully via SMTP fallback:', data);
-        return data;
+      } catch (error) {
+        console.error('Email sending failed:', error);
+        throw error;
       }
     },
     onSuccess: () => {
       toast({
         title: "Email sent successfully",
-        description: "Your email has been sent via Auth system",
+        description: "Your email has been sent successfully",
       });
     },
     onError: (error: any) => {

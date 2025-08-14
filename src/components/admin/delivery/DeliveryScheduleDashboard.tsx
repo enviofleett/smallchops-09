@@ -16,8 +16,10 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { useDeliveryScheduleDashboard } from '@/hooks/useDeliveryScheduleDashboard';
+import { useDeliveryRealtime } from '@/hooks/useDeliveryRealtime';
 import { DeliveryCard } from './DeliveryCard';
 import { FilterBar } from './FilterBar';
+import { DeliveryMetricsWidget } from './DeliveryMetricsWidget';
 import { PriceDisplay } from '@/components/ui/price-display';
 
 export function DeliveryScheduleDashboard() {
@@ -31,20 +33,46 @@ export function DeliveryScheduleDashboard() {
   });
 
   const { orders, metrics, isLoading, error, refetch } = useDeliveryScheduleDashboard(filters);
+  const [localOrders, setLocalOrders] = useState(orders);
+
+  // Update local orders when data changes
+  React.useEffect(() => {
+    setLocalOrders(orders);
+  }, [orders]);
+
+  // Real-time updates
+  const { connectionStatus, lastUpdate } = useDeliveryRealtime(
+    localOrders,
+    (updatedOrder) => {
+      setLocalOrders(prev => 
+        prev.map(order => 
+          order.id === updatedOrder.id ? updatedOrder : order
+        )
+      );
+    }
+  );
 
   const handleStatusUpdate = async (orderId: string, newStatus: string) => {
     try {
-      // This would typically call an API to update the order status
-      // For now, we'll just show a toast and refetch
+      const { updateOrderStatus } = await import('@/api/orderStatusApi');
+      
+      await updateOrderStatus(orderId, { 
+        status: newStatus as any,
+        notes: `Status updated via delivery dashboard at ${new Date().toLocaleString()}`
+      });
+      
       toast({
         title: "Status Updated",
         description: `Order status updated to ${newStatus.replace('_', ' ')}`,
       });
+      
+      // Refetch to get updated data
       refetch();
     } catch (error) {
+      console.error('Failed to update order status:', error);
       toast({
         title: "Error",
-        description: "Failed to update order status",
+        description: error instanceof Error ? error.message : "Failed to update order status",
         variant: "destructive",
       });
     }
@@ -108,128 +136,29 @@ export function DeliveryScheduleDashboard() {
         </div>
       </div>
 
+      {/* Real-time Status Indicator */}
+      {connectionStatus && (
+        <div className="flex items-center justify-between mb-4 p-2 bg-muted/50 rounded-lg">
+          <div className="flex items-center gap-2 text-sm">
+            <div className={`w-2 h-2 rounded-full ${
+              connectionStatus === 'connected' ? 'bg-green-500' : 
+              connectionStatus === 'connecting' ? 'bg-yellow-500' : 'bg-red-500'
+            }`} />
+            <span>Real-time updates: {connectionStatus}</span>
+          </div>
+          {lastUpdate && (
+            <span className="text-xs text-muted-foreground">
+              Last update: {lastUpdate.toLocaleTimeString()}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* Metrics Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                <Package className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Total</p>
-                <p className="text-lg font-bold">
-                  {isLoading ? <Skeleton className="h-6 w-8" /> : metrics.totalOrders}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
-                <Clock className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Pending</p>
-                <p className="text-lg font-bold">
-                  {isLoading ? <Skeleton className="h-6 w-8" /> : metrics.pendingOrders}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-yellow-100 text-yellow-600 rounded-lg">
-                <Package className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Preparing</p>
-                <p className="text-lg font-bold">
-                  {isLoading ? <Skeleton className="h-6 w-8" /> : metrics.preparingOrders}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
-                <Truck className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Out</p>
-                <p className="text-lg font-bold">
-                  {isLoading ? <Skeleton className="h-6 w-8" /> : metrics.outForDelivery}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                <CheckCircle className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Completed</p>
-                <p className="text-lg font-bold">
-                  {isLoading ? <Skeleton className="h-6 w-8" /> : metrics.completedOrders}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-red-100 text-red-600 rounded-lg">
-                <AlertCircle className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Urgent</p>
-                <p className="text-lg font-bold">
-                  {isLoading ? <Skeleton className="h-6 w-8" /> : metrics.urgentOrders}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                <DollarSign className="w-4 h-4" />
-              </div>
-              <div>
-                <p className="text-xs text-muted-foreground">Revenue</p>
-                <div className="text-sm font-bold">
-                  {isLoading ? (
-                    <Skeleton className="h-5 w-12" />
-                  ) : (
-                    <PriceDisplay 
-                      originalPrice={metrics.totalRevenue} 
-                      size="sm"
-                      className="text-green-600"
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+      <DeliveryMetricsWidget 
+        metrics={metrics} 
+        isLoading={isLoading}
+      />
 
       {/* Filters */}
       <FilterBar 
@@ -286,7 +215,7 @@ export function DeliveryScheduleDashboard() {
           </Card>
         ) : (
           <div className="space-y-3">
-            {orders.map((order) => (
+            {localOrders.map((order) => (
               <DeliveryCard 
                 key={order.id} 
                 order={order} 
@@ -298,7 +227,7 @@ export function DeliveryScheduleDashboard() {
       </div>
 
       {/* Load More Button for large datasets */}
-      {orders.length >= 50 && (
+      {localOrders.length >= 50 && (
         <div className="text-center pt-4">
           <Button variant="outline">
             Load More Orders

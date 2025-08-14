@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useCustomerOrdersOptimized } from '@/hooks/useCustomerOrdersOptimized';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -70,10 +70,6 @@ function OrdersContent() {
       supabase.removeChannel(channel);
     };
   }, [isAuthenticated, user?.email, ordersQuery.refetch]);
-
-  const handleManualRefresh = useCallback(() => {
-    ordersQuery.refetch();
-  }, [ordersQuery]);
 
   const formatOrderDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -147,13 +143,6 @@ function OrdersContent() {
         </p>
         <p className="text-sm text-muted-foreground mb-6">Customer: {user?.email}</p>
         
-        <div className="flex items-center justify-center mb-4 text-sm">
-          <div className={`w-2 h-2 rounded-full mr-2 ${realtimeConnected ? 'bg-success' : 'bg-destructive'}`}></div>
-          <span className="text-muted-foreground">
-            Real-time: {realtimeConnected ? 'Connected' : 'Disconnected'}
-          </span>
-        </div>
-        
         <Button onClick={() => ordersQuery.refetch()} className="flex items-center">
           <RefreshCw className="h-4 w-4 mr-2" />
           Try Again
@@ -194,7 +183,7 @@ function OrdersContent() {
         <Button 
           variant="outline" 
           size="sm" 
-          onClick={handleManualRefresh}
+          onClick={() => ordersQuery.refetch()}
           disabled={ordersQuery.isFetching}
           className="flex items-center"
         >
@@ -271,6 +260,6 @@ function OrdersContent() {
   );
 }
 
-export default function OrdersSection() {
+export default function OptimizedOrdersSection() {
   return <OrdersContent />;
 }

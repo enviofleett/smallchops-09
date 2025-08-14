@@ -85,23 +85,20 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  // CRITICAL: Check for order BEFORE any hooks to prevent React Error #310
+  if (!order) {
+    return null;
+  }
+
   const [deliveryZone, setDeliveryZone] = useState<DeliveryZone | null>(null);
   const [dispatchRider, setDispatchRider] = useState<DispatchRider | null>(null);
-  const [orderStatus, setOrderStatus] = useState(order?.status);
+  const [orderStatus, setOrderStatus] = useState(order.status);
   const [loading, setLoading] = useState(false);
 
   // Initialize orderStatus when order changes
   useEffect(() => {
-    if (order) {
-      console.log('🔄 Initializing order status:', order.status);
-      setOrderStatus(order.status);
-    }
-  }, [order]);
-
-  if (!order) {
-    console.log('❌ No order provided to OrderDetailsModal');
-    return null;
-  }
+    setOrderStatus(order.status);
+  }, [order.status]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {

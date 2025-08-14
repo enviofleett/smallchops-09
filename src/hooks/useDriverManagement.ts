@@ -24,19 +24,9 @@ export const useDriverManagement = () => {
 
   const addDriver = async (driverData: NewDriver): Promise<Driver | null> => {
     try {
-      // If email is provided, add invitation flag
-      const dataWithInvitation = driverData.email 
-        ? { ...driverData, sendInvitation: true }
-        : driverData;
-        
-      const newDriver = await createDriver(dataWithInvitation);
+      const newDriver = await createDriver(driverData);
       setDrivers(prev => [...prev, newDriver]);
-      
-      const successMessage = driverData.email 
-        ? `Driver ${driverData.name} added and invitation sent successfully!`
-        : `Driver ${driverData.name} added successfully!`;
-      
-      toast.success(successMessage);
+      toast.success('Driver added successfully');
       return newDriver;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to add driver';

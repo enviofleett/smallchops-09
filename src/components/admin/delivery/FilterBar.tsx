@@ -194,17 +194,17 @@ export function FilterBar({ filters, onFiltersChange, totalCount }: FilterBarPro
         <div className="flex items-center gap-2">
           <Clock className="w-4 h-4 text-muted-foreground" />
           <Select 
-            value={filters.timeSlot || 'all'} 
+            value={filters.timeSlot || ''} 
             onValueChange={(value) => onFiltersChange({ 
               ...filters, 
-              timeSlot: value === 'all' ? undefined : value 
+              timeSlot: value || undefined 
             })}
           >
             <SelectTrigger className="w-auto min-w-[160px]">
               <SelectValue placeholder="All times" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">All times</SelectItem>
+              <SelectItem value="">All times</SelectItem>
               {TIME_SLOT_OPTIONS.map(option => (
                 <SelectItem key={option.value} value={option.value}>
                   {option.label}
@@ -308,17 +308,17 @@ export function FilterBar({ filters, onFiltersChange, totalCount }: FilterBarPro
             <div className="space-y-2">
               <Label className="text-sm font-medium">Time Slot</Label>
               <Select 
-                value={filters.timeSlot || 'all'} 
+                value={filters.timeSlot || ''} 
                 onValueChange={(value) => onFiltersChange({ 
                   ...filters, 
-                  timeSlot: value === 'all' ? undefined : value 
+                  timeSlot: value || undefined 
                 })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="All times" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">All times</SelectItem>
+                  <SelectItem value="">All times</SelectItem>
                   {TIME_SLOT_OPTIONS.map(option => (
                     <SelectItem key={option.value} value={option.value}>
                       {option.label}

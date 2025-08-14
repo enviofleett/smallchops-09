@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { safeStorage } from '@/utils/safeStorage';
 
 interface CustomerAccount {
   id: string;
@@ -48,6 +47,7 @@ export const useCustomerAuth = () => {
           return null;
         }
         
+        console.log('🔍 Customer account data:', data);
         return data;
       } catch (error) {
         console.error('Customer account fetch error:', error);
@@ -61,28 +61,32 @@ export const useCustomerAuth = () => {
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (!mounted) return;
           
-          console.log('🔄 Auth state change:', event, !!session);
-          
           if (session?.user) {
-            setAuthState(prev => ({ 
-              ...prev, 
-              user: session.user, 
-              session, 
-              isLoading: true,
-              error: null
-            }));
-
-            const customerAccount = await loadCustomerAccount(session.user.id);
-            
-            if (mounted) {
-              setAuthState(prev => ({
-                ...prev,
-                customerAccount,
-                isLoading: false,
-                isAuthenticated: true,
+            // Use setTimeout to prevent potential Supabase deadlocks
+            setTimeout(async () => {
+              if (!mounted) return;
+              
+              setAuthState(prev => ({ 
+                ...prev, 
+                user: session.user, 
+                session, 
+                isLoading: true,
                 error: null
               }));
-            }
+
+              // Load customer account
+              const customerAccount = await loadCustomerAccount(session.user.id);
+              
+              if (mounted) {
+                setAuthState(prev => ({
+                  ...prev,
+                  customerAccount,
+                  isLoading: false,
+                  isAuthenticated: !!customerAccount,
+                  error: customerAccount ? null : 'Customer account not found'
+                }));
+              }
+            }, 0);
           } else {
             setAuthState({
               user: null,
@@ -103,7 +107,6 @@ export const useCustomerAuth = () => {
         if (!mounted) return;
 
         if (initialSession?.user) {
-          console.log('🚀 Initial session found:', initialSession.user.email);
           setAuthState(prev => ({ 
             ...prev, 
             user: initialSession.user, 
@@ -118,12 +121,11 @@ export const useCustomerAuth = () => {
               ...prev,
               customerAccount,
               isLoading: false,
-              isAuthenticated: true,
-              error: null
+              isAuthenticated: !!customerAccount,
+              error: customerAccount ? null : 'Customer account not found'
             }));
           }
         } else {
-          console.log('🔍 No initial session found');
           if (mounted) {
             setAuthState(prev => ({ ...prev, isLoading: false }));
           }
@@ -140,10 +142,7 @@ export const useCustomerAuth = () => {
       }
     };
 
-    // Only initialize after hydration on client
-    if (typeof window !== 'undefined') {
-      initializeAuth();
-    }
+    initializeAuth();
 
     return () => {
       mounted = false;
@@ -176,9 +175,9 @@ export const useCustomerAuth = () => {
 
   const logout = async () => {
     // Clear cart and shopping data before signing out
-    safeStorage.removeItem('restaurant_cart');
-    safeStorage.removeItem('guest_session');
-    safeStorage.removeItem('cart_abandonment_tracking');
+    localStorage.removeItem('restaurant_cart');
+    localStorage.removeItem('guest_session');
+    localStorage.removeItem('cart_abandonment_tracking');
     
     // Clear React Query cache (if available)
     try {

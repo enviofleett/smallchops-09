@@ -48,7 +48,7 @@ export function PriceDisplay({
         </span>
       </div>
       {showSavings && savings > 0 && (
-        <div className="text-xs font-medium text-emerald-600 dark:text-emerald-400">
+        <div className="text-xs text-green-600 font-medium">
           You save {formatCurrency(savings)}
         </div>
       )}

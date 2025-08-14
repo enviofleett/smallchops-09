@@ -78,104 +78,52 @@ export async function getProductWithDiscounts(productId: string): Promise<Produc
 export async function validatePromotionCode(
   code: string, 
   orderAmount: number
-): Promise<{ 
-  valid: boolean; 
-  promotion?: any; 
-  discount_amount?: number; 
-  error?: string;
-  errorCode?: string;
-}> {
+): Promise<{ valid: boolean; promotion?: any; discount_amount?: number; error?: string }> {
   try {
-    // Input validation
-    if (!code || code.trim().length === 0) {
-      return { 
-        valid: false, 
-        error: "Please enter a promotion code",
-        errorCode: "EMPTY_CODE"
-      };
-    }
-
-    if (orderAmount <= 0) {
-      return { 
-        valid: false, 
-        error: "Your cart is empty. Add items before applying a promotion.",
-        errorCode: "CART_EMPTY"
-      };
-    }
-
     const { data: promotion, error } = await supabase
       .from("promotions")
       .select("*")
-      .eq("code", code.trim().toUpperCase())
+      .eq("code", code)
+      .eq("status", "active")
       .single();
     
-    if (error || !promotion) {
-      return { 
-        valid: false, 
-        error: "The promotion code you entered is not valid. Please check the code and try again.",
-        errorCode: "PROMOTION_NOT_FOUND"
-      };
-    }
-
-    // Check status
-    if (promotion.status !== "active") {
-      return { 
-        valid: false, 
-        error: "This promotion is currently inactive. Please contact support if you believe this is an error.",
-        errorCode: "PROMOTION_INACTIVE"
-      };
+    if (error) {
+      return { valid: false, error: "Invalid promotion code" };
     }
     
-    // Check date validity
     const currentDate = new Date();
-    const validFrom = promotion.valid_from ? new Date(promotion.valid_from) : null;
+    const validFrom = new Date(promotion.valid_from);
     const validUntil = promotion.valid_until ? new Date(promotion.valid_until) : null;
     
-    if (validFrom && currentDate < validFrom) {
-      return { 
-        valid: false, 
-        error: `This promotion will be available starting ${validFrom.toLocaleDateString()}`,
-        errorCode: "PROMOTION_NOT_STARTED"
-      };
+    // Check if promotion is currently valid
+    if (currentDate < validFrom) {
+      return { valid: false, error: "Promotion not yet active" };
     }
     
     if (validUntil && currentDate > validUntil) {
-      return { 
-        valid: false, 
-        error: "This promotion has expired. Please check for current offers.",
-        errorCode: "PROMOTION_EXPIRED"
-      };
+      return { valid: false, error: "Promotion has expired" };
     }
 
-    // Check day of week applicability
+    // PRODUCTION CRITICAL: Check if promotion is valid for current day
     if (!isPromotionValidForCurrentDay(promotion)) {
       const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' });
-      const validDays = promotion.applicable_days?.join(', ') || 'specific days';
       return { 
         valid: false, 
-        error: `This promotion is only valid on ${validDays}. Today is ${currentDay}.`,
-        errorCode: "PROMOTION_NOT_APPLICABLE_TODAY"
+        error: `This promotion is not available on ${currentDay}` 
       };
     }
     
     // Check minimum order amount
     if (promotion.min_order_amount && orderAmount < promotion.min_order_amount) {
-      const required = promotion.min_order_amount;
-      const shortfall = required - orderAmount;
       return { 
         valid: false, 
-        error: `Add ₦${shortfall.toFixed(2)} more to your order. Minimum required: ₦${required} (Current: ₦${orderAmount.toFixed(2)})`,
-        errorCode: "MINIMUM_ORDER_NOT_MET"
+        error: `Minimum order amount of ₦${promotion.min_order_amount} required` 
       };
     }
     
     // Check usage limit
     if (promotion.usage_limit && promotion.usage_count >= promotion.usage_limit) {
-      return { 
-        valid: false, 
-        error: "This promotion has reached its usage limit and is no longer available.",
-        errorCode: "USAGE_LIMIT_REACHED"
-      };
+      return { valid: false, error: "Promotion usage limit reached" };
     }
     
     // Calculate discount amount
@@ -187,7 +135,6 @@ export async function validatePromotionCode(
         if (promotion.max_discount_amount) {
           discountAmount = Math.min(discountAmount, promotion.max_discount_amount);
         }
-        discountAmount = Math.min(discountAmount, orderAmount); // Can't discount more than order total
         break;
       case 'fixed_amount':
         discountAmount = Math.min(promotion.value, orderAmount);
@@ -198,25 +145,15 @@ export async function validatePromotionCode(
       case 'buy_one_get_one':
         discountAmount = 0; // BOGO handled separately in cart logic
         break;
-      default:
-        return { 
-          valid: false, 
-          error: "Invalid promotion type",
-          errorCode: "INVALID_PROMOTION_TYPE"
-        };
     }
     
     return { 
       valid: true, 
       promotion, 
-      discount_amount: Math.round(discountAmount * 100) / 100 // Round to 2 decimal places
+      discount_amount: discountAmount 
     };
   } catch (error) {
     console.error('Error validating promotion code:', error);
-    return { 
-      valid: false, 
-      error: "Unable to validate promotion. Please try again or contact support.",
-      errorCode: "VALIDATION_ERROR"
-    };
+    return { valid: false, error: "Error validating promotion code" };
   }
 }

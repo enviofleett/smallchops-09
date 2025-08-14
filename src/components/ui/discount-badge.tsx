@@ -6,14 +6,12 @@ interface DiscountBadgeProps {
   discountPercentage: number;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
-  variant?: 'default' | 'outline';
 }
 
 export function DiscountBadge({ 
   discountPercentage, 
   className, 
-  size = 'md',
-  variant = 'default'
+  size = 'md' 
 }: DiscountBadgeProps) {
   if (discountPercentage <= 0) return null;
   
@@ -22,18 +20,13 @@ export function DiscountBadge({
     md: 'text-sm px-2 py-1',
     lg: 'text-base px-3 py-1.5'
   };
-
-  const variantClasses = {
-    default: "bg-gradient-to-r from-destructive to-destructive/80 text-destructive-foreground font-bold shadow-sm hover:from-destructive/90 hover:to-destructive/70",
-    outline: "border-destructive text-destructive bg-background hover:bg-destructive/10"
-  };
   
   return (
     <Badge 
+      variant="destructive" 
       className={cn(
-        variantClasses[variant],
+        "bg-red-500 hover:bg-red-600 text-white font-bold",
         sizeClasses[size],
-        "transition-all duration-200",
         className
       )}
     >

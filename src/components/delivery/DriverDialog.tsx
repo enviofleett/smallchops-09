@@ -84,15 +84,10 @@ export const DriverDialog = ({ driver, open, onOpenChange, onSave }: DriverDialo
               name="email"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Email {!driver && '*'}</FormLabel>
+                  <FormLabel>Email</FormLabel>
                   <FormControl>
-                    <Input {...field} type="email" required={!driver} />
+                    <Input {...field} type="email" />
                   </FormControl>
-                  {!driver && (
-                    <div className="text-sm text-muted-foreground">
-                      Required for dispatch riders to receive assignments
-                    </div>
-                  )}
                 </FormItem>
               )}
             />
@@ -200,7 +195,7 @@ export const DriverDialog = ({ driver, open, onOpenChange, onSave }: DriverDialo
                 Cancel
               </Button>
               <Button type="submit" className="flex-1">
-                {driver ? 'Update' : 'Create & Invite'} Driver
+                {driver ? 'Update' : 'Create'} Driver
               </Button>
             </div>
           </form>

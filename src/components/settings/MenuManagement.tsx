@@ -29,7 +29,7 @@ export const MenuManagement = () => {
   const [newMenuData, setNewMenuData] = useState({
     key: "",
     label: "",
-    parent_key: "none",
+    parent_key: "",
     sort_order: 0,
   });
 
@@ -76,19 +76,15 @@ export const MenuManagement = () => {
 
   const addMenuMutation = useMutation({
     mutationFn: async (menuData: typeof newMenuData) => {
-      const sanitizedData = {
-        ...menuData,
-        parent_key: menuData.parent_key === 'none' ? null : menuData.parent_key
-      };
       const { error } = await supabase
         .from('menu_structure')
-        .insert(sanitizedData);
+        .insert(menuData);
 
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['menu-structure'] });
-      setNewMenuData({ key: "", label: "", parent_key: "none", sort_order: 0 });
+      setNewMenuData({ key: "", label: "", parent_key: "", sort_order: 0 });
       toast({ title: "Menu added successfully" });
     },
     onError: (error) => handleError(error, "adding menu"),
@@ -237,7 +233,7 @@ export const MenuManagement = () => {
                   <SelectValue placeholder="Select parent (optional)" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">None (Main Menu)</SelectItem>
+                  <SelectItem value="">None (Main Menu)</SelectItem>
                   {menuStructure?.map((menu) => (
                     <SelectItem key={menu.key} value={menu.key}>
                       {menu.label}

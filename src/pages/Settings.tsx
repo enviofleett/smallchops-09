@@ -23,7 +23,6 @@ import { ProductionReadinessStatus } from "@/components/admin/ProductionReadines
 import RegistrationHealth from "./RegistrationHealth";
 import AdminCheckoutSettingsCard from '@/components/admin/settings/AdminCheckoutSettingsCard';
 import PaymentsWebhooksPanel from '@/components/admin/dev/PaymentsWebhooksPanel';
-import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 
@@ -142,7 +141,7 @@ const Settings = () => {
 
         {isAdmin && <TabsContent value="developer" className="space-y-6">
             <Tabs defaultValue="auth-endpoints" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-9">
+              <TabsList className="grid w-full grid-cols-8">
                 <TabsTrigger value="auth-endpoints">Auth API</TabsTrigger>
                 <TabsTrigger value="buying-logic">Buying Logic</TabsTrigger>
                 <TabsTrigger value="checkout">Checkout</TabsTrigger>
@@ -151,7 +150,6 @@ const Settings = () => {
                 <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
                 <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
                 <TabsTrigger value="production-readiness">Production</TabsTrigger>
-                <TabsTrigger value="performance">Performance</TabsTrigger>
               </TabsList>
               
               <TabsContent value="auth-endpoints">
@@ -723,7 +721,7 @@ const promotions = await publicAPI.getActivePromotions();
 
 // Validate promotion code
 const discount = await publicAPI.validatePromotion(
-  promotionCode, 
+  'WELCOME10', 
   cart.summary.subtotal
 );
 
@@ -861,7 +859,7 @@ if (!paymentSuccess) {
                         <li>• <strong>8 Categories:</strong> Pizza, Burgers, Pasta, Salads, Appetizers, Desserts, Beverages, Seafood</li>
                         <li>• <strong>30 Products:</strong> Full menu with prices and descriptions</li>
                         <li>• <strong>15 Sample Customers:</strong> For testing customer registration</li>
-                        <li>• <strong>Production-Ready Promotions:</strong> Percentage, Fixed Amount, BOGO, and Free Delivery types</li>
+                        <li>• <strong>4 Active Promotions:</strong> Including WELCOME10, FREEDEL, PIZZA20, WEEKEND15</li>
                         <li>• <strong>Payment Testing:</strong> Use Paystack test cards for secure transactions</li>
                       </ul>
                     </div>
@@ -1460,20 +1458,6 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                   <ProductionReadinessStatus />
                   <ProductionHealthMonitor />
                 </div>
-              </TabsContent>
-              
-              <TabsContent value="performance">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Performance Monitoring</CardTitle>
-                    <CardDescription>
-                      Monitor web performance metrics, network activity, and system health
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <PerformanceDebugger />
-                  </CardContent>
-                </Card>
               </TabsContent>
             </Tabs>
           </TabsContent>}

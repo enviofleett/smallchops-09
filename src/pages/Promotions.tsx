@@ -11,13 +11,11 @@ import { usePromotions, useDeletePromotion, useUpdatePromotion } from "@/hooks/u
 
 import CreatePromotionForm from "@/components/promotions/CreatePromotionForm";
 import EditPromotionDialog from "@/components/promotions/EditPromotionDialog";
-import { PromotionOptimizationPanel } from "@/components/admin/promotions/PromotionOptimizationPanel";
 import type { Promotion, PromotionStatus } from "@/api/promotions";
 
 import { useToast } from "@/hooks/use-toast";
 import { useQuery } from "@tanstack/react-query"; // For the usage counts
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 
 // --- Add helper for status colors ---
@@ -117,14 +115,6 @@ export default function PromotionsPage() {
           Create Promotion
         </Button>
       </div>
-
-      <Tabs defaultValue="promotions" className="w-full">
-        <TabsList>
-          <TabsTrigger value="promotions">Promotions</TabsTrigger>
-          <TabsTrigger value="analytics">Analytics & Optimization</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="promotions" className="space-y-6">{/* Promotions Table */}
 
       {/* Promotions Table */}
       {isLoading && <div className="p-8 text-center">Loading...</div>}
@@ -331,12 +321,6 @@ export default function PromotionsPage() {
           </table>
         </ResponsiveTable>
       )}
-        </TabsContent>
-
-        <TabsContent value="analytics" className="space-y-6">
-          <PromotionOptimizationPanel />
-        </TabsContent>
-      </Tabs>
 
       {/* Create Promotion Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>

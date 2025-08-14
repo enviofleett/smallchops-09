@@ -10,6 +10,7 @@ import { useOrderSummary } from '@/hooks/useOrderSummary';
 import { format } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { PriceDisplay } from '@/components/ui/price-display';
+import { SafeHtml } from '@/components/ui/safe-html';
 
 interface OrderSummaryProps {
   detailed?: boolean;
@@ -270,9 +271,11 @@ export function OrderSummary({ detailed = false }: OrderSummaryProps) {
                               {item.products?.name || item.product_name}
                             </h5>
                             {item.products?.description && (
-                              <p className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2">
+                              <SafeHtml 
+                                className="text-xs sm:text-sm text-muted-foreground mt-1 line-clamp-2"
+                              >
                                 {item.products.description}
-                              </p>
+                              </SafeHtml>
                             )}
                             <div className="flex items-center justify-between mt-2">
                               <span className="text-xs sm:text-sm text-muted-foreground">

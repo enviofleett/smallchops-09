@@ -1,6 +1,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { Image, Package, ShoppingCart } from "lucide-react";
 
 interface ProductDetail {
@@ -70,9 +71,9 @@ export function ProductDetailCard({ item, onReorder, showReorderButton = false }
               <div className="flex-1">
                 <h4 className="font-medium text-sm line-clamp-2">{productName}</h4>
                 {productDescription && (
-                  <p className="text-xs text-muted-foreground line-clamp-1 mt-1">
+                  <SafeHtml className="text-xs text-muted-foreground line-clamp-1 mt-1">
                     {productDescription}
-                  </p>
+                  </SafeHtml>
                 )}
               </div>
               

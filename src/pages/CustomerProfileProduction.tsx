@@ -3,12 +3,13 @@ import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import ProductionOrdersList from '@/components/customer/ProductionOrdersList';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 import ProductionMonitoring from '@/components/ProductionMonitoring';
+import ProductionOrdersErrorBoundary from '@/components/customer/ProductionOrdersErrorBoundary';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { User, Package, Settings, LogOut } from 'lucide-react';
+import { User, Package, Settings, LogOut, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
 const CustomerProfileProduction = () => {
-  const { user, logout } = useCustomerAuth();
+  const { user, logout, isLoading, error, customerAccount, refetch } = useCustomerAuth();
   
   const handleSignOut = async () => {
     try {
@@ -20,6 +21,20 @@ const CustomerProfileProduction = () => {
     }
   };
 
+  // PRODUCTION FIX: Enhanced loading and error states
+  if (isLoading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="max-w-md mx-auto">
+          <CardContent className="text-center py-8">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-4"></div>
+            <p className="text-muted-foreground">Loading your profile...</p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (!user) {
     return (
       <div className="container mx-auto px-4 py-8">
@@ -29,6 +44,28 @@ const CustomerProfileProduction = () => {
             <Button onClick={() => window.location.href = '/auth'}>
               Sign In
             </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  if (error && !customerAccount) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <Card className="max-w-md mx-auto">
+          <CardContent className="text-center py-8">
+            <p className="text-destructive mb-4">Authentication Error</p>
+            <p className="text-muted-foreground text-sm mb-4">{error}</p>
+            <div className="space-y-2">
+              <Button onClick={refetch} className="w-full">
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+              <Button variant="outline" onClick={() => window.location.href = '/auth'} className="w-full">
+                Sign In Again
+              </Button>
+            </div>
           </CardContent>
         </Card>
       </div>
@@ -83,9 +120,20 @@ const CustomerProfileProduction = () => {
             
             {/* Main content */}
             <div className="lg:col-span-3">
-              <ProductionErrorBoundary>
+              <ProductionOrdersErrorBoundary 
+                customerEmail={user.email}
+                onError={(error, errorInfo) => {
+                  console.error('Orders component error for customer:', {
+                    email: user.email,
+                    customerId: customerAccount?.id,
+                    error: error.message,
+                    errorInfo,
+                    timestamp: new Date().toISOString()
+                  });
+                }}
+              >
                 <ProductionOrdersList customerEmail={user.email} />
-              </ProductionErrorBoundary>
+              </ProductionOrdersErrorBoundary>
             </div>
           </div>
         </div>

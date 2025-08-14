@@ -38,9 +38,9 @@ export const useCustomerOrders = () => {
           timestamp: new Date().toISOString()
         });
         
-        // PRODUCTION FIX: Check for abort signal only once per query section
+        // PRODUCTION FIX: Minimal abort checking to prevent premature cancellation
         if (signal?.aborted) {
-          console.log('🔄 Query aborted by React Query');
+          console.log('🔄 Query aborted at start');
           throw new Error('Query aborted');
         }
 
@@ -83,7 +83,7 @@ export const useCustomerOrders = () => {
         }
 
         // Approach 2: If customer account exists, also try direct customer_id match
-        if (customerAccount?.id && !signal?.aborted) {
+        if (customerAccount?.id) {
           try {
             const { data: directOrders, error: directError } = await supabase
               .from('orders')
@@ -122,10 +122,7 @@ export const useCustomerOrders = () => {
           }
         }
 
-        // Final abort check before processing
-        if (signal?.aborted) {
-          throw new Error('Query aborted');
-        }
+        // PRODUCTION FIX: Remove redundant abort check - React Query handles this
 
         // Process orders to handle missing data gracefully
         const processedOrders = allOrders.map(order => ({
@@ -172,13 +169,24 @@ export const useCustomerOrders = () => {
           timestamp: new Date().toISOString()
         });
         
-        // PRODUCTION FIX: More descriptive error messages
+        // PRODUCTION FIX: Enhanced error context for debugging
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+        const context = {
+          customerEmail: userEmail,
+          customerId: customerAccount?.id,
+          isAuthenticated,
+          timestamp: new Date().toISOString()
+        };
+        
         if (errorMessage.includes('permission') || errorMessage.includes('policy')) {
-          throw new Error('Authentication issue detected. Please refresh the page and try again.');
+          throw new Error(`Authentication issue detected for ${userEmail}. Please refresh and try again. Context: ${JSON.stringify(context)}`);
         }
         
-        throw new Error(`Unable to load orders: ${errorMessage}`);
+        if (errorMessage.includes('PGRST')) {
+          throw new Error(`Database connection issue. Please try again in a moment. Context: ${JSON.stringify(context)}`);
+        }
+        
+        throw new Error(`Unable to load orders for ${userEmail}: ${errorMessage}. Context: ${JSON.stringify(context)}`);
       }
     },
     enabled: isAuthenticated && !!(user?.email || customerAccount?.email),

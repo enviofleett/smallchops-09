@@ -105,47 +105,65 @@ export const useCustomerAuth = () => {
 
     const initializeAuth = async () => {
       try {
-        // Set up auth state listener
+        // PRODUCTION FIX: Set up auth state listener with atomic updates
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (!mounted) return;
           
+          console.log(`🔄 Auth state change: ${event}`, { 
+            hasUser: !!session?.user, 
+            email: session?.user?.email,
+            timestamp: new Date().toISOString()
+          });
+          
           if (session?.user) {
-            // PRODUCTION FIX: Remove setTimeout to eliminate race conditions
-            if (!mounted) return;
-            
-            console.log('🔄 Auth state change - user session detected:', session.user.email);
-            
-            setAuthState(prev => ({ 
-              ...prev, 
-              user: session.user, 
-              session, 
-              isLoading: true,
-              error: null
-            }));
+            try {
+              // Single atomic state update for loading state
+              setAuthState(prev => ({ 
+                ...prev, 
+                user: session.user, 
+                session, 
+                isLoading: true,
+                error: null
+              }));
 
-            // Load customer account with email fallback
-            const customerAccount = await loadCustomerAccount(session.user.id, session.user.email);
-            
-            if (mounted) {
-              const isAuthenticated = !!customerAccount;
-              const error = customerAccount ? null : 'Unable to load customer profile. Please try refreshing the page.';
+              // Load customer account with enhanced error handling
+              const customerAccount = await loadCustomerAccount(session.user.id, session.user.email);
               
-              console.log('🔄 Customer account load result:', { 
-                hasAccount: !!customerAccount, 
-                isAuthenticated, 
-                userId: session.user.id,
-                email: session.user.email 
-              });
+              if (!mounted) return;
               
-              setAuthState(prev => ({
-                ...prev,
+              // Single atomic state update with complete auth state
+              const authUpdate = {
+                user: session.user,
+                session,
                 customerAccount,
                 isLoading: false,
-                isAuthenticated,
-                error
-              }));
+                isAuthenticated: !!customerAccount,
+                error: customerAccount ? null : `Customer profile not found for ${session.user.email}. Please contact support if this persists.`
+              };
+              
+              console.log('✅ Auth state update complete:', { 
+                hasAccount: !!customerAccount, 
+                isAuthenticated: authUpdate.isAuthenticated, 
+                userId: session.user.id,
+                email: session.user.email,
+                timestamp: new Date().toISOString()
+              });
+              
+              setAuthState(authUpdate);
+            } catch (error) {
+              console.error('❌ Auth state change error:', error);
+              if (mounted) {
+                setAuthState(prev => ({
+                  ...prev,
+                  customerAccount: null,
+                  isLoading: false,
+                  isAuthenticated: false,
+                  error: `Authentication error: ${error instanceof Error ? error.message : 'Unknown error'}`
+                }));
+              }
             }
           } else {
+            // Clear state when no session
             setAuthState({
               user: null,
               session: null,

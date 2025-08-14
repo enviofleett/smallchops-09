@@ -1,11 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone, ChevronRight, User, Car, MapPinIcon, Building, Navigation, CheckCircle } from 'lucide-react';
 import { formatAddress } from '@/utils/formatAddress';
 import { DeliveryCountdown } from './DeliveryCountdown';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 
 interface OrderItem {
   id: string;
@@ -29,6 +32,27 @@ interface DeliverySchedule {
   delivery_fee?: number;
 }
 
+interface DeliveryZone {
+  id: string;
+  name: string;
+  description?: string;
+  area?: any;
+  created_at: string;
+  updated_at: string;
+}
+
+interface DispatchRider {
+  id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  vehicle_type?: string;
+  vehicle_brand?: string;
+  vehicle_model?: string;
+  license_plate?: string;
+  is_active: boolean;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -40,9 +64,12 @@ interface Order {
   order_time: string;
   order_type: 'delivery' | 'pickup';
   delivery_address?: any;
+  delivery_zone_id?: string;
+  assigned_rider_id?: string;
   customer_phone?: string;
   order_items: OrderItem[];
   paid_at?: string;
+  delivery_fee?: number;
 }
 
 interface OrderDetailsModalProps {
@@ -58,6 +85,11 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   isOpen,
   onClose,
 }) => {
+  const [deliveryZone, setDeliveryZone] = useState<DeliveryZone | null>(null);
+  const [dispatchRider, setDispatchRider] = useState<DispatchRider | null>(null);
+  const [orderStatus, setOrderStatus] = useState(order?.status);
+  const [loading, setLoading] = useState(false);
+
   if (!order) return null;
 
   const formatCurrency = (amount: number) => {
@@ -101,9 +133,104 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     return colors[status as keyof typeof colors] || 'bg-muted text-muted-foreground';
   };
 
+  // Fetch delivery zone and dispatch rider information
+  useEffect(() => {
+    const fetchDeliveryInfo = async () => {
+      if (!order) return;
+      
+      setLoading(true);
+      try {
+        // Fetch delivery zone if available
+        if (order.delivery_zone_id) {
+          const { data: zoneData, error: zoneError } = await supabase
+            .from('delivery_zones')
+            .select('*')
+            .eq('id', order.delivery_zone_id)
+            .single();
+          
+          if (!zoneError && zoneData) {
+            setDeliveryZone(zoneData);
+          }
+        }
+
+        // Fetch dispatch rider if assigned
+        if (order.assigned_rider_id) {
+          const { data: riderData, error: riderError } = await supabase
+            .from('drivers')
+            .select('*')
+            .eq('id', order.assigned_rider_id)
+            .single();
+          
+          if (!riderError && riderData) {
+            setDispatchRider(riderData);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching delivery info:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDeliveryInfo();
+  }, [order]);
+
+  // Real-time status updates
+  useEffect(() => {
+    if (!order?.id) return;
+
+    const channel = supabase
+      .channel('order-status-updates')
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'orders',
+          filter: `id=eq.${order.id}`
+        },
+        (payload) => {
+          setOrderStatus(payload.new.status);
+          if (payload.new.status === 'delivered') {
+            toast.success('Your order has been delivered!');
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [order?.id]);
+
   const subtotal = order.order_items.reduce((sum, item) => sum + item.total_price, 0);
   const totalVat = order.order_items.reduce((sum, item) => sum + (item.vat_amount || 0), 0);
   const totalDiscount = order.order_items.reduce((sum, item) => sum + (item.discount_amount || 0), 0);
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'delivered':
+        return <CheckCircle className="h-4 w-4 text-green-600" />;
+      case 'out_for_delivery':
+        return <Truck className="h-4 w-4 text-blue-600" />;
+      case 'ready':
+        return <Package className="h-4 w-4 text-purple-600" />;
+      default:
+        return <Clock className="h-4 w-4 text-orange-600" />;
+    }
+  };
+
+  const getStatusSteps = () => {
+    const steps = [
+      { key: 'pending', label: 'Order Placed', completed: true },
+      { key: 'confirmed', label: 'Confirmed', completed: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'].includes(orderStatus) },
+      { key: 'preparing', label: 'Preparing', completed: ['preparing', 'ready', 'out_for_delivery', 'delivered'].includes(orderStatus) },
+      { key: 'ready', label: 'Ready', completed: ['ready', 'out_for_delivery', 'delivered'].includes(orderStatus) },
+      { key: 'out_for_delivery', label: 'Out for Delivery', completed: ['out_for_delivery', 'delivered'].includes(orderStatus) },
+      { key: 'delivered', label: 'Delivered', completed: orderStatus === 'delivered' }
+    ];
+    return steps;
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -125,14 +252,48 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             />
           )}
 
+          {/* Order Status Timeline */}
+          {order.order_type === 'delivery' && (
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Navigation className="h-5 w-5 flex-shrink-0" />
+                  Order Progress
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {getStatusSteps().map((step, index) => (
+                    <div key={step.key} className="flex items-center gap-3">
+                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                        step.completed ? 'bg-green-500' : 'bg-muted'
+                      }`} />
+                      <div className="flex-1">
+                        <p className={`text-sm font-medium ${
+                          step.completed ? 'text-green-700' : 'text-muted-foreground'
+                        }`}>
+                          {step.label}
+                        </p>
+                      </div>
+                      {step.completed && (
+                        <CheckCircle className="h-4 w-4 text-green-500" />
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Order Header */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <Card className="p-3 sm:p-4">
               <CardContent className="p-0">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge className={getStatusColor(order.status)} variant="secondary">
-                      {order.status.replace('_', ' ').toUpperCase()}
+                    {getStatusIcon(orderStatus)}
+                    <Badge className={getStatusColor(orderStatus)} variant="secondary">
+                      {orderStatus.replace('_', ' ').toUpperCase()}
                     </Badge>
                   </div>
                   <p className="text-xs sm:text-sm text-muted-foreground">Order Status</p>
@@ -307,10 +468,123 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
                         <div className="min-w-0 flex-1">
                           <p className="text-xs sm:text-sm text-muted-foreground mb-2">Delivery Address</p>
-                          <p className="font-medium text-sm sm:text-base leading-relaxed break-words">
-                            {formatAddress(order.delivery_address)}
+                          <div className="space-y-1">
+                            <p className="font-medium text-sm sm:text-base leading-relaxed break-words">
+                              {order.delivery_address.address_line_1}
+                            </p>
+                            {order.delivery_address.address_line_2 && (
+                              <p className="font-medium text-sm sm:text-base leading-relaxed break-words">
+                                {order.delivery_address.address_line_2}
+                              </p>
+                            )}
+                            {order.delivery_address.apartment && (
+                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                <Building className="h-4 w-4" />
+                                <span>Apt/Unit: {order.delivery_address.apartment}</span>
+                              </div>
+                            )}
+                            {order.delivery_address.landmark && (
+                              <div className="flex items-center gap-2 text-sm text-primary">
+                                <MapPinIcon className="h-4 w-4" />
+                                <span>Landmark: {order.delivery_address.landmark}</span>
+                              </div>
+                            )}
+                            <p className="text-sm text-muted-foreground">
+                              {order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.postal_code}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Delivery Zone Information */}
+                  {deliveryZone && (
+                    <div className="bg-blue-50/50 rounded-lg p-3 sm:p-4 border border-blue-200/50">
+                      <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Delivery Zone
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        <div className="space-y-1">
+                          <p className="text-xs sm:text-sm text-muted-foreground">Zone</p>
+                          <p className="font-medium text-sm sm:text-base">{deliveryZone.name}</p>
+                        </div>
+                        <div className="space-y-1">
+                          <p className="text-xs sm:text-sm text-muted-foreground">Delivery Fee</p>
+                          <p className="font-medium text-sm sm:text-base text-primary">
+                            {order.delivery_fee ? formatCurrency(order.delivery_fee) : 'Contact for pricing'}
                           </p>
                         </div>
+                        {deliveryZone.description && (
+                          <div className="space-y-1 sm:col-span-2">
+                            <p className="text-xs sm:text-sm text-muted-foreground">Coverage Area</p>
+                            <p className="text-sm break-words">{deliveryZone.description}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dispatch Rider Information */}
+                  {dispatchRider && (
+                    <div className="bg-green-50/50 rounded-lg p-3 sm:p-4 border border-green-200/50">
+                      <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Dispatch Rider
+                      </h4>
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <p className="text-xs sm:text-sm text-muted-foreground">Rider Name</p>
+                            <p className="font-medium text-sm sm:text-base">{dispatchRider.name}</p>
+                          </div>
+                          {dispatchRider.phone && (
+                            <div className="space-y-1">
+                              <p className="text-xs sm:text-sm text-muted-foreground">Contact</p>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-sm sm:text-base">{dispatchRider.phone}</p>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-7 px-2"
+                                  onClick={() => window.open(`tel:${dispatchRider.phone}`, '_self')}
+                                >
+                                  <Phone className="h-3 w-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                        
+                        {(dispatchRider.vehicle_type || dispatchRider.vehicle_brand) && (
+                          <div className="pt-2 border-t border-green-200/50">
+                            <div className="flex items-center gap-2 mb-2">
+                              <Car className="h-4 w-4 text-green-600" />
+                              <span className="text-xs sm:text-sm text-muted-foreground">Vehicle Information</span>
+                            </div>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+                              {dispatchRider.vehicle_type && (
+                                <div>
+                                  <span className="text-muted-foreground">Type: </span>
+                                  <span className="font-medium capitalize">{dispatchRider.vehicle_type}</span>
+                                </div>
+                              )}
+                              {dispatchRider.vehicle_brand && (
+                                <div>
+                                  <span className="text-muted-foreground">Brand: </span>
+                                  <span className="font-medium">{dispatchRider.vehicle_brand} {dispatchRider.vehicle_model}</span>
+                                </div>
+                              )}
+                              {dispatchRider.license_plate && (
+                                <div className="sm:col-span-2">
+                                  <span className="text-muted-foreground">License Plate: </span>
+                                  <span className="font-medium font-mono">{dispatchRider.license_plate}</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
                   )}
@@ -342,18 +616,20 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                           </p>
                         </div>
                         
-                        {deliverySchedule.delivery_zone && (
+                        {(deliverySchedule.delivery_zone || deliveryZone) && (
                           <div className="space-y-1">
                             <p className="text-xs sm:text-sm text-muted-foreground">Delivery Zone</p>
-                            <p className="font-medium text-sm sm:text-base">{deliverySchedule.delivery_zone}</p>
+                            <p className="font-medium text-sm sm:text-base">
+                              {deliverySchedule.delivery_zone || deliveryZone?.name}
+                            </p>
                           </div>
                         )}
                         
-                        {deliverySchedule.delivery_fee && (
+                         {(deliverySchedule.delivery_fee || order.delivery_fee) && (
                           <div className="space-y-1">
                             <p className="text-xs sm:text-sm text-muted-foreground">Delivery Fee</p>
                             <p className="font-medium text-sm sm:text-base text-primary">
-                              {formatCurrency(deliverySchedule.delivery_fee)}
+                              {formatCurrency(deliverySchedule.delivery_fee || order.delivery_fee || 0)}
                             </p>
                           </div>
                         )}

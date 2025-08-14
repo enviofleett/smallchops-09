@@ -118,7 +118,8 @@ serve(async (req) => {
       delivery_zone_id,
       payment_method,
       guest_session_id,
-      payment_reference
+      payment_reference,
+      delivery_schedule
     } = requestBody;
 
     // 🚨 CRITICAL: Block frontend-generated payment references
@@ -340,6 +341,30 @@ serve(async (req) => {
     }
 
     console.log('✅ Order created successfully:', orderId);
+
+    // Save delivery schedule if provided
+    if (delivery_schedule && fulfillment_type === 'delivery') {
+      console.log('📅 Creating delivery schedule:', delivery_schedule);
+      
+      const { error: scheduleError } = await supabaseClient
+        .from('order_delivery_schedule')
+        .insert({
+          order_id: orderId,
+          delivery_date: delivery_schedule.delivery_date,
+          delivery_time_start: delivery_schedule.delivery_time_start,
+          delivery_time_end: delivery_schedule.delivery_time_end,
+          requested_at: new Date().toISOString(),
+          is_flexible: delivery_schedule.is_flexible || false,
+          special_instructions: delivery_schedule.special_instructions || null
+        });
+
+      if (scheduleError) {
+        console.error('❌ Failed to create delivery schedule:', scheduleError);
+        // Don't fail the entire order, just log the error
+      } else {
+        console.log('✅ Delivery schedule created successfully');
+      }
+    }
 
     // Get the created order details
     const { data: orderDetails } = await supabaseClient

@@ -1,12 +1,14 @@
-import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import React, { useEffect, useState } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Button } from '@/components/ui/button';
-import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone, ChevronRight, User, Car, MapPinIcon, Building, Navigation, CheckCircle } from 'lucide-react';
-import { formatAddress } from '@/utils/formatAddress';
-import { DeliveryCountdown } from './DeliveryCountdown';
+import { Skeleton } from '@/components/ui/skeleton';
+import { X, Package, MapPin, Clock, Phone, Mail, CreditCard, Calendar, Truck, User, Car, MapPinIcon, Building, Navigation, CheckCircle } from 'lucide-react';
+import { DeliveryCountdown } from '@/components/customer/DeliveryCountdown';
+
+import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 
@@ -81,14 +83,47 @@ interface OrderDetailsModalProps {
 
 export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   order,
-  deliverySchedule,
+  deliverySchedule: propDeliverySchedule,
   isOpen,
   onClose,
 }) => {
+  const [deliverySchedule, setDeliverySchedule] = useState(propDeliverySchedule);
+  const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
+
   // CRITICAL: Check for order BEFORE any hooks to prevent React Error #310
   if (!order) {
     return null;
   }
+
+  // Fetch delivery schedule if not provided and order type is delivery
+  useEffect(() => {
+    const fetchDeliverySchedule = async () => {
+      if (order.order_type === 'delivery' && !propDeliverySchedule && !deliverySchedule) {
+        setIsLoadingSchedule(true);
+        try {
+          const { data, error } = await supabase
+            .from('order_delivery_schedule')
+            .select('*')
+            .eq('order_id', order.id)
+            .maybeSingle();
+
+          if (!error && data) {
+            setDeliverySchedule(data);
+          }
+        } catch (error) {
+          console.error('Error fetching delivery schedule:', error);
+        } finally {
+          setIsLoadingSchedule(false);
+        }
+      } else {
+        setDeliverySchedule(propDeliverySchedule);
+      }
+    };
+
+    if (isOpen && order) {
+      fetchDeliverySchedule();
+    }
+  }, [order, propDeliverySchedule, isOpen]);
 
   const [deliveryZone, setDeliveryZone] = useState<DeliveryZone | null>(null);
   const [dispatchRider, setDispatchRider] = useState<DispatchRider | null>(null);
@@ -620,7 +655,15 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   )}
 
-                  {deliverySchedule && (
+                  {isLoadingSchedule ? (
+                    <div className="bg-primary/5 rounded-lg p-3 sm:p-4 border border-primary/10">
+                      <div className="space-y-2">
+                        <Skeleton className="h-4 w-3/4" />
+                        <Skeleton className="h-4 w-1/2" />
+                        <Skeleton className="h-8 w-full" />
+                      </div>
+                    </div>
+                  ) : deliverySchedule ? (
                     <div className="bg-primary/5 rounded-lg p-3 sm:p-4 border border-primary/10">
                       <h4 className="font-semibold text-primary mb-3 flex items-center gap-2">
                         <Calendar className="h-4 w-4" />
@@ -674,6 +717,19 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                           </p>
                         </div>
                       )}
+                      
+                      {/* Countdown Timer */}
+                      <div className="mt-4 pt-3 border-t border-primary/10">
+                        <DeliveryCountdown
+                          deliveryDate={deliverySchedule.delivery_date}
+                          deliveryTimeStart={deliverySchedule.delivery_time_start}
+                          className="w-full"
+                        />
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-muted/30 rounded-lg p-3 text-sm text-muted-foreground">
+                      No delivery schedule information available for this order.
                     </div>
                   )}
 

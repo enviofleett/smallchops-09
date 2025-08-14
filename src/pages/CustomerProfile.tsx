@@ -19,8 +19,7 @@ import {
   Phone,
   Mail,
   AlertTriangle,
-  Calendar,
-  Package
+  Calendar
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -29,7 +28,6 @@ import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { AddressManager } from '@/components/customer/AddressManager';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
-import OrderErrorBoundary from '@/components/customer/OrderErrorBoundary';
 import { EnhancedOrdersSection } from '@/components/customer/EnhancedOrdersSection';
 import { EnhancedWishlistSection } from '@/components/customer/EnhancedWishlistSection';
 import { TransactionHistoryTab } from '@/components/purchase-history/TransactionHistoryTab';
@@ -53,19 +51,16 @@ const ContentSkeleton = () => (
 );
 
 export default function CustomerProfile() {
-  const { isAuthenticated, customerAccount, user, isLoading: authLoading, logout, error: authError } = useCustomerAuth();
+  const { isAuthenticated, customerAccount, isLoading: authLoading, logout, error: authError } = useCustomerAuth();
   const { data: settings } = useBusinessSettings();
   const { handleError } = useErrorHandler();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<ProfileSection>('orders');
-  
-  // Get customer email for error reporting
-  const customerEmail = user?.email || customerAccount?.email;
 
   // Memoize sidebar items to prevent unnecessary re-renders
   const sidebarItems = useMemo(() => [
     { id: 'orders' as const, label: 'My Orders', icon: ShoppingBag, path: '/purchase-history' },
-    { id: 'tracking' as const, label: 'Order Summary', icon: Package, path: '/order-summary' },
+    { id: 'tracking' as const, label: 'Track Orders', icon: MapPin, path: '/track-order' },
     { id: 'bookings' as const, label: 'Catering Bookings', icon: Calendar },
     { id: 'wishlist' as const, label: 'Wishlist', icon: Heart, path: '/customer-favorites' },
     { id: 'payment' as const, label: 'Payment Method', icon: CreditCard },
@@ -128,18 +123,10 @@ export default function CustomerProfile() {
   const renderContent = () => {
     switch (activeSection) {
       case 'orders':
-        return (
-          <OrderErrorBoundary customerEmail={customerEmail}>
-            <EnhancedOrdersSection />
-          </OrderErrorBoundary>
-        );
+        return <EnhancedOrdersSection />;
       case 'tracking':
         // This will be handled by navigation, fallback to orders
-        return (
-          <OrderErrorBoundary customerEmail={customerEmail}>
-            <EnhancedOrdersSection />
-          </OrderErrorBoundary>
-        );
+        return <EnhancedOrdersSection />;
       case 'bookings':
         return <CustomerBookingsSection />;
       case 'wishlist':
@@ -151,11 +138,7 @@ export default function CustomerProfile() {
       case 'help':
         return <HelpSection settings={settings} />;
       default:
-        return (
-          <OrderErrorBoundary customerEmail={customerEmail}>
-            <EnhancedOrdersSection />
-          </OrderErrorBoundary>
-        );
+        return <EnhancedOrdersSection />;
     }
   };
 

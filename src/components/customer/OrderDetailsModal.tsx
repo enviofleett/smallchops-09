@@ -1,16 +1,9 @@
-import React, { useEffect, useState } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from '@/components/ui/dialog';
+import React from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { X, Package, MapPin, Clock, Phone, Mail, CreditCard, Calendar, Truck, User, Car, MapPinIcon, Building, Navigation, CheckCircle } from 'lucide-react';
-import { DeliveryCountdown } from '@/components/customer/DeliveryCountdown';
-
-import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone } from 'lucide-react';
 
 interface OrderItem {
   id: string;
@@ -34,27 +27,6 @@ interface DeliverySchedule {
   delivery_fee?: number;
 }
 
-interface DeliveryZone {
-  id: string;
-  name: string;
-  description?: string;
-  area?: any;
-  created_at: string;
-  updated_at: string;
-}
-
-interface DispatchRider {
-  id: string;
-  name: string;
-  phone?: string;
-  email?: string;
-  vehicle_type?: string;
-  vehicle_brand?: string;
-  vehicle_model?: string;
-  license_plate?: string;
-  is_active: boolean;
-}
-
 interface Order {
   id: string;
   order_number: string;
@@ -66,12 +38,9 @@ interface Order {
   order_time: string;
   order_type: 'delivery' | 'pickup';
   delivery_address?: any;
-  delivery_zone_id?: string;
-  assigned_rider_id?: string;
   customer_phone?: string;
   order_items: OrderItem[];
   paid_at?: string;
-  delivery_fee?: number;
 }
 
 interface OrderDetailsModalProps {
@@ -83,57 +52,11 @@ interface OrderDetailsModalProps {
 
 export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   order,
-  deliverySchedule: propDeliverySchedule,
+  deliverySchedule,
   isOpen,
   onClose,
 }) => {
-  const [deliverySchedule, setDeliverySchedule] = useState(propDeliverySchedule);
-  const [isLoadingSchedule, setIsLoadingSchedule] = useState(false);
-
-  // CRITICAL: Check for order BEFORE any hooks to prevent React Error #310
-  if (!order) {
-    return null;
-  }
-
-  // Fetch delivery schedule if not provided and order type is delivery
-  useEffect(() => {
-    const fetchDeliverySchedule = async () => {
-      if (order.order_type === 'delivery' && !propDeliverySchedule && !deliverySchedule) {
-        setIsLoadingSchedule(true);
-        try {
-          const { data, error } = await supabase
-            .from('order_delivery_schedule')
-            .select('*')
-            .eq('order_id', order.id)
-            .maybeSingle();
-
-          if (!error && data) {
-            setDeliverySchedule(data);
-          }
-        } catch (error) {
-          console.error('Error fetching delivery schedule:', error);
-        } finally {
-          setIsLoadingSchedule(false);
-        }
-      } else {
-        setDeliverySchedule(propDeliverySchedule);
-      }
-    };
-
-    if (isOpen && order) {
-      fetchDeliverySchedule();
-    }
-  }, [order, propDeliverySchedule, isOpen]);
-
-  const [deliveryZone, setDeliveryZone] = useState<DeliveryZone | null>(null);
-  const [dispatchRider, setDispatchRider] = useState<DispatchRider | null>(null);
-  const [orderStatus, setOrderStatus] = useState(order.status);
-  const [loading, setLoading] = useState(false);
-
-  // Initialize orderStatus when order changes
-  useEffect(() => {
-    setOrderStatus(order.status);
-  }, [order.status]);
+  if (!order) return null;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -176,220 +99,57 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     return colors[status as keyof typeof colors] || 'bg-muted text-muted-foreground';
   };
 
-  // Fetch delivery zone and dispatch rider information
-  useEffect(() => {
-    let isMounted = true;
-    const abortController = new AbortController();
-
-    const fetchDeliveryInfo = async () => {
-      if (!order || !isMounted) return;
-      
-      setLoading(true);
-      
-      try {
-        // Fetch delivery zone if available
-        if (order.delivery_zone_id && isMounted) {
-          const { data: zoneData, error: zoneError } = await supabase
-            .from('delivery_zones')
-            .select('*')
-            .eq('id', order.delivery_zone_id)
-            .maybeSingle();
-          
-          if (abortController.signal.aborted || !isMounted) return;
-          
-          if (!zoneError && zoneData) {
-            setDeliveryZone(zoneData);
-          }
-        }
-
-        // Fetch dispatch rider if assigned
-        if (order.assigned_rider_id && isMounted) {
-          const { data: riderData, error: riderError } = await supabase
-            .from('drivers')
-            .select('*')
-            .eq('id', order.assigned_rider_id)
-            .maybeSingle();
-          
-          if (abortController.signal.aborted || !isMounted) return;
-          
-          if (!riderError && riderData) {
-            setDispatchRider(riderData);
-          }
-        }
-      } catch (error) {
-        // Silently handle errors in production
-        if (process.env.NODE_ENV === 'development') {
-          console.error('Error fetching delivery info:', error);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchDeliveryInfo();
-
-    return () => {
-      isMounted = false;
-      abortController.abort();
-    };
-  }, [order?.id]);
-
-  // Real-time status updates
-  useEffect(() => {
-    if (!order?.id) return;
-
-    let isMounted = true;
-    
-    const channel = supabase
-      .channel(`order-status-updates-${order.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'orders',
-          filter: `id=eq.${order.id}`
-        },
-        (payload) => {
-          if (isMounted) {
-            setOrderStatus(payload.new.status);
-            if (payload.new.status === 'delivered') {
-              toast.success('Your order has been delivered!');
-            }
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      isMounted = false;
-      supabase.removeChannel(channel);
-    };
-  }, [order?.id]);
-
   const subtotal = order.order_items.reduce((sum, item) => sum + item.total_price, 0);
   const totalVat = order.order_items.reduce((sum, item) => sum + (item.vat_amount || 0), 0);
   const totalDiscount = order.order_items.reduce((sum, item) => sum + (item.discount_amount || 0), 0);
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return <CheckCircle className="h-4 w-4 text-green-600" />;
-      case 'out_for_delivery':
-        return <Truck className="h-4 w-4 text-blue-600" />;
-      case 'ready':
-        return <Package className="h-4 w-4 text-purple-600" />;
-      default:
-        return <Clock className="h-4 w-4 text-orange-600" />;
-    }
-  };
-
-  const getStatusSteps = () => {
-    const steps = [
-      { key: 'pending', label: 'Order Placed', completed: true },
-      { key: 'confirmed', label: 'Confirmed', completed: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'].includes(orderStatus) },
-      { key: 'preparing', label: 'Preparing', completed: ['preparing', 'ready', 'out_for_delivery', 'delivered'].includes(orderStatus) },
-      { key: 'ready', label: 'Ready', completed: ['ready', 'out_for_delivery', 'delivered'].includes(orderStatus) },
-      { key: 'out_for_delivery', label: 'Out for Delivery', completed: ['out_for_delivery', 'delivered'].includes(orderStatus) },
-      { key: 'delivered', label: 'Delivered', completed: orderStatus === 'delivered' }
-    ];
-    return steps;
-  };
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
-        <DialogHeader className="space-y-3">
-          <DialogTitle className="flex items-center gap-3 text-lg sm:text-xl">
-            <Package className="h-5 w-5 text-primary flex-shrink-0" />
-            <span className="truncate">Order Details - {order.order_number}</span>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <Package className="h-5 w-5 text-primary" />
+            Order Details - {order.order_number}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 sm:space-y-6">
-          {/* Delivery Countdown - Only show if delivery is scheduled */}
-          {deliverySchedule && (
-            <DeliveryCountdown
-              deliveryDate={deliverySchedule.delivery_date}
-              deliveryTimeStart={deliverySchedule.delivery_time_start}
-              className="w-full"
-            />
-          )}
-
-          {/* Order Status Timeline */}
-          {order.order_type === 'delivery' && (
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <Navigation className="h-5 w-5 flex-shrink-0" />
-                  Order Progress
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {getStatusSteps().map((step, index) => (
-                    <div key={step.key} className="flex items-center gap-3">
-                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
-                        step.completed ? 'bg-green-500' : 'bg-muted'
-                      }`} />
-                      <div className="flex-1">
-                        <p className={`text-sm font-medium ${
-                          step.completed ? 'text-green-700' : 'text-muted-foreground'
-                        }`}>
-                          {step.label}
-                        </p>
-                      </div>
-                      {step.completed && (
-                        <CheckCircle className="h-4 w-4 text-green-500" />
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          )}
-
+        <div className="space-y-6">
           {/* Order Header */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <Card className="p-3 sm:p-4">
-              <CardContent className="p-0">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="pt-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    {getStatusIcon(orderStatus)}
-                    <Badge className={getStatusColor(orderStatus)} variant="secondary">
-                      {orderStatus.replace('_', ' ').toUpperCase()}
+                    <Badge className={getStatusColor(order.status)}>
+                      {order.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Order Status</p>
+                  <p className="text-sm text-muted-foreground">Order Status</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="p-3 sm:p-4">
-              <CardContent className="p-0">
+            <Card>
+              <CardContent className="pt-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge className={getPaymentStatusColor(order.payment_status)} variant="secondary">
+                    <Badge className={getPaymentStatusColor(order.payment_status)}>
                       {order.payment_status.toUpperCase()}
                     </Badge>
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Payment Status</p>
+                  <p className="text-sm text-muted-foreground">Payment Status</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
-              <CardContent className="p-0">
+            <Card>
+              <CardContent className="pt-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-                    <span className="font-medium text-sm sm:text-base break-words">
-                      {formatDateTime(order.order_time)}
-                    </span>
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{formatDateTime(order.order_time)}</span>
                   </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">Order Time</p>
+                  <p className="text-sm text-muted-foreground">Order Time</p>
                 </div>
               </CardContent>
             </Card>
@@ -397,88 +157,73 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
           {/* Order Items */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <Package className="h-5 w-5 flex-shrink-0" />
-                Order Items ({order.order_items.length} {order.order_items.length === 1 ? 'item' : 'items'})
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Order Items ({order.order_items.length} items)
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3 sm:space-y-4">
+              <div className="space-y-4">
                 {order.order_items.map((item) => (
-                  <div key={item.id} className="border rounded-lg p-3 sm:p-4 bg-card">
-                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-sm sm:text-base break-words">{item.product_name}</h4>
-                        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground mt-1">
-                          <span>Qty: {item.quantity}</span>
-                          <span>•</span>
-                          <span>{formatCurrency(item.unit_price)} each</span>
-                        </div>
-                        
+                  <div key={item.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1">
+                        <h4 className="font-medium">{item.product_name}</h4>
                         {item.special_instructions && (
-                          <div className="mt-2 p-2 bg-muted/50 rounded text-xs sm:text-sm">
-                            <p className="font-medium text-muted-foreground mb-1">Special Instructions:</p>
-                            <p className="break-words">{item.special_instructions}</p>
-                          </div>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            <strong>Special Instructions:</strong> {item.special_instructions}
+                          </p>
                         )}
-                        
-                        {item.customizations && typeof item.customizations === 'object' && (
-                          <div className="mt-2 p-2 bg-muted/50 rounded text-xs sm:text-sm">
-                            <p className="font-medium text-muted-foreground mb-1">Customizations:</p>
-                            <div className="space-y-1">
-                              {Object.entries(item.customizations).map(([key, value]) => (
-                                <div key={key} className="flex gap-2 break-words">
-                                  <span className="font-medium">{key}:</span>
-                                  <span>{String(value)}</span>
-                                </div>
-                              ))}
-                            </div>
-                          </div>
+                        {item.customizations && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            <strong>Customizations:</strong> {JSON.stringify(item.customizations)}
+                          </p>
                         )}
                       </div>
-                      
-                      <div className="text-right sm:ml-4 flex-shrink-0">
-                        <p className="font-bold text-primary text-sm sm:text-base">
-                          {formatCurrency(item.total_price)}
+                      <div className="text-right ml-4">
+                        <p className="font-medium">{formatCurrency(item.total_price)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.quantity} × {formatCurrency(item.unit_price)}
                         </p>
-                        {(item.vat_amount > 0 || item.discount_amount > 0) && (
-                          <div className="text-xs text-muted-foreground mt-1 space-y-1">
-                            {item.vat_amount > 0 && (
-                              <div>VAT: {formatCurrency(item.vat_amount)}</div>
-                            )}
-                            {item.discount_amount > 0 && (
-                              <div className="text-green-600">Discount: -{formatCurrency(item.discount_amount)}</div>
-                            )}
-                          </div>
-                        )}
                       </div>
                     </div>
+                    
+                    {(item.vat_amount || item.discount_amount) && (
+                      <div className="flex justify-between text-sm text-muted-foreground pt-2 border-t">
+                        {item.vat_amount > 0 && (
+                          <span>VAT: {formatCurrency(item.vat_amount)}</span>
+                        )}
+                        {item.discount_amount > 0 && (
+                          <span>Discount: -{formatCurrency(item.discount_amount)}</span>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ))}
 
-                <Separator className="my-4" />
+                <Separator />
 
                 {/* Order Summary */}
-                <div className="bg-muted/30 rounded-lg p-3 sm:p-4 space-y-2">
+                <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal:</span>
-                    <span className="font-medium">{formatCurrency(subtotal)}</span>
+                    <span>{formatCurrency(subtotal)}</span>
                   </div>
                   {totalVat > 0 && (
                     <div className="flex justify-between text-sm">
                       <span>VAT (7.5%):</span>
-                      <span className="font-medium">{formatCurrency(totalVat)}</span>
+                      <span>{formatCurrency(totalVat)}</span>
                     </div>
                   )}
                   {totalDiscount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Total Discount:</span>
-                      <span className="font-medium">-{formatCurrency(totalDiscount)}</span>
+                      <span>-{formatCurrency(totalDiscount)}</span>
                     </div>
                   )}
-                  <Separator className="my-2" />
-                  <div className="flex justify-between font-bold text-base sm:text-lg text-primary">
+                  <Separator />
+                  <div className="flex justify-between font-semibold text-lg">
                     <span>Total:</span>
                     <span>{formatCurrency(order.total_amount)}</span>
                   </div>
@@ -489,28 +234,28 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
           {/* Payment Information */}
           <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                <CreditCard className="h-5 w-5 flex-shrink-0" />
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
                 Payment Information
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                <div className="space-y-1">
-                  <p className="text-xs sm:text-sm text-muted-foreground">Payment Method</p>
-                  <p className="font-medium text-sm sm:text-base">{order.payment_method || 'Online Payment'}</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Payment Method</p>
+                  <p className="font-medium">{order.payment_method || 'Online Payment'}</p>
                 </div>
                 {order.payment_reference && (
-                  <div className="space-y-1">
-                    <p className="text-xs sm:text-sm text-muted-foreground">Payment Reference</p>
-                    <p className="font-mono text-xs sm:text-sm break-all">{order.payment_reference}</p>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Payment Reference</p>
+                    <p className="font-mono text-sm">{order.payment_reference}</p>
                   </div>
                 )}
                 {order.paid_at && (
-                  <div className="space-y-1 sm:col-span-2">
-                    <p className="text-xs sm:text-sm text-muted-foreground">Paid At</p>
-                    <p className="font-medium text-sm sm:text-base">{formatDateTime(order.paid_at)}</p>
+                  <div>
+                    <p className="text-sm text-muted-foreground">Paid At</p>
+                    <p className="font-medium">{formatDateTime(order.paid_at)}</p>
                   </div>
                 )}
               </div>
@@ -520,225 +265,84 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           {/* Delivery Information */}
           {(order.order_type === 'delivery' || deliverySchedule) && (
             <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
-                  <Truck className="h-5 w-5 flex-shrink-0" />
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Truck className="h-5 w-5" />
                   Delivery Information
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4 sm:space-y-6">
+                <div className="space-y-4">
                   {order.delivery_address && (
-                    <div className="bg-muted/30 rounded-lg p-3 sm:p-4">
-                      <div className="flex items-start gap-3">
-                        <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
-                        <div className="min-w-0 flex-1">
-                          <p className="text-xs sm:text-sm text-muted-foreground mb-2">Delivery Address</p>
-                          <div className="space-y-1">
-                            <p className="font-medium text-sm sm:text-base leading-relaxed break-words">
-                              {order.delivery_address.address_line_1}
-                            </p>
-                            {order.delivery_address.address_line_2 && (
-                              <p className="font-medium text-sm sm:text-base leading-relaxed break-words">
-                                {order.delivery_address.address_line_2}
-                              </p>
-                            )}
-                            {order.delivery_address.apartment && (
-                              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                                <Building className="h-4 w-4" />
-                                <span>Apt/Unit: {order.delivery_address.apartment}</span>
-                              </div>
-                            )}
-                            {order.delivery_address.landmark && (
-                              <div className="flex items-center gap-2 text-sm text-primary">
-                                <MapPinIcon className="h-4 w-4" />
-                                <span>Landmark: {order.delivery_address.landmark}</span>
-                              </div>
-                            )}
-                            <p className="text-sm text-muted-foreground">
-                              {order.delivery_address.city}, {order.delivery_address.state} {order.delivery_address.postal_code}
-                            </p>
-                          </div>
+                    <div>
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Delivery Address</p>
+                          <p className="font-medium">
+                            {typeof order.delivery_address === 'string' 
+                              ? order.delivery_address 
+                              : JSON.stringify(order.delivery_address)
+                            }
+                          </p>
                         </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Delivery Zone Information */}
-                  {deliveryZone && (
-                    <div className="bg-blue-50/50 rounded-lg p-3 sm:p-4 border border-blue-200/50">
-                      <h4 className="font-semibold text-blue-800 mb-3 flex items-center gap-2">
-                        <MapPin className="h-4 w-4" />
-                        Delivery Zone
-                      </h4>
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div className="space-y-1">
-                          <p className="text-xs sm:text-sm text-muted-foreground">Zone</p>
-                          <p className="font-medium text-sm sm:text-base">{deliveryZone.name}</p>
-                        </div>
-                        <div className="space-y-1">
-                          <p className="text-xs sm:text-sm text-muted-foreground">Delivery Fee</p>
-                          <p className="font-medium text-sm sm:text-base text-primary">
-                            {order.delivery_fee ? formatCurrency(order.delivery_fee) : 'Contact for pricing'}
-                          </p>
-                        </div>
-                        {deliveryZone.description && (
-                          <div className="space-y-1 sm:col-span-2">
-                            <p className="text-xs sm:text-sm text-muted-foreground">Coverage Area</p>
-                            <p className="text-sm break-words">{deliveryZone.description}</p>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Dispatch Rider Information */}
-                  {dispatchRider && (
-                    <div className="bg-green-50/50 rounded-lg p-3 sm:p-4 border border-green-200/50">
-                      <h4 className="font-semibold text-green-800 mb-3 flex items-center gap-2">
-                        <User className="h-4 w-4" />
-                        Dispatch Rider
-                      </h4>
-                      <div className="space-y-3">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <p className="text-xs sm:text-sm text-muted-foreground">Rider Name</p>
-                            <p className="font-medium text-sm sm:text-base">{dispatchRider.name}</p>
-                          </div>
-                          {dispatchRider.phone && (
-                            <div className="space-y-1">
-                              <p className="text-xs sm:text-sm text-muted-foreground">Contact</p>
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium text-sm sm:text-base">{dispatchRider.phone}</p>
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-7 px-2"
-                                  onClick={() => window.open(`tel:${dispatchRider.phone}`, '_self')}
-                                >
-                                  <Phone className="h-3 w-3" />
-                                </Button>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                        
-                        {(dispatchRider.vehicle_type || dispatchRider.vehicle_brand) && (
-                          <div className="pt-2 border-t border-green-200/50">
-                            <div className="flex items-center gap-2 mb-2">
-                              <Car className="h-4 w-4 text-green-600" />
-                              <span className="text-xs sm:text-sm text-muted-foreground">Vehicle Information</span>
-                            </div>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-                              {dispatchRider.vehicle_type && (
-                                <div>
-                                  <span className="text-muted-foreground">Type: </span>
-                                  <span className="font-medium capitalize">{dispatchRider.vehicle_type}</span>
-                                </div>
-                              )}
-                              {dispatchRider.vehicle_brand && (
-                                <div>
-                                  <span className="text-muted-foreground">Brand: </span>
-                                  <span className="font-medium">{dispatchRider.vehicle_brand} {dispatchRider.vehicle_model}</span>
-                                </div>
-                              )}
-                              {dispatchRider.license_plate && (
-                                <div className="sm:col-span-2">
-                                  <span className="text-muted-foreground">License Plate: </span>
-                                  <span className="font-medium font-mono">{dispatchRider.license_plate}</span>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  )}
-
-                  {isLoadingSchedule ? (
-                    <div className="bg-primary/5 rounded-lg p-3 sm:p-4 border border-primary/10">
-                      <div className="space-y-2">
-                        <Skeleton className="h-4 w-3/4" />
-                        <Skeleton className="h-4 w-1/2" />
-                        <Skeleton className="h-8 w-full" />
-                      </div>
-                    </div>
-                  ) : deliverySchedule ? (
-                    <div className="bg-primary/5 rounded-lg p-3 sm:p-4 border border-primary/10">
-                      <h4 className="font-semibold text-primary mb-3 flex items-center gap-2">
-                        <Calendar className="h-4 w-4" />
-                        Scheduled Delivery
-                      </h4>
-                      
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
-                        <div className="space-y-1">
-                          <p className="text-xs sm:text-sm text-muted-foreground">Delivery Date</p>
-                          <p className="font-medium text-sm sm:text-base">
-                            {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG', {
-                              weekday: 'long',
-                              year: 'numeric',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </p>
-                        </div>
-                        
-                        <div className="space-y-1">
-                          <p className="text-xs sm:text-sm text-muted-foreground">Time Window</p>
-                          <p className="font-medium text-sm sm:text-base">
-                            {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                          </p>
-                        </div>
-                        
-                        {(deliverySchedule.delivery_zone || deliveryZone) && (
-                          <div className="space-y-1">
-                            <p className="text-xs sm:text-sm text-muted-foreground">Delivery Zone</p>
-                            <p className="font-medium text-sm sm:text-base">
-                              {deliverySchedule.delivery_zone || deliveryZone?.name}
+                  {deliverySchedule && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Delivery Date</p>
+                            <p className="font-medium">
+                              {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG')}
                             </p>
                           </div>
-                        )}
-                        
-                         {(deliverySchedule.delivery_fee || order.delivery_fee) && (
-                          <div className="space-y-1">
-                            <p className="text-xs sm:text-sm text-muted-foreground">Delivery Fee</p>
-                            <p className="font-medium text-sm sm:text-base text-primary">
-                              {formatCurrency(deliverySchedule.delivery_fee || order.delivery_fee || 0)}
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Delivery Time</p>
+                            <p className="font-medium">
+                              {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
                             </p>
                           </div>
-                        )}
+                        </div>
                       </div>
-                      
-                      {deliverySchedule.special_instructions && (
-                        <div className="mt-4 pt-3 border-t border-primary/10">
-                          <p className="text-xs sm:text-sm text-muted-foreground mb-2">Special Instructions</p>
-                          <p className="font-medium text-sm sm:text-base break-words bg-white/50 p-2 rounded">
-                            {deliverySchedule.special_instructions}
-                          </p>
+                      {deliverySchedule.delivery_zone && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Delivery Zone</p>
+                          <p className="font-medium">{deliverySchedule.delivery_zone}</p>
                         </div>
                       )}
-                      
-                      {/* Countdown Timer */}
-                      <div className="mt-4 pt-3 border-t border-primary/10">
-                        <DeliveryCountdown
-                          deliveryDate={deliverySchedule.delivery_date}
-                          deliveryTimeStart={deliverySchedule.delivery_time_start}
-                          className="w-full"
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="bg-muted/30 rounded-lg p-3 text-sm text-muted-foreground">
-                      No delivery schedule information available for this order.
+                      {deliverySchedule.delivery_fee && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Delivery Fee</p>
+                          <p className="font-medium">{formatCurrency(deliverySchedule.delivery_fee)}</p>
+                        </div>
+                      )}
+                      {deliverySchedule.special_instructions && (
+                        <div className="md:col-span-2">
+                          <p className="text-sm text-muted-foreground">Special Instructions</p>
+                          <p className="font-medium">{deliverySchedule.special_instructions}</p>
+                        </div>
+                      )}
                     </div>
                   )}
 
                   {order.customer_phone && (
-                    <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                      <Phone className="h-5 w-5 text-primary flex-shrink-0" />
-                      <div>
-                        <p className="text-xs sm:text-sm text-muted-foreground">Contact Phone</p>
-                        <p className="font-medium text-sm sm:text-base">{order.customer_phone}</p>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Contact Phone</p>
+                          <p className="font-medium">{order.customer_phone}</p>
+                        </div>
                       </div>
                     </div>
                   )}

@@ -1,55 +1,32 @@
 
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useCustomerAuth } from './useCustomerAuth';
+import { getCustomerOrderHistory } from '@/api/purchaseHistory';
 import { supabase } from '@/integrations/supabase/client';
 
 export const useCustomerOrders = () => {
   const { isAuthenticated, customerAccount, user } = useCustomerAuth();
-  const abortControllerRef = useRef<AbortController | null>(null);
-  const isMountedRef = useRef(true);
 
   const query = useQuery({
     queryKey: ['customer-orders', customerAccount?.id, user?.email],
-    queryFn: async ({ signal }) => {
-      // PRODUCTION FIX: Simplified abort controller to prevent conflicts
+    queryFn: async () => {
+      // First, get the user's email for order lookup
       const userEmail = user?.email || customerAccount?.email;
-      
-      console.log('🔍 Starting order query for:', { 
-        customerEmail: userEmail, 
-        customerId: customerAccount?.id,
-        isAuthenticated 
-      });
-      
       if (!userEmail) {
-        console.log('⚠️ No user email found for order lookup');
-        return { orders: [], count: 0 };
-      }
-      
-      if (!isAuthenticated) {
-        console.log('⚠️ User not authenticated, returning empty orders');
+        console.log('🔍 No user email found for order lookup');
         return { orders: [], count: 0 };
       }
       
       try {
-        console.log('🔍 Fetching orders for customer:', { 
-          customerId: customerAccount?.id, 
-          email: userEmail,
-          timestamp: new Date().toISOString()
-        });
+        console.log('🔍 Fetching orders for customer:', customerAccount?.id, userEmail);
         
-        // PRODUCTION FIX: Minimal abort checking to prevent premature cancellation
-        if (signal?.aborted) {
-          console.log('🔄 Query aborted at start');
-          throw new Error('Query aborted');
-        }
-
+        // Primary strategy: Look up orders by the authenticated user's email
+        // This handles both new customer_accounts orders and legacy guest orders
         let allOrders: any[] = [];
-        let hasEmailOrders = false;
-        let hasCustomerIdOrders = false;
         
-        // Simplified orders fetch with enhanced RLS error handling
-        const { data: orders, error: ordersError } = await supabase
+        // Approach 1: Get orders by authenticated user's email (most reliable)
+        const { data: emailOrders, error: emailError } = await supabase
           .from('orders')
           .select(`
             *,
@@ -58,302 +35,105 @@ export const useCustomerOrders = () => {
               product_id,
               product_name,
               quantity,
-              unit_price,
-              total_price
+              unit_price
             )
           `)
-          .eq('customer_email', userEmail.toLowerCase())
+          .eq('customer_email', userEmail)
           .order('order_time', { ascending: false });
 
-        if (ordersError) {
-          console.error('❌ Orders query error:', {
-            error: ordersError,
-            code: ordersError.code,
-            message: ordersError.message,
-            hint: ordersError.hint,
-            userEmail,
-            timestamp: new Date().toISOString()
-          });
-          
-          // Handle specific RLS and authentication errors
-          if (ordersError.code === '42501') {
-            throw new Error(`Access denied for ${userEmail}. Please refresh and try again.`);
-          }
-          
-          if (ordersError.code === 'PGRST116') {
-            throw new Error(`Authentication error for ${userEmail}. Please sign out and sign back in.`);
-          }
-          
-          if (ordersError.message.includes('JWT')) {
-            throw new Error(`Session expired for ${userEmail}. Please refresh the page.`);
-          }
-          
-          throw new Error(`Database error: ${ordersError.message}`);
+        if (emailError) {
+          console.error('Error in email orders query:', emailError);
+        } else {
+          console.log('🔍 Email-based orders found:', emailOrders?.length || 0);
+          allOrders.push(...(emailOrders || []));
         }
 
-        allOrders = orders || [];
-        hasEmailOrders = (orders?.length || 0) > 0;
-        console.log('✅ Orders loaded successfully:', {
-          count: allOrders.length,
-          userEmail,
-          timestamp: new Date().toISOString()
-        });
+        // Approach 2: If customer account exists, also try direct customer_id match
+        if (customerAccount?.id) {
+          const { data: directOrders, error: directError } = await supabase
+            .from('orders')
+            .select(`
+              *,
+              order_items (
+                id,
+                product_id,
+                product_name,
+                quantity,
+                unit_price
+              )
+            `)
+            .eq('customer_id', customerAccount.id)
+            .order('order_time', { ascending: false });
 
-        // Remove the duplicate customer_id query approach - the new RLS policy handles this automatically
+          if (directError) {
+            console.error('Error in direct orders query:', directError);
+          } else {
+            console.log('🔍 Direct customer_id orders found:', directOrders?.length || 0);
+            // Only add orders not already found by email to avoid duplicates
+            const newOrders = directOrders?.filter(order => 
+              !allOrders.some(existing => existing.id === order.id)
+            ) || [];
+            allOrders.push(...newOrders);
+          }
+        }
 
-        // PRODUCTION FIX: Remove redundant abort check - React Query handles this
-
-        // Process orders to handle missing data gracefully
-        const processedOrders = allOrders.map(order => ({
-          ...order,
-          order_items: (order.order_items || []).map((item: any) => ({
-            ...item,
-            product_name: item.product_name || 'Unknown Product',
-            quantity: item.quantity || 1,
-            unit_price: item.unit_price || 0,
-            total_price: item.total_price || (item.quantity * item.unit_price) || 0
-          }))
-        }));
-
-        console.log(`✅ Orders processing complete:`, {
-          totalOrders: processedOrders.length,
-          customerEmail: userEmail,
-          customerId: customerAccount?.id,
-          hasEmailOrders,
-          hasCustomerIdOrders,
-          timestamp: new Date().toISOString()
-        });
+        console.log(`✅ Total orders found: ${allOrders.length} for customer account ID: ${customerAccount?.id} or email: ${userEmail}`);
         
         return {
-          orders: processedOrders,
-          count: processedOrders.length,
-          sources: {
-            email: hasEmailOrders,
-            customerId: hasCustomerIdOrders
-          }
+          orders: allOrders,
+          count: allOrders.length
         };
       } catch (error) {
-        if (error instanceof Error && error.message === 'Query aborted') {
-          console.log('🔄 Order query aborted - component unmounted or cancelled');
-          throw error;
-        }
-        
-        console.error('❌ Critical error fetching orders:', {
-          error,
-          customerEmail: userEmail,
-          customerId: customerAccount?.id,
-          isAuthenticated,
-          errorMessage: error instanceof Error ? error.message : 'Unknown error',
-          stack: error instanceof Error ? error.stack : undefined,
-          timestamp: new Date().toISOString()
-        });
-        
-        // Enhanced error context for production debugging
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
-        const context = {
-          customerEmail: userEmail,
-          customerId: customerAccount?.id,
-          isAuthenticated,
-          timestamp: new Date().toISOString(),
-          errorCode: (error as any)?.code || 'unknown'
-        };
-        
-        console.error('🚨 Critical order loading error:', {
-          error,
-          context,
-          stack: error instanceof Error ? error.stack : undefined
-        });
-        
-        // User-friendly error messages based on error type
-        if (errorMessage.includes('permission') || errorMessage.includes('policy') || errorMessage.includes('42501')) {
-          throw new Error(`Access denied. Please sign out and sign back in to refresh your permissions.`);
-        }
-        
-        if (errorMessage.includes('PGRST') || errorMessage.includes('connection')) {
-          throw new Error(`Connection issue. Please check your internet and try again.`);
-        }
-        
-        if (errorMessage.includes('JWT') || errorMessage.includes('token')) {
-          throw new Error(`Session expired. Please refresh the page to continue.`);
-        }
-        
-        throw new Error(`Unable to load orders. Please try again or contact support if the issue persists.`);
+        console.error('Error fetching orders:', error);
+        return { orders: [], count: 0 };
       }
     },
     enabled: isAuthenticated && !!(user?.email || customerAccount?.email),
-    staleTime: 2 * 60 * 1000, // 2 minutes for faster updates in production
-    refetchOnMount: 'always',
+    // Balanced refetch strategy to reduce flickering
+    refetchOnMount: true,
     refetchOnWindowFocus: false,
+    // Longer stale time for better stability
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    // Poll only while there are pending payments but less frequently
     refetchInterval: (data) => {
-      if (!isMountedRef.current) return false;
       const list = Array.isArray((data as any)?.orders) ? (data as any).orders : [];
       const hasPending = list.some((o: any) => (o?.payment_status || '').toLowerCase() !== 'paid');
-      return hasPending ? 30 * 1000 : false; // Check every 30 seconds for pending orders
+      return hasPending ? 30 * 1000 : false; // 30 seconds instead of 10
     },
-    retry: (failureCount, error) => {
-      if (error instanceof Error && error.message === 'Query aborted') {
-        console.log('🔄 Not retrying aborted query');
-        return false;
-      }
-      
-      const shouldRetry = failureCount < 3;
-      console.log(`🔄 Order query retry decision:`, {
-        failureCount,
-        shouldRetry,
-        errorMessage: error instanceof Error ? error.message : 'Unknown error'
-      });
-      
-      return shouldRetry;
-    },
-    retryDelay: (attemptIndex) => {
-      const delay = Math.min(1000 * 2 ** attemptIndex, 5000); // Max 5 second delay
-      console.log(`🔄 Retrying order query in ${delay}ms (attempt ${attemptIndex + 1})`);
-      return delay;
-    },
+    retry: 1,
+    retryDelay: 2000,
   });
 
-  // Enhanced realtime subscription with resilient error handling and connection monitoring
+  // Realtime: refresh on customer-specific orders changes
   useEffect(() => {
-    isMountedRef.current = true;
-    
     if (!isAuthenticated) return;
-    
     const userEmail = user?.email || customerAccount?.email;
     const custId = customerAccount?.id;
     if (!userEmail && !custId) return;
 
-    let subscription: any = null;
-    let reconnectTimeout: NodeJS.Timeout | null = null;
-    let connectionStatus = 'disconnected';
+    const filter = custId ? `customer_id=eq.${custId}` : `customer_email=eq.${userEmail}`;
+    const channelName = `orders-${custId || userEmail}`;
 
-    const setupRealtimeSubscription = async () => {
-      try {
-        // Verify session before setting up real-time
-        const { data: currentSession } = await supabase.auth.getSession();
-        
-        if (!currentSession?.session) {
-          console.log('📡 No session available for realtime subscription');
-          return;
+    const channel = supabase
+      .channel(channelName)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter }, (payload) => {
+        try { (query as any)?.refetch?.(); } catch {}
+        const oldStatus = (payload as any)?.old?.payment_status?.toLowerCase?.();
+        const newStatus = (payload as any)?.new?.payment_status?.toLowerCase?.();
+        if (oldStatus !== 'paid' && newStatus === 'paid') {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('payment-confirmed', {
+              detail: { orderId: (payload as any)?.new?.id, orderReference: (payload as any)?.new?.payment_reference }
+            }));
+          }
         }
-
-        const filter = custId ? `customer_id=eq.${custId}` : `customer_email=eq.${userEmail}`;
-        const channelName = `orders-${custId || userEmail?.replace('@', '_').replace('.', '_')}`;
-
-        console.log('📡 Setting up enhanced realtime subscription:', { 
-          channelName, 
-          filter,
-          timestamp: new Date().toISOString()
-        });
-
-        subscription = supabase
-          .channel(channelName)
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter }, (payload) => {
-            if (!isMountedRef.current) return;
-            
-            try {
-              console.log('📦 Real-time order update:', payload.eventType, (payload.new as any)?.id, {
-                timestamp: new Date().toISOString(),
-                connectionStatus
-              });
-              
-              // Delayed refetch to prevent subscription conflicts
-              setTimeout(() => {
-                if (isMountedRef.current) {
-                  query.refetch();
-                }
-              }, 100);
-              
-              // Emit payment confirmation events
-              const oldStatus = (payload as any)?.old?.payment_status?.toLowerCase?.();
-              const newStatus = (payload as any)?.new?.payment_status?.toLowerCase?.();
-              if (oldStatus !== 'paid' && newStatus === 'paid') {
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new CustomEvent('payment-confirmed', {
-                    detail: { orderId: (payload as any)?.new?.id, orderReference: (payload as any)?.new?.payment_reference }
-                  }));
-                }
-              }
-            } catch (error) {
-              console.error('❌ Error handling realtime update:', error);
-            }
-          })
-          .subscribe((status, err) => {
-            connectionStatus = status;
-            console.log('📡 Real-time subscription status:', status, {
-              timestamp: new Date().toISOString(),
-              error: err
-            });
-            
-            if (err) {
-              console.error('❌ Real-time subscription error:', err);
-            }
-            
-            if (status === 'SUBSCRIBED') {
-              console.log('✅ Real-time orders subscription active');
-              // Clear any pending reconnection
-              if (reconnectTimeout) {
-                clearTimeout(reconnectTimeout);
-                reconnectTimeout = null;
-              }
-            } else if (String(status).includes('ERROR')) {
-              console.warn('⚠️ Real-time subscription failed, continuing without live updates');
-              
-              // Attempt to reconnect after 5 seconds
-              if (!reconnectTimeout && isMountedRef.current) {
-                reconnectTimeout = setTimeout(() => {
-                  if (isMountedRef.current) {
-                    console.log('🔄 Attempting to reconnect real-time subscription...');
-                    setupRealtimeSubscription();
-                  }
-                }, 5000);
-              }
-            } else if (status === 'CLOSED') {
-              console.log('📡 Real-time subscription closed');
-            }
-          });
-
-      } catch (error) {
-        console.error('❌ Failed to setup enhanced realtime subscription:', error);
-        
-        // Retry setup if we're still mounted
-        if (isMountedRef.current && !reconnectTimeout) {
-          reconnectTimeout = setTimeout(() => {
-            if (isMountedRef.current) {
-              console.log('🔄 Retrying realtime subscription setup...');
-              setupRealtimeSubscription();
-            }
-          }, 10000);
-        }
-      }
-    };
-
-    setupRealtimeSubscription();
+      })
+      .subscribe();
 
     return () => {
-      isMountedRef.current = false;
-      if (subscription) {
-        subscription.unsubscribe();
-      }
-      if (reconnectTimeout) {
-        clearTimeout(reconnectTimeout);
-      }
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      console.log('🔌 Cleaned up enhanced realtime subscription');
+      supabase.removeChannel(channel);
     };
-  }, [isAuthenticated, customerAccount?.id, user?.email, query.refetch]);
-
-  // Cleanup on unmount
-  useEffect(() => {
-    return () => {
-      console.log('🔌 Cleaning up useCustomerOrders hook');
-      isMountedRef.current = false;
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
-  }, []);
+  }, [isAuthenticated, customerAccount?.id, user?.email]);
 
   return query;
 };

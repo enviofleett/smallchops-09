@@ -15,10 +15,10 @@ export function CustomerNavigation() {
 
   const navItems = [
     {
-      label: 'Order Summary',
-      href: '/order-summary',
-      icon: Package,
-      description: 'View your order summary and history'
+      label: 'Track Order',
+      href: '/track-order',
+      icon: MapPin,
+      description: 'Track your order in real-time'
     },
     {
       label: 'Order History',

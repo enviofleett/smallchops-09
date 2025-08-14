@@ -50,7 +50,7 @@ const PaymentCallbackRedirect = withLazyLoading(() => import("./pages/PaymentCal
 const Unsubscribe = withLazyLoading(() => import("./pages/Unsubscribe"));
 const AdminSetup = withLazyLoading(() => import("./pages/AdminSetup"));
 const CustomerRegister = withLazyLoading(() => import("./pages/CustomerRegister"));
-const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfileProduction"));
+const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfile"));
 const AuthPage = withLazyLoading(() => import("./pages/AuthPage"));
 const AdminAuth = withLazyLoading(() => import("./pages/admin/AdminAuth"));
 const Cart = withLazyLoading(() => import("./pages/Cart"));
@@ -64,7 +64,6 @@ const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerific
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"));
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"));
-const OrderSummaryPage = withLazyLoading(() => import("./pages/OrderSummaryPage"));
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
 
 // Optimized QueryClient for better stability and reduced flickering
@@ -192,7 +191,7 @@ const App = () => {
               <Route path="/purchase-history" element={<PurchaseHistory />} />
               <Route path="/purchase-history/:customerEmail" element={<PurchaseHistory />} />
               <Route path="/orders/:id" element={<OrderDetails />} />
-              <Route path="/order-summary" element={<OrderSummaryPage />} />
+              <Route path="/track-order" element={<TrackOrder />} />
               <Route path="/track/:orderNumber" element={<TrackOrder />} />
               
               {/* Payment routes */}

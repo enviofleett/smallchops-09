@@ -1,210 +1,231 @@
-import React from 'react';
-import { AlertTriangle, RefreshCw, ArrowLeft } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { AlertTriangle, RefreshCw, Home, Bug } from 'lucide-react';
 
 interface Props {
-  children: React.ReactNode;
-  fallback?: React.ReactNode;
-  onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
-  title?: string;
-  description?: string;
-  showDetails?: boolean;
+  children?: ReactNode;
+  fallback?: ReactNode;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
+  showErrorDetails?: boolean;
+  context?: string;
 }
 
 interface State {
   hasError: boolean;
   error?: Error;
-  errorInfo?: React.ErrorInfo;
-  retryCount: number;
+  errorInfo?: ErrorInfo;
+  isRetrying: boolean;
 }
 
-export class EnhancedErrorBoundary extends React.Component<Props, State> {
-  private retryTimeoutId: NodeJS.Timeout | null = null;
+class EnhancedErrorBoundary extends Component<Props, State> {
+  private retryCount = 0;
+  private maxRetries = 3;
 
   constructor(props: Props) {
     super(props);
     this.state = { 
-      hasError: false, 
-      retryCount: 0 
+      hasError: false,
+      isRetrying: false
     };
   }
 
-  static getDerivedStateFromError(error: Error): Partial<State> {
-    return { hasError: true, error };
+  public static getDerivedStateFromError(error: Error): State {
+    return { 
+      hasError: true, 
+      error,
+      isRetrying: false
+    };
   }
 
-  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error('🚨 Enhanced Error Boundary caught an error:', error, errorInfo);
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error('Enhanced ErrorBoundary caught an error:', error, errorInfo);
+    
+    // Call custom error handler if provided
+    this.props.onError?.(error, errorInfo);
+    
+    // Log to external service if needed
+    this.logErrorToService(error, errorInfo);
     
     this.setState({ errorInfo });
-    
-    // Call optional error handler
-    if (this.props.onError) {
-      this.props.onError(error, errorInfo);
-    }
-
-    // Log error details for debugging
-    console.group('🔍 Error Boundary Details');
-    console.error('Error:', error);
-    console.error('Component Stack:', errorInfo.componentStack);
-    console.groupEnd();
   }
 
-  componentWillUnmount() {
-    if (this.retryTimeoutId) {
-      clearTimeout(this.retryTimeoutId);
-    }
-  }
-
-  handleRetry = () => {
-    console.log('🔄 Retrying after error...');
+  private logErrorToService = (error: Error, errorInfo: ErrorInfo) => {
+    // Log error details for monitoring
+    const errorData = {
+      error: {
+        message: error.message,
+        stack: error.stack,
+        name: error.name
+      },
+      errorInfo: {
+        componentStack: errorInfo.componentStack
+      },
+      context: this.props.context || 'Unknown',
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
     
-    this.setState(prevState => ({ 
+    console.error('Error logged:', errorData);
+    
+    // Could send to monitoring service here
+    // Example: analytics.track('error_boundary_triggered', errorData);
+  };
+
+  private handleReset = () => {
+    this.retryCount++;
+    this.setState({ 
       hasError: false, 
       error: undefined, 
       errorInfo: undefined,
-      retryCount: prevState.retryCount + 1 
-    }));
-  };
-
-  handleRetryWithDelay = () => {
-    console.log('⏳ Retrying with delay...');
+      isRetrying: true
+    });
     
-    this.retryTimeoutId = setTimeout(() => {
-      this.handleRetry();
-    }, 1000);
+    // Reset retry flag after a short delay
+    setTimeout(() => {
+      this.setState({ isRetrying: false });
+    }, 500);
   };
 
-  handleGoBack = () => {
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      window.location.href = '/';
+  private handleReload = () => {
+    window.location.reload();
+  };
+
+  private handleGoHome = () => {
+    window.location.href = '/';
+  };
+
+  private getErrorCategory = (error: Error): string => {
+    if (error.message.includes('ChunkLoadError') || error.message.includes('Loading chunk')) {
+      return 'chunk_load';
+    }
+    if (error.message.includes('Network') || error.message.includes('fetch')) {
+      return 'network';
+    }
+    if (error.message.includes('Cannot read') || error.message.includes('undefined')) {
+      return 'null_reference';
+    }
+    if (error.name === 'TypeError') {
+      return 'type_error';
+    }
+    return 'unknown';
+  };
+
+  private getErrorSuggestion = (error: Error): string => {
+    const category = this.getErrorCategory(error);
+    
+    switch (category) {
+      case 'chunk_load':
+        return 'This appears to be a loading issue. Try refreshing the page.';
+      case 'network':
+        return 'This seems to be a network connectivity issue. Check your internet connection.';
+      case 'null_reference':
+        return 'This appears to be a data loading issue. Try refreshing the page.';
+      case 'type_error':
+        return 'This is a technical issue. Our team has been notified.';
+      default:
+        return 'An unexpected error occurred. Try refreshing the page or contact support if it persists.';
     }
   };
 
-  render() {
+  public render() {
     if (this.state.hasError) {
-      // Use custom fallback if provided
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
-      const { error, errorInfo, retryCount } = this.state;
-      const { title = "Something went wrong", description, showDetails = false } = this.props;
+      const showRetry = this.retryCount < this.maxRetries;
+      const errorCategory = this.state.error ? this.getErrorCategory(this.state.error) : 'unknown';
+      const suggestion = this.state.error ? this.getErrorSuggestion(this.state.error) : '';
 
       return (
-        <div className="flex items-center justify-center min-h-[400px] p-4">
-          <Card className="w-full max-w-lg">
-            <CardHeader className="text-center">
-              <div className="flex justify-center mb-4">
-                <AlertTriangle className="h-16 w-16 text-destructive" />
-              </div>
-              <CardTitle className="text-xl">{title}</CardTitle>
-            </CardHeader>
-            
-            <CardContent className="space-y-4">
-              <div className="text-center">
-                <p className="text-muted-foreground">
-                  {description || "We encountered an unexpected error. This has been logged and will be investigated."}
-                </p>
-                
-                {retryCount > 0 && (
-                  <p className="text-sm text-muted-foreground mt-2">
-                    Retry attempts: {retryCount}
+        <div className="bg-white border border-gray-200 rounded-xl p-6 w-full max-w-4xl mx-auto my-4">
+          <Alert className="border-red-200 bg-red-50">
+            <AlertTriangle className="h-4 w-4 text-red-600" />
+            <AlertDescription className="text-red-800">
+              <div className="space-y-4">
+                <div>
+                  <strong className="text-lg">
+                    {errorCategory === 'chunk_load' ? 'Loading Error' :
+                     errorCategory === 'network' ? 'Connection Error' :
+                     'Something went wrong'}
+                  </strong>
+                  {this.state.error && (
+                    <p className="text-sm mt-2 opacity-90">
+                      {suggestion}
+                    </p>
+                  )}
+                  {this.props.context && (
+                    <p className="text-xs mt-1 opacity-75">
+                      Context: {this.props.context}
+                    </p>
+                  )}
+                </div>
+
+                {this.props.showErrorDetails && this.state.error && (
+                  <details className="text-xs bg-red-100 p-2 rounded border">
+                    <summary className="cursor-pointer font-medium mb-2">
+                      <Bug className="inline h-3 w-3 mr-1" />
+                      Technical Details
+                    </summary>
+                    <div className="space-y-1">
+                      <div><strong>Error:</strong> {this.state.error.message}</div>
+                      {this.state.error.stack && (
+                        <div>
+                          <strong>Stack:</strong>
+                          <pre className="text-xs mt-1 bg-white p-2 rounded overflow-auto max-h-32">
+                            {this.state.error.stack}
+                          </pre>
+                        </div>
+                      )}
+                    </div>
+                  </details>
+                )}
+
+                <div className="flex flex-wrap gap-2">
+                  {showRetry && (
+                    <Button
+                      onClick={this.handleReset}
+                      variant="outline"
+                      size="sm"
+                      className="border-red-300 text-red-700 hover:bg-red-100"
+                      disabled={this.state.isRetrying}
+                    >
+                      <RefreshCw className={`h-3 w-3 mr-1 ${this.state.isRetrying ? 'animate-spin' : ''}`} />
+                      {this.state.isRetrying ? 'Retrying...' : 'Try Again'}
+                    </Button>
+                  )}
+                  
+                  <Button
+                    onClick={this.handleReload}
+                    variant="outline"
+                    size="sm"
+                    className="border-red-300 text-red-700 hover:bg-red-100"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" />
+                    Refresh Page
+                  </Button>
+                  
+                  <Button
+                    onClick={this.handleGoHome}
+                    variant="outline"
+                    size="sm"
+                    className="border-red-300 text-red-700 hover:bg-red-100"
+                  >
+                    <Home className="h-3 w-3 mr-1" />
+                    Go Home
+                  </Button>
+                </div>
+
+                {this.retryCount >= this.maxRetries && (
+                  <p className="text-xs opacity-75 mt-2">
+                    Multiple retry attempts failed. Please refresh the page or contact support if the issue persists.
                   </p>
                 )}
               </div>
-
-              {/* Error Details (Developer Mode) */}
-              {showDetails && error && (
-                <Alert variant="destructive">
-                  <AlertDescription>
-                    <details>
-                      <summary className="cursor-pointer font-medium">
-                        Technical Details (Click to expand)
-                      </summary>
-                      <div className="mt-2 space-y-2">
-                        <div>
-                          <strong>Error:</strong> {error.message}
-                        </div>
-                        {error.stack && (
-                          <div>
-                            <strong>Stack Trace:</strong>
-                            <pre className="text-xs mt-1 overflow-auto max-h-32 bg-muted p-2 rounded">
-                              {error.stack}
-                            </pre>
-                          </div>
-                        )}
-                        {errorInfo?.componentStack && (
-                          <div>
-                            <strong>Component Stack:</strong>
-                            <pre className="text-xs mt-1 overflow-auto max-h-32 bg-muted p-2 rounded">
-                              {errorInfo.componentStack}
-                            </pre>
-                          </div>
-                        )}
-                      </div>
-                    </details>
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex flex-col gap-2">
-                <div className="flex gap-2">
-                  <Button 
-                    onClick={this.handleRetry}
-                    className="flex-1"
-                    disabled={retryCount >= 3}
-                  >
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    {retryCount >= 3 ? 'Max Retries Reached' : 'Try Again'}
-                  </Button>
-                  
-                  {retryCount < 3 && (
-                    <Button 
-                      variant="outline" 
-                      onClick={this.handleRetryWithDelay}
-                      className="flex-1"
-                    >
-                      Retry in 1s
-                    </Button>
-                  )}
-                </div>
-                
-                <Button 
-                  variant="outline" 
-                  onClick={this.handleGoBack}
-                  className="w-full"
-                >
-                  <ArrowLeft className="h-4 w-4 mr-2" />
-                  Go Back
-                </Button>
-                
-                <Button 
-                  variant="ghost" 
-                  onClick={() => window.location.reload()}
-                  className="w-full"
-                >
-                  Refresh Page
-                </Button>
-              </div>
-
-              {/* Helpful Tips */}
-              <div className="text-sm text-muted-foreground bg-muted/50 p-3 rounded">
-                <strong>Troubleshooting tips:</strong>
-                <ul className="list-disc list-inside mt-1 space-y-1">
-                  <li>Check your internet connection</li>
-                  <li>Clear your browser cache and cookies</li>
-                  <li>Try refreshing the page</li>
-                  <li>Contact support if the problem persists</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
+            </AlertDescription>
+          </Alert>
         </div>
       );
     }
@@ -213,24 +234,4 @@ export class EnhancedErrorBoundary extends React.Component<Props, State> {
   }
 }
 
-// Hook version for functional components
-export const useErrorBoundary = () => {
-  const [error, setError] = React.useState<Error | null>(null);
-
-  const captureError = React.useCallback((error: Error) => {
-    console.error('🚨 Error captured by useErrorBoundary:', error);
-    setError(error);
-  }, []);
-
-  const resetError = React.useCallback(() => {
-    setError(null);
-  }, []);
-
-  React.useEffect(() => {
-    if (error) {
-      throw error;
-    }
-  }, [error]);
-
-  return { captureError, resetError };
-};
+export default EnhancedErrorBoundary;

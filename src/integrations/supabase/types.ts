@@ -2364,151 +2364,6 @@ export type Database = {
         }
         Relationships: []
       }
-      dispatch_analytics: {
-        Row: {
-          average_completion_time_minutes: number | null
-          cancelled_assignments: number
-          completed_assignments: number
-          created_at: string
-          customer_rating: number | null
-          date: string
-          earnings: number | null
-          fuel_cost: number | null
-          id: string
-          rider_id: string
-          total_assignments: number
-          total_distance_km: number | null
-          updated_at: string
-        }
-        Insert: {
-          average_completion_time_minutes?: number | null
-          cancelled_assignments?: number
-          completed_assignments?: number
-          created_at?: string
-          customer_rating?: number | null
-          date?: string
-          earnings?: number | null
-          fuel_cost?: number | null
-          id?: string
-          rider_id: string
-          total_assignments?: number
-          total_distance_km?: number | null
-          updated_at?: string
-        }
-        Update: {
-          average_completion_time_minutes?: number | null
-          cancelled_assignments?: number
-          completed_assignments?: number
-          created_at?: string
-          customer_rating?: number | null
-          date?: string
-          earnings?: number | null
-          fuel_cost?: number | null
-          id?: string
-          rider_id?: string
-          total_assignments?: number
-          total_distance_km?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dispatch_analytics_rider_id_fkey"
-            columns: ["rider_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      driver_delivery_analytics: {
-        Row: {
-          average_customer_rating: number | null
-          created_at: string | null
-          date: string
-          deliveries_completed: number | null
-          deliveries_failed: number | null
-          delivery_fees_collected: number | null
-          driver_id: string
-          fuel_cost: number | null
-          id: string
-          total_delivery_time_minutes: number | null
-          total_distance_km: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          average_customer_rating?: number | null
-          created_at?: string | null
-          date: string
-          deliveries_completed?: number | null
-          deliveries_failed?: number | null
-          delivery_fees_collected?: number | null
-          driver_id: string
-          fuel_cost?: number | null
-          id?: string
-          total_delivery_time_minutes?: number | null
-          total_distance_km?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          average_customer_rating?: number | null
-          created_at?: string | null
-          date?: string
-          deliveries_completed?: number | null
-          deliveries_failed?: number | null
-          delivery_fees_collected?: number | null
-          driver_id?: string
-          fuel_cost?: number | null
-          id?: string
-          total_delivery_time_minutes?: number | null
-          total_distance_km?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "driver_delivery_analytics_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      driver_invitations: {
-        Row: {
-          accepted_at: string | null
-          created_at: string
-          driver_data: Json
-          email: string
-          expires_at: string
-          id: string
-          invitation_token: string
-          invited_by: string | null
-          status: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string
-          driver_data?: Json
-          email: string
-          expires_at?: string
-          id?: string
-          invitation_token?: string
-          invited_by?: string | null
-          status?: string
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string
-          driver_data?: Json
-          email?: string
-          expires_at?: string
-          id?: string
-          invitation_token?: string
-          invited_by?: string | null
-          status?: string
-        }
-        Relationships: []
-      }
       driver_location_tracking: {
         Row: {
           accuracy: number | null
@@ -3507,73 +3362,6 @@ export type Database = {
         }
         Relationships: []
       }
-      order_assignments: {
-        Row: {
-          accepted_at: string | null
-          actual_delivery_time: string | null
-          assigned_at: string
-          assigned_by: string | null
-          cancelled_at: string | null
-          completed_at: string | null
-          estimated_delivery_time: string | null
-          id: string
-          notes: string | null
-          order_id: string
-          rider_id: string
-          status: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          actual_delivery_time?: string | null
-          assigned_at?: string
-          assigned_by?: string | null
-          cancelled_at?: string | null
-          completed_at?: string | null
-          estimated_delivery_time?: string | null
-          id?: string
-          notes?: string | null
-          order_id: string
-          rider_id: string
-          status?: string
-        }
-        Update: {
-          accepted_at?: string | null
-          actual_delivery_time?: string | null
-          assigned_at?: string
-          assigned_by?: string | null
-          cancelled_at?: string | null
-          completed_at?: string | null
-          estimated_delivery_time?: string | null
-          id?: string
-          notes?: string | null
-          order_id?: string
-          rider_id?: string
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_assignments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_assignments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "orders_with_payment"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_assignments_rider_id_fkey"
-            columns: ["rider_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       order_delivery_schedule: {
         Row: {
           created_at: string
@@ -3817,7 +3605,6 @@ export type Database = {
           total_vat: number | null
           updated_at: string
           updated_by: string | null
-          user_id: string | null
         }
         Insert: {
           assigned_rider_id?: string | null
@@ -3856,7 +3643,6 @@ export type Database = {
           total_vat?: number | null
           updated_at?: string
           updated_by?: string | null
-          user_id?: string | null
         }
         Update: {
           assigned_rider_id?: string | null
@@ -3895,7 +3681,6 @@ export type Database = {
           total_vat?: number | null
           updated_at?: string
           updated_by?: string | null
-          user_id?: string | null
         }
         Relationships: [
           {
@@ -6549,50 +6334,6 @@ export type Database = {
         }
         Relationships: []
       }
-      zone_delivery_analytics: {
-        Row: {
-          average_delivery_time_minutes: number | null
-          created_at: string | null
-          date: string
-          id: string
-          successful_deliveries: number | null
-          total_deliveries: number | null
-          total_delivery_fees: number | null
-          updated_at: string | null
-          zone_id: string
-        }
-        Insert: {
-          average_delivery_time_minutes?: number | null
-          created_at?: string | null
-          date: string
-          id?: string
-          successful_deliveries?: number | null
-          total_deliveries?: number | null
-          total_delivery_fees?: number | null
-          updated_at?: string | null
-          zone_id: string
-        }
-        Update: {
-          average_delivery_time_minutes?: number | null
-          created_at?: string | null
-          date?: string
-          id?: string
-          successful_deliveries?: number | null
-          total_deliveries?: number | null
-          total_delivery_fees?: number | null
-          updated_at?: string | null
-          zone_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "zone_delivery_analytics_zone_id_fkey"
-            columns: ["zone_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_zones"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
     }
     Views: {
       orders_with_payment: {
@@ -6734,10 +6475,6 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
-      assign_rider_to_order: {
-        Args: { p_assigned_by?: string; p_order_id: string; p_rider_id: string }
-        Returns: string
-      }
       bulk_safe_delete_products: {
         Args: { product_ids: string[] }
         Returns: Json
@@ -6754,17 +6491,9 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      calculate_daily_delivery_analytics: {
-        Args: { target_date?: string }
-        Returns: undefined
-      }
       calculate_daily_email_metrics: {
         Args: Record<PropertyKey, never> | { target_date?: string }
         Returns: Json
-      }
-      calculate_delivery_metrics: {
-        Args: { target_date?: string }
-        Returns: undefined
       }
       calculate_profile_completion: {
         Args: { customer_uuid: string }
@@ -6943,14 +6672,6 @@ export type Database = {
         }
         Returns: Json
       }
-      create_driver_with_profile: {
-        Args: {
-          p_create_profile?: boolean
-          p_driver_data: Json
-          p_send_invitation?: boolean
-        }
-        Returns: Json
-      }
       create_logo_version: {
         Args: {
           p_dimensions: Json
@@ -7115,10 +6836,6 @@ export type Database = {
           total_products: number
           total_revenue: number
         }[]
-      }
-      get_delivery_reports: {
-        Args: { end_date?: string; start_date?: string }
-        Returns: Json
       }
       get_detailed_order_with_products: {
         Args: { p_order_id: string }
@@ -7615,10 +7332,6 @@ export type Database = {
       }
       safe_delete_product: {
         Args: { product_id: string }
-        Returns: Json
-      }
-      safe_get_order_details: {
-        Args: { p_order_id: string }
         Returns: Json
       }
       setup_admin_permissions: {

@@ -6,7 +6,7 @@ import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { Navigate } from 'react-router-dom';
 import { Skeleton } from '@/components/ui/skeleton';
 
-export default function OrderSummaryPage() {
+function OrderSummaryPage() {
   const { isAuthenticated, isLoading } = useCustomerAuth();
 
   if (isLoading) {
@@ -68,3 +68,5 @@ export default function OrderSummaryPage() {
     </div>
   );
 }
+
+export default OrderSummaryPage;

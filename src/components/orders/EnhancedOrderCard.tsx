@@ -104,63 +104,65 @@ export function EnhancedOrderCard({
 
   return (
     <Card className={`overflow-hidden ${className}`}>
-      {/* Card Header */}
-      <div className="p-6 border-b bg-gray-50">
-        <div className="flex justify-between items-start gap-4">
+      {/* Mobile-responsive Card Header */}
+      <div className="p-4 sm:p-6 border-b bg-gray-50">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-4">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-3 mb-2">
-              <StatusIcon className={`h-5 w-5 ${statusConfig.iconColor}`} />
-              <h3 className="text-lg font-semibold text-gray-900 break-words">
+            <div className="flex items-center gap-2 sm:gap-3 mb-2 flex-wrap">
+              <StatusIcon className={`h-4 w-4 sm:h-5 sm:w-5 ${statusConfig.iconColor} flex-shrink-0`} />
+              <h3 className="text-lg sm:text-xl font-semibold text-gray-900 break-words">
                 Order #{order.order_number}
               </h3>
-              <Badge className={statusConfig.className}>
+              <Badge className={`${statusConfig.className} text-xs`}>
                 {statusConfig.label}
               </Badge>
             </div>
             
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm text-gray-600">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm text-gray-600">
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4" />
-                <span>{format(new Date(order.order_time), 'MMM d, yyyy h:mm a')}</span>
+                <Calendar className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <span className="truncate">{format(new Date(order.order_time), 'MMM d, yyyy h:mm a')}</span>
               </div>
               
               {order.order_type === 'delivery' && (
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
+                  <MapPin className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                   <span className="capitalize">{order.order_type}</span>
                 </div>
               )}
               
               <div className="flex items-center gap-2">
-                <Package className="h-4 w-4" />
+                <Package className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
                 <span>{order.order_items?.length || 0} items</span>
               </div>
               
               <div className="flex items-center gap-2">
-                <CreditCard className="h-4 w-4" />
-                <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
+                <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 flex-shrink-0" />
+                <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'} className="text-xs">
                   {order.payment_status === 'paid' ? 'Paid' : 'Pending'}
                 </Badge>
               </div>
             </div>
           </div>
           
-          <div className="text-right flex-shrink-0">
-            <div className="text-2xl font-bold text-primary">
+          <div className="flex sm:flex-col items-center sm:items-end gap-4 sm:gap-2 justify-between sm:justify-start">
+            <div className="text-xl sm:text-2xl font-bold text-primary">
               {formatCurrency(order.total_amount)}
             </div>
             <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="mt-2">
+                <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
                   {isExpanded ? (
                     <>
-                      <ChevronUp className="h-4 w-4 mr-2" />
-                      Hide Details
+                      <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">Hide Details</span>
+                      <span className="sm:hidden">Hide</span>
                     </>
                   ) : (
                     <>
-                      <ChevronDown className="h-4 w-4 mr-2" />
-                      View Details
+                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <span className="hidden sm:inline">View Details</span>
+                      <span className="sm:hidden">Details</span>
                     </>
                   )}
                 </Button>
@@ -170,10 +172,10 @@ export function EnhancedOrderCard({
         </div>
       </div>
 
-      {/* Expandable Content */}
+      {/* Expandable Content - Mobile optimized */}
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
         <CollapsibleContent>
-          <div className="p-6 space-y-6">
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
             {/* Order Items Breakdown */}
             {order.order_items && order.order_items.length > 0 && (
               <OrderItemsBreakdown
@@ -186,7 +188,7 @@ export function EnhancedOrderCard({
               />
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
               {/* Payment Details */}
               <PaymentDetailsCard
                 paymentStatus={order.payment_status}

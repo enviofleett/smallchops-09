@@ -93,95 +93,78 @@ export function EnhancedOrdersSection() {
         <p className="text-gray-500">Track and manage your orders</p>
       </div>
       
-      <div className="flex gap-6">
-        {/* Enhanced Orders List */}
-        <div className="flex-1 space-y-4">
-          {orders.slice(0, 3).map((order) => {
-            try {
-              return (
-                <div 
-                  key={order?.id || Math.random()}
-                  onClick={() => {
-                    setSelectedOrder(order);
-                    setIsModalOpen(true);
-                  }}
-                  className="cursor-pointer transition-transform hover:scale-[1.02]"
-                >
-                  <EnhancedOrderCard
-                    order={order}
-                    deliverySchedule={schedules[order.id]}
-                    showExpandedByDefault={false}
-                  />
-                </div>
-              );
-            } catch (error) {
-              console.error('Error rendering order card:', error);
-              return (
-                <Card key={order?.id || Math.random()} className="p-6 border border-red-200">
-                  <p className="text-red-600">Error loading order details</p>
-                </Card>
-              );
-            }
-          })}
-          
-          {orders.length > 3 && (
-            <div className="text-center pt-4">
-              <Button variant="outline" onClick={() => window.location.href = '/orders'}>
-                View All Orders ({orders.length})
-              </Button>
-            </div>
-          )}
-        </div>
-
-        {/* Order History Sidebar */}
-        <div className="w-80 bg-white rounded-lg border border-gray-200 p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-semibold">Order Summary</h3>
-            <Button variant="ghost" size="sm" className="text-primary">
-              View All
+      {/* Mobile-first responsive orders list */}
+      <div className="space-y-4">
+        {orders.slice(0, 10).map((order) => {
+          try {
+            return (
+              <div 
+                key={order?.id || Math.random()}
+                onClick={() => {
+                  setSelectedOrder(order);
+                  setIsModalOpen(true);
+                }}
+                className="cursor-pointer transition-transform hover:scale-[1.02] active:scale-[0.98]"
+              >
+                <EnhancedOrderCard
+                  order={order}
+                  deliverySchedule={schedules[order.id]}
+                  showExpandedByDefault={false}
+                />
+              </div>
+            );
+          } catch (error) {
+            console.error('Error rendering order card:', error);
+            return (
+              <Card key={order?.id || Math.random()} className="p-4 sm:p-6 border border-red-200">
+                <p className="text-red-600 text-sm">Error loading order details</p>
+              </Card>
+            );
+          }
+        })}
+        
+        {orders.length > 10 && (
+          <div className="text-center pt-4">
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.href = '/orders'}
+              className="w-full sm:w-auto"
+            >
+              View All Orders ({orders.length})
             </Button>
           </div>
-          
-          <div className="space-y-3">
-            {orders.slice(0, 5).map((order) => {
-              // Safe access to order properties
-              const orderNumber = order?.order_number || 'N/A';
-              const orderTime = order?.order_time ? new Date(order.order_time).toLocaleDateString() : 'N/A';
-              const totalAmount = typeof order?.total_amount === 'number' ? order.total_amount : 0;
-              const status = order?.status || 'unknown';
-              
-              return (
-                <div key={order?.id || Math.random()} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                  <div>
-                    <p className="font-medium text-sm">#{orderNumber}</p>
-                    <p className="text-xs text-gray-500">{orderTime}</p>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium text-sm">₦{totalAmount.toLocaleString()}</p>
-                    <Badge variant={status === 'delivered' ? 'default' : 'secondary'} className="text-xs">
-                      {status}
-                    </Badge>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-          
-          {orders.length > 0 && (
-            <div className="mt-4 pt-4 border-t space-y-2 text-sm text-gray-600">
-              <div className="flex justify-between">
-                <span>Total Orders:</span>
-                <span className="font-medium">{orders.length}</span>
+        )}
+        
+        {orders.length > 0 && (
+          <div className="mt-6 p-4 bg-muted/50 rounded-lg">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+              <div className="space-y-1">
+                <p className="text-2xl sm:text-3xl font-bold text-primary">
+                  {orders.length}
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Orders</p>
               </div>
-              <div className="flex justify-between">
-                <span>Total Spent:</span>
-                <span className="font-medium">
+              <div className="space-y-1">
+                <p className="text-2xl sm:text-3xl font-bold text-primary">
                   ₦{orders.reduce((sum, order) => sum + (order.total_amount || 0), 0).toLocaleString()}
-                </span>
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Total Spent</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-2xl sm:text-3xl font-bold text-green-600">
+                  {orders.filter(order => order.status === 'delivered').length}
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground">Delivered</p>
+              </div>
+              <div className="space-y-1">
+                <p className="text-2xl sm:text-3xl font-bold text-orange-600">
+                  {orders.filter(order => ['pending', 'confirmed', 'preparing', 'out_for_delivery'].includes(order.status)).length}
+                </p>
+                <p className="text-xs sm:text-sm text-muted-foreground">In Progress</p>
               </div>
             </div>
-          )}
-        </div>
+          </div>
+        )}
       </div>
 
       <OrderDetailsModal

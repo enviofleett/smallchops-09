@@ -60,7 +60,6 @@ export default function CustomerProfile() {
   // Memoize sidebar items to prevent unnecessary re-renders
   const sidebarItems = useMemo(() => [
     { id: 'orders' as const, label: 'My Orders', icon: ShoppingBag, path: '/purchase-history' },
-    { id: 'tracking' as const, label: 'Track Orders', icon: MapPin, path: '/track-order' },
     { id: 'bookings' as const, label: 'Catering Bookings', icon: Calendar },
     { id: 'wishlist' as const, label: 'Wishlist', icon: Heart, path: '/customer-favorites' },
     { id: 'payment' as const, label: 'Payment Method', icon: CreditCard },
@@ -148,11 +147,11 @@ export default function CustomerProfile() {
       
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar */}
-          <div className="lg:w-80 bg-white rounded-lg shadow-sm border border-border p-6">
+          {/* Mobile-responsive Sidebar */}
+          <div className="lg:w-80 bg-white rounded-lg shadow-sm border border-border p-4 lg:p-6">
             <h1 className="text-xl font-bold mb-6">Account</h1>
             
-            {/* Navigation */}
+            {/* Navigation - Mobile optimized */}
             <nav className="space-y-1">
               {sidebarItems.map((item) => (
                 <button
@@ -164,20 +163,20 @@ export default function CustomerProfile() {
                       setActiveSection(item.id);
                     }
                   }}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
+                  className={`w-full flex items-center justify-between px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-colors ${
                     activeSection === item.id
                       ? 'bg-orange-50 text-orange-600 border border-orange-200'
                       : 'hover:bg-gray-50 text-gray-700'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <item.icon className="w-5 h-5" />
-                    <span className="font-medium">{item.label}</span>
+                  <div className="flex items-center gap-2 lg:gap-3">
+                    <item.icon className="w-4 h-4 lg:w-5 lg:h-5 flex-shrink-0" />
+                    <span className="font-medium text-sm lg:text-base">{item.label}</span>
                   </div>
                   {item.path ? (
-                    <ChevronRight className="w-4 h-4 text-gray-400" />
+                    <ChevronRight className="w-3 h-3 lg:w-4 lg:h-4 text-gray-400 flex-shrink-0" />
                   ) : (
-                    <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                    <MoreHorizontal className="w-3 h-3 lg:w-4 lg:h-4 text-gray-400 flex-shrink-0" />
                   )}
                 </button>
               ))}
@@ -185,20 +184,20 @@ export default function CustomerProfile() {
               <div className="pt-4 border-t border-gray-200 mt-4">
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors hover:bg-gray-50 text-gray-700"
+                  className="w-full flex items-center justify-between px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-colors hover:bg-gray-50 text-gray-700"
                 >
-                  <div className="flex items-center gap-3">
-                    <LogOut className="w-5 h-5" />
-                    <span className="font-medium">Logout</span>
+                  <div className="flex items-center gap-2 lg:gap-3">
+                    <LogOut className="w-4 h-4 lg:w-5 lg:h-5 flex-shrink-0" />
+                    <span className="font-medium text-sm lg:text-base">Logout</span>
                   </div>
-                  <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                  <MoreHorizontal className="w-3 h-3 lg:w-4 lg:h-4 text-gray-400 flex-shrink-0" />
                 </button>
               </div>
             </nav>
           </div>
 
-          {/* Main Content */}
-          <div className="flex-1">
+          {/* Main Content - Mobile optimized */}
+          <div className="flex-1 min-w-0">
             <ErrorBoundary fallback={<SectionErrorFallback section={activeSection} />}>
               {renderContent()}
             </ErrorBoundary>

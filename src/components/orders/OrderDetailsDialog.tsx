@@ -243,7 +243,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                   <SelectContent className="bg-background border shadow-lg z-50">
                     <SelectItem value="unassigned">Unassigned</SelectItem>
                     {riders?.length === 0 && !isLoadingRiders && (
-                      <SelectItem value="" disabled>No active riders available</SelectItem>
+                      <SelectItem value="no-riders" disabled>No active riders available</SelectItem>
                     )}
                     {riders?.map((rider) => (
                       <SelectItem key={rider.id} value={rider.id}>

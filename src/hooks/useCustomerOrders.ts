@@ -212,7 +212,7 @@ export const useCustomerOrders = () => {
     },
   });
 
-  // Realtime subscription with proper cleanup
+  // Enhanced realtime subscription with resilient error handling and connection monitoring
   useEffect(() => {
     isMountedRef.current = true;
     
@@ -222,55 +222,125 @@ export const useCustomerOrders = () => {
     const custId = customerAccount?.id;
     if (!userEmail && !custId) return;
 
-    const filter = custId ? `customer_id=eq.${custId}` : `customer_email=eq.${userEmail}`;
-    const channelName = `orders-${custId || userEmail}`;
+    let subscription: any = null;
+    let reconnectTimeout: NodeJS.Timeout | null = null;
+    let connectionStatus = 'disconnected';
 
-    console.log('📡 Setting up realtime subscription for orders:', channelName);
-
-    const channel = supabase
-      .channel(channelName)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter }, (payload) => {
-        if (!isMountedRef.current) return;
+    const setupRealtimeSubscription = async () => {
+      try {
+        // Verify session before setting up real-time
+        const { data: currentSession } = await supabase.auth.getSession();
         
-        try {
-          console.log('📦 Order update received:', payload);
-          // Delayed refetch to prevent subscription conflicts
-          setTimeout(() => {
+        if (!currentSession?.session) {
+          console.log('📡 No session available for realtime subscription');
+          return;
+        }
+
+        const filter = custId ? `customer_id=eq.${custId}` : `customer_email=eq.${userEmail}`;
+        const channelName = `orders-${custId || userEmail?.replace('@', '_').replace('.', '_')}`;
+
+        console.log('📡 Setting up enhanced realtime subscription:', { 
+          channelName, 
+          filter,
+          timestamp: new Date().toISOString()
+        });
+
+        subscription = supabase
+          .channel(channelName)
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'orders', filter }, (payload) => {
+            if (!isMountedRef.current) return;
+            
+            try {
+              console.log('📦 Real-time order update:', payload.eventType, (payload.new as any)?.id, {
+                timestamp: new Date().toISOString(),
+                connectionStatus
+              });
+              
+              // Delayed refetch to prevent subscription conflicts
+              setTimeout(() => {
+                if (isMountedRef.current) {
+                  query.refetch();
+                }
+              }, 100);
+              
+              // Emit payment confirmation events
+              const oldStatus = (payload as any)?.old?.payment_status?.toLowerCase?.();
+              const newStatus = (payload as any)?.new?.payment_status?.toLowerCase?.();
+              if (oldStatus !== 'paid' && newStatus === 'paid') {
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('payment-confirmed', {
+                    detail: { orderId: (payload as any)?.new?.id, orderReference: (payload as any)?.new?.payment_reference }
+                  }));
+                }
+              }
+            } catch (error) {
+              console.error('❌ Error handling realtime update:', error);
+            }
+          })
+          .subscribe((status, err) => {
+            connectionStatus = status;
+            console.log('📡 Real-time subscription status:', status, {
+              timestamp: new Date().toISOString(),
+              error: err
+            });
+            
+            if (err) {
+              console.error('❌ Real-time subscription error:', err);
+            }
+            
+            if (status === 'SUBSCRIBED') {
+              console.log('✅ Real-time orders subscription active');
+              // Clear any pending reconnection
+              if (reconnectTimeout) {
+                clearTimeout(reconnectTimeout);
+                reconnectTimeout = null;
+              }
+            } else if (String(status).includes('ERROR')) {
+              console.warn('⚠️ Real-time subscription failed, continuing without live updates');
+              
+              // Attempt to reconnect after 5 seconds
+              if (!reconnectTimeout && isMountedRef.current) {
+                reconnectTimeout = setTimeout(() => {
+                  if (isMountedRef.current) {
+                    console.log('🔄 Attempting to reconnect real-time subscription...');
+                    setupRealtimeSubscription();
+                  }
+                }, 5000);
+              }
+            } else if (status === 'CLOSED') {
+              console.log('📡 Real-time subscription closed');
+            }
+          });
+
+      } catch (error) {
+        console.error('❌ Failed to setup enhanced realtime subscription:', error);
+        
+        // Retry setup if we're still mounted
+        if (isMountedRef.current && !reconnectTimeout) {
+          reconnectTimeout = setTimeout(() => {
             if (isMountedRef.current) {
-              query.refetch();
+              console.log('🔄 Retrying realtime subscription setup...');
+              setupRealtimeSubscription();
             }
-          }, 100);
-          
-          const oldStatus = (payload as any)?.old?.payment_status?.toLowerCase?.();
-          const newStatus = (payload as any)?.new?.payment_status?.toLowerCase?.();
-          if (oldStatus !== 'paid' && newStatus === 'paid') {
-            if (typeof window !== 'undefined') {
-              window.dispatchEvent(new CustomEvent('payment-confirmed', {
-                detail: { orderId: (payload as any)?.new?.id, orderReference: (payload as any)?.new?.payment_reference }
-              }));
-            }
-          }
-        } catch (error) {
-          console.error('❌ Error handling realtime update:', error);
+          }, 10000);
         }
-      })
-      .subscribe((status) => {
-        console.log('📡 Subscription status:', status);
-        // Handle subscription status changes without type checking
-        if (String(status).includes('ERROR')) {
-          console.error('❌ Real-time subscription failed - continuing without real-time updates');
-        } else if (String(status).includes('SUBSCRIBED')) {
-          console.log('✅ Real-time subscription active');
-        }
-      });
+      }
+    };
+
+    setupRealtimeSubscription();
 
     return () => {
       isMountedRef.current = false;
+      if (subscription) {
+        subscription.unsubscribe();
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
-      supabase.removeChannel(channel);
-      console.log('🔌 Cleaned up realtime subscription:', channelName);
+      console.log('🔌 Cleaned up enhanced realtime subscription');
     };
   }, [isAuthenticated, customerAccount?.id, user?.email, query.refetch]);
 

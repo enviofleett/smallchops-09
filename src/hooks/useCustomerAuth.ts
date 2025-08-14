@@ -30,6 +30,70 @@ export const useCustomerAuth = () => {
     error: null,
   });
 
+  // Enhanced session validation and refresh
+  const refreshSession = async () => {
+    try {
+      console.log('🔄 Refreshing session...');
+      const { data, error } = await supabase.auth.refreshSession();
+      if (error) throw error;
+      
+      if (data.session) {
+        setAuthState(prev => ({
+          ...prev,
+          session: data.session,
+          user: data.user,
+          error: null
+        }));
+        console.log('✅ Session refreshed successfully');
+      }
+      return data.session;
+    } catch (error) {
+      console.error('❌ Session refresh failed:', error);
+      setAuthState(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Session refresh failed'
+      }));
+      return null;
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      // Clear local storage
+      localStorage.removeItem('restaurant_cart');
+      localStorage.removeItem('guest_session');
+      localStorage.removeItem('cart_abandonment_tracking');
+      
+      // Clear React Query cache if available
+      try {
+        const queryClient = (window as any)?.queryClient;
+        if (queryClient && typeof queryClient.clear === 'function') {
+          queryClient.clear();
+        }
+      } catch {
+        console.log('Query client not available for clearing');
+      }
+      
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      setAuthState({
+        user: null,
+        session: null,
+        customerAccount: null,
+        isLoading: false,
+        isAuthenticated: false,
+        error: null,
+      });
+    } catch (error) {
+      console.error('❌ Sign out failed:', error);
+      setAuthState(prev => ({
+        ...prev,
+        error: error instanceof Error ? error.message : 'Sign out failed'
+      }));
+    }
+  };
+
   // Simplified customer account creation with better error handling
   const createCustomerAccount = async (userId: string, userEmail: string) => {
     try {
@@ -115,19 +179,30 @@ export const useCustomerAuth = () => {
 
     const initializeAuth = async () => {
       try {
-        // PRODUCTION FIX: Set up auth state listener with atomic updates
+        // Enhanced auth state listener with session validation
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (!mounted) return;
           
-          console.log(`🔄 Auth state change: ${event}`, { 
+          console.log(`🔄 Enhanced auth state change: ${event}`, { 
             hasUser: !!session?.user, 
             email: session?.user?.email,
+            sessionValid: !!session?.access_token,
             timestamp: new Date().toISOString()
           });
           
           if (session?.user) {
             try {
-              // Single atomic state update for loading state
+              // Validate session before processing
+              if (!session.access_token) {
+                console.warn('⚠️ Session missing access token, attempting refresh...');
+                const refreshedSession = await refreshSession();
+                if (!refreshedSession) {
+                  throw new Error('Unable to refresh session');
+                }
+                session = refreshedSession;
+              }
+
+              // Atomic loading state update
               setAuthState(prev => ({ 
                 ...prev, 
                 user: session.user, 
@@ -141,19 +216,20 @@ export const useCustomerAuth = () => {
               
               if (!mounted) return;
               
-              // Single atomic state update with complete auth state
+              // Complete auth state update with validation
               const authUpdate = {
                 user: session.user,
                 session,
                 customerAccount,
                 isLoading: false,
-                isAuthenticated: !!customerAccount,
+                isAuthenticated: !!customerAccount && !!session.access_token,
                 error: customerAccount ? null : `Customer profile not found for ${session.user.email}. Please contact support if this persists.`
               };
               
-              console.log('✅ Auth state update complete:', { 
+              console.log('✅ Enhanced auth state update complete:', { 
                 hasAccount: !!customerAccount, 
                 isAuthenticated: authUpdate.isAuthenticated, 
+                sessionValid: !!session.access_token,
                 userId: session.user.id,
                 email: session.user.email,
                 timestamp: new Date().toISOString()
@@ -161,7 +237,7 @@ export const useCustomerAuth = () => {
               
               setAuthState(authUpdate);
             } catch (error) {
-              console.error('❌ Auth state change error:', error);
+              console.error('❌ Enhanced auth state change error:', error);
               if (mounted) {
                 setAuthState(prev => ({
                   ...prev,
@@ -173,7 +249,8 @@ export const useCustomerAuth = () => {
               }
             }
           } else {
-            // Clear state when no session
+            // Clear state when no session with cleanup
+            console.log('🔄 Clearing auth state - no session');
             setAuthState({
               user: null,
               session: null,
@@ -330,8 +407,9 @@ export const useCustomerAuth = () => {
 
   return {
     ...authState,
-    logout,
+    logout: signOut,
     updateCustomerAccount,
     refetch: refreshAccount,
+    refreshSession,
   };
 };

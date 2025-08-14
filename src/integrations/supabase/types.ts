@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instanciate createClient with right options
+  // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -6442,7 +6442,7 @@ export type Database = {
         Returns: Json
       }
       calculate_bogo_discount: {
-        Args: { p_promotion_id: string; p_cart_items: Json }
+        Args: { p_cart_items: Json; p_promotion_id: string }
         Returns: Json
       }
       calculate_brand_consistency_score: {
@@ -6478,29 +6478,29 @@ export type Database = {
         Returns: boolean
       }
       check_customer_operation_rate_limit: {
-        Args: { p_admin_id: string; p_operation: string; p_limit?: number }
+        Args: { p_admin_id: string; p_limit?: number; p_operation: string }
         Returns: boolean
       }
       check_customer_rate_limit: {
         Args: {
           p_customer_id?: string
-          p_ip_address?: unknown
           p_endpoint?: string
+          p_ip_address?: unknown
           p_tier?: string
         }
         Returns: boolean
       }
       check_email_rate_limit: {
-        Args: { p_identifier: string; p_email_type?: string }
+        Args: { p_email_type?: string; p_identifier: string }
         Returns: boolean
       }
       check_enhanced_rate_limit: {
         Args: {
-          p_user_id?: string
           p_ip_address?: string
-          p_operation_type?: string
-          p_limit_per_minute?: number
           p_limit_per_hour?: number
+          p_limit_per_minute?: number
+          p_operation_type?: string
+          p_user_id?: string
         }
         Returns: boolean
       }
@@ -6515,9 +6515,9 @@ export type Database = {
       check_payment_system_health: {
         Args: Record<PropertyKey, never>
         Returns: {
+          description: string
           metric: string
           value: number
-          description: string
         }[]
       }
       check_paystack_production_readiness: {
@@ -6551,9 +6551,9 @@ export type Database = {
       }
       check_user_permission: {
         Args: {
-          user_id_param: string
           menu_key_param: string
           required_level_param?: string
+          user_id_param: string
         }
         Returns: boolean
       }
@@ -6599,43 +6599,43 @@ export type Database = {
       }
       confirm_payment_atomic: {
         Args: {
-          p_reference: string
           p_amount: number
-          p_paystack_data: Json
           p_confirmed_at: string
+          p_paystack_data: Json
+          p_reference: string
         }
         Returns: Json
       }
       convert_guest_cart_to_customer: {
-        Args: { p_guest_session_id: string; p_customer_id: string }
+        Args: { p_customer_id: string; p_guest_session_id: string }
         Returns: Json
       }
       create_admin_session: {
         Args: {
-          p_user_id: string
           p_ip_address?: unknown
           p_user_agent?: string
+          p_user_id: string
         }
         Returns: string
       }
       create_customer_with_validation: {
         Args: {
-          p_name: string
-          p_email: string
-          p_phone?: string
           p_admin_id?: string
-          p_send_welcome_email?: boolean
+          p_email: string
           p_ip_address?: unknown
+          p_name: string
+          p_phone?: string
+          p_send_welcome_email?: boolean
           p_user_agent?: string
         }
         Returns: Json
       }
       create_logo_version: {
         Args: {
-          p_logo_url: string
+          p_dimensions: Json
           p_file_size: number
           p_file_type: string
-          p_dimensions: Json
+          p_logo_url: string
           p_uploaded_by: string
         }
         Returns: string
@@ -6647,12 +6647,12 @@ export type Database = {
       create_order_with_items: {
         Args: {
           p_customer_id: string
-          p_fulfillment_type: string
           p_delivery_address?: Json
-          p_pickup_point_id?: string
           p_delivery_zone_id?: string
+          p_fulfillment_type: string
           p_guest_session_id?: string
           p_items?: Json
+          p_pickup_point_id?: string
         }
         Returns: string
       }
@@ -6670,13 +6670,13 @@ export type Database = {
       }
       debug_payment_transaction_insert: {
         Args: {
-          p_order_id: string
-          p_customer_email: string
           p_amount: number
           p_currency?: string
+          p_customer_email: string
+          p_order_id: string
           p_payment_method?: string
-          p_transaction_type?: string
           p_status?: string
+          p_transaction_type?: string
         }
         Returns: Json
       }
@@ -6691,11 +6691,11 @@ export type Database = {
       detect_orphaned_customer_records: {
         Args: Record<PropertyKey, never>
         Returns: {
+          communication_events_count: number
           email: string
-          has_customer_record: boolean
           has_auth_user: boolean
           has_customer_account: boolean
-          communication_events_count: number
+          has_customer_record: boolean
           issue_type: string
         }[]
       }
@@ -6714,9 +6714,9 @@ export type Database = {
       find_or_create_customer: {
         Args: {
           p_email: string
+          p_is_guest?: boolean
           p_name: string
           p_phone?: string
-          p_is_guest?: boolean
         }
         Returns: {
           customer_id: string
@@ -6746,21 +6746,21 @@ export type Database = {
       get_active_paystack_config: {
         Args: Record<PropertyKey, never>
         Returns: {
-          public_key: string
-          test_mode: boolean
-          secret_key: string
-          webhook_secret: string
           environment: string
+          public_key: string
+          secret_key: string
+          test_mode: boolean
+          webhook_secret: string
         }[]
       }
       get_admin_invitation_metrics: {
         Args: Record<PropertyKey, never>
         Returns: {
-          total_invitations: number
-          pending_invitations: number
           accepted_invitations: number
           expired_invitations: number
+          pending_invitations: number
           success_rate: number
+          total_invitations: number
         }[]
       }
       get_all_customers_display: {
@@ -6770,9 +6770,9 @@ export type Database = {
       get_all_customers_for_analytics: {
         Args: Record<PropertyKey, never>
         Returns: {
+          customer_email: string
           customer_id: string
           customer_name: string
-          customer_email: string
           customer_phone: string
           is_registered: boolean
           registration_date: string
@@ -6783,15 +6783,15 @@ export type Database = {
         Returns: Json
       }
       get_customer_analytics_safe: {
-        Args: { p_start_date?: string; p_end_date?: string }
+        Args: { p_end_date?: string; p_start_date?: string }
         Returns: Json
       }
       get_dashboard_data: {
         Args: Record<PropertyKey, never>
         Returns: {
-          total_products: number
-          total_orders: number
           total_customers: number
+          total_orders: number
+          total_products: number
           total_revenue: number
         }[]
       }
@@ -6808,14 +6808,14 @@ export type Database = {
         }[]
       }
       get_hourly_email_stats: {
-        Args: { start_time: string; end_time: string }
+        Args: { end_time: string; start_time: string }
         Returns: {
-          hour_bucket: string
-          total_sent: number
-          successful_delivered: number
-          failed_attempts: number
           bounce_rate: number
           delivery_rate: number
+          failed_attempts: number
+          hour_bucket: string
+          successful_delivered: number
+          total_sent: number
         }[]
       }
       get_order_linking_stats: {
@@ -6825,76 +6825,76 @@ export type Database = {
       get_order_payment_status: {
         Args: { p_order_id: string }
         Returns: {
-          order_id: string
-          payment_status: string
-          order_status: string
-          paid_at: string
+          computed_payment_method: string
           final_paid: boolean
           final_paid_at: string
-          payment_channel: string
-          computed_payment_method: string
-          needs_reconciliation: boolean
-          latest_tx_status: string
           latest_tx_reference: string
+          latest_tx_status: string
+          needs_reconciliation: boolean
+          order_id: string
+          order_status: string
+          paid_at: string
+          payment_channel: string
+          payment_status: string
         }[]
       }
       get_orders_with_payment: {
-        Args: { p_order_id?: string; p_customer_email?: string }
+        Args: { p_customer_email?: string; p_order_id?: string }
         Returns: {
-          id: string
-          order_number: string
+          assigned_rider_id: string
+          created_at: string
+          created_by: string
+          customer_email: string
           customer_id: string
           customer_name: string
-          customer_email: string
           customer_phone: string
-          order_type: Database["public"]["Enums"]["order_type"]
-          status: Database["public"]["Enums"]["order_status"]
-          payment_status: Database["public"]["Enums"]["payment_status"]
-          subtotal: number
-          tax_amount: number
-          delivery_fee: number
-          discount_amount: number
-          total_amount: number
           delivery_address: Json
-          pickup_time: string
+          delivery_fee: number
           delivery_time: string
-          special_instructions: string
-          payment_method: string
-          payment_reference: string
-          assigned_rider_id: string
-          order_time: string
-          created_at: string
-          updated_at: string
-          created_by: string
-          updated_by: string
-          delivery_zone_id: string
-          preferred_delivery_time: string
-          pickup_point_id: string
           delivery_time_slot_id: string
-          subtotal_cost: number
-          total_vat: number
-          guest_session_id: string
-          paid_at: string
-          tx_id: string
-          tx_status: string
-          tx_paid_at: string
-          tx_channel: string
-          tx_provider_reference: string
+          delivery_zone_id: string
+          discount_amount: number
           final_paid: boolean
           final_paid_at: string
+          guest_session_id: string
+          id: string
+          order_number: string
+          order_time: string
+          order_type: Database["public"]["Enums"]["order_type"]
+          paid_at: string
           payment_channel: string
+          payment_method: string
+          payment_reference: string
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          pickup_point_id: string
+          pickup_time: string
+          preferred_delivery_time: string
+          special_instructions: string
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          subtotal_cost: number
+          tax_amount: number
+          total_amount: number
+          total_vat: number
+          tx_channel: string
+          tx_id: string
+          tx_paid_at: string
+          tx_provider_reference: string
+          tx_status: string
+          updated_at: string
+          updated_by: string
         }[]
       }
       get_payment_flow_health: {
         Args: Record<PropertyKey, never>
         Returns: {
-          period: string
-          total_orders: number
           completed_orders: number
-          pending_orders: number
+          completion_rate_percent: number
           paid_orders: number
           payment_pending: number
-          completion_rate_percent: number
+          pending_orders: number
+          period: string
+          total_orders: number
         }[]
       }
       get_payment_health_summary: {
@@ -6908,29 +6908,29 @@ export type Database = {
       get_production_metrics: {
         Args: Record<PropertyKey, never>
         Returns: {
-          total_products: number
           total_paid_orders: number
           total_paying_customers: number
+          total_products: number
           total_revenue: number
         }[]
       }
       get_public_delivery_zones: {
         Args: Record<PropertyKey, never>
         Returns: {
-          id: string
-          name: string
-          description: string
           base_fee: number
+          description: string
           fee_per_km: number
+          id: string
           min_order_for_free_delivery: number
+          name: string
         }[]
       }
       get_public_paystack_config: {
         Args: Record<PropertyKey, never>
         Returns: {
+          environment: string
           public_key: string
           test_mode: boolean
-          environment: string
         }[]
       }
       get_queued_communication_events: {
@@ -6974,16 +6974,16 @@ export type Database = {
       }
       handle_successful_payment: {
         Args: {
-          p_paystack_reference: string
-          p_order_reference?: string
           p_amount?: number
           p_currency?: string
+          p_order_reference?: string
           p_paystack_data?: Json
+          p_paystack_reference: string
         }
         Returns: Json
       }
       has_email_consent: {
-        Args: { email_address: string; consent_type?: string }
+        Args: { consent_type?: string; email_address: string }
         Returns: boolean
       }
       health_check: {
@@ -6992,13 +6992,13 @@ export type Database = {
       }
       increment_promotion_usage: {
         Args: {
-          p_promotion_id: string
-          p_order_id: string
           p_customer_email: string
           p_discount_amount: number
-          p_original_amount: number
           p_final_amount: number
           p_metadata?: Json
+          p_order_id: string
+          p_original_amount: number
+          p_promotion_id: string
         }
         Returns: undefined
       }
@@ -7019,42 +7019,42 @@ export type Database = {
         Returns: undefined
       }
       link_order_to_customer_account: {
-        Args: { p_order_id: string; p_customer_email: string }
+        Args: { p_customer_email: string; p_order_id: string }
         Returns: undefined
       }
       log_admin_action: {
         Args: {
           action_type: string
-          entity_type: string
           entity_id: string
-          old_values?: Json
-          new_values?: Json
+          entity_type: string
           message?: string
+          new_values?: Json
+          old_values?: Json
         }
         Returns: undefined
       }
       log_admin_management_action: {
         Args: {
-          action_type: string
-          target_user_id?: string
-          target_email?: string
           action_data?: Json
           action_result?: string
+          action_type: string
+          target_email?: string
+          target_user_id?: string
         }
         Returns: undefined
       }
       log_api_request: {
         Args: {
+          p_customer_id?: string
           p_endpoint: string
-          p_method: string
+          p_error_details?: Json
           p_ip_address?: unknown
-          p_user_agent?: string
+          p_method: string
           p_request_payload?: Json
           p_response_status?: number
           p_response_time_ms?: number
-          p_customer_id?: string
           p_session_id?: string
-          p_error_details?: Json
+          p_user_agent?: string
         }
         Returns: string
       }
@@ -7062,21 +7062,21 @@ export type Database = {
         Args: {
           p_action: string
           p_field_name: string
-          p_old_value: string
-          p_new_value: string
-          p_metadata?: Json
           p_ip_address?: unknown
+          p_metadata?: Json
+          p_new_value: string
+          p_old_value: string
           p_user_agent?: string
         }
         Returns: string
       }
       log_customer_operation: {
         Args: {
-          p_operation: string
+          p_admin_id?: string
           p_customer_id: string
           p_details?: Json
-          p_admin_id?: string
           p_ip_address?: unknown
+          p_operation: string
           p_user_agent?: string
         }
         Returns: string
@@ -7084,87 +7084,87 @@ export type Database = {
       log_payment_error: {
         Args: {
           p_error_code: string
-          p_error_message: string
           p_error_context?: Json
-          p_user_id?: string
+          p_error_message: string
           p_order_id?: string
-          p_transaction_reference?: string
           p_severity?: string
+          p_transaction_reference?: string
+          p_user_id?: string
         }
         Returns: string
       }
       log_payment_security_event: {
         Args: {
-          event_type: string
-          severity?: string
           details?: Json
+          event_type: string
           ip_address?: unknown
+          severity?: string
           user_agent?: string
         }
         Returns: string
       }
       log_payment_verification_attempt: {
         Args: {
-          p_reference: string
-          p_user_id?: string
-          p_success?: boolean
           p_error_message?: string
           p_ip_address?: unknown
+          p_reference: string
+          p_success?: boolean
+          p_user_id?: string
         }
         Returns: undefined
       }
       log_profile_activity: {
         Args: {
-          p_customer_id: string
           p_action_type: string
+          p_customer_id: string
           p_field_changed?: string
-          p_old_value?: string
-          p_new_value?: string
           p_ip_address?: unknown
+          p_new_value?: string
+          p_old_value?: string
           p_user_agent?: string
         }
         Returns: string
       }
       log_registration_debug: {
         Args: {
-          p_message: string
-          p_level?: string
           p_category?: string
           p_details?: Json
-          p_user_id?: string
-          p_session_id?: string
           p_ip_address?: unknown
+          p_level?: string
+          p_message: string
+          p_session_id?: string
           p_user_agent?: string
+          p_user_id?: string
         }
         Returns: string
       }
       log_security_event: {
         Args:
           | {
-              p_event_type: string
               p_description: string
-              p_severity?: string
+              p_event_type: string
               p_metadata?: Json
+              p_severity?: string
             }
           | {
-              p_event_type: string
-              p_severity?: string
               p_description?: string
-              p_user_id?: string
+              p_event_type: string
               p_ip_address?: unknown
-              p_user_agent?: string
               p_metadata?: Json
+              p_severity?: string
+              p_user_agent?: string
+              p_user_id?: string
             }
         Returns: string
       }
       log_security_incident: {
         Args: {
-          p_incident_type: string
-          p_severity?: string
-          p_ip_address?: unknown
-          p_user_agent?: string
-          p_endpoint?: string
           p_details?: Json
+          p_endpoint?: string
+          p_incident_type: string
+          p_ip_address?: unknown
+          p_severity?: string
+          p_user_agent?: string
         }
         Returns: string
       }
@@ -7181,7 +7181,7 @@ export type Database = {
         Returns: string
       }
       minimal_payment_test_insert: {
-        Args: { p_order_id: string; p_amount: number }
+        Args: { p_amount: number; p_order_id: string }
         Returns: Json
       }
       order_needs_reconciliation: {
@@ -7207,12 +7207,12 @@ export type Database = {
       reconcile_payment_status: {
         Args: { p_order_id?: string }
         Returns: {
-          order_id: string
-          was_updated: boolean
-          old_payment_status: string
+          new_order_status: string
           new_payment_status: string
           old_order_status: string
-          new_order_status: string
+          old_payment_status: string
+          order_id: string
+          was_updated: boolean
         }[]
       }
       reconcile_payment_status_batch: {
@@ -7226,44 +7226,44 @@ export type Database = {
       record_health_metric: {
         Args: {
           p_metric_name: string
-          p_metric_value: number
           p_metric_type?: string
-          p_tags?: Json
+          p_metric_value: number
           p_severity?: string
+          p_tags?: Json
         }
         Returns: string
       }
       record_payment_metric: {
         Args: {
-          p_metric_name: string
-          p_metric_value: number
-          p_metric_unit?: string
           p_metadata?: Json
+          p_metric_name: string
+          p_metric_unit?: string
+          p_metric_value: number
         }
         Returns: undefined
       }
       record_performance_metric: {
         Args: {
+          p_cache_hit?: boolean
+          p_database_query_time_ms?: number
           p_endpoint: string
-          p_method: string
-          p_response_time_ms: number
-          p_status_code: number
-          p_user_id?: string
+          p_error_details?: Json
           p_ip_address?: unknown
-          p_user_agent?: string
+          p_method: string
           p_request_size_bytes?: number
           p_response_size_bytes?: number
-          p_database_query_time_ms?: number
-          p_cache_hit?: boolean
-          p_error_details?: Json
+          p_response_time_ms: number
+          p_status_code: number
+          p_user_agent?: string
+          p_user_id?: string
         }
         Returns: string
       }
       record_smtp_health_metric: {
         Args: {
-          p_provider_name: string
           p_metric_type: string
           p_metric_value: number
+          p_provider_name: string
           p_threshold_value?: number
         }
         Returns: undefined
@@ -7294,9 +7294,9 @@ export type Database = {
       }
       sync_payment_to_order_status: {
         Args: {
-          p_transaction_id: string
-          p_payment_status: string
           p_order_status?: string
+          p_payment_status: string
+          p_transaction_id: string
         }
         Returns: undefined
       }
@@ -7308,22 +7308,22 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           component: string
-          status: string
           message: string
+          status: string
         }[]
       }
       update_admin_role: {
-        Args: { p_user_id: string; p_new_role: string }
+        Args: { p_new_role: string; p_user_id: string }
         Returns: Json
       }
       update_customer_with_validation: {
         Args: {
-          p_customer_id: string
-          p_name?: string
-          p_email?: string
-          p_phone?: string
           p_admin_id?: string
+          p_customer_id: string
+          p_email?: string
           p_ip_address?: unknown
+          p_name?: string
+          p_phone?: string
           p_user_agent?: string
         }
         Returns: Json
@@ -7331,11 +7331,11 @@ export type Database = {
       validate_admin_invitation_token: {
         Args: { token: string }
         Returns: {
-          invitation_id: string
           email: string
-          role: string
-          is_valid: boolean
           expires_at: string
+          invitation_id: string
+          is_valid: boolean
+          role: string
         }[]
       }
       validate_admin_permission: {
@@ -7343,11 +7343,11 @@ export type Database = {
         Returns: boolean
       }
       validate_admin_permissions: {
-        Args: { p_user_id: string; p_required_permission: string }
+        Args: { p_required_permission: string; p_user_id: string }
         Returns: boolean
       }
       validate_admin_session: {
-        Args: { p_session_token: string; p_ip_address?: unknown }
+        Args: { p_ip_address?: unknown; p_session_token: string }
         Returns: Json
       }
       validate_order_data: {
@@ -7368,10 +7368,10 @@ export type Database = {
       }
       validate_promotion_usage: {
         Args: {
-          p_promotion_id: string
-          p_order_amount: number
           p_customer_email?: string
+          p_order_amount: number
           p_promotion_code?: string
+          p_promotion_id: string
         }
         Returns: Json
       }
@@ -7379,28 +7379,28 @@ export type Database = {
         Args:
           | {
               p_email: string
+              p_ip_address?: string
               p_otp_code: string
               p_otp_type: string
-              p_ip_address?: string
             }
           | {
               p_email: string
+              p_ip_address?: unknown
               p_otp_code: string
               p_otp_type: string
-              p_ip_address?: unknown
             }
         Returns: Json
       }
       verify_payment_atomic: {
         Args: {
-          p_reference: string
           p_paystack_data: Json
+          p_reference: string
           p_verified_at: string
         }
         Returns: Json
       }
       verify_webhook_signature: {
-        Args: { p_payload: string; p_signature: string; p_secret: string }
+        Args: { p_payload: string; p_secret: string; p_signature: string }
         Returns: boolean
       }
     }

@@ -3,7 +3,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone } from 'lucide-react';
+import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone, ChevronRight } from 'lucide-react';
+import { formatAddress } from '@/utils/formatAddress';
+import { DeliveryCountdown } from './DeliveryCountdown';
 
 interface OrderItem {
   id: string;
@@ -105,51 +107,62 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-3">
-            <Package className="h-5 w-5 text-primary" />
-            Order Details - {order.order_number}
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
+        <DialogHeader className="space-y-3">
+          <DialogTitle className="flex items-center gap-3 text-lg sm:text-xl">
+            <Package className="h-5 w-5 text-primary flex-shrink-0" />
+            <span className="truncate">Order Details - {order.order_number}</span>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
+          {/* Delivery Countdown - Only show if delivery is scheduled */}
+          {deliverySchedule && (
+            <DeliveryCountdown
+              deliveryDate={deliverySchedule.delivery_date}
+              deliveryTimeStart={deliverySchedule.delivery_time_start}
+              className="w-full"
+            />
+          )}
+
           {/* Order Header */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <Card>
-              <CardContent className="pt-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            <Card className="p-3 sm:p-4">
+              <CardContent className="p-0">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge className={getStatusColor(order.status)}>
+                    <Badge className={getStatusColor(order.status)} variant="secondary">
                       {order.status.replace('_', ' ').toUpperCase()}
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">Order Status</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Order Status</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="pt-4">
+            <Card className="p-3 sm:p-4">
+              <CardContent className="p-0">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge className={getPaymentStatusColor(order.payment_status)}>
+                    <Badge className={getPaymentStatusColor(order.payment_status)} variant="secondary">
                       {order.payment_status.toUpperCase()}
                     </Badge>
                   </div>
-                  <p className="text-sm text-muted-foreground">Payment Status</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Payment Status</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardContent className="pt-4">
+            <Card className="p-3 sm:p-4 sm:col-span-2 lg:col-span-1">
+              <CardContent className="p-0">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Clock className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium">{formatDateTime(order.order_time)}</span>
+                    <Clock className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                    <span className="font-medium text-sm sm:text-base break-words">
+                      {formatDateTime(order.order_time)}
+                    </span>
                   </div>
-                  <p className="text-sm text-muted-foreground">Order Time</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">Order Time</p>
                 </div>
               </CardContent>
             </Card>
@@ -157,73 +170,88 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
           {/* Order Items */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Package className="h-5 w-5" />
-                Order Items ({order.order_items.length} items)
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <Package className="h-5 w-5 flex-shrink-0" />
+                Order Items ({order.order_items.length} {order.order_items.length === 1 ? 'item' : 'items'})
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {order.order_items.map((item) => (
-                  <div key={item.id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{item.product_name}</h4>
+                  <div key={item.id} className="border rounded-lg p-3 sm:p-4 bg-card">
+                    <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-3">
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-sm sm:text-base break-words">{item.product_name}</h4>
+                        <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground mt-1">
+                          <span>Qty: {item.quantity}</span>
+                          <span>•</span>
+                          <span>{formatCurrency(item.unit_price)} each</span>
+                        </div>
+                        
                         {item.special_instructions && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            <strong>Special Instructions:</strong> {item.special_instructions}
-                          </p>
+                          <div className="mt-2 p-2 bg-muted/50 rounded text-xs sm:text-sm">
+                            <p className="font-medium text-muted-foreground mb-1">Special Instructions:</p>
+                            <p className="break-words">{item.special_instructions}</p>
+                          </div>
                         )}
-                        {item.customizations && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            <strong>Customizations:</strong> {JSON.stringify(item.customizations)}
-                          </p>
+                        
+                        {item.customizations && typeof item.customizations === 'object' && (
+                          <div className="mt-2 p-2 bg-muted/50 rounded text-xs sm:text-sm">
+                            <p className="font-medium text-muted-foreground mb-1">Customizations:</p>
+                            <div className="space-y-1">
+                              {Object.entries(item.customizations).map(([key, value]) => (
+                                <div key={key} className="flex gap-2 break-words">
+                                  <span className="font-medium">{key}:</span>
+                                  <span>{String(value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
                         )}
                       </div>
-                      <div className="text-right ml-4">
-                        <p className="font-medium">{formatCurrency(item.total_price)}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {item.quantity} × {formatCurrency(item.unit_price)}
+                      
+                      <div className="text-right sm:ml-4 flex-shrink-0">
+                        <p className="font-bold text-primary text-sm sm:text-base">
+                          {formatCurrency(item.total_price)}
                         </p>
+                        {(item.vat_amount > 0 || item.discount_amount > 0) && (
+                          <div className="text-xs text-muted-foreground mt-1 space-y-1">
+                            {item.vat_amount > 0 && (
+                              <div>VAT: {formatCurrency(item.vat_amount)}</div>
+                            )}
+                            {item.discount_amount > 0 && (
+                              <div className="text-green-600">Discount: -{formatCurrency(item.discount_amount)}</div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     </div>
-                    
-                    {(item.vat_amount || item.discount_amount) && (
-                      <div className="flex justify-between text-sm text-muted-foreground pt-2 border-t">
-                        {item.vat_amount > 0 && (
-                          <span>VAT: {formatCurrency(item.vat_amount)}</span>
-                        )}
-                        {item.discount_amount > 0 && (
-                          <span>Discount: -{formatCurrency(item.discount_amount)}</span>
-                        )}
-                      </div>
-                    )}
                   </div>
                 ))}
 
-                <Separator />
+                <Separator className="my-4" />
 
                 {/* Order Summary */}
-                <div className="space-y-2">
+                <div className="bg-muted/30 rounded-lg p-3 sm:p-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Subtotal:</span>
-                    <span>{formatCurrency(subtotal)}</span>
+                    <span className="font-medium">{formatCurrency(subtotal)}</span>
                   </div>
                   {totalVat > 0 && (
                     <div className="flex justify-between text-sm">
                       <span>VAT (7.5%):</span>
-                      <span>{formatCurrency(totalVat)}</span>
+                      <span className="font-medium">{formatCurrency(totalVat)}</span>
                     </div>
                   )}
                   {totalDiscount > 0 && (
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Total Discount:</span>
-                      <span>-{formatCurrency(totalDiscount)}</span>
+                      <span className="font-medium">-{formatCurrency(totalDiscount)}</span>
                     </div>
                   )}
-                  <Separator />
-                  <div className="flex justify-between font-semibold text-lg">
+                  <Separator className="my-2" />
+                  <div className="flex justify-between font-bold text-base sm:text-lg text-primary">
                     <span>Total:</span>
                     <span>{formatCurrency(order.total_amount)}</span>
                   </div>
@@ -234,28 +262,28 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
           {/* Payment Information */}
           <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CreditCard className="h-5 w-5" />
+            <CardHeader className="pb-3">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                <CreditCard className="h-5 w-5 flex-shrink-0" />
                 Payment Information
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-muted-foreground">Payment Method</p>
-                  <p className="font-medium">{order.payment_method || 'Online Payment'}</p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                <div className="space-y-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground">Payment Method</p>
+                  <p className="font-medium text-sm sm:text-base">{order.payment_method || 'Online Payment'}</p>
                 </div>
                 {order.payment_reference && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Payment Reference</p>
-                    <p className="font-mono text-sm">{order.payment_reference}</p>
+                  <div className="space-y-1">
+                    <p className="text-xs sm:text-sm text-muted-foreground">Payment Reference</p>
+                    <p className="font-mono text-xs sm:text-sm break-all">{order.payment_reference}</p>
                   </div>
                 )}
                 {order.paid_at && (
-                  <div>
-                    <p className="text-sm text-muted-foreground">Paid At</p>
-                    <p className="font-medium">{formatDateTime(order.paid_at)}</p>
+                  <div className="space-y-1 sm:col-span-2">
+                    <p className="text-xs sm:text-sm text-muted-foreground">Paid At</p>
+                    <p className="font-medium text-sm sm:text-base">{formatDateTime(order.paid_at)}</p>
                   </div>
                 )}
               </div>
@@ -265,25 +293,22 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           {/* Delivery Information */}
           {(order.order_type === 'delivery' || deliverySchedule) && (
             <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Truck className="h-5 w-5" />
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <Truck className="h-5 w-5 flex-shrink-0" />
                   Delivery Information
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="space-y-4">
+                <div className="space-y-4 sm:space-y-6">
                   {order.delivery_address && (
-                    <div>
-                      <div className="flex items-start gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Delivery Address</p>
-                          <p className="font-medium">
-                            {typeof order.delivery_address === 'string' 
-                              ? order.delivery_address 
-                              : JSON.stringify(order.delivery_address)
-                            }
+                    <div className="bg-muted/30 rounded-lg p-3 sm:p-4">
+                      <div className="flex items-start gap-3">
+                        <MapPin className="h-5 w-5 text-primary mt-0.5 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-xs sm:text-sm text-muted-foreground mb-2">Delivery Address</p>
+                          <p className="font-medium text-sm sm:text-base leading-relaxed break-words">
+                            {formatAddress(order.delivery_address)}
                           </p>
                         </div>
                       </div>
@@ -291,58 +316,66 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   )}
 
                   {deliverySchedule && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm text-muted-foreground">Delivery Date</p>
-                            <p className="font-medium">
-                              {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG')}
+                    <div className="bg-primary/5 rounded-lg p-3 sm:p-4 border border-primary/10">
+                      <h4 className="font-semibold text-primary mb-3 flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Scheduled Delivery
+                      </h4>
+                      
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+                        <div className="space-y-1">
+                          <p className="text-xs sm:text-sm text-muted-foreground">Delivery Date</p>
+                          <p className="font-medium text-sm sm:text-base">
+                            {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG', {
+                              weekday: 'long',
+                              year: 'numeric',
+                              month: 'long',
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <p className="text-xs sm:text-sm text-muted-foreground">Time Window</p>
+                          <p className="font-medium text-sm sm:text-base">
+                            {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                          </p>
+                        </div>
+                        
+                        {deliverySchedule.delivery_zone && (
+                          <div className="space-y-1">
+                            <p className="text-xs sm:text-sm text-muted-foreground">Delivery Zone</p>
+                            <p className="font-medium text-sm sm:text-base">{deliverySchedule.delivery_zone}</p>
+                          </div>
+                        )}
+                        
+                        {deliverySchedule.delivery_fee && (
+                          <div className="space-y-1">
+                            <p className="text-xs sm:text-sm text-muted-foreground">Delivery Fee</p>
+                            <p className="font-medium text-sm sm:text-base text-primary">
+                              {formatCurrency(deliverySchedule.delivery_fee)}
                             </p>
                           </div>
-                        </div>
+                        )}
                       </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <Clock className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm text-muted-foreground">Delivery Time</p>
-                            <p className="font-medium">
-                              {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                      {deliverySchedule.delivery_zone && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Delivery Zone</p>
-                          <p className="font-medium">{deliverySchedule.delivery_zone}</p>
-                        </div>
-                      )}
-                      {deliverySchedule.delivery_fee && (
-                        <div>
-                          <p className="text-sm text-muted-foreground">Delivery Fee</p>
-                          <p className="font-medium">{formatCurrency(deliverySchedule.delivery_fee)}</p>
-                        </div>
-                      )}
+                      
                       {deliverySchedule.special_instructions && (
-                        <div className="md:col-span-2">
-                          <p className="text-sm text-muted-foreground">Special Instructions</p>
-                          <p className="font-medium">{deliverySchedule.special_instructions}</p>
+                        <div className="mt-4 pt-3 border-t border-primary/10">
+                          <p className="text-xs sm:text-sm text-muted-foreground mb-2">Special Instructions</p>
+                          <p className="font-medium text-sm sm:text-base break-words bg-white/50 p-2 rounded">
+                            {deliverySchedule.special_instructions}
+                          </p>
                         </div>
                       )}
                     </div>
                   )}
 
                   {order.customer_phone && (
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Contact Phone</p>
-                          <p className="font-medium">{order.customer_phone}</p>
-                        </div>
+                    <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                      <Phone className="h-5 w-5 text-primary flex-shrink-0" />
+                      <div>
+                        <p className="text-xs sm:text-sm text-muted-foreground">Contact Phone</p>
+                        <p className="font-medium text-sm sm:text-base">{order.customer_phone}</p>
                       </div>
                     </div>
                   )}

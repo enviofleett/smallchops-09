@@ -146,21 +146,26 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
   // Fetch delivery zone and dispatch rider information
   useEffect(() => {
+    let isMounted = true;
+    const abortController = new AbortController();
+
     const fetchDeliveryInfo = async () => {
-      if (!order) return;
+      if (!order || !isMounted) return;
       
       console.log('🔍 Fetching delivery info for order:', order.id);
       setLoading(true);
       
       try {
         // Fetch delivery zone if available
-        if (order.delivery_zone_id) {
+        if (order.delivery_zone_id && isMounted) {
           console.log('📍 Fetching delivery zone:', order.delivery_zone_id);
           const { data: zoneData, error: zoneError } = await supabase
             .from('delivery_zones')
             .select('*')
             .eq('id', order.delivery_zone_id)
             .maybeSingle();
+          
+          if (abortController.signal.aborted || !isMounted) return;
           
           if (zoneError) {
             console.warn('⚠️ Delivery zone fetch error:', zoneError);
@@ -173,13 +178,15 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
         }
 
         // Fetch dispatch rider if assigned
-        if (order.assigned_rider_id) {
+        if (order.assigned_rider_id && isMounted) {
           console.log('🚚 Fetching dispatch rider:', order.assigned_rider_id);
           const { data: riderData, error: riderError } = await supabase
             .from('drivers')
             .select('*')
             .eq('id', order.assigned_rider_id)
             .maybeSingle();
+          
+          if (abortController.signal.aborted || !isMounted) return;
           
           if (riderError) {
             console.warn('⚠️ Dispatch rider fetch error:', riderError);
@@ -191,24 +198,34 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           }
         }
       } catch (error) {
-        console.error('❌ Critical error fetching delivery info:', error);
-        // Don't break the modal, just log the error
+        if (!abortController.signal.aborted && isMounted) {
+          console.error('❌ Critical error fetching delivery info:', error);
+          // Don't break the modal, just log the error
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchDeliveryInfo();
-  }, [order]);
+
+    return () => {
+      isMounted = false;
+      abortController.abort();
+    };
+  }, [order?.id]);
 
   // Real-time status updates
   useEffect(() => {
     if (!order?.id) return;
 
     console.log('📡 Setting up real-time subscription for order:', order.id);
+    let isMounted = true;
     
     const channel = supabase
-      .channel('order-status-updates')
+      .channel(`order-status-updates-${order.id}`)
       .on(
         'postgres_changes',
         {
@@ -218,16 +235,21 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
           filter: `id=eq.${order.id}`
         },
         (payload) => {
-          console.log('📦 Order status update received:', payload);
-          setOrderStatus(payload.new.status);
-          if (payload.new.status === 'delivered') {
-            toast.success('Your order has been delivered!');
+          if (isMounted) {
+            console.log('📦 Order status update received:', payload);
+            setOrderStatus(payload.new.status);
+            if (payload.new.status === 'delivered') {
+              toast.success('Your order has been delivered!');
+            }
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Real-time subscription status:', status);
+      });
 
     return () => {
+      isMounted = false;
       console.log('🔌 Cleaning up real-time subscription');
       supabase.removeChannel(channel);
     };

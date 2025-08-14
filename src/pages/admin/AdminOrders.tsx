@@ -8,10 +8,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { getOrders, OrderWithItems } from '@/api/orders';
+import { getOrdersWithDeliverySchedule } from '@/api/deliveryScheduleApi';
+import { useDeliveryOrdersWithFiltering, calculateOrderMetrics } from '@/hooks/useDeliveryOrdersWithFiltering';
+import { EnhancedDeliveryFilter } from '@/components/admin/delivery/EnhancedDeliveryFilter';
+import { MobileDeliveryCard } from '@/components/admin/delivery/MobileDeliveryCard';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
 import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
+import { CountdownTimer } from '@/components/orders/CountdownTimer';
 import { 
   Search, 
   Filter, 
@@ -23,11 +29,14 @@ import {
   AlertCircle,
   Plus,
   Activity,
-  ChevronDown
+  ChevronDown,
+  Calendar,
+  MapPin,
+  Truck
 } from 'lucide-react';
 import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
-import { format } from 'date-fns';
+import { format, isToday, isTomorrow, isWithinInterval, subDays, addDays } from 'date-fns';
 
 import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
 
@@ -38,18 +47,30 @@ export default function AdminOrders() {
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
+  const [dateFilter, setDateFilter] = useState<'all' | 'today' | 'tomorrow' | 'this_week' | 'past_week'>('all');
+  const [timeSlotFilter, setTimeSlotFilter] = useState<'all' | 'morning' | 'afternoon' | 'evening'>('all');
+  const [deliveryUrgency, setDeliveryUrgency] = useState<'all' | 'urgent' | 'due_today' | 'upcoming'>('all');
 
-  // Fetch orders with pagination and filters
-  const { data: ordersData, isLoading, error, refetch } = useQuery({
-    queryKey: ['admin-orders', currentPage, statusFilter, searchQuery],
-    queryFn: () => getOrders({
-      page: currentPage,
-      pageSize: 20,
-      status: statusFilter === 'all' ? undefined : statusFilter,
-      searchQuery: searchQuery || undefined,
-    }),
-    refetchInterval: 30000, // Refresh every 30 seconds
+  const isMobile = useIsMobile();
+
+  // Use the enhanced filtering hook
+  const { data: ordersData, isLoading, error, refetch } = useDeliveryOrdersWithFiltering({
+    dateRange: dateFilter,
+    timeSlot: timeSlotFilter,
+    urgency: deliveryUrgency,
+    status: statusFilter,
+    searchQuery,
+    page: currentPage,
+    pageSize: 20
   });
+
+  // Calculate order metrics for display
+  const orderMetrics = ordersData ? calculateOrderMetrics(ordersData.orders) : {
+    total: 0,
+    urgent: 0,
+    dueToday: 0,
+    upcoming: 0
+  };
 
   const orders = ordersData?.orders || [];
   const totalCount = ordersData?.count || 0;
@@ -193,30 +214,55 @@ export default function AdminOrders() {
           </Card>
         </div>
 
-        {/* Filters */}
-        <Card>
-          <CardContent className="p-4">
-            <form onSubmit={handleSearch} className="flex gap-4">
-              <div className="flex-1">
-                <Input
-                  type="text"
-                  placeholder="Search by order number, customer name, or email..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full"
-                />
-              </div>
-              <Button type="submit" variant="outline">
-                <Search className="w-4 h-4 mr-2" />
-                Search
-              </Button>
-              <Button variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-            </form>
-          </CardContent>
-        </Card>
+        {/* Enhanced Search and Filters */}
+        <div className="space-y-4">
+          <Card>
+            <CardContent className="p-4">
+              <form onSubmit={handleSearch} className="flex gap-4">
+                <div className="flex-1">
+                  <Input
+                    type="text"
+                    placeholder="Search by order number, customer name, or email..."
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="w-full"
+                  />
+                </div>
+                <Button type="submit" variant="outline">
+                  <Search className="w-4 h-4 mr-2" />
+                  Search
+                </Button>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Enhanced Delivery Filter Component */}
+          <EnhancedDeliveryFilter
+            filters={{
+              dateRange: dateFilter,
+              timeSlot: timeSlotFilter,
+              urgency: deliveryUrgency
+            }}
+            onFiltersChange={(filters) => {
+              setDateFilter(filters.dateRange);
+              setTimeSlotFilter(filters.timeSlot);
+              setDeliveryUrgency(filters.urgency);
+              setCurrentPage(1);
+            }}
+            onClearFilters={() => {
+              setDateFilter('all');
+              setTimeSlotFilter('all');
+              setDeliveryUrgency('all');
+              setSearchQuery('');
+              setCurrentPage(1);
+            }}
+            orderCounts={orderMetrics}
+          />
+        </div>
 
         {/* Performance Debugger */}
         {import.meta.env.DEV && (
@@ -279,17 +325,42 @@ export default function AdminOrders() {
               </Card>
             ) : (
               <>
-                {/* Orders List */}
-                <div className="space-y-4">
-                  {orders.map((order) => (
-                    <div
-                      key={order.id}
-                      onClick={() => handleOrderClick(order)}
-                      className="cursor-pointer transition-transform hover:scale-[1.01]"
-                    >
-                      <AdminOrderCard order={order} />
-                    </div>
-                  ))}
+                {/* Orders List - Responsive Design */}
+                <div className={`${isMobile ? 'space-y-3' : 'space-y-4'}`}>
+                  {orders.map((order) => {
+                    const deliverySchedule = ordersData?.hasDeliverySchedule 
+                      ? (order as any).delivery_schedule 
+                      : null;
+                    
+                    const isUrgent = deliverySchedule ? (() => {
+                      const now = new Date();
+                      const deliveryDateTime = new Date(deliverySchedule.delivery_date);
+                      const [startHours, startMinutes] = deliverySchedule.delivery_time_start.split(':').map(Number);
+                      deliveryDateTime.setHours(startHours, startMinutes, 0, 0);
+                      const hoursUntilDelivery = (deliveryDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+                      return hoursUntilDelivery <= 2 && hoursUntilDelivery > 0;
+                    })() : false;
+
+                    return (
+                      <div key={order.id}>
+                        {isMobile ? (
+                          <MobileDeliveryCard
+                            order={order}
+                            deliverySchedule={deliverySchedule}
+                            isUrgent={isUrgent}
+                            onCardClick={() => handleOrderClick(order)}
+                          />
+                        ) : (
+                          <div
+                            onClick={() => handleOrderClick(order)}
+                            className="cursor-pointer transition-transform hover:scale-[1.01]"
+                          >
+                            <AdminOrderCard order={order} />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
 
                 {/* Pagination */}
@@ -344,7 +415,7 @@ export default function AdminOrders() {
   );
 }
 
-// Admin-specific order card component
+// Enhanced Admin-specific order card component with delivery schedule
 function AdminOrderCard({ order }: { order: OrderWithItems }) {
   const { data: deliverySchedule } = useQuery({
     queryKey: ['delivery-schedule', order.id],
@@ -354,6 +425,16 @@ function AdminOrderCard({ order }: { order: OrderWithItems }) {
   
   const { data: detailedOrderData, isLoading: isLoadingDetails } = useDetailedOrderData(order.id);
   const [showProductDetails, setShowProductDetails] = useState(false);
+
+  // Determine if delivery is urgent (within next 2 hours)
+  const isUrgentDelivery = deliverySchedule ? (() => {
+    const now = new Date();
+    const deliveryDateTime = new Date(deliverySchedule.delivery_date);
+    const [startHours, startMinutes] = deliverySchedule.delivery_time_start.split(':').map(Number);
+    deliveryDateTime.setHours(startHours, startMinutes, 0, 0);
+    const hoursUntilDelivery = (deliveryDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    return hoursUntilDelivery <= 2 && hoursUntilDelivery > 0;
+  })() : false;
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
@@ -382,18 +463,35 @@ function AdminOrderCard({ order }: { order: OrderWithItems }) {
   };
 
   return (
-    <Card className="hover:shadow-md transition-shadow">
+    <Card className={`hover:shadow-md transition-shadow ${isUrgentDelivery ? 'ring-2 ring-orange-200 bg-orange-50/30' : ''}`}>
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-semibold text-lg">Order #{order.order_number}</h3>
-            <p className="text-sm text-muted-foreground">
-              {format(new Date(order.order_time), 'PPp')}
-            </p>
+          <div className="flex items-center gap-3">
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-lg">Order #{order.order_number}</h3>
+                {isUrgentDelivery && (
+                  <Badge variant="destructive" className="text-xs">
+                    <Clock className="w-3 h-3 mr-1" />
+                    URGENT
+                  </Badge>
+                )}
+              </div>
+              <p className="text-sm text-muted-foreground">
+                {format(new Date(order.order_time), 'PPp')}
+              </p>
+            </div>
           </div>
-          <Badge className={getStatusBadgeColor(order.status)}>
-            {order.status.replace('_', ' ').toUpperCase()}
-          </Badge>
+          <div className="flex items-center gap-2">
+            {order.order_type === 'delivery' ? (
+              <Truck className="w-4 h-4 text-blue-600" />
+            ) : (
+              <MapPin className="w-4 h-4 text-green-600" />
+            )}
+            <Badge className={getStatusBadgeColor(order.status)}>
+              {order.status.replace('_', ' ').toUpperCase()}
+            </Badge>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -459,12 +557,60 @@ function AdminOrderCard({ order }: { order: OrderWithItems }) {
           </div>
         )}
 
+        {/* Enhanced Delivery Schedule Display */}
         {deliverySchedule && (
-          <div className="mt-4 p-3 bg-muted rounded-lg">
-            <p className="text-sm font-medium">Delivery Scheduled:</p>
-            <p className="text-sm">
-              {format(new Date(deliverySchedule.delivery_date), 'PPP')} | {' '}
-              {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+          <div className="mt-4 space-y-3">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground">
+              <Calendar className="w-4 h-4" />
+              Delivery Schedule
+            </div>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Delivery Details */}
+              <div className="p-3 bg-muted rounded-lg">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium">
+                    {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                  </p>
+                  {deliverySchedule.is_flexible && (
+                    <Badge variant="outline" className="text-xs">
+                      Flexible Time
+                    </Badge>
+                  )}
+                  {deliverySchedule.special_instructions && (
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Note: {deliverySchedule.special_instructions}
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {/* Countdown Timer */}
+              <div className="min-h-[100px]">
+                <CountdownTimer
+                  deliveryDate={deliverySchedule.delivery_date}
+                  deliveryTimeStart={deliverySchedule.delivery_time_start}
+                  deliveryTimeEnd={deliverySchedule.delivery_time_end}
+                  isFlexible={deliverySchedule.is_flexible}
+                  className="h-full"
+                />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Pickup Information */}
+        {order.order_type === 'pickup' && (
+          <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div className="flex items-center gap-2 text-green-800">
+              <MapPin className="w-4 h-4" />
+              <span className="text-sm font-medium">Store Pickup</span>
+            </div>
+            <p className="text-sm text-green-700 mt-1">
+              Ready for pickup at store location
             </p>
           </div>
         )}

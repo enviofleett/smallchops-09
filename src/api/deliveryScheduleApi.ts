@@ -64,6 +64,9 @@ export const getOrdersWithDeliverySchedule = async (filters: {
   status?: string[];
   page?: number;
   pageSize?: number;
+  searchQuery?: string;
+  timeSlot?: 'morning' | 'afternoon' | 'evening';
+  urgency?: 'urgent' | 'due_today' | 'upcoming';
 }): Promise<{ orders: OrderWithDeliverySchedule[]; total: number }> => {
   let query = supabase
     .from('orders')

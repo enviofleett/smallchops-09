@@ -11,6 +11,11 @@ export const CheckoutButton: React.FC = () => {
   // Show different button states based on cart content
   const isEmpty = cart.items.length === 0;
 
+  // Don't show button when cart is empty
+  if (isEmpty) {
+    return null;
+  }
+
   return (
     <>
       <Button
@@ -19,18 +24,9 @@ export const CheckoutButton: React.FC = () => {
         size="lg"
       >
         <ShoppingCart className="mr-2 h-4 w-4" />
-        {isEmpty ? (
-          <>
-            <span className="hidden sm:inline">Start Shopping</span>
-            <span className="sm:hidden">Shop</span>
-          </>
-        ) : (
-          <>
-            <span className="hidden sm:inline">Checkout & Schedule Delivery</span>
-            <span className="sm:hidden">Cart</span>
-            <span className="ml-1">({cart.itemCount})</span>
-          </>
-        )}
+        <span className="hidden sm:inline">Checkout & Schedule Delivery</span>
+        <span className="sm:hidden">Cart</span>
+        <span className="ml-1">({cart.itemCount})</span>
       </Button>
 
       <EnhancedCheckoutFlow

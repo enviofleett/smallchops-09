@@ -191,21 +191,12 @@ const PublicHome = () => {
                   Crispy, savory small chops, freshly made and delivered fast.
                 </p>
                 <div className="pt-2">
-                  <div className="flex flex-col sm:flex-row gap-3">
-                    <Button 
-                      onClick={() => navigate('/products')}
-                      className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg"
-                    >
-                      Order Now & Enjoy!
-                    </Button>
-                    <Button 
-                      onClick={() => navigate('/track-order')}
-                      variant="outline"
-                      className="border-red-600 text-red-600 hover:bg-red-50 px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full"
-                    >
-                      Track Your Order
-                    </Button>
-                  </div>
+                  <Button 
+                    onClick={() => navigate('/products')}
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg"
+                  >
+                    Order Now & Enjoy!
+                  </Button>
                 </div>
               </div>
             </div>

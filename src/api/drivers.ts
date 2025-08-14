@@ -27,6 +27,7 @@ export interface NewDriver {
   vehicle_model?: string;
   license_plate?: string;
   is_active?: boolean;
+  sendInvitation?: boolean; // New field for dispatch integration
 }
 
 export const getDrivers = async (): Promise<Driver[]> => {
@@ -40,6 +41,26 @@ export const getDrivers = async (): Promise<Driver[]> => {
 };
 
 export const createDriver = async (driver: NewDriver): Promise<Driver> => {
+  // If this is a dispatch driver with email, use the enhanced creation
+  if (driver.email && driver.sendInvitation) {
+    const { createDispatchDriver } = await import('@/api/dispatchApi');
+    const result = await createDispatchDriver(
+      { ...driver, email: driver.email } as any,
+      driver.sendInvitation
+    );
+    
+    // Fetch the created driver data
+    const { data, error } = await supabase
+      .from('drivers')
+      .select('*')
+      .eq('id', result.driverId)
+      .single();
+      
+    if (error) throw error;
+    return data as Driver;
+  }
+  
+  // Standard driver creation for non-dispatch drivers
   const { data, error } = await supabase
     .from('drivers')
     .insert(driver)

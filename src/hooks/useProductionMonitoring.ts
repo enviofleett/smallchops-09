@@ -1,236 +1,138 @@
 import { useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
 
-interface MonitoringHook {
-  recordHealthMetric: (name: string, value: number, type: string, severity?: string) => Promise<void>;
-  recordPerformanceMetric: (endpoint: string, method: string, responseTime: number, statusCode?: number, error?: string) => Promise<void>;
-  createSecurityAlert: (type: string, severity: string, title: string, description: string) => Promise<void>;
-  cleanupOldData: () => Promise<void>;
-  isRecording: boolean;
+interface ErrorReport {
+  component: string;
+  error: string;
+  user_id?: string;
+  url: string;
+  timestamp: string;
+  user_agent: string;
+  additional_info?: any;
 }
 
-export const useProductionMonitoring = (): MonitoringHook => {
-  const { toast } = useToast();
-  const isRecording = process.env.NODE_ENV === 'production';
+interface PerformanceMetric {
+  component: string;
+  load_time: number;
+  user_id?: string;
+  url: string;
+  timestamp: string;
+}
 
-  const recordHealthMetric = useCallback(async (
-    name: string, 
-    value: number, 
-    type: string, 
-    severity: string = 'info'
-  ) => {
-    if (!isRecording) return;
-    
+export const useProductionMonitoring = () => {
+  const reportError = useCallback(async (error: Error, component: string, additionalInfo?: any) => {
     try {
-      const { error } = await supabase
-        .from('business_analytics')
-        .insert({
-          metric_name: `health_${name}`,
-          metric_value: value,
-          period_start: new Date().toISOString(),
-          period_end: new Date().toISOString(),
-          dimensions: {
-            type,
-            severity,
-            component: 'frontend'
-          }
-        });
+      const errorReport: ErrorReport = {
+        component,
+        error: error.message + (error.stack ? `\n${error.stack}` : ''),
+        url: window.location.href,
+        timestamp: new Date().toISOString(),
+        user_agent: navigator.userAgent,
+        additional_info: additionalInfo
+      };
 
-      if (error) {
-        console.error('Failed to record health metric:', error);
-      }
+      // Log to console for immediate debugging
+      console.error(`[${component}] Production Error:`, error, additionalInfo);
 
-      // Show toast for critical health metrics
-      if (severity === 'critical') {
-        toast({
-          title: "System Health Alert",
-          description: `${name}: ${value}`,
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Error recording health metric:', error);
-    }
-  }, [isRecording, toast]);
-
-  const recordPerformanceMetric = useCallback(async (
-    endpoint: string,
-    method: string,
-    responseTime: number,
-    statusCode?: number,
-    error?: string
-  ) => {
-    if (!isRecording) return;
-    
-    try {
-      const { error: insertError } = await supabase
-        .from('api_metrics')
-        .insert({
-          endpoint,
-          metric_type: 'response_time',
-          metric_value: responseTime,
-          dimensions: {
-            method,
-            status_code: statusCode,
-            error: error || null,
-            user_agent: navigator.userAgent,
-            timestamp: new Date().toISOString()
-          }
-        });
-
-      if (insertError) {
-        console.error('Failed to record performance metric:', insertError);
-      }
-
-      // Alert for slow API responses
-      if (responseTime > 3000) {
-        toast({
-          title: "Slow API Response",
-          description: `${endpoint} took ${responseTime}ms`,
-          variant: "destructive"
-        });
-      }
-    } catch (error) {
-      console.error('Error recording performance metric:', error);
-    }
-  }, [isRecording, toast]);
-
-  const createSecurityAlert = useCallback(async (
-    type: string,
-    severity: string,
-    title: string,
-    description: string
-  ) => {
-    if (!isRecording) return;
-    
-    try {
-      const { error } = await supabase
-        .from('security_incidents')
-        .insert({
-          type,
-          severity,
-          request_data: {
-            title,
-            description,
-            source: 'frontend',
-            metadata: {
-              user_agent: navigator.userAgent,
-              url: window.location.href,
-              timestamp: new Date().toISOString()
-            }
-          }
-        });
-
-      if (error) {
-        console.error('Failed to create security alert:', error);
-        return;
-      }
-
-      toast({
-        title: "Security Alert Created",
-        description: title,
-        variant: severity === 'high' || severity === 'critical' ? "destructive" : "default"
-      });
-    } catch (error) {
-      console.error('Error creating security alert:', error);
-      toast({
-        title: "Failed to Create Security Alert",
-        description: "Please contact support if this persists",
-        variant: "destructive"
-      });
-    }
-  }, [isRecording, toast]);
-
-  const cleanupOldData = useCallback(async () => {
-    if (!isRecording) return;
-    
-    try {
-      // Cleanup old metrics manually since we don't have the RPC function
-      const thirtyDaysAgo = new Date();
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-      await Promise.all([
-        supabase
-          .from('api_metrics')
-          .delete()
-          .lt('timestamp', thirtyDaysAgo.toISOString()),
-        supabase
-          .from('business_analytics')
-          .delete()
-          .lt('created_at', thirtyDaysAgo.toISOString())
-      ]);
-
-      toast({
-        title: "Data Cleanup Successful",
-        description: "Old monitoring data has been cleaned up",
-        variant: "default"
-      });
-    } catch (error) {
-      console.error('Error during data cleanup:', error);
-      toast({
-        title: "Cleanup Error",
-        description: "An error occurred during data cleanup",
-        variant: "destructive"
-      });
-    }
-  }, [isRecording, toast]);
-
-  // Auto-record page load performance
-  useEffect(() => {
-    if (!isRecording) return;
-    
-    const recordPageLoad = () => {
-      const navigation = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming;
-      if (navigation) {
-        const loadTime = navigation.loadEventEnd - navigation.loadEventStart;
-        if (loadTime > 0) {
-          recordPerformanceMetric(
-            window.location.pathname,
-            'GET',
-            loadTime,
-            200,
-            undefined
-          );
+      // Store in audit logs for tracking
+      await supabase.from('audit_logs').insert({
+        action: 'production_error',
+        category: 'Error Tracking',
+        message: `[${errorReport.component}] ${errorReport.error}`,
+        new_values: {
+          component: errorReport.component,
+          url: errorReport.url,
+          user_agent: errorReport.user_agent,
+          additional_info: errorReport.additional_info,
+          severity: 'error'
         }
-      }
-    };
-
-    if (document.readyState === 'complete') {
-      recordPageLoad();
-    } else {
-      window.addEventListener('load', recordPageLoad);
-      return () => window.removeEventListener('load', recordPageLoad);
+      });
+    } catch (reportingError) {
+      console.error('Failed to report error:', reportingError);
     }
-  }, [isRecording, recordPerformanceMetric]);
+  }, []);
 
-  // Auto-record system health metrics
-  useEffect(() => {
-    if (!isRecording) return;
-    
-    const recordSystemHealth = () => {
-      // Memory usage
-      if ('memory' in performance) {
-        const memory = (performance as any).memory;
-        const memoryUsagePercent = (memory.usedJSHeapSize / memory.jsHeapSizeLimit) * 100;
-        recordHealthMetric('memory_usage', memoryUsagePercent, 'system');
+  const reportPerformance = useCallback(async (component: string, loadTime: number) => {
+    try {
+      const performanceMetric: PerformanceMetric = {
+        component,
+        load_time: loadTime,
+        url: window.location.href,
+        timestamp: new Date().toISOString()
+      };
+
+      // Only report slow loads (> 2 seconds)
+      if (loadTime > 2000) {
+        console.warn(`[${component}] Slow load detected: ${loadTime}ms`);
+        
+        await supabase.from('audit_logs').insert({
+          action: 'performance_slow_load',
+          category: 'Performance Monitoring',
+          message: `Slow load detected: ${performanceMetric.component} (${performanceMetric.load_time}ms)`,
+          new_values: {
+            component: performanceMetric.component,
+            load_time_ms: performanceMetric.load_time,
+            url: performanceMetric.url,
+            recorded_at: performanceMetric.timestamp
+          }
+        });
       }
+    } catch (reportingError) {
+      console.error('Failed to report performance:', reportingError);
+    }
+  }, []);
+
+  const reportOrderVisibilityIssue = useCallback(async (details: any) => {
+    try {
+      console.error('[ORDER_VISIBILITY] Issue detected:', details);
       
-      // Connection status
-      recordHealthMetric('connection_status', navigator.onLine ? 1 : 0, 'network');
+      await supabase.from('audit_logs').insert({
+        action: 'order_visibility_issue',
+        category: 'Order Management',
+        message: 'Order visibility issue detected',
+        new_values: {
+          component: 'order_visibility',
+          details: details,
+          url: window.location.href,
+          user_agent: navigator.userAgent,
+          severity: 'warning'
+        }
+      });
+    } catch (error) {
+      console.error('Failed to report order visibility issue:', error);
+    }
+  }, []);
+
+  // Set up global error handling
+  useEffect(() => {
+    const handleUnhandledError = (event: ErrorEvent) => {
+      reportError(new Error(event.message), 'global_error_handler', {
+        filename: event.filename,
+        lineno: event.lineno,
+        colno: event.colno
+      });
     };
 
-    recordSystemHealth();
-    const interval = setInterval(recordSystemHealth, 60000); // Every minute
-    
-    return () => clearInterval(interval);
-  }, [isRecording, recordHealthMetric]);
+    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
+      reportError(
+        new Error(event.reason?.message || 'Unhandled Promise Rejection'),
+        'global_promise_handler',
+        { reason: event.reason }
+      );
+    };
+
+    window.addEventListener('error', handleUnhandledError);
+    window.addEventListener('unhandledrejection', handleUnhandledRejection);
+
+    return () => {
+      window.removeEventListener('error', handleUnhandledError);
+      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
+    };
+  }, [reportError]);
 
   return {
-    recordHealthMetric,
-    recordPerformanceMetric,
-    createSecurityAlert,
-    cleanupOldData,
-    isRecording
+    reportError,
+    reportPerformance,
+    reportOrderVisibilityIssue
   };
 };

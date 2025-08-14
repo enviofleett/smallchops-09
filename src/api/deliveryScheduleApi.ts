@@ -98,8 +98,7 @@ export const getOrdersWithDeliverySchedule = async (filters: {
         updated_at
       )
     `)
-    .eq('order_type', 'delivery')
-    .eq('status', 'ready'); // CRITICAL: Only show orders with "ready" status
+    .eq('order_type', 'delivery'); // FIXED: Show ALL delivery orders, not just "ready" ones
 
   // Date filtering - properly filter by delivery schedule dates
   if (filters.startDate || filters.endDate) {

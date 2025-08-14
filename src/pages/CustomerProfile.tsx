@@ -27,7 +27,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { AddressManager } from '@/components/customer/AddressManager';
-import ErrorBoundary from '@/components/ErrorBoundary';
+import { ErrorBoundary } from '@/components/ui/error-boundary';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { EnhancedOrdersSection } from '@/components/customer/EnhancedOrdersSection';
 import { EnhancedWishlistSection } from '@/components/customer/EnhancedWishlistSection';
@@ -121,27 +121,63 @@ export default function CustomerProfile() {
     );
   }
 
-  const renderContent = () => {
-    switch (activeSection) {
-      case 'orders':
-        return <EnhancedOrdersSection />;
-      case 'tracking':
-        // This will be handled by navigation, fallback to orders
-        return <EnhancedOrdersSection />;
-      case 'bookings':
-        return <CustomerBookingsSection />;
-      case 'wishlist':
-        return <EnhancedWishlistSection />;
-      case 'payment':
-        return <PaymentSection />;
-      case 'address':
-        return <AddressManager />;
-      case 'help':
-        return <HelpSection settings={settings} />;
-      default:
-        return <EnhancedOrdersSection />;
+  const renderContent = React.useCallback(() => {
+    try {
+      switch (activeSection) {
+        case 'orders':
+          return (
+            <ErrorBoundary fallback={<SectionErrorFallback section="orders" />}>
+              <EnhancedOrdersSection />
+            </ErrorBoundary>
+          );
+        case 'tracking':
+          return (
+            <ErrorBoundary fallback={<SectionErrorFallback section="tracking" />}>
+              <EnhancedOrdersSection />
+            </ErrorBoundary>
+          );
+        case 'bookings':
+          return (
+            <ErrorBoundary fallback={<SectionErrorFallback section="bookings" />}>
+              <CustomerBookingsSection />
+            </ErrorBoundary>
+          );
+        case 'wishlist':
+          return (
+            <ErrorBoundary fallback={<SectionErrorFallback section="wishlist" />}>
+              <EnhancedWishlistSection />
+            </ErrorBoundary>
+          );
+        case 'payment':
+          return (
+            <ErrorBoundary fallback={<SectionErrorFallback section="payment" />}>
+              <PaymentSection />
+            </ErrorBoundary>
+          );
+        case 'address':
+          return (
+            <ErrorBoundary fallback={<SectionErrorFallback section="address" />}>
+              <AddressManager />
+            </ErrorBoundary>
+          );
+        case 'help':
+          return (
+            <ErrorBoundary fallback={<SectionErrorFallback section="help" />}>
+              <HelpSection settings={settings} />
+            </ErrorBoundary>
+          );
+        default:
+          return (
+            <ErrorBoundary fallback={<SectionErrorFallback section="orders" />}>
+              <EnhancedOrdersSection />
+            </ErrorBoundary>
+          );
+      }
+    } catch (error) {
+      console.error('Error rendering content:', error);
+      return <SectionErrorFallback section={activeSection} />;
     }
-  };
+  }, [activeSection, settings]);
 
   return (
     <div className="min-h-screen bg-background">
@@ -200,9 +236,9 @@ export default function CustomerProfile() {
 
           {/* Main Content */}
           <div className="flex-1">
-            <ErrorBoundary fallback={<SectionErrorFallback section={activeSection} />}>
+            <Suspense fallback={<ContentSkeleton />}>
               {renderContent()}
-            </ErrorBoundary>
+            </Suspense>
           </div>
         </div>
       </div>

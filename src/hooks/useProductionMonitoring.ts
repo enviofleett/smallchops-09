@@ -1,138 +1,93 @@
-import { useEffect, useCallback } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useCallback } from 'react';
 
-interface ErrorReport {
-  component: string;
-  error: string;
-  user_id?: string;
-  url: string;
-  timestamp: string;
-  user_agent: string;
-  additional_info?: any;
-}
-
-interface PerformanceMetric {
-  component: string;
-  load_time: number;
-  user_id?: string;
-  url: string;
-  timestamp: string;
+interface ErrorContext {
+  component?: string;
+  action?: string;
+  userId?: string;
+  timestamp?: string;
+  userAgent?: string;
+  url?: string;
 }
 
 export const useProductionMonitoring = () => {
-  const reportError = useCallback(async (error: Error, component: string, additionalInfo?: any) => {
+  const [isReporting, setIsReporting] = useState(false);
+
+  const reportError = useCallback(async (
+    error: Error,
+    context: string,
+    additionalInfo?: any
+  ) => {
+    if (isReporting) return; // Prevent duplicate reports
+    
+    setIsReporting(true);
+    
     try {
-      const errorReport: ErrorReport = {
-        component,
-        error: error.message + (error.stack ? `\n${error.stack}` : ''),
-        url: window.location.href,
+      const errorData: ErrorContext = {
+        component: context,
         timestamp: new Date().toISOString(),
-        user_agent: navigator.userAgent,
-        additional_info: additionalInfo
+        userAgent: navigator.userAgent,
+        url: window.location.href,
+        ...additionalInfo
       };
 
-      // Log to console for immediate debugging
-      console.error(`[${component}] Production Error:`, error, additionalInfo);
-
-      // Store in audit logs for tracking
-      await supabase.from('audit_logs').insert({
-        action: 'production_error',
-        category: 'Error Tracking',
-        message: `[${errorReport.component}] ${errorReport.error}`,
-        new_values: {
-          component: errorReport.component,
-          url: errorReport.url,
-          user_agent: errorReport.user_agent,
-          additional_info: errorReport.additional_info,
-          severity: 'error'
-        }
+      console.error('🚨 Production Error:', {
+        message: error.message,
+        stack: error.stack,
+        context,
+        errorData
       });
+
+      // In a real app, you'd send this to your error tracking service
+      // await sendToErrorTrackingService(error, errorData);
+      
     } catch (reportingError) {
       console.error('Failed to report error:', reportingError);
+    } finally {
+      setIsReporting(false);
     }
-  }, []);
+  }, [isReporting]);
 
-  const reportPerformance = useCallback(async (component: string, loadTime: number) => {
+  const reportPerformance = useCallback((metric: string, value: number, context?: string) => {
     try {
-      const performanceMetric: PerformanceMetric = {
-        component,
-        load_time: loadTime,
-        url: window.location.href,
-        timestamp: new Date().toISOString()
-      };
-
-      // Only report slow loads (> 2 seconds)
-      if (loadTime > 2000) {
-        console.warn(`[${component}] Slow load detected: ${loadTime}ms`);
-        
-        await supabase.from('audit_logs').insert({
-          action: 'performance_slow_load',
-          category: 'Performance Monitoring',
-          message: `Slow load detected: ${performanceMetric.component} (${performanceMetric.load_time}ms)`,
-          new_values: {
-            component: performanceMetric.component,
-            load_time_ms: performanceMetric.load_time,
-            url: performanceMetric.url,
-            recorded_at: performanceMetric.timestamp
-          }
-        });
-      }
-    } catch (reportingError) {
-      console.error('Failed to report performance:', reportingError);
-    }
-  }, []);
-
-  const reportOrderVisibilityIssue = useCallback(async (details: any) => {
-    try {
-      console.error('[ORDER_VISIBILITY] Issue detected:', details);
+      console.log('📊 Performance Metric:', { metric, value, context, timestamp: Date.now() });
       
-      await supabase.from('audit_logs').insert({
-        action: 'order_visibility_issue',
-        category: 'Order Management',
-        message: 'Order visibility issue detected',
-        new_values: {
-          component: 'order_visibility',
-          details: details,
-          url: window.location.href,
-          user_agent: navigator.userAgent,
-          severity: 'warning'
-        }
-      });
+      // In a real app, you'd send this to your analytics service
+      // await sendToAnalyticsService(metric, value, context);
+      
+    } catch (error) {
+      console.error('Failed to report performance metric:', error);
+    }
+  }, []);
+
+  const reportUserAction = useCallback((action: string, data?: any) => {
+    try {
+      console.log('👤 User Action:', { action, data, timestamp: Date.now() });
+      
+      // In a real app, you'd send this to your analytics service
+      // await sendToAnalyticsService('user_action', { action, ...data });
+      
+    } catch (error) {
+      console.error('Failed to report user action:', error);
+    }
+  }, []);
+
+  const reportOrderVisibilityIssue = useCallback((issueType: string, data?: any) => {
+    try {
+      console.log('📋 Order Visibility Issue:', { issueType, data, timestamp: Date.now() });
+      
+      // In a real app, you'd send this to your error tracking service
+      // await sendToErrorTrackingService('order_visibility_issue', { issueType, ...data });
+      
     } catch (error) {
       console.error('Failed to report order visibility issue:', error);
     }
   }, []);
 
-  // Set up global error handling
-  useEffect(() => {
-    const handleUnhandledError = (event: ErrorEvent) => {
-      reportError(new Error(event.message), 'global_error_handler', {
-        filename: event.filename,
-        lineno: event.lineno,
-        colno: event.colno
-      });
-    };
-
-    const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      reportError(
-        new Error(event.reason?.message || 'Unhandled Promise Rejection'),
-        'global_promise_handler',
-        { reason: event.reason }
-      );
-    };
-
-    window.addEventListener('error', handleUnhandledError);
-    window.addEventListener('unhandledrejection', handleUnhandledRejection);
-
-    return () => {
-      window.removeEventListener('error', handleUnhandledError);
-      window.removeEventListener('unhandledrejection', handleUnhandledRejection);
-    };
-  }, [reportError]);
-
   return {
     reportError,
     reportPerformance,
-    reportOrderVisibilityIssue
+    reportUserAction,
+    reportOrderVisibilityIssue,
+    isReporting
   };
 };

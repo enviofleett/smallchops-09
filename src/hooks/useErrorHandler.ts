@@ -1,87 +1,27 @@
-
-import { useToast } from "@/hooks/use-toast";
-
-interface ErrorDetails {
-  title: string;
-  description?: string;
-  variant?: "default" | "destructive";
-}
+import { useCallback } from 'react';
+import { useToast } from '@/hooks/use-toast';
 
 export const useErrorHandler = () => {
   const { toast } = useToast();
 
-  const handleError = (error: any, context?: string): ErrorDetails => {
-    console.error(`Error in ${context}:`, error);
-
-    let errorDetails: ErrorDetails = {
-      title: "An error occurred",
-      description: "Please try again later",
-      variant: "destructive",
-    };
-
-    if (error?.message) {
-      if (error.message.includes("Access denied")) {
-        errorDetails = {
-          title: "Access Denied",
-          description: "You don't have permission to perform this action. Please contact an administrator.",
-          variant: "destructive",
-        };
-      } else if (error.message.includes("Network")) {
-        errorDetails = {
-          title: "Network Error",
-          description: "Please check your internet connection and try again.",
-          variant: "destructive",
-        };
-      } else if (error.message.includes("Database error")) {
-        errorDetails = {
-          title: "Database Error",
-          description: "There was a problem saving your changes. Please try again.",
-          variant: "destructive",
-        };
-      } else if (error.message.includes("Invalid JSON")) {
-        errorDetails = {
-          title: "Data Format Error",
-          description: "There was a problem with the data format. Please refresh and try again.",
-          variant: "destructive",
-        };
-      } else if (error.message.includes("CORS") || error.message.includes("Failed to fetch")) {
-        errorDetails = {
-          title: "Connection Error",
-          description: "Unable to connect to the server. Please check your internet connection and try again.",
-          variant: "destructive",
-        };
-      } else if (error.message.includes("FunctionsFetchError")) {
-        errorDetails = {
-          title: "Service Error",
-          description: "The requested service is temporarily unavailable. Please try again in a moment.",
-          variant: "destructive",
-        };
-      } else if (error.message.includes("timeout") || error.message.includes("Timeout")) {
-        errorDetails = {
-          title: "Request Timeout",
-          description: "The request took too long to complete. Please try again.",
-          variant: "destructive",
-        };
-      } else {
-        errorDetails = {
-          title: "Error",
-          description: error.message,
-          variant: "destructive",
-        };
-      }
+  const handleError = useCallback((error: unknown, context?: string) => {
+    let message = 'An unexpected error occurred';
+    
+    if (error instanceof Error) {
+      message = error.message;
+    } else if (typeof error === 'string') {
+      message = error;
     }
 
-    toast(errorDetails);
-    return errorDetails;
-  };
+    console.error(`Error in ${context || 'Unknown context'}:`, error);
 
-  const handleSuccess = (message: string, description?: string) => {
+    // Show user-friendly error message
     toast({
-      title: message,
-      description,
-      variant: "default",
+      title: 'Error',
+      description: message,
+      variant: 'destructive',
     });
-  };
+  }, [toast]);
 
-  return { handleError, handleSuccess };
+  return { handleError };
 };

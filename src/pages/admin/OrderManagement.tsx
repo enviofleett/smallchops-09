@@ -215,7 +215,7 @@ export default function OrderManagement() {
       console.log(`[ORDER_MANAGEMENT] Loaded ${fetchedOrders.length} orders in ${loadTime}ms`);
       
       if (fetchedOrders.length === 0) {
-        await reportOrderVisibilityIssue({
+        reportOrderVisibilityIssue('no_orders_found', {
           expected_orders: 'some',
           actual_orders: 0,
           status_filter: selectedStatus,

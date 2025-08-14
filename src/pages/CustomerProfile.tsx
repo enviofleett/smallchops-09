@@ -30,12 +30,39 @@ import { useProductionMonitoring } from '@/hooks/useProductionMonitoring';
 
 type ProfileSection = 'orders' | 'tracking' | 'wishlist' | 'payment' | 'address' | 'help' | 'bookings';
 
-// Lazy load components to prevent initial bundle size issues
-const LazyEnhancedOrdersSection = React.lazy(() => import('@/components/customer/EnhancedOrdersSection').then(m => ({ default: m.EnhancedOrdersSection })));
-const LazyEnhancedWishlistSection = React.lazy(() => import('@/components/customer/EnhancedWishlistSection').then(m => ({ default: m.EnhancedWishlistSection })));
-const LazyCustomerBookingsSection = React.lazy(() => import('@/components/customer/CustomerBookingsSection').then(m => ({ default: m.CustomerBookingsSection })));
-const LazyAddressManager = React.lazy(() => import('@/components/customer/AddressManager').then(m => ({ default: m.AddressManager })));
-const LazyTransactionHistoryTab = React.lazy(() => import('@/components/purchase-history/TransactionHistoryTab').then(m => ({ default: m.TransactionHistoryTab })));
+// Import simple fallback component directly
+import SimpleOrdersSection from '@/components/customer/SimpleOrdersSection';
+
+// Simplified lazy loading with better error handling
+const LazyEnhancedOrdersSection = React.lazy(() => 
+  import('@/components/customer/EnhancedOrdersSection')
+    .then(m => ({ default: m.EnhancedOrdersSection }))
+    .catch(() => ({ default: SimpleOrdersSection }))
+);
+
+const LazyEnhancedWishlistSection = React.lazy(() => 
+  import('@/components/customer/EnhancedWishlistSection')
+    .then(m => ({ default: m.EnhancedWishlistSection }))
+    .catch(() => ({ default: () => <div>Wishlist section unavailable</div> }))
+);
+
+const LazyCustomerBookingsSection = React.lazy(() => 
+  import('@/components/customer/CustomerBookingsSection')
+    .then(m => ({ default: m.CustomerBookingsSection }))
+    .catch(() => ({ default: () => <div>Bookings section unavailable</div> }))
+);
+
+const LazyAddressManager = React.lazy(() => 
+  import('@/components/customer/AddressManager')
+    .then(m => ({ default: m.AddressManager }))
+    .catch(() => ({ default: () => <div>Address manager unavailable</div> }))
+);
+
+const LazyTransactionHistoryTab = React.lazy(() => 
+  import('@/components/purchase-history/TransactionHistoryTab')
+    .then(m => ({ default: m.TransactionHistoryTab }))
+    .catch(() => ({ default: () => <div>Transaction history unavailable</div> }))
+);
 
 // Loading skeleton component
 const ContentSkeleton = () => (
@@ -53,12 +80,23 @@ const ContentSkeleton = () => (
 );
 
 export default function CustomerProfile() {
-  const { isAuthenticated, customerAccount, isLoading: authLoading, logout, error: authError } = useCustomerAuth();
+  const { isAuthenticated, user, customerAccount, isLoading: authLoading, logout, error: authError } = useCustomerAuth();
   const { data: settings } = useBusinessSettings();
   const { handleError } = useErrorHandler();
   const { reportError } = useProductionMonitoring();
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState<ProfileSection>('orders');
+
+  // Debug logging for production
+  React.useEffect(() => {
+    console.log('🏠 CustomerProfile render:', {
+      isAuthenticated,
+      hasUser: !!user,
+      hasCustomerAccount: !!customerAccount,
+      authLoading,
+      authError
+    });
+  }, [isAuthenticated, user, customerAccount, authLoading, authError]);
 
   // Memoize sidebar items to prevent unnecessary re-renders
   const sidebarItems = useMemo(() => [
@@ -99,7 +137,9 @@ export default function CustomerProfile() {
     );
   }
 
-  if (!isAuthenticated && !authLoading) {
+  // Simplified authentication check - redirect if no user and not loading
+  if (!user && !authLoading) {
+    console.log('🔒 No user found, redirecting to auth');
     return <Navigate to="/auth" replace />;
   }
 
@@ -130,7 +170,7 @@ export default function CustomerProfile() {
           return (
             <ProductionReadyErrorBoundary 
               context="Customer Orders" 
-              fallback={<SectionErrorFallback section="orders" />}
+              fallback={<SimpleOrdersSection />}
               onError={(error, errorInfo) => handleError(error, 'customer-orders')}
             >
               <Suspense fallback={<ContentSkeleton />}>
@@ -142,7 +182,7 @@ export default function CustomerProfile() {
           return (
             <ProductionReadyErrorBoundary 
               context="Order Tracking" 
-              fallback={<SectionErrorFallback section="tracking" />}
+              fallback={<SimpleOrdersSection />}
               onError={(error, errorInfo) => handleError(error, 'order-tracking')}
             >
               <Suspense fallback={<ContentSkeleton />}>
@@ -210,7 +250,7 @@ export default function CustomerProfile() {
           return (
             <ProductionReadyErrorBoundary 
               context="Default Orders View" 
-              fallback={<SectionErrorFallback section="orders" />}
+              fallback={<SimpleOrdersSection />}
               onError={(error, errorInfo) => handleError(error, 'default-orders')}
             >
               <Suspense fallback={<ContentSkeleton />}>

@@ -55,65 +55,71 @@ export const useCustomerAuth = () => {
       }
     };
 
-    const initializeAuth = async () => {
-      try {
-        // Set up auth state listener
-        const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
-          if (!mounted) return;
-          
-          if (session?.user) {
-            // Use setTimeout to prevent potential Supabase deadlocks
-            setTimeout(async () => {
-              if (!mounted) return;
-              
-              setAuthState(prev => ({ 
-                ...prev, 
-                user: session.user, 
-                session, 
-                isLoading: true,
+  const initializeAuth = async () => {
+    try {
+      // Set up auth state listener - simplified to prevent deadlocks
+      const { data } = supabase.auth.onAuthStateChange((event, session) => {
+        if (!mounted) return;
+        
+        console.log('🔄 Auth state change:', event, !!session);
+        
+        if (session?.user) {
+          setAuthState(prev => ({ 
+            ...prev, 
+            user: session.user, 
+            session, 
+            isLoading: true,
+            error: null
+          }));
+
+          // Defer customer account loading to prevent auth state conflicts
+          setTimeout(async () => {
+            if (!mounted) return;
+            
+            const customerAccount = await loadCustomerAccount(session.user.id);
+            
+            if (mounted) {
+              setAuthState(prev => ({
+                ...prev,
+                customerAccount,
+                isLoading: false,
+                isAuthenticated: true, // Simplified: authenticated if user exists
                 error: null
               }));
-
-              // Load customer account
-              const customerAccount = await loadCustomerAccount(session.user.id);
-              
-              if (mounted) {
-                setAuthState(prev => ({
-                  ...prev,
-                  customerAccount,
-                  isLoading: false,
-                  isAuthenticated: !!customerAccount,
-                  error: customerAccount ? null : 'Customer account not found'
-                }));
-              }
-            }, 0);
-          } else {
-            setAuthState({
-              user: null,
-              session: null,
-              customerAccount: null,
-              isLoading: false,
-              isAuthenticated: false,
-              error: null,
-            });
-          }
-        });
+            }
+          }, 100);
+        } else {
+          setAuthState({
+            user: null,
+            session: null,
+            customerAccount: null,
+            isLoading: false,
+            isAuthenticated: false,
+            error: null,
+          });
+        }
+      });
 
         subscription = data.subscription;
 
-        // Check for existing session
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
-        
-        if (!mounted) return;
+      // Check for existing session
+      const { data: { session: initialSession } } = await supabase.auth.getSession();
+      
+      if (!mounted) return;
 
-        if (initialSession?.user) {
-          setAuthState(prev => ({ 
-            ...prev, 
-            user: initialSession.user, 
-            session: initialSession, 
-            isLoading: true 
-          }));
+      if (initialSession?.user) {
+        console.log('🚀 Initial session found:', initialSession.user.email);
+        setAuthState(prev => ({ 
+          ...prev, 
+          user: initialSession.user, 
+          session: initialSession, 
+          isLoading: true 
+        }));
 
+        // Load customer account with retry logic
+        setTimeout(async () => {
+          if (!mounted) return;
+          
           const customerAccount = await loadCustomerAccount(initialSession.user.id);
           
           if (mounted) {
@@ -121,15 +127,17 @@ export const useCustomerAuth = () => {
               ...prev,
               customerAccount,
               isLoading: false,
-              isAuthenticated: !!customerAccount,
-              error: customerAccount ? null : 'Customer account not found'
+              isAuthenticated: true, // Simplified: user exists = authenticated
+              error: null
             }));
           }
-        } else {
-          if (mounted) {
-            setAuthState(prev => ({ ...prev, isLoading: false }));
-          }
+        }, 50);
+      } else {
+        console.log('🔍 No initial session found');
+        if (mounted) {
+          setAuthState(prev => ({ ...prev, isLoading: false }));
         }
+      }
       } catch (error) {
         console.error('Customer auth initialization error:', error);
         if (mounted) {

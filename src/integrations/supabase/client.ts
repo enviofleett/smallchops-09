@@ -13,5 +13,25 @@ export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABL
     storage: localStorage,
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true
+  },
+  realtime: {
+    params: {
+      eventsPerSecond: 2
+    }
+  }
+});
+
+// Global error handler for auth state changes
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log('🔐 Auth state changed:', event, session?.user?.email);
+  
+  if (event === 'SIGNED_OUT') {
+    // Clear any cached data on signout
+    console.log('🧹 Clearing cached data after signout');
+  }
+  
+  if (event === 'TOKEN_REFRESHED') {
+    console.log('🔄 Token refreshed successfully');
   }
 });

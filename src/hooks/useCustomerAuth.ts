@@ -30,10 +30,15 @@ export const useCustomerAuth = () => {
     error: null,
   });
 
-  // Move helper functions outside useEffect so they can be reused
+  // Simplified customer account creation with better error handling
   const createCustomerAccount = async (userId: string, userEmail: string) => {
     try {
       console.log('🔄 Creating customer account for:', { userId, userEmail });
+      
+      // Validate inputs
+      if (!userId || !userEmail) {
+        throw new Error('User ID and email are required');
+      }
       
       const { data, error } = await supabase
         .from('customer_accounts')
@@ -47,6 +52,11 @@ export const useCustomerAuth = () => {
         .single();
 
       if (error) {
+        // Handle specific database errors
+        if (error.code === '23505') { // unique_violation
+          console.log('ℹ️ Customer account already exists, fetching existing account');
+          return await loadCustomerAccount(userId, userEmail);
+        }
         console.error('❌ Failed to create customer account:', error);
         return null;
       }

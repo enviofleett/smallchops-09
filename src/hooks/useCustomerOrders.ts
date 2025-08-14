@@ -48,79 +48,58 @@ export const useCustomerOrders = () => {
         let hasEmailOrders = false;
         let hasCustomerIdOrders = false;
         
-        // Approach 1: Get orders by email with comprehensive error handling
-        try {
-          const { data: emailOrders, error: emailError } = await supabase
-            .from('orders')
-            .select(`
-              *,
-              order_items (
-                id,
-                product_id,
-                product_name,
-                quantity,
-                unit_price,
-                total_price
-              )
-            `)
-            .eq('customer_email', userEmail.toLowerCase())
-            .order('order_time', { ascending: false });
+        // Simplified orders fetch with enhanced RLS error handling
+        const { data: orders, error: ordersError } = await supabase
+          .from('orders')
+          .select(`
+            *,
+            order_items (
+              id,
+              product_id,
+              product_name,
+              quantity,
+              unit_price,
+              total_price
+            )
+          `)
+          .eq('customer_email', userEmail.toLowerCase())
+          .order('order_time', { ascending: false });
 
-          if (emailError) {
-            console.error('❌ Email orders query error:', {
-              error: emailError,
-              code: emailError.code,
-              message: emailError.message,
-              hint: emailError.hint
-            });
-          } else {
-            console.log('✅ Email-based orders found:', emailOrders?.length || 0);
-            allOrders.push(...(emailOrders || []));
-            hasEmailOrders = (emailOrders?.length || 0) > 0;
+        if (ordersError) {
+          console.error('❌ Orders query error:', {
+            error: ordersError,
+            code: ordersError.code,
+            message: ordersError.message,
+            hint: ordersError.hint,
+            userEmail,
+            timestamp: new Date().toISOString()
+          });
+          
+          // Handle specific RLS and authentication errors
+          if (ordersError.code === '42501') {
+            throw new Error(`Access denied for ${userEmail}. Please refresh and try again.`);
           }
-        } catch (emailQueryError) {
-          console.error('❌ Email orders query exception:', emailQueryError);
+          
+          if (ordersError.code === 'PGRST116') {
+            throw new Error(`Authentication error for ${userEmail}. Please sign out and sign back in.`);
+          }
+          
+          if (ordersError.message.includes('JWT')) {
+            throw new Error(`Session expired for ${userEmail}. Please refresh the page.`);
+          }
+          
+          throw new Error(`Database error: ${ordersError.message}`);
         }
 
-        // Approach 2: If customer account exists, also try direct customer_id match
-        if (customerAccount?.id) {
-          try {
-            const { data: directOrders, error: directError } = await supabase
-              .from('orders')
-              .select(`
-                *,
-                order_items (
-                  id,
-                  product_id,
-                  product_name,
-                  quantity,
-                  unit_price,
-                  total_price
-                )
-              `)
-              .eq('customer_id', customerAccount.id)
-              .order('order_time', { ascending: false });
+        allOrders = orders || [];
+        hasEmailOrders = (orders?.length || 0) > 0;
+        console.log('✅ Orders loaded successfully:', {
+          count: allOrders.length,
+          userEmail,
+          timestamp: new Date().toISOString()
+        });
 
-            if (directError) {
-              console.error('❌ Customer ID orders query error:', {
-                error: directError,
-                customerId: customerAccount.id,
-                code: directError.code,
-                message: directError.message
-              });
-            } else {
-              console.log('✅ Direct customer_id orders found:', directOrders?.length || 0);
-              // Only add orders not already found by email to avoid duplicates
-              const newOrders = directOrders?.filter(order => 
-                !allOrders.some(existing => existing.id === order.id)
-              ) || [];
-              allOrders.push(...newOrders);
-              hasCustomerIdOrders = (directOrders?.length || 0) > 0;
-            }
-          } catch (customerQueryError) {
-            console.error('❌ Customer ID orders query exception:', customerQueryError);
-          }
-        }
+        // Remove the duplicate customer_id query approach - the new RLS policy handles this automatically
 
         // PRODUCTION FIX: Remove redundant abort check - React Query handles this
 
@@ -169,24 +148,36 @@ export const useCustomerOrders = () => {
           timestamp: new Date().toISOString()
         });
         
-        // PRODUCTION FIX: Enhanced error context for debugging
+        // Enhanced error context for production debugging
         const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
         const context = {
           customerEmail: userEmail,
           customerId: customerAccount?.id,
           isAuthenticated,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          errorCode: (error as any)?.code || 'unknown'
         };
         
-        if (errorMessage.includes('permission') || errorMessage.includes('policy')) {
-          throw new Error(`Authentication issue detected for ${userEmail}. Please refresh and try again. Context: ${JSON.stringify(context)}`);
+        console.error('🚨 Critical order loading error:', {
+          error,
+          context,
+          stack: error instanceof Error ? error.stack : undefined
+        });
+        
+        // User-friendly error messages based on error type
+        if (errorMessage.includes('permission') || errorMessage.includes('policy') || errorMessage.includes('42501')) {
+          throw new Error(`Access denied. Please sign out and sign back in to refresh your permissions.`);
         }
         
-        if (errorMessage.includes('PGRST')) {
-          throw new Error(`Database connection issue. Please try again in a moment. Context: ${JSON.stringify(context)}`);
+        if (errorMessage.includes('PGRST') || errorMessage.includes('connection')) {
+          throw new Error(`Connection issue. Please check your internet and try again.`);
         }
         
-        throw new Error(`Unable to load orders for ${userEmail}: ${errorMessage}. Context: ${JSON.stringify(context)}`);
+        if (errorMessage.includes('JWT') || errorMessage.includes('token')) {
+          throw new Error(`Session expired. Please refresh the page to continue.`);
+        }
+        
+        throw new Error(`Unable to load orders. Please try again or contact support if the issue persists.`);
       }
     },
     enabled: isAuthenticated && !!(user?.email || customerAccount?.email),
@@ -243,7 +234,12 @@ export const useCustomerOrders = () => {
         
         try {
           console.log('📦 Order update received:', payload);
-          query.refetch();
+          // Delayed refetch to prevent subscription conflicts
+          setTimeout(() => {
+            if (isMountedRef.current) {
+              query.refetch();
+            }
+          }, 100);
           
           const oldStatus = (payload as any)?.old?.payment_status?.toLowerCase?.();
           const newStatus = (payload as any)?.new?.payment_status?.toLowerCase?.();
@@ -258,7 +254,15 @@ export const useCustomerOrders = () => {
           console.error('❌ Error handling realtime update:', error);
         }
       })
-      .subscribe();
+      .subscribe((status) => {
+        console.log('📡 Subscription status:', status);
+        // Handle subscription status changes without type checking
+        if (String(status).includes('ERROR')) {
+          console.error('❌ Real-time subscription failed - continuing without real-time updates');
+        } else if (String(status).includes('SUBSCRIBED')) {
+          console.log('✅ Real-time subscription active');
+        }
+      });
 
     return () => {
       isMountedRef.current = false;

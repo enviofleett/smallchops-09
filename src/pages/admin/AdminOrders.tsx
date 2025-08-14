@@ -29,7 +29,7 @@ import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { format } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
-import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
+
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -220,10 +220,6 @@ export default function AdminOrders() {
           </CardContent>
         </Card>
 
-        {/* Performance Debugger */}
-        {import.meta.env.DEV && (
-          <PerformanceDebugger />
-        )}
 
         {/* Orders Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>

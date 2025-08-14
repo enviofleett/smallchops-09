@@ -20,6 +20,7 @@ import { BuyingLogicEndpointsTab } from "@/components/settings/BuyingLogicEndpoi
 import { PickupPointsManager } from "@/components/admin/PickupPointsManager";
 import { ProductionHealthMonitor } from "@/components/admin/ProductionHealthMonitor";
 import { ProductionReadinessStatus } from "@/components/admin/ProductionReadinessStatus";
+import { PerformanceDebugger } from "@/components/monitoring/PerformanceDebugger";
 import RegistrationHealth from "./RegistrationHealth";
 import AdminCheckoutSettingsCard from '@/components/admin/settings/AdminCheckoutSettingsCard';
 import PaymentsWebhooksPanel from '@/components/admin/dev/PaymentsWebhooksPanel';
@@ -150,6 +151,7 @@ const Settings = () => {
                 <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
                 <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
                 <TabsTrigger value="production-readiness">Production</TabsTrigger>
+                <TabsTrigger value="performance">Performance</TabsTrigger>
               </TabsList>
               
               <TabsContent value="auth-endpoints">
@@ -1458,6 +1460,20 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                   <ProductionReadinessStatus />
                   <ProductionHealthMonitor />
                 </div>
+              </TabsContent>
+
+              <TabsContent value="performance">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Performance Debugger</CardTitle>
+                    <CardDescription>
+                      Monitor web performance metrics, system health, and network activity
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <PerformanceDebugger />
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </TabsContent>}

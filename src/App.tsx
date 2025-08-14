@@ -15,6 +15,7 @@ import { initPaymentMonitoring } from "./utils/paymentMonitoring";
 import DynamicFavicon from "./components/seo/DynamicFavicon";
 import { initializeConsoleCleanup, validatePaystackCSP, suppressWebSocketErrors } from "./utils/consoleCleanup";
 import { logEnvironmentStatus, validateEnvironment, createEnvironmentErrorElement } from "./utils/environmentValidator";
+import { ErrorTrackerComponent } from "./components/monitoring/ErrorTracker";
 
 // Initialize payment monitoring and cache busting
 initPaymentMonitoring();
@@ -147,6 +148,7 @@ const App = () => {
   >
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
+        <ErrorTrackerComponent />
         <Toaster />
         <Sonner />
         <DynamicFavicon />

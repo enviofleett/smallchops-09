@@ -2045,10 +2045,13 @@ export type Database = {
           failed_deliveries: number | null
           fuel_cost: number | null
           id: string
+          pending_deliveries: number | null
           successful_deliveries: number | null
           total_deliveries: number | null
+          total_delivery_fees: number | null
           total_distance: number | null
           total_duration: number | null
+          updated_at: string | null
         }
         Insert: {
           average_delivery_time?: number | null
@@ -2060,10 +2063,13 @@ export type Database = {
           failed_deliveries?: number | null
           fuel_cost?: number | null
           id?: string
+          pending_deliveries?: number | null
           successful_deliveries?: number | null
           total_deliveries?: number | null
+          total_delivery_fees?: number | null
           total_distance?: number | null
           total_duration?: number | null
+          updated_at?: string | null
         }
         Update: {
           average_delivery_time?: number | null
@@ -2075,10 +2081,13 @@ export type Database = {
           failed_deliveries?: number | null
           fuel_cost?: number | null
           id?: string
+          pending_deliveries?: number | null
           successful_deliveries?: number | null
           total_deliveries?: number | null
+          total_delivery_fees?: number | null
           total_distance?: number | null
           total_duration?: number | null
+          updated_at?: string | null
         }
         Relationships: [
           {

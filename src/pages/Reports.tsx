@@ -148,43 +148,47 @@ export default function Reports() {
     : [];
 
   return (
-    <div className="space-y-6 md:space-y-8 px-4 md:px-0">
+    <div className="space-y-4 md:space-y-6 lg:space-y-8 px-3 md:px-4 lg:px-0">
       {/* Header */}
-      <div className="flex flex-col space-y-4 lg:flex-row lg:items-center lg:justify-between lg:space-y-0">
-        <div className="space-y-1">
-          <h2 className="text-2xl md:text-3xl font-bold tracking-tight text-foreground">
+      <div className="flex flex-col space-y-3 md:space-y-4 lg:flex-row lg:items-start lg:justify-between lg:space-y-0">
+        <div className="space-y-1 md:space-y-2">
+          <h2 className="text-xl md:text-2xl lg:text-3xl font-bold tracking-tight text-foreground">
             Reports & Analytics
           </h2>
-          <p className="text-sm md:text-base text-muted-foreground">
+          <p className="text-sm md:text-base text-muted-foreground max-w-2xl">
             Comprehensive business insights and performance metrics
           </p>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+        <div className="flex flex-col gap-3 lg:gap-4">
           {/* Time Period Filter */}
-          <Select value={groupBy} onValueChange={(value: 'week' | 'month') => setGroupBy(value)}>
-            <SelectTrigger className="w-full sm:w-auto">
-              <SelectValue placeholder="Select period" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="week">Weekly</SelectItem>
-              <SelectItem value="month">Monthly</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="w-full lg:w-auto">
+            <Select value={groupBy} onValueChange={(value: 'week' | 'month') => setGroupBy(value)}>
+              <SelectTrigger className="w-full lg:w-[140px] h-10 text-sm">
+                <SelectValue placeholder="Select period" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="week">Weekly</SelectItem>
+                <SelectItem value="month">Monthly</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
 
           {/* Date Range Picker */}
-          <div className="flex flex-col sm:flex-row gap-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 lg:flex lg:gap-2">
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full sm:w-auto justify-start text-left font-normal",
+                    "w-full lg:w-auto justify-start text-left font-normal h-10 text-sm",
                     !startDate && "text-muted-foreground"
                   )}
                 >
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {startDate ? format(startDate, "MMM d, yyyy") : <span>Start date</span>}
+                  <Calendar className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    {startDate ? format(startDate, "MMM d, yyyy") : "Start date"}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -203,12 +207,14 @@ export default function Reports() {
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-full sm:w-auto justify-start text-left font-normal",
+                    "w-full lg:w-auto justify-start text-left font-normal h-10 text-sm",
                     !endDate && "text-muted-foreground"
                   )}
                 >
-                  <Calendar className="mr-2 h-4 w-4" />
-                  {endDate ? format(endDate, "MMM d, yyyy") : <span>End date</span>}
+                  <Calendar className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    {endDate ? format(endDate, "MMM d, yyyy") : "End date"}
+                  </span>
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0" align="start">
@@ -224,65 +230,82 @@ export default function Reports() {
             </Popover>
           </div>
           
-          <div className="flex gap-2">
+          {/* Action Buttons */}
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:gap-2">
             <Button
               onClick={exportToCSV}
               variant="outline"
               size="sm"
-              className="flex items-center gap-2"
+              className="flex items-center justify-center gap-2 h-10 text-sm"
             >
-              <Download className="h-4 w-4" />
-              Export CSV
+              <Download className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Export</span>
+              <span className="sm:hidden">CSV</span>
             </Button>
             
             <Button
               onClick={() => window.print()}
               variant="outline"
               size="sm"
-              className="flex items-center gap-2"
+              className="flex items-center justify-center gap-2 h-10 text-sm"
             >
-              <Printer className="h-4 w-4" />
-              Print
+              <Printer className="h-4 w-4 flex-shrink-0" />
+              <span className="hidden sm:inline">Print</span>
+              <span className="sm:hidden">Print</span>
             </Button>
           </div>
         </div>
       </div>
 
       {/* KPI Grid */}
-      <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 md:gap-4 lg:gap-6 grid-cols-2 lg:grid-cols-4">
         {isLoading ? (
-          <KpiSkeletons />
+          <>
+            {[...Array(4)].map((_, idx) => (
+              <Card key={idx} className="overflow-hidden">
+                <CardContent className="p-3 md:p-4 lg:p-6">
+                  <div className="space-y-2">
+                    <Skeleton className="h-4 w-2/3" />
+                    <Skeleton className="h-6 md:h-8 w-1/2" />
+                    <Skeleton className="h-3 w-1/3" />
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </>
         ) : kpiData.length > 0 ? (
           kpiData.map((kpi, index) => (
-            <Card key={index} className="overflow-hidden">
-              <CardContent className="p-4 md:p-6">
+            <Card key={index} className="overflow-hidden hover:shadow-md transition-shadow">
+              <CardContent className="p-3 md:p-4 lg:p-6">
                 <div className="flex items-center justify-between space-y-0 pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                  <CardTitle className="text-xs md:text-sm font-medium text-muted-foreground line-clamp-2">
                     {kpi.label}
                   </CardTitle>
-                   <div className={`p-2 rounded-md ${kpi.iconClass}`}>
+                   <div className={`p-1.5 md:p-2 rounded-md ${kpi.iconClass} flex-shrink-0`}>
                      {renderIcon(kpi.icon)}
                    </div>
                 </div>
                  <div className="space-y-1">
-                   <div className="text-2xl font-bold">{kpi.value}</div>
+                   <div className="text-lg md:text-xl lg:text-2xl font-bold leading-tight break-all">
+                     {kpi.value}
+                   </div>
                  </div>
               </CardContent>
             </Card>
           ))
         ) : (
-          <div className="col-span-full text-center py-8">
-            <p className="text-muted-foreground">No data available for the selected period</p>
+          <div className="col-span-full text-center py-6 md:py-8">
+            <p className="text-sm md:text-base text-muted-foreground">No data available for the selected period</p>
           </div>
         )}
       </div>
 
       {/* Charts Section */}
-      <div className="grid gap-4 md:gap-6 grid-cols-1 lg:grid-cols-3">
-        <div className="lg:col-span-2">
+      <div className="grid gap-4 md:gap-6 grid-cols-1 xl:grid-cols-3">
+        <div className="xl:col-span-2 order-2 xl:order-1">
           <RevenueBreakdown data={data} isLoading={isLoading} />
         </div>
-        <div className="lg:col-span-1">
+        <div className="xl:col-span-1 order-1 xl:order-2">
           <ReportTabs reportsData={data} isLoading={isLoading} />
         </div>
       </div>

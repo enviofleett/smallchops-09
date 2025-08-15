@@ -49,19 +49,22 @@ export default function AdminDelivery() {
     refetchInterval: 30000,
   });
 
-  // Filter for paid delivery orders only
+  // Filter for paid delivery orders only (all statuses for metrics)
   const deliveryOrders = deliveryOrdersData?.orders?.filter(order => 
     order.order_type === 'delivery' && 
     order.payment_status === 'paid' &&
     ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
   ) || [];
 
-  // Fetch delivery schedules in bulk for better performance
-  const orderIds = deliveryOrders.map(order => order.id);
-  const { data: deliverySchedules = {} } = useQuery({
-    queryKey: ['delivery-schedules-bulk', orderIds],
-    queryFn: () => getSchedulesByOrderIds(orderIds),
-    enabled: orderIds.length > 0,
+  // Filter for ready orders only (for Delivery Orders tab)
+  const readyOrders = deliveryOrders.filter(order => order.status === 'ready');
+
+  // Fetch delivery schedules in bulk for ready orders only
+  const readyOrderIds = readyOrders.map(order => order.id);
+  const { data: deliverySchedules = {}, error: schedulesError } = useQuery({
+    queryKey: ['delivery-schedules-bulk', readyOrderIds],
+    queryFn: () => getSchedulesByOrderIds(readyOrderIds),
+    enabled: readyOrderIds.length > 0,
   });
 
   // Fetch delivery zones
@@ -79,14 +82,14 @@ export default function AdminDelivery() {
     return windows;
   }, []);
 
-  // Filter orders by delivery window
-  const filteredOrders = useMemo(() => {
-    if (deliveryWindowFilter === 'all') return deliveryOrders;
+  // Filter ready orders by delivery window (for Delivery Orders tab)
+  const readyFilteredOrders = useMemo(() => {
+    if (deliveryWindowFilter === 'all') return readyOrders;
     if (deliveryWindowFilter === 'due-now') {
       const now = new Date();
       const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       
-      return deliveryOrders.filter(order => {
+      return readyOrders.filter(order => {
         const schedule = deliverySchedules[order.id];
         if (!schedule) return false;
         return currentTime >= schedule.delivery_time_start && currentTime <= schedule.delivery_time_end;
@@ -94,12 +97,19 @@ export default function AdminDelivery() {
     }
     
     const [startHour] = deliveryWindowFilter.split('-');
-    return deliveryOrders.filter(order => {
+    return readyOrders.filter(order => {
       const schedule = deliverySchedules[order.id];
       if (!schedule) return false;
       return schedule.delivery_time_start.startsWith(startHour);
     });
-  }, [deliveryOrders, deliveryWindowFilter, deliverySchedules]);
+  }, [readyOrders, deliveryWindowFilter, deliverySchedules]);
+
+  // Reset selection when window filter changes
+  React.useEffect(() => {
+    setSelectedOrders(prev => prev.filter(order => 
+      readyFilteredOrders.some(filtered => filtered.id === order.id)
+    ));
+  }, [deliveryWindowFilter, readyFilteredOrders]);
 
   // Calculate delivery metrics
   const deliveryMetrics = {
@@ -267,7 +277,30 @@ export default function AdminDelivery() {
 
           {/* Delivery Orders Tab */}
           <TabsContent value="orders" className="space-y-4">
-            <div className="flex items-center gap-4 mb-4">
+            {/* Header */}
+            <div className="border-b pb-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-xl font-semibold">Ready Delivery Orders</h2>
+                  <p className="text-sm text-muted-foreground">
+                    Showing only orders with status READY
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Badge variant="outline">
+                    Ready: {readyOrders.length}
+                  </Badge>
+                  {selectedOrders.length > 0 && (
+                    <Badge variant="secondary">
+                      Selected: {selectedOrders.length}
+                    </Badge>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Controls */}
+            <div className="flex items-center gap-4">
               <Select value={deliveryWindowFilter} onValueChange={setDeliveryWindowFilter}>
                 <SelectTrigger className="w-48">
                   <SelectValue placeholder="Filter by time window" />
@@ -275,13 +308,29 @@ export default function AdminDelivery() {
                 <SelectContent>
                   {deliveryWindows.map((window) => (
                     <SelectItem key={window} value={window}>
-                      {window === 'all' ? 'All Orders' : 
+                      {window === 'all' ? 'All Time Windows' : 
                        window === 'due-now' ? 'Due Now' : 
                        window.replace('-', ':00 - ') + ':00'}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              
+              {readyFilteredOrders.length > 0 && (
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    checked={selectedOrders.length === readyFilteredOrders.length}
+                    onCheckedChange={(checked) => {
+                      if (checked) {
+                        setSelectedOrders(readyFilteredOrders);
+                      } else {
+                        setSelectedOrders([]);
+                      }
+                    }}
+                  />
+                  <span className="text-sm text-muted-foreground">Select All in View</span>
+                </div>
+              )}
               
               {selectedOrders.length > 0 && (
                 <Button 
@@ -292,6 +341,15 @@ export default function AdminDelivery() {
                 </Button>
               )}
             </div>
+
+            {/* Error state for schedules */}
+            {schedulesError && (
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+                <p className="text-sm text-destructive">
+                  Failed to load delivery schedules. Some features may not work properly.
+                </p>
+              </div>
+            )}
 
             <div className="grid gap-4">
               {ordersLoading ? (
@@ -305,7 +363,7 @@ export default function AdminDelivery() {
                   </Card>
                 ))
               ) : (
-                filteredOrders.map((order) => (
+                readyFilteredOrders.map((order) => (
                   <DeliveryOrderCard 
                     key={order.id} 
                     order={order} 
@@ -318,19 +376,23 @@ export default function AdminDelivery() {
                       }
                     }}
                     isSelected={selectedOrders.some(o => o.id === order.id)}
+                    onAssignDriver={() => {
+                      setSelectedOrders([order]);
+                      setIsDriverDialogOpen(true);
+                    }}
                   />
                 ))
               )}
               
-              {!ordersLoading && filteredOrders.length === 0 && (
+              {!ordersLoading && readyFilteredOrders.length === 0 && (
                 <Card>
                   <CardContent className="p-12 text-center">
                     <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No delivery orders</h3>
+                    <h3 className="text-lg font-semibold mb-2">No ready orders</h3>
                     <p className="text-muted-foreground">
                       {deliveryWindowFilter === 'all' 
-                        ? 'No delivery orders found for the selected date'
-                        : 'No orders in this time window'
+                        ? 'No ready orders found for the selected date'
+                        : 'No ready orders in this time window'
                       }
                     </p>
                   </CardContent>
@@ -395,12 +457,14 @@ function DeliveryOrderCard({
   order, 
   onSelect, 
   isSelected,
-  schedule
+  schedule,
+  onAssignDriver
 }: { 
   order: any; 
   onSelect?: (selected: boolean) => void;
   isSelected?: boolean;
   schedule?: any;
+  onAssignDriver?: () => void;
 }) {
   
   return (
@@ -421,14 +485,25 @@ function DeliveryOrderCard({
                 <h3 className="font-semibold">Order #{order.order_number}</h3>
                 <p className="text-sm text-muted-foreground">{order.customer_name}</p>
               </div>
-              <Badge variant={order.status === 'out_for_delivery' ? 'default' : 'secondary'}>
-                {order.status.replace('_', ' ').toUpperCase()}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary">
+                  {order.status.replace('_', ' ').toUpperCase()}
+                </Badge>
+                {onAssignDriver && (
+                  <Button
+                    size="sm"
+                    variant={order.assigned_rider_id ? "outline" : "default"}
+                    onClick={onAssignDriver}
+                  >
+                    {order.assigned_rider_id ? "Reassign" : "Assign Driver"}
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <div className="space-y-1">
-                <p><span className="text-muted-foreground">Amount:</span> ₦{order.total_amount}</p>
+                <p><span className="text-muted-foreground">Amount:</span> ₦{order.total_amount?.toLocaleString()}</p>
                 <p><span className="text-muted-foreground">Phone:</span> {order.customer_phone}</p>
                 {order.assigned_rider_id && (
                   <p><span className="text-muted-foreground">Assigned Driver:</span> 

@@ -2125,6 +2125,36 @@ export type Database = {
           },
         ]
       }
+      delivery_fees_backup: {
+        Row: {
+          base_fee: number | null
+          created_at: string | null
+          fee_per_km: number | null
+          id: string | null
+          min_order_for_free_delivery: number | null
+          updated_at: string | null
+          zone_id: string | null
+        }
+        Insert: {
+          base_fee?: number | null
+          created_at?: string | null
+          fee_per_km?: number | null
+          id?: string | null
+          min_order_for_free_delivery?: number | null
+          updated_at?: string | null
+          zone_id?: string | null
+        }
+        Update: {
+          base_fee?: number | null
+          created_at?: string | null
+          fee_per_km?: number | null
+          id?: string | null
+          min_order_for_free_delivery?: number | null
+          updated_at?: string | null
+          zone_id?: string | null
+        }
+        Relationships: []
+      }
       delivery_notifications: {
         Row: {
           channel: string
@@ -2363,6 +2393,7 @@ export type Database = {
           created_at: string
           description: string | null
           id: string
+          is_active: boolean | null
           name: string
           updated_at: string
         }
@@ -2371,6 +2402,7 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_active?: boolean | null
           name: string
           updated_at?: string
         }
@@ -2379,8 +2411,36 @@ export type Database = {
           created_at?: string
           description?: string | null
           id?: string
+          is_active?: boolean | null
           name?: string
           updated_at?: string
+        }
+        Relationships: []
+      }
+      delivery_zones_backup: {
+        Row: {
+          area: Json | null
+          created_at: string | null
+          description: string | null
+          id: string | null
+          name: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          area?: Json | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          area?: Json | null
+          created_at?: string | null
+          description?: string | null
+          id?: string | null
+          name?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -6648,6 +6708,30 @@ export type Database = {
         }
         Relationships: []
       }
+      zone_consolidation_map: {
+        Row: {
+          consolidation_reason: string | null
+          created_at: string | null
+          new_zone_id: string | null
+          old_zone_id: string | null
+          zone_name: string | null
+        }
+        Insert: {
+          consolidation_reason?: string | null
+          created_at?: string | null
+          new_zone_id?: string | null
+          old_zone_id?: string | null
+          zone_name?: string | null
+        }
+        Update: {
+          consolidation_reason?: string | null
+          created_at?: string | null
+          new_zone_id?: string | null
+          old_zone_id?: string | null
+          zone_name?: string | null
+        }
+        Relationships: []
+      }
       zone_delivery_analytics: {
         Row: {
           average_delivery_time_minutes: number | null
@@ -6694,6 +6778,29 @@ export type Database = {
       }
     }
     Views: {
+      delivery_zone_monitoring: {
+        Row: {
+          delivery_orders: number | null
+          missing_zone_orders: number | null
+          order_date: string | null
+          payment_status_mismatches: number | null
+          pending_orders: number | null
+          total_orders: number | null
+          zone_completion_rate: number | null
+        }
+        Relationships: []
+      }
+      delivery_zones_migration_summary: {
+        Row: {
+          new_zones_count: number | null
+          orders_with_zones: number | null
+          orders_without_zones: number | null
+          original_zones_count: number | null
+          report_type: string | null
+          zones_consolidated: number | null
+        }
+        Relationships: []
+      }
       payment_flow_health: {
         Row: {
           completed_orders: number | null

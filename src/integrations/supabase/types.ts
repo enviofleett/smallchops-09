@@ -6879,7 +6879,7 @@ export type Database = {
         Returns: Json
       }
       calculate_delivery_metrics: {
-        Args: { target_date?: string }
+        Args: { p_date: string }
         Returns: undefined
       }
       calculate_profile_completion: {

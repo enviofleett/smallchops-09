@@ -7902,12 +7902,23 @@ export type Database = {
         Returns: Json
       }
       verify_and_update_payment_status: {
-        Args: {
-          new_status: string
-          payment_amount?: number
-          payment_gateway_response?: Json
-          payment_ref: string
-        }
+        Args:
+          | {
+              new_status: string
+              payment_amount?: number
+              payment_gateway_response?: Json
+              payment_ref: string
+            }
+          | {
+              p_amount: number
+              p_currency: string
+              p_new_state: string
+              p_order_id: string
+              p_provider: string
+              p_provider_ref: string
+              p_raw: Json
+              p_reference: string
+            }
         Returns: {
           amount: number
           customer_email: string

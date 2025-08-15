@@ -102,8 +102,15 @@ serve(async (req) => {
         message: updateError.message,
         details: updateError.details,
         hint: updateError.hint,
-        code: updateError.code
+        code: updateError.code,
+        sqlstate: updateError.code
       })
+      
+      // Check for specific ambiguous column error
+      if (updateError.message?.includes('ambiguous') || updateError.message?.includes('updated_at')) {
+        console.error('[VERIFY-PAYMENT] Column ambiguity error detected - this should be fixed by the database migration')
+      }
+      
       throw new Error(`Database update failed: ${updateError.message}`)
     }
 

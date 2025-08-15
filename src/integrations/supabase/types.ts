@@ -4332,6 +4332,57 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_processing_logs: {
+        Row: {
+          created_at: string | null
+          error_message: string | null
+          fulfillment_type: string | null
+          id: string
+          metadata: Json | null
+          order_id: string | null
+          payment_reference: string | null
+          processing_stage: string | null
+          reference_type: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          error_message?: string | null
+          fulfillment_type?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          payment_reference?: string | null
+          processing_stage?: string | null
+          reference_type?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          error_message?: string | null
+          fulfillment_type?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string | null
+          payment_reference?: string | null
+          processing_stage?: string | null
+          reference_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_processing_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_processing_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_rate_limits: {
         Row: {
           attempts: number | null
@@ -6717,6 +6768,38 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_processing_status: {
+        Row: {
+          created_at: string | null
+          current_order_status:
+            | Database["public"]["Enums"]["order_status"]
+            | null
+          error_message: string | null
+          order_id: string | null
+          order_number: string | null
+          order_type: Database["public"]["Enums"]["order_type"] | null
+          overall_status: string | null
+          payment_reference: string | null
+          processing_stage: string | null
+          reference_type: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_processing_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_processing_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_system_health: {
         Row: {
           amount_mismatches: number | null
@@ -7750,6 +7833,14 @@ export type Database = {
           total_amount: number
         }[]
       }
+      update_order_with_payment_reference: {
+        Args: {
+          new_payment_reference: string
+          order_fulfillment_type?: string
+          order_uuid: string
+        }
+        Returns: Json
+      }
       validate_admin_access: {
         Args: Record<PropertyKey, never>
         Returns: boolean
@@ -7804,6 +7895,24 @@ export type Database = {
           p_promotion_id: string
         }
         Returns: Json
+      }
+      verify_and_update_payment_status: {
+        Args: {
+          new_status: string
+          payment_amount?: number
+          payment_gateway_response?: Json
+          payment_ref: string
+        }
+        Returns: {
+          amount: number
+          customer_email: string
+          order_id: string
+          order_number: string
+          order_type: string
+          payment_reference: string
+          status: string
+          updated_at: string
+        }[]
       }
       verify_customer_otp: {
         Args:

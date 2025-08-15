@@ -295,10 +295,28 @@ serve(async (req) => {
     // Generate unique order number
     const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Math.floor(Math.random() * 10000).toString().padStart(4, '0')}`;
     
-    // 🔧 BACKEND GENERATES SINGLE SOURCE OF TRUTH REFERENCE
-    const authoritativePaymentReference = `txn_${Date.now()}_${crypto.randomUUID()}`;
+    // 🔧 PRODUCTION FIX: Ensure consistent txn_ reference generation
+    // This prevents database constraint violations that cause delivery order failures
+    let authoritativePaymentReference: string;
     
-    console.log('🔧 Backend-generated authoritative reference:', authoritativePaymentReference);
+    // Handle different reference scenarios
+    if (requestBody.reference && requestBody.reference.startsWith('txn_')) {
+      // Use existing txn_ reference if provided
+      authoritativePaymentReference = requestBody.reference;
+      console.log('✅ Using provided txn_ reference:', authoritativePaymentReference);
+    } else if (requestBody.reference && requestBody.reference.startsWith('pay_')) {
+      // Convert pay_ reference to txn_ format to prevent constraint violation
+      const timestampPart = requestBody.reference.split('_')[1];
+      authoritativePaymentReference = `txn_${timestampPart}_${crypto.randomUUID()}`;
+      console.log('🔄 Converted pay_ to txn_ reference:', {
+        original: requestBody.reference,
+        converted: authoritativePaymentReference
+      });
+    } else {
+      // Generate new txn_ reference
+      authoritativePaymentReference = `txn_${Date.now()}_${crypto.randomUUID()}`;
+      console.log('🔧 Generated new txn_ reference:', authoritativePaymentReference);
+    }
     
     // Log the final data being sent to the database function
     console.log('📦 Creating order with data:', {
@@ -372,7 +390,7 @@ serve(async (req) => {
             action: 'initialize',
             email: customer_email,
             amount: total_amount, // Amount already in kobo from database
-            reference: authoritativePaymentReference, // 🔧 Use backend-generated reference
+            reference: authoritativePaymentReference, // 🔧 Use consistent txn_ reference
             callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?reference=${authoritativePaymentReference}&order_id=${orderId}&source=process_checkout`,
             metadata: {
               order_id: orderId,
@@ -515,16 +533,33 @@ serve(async (req) => {
     const effectiveReference = authoritativePaymentReference;
 
     // Persist the effective reference on the order for reliable reconciliation
+    // CRITICAL FIX: Validate reference format before database update to prevent constraint violation
     try {
-      await supabaseClient
+      // Ensure we only store txn_ references to prevent database constraint issues
+      if (!effectiveReference.startsWith('txn_')) {
+        console.error('❌ Invalid reference format for database storage:', effectiveReference);
+        throw new Error(`Invalid payment reference format: ${effectiveReference}. Must start with txn_`);
+      }
+      
+      console.log('💾 Updating order with payment reference:', effectiveReference);
+      const { error: updateError } = await supabaseClient
         .from('orders')
         .update({
           payment_reference: effectiveReference,
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId);
+        
+      if (updateError) {
+        console.error('❌ Failed to update payment reference:', updateError);
+        throw updateError;
+      }
+      
+      console.log('✅ Order payment reference updated successfully');
     } catch (e) {
-      console.warn('⚠️ Failed to update order with payment_reference:', e);
+      console.error('⚠️ Failed to update order with payment_reference:', e);
+      // This is critical for payment reconciliation, so we should throw the error
+      throw new Error(`Failed to update order payment reference: ${e.message}`);
     }
 
     // NEW: Mark any previous pending initializations as superseded so the latest reference is the canonical one

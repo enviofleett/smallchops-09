@@ -54,9 +54,29 @@ serve(async (req) => {
       )
     }
 
+    // ENHANCED: Handle both txn_ and pay_ reference formats during transition
+    let paystackReference = reference;
+    
+    // If we have a txn_ reference, find the corresponding Paystack reference for verification
+    if (reference.startsWith('txn_')) {
+      console.log('[VERIFY-PAYMENT] Processing txn_ reference, checking for Paystack reference...');
+      
+      // First try to find the order and check if it has a paystack_reference
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('paystack_reference, id, order_number')
+        .eq('payment_reference', reference)
+        .maybeSingle();
+        
+      if (orderData?.paystack_reference && orderData.paystack_reference !== reference) {
+        paystackReference = orderData.paystack_reference;
+        console.log('[VERIFY-PAYMENT] Using paystack_reference for verification:', paystackReference);
+      }
+    }
+    
     // Verify payment with Paystack
-    console.log(`[VERIFY-PAYMENT] Verifying payment with Paystack - reference: ${reference}`)
-    const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+    console.log(`[VERIFY-PAYMENT] Verifying payment with Paystack - reference: ${paystackReference}`)
+    const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${paystackReference}`, {
       headers: {
         'Authorization': `Bearer ${paystackSecretKey}`,
         'Content-Type': 'application/json',

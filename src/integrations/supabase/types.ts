@@ -1150,13 +1150,6 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "communication_events_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
-            referencedColumns: ["id"]
-          },
         ]
       }
       communication_logs: {
@@ -2172,13 +2165,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "delivery_notifications_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -3593,13 +3579,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "order_assignments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "orders_with_payment"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "order_assignments_rider_id_fkey"
             columns: ["rider_id"]
             isOneToOne: false
@@ -3651,13 +3630,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_delivery_schedule_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -3714,13 +3686,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -3802,13 +3767,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_status_changes_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -4374,13 +4332,6 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "payment_processing_logs_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
-            referencedColumns: ["id"]
-          },
         ]
       }
       payment_rate_limits: {
@@ -4455,13 +4406,6 @@ export type Database = {
             foreignKeyName: "payment_refunds_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
-            referencedRelation: "orders_with_payment"
-            referencedColumns: ["tx_id"]
-          },
-          {
-            foreignKeyName: "payment_refunds_transaction_id_fkey"
-            columns: ["transaction_id"]
-            isOneToOne: false
             referencedRelation: "payment_transactions"
             referencedColumns: ["id"]
           },
@@ -4499,13 +4443,6 @@ export type Database = {
           transaction_id?: string
         }
         Relationships: [
-          {
-            foreignKeyName: "payment_status_tracking_transaction_id_fkey"
-            columns: ["transaction_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
-            referencedColumns: ["tx_id"]
-          },
           {
             foreignKeyName: "payment_status_tracking_transaction_id_fkey"
             columns: ["transaction_id"]
@@ -4612,13 +4549,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_transactions_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -4884,13 +4814,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_reviews_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -5258,13 +5181,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "promotion_usage_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -5637,13 +5553,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "route_order_assignments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -6673,89 +6582,6 @@ export type Database = {
       }
     }
     Views: {
-      orders_with_payment: {
-        Row: {
-          assigned_rider_id: string | null
-          created_at: string | null
-          created_by: string | null
-          customer_email: string | null
-          customer_id: string | null
-          customer_name: string | null
-          customer_phone: string | null
-          delivery_address: Json | null
-          delivery_fee: number | null
-          delivery_time: string | null
-          delivery_time_slot_id: string | null
-          delivery_zone_id: string | null
-          discount_amount: number | null
-          final_paid: boolean | null
-          final_paid_at: string | null
-          guest_session_id: string | null
-          id: string | null
-          order_number: string | null
-          order_time: string | null
-          order_type: Database["public"]["Enums"]["order_type"] | null
-          paid_at: string | null
-          payment_channel: string | null
-          payment_method: string | null
-          payment_reference: string | null
-          payment_status: Database["public"]["Enums"]["payment_status"] | null
-          pickup_point_id: string | null
-          pickup_time: string | null
-          preferred_delivery_time: string | null
-          special_instructions: string | null
-          status: Database["public"]["Enums"]["order_status"] | null
-          subtotal: number | null
-          subtotal_cost: number | null
-          tax_amount: number | null
-          total_amount: number | null
-          total_vat: number | null
-          tx_channel: string | null
-          tx_id: string | null
-          tx_paid_at: string | null
-          tx_provider_reference: string | null
-          tx_status: string | null
-          updated_at: string | null
-          updated_by: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "orders_assigned_rider_id_fkey"
-            columns: ["assigned_rider_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_assigned_rider_profile_fkey"
-            columns: ["assigned_rider_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["profile_id"]
-          },
-          {
-            foreignKeyName: "orders_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customer_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_delivery_zone_id_fkey"
-            columns: ["delivery_zone_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_zones"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_pickup_point_id_fkey"
-            columns: ["pickup_point_id"]
-            isOneToOne: false
-            referencedRelation: "pickup_points"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       payment_flow_health: {
         Row: {
           completed_orders: number | null
@@ -6789,13 +6615,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_processing_logs_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -7291,17 +7110,12 @@ export type Database = {
       get_order_payment_status: {
         Args: { p_order_id: string }
         Returns: {
-          computed_payment_method: string
-          final_paid: boolean
-          final_paid_at: string
-          latest_tx_reference: string
-          latest_tx_status: string
-          needs_reconciliation: boolean
+          computed_payment_status: string
           order_id: string
-          order_status: string
-          paid_at: string
-          payment_channel: string
+          order_number: string
+          payment_reference: string
           payment_status: string
+          total_amount: number
         }[]
       }
       get_orders_with_payment: {
@@ -7658,6 +7472,10 @@ export type Database = {
         Args: { p_amount: number; p_order_id: string }
         Returns: Json
       }
+      monitor_payment_security: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       order_needs_reconciliation: {
         Args: { p_order_id: string }
         Returns: boolean
@@ -7897,6 +7715,24 @@ export type Database = {
         Returns: Json
       }
       verify_and_update_payment_status: {
+        Args: {
+          new_status: string
+          payment_amount?: number
+          payment_gateway_response?: Json
+          payment_ref: string
+        }
+        Returns: {
+          amount: number
+          customer_email: string
+          order_id: string
+          order_number: string
+          order_type: string
+          payment_reference: string
+          status: string
+          updated_at: string
+        }[]
+      }
+      verify_and_update_payment_status_secure: {
         Args: {
           new_status: string
           payment_amount?: number

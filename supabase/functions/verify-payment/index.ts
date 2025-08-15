@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0/dist/module/index.js'
 import { corsHeaders } from '../_shared/cors.ts'
+import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts'
 
 interface VerificationRequest {
   reference: string
@@ -51,60 +52,56 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    // CRITICAL FIX: Enhanced Paystack secret key validation  
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
-    if (!paystackSecretKey) {
-      console.error('[VERIFY-PAYMENT] ERROR - PAYSTACK_SECRET_KEY not configured')
+    // Get environment-specific Paystack configuration
+    let finalSecretKey: string;
+    try {
+      const envConfig = getPaystackConfig(req);
+      const validation = validatePaystackConfig(envConfig);
       
-      // Try to get from Supabase configuration as fallback
-      const { data: configData, error: configError } = await supabaseClient
-        .rpc('get_active_paystack_config')
-      
-      if (configError || !configData?.secret_key) {
-        console.error('[VERIFY-PAYMENT] ERROR - No Paystack configuration found anywhere')
+      if (!validation.isValid) {
+        console.error('[VERIFY-PAYMENT] Paystack configuration invalid:', validation.errors);
         return new Response(
           JSON.stringify({
             success: false,
             error: 'Payment service configuration error',
-            code: 'PAYSTACK_KEY_MISSING',
-            details: 'Paystack secret key not configured'
+            code: 'PAYSTACK_CONFIG_INVALID',
+            details: validation.errors.join(', ')
           }),
           { 
             status: 503, 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           }
-        )
+        );
       }
       
-      // Use secret key from database configuration
-      console.log('[VERIFY-PAYMENT] Using Paystack key from database configuration')
-      const paystackKey = configData.secret_key
-    } else {
-      console.log('[VERIFY-PAYMENT] Using Paystack key from environment variables')
-      const paystackKey = paystackSecretKey
-    }
-
-    // Get the final secret key to use
-    const finalSecretKey = paystackSecretKey || paystackKey
-    
-    // Validate secret key format
-    if (!finalSecretKey || (!finalSecretKey.startsWith('sk_test_') && !finalSecretKey.startsWith('sk_live_'))) {
-      console.error('[VERIFY-PAYMENT] ERROR - Invalid PAYSTACK_SECRET_KEY format')
+      logPaystackConfigStatus(envConfig);
+      finalSecretKey = envConfig.secretKey;
       
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Payment service configuration error',
-          code: 'INVALID_KEY_FORMAT'
-        }),
-        { 
-          status: 503, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
+      console.log('[VERIFY-PAYMENT] Using environment-specific key:', finalSecretKey.substring(0, 10) + '...');
+      
+    } catch (configError) {
+      console.error('[VERIFY-PAYMENT] Environment config failed:', configError);
+      
+      // Fallback to legacy environment variable
+      const fallbackKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+      if (!fallbackKey) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Payment service configuration error',
+            code: 'PAYSTACK_KEY_MISSING',
+            details: 'No Paystack secret key configured'
+          }),
+          { 
+            status: 503, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+      
+      finalSecretKey = fallbackKey;
+      console.log('[VERIFY-PAYMENT] Using fallback PAYSTACK_SECRET_KEY');
     }
-
-    console.log('[VERIFY-PAYMENT] Secret key validation passed:', finalSecretKey.substring(0, 10) + '...')
 
     const { reference, order_id } = await req.json() as VerificationRequest
 

@@ -46,3 +46,10 @@ export function validateOrigin(origin: string | null): boolean {
   
   return allowedOrigins.includes(origin.toLowerCase());
 }
+
+// Simple CORS headers for backward compatibility
+export const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+}

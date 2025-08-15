@@ -5,6 +5,7 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0/dist/module/index.js'
+import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -170,10 +171,42 @@ const handlePaymentRequest = async (req: Request) => {
       Deno.env.get('SUPABASE_ANON_KEY') ?? ''
     )
 
-    // Get Paystack secret key
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
-    if (!paystackSecretKey) {
-      throw new Error('PAYSTACK_SECRET_KEY not configured')
+    // Get environment-specific Paystack configuration
+    console.log('🔍 Fetching Paystack configuration...')
+    
+    let paystackConfig;
+    try {
+      const envConfig = getPaystackConfig(req);
+      const validation = validatePaystackConfig(envConfig);
+      
+      if (!validation.isValid) {
+        throw new Error(`Paystack configuration invalid: ${validation.errors.join(', ')}`);
+      }
+      
+      logPaystackConfigStatus(envConfig);
+      
+      paystackConfig = {
+        secret_key: envConfig.secretKey,
+        test_mode: envConfig.isTestMode,
+        environment: envConfig.environment
+      };
+      
+      console.log('🔑 Using secret key type:', envConfig.isTestMode ? 'test' : 'live');
+      
+    } catch (configError) {
+      console.error('❌ Environment config failed:', configError);
+      
+      // Fallback: try legacy environment variable
+      const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+      if (!paystackSecretKey) {
+        throw new Error('Paystack not configured - ' + configError.message);
+      }
+      
+      console.log('🔄 Using fallback PAYSTACK_SECRET_KEY');
+      paystackConfig = {
+        secret_key: paystackSecretKey,
+        test_mode: paystackSecretKey.startsWith('sk_test_')
+      };
     }
 
     switch (action) {
@@ -216,7 +249,7 @@ const handlePaymentRequest = async (req: Request) => {
         const initializeResponse = await fetch('https://api.paystack.co/transaction/initialize', {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${paystackSecretKey}`,
+            'Authorization': `Bearer ${paystackConfig.secret_key}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify(paymentRequest),
@@ -346,7 +379,7 @@ const handlePaymentRequest = async (req: Request) => {
             verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${normalizedReference}`, {
               method: 'GET',
               headers: {
-                'Authorization': `Bearer ${paystackSecretKey}`,
+                'Authorization': `Bearer ${paystackConfig.secret_key}`,
                 'Content-Type': 'application/json',
               },
               signal: controller.signal

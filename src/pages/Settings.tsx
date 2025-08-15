@@ -23,6 +23,7 @@ import { ProductionReadinessStatus } from "@/components/admin/ProductionReadines
 import RegistrationHealth from "./RegistrationHealth";
 import AdminCheckoutSettingsCard from '@/components/admin/settings/AdminCheckoutSettingsCard';
 import PaymentsWebhooksPanel from '@/components/admin/dev/PaymentsWebhooksPanel';
+import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 
@@ -141,7 +142,7 @@ const Settings = () => {
 
         {isAdmin && <TabsContent value="developer" className="space-y-6">
             <Tabs defaultValue="auth-endpoints" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-8">
+              <TabsList className="grid w-full grid-cols-9">
                 <TabsTrigger value="auth-endpoints">Auth API</TabsTrigger>
                 <TabsTrigger value="buying-logic">Buying Logic</TabsTrigger>
                 <TabsTrigger value="checkout">Checkout</TabsTrigger>
@@ -150,6 +151,7 @@ const Settings = () => {
                 <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
                 <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
                 <TabsTrigger value="production-readiness">Production</TabsTrigger>
+                <TabsTrigger value="performance">Performance</TabsTrigger>
               </TabsList>
               
               <TabsContent value="auth-endpoints">
@@ -1458,6 +1460,20 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                   <ProductionReadinessStatus />
                   <ProductionHealthMonitor />
                 </div>
+              </TabsContent>
+
+              <TabsContent value="performance">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Performance Monitoring & Debugging</CardTitle>
+                    <CardDescription>
+                      Monitor application performance metrics, detect issues, and optimize user experience
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <PerformanceDebugger />
+                  </CardContent>
+                </Card>
               </TabsContent>
             </Tabs>
           </TabsContent>}

@@ -6,12 +6,9 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { supabase } from '@/integrations/supabase/client';
-import { Clock, CheckCircle, CreditCard, Package, Truck, Calendar } from 'lucide-react';
+import { Clock, CheckCircle, CreditCard, Package, Truck } from 'lucide-react';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
-import { PublicHeader } from '@/components/layout/PublicHeader';
-import { DeliveryScheduleCard } from '@/components/orders/DeliveryScheduleCard';
-import { getDeliveryScheduleByOrderId, DeliverySchedule } from '@/api/deliveryScheduleApi';
 interface OrderDetailsData {
   id: string;
   order_number: string;
@@ -64,7 +61,6 @@ const { isAuthenticated, customerAccount, user, isLoading } = useCustomerAuth();
 const { toast } = useToast();
 const [order, setOrder] = React.useState<OrderDetailsData | null>(null);
 const [tx, setTx] = React.useState<PaymentTx | null>(null);
-const [deliverySchedule, setDeliverySchedule] = React.useState<DeliverySchedule | null>(null);
 const [isLoadingData, setIsLoadingData] = React.useState(true);
 const [isReconciling, setIsReconciling] = React.useState(false);
 const [error, setError] = React.useState<string | null>(null);
@@ -110,14 +106,6 @@ const loadData = React.useCallback(async () => {
       console.warn('Payment transaction fetch error:', txErr);
     }
     setTx((txData || null) as PaymentTx | null);
-
-    // Load delivery schedule
-    try {
-      const scheduleData = await getDeliveryScheduleByOrderId(id);
-      setDeliverySchedule(scheduleData);
-    } catch (scheduleErr) {
-      console.warn('Delivery schedule fetch error:', scheduleErr);
-    }
   } catch (e: any) {
     console.error(e);
     setError(e.message || 'Failed to load order details');
@@ -188,30 +176,17 @@ const reconcileNow = async () => {
         <link rel="canonical" href={`${window.location.origin}/orders/${order.id}`} />
       </Helmet>
 
-      <PublicHeader />
-
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
+      <div className="container mx-auto px-4 py-6">
         {/* Header */}
-        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">Order {order.order_number}</h1>
-            <p className="text-muted-foreground">Placed on {formatDateTime(order.order_time)}</p>
-          </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={refreshNow} disabled={isLoadingData}>Refresh status</Button>
-          </div>
-        </div>
-
-        {/* Delivery Schedule - Show prominently if available */}
-        {deliverySchedule && (
-          <div className="mb-6">
-            <DeliveryScheduleCard 
-              schedule={deliverySchedule} 
-              orderStatus={order.status}
-              className="shadow-sm"
-            />
-          </div>
-        )}
+<div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+  <div>
+    <h1 className="text-2xl font-bold">Order {order.order_number}</h1>
+    <p className="text-muted-foreground">Placed on {formatDateTime(order.order_time)}</p>
+  </div>
+  <div className="flex gap-2">
+    <Button variant="outline" onClick={refreshNow} disabled={isLoadingData}>Refresh status</Button>
+  </div>
+</div>
 
         {/* Status Row */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -238,6 +213,47 @@ const reconcileNow = async () => {
           </Card>
         </div>
 
+        {/* Payment Details */}
+        <Card className="p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4">Payment Details</h2>
+          {tx ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <div className="text-muted-foreground">Reference</div>
+                <div className="font-mono">{tx.provider_reference || '-'}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Method</div>
+                <div>{tx.channel || order.payment_method || '-'}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Status</div>
+                <div>{(tx.status || '').toUpperCase() || '-'}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Paid Amount</div>
+                <div>{formatMoney(tx.amount || order.total_amount)}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Initiated</div>
+                <div>{formatDateTime(tx.created_at) || '-'}</div>
+              </div>
+              <div>
+                <div className="text-muted-foreground">Completed</div>
+                <div>{formatDateTime(tx.paid_at || tx.updated_at) || '-'}</div>
+              </div>
+              {tx.gateway_response && (
+                <div className="md:col-span-2">
+                  <div className="text-muted-foreground">Gateway Response</div>
+                  <pre className="text-xs bg-muted p-3 rounded overflow-x-auto">{tx.gateway_response}</pre>
+                </div>
+              )}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No payment transaction found for this order.</p>
+          )}
+        </Card>
+
         {/* Timeline */}
         <Card className="p-6">
           <h2 className="text-lg font-semibold mb-4">Order Timeline</h2>
@@ -258,12 +274,6 @@ const reconcileNow = async () => {
               <div className="flex items-center gap-2">
                 <Truck className="w-4 h-4" />
                 <span>Current Status: {order.status}</span>
-              </div>
-            )}
-            {deliverySchedule && (
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span>Delivery Scheduled: {formatDateTime(deliverySchedule.delivery_date)} at {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</span>
               </div>
             )}
           </div>

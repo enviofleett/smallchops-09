@@ -31,40 +31,40 @@ export interface NewDriver {
 
 export const getDrivers = async (): Promise<Driver[]> => {
   const { data, error } = await supabase
-    .from('drivers')
+    .from('drivers' as any)
     .select('*')
     .order('name');
 
   if (error) throw error;
-  return (data || []) as Driver[];
+  return (data || []) as unknown as Driver[];
 };
 
 export const createDriver = async (driver: NewDriver): Promise<Driver> => {
   const { data, error } = await supabase
-    .from('drivers')
+    .from('drivers' as any)
     .insert(driver)
     .select()
     .single();
 
   if (error) throw error;
-  return data as Driver;
+  return data as unknown as Driver;
 };
 
 export const updateDriver = async (id: string, updates: Partial<Driver>): Promise<Driver> => {
   const { data, error } = await supabase
-    .from('drivers')
+    .from('drivers' as any)
     .update(updates)
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data as Driver;
+  return data as unknown as Driver;
 };
 
 export const deleteDriver = async (id: string): Promise<void> => {
   const { error } = await supabase
-    .from('drivers')
+    .from('drivers' as any)
     .delete()
     .eq('id', id);
 

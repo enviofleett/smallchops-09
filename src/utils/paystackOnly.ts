@@ -74,11 +74,8 @@ export const verifySecurePayment = async (reference: string) => {
 
     console.log('🔍 Verifying payment with backend:', reference);
     
-    const { data, error } = await supabase.functions.invoke('verify-payment-unified', {
-      body: { 
-        order_id: reference, // Use reference as order lookup
-        reference 
-      }
+    const { data, error } = await supabase.functions.invoke('verify-payment', {
+      body: { reference }
     });
 
     if (error) {

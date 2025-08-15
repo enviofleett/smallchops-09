@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, User, Menu, X, Heart, MapPin } from 'lucide-react';
+import { Search, ShoppingCart, User, Menu, X, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
@@ -94,19 +94,6 @@ const PublicHeaderContent = () => {
 
           {/* Right Actions - Mobile optimized */}
           <div className="flex items-center space-x-2 sm:space-x-4">
-            {/* Track Order - For authenticated users */}
-            {isAuthenticated && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden md:flex"
-                onClick={() => navigate('/track-order')}
-                title="Track Order"
-              >
-                <MapPin className="h-5 w-5" />
-              </Button>
-            )}
-
             {/* Favorites - Hidden on small mobile */}
             <Button
               variant="ghost"
@@ -209,17 +196,6 @@ const PublicHeaderContent = () => {
                 >
                   Booking
                 </Link>
-                {isAuthenticated && (
-                  <button 
-                    className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full"
-                    onClick={() => {
-                      setIsMenuOpen(false);
-                      navigate('/track-order');
-                    }}
-                  >
-                    Track Order
-                  </button>
-                )}
                 <button 
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full"
                   onClick={() => {

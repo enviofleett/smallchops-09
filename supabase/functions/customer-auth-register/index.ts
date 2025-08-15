@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import * as bcrypt from "https://deno.land/x/bcrypt@v0.4.1/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -134,40 +133,10 @@ serve(async (req) => {
       );
     }
 
-    // Enhanced password validation
-    if (password.length < 12) {
+    // Validate password strength
+    if (password.length < 8) {
       return new Response(
-        JSON.stringify({ error: "Password must be at least 12 characters long" }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
-    }
-    
-    // Check password complexity (NIST guidelines)
-    const hasUpperCase = /[A-Z]/.test(password);
-    const hasLowerCase = /[a-z]/.test(password);
-    const hasNumbers = /\d/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-    
-    if (!(hasUpperCase && hasLowerCase && hasNumbers && hasSpecialChar)) {
-      return new Response(
-        JSON.stringify({ 
-          error: "Password must contain uppercase, lowercase, numbers, and special characters" 
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, "Content-Type": "application/json" } 
-        }
-      );
-    }
-    
-    // Check for common patterns
-    const commonPatterns = ['123456', 'password', 'qwerty', 'admin'];
-    if (commonPatterns.some(pattern => password.toLowerCase().includes(pattern))) {
-      return new Response(
-        JSON.stringify({ error: "Password contains common patterns and is not secure" }),
+        JSON.stringify({ error: "Password must be at least 8 characters long" }),
         { 
           status: 400, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
@@ -209,16 +178,10 @@ serve(async (req) => {
       );
     }
 
-    // Generate correlation ID for tracking
-    const correlationId = crypto.randomUUID();
-    
-    // Check enhanced rate limit with IP tracking
+    // Check rate limit for OTP generation
     const { data: rateLimitCheck, error: rateLimitError } = await supabaseAdmin.rpc(
-      'check_registration_rate_limit_secure',
-      { 
-        p_email: email.toLowerCase(),
-        p_ip_address: clientIP
-      }
+      'check_otp_rate_limit',
+      { p_email: email.toLowerCase() }
     );
 
     if (rateLimitError) {
@@ -250,16 +213,9 @@ serve(async (req) => {
       );
     }
 
-    // Generate secure alphanumeric OTP code (harder to guess)
-    const otpChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-    let otpCode = '';
-    for (let i = 0; i < 6; i++) {
-      otpCode += otpChars.charAt(Math.floor(Math.random() * otpChars.length));
-    }
+    // Generate OTP code
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes from now
-    
-    // Hash password securely before storing
-    const passwordHash = await bcrypt.hash(password, 12);
 
     // Store registration data temporarily and OTP
     const { data: otpRecord, error: otpError } = await supabaseAdmin
@@ -270,12 +226,10 @@ serve(async (req) => {
         otp_type: 'registration',
         expires_at: expiresAt.toISOString(),
         created_by_ip: clientIP,
-        correlation_id: correlationId,
-        ip_address: clientIP,
         verification_metadata: {
           name: name,
           phone: phone,
-          password_hash: passwordHash // Now properly hashed
+          password_hash: password // In production, this should be hashed
         }
       })
       .select()
@@ -327,20 +281,18 @@ serve(async (req) => {
       }
     }
 
-    // Log registration attempt with correlation ID
+    // Log registration attempt
     await supabaseAdmin
       .from('customer_auth_audit')
       .insert({
         email: email.toLowerCase(),
-        action: 'registration_initiated',
+        action: 'registration',
         success: true,
         ip_address: clientIP,
         metadata: {
           otp_id: otpRecord.id,
-          correlation_id: correlationId,
           name: name,
-          has_phone: !!phone,
-          password_strength: 'strong'
+          has_phone: !!phone
         }
       });
 
@@ -350,8 +302,7 @@ serve(async (req) => {
         message: "Registration initiated. Please check your email for the verification code.",
         email: email.toLowerCase(),
         expires_in_minutes: 10,
-        requires_otp_verification: true,
-        correlation_id: correlationId
+        requires_otp_verification: true
       }),
       { 
         status: 200, 

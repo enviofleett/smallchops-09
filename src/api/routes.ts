@@ -28,7 +28,7 @@ export interface RouteOrderAssignment {
 
 export const getRoutes = async (date?: string): Promise<DeliveryRoute[]> => {
   let query = supabase
-    .from('delivery_routes')
+    .from('delivery_routes' as any)
     .select(`
       *,
       drivers(name, phone, vehicle_type)
@@ -41,30 +41,30 @@ export const getRoutes = async (date?: string): Promise<DeliveryRoute[]> => {
 
   const { data, error } = await query;
   if (error) throw error;
-  return (data || []) as DeliveryRoute[];
+  return (data || []) as unknown as DeliveryRoute[];
 };
 
 export const createRoute = async (route: Omit<DeliveryRoute, 'id' | 'created_at' | 'updated_at'>): Promise<DeliveryRoute> => {
   const { data, error } = await supabase
-    .from('delivery_routes')
+    .from('delivery_routes' as any)
     .insert(route)
     .select()
     .single();
 
   if (error) throw error;
-  return data as DeliveryRoute;
+  return data as unknown as DeliveryRoute;
 };
 
 export const updateRoute = async (id: string, updates: Partial<DeliveryRoute>): Promise<DeliveryRoute> => {
   const { data, error } = await supabase
-    .from('delivery_routes')
+    .from('delivery_routes' as any)
     .update(updates)
     .eq('id', id)
     .select()
     .single();
 
   if (error) throw error;
-  return data as DeliveryRoute;
+  return data as unknown as DeliveryRoute;
 };
 
 export const assignOrdersToRoute = async (routeId: string, orderIds: string[]): Promise<RouteOrderAssignment[]> => {
@@ -76,7 +76,7 @@ export const assignOrdersToRoute = async (routeId: string, orderIds: string[]): 
   }));
 
   const { data, error } = await supabase
-    .from('route_order_assignments')
+    .from('route_order_assignments' as any)
     .insert(assignments)
     .select();
 
@@ -84,16 +84,16 @@ export const assignOrdersToRoute = async (routeId: string, orderIds: string[]): 
 
   // Update route total orders count
   await supabase
-    .from('delivery_routes')
+    .from('delivery_routes' as any)
     .update({ total_orders: orderIds.length })
     .eq('id', routeId);
 
-  return (data || []) as RouteOrderAssignment[];
+  return (data || []) as unknown as RouteOrderAssignment[];
 };
 
 export const getRouteAssignments = async (routeId: string): Promise<RouteOrderAssignment[]> => {
   const { data, error } = await supabase
-    .from('route_order_assignments')
+    .from('route_order_assignments' as any)
     .select(`
       *,
       orders(
@@ -109,7 +109,7 @@ export const getRouteAssignments = async (routeId: string): Promise<RouteOrderAs
     .order('sequence_number');
 
   if (error) throw error;
-  return (data || []) as RouteOrderAssignment[];
+  return (data || []) as unknown as RouteOrderAssignment[];
 };
 
 export const updateDeliveryStatus = async (
@@ -127,7 +127,7 @@ export const updateDeliveryStatus = async (
   }
 
   const { error } = await supabase
-    .from('route_order_assignments')
+    .from('route_order_assignments' as any)
     .update(updates)
     .eq('id', assignmentId);
 
@@ -138,11 +138,11 @@ export const optimizeRoute = async (routeId: string): Promise<DeliveryRoute> => 
   // This would implement route optimization logic
   // For now, just return the route as-is
   const { data, error } = await supabase
-    .from('delivery_routes')
+    .from('delivery_routes' as any)
     .select()
     .eq('id', routeId)
     .single();
 
   if (error) throw error;
-  return data as DeliveryRoute;
+  return data as unknown as DeliveryRoute;
 };

@@ -31,15 +31,6 @@ export interface BusinessSettings {
   brand_guidelines?: string;
   logo_usage_rules?: string;
   whatsapp_support_number?: string;
-  business_hours?: {
-    monday?: { open: string; close: string; is_open: boolean };
-    tuesday?: { open: string; close: string; is_open: boolean };
-    wednesday?: { open: string; close: string; is_open: boolean };
-    thursday?: { open: string; close: string; is_open: boolean };
-    friday?: { open: string; close: string; is_open: boolean };
-    saturday?: { open: string; close: string; is_open: boolean };
-    sunday?: { open: string; close: string; is_open: boolean };
-  };
   created_at: string;
   updated_at: string;
   allow_guest_checkout?: boolean;

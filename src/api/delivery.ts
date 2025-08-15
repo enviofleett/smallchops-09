@@ -17,9 +17,7 @@ export const getDeliveryZonesWithFees = async (): Promise<DeliveryZoneWithFee[]>
     .select(`
       *,
       delivery_fees(*)
-    `)
-    .eq('is_active', true)
-    .order('name');
+    `);
 
   if (error) throw error;
   

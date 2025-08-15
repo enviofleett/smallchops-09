@@ -1,0 +1,357 @@
+import React from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Separator } from '@/components/ui/separator';
+import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone } from 'lucide-react';
+
+interface OrderItem {
+  id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  vat_amount?: number;
+  discount_amount?: number;
+  customizations?: any;
+  special_instructions?: string;
+}
+
+interface DeliverySchedule {
+  id: string;
+  delivery_date: string;
+  delivery_time_start: string;
+  delivery_time_end: string;
+  delivery_zone?: string;
+  special_instructions?: string;
+  delivery_fee?: number;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  status: string;
+  payment_status: string;
+  payment_method?: string;
+  payment_reference?: string;
+  total_amount: number;
+  order_time: string;
+  order_type: 'delivery' | 'pickup';
+  delivery_address?: any;
+  customer_phone?: string;
+  order_items: OrderItem[];
+  paid_at?: string;
+}
+
+interface OrderDetailsModalProps {
+  order: Order | null;
+  deliverySchedule?: DeliverySchedule | null;
+  isOpen: boolean;
+  onClose: () => void;
+}
+
+export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
+  order,
+  deliverySchedule,
+  isOpen,
+  onClose,
+}) => {
+  if (!order) return null;
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN',
+    }).format(amount);
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-NG', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
+
+  const getStatusColor = (status: string) => {
+    const colors = {
+      pending: 'bg-amber-100 text-amber-800',
+      confirmed: 'bg-blue-100 text-blue-800',
+      preparing: 'bg-purple-100 text-purple-800',
+      ready: 'bg-green-100 text-green-800',
+      out_for_delivery: 'bg-orange-100 text-orange-800',
+      delivered: 'bg-green-100 text-green-800',
+      completed: 'bg-emerald-100 text-emerald-800',
+      cancelled: 'bg-red-100 text-red-800',
+    };
+    return colors[status as keyof typeof colors] || 'bg-muted text-muted-foreground';
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    const colors = {
+      pending: 'bg-amber-100 text-amber-800',
+      paid: 'bg-green-100 text-green-800',
+      failed: 'bg-red-100 text-red-800',
+      refunded: 'bg-purple-100 text-purple-800',
+    };
+    return colors[status as keyof typeof colors] || 'bg-muted text-muted-foreground';
+  };
+
+  const subtotal = order.order_items.reduce((sum, item) => sum + item.total_price, 0);
+  const totalVat = order.order_items.reduce((sum, item) => sum + (item.vat_amount || 0), 0);
+  const totalDiscount = order.order_items.reduce((sum, item) => sum + (item.discount_amount || 0), 0);
+
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-3">
+            <Package className="h-5 w-5 text-primary" />
+            Order Details - {order.order_number}
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-6">
+          {/* Order Header */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <Card>
+              <CardContent className="pt-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className={getStatusColor(order.status)}>
+                      {order.status.replace('_', ' ').toUpperCase()}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Order Status</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge className={getPaymentStatusColor(order.payment_status)}>
+                      {order.payment_status.toUpperCase()}
+                    </Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Payment Status</p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardContent className="pt-4">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Clock className="h-4 w-4 text-muted-foreground" />
+                    <span className="font-medium">{formatDateTime(order.order_time)}</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">Order Time</p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Order Items */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Package className="h-5 w-5" />
+                Order Items ({order.order_items.length} items)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {order.order_items.map((item) => (
+                  <div key={item.id} className="border rounded-lg p-4">
+                    <div className="flex justify-between items-start mb-2">
+                      <div className="flex-1">
+                        <h4 className="font-medium">{item.product_name}</h4>
+                        {item.special_instructions && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            <strong>Special Instructions:</strong> {item.special_instructions}
+                          </p>
+                        )}
+                        {item.customizations && (
+                          <p className="text-sm text-muted-foreground mt-1">
+                            <strong>Customizations:</strong> {JSON.stringify(item.customizations)}
+                          </p>
+                        )}
+                      </div>
+                      <div className="text-right ml-4">
+                        <p className="font-medium">{formatCurrency(item.total_price)}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {item.quantity} × {formatCurrency(item.unit_price)}
+                        </p>
+                      </div>
+                    </div>
+                    
+                    {(item.vat_amount || item.discount_amount) && (
+                      <div className="flex justify-between text-sm text-muted-foreground pt-2 border-t">
+                        {item.vat_amount > 0 && (
+                          <span>VAT: {formatCurrency(item.vat_amount)}</span>
+                        )}
+                        {item.discount_amount > 0 && (
+                          <span>Discount: -{formatCurrency(item.discount_amount)}</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+
+                <Separator />
+
+                {/* Order Summary */}
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm">
+                    <span>Subtotal:</span>
+                    <span>{formatCurrency(subtotal)}</span>
+                  </div>
+                  {totalVat > 0 && (
+                    <div className="flex justify-between text-sm">
+                      <span>VAT (7.5%):</span>
+                      <span>{formatCurrency(totalVat)}</span>
+                    </div>
+                  )}
+                  {totalDiscount > 0 && (
+                    <div className="flex justify-between text-sm text-green-600">
+                      <span>Total Discount:</span>
+                      <span>-{formatCurrency(totalDiscount)}</span>
+                    </div>
+                  )}
+                  <Separator />
+                  <div className="flex justify-between font-semibold text-lg">
+                    <span>Total:</span>
+                    <span>{formatCurrency(order.total_amount)}</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Payment Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CreditCard className="h-5 w-5" />
+                Payment Information
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-sm text-muted-foreground">Payment Method</p>
+                  <p className="font-medium">{order.payment_method || 'Online Payment'}</p>
+                </div>
+                {order.payment_reference && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Payment Reference</p>
+                    <p className="font-mono text-sm">{order.payment_reference}</p>
+                  </div>
+                )}
+                {order.paid_at && (
+                  <div>
+                    <p className="text-sm text-muted-foreground">Paid At</p>
+                    <p className="font-medium">{formatDateTime(order.paid_at)}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Delivery Information */}
+          {(order.order_type === 'delivery' || deliverySchedule) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Truck className="h-5 w-5" />
+                  Delivery Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {order.delivery_address && (
+                    <div>
+                      <div className="flex items-start gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Delivery Address</p>
+                          <p className="font-medium">
+                            {typeof order.delivery_address === 'string' 
+                              ? order.delivery_address 
+                              : JSON.stringify(order.delivery_address)
+                            }
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {deliverySchedule && (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Calendar className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Delivery Date</p>
+                            <p className="font-medium">
+                              {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG')}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Delivery Time</p>
+                            <p className="font-medium">
+                              {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                      {deliverySchedule.delivery_zone && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Delivery Zone</p>
+                          <p className="font-medium">{deliverySchedule.delivery_zone}</p>
+                        </div>
+                      )}
+                      {deliverySchedule.delivery_fee && (
+                        <div>
+                          <p className="text-sm text-muted-foreground">Delivery Fee</p>
+                          <p className="font-medium">{formatCurrency(deliverySchedule.delivery_fee)}</p>
+                        </div>
+                      )}
+                      {deliverySchedule.special_instructions && (
+                        <div className="md:col-span-2">
+                          <p className="text-sm text-muted-foreground">Special Instructions</p>
+                          <p className="font-medium">{deliverySchedule.special_instructions}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {order.customer_phone && (
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Phone className="h-4 w-4 text-muted-foreground" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Contact Phone</p>
+                          <p className="font-medium">{order.customer_phone}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+};

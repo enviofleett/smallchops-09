@@ -46,24 +46,14 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
   const calculateDeliveryFee = (zone: DeliveryZoneWithFee): number => {
     if (!zone.delivery_fees) return 0;
     
-    const { base_fee, fee_per_km, min_order_for_free_delivery } = zone.delivery_fees;
+    const { base_fee, min_order_for_free_delivery } = zone.delivery_fees;
     
     // Check if order qualifies for free delivery
     if (min_order_for_free_delivery && orderSubtotal >= min_order_for_free_delivery) {
       return 0;
     }
     
-    let totalFee = base_fee;
-    
-    // Add distance-based fee if configured
-    // TODO: Integrate with mapping service for actual distance calculation
-    if (fee_per_km && fee_per_km > 0) {
-      // For now, assume average distance within zone (this should be replaced with actual distance)
-      const estimatedDistance = 5; // km - placeholder value
-      totalFee += fee_per_km * estimatedDistance;
-    }
-    
-    return totalFee;
+    return base_fee;
   };
 
   const handleZoneSelect = (zoneId: string) => {

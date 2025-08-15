@@ -10,7 +10,7 @@ import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { format } from 'date-fns';
 
 export function ProfileAnalytics() {
-  const { data: analytics, isLoading } = useCustomerAnalytics();
+  const { analytics, isLoading } = useCustomerAnalytics();
   const { customerAccount } = useCustomerAuth();
   const { favorites } = useCustomerFavorites(customerAccount?.id);
 

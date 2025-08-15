@@ -16,15 +16,15 @@ export interface DeliveryPreferences {
   updated_at?: string;
 }
 
-export interface DeliveryTimeSlot {
+// Using the new delivery_time_slots table structure
+export interface DatabaseDeliveryTimeSlot {
   id?: string;
-  zone_id?: string;
-  day_of_week: number; // 0=Sunday, 1=Monday, etc.
+  date: string;
   start_time: string;
   end_time: string;
   max_capacity: number;
   current_bookings: number;
-  is_active: boolean;
+  is_available?: boolean;
   created_at?: string;
   updated_at?: string;
 }
@@ -67,27 +67,26 @@ export const upsertDeliveryPreferences = async (preferences: Omit<DeliveryPrefer
 };
 
 // Delivery Time Slots API
-export const getAvailableTimeSlots = async (zoneId?: string, dayOfWeek?: number): Promise<DeliveryTimeSlot[]> => {
-  let query = supabase
-    .from('delivery_time_slots')
-    .select('*')
-    .eq('is_active', true);
-
-  if (zoneId) {
-    query = query.eq('zone_id', zoneId);
-  }
-
-  if (dayOfWeek !== undefined) {
-    query = query.eq('day_of_week', dayOfWeek);
-  }
-
-  const { data, error } = await query.order('start_time');
+export const getAvailableTimeSlots = async (startDate?: string, endDate?: string): Promise<DatabaseDeliveryTimeSlot[]> => {
+  const { data, error } = await supabase
+    .rpc('get_available_delivery_slots', {
+      p_start_date: startDate || new Date().toISOString().split('T')[0],
+      p_end_date: endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map((slot: any) => ({
+    id: slot.slot_id,
+    date: slot.date,
+    start_time: slot.start_time,
+    end_time: slot.end_time,
+    max_capacity: slot.max_capacity,
+    current_bookings: slot.current_bookings,
+    is_available: slot.is_available
+  }));
 };
 
-export const createTimeSlot = async (timeSlot: Omit<DeliveryTimeSlot, 'id' | 'created_at' | 'updated_at'>): Promise<DeliveryTimeSlot> => {
+export const createTimeSlot = async (timeSlot: Omit<DatabaseDeliveryTimeSlot, 'id' | 'created_at' | 'updated_at'>): Promise<DatabaseDeliveryTimeSlot> => {
   const { data, error } = await supabase
     .from('delivery_time_slots')
     .insert(timeSlot)
@@ -98,7 +97,7 @@ export const createTimeSlot = async (timeSlot: Omit<DeliveryTimeSlot, 'id' | 'cr
   return data;
 };
 
-export const updateTimeSlot = async (id: string, updates: Partial<DeliveryTimeSlot>): Promise<DeliveryTimeSlot> => {
+export const updateTimeSlot = async (id: string, updates: Partial<DatabaseDeliveryTimeSlot>): Promise<DatabaseDeliveryTimeSlot> => {
   const { data, error } = await supabase
     .from('delivery_time_slots')
     .update(updates)

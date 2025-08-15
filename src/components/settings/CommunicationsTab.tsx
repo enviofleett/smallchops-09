@@ -16,6 +16,7 @@ import { useSMTPSettings } from '@/hooks/useSMTPSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Mail, Settings, FileText, TestTube, Activity, BarChart3, AlertCircle, CheckCircle, Clock, Send, TrendingUp, User, Zap } from 'lucide-react';
+import { DeliverySchedulingTab } from './DeliverySchedulingTab';
 interface EmailStats {
   totalSent: number;
   deliveredToday: number;
@@ -176,7 +177,7 @@ export const CommunicationsTab = () => {
         </div>}
 
       <Tabs defaultValue="settings" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             SMTP Settings
@@ -196,6 +197,10 @@ export const CommunicationsTab = () => {
           <TabsTrigger value="analytics" className="flex items-center gap-2">
             <Activity className="h-4 w-4" />
             Delivery Monitoring
+          </TabsTrigger>
+          <TabsTrigger value="delivery-scheduling" className="flex items-center gap-2">
+            <Clock className="h-4 w-4" />
+            Delivery Scheduling
           </TabsTrigger>
         </TabsList>
 
@@ -339,6 +344,10 @@ export const CommunicationsTab = () => {
               <EmailDeliveryMonitor />
             </CardContent>
           </Card>
+        </TabsContent>
+
+        <TabsContent value="delivery-scheduling" className="space-y-4">
+          <DeliverySchedulingTab />
         </TabsContent>
       </Tabs>
     </div>;

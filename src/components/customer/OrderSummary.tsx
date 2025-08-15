@@ -12,7 +12,7 @@ interface OrderSummaryProps {
 }
 
 export function OrderSummary({ detailed = false }: OrderSummaryProps) {
-  const { data: analytics, isLoading } = useCustomerAnalytics();
+  const { analytics, isLoading } = useCustomerAnalytics();
 
   if (isLoading) {
     return (

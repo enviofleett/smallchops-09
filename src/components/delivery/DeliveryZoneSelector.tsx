@@ -41,25 +41,14 @@ export const DeliveryZoneSelector: React.FC<DeliveryZoneSelectorProps> = ({
   const calculateDeliveryFee = (zone: DeliveryZoneWithFee): number => {
     if (!zone.delivery_fees) return 0;
     
-    const { base_fee, fee_per_km, min_order_for_free_delivery } = zone.delivery_fees;
+    const { base_fee, min_order_for_free_delivery } = zone.delivery_fees;
     
     // Check if order qualifies for free delivery
     if (min_order_for_free_delivery && orderSubtotal >= min_order_for_free_delivery) {
       return 0;
     }
     
-    // Start with base fee
-    let totalFee = base_fee || 0;
-    
-    // Add distance-based fee if configured
-    // TODO: Integrate with mapping service for actual distance calculation
-    // For now, we only use base fee as distance calculation requires address
-    if (fee_per_km && fee_per_km > 0) {
-      // This would be calculated based on delivery address distance
-      // totalFee += (calculatedDistance * fee_per_km);
-    }
-    
-    return totalFee;
+    return base_fee;
   };
 
   const handleZoneSelect = (zoneId: string) => {

@@ -11,6 +11,7 @@ import { Separator } from "@/components/ui/separator";
 import { LogoUpload } from "./LogoUpload";
 import { SocialMediaLinks } from "./SocialMediaLinks";
 import { SEOSettings } from "./SEOSettings";
+import { BusinessHoursManager } from "./BusinessHoursManager";
 import { useBusinessSettings } from "@/hooks/useBusinessSettings";
 import { toast } from "sonner";
 import { Loader2 } from "lucide-react";
@@ -32,7 +33,16 @@ const brandingSchema = z.object({
   youtube_url: z.string().url("Invalid URL format").optional().or(z.literal("")),
   seo_title: z.string().optional(),
   seo_description: z.string().optional(),
-  seo_keywords: z.string().optional()
+  seo_keywords: z.string().optional(),
+  business_hours: z.object({
+    monday: z.object({ open: z.string(), close: z.string(), is_open: z.boolean() }).optional(),
+    tuesday: z.object({ open: z.string(), close: z.string(), is_open: z.boolean() }).optional(),
+    wednesday: z.object({ open: z.string(), close: z.string(), is_open: z.boolean() }).optional(),
+    thursday: z.object({ open: z.string(), close: z.string(), is_open: z.boolean() }).optional(),
+    friday: z.object({ open: z.string(), close: z.string(), is_open: z.boolean() }).optional(),
+    saturday: z.object({ open: z.string(), close: z.string(), is_open: z.boolean() }).optional(),
+    sunday: z.object({ open: z.string(), close: z.string(), is_open: z.boolean() }).optional(),
+  }).optional()
 });
 type BrandingFormData = z.infer<typeof brandingSchema>;
 export const BrandingTab = () => {
@@ -62,7 +72,16 @@ export const BrandingTab = () => {
       youtube_url: "",
       seo_title: "",
       seo_description: "",
-      seo_keywords: ""
+      seo_keywords: "",
+      business_hours: {
+        monday: { open: '09:00', close: '21:00', is_open: true },
+        tuesday: { open: '09:00', close: '21:00', is_open: true },
+        wednesday: { open: '09:00', close: '21:00', is_open: true },
+        thursday: { open: '09:00', close: '21:00', is_open: true },
+        friday: { open: '09:00', close: '21:00', is_open: true },
+        saturday: { open: '09:00', close: '21:00', is_open: true },
+        sunday: { open: '10:00', close: '20:00', is_open: true },
+      }
     }
   });
 
@@ -86,7 +105,16 @@ export const BrandingTab = () => {
         youtube_url: settings.youtube_url || "",
         seo_title: settings.seo_title || "",
         seo_description: settings.seo_description || "",
-        seo_keywords: settings.seo_keywords || ""
+        seo_keywords: settings.seo_keywords || "",
+        business_hours: settings.business_hours || {
+          monday: { open: '09:00', close: '21:00', is_open: true },
+          tuesday: { open: '09:00', close: '21:00', is_open: true },
+          wednesday: { open: '09:00', close: '21:00', is_open: true },
+          thursday: { open: '09:00', close: '21:00', is_open: true },
+          friday: { open: '09:00', close: '21:00', is_open: true },
+          saturday: { open: '09:00', close: '21:00', is_open: true },
+          sunday: { open: '10:00', close: '20:00', is_open: true },
+        }
       });
     }
   }, [settings, form]);
@@ -208,6 +236,9 @@ export const BrandingTab = () => {
 
         {/* Social Media Links */}
         <SocialMediaLinks form={form} />
+
+        {/* Business Hours */}
+        <BusinessHoursManager form={form} />
 
         {/* SEO Settings */}
         <SEOSettings form={form} />

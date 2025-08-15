@@ -46,12 +46,13 @@ export const usePaymentStatus = (
         setIsLoading(true);
         setError(null);
 
-        // Prefer secure RPC for consolidated status
+        // Use the optimized RPC function with the new public view
         const { data: statusData, error: statusError } = await supabase
           .rpc('get_order_payment_status', { p_order_id: orderIdToResolve });
 
         if (statusError) {
-          // Fallback to direct queries if RPC fails
+          console.error('RPC get_order_payment_status failed:', statusError);
+          // Fallback to the new public orders_with_payment view
           return await fallbackPaymentStatusQuery(orderIdToResolve);
         }
 
@@ -118,14 +119,43 @@ export const usePaymentStatus = (
 
   const fallbackPaymentStatusQuery = useCallback(async (orderIdToResolve: string) => {
     try {
-      // Orders table
-      const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .select('payment_status, paid_at, status')
+      // Try the new public orders_with_payment view first
+      const { data: orderWithPayment, error: viewError } = await supabase
+        .from('orders_with_payment')
+        .select(`
+          id,
+          payment_status,
+          paid_at,
+          status,
+          computed_payment_status,
+          payment_reference,
+          transaction_status,
+          transaction_amount
+        `)
         .eq('id', orderIdToResolve)
         .maybeSingle();
 
-      if (orderError) throw orderError;
+      let order = orderWithPayment;
+      
+      if (viewError || !orderWithPayment) {
+        console.warn('orders_with_payment view failed, using direct orders table:', viewError);
+        // Fallback to direct orders table
+        const { data: directOrder, error: orderError } = await supabase
+          .from('orders')
+          .select('id, payment_status, paid_at, status')
+          .eq('id', orderIdToResolve)
+          .maybeSingle();
+
+        if (orderError) throw orderError;
+        // Ensure fallback order has all required fields for type checking
+        order = directOrder ? {
+          ...directOrder,
+          computed_payment_status: directOrder.payment_status === 'paid' ? 'paid' : 'pending',
+          payment_reference: null,
+          transaction_status: null,
+          transaction_amount: null
+        } : null;
+      }
 
       // Transactions table (latest first)
       const { data: transactions, error: txError } = await supabase
@@ -136,22 +166,39 @@ export const usePaymentStatus = (
 
       if (txError) throw txError;
 
-      const successfulTx = transactions?.find(
-        (tx) => tx.status === 'success' || tx.status === 'paid'
-      );
+      // Use computed payment status if available from the view
+      if (order && 'computed_payment_status' in order) {
+        const needsReconciliation = order.computed_payment_status === 'processing' || 
+                                  (order.payment_status !== 'paid' && order.transaction_status === 'success');
+        
+        setPaymentStatus({
+          isPaid: order.computed_payment_status === 'paid',
+          paidAt: order.paid_at,
+          paymentMethod: order.computed_payment_status === 'paid' ? 'processed' : null,
+          source: 'order',
+          lastUpdated: new Date().toISOString(),
+          needsReconciliation,
+          orderStatus: order.status || 'pending',
+        });
+      } else {
+        // Fallback to transaction checking logic
+        const successfulTx = transactions?.find(
+          (tx) => tx.status === 'success' || tx.status === 'paid'
+        );
 
-      const needsReconciliation = order?.payment_status !== 'paid' && !!successfulTx;
+        const needsReconciliation = order?.payment_status !== 'paid' && !!successfulTx;
 
-      setPaymentStatus({
-        isPaid: order?.payment_status === 'paid' || !!successfulTx,
-        paidAt: order?.paid_at || successfulTx?.paid_at || null,
-        paymentMethod:
-          successfulTx?.channel || (order?.payment_status === 'paid' ? 'processed' : null),
-        source: needsReconciliation ? 'transaction' : 'order',
-        lastUpdated: new Date().toISOString(),
-        needsReconciliation,
-        orderStatus: order?.status || 'pending',
-      });
+        setPaymentStatus({
+          isPaid: order?.payment_status === 'paid' || !!successfulTx,
+          paidAt: order?.paid_at || successfulTx?.paid_at || null,
+          paymentMethod:
+            successfulTx?.channel || (order?.payment_status === 'paid' ? 'processed' : null),
+          source: needsReconciliation ? 'transaction' : 'order',
+          lastUpdated: new Date().toISOString(),
+          needsReconciliation,
+          orderStatus: order?.status || 'pending',
+        });
+      }
     } catch (fallbackError) {
       console.error('Fallback query failed:', fallbackError);
       setError('Unable to determine payment status');
@@ -270,9 +317,9 @@ export const useMultiplePaymentStatuses = (orderIds: string[] = []) => {
       setIsLoading(true);
       setError(null);
 
-      // Prefer enriched view if available
+      // Query orders directly with payment information
       const { data: ordersWithPayment, error: viewError } = await supabase
-        .from('orders_with_payment')
+        .from('orders')
         .select(`
           id,
           payment_status,

@@ -14,6 +14,8 @@ import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
 import { DriverAssignDialog } from '@/components/admin/delivery/DriverAssignDialog';
 import { ShippingFeesReport } from '@/components/admin/delivery/ShippingFeesReport';
 import { DriverDialog } from '@/components/delivery/DriverDialog';
+import { AdminDriversTab } from '@/components/admin/delivery/AdminDriversTab';
+import { DeliveryZonesManager } from '@/components/delivery/DeliveryZonesManager';
 import { 
   MapPin, 
   Truck, 
@@ -205,9 +207,10 @@ export default function AdminDelivery() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-3">
+          <TabsList className="grid w-full grid-cols-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="orders">Delivery Orders</TabsTrigger>
+            <TabsTrigger value="drivers">Drivers</TabsTrigger>
             <TabsTrigger value="zones">Delivery Zones</TabsTrigger>
           </TabsList>
 
@@ -264,6 +267,32 @@ export default function AdminDelivery() {
 
           {/* Delivery Orders Tab */}
           <TabsContent value="orders" className="space-y-4">
+            <div className="flex items-center gap-4 mb-4">
+              <Select value={deliveryWindowFilter} onValueChange={setDeliveryWindowFilter}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="Filter by time window" />
+                </SelectTrigger>
+                <SelectContent>
+                  {deliveryWindows.map((window) => (
+                    <SelectItem key={window} value={window}>
+                      {window === 'all' ? 'All Orders' : 
+                       window === 'due-now' ? 'Due Now' : 
+                       window.replace('-', ':00 - ') + ':00'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              {selectedOrders.length > 0 && (
+                <Button 
+                  onClick={() => setIsDriverDialogOpen(true)}
+                  className="ml-auto"
+                >
+                  Assign Driver ({selectedOrders.length})
+                </Button>
+              )}
+            </div>
+
             <div className="grid gap-4">
               {ordersLoading ? (
                 [...Array(5)].map((_, i) => (
@@ -276,55 +305,48 @@ export default function AdminDelivery() {
                   </Card>
                 ))
               ) : (
-                deliveryOrders.map((order) => (
-                  <DeliveryOrderCard key={order.id} order={order} />
+                filteredOrders.map((order) => (
+                  <DeliveryOrderCard 
+                    key={order.id} 
+                    order={order} 
+                    schedule={deliverySchedules[order.id]}
+                    onSelect={(selected) => {
+                      if (selected) {
+                        setSelectedOrders(prev => [...prev, order]);
+                      } else {
+                        setSelectedOrders(prev => prev.filter(o => o.id !== order.id));
+                      }
+                    }}
+                    isSelected={selectedOrders.some(o => o.id === order.id)}
+                  />
                 ))
+              )}
+              
+              {!ordersLoading && filteredOrders.length === 0 && (
+                <Card>
+                  <CardContent className="p-12 text-center">
+                    <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold mb-2">No delivery orders</h3>
+                    <p className="text-muted-foreground">
+                      {deliveryWindowFilter === 'all' 
+                        ? 'No delivery orders found for the selected date'
+                        : 'No orders in this time window'
+                      }
+                    </p>
+                  </CardContent>
+                </Card>
               )}
             </div>
           </TabsContent>
 
+          {/* Drivers Tab */}
+          <TabsContent value="drivers">
+            <AdminDriversTab />
+          </TabsContent>
 
           {/* Delivery Zones Tab */}
-          <TabsContent value="zones" className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {zonesLoading ? (
-                [...Array(6)].map((_, i) => (
-                  <Card key={i} className="p-4">
-                    <div className="animate-pulse space-y-3">
-                      <div className="h-4 bg-muted rounded w-3/4"></div>
-                      <div className="h-3 bg-muted rounded w-1/2"></div>
-                    </div>
-                  </Card>
-                ))
-              ) : (
-                zones.map((zone: any) => (
-                  <Card key={zone.id}>
-                    <CardContent className="p-4">
-                      <div className="flex items-center gap-3 mb-3">
-                        <MapPin className="w-5 h-5 text-primary" />
-                        <h3 className="font-semibold">{zone.name}</h3>
-                      </div>
-                      <div className="space-y-2 text-sm">
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Coverage:</span>
-                          <span>{zone.coverage_area || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Base Fee:</span>
-                          <span>₦{zone.delivery_fees?.[0]?.base_fee || 'N/A'}</span>
-                        </div>
-                        <div className="flex justify-between">
-                          <span className="text-muted-foreground">Status:</span>
-                          <Badge variant={zone.is_active ? 'default' : 'secondary'}>
-                            {zone.is_active ? 'Active' : 'Inactive'}
-                          </Badge>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))
-              )}
-            </div>
+          <TabsContent value="zones">
+            <DeliveryZonesManager />
           </TabsContent>
         </Tabs>
 
@@ -369,23 +391,63 @@ function DeliveryOrderItem({ order }: { order: any }) {
   );
 }
 
-function DeliveryOrderCard({ order }: { order: any }) {
+function DeliveryOrderCard({ 
+  order, 
+  onSelect, 
+  isSelected,
+  schedule
+}: { 
+  order: any; 
+  onSelect?: (selected: boolean) => void;
+  isSelected?: boolean;
+  schedule?: any;
+}) {
+  
   return (
-    <Card>
+    <Card className={isSelected ? 'ring-2 ring-primary' : ''}>
       <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-semibold">Order #{order.order_number}</h3>
-            <p className="text-sm text-muted-foreground">{order.customer_name}</p>
-          </div>
-          <Badge variant={order.status === 'out_for_delivery' ? 'default' : 'secondary'}>
-            {order.status.replace('_', ' ').toUpperCase()}
-          </Badge>
-        </div>
+        <div className="flex items-start gap-4">
+          {onSelect && (
+            <Checkbox
+              checked={isSelected}
+              onCheckedChange={onSelect}
+              className="mt-1"
+            />
+          )}
+          
+          <div className="flex-1">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h3 className="font-semibold">Order #{order.order_number}</h3>
+                <p className="text-sm text-muted-foreground">{order.customer_name}</p>
+              </div>
+              <Badge variant={order.status === 'out_for_delivery' ? 'default' : 'secondary'}>
+                {order.status.replace('_', ' ').toUpperCase()}
+              </Badge>
+            </div>
 
-        <div className="text-sm text-muted-foreground">
-          <p>Amount: ₦{order.total_amount}</p>
-          <p>Address: {order.delivery_address?.address || 'N/A'}</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div className="space-y-1">
+                <p><span className="text-muted-foreground">Amount:</span> ₦{order.total_amount}</p>
+                <p><span className="text-muted-foreground">Phone:</span> {order.customer_phone}</p>
+                {order.assigned_rider_id && (
+                  <p><span className="text-muted-foreground">Assigned Driver:</span> 
+                    <Badge variant="outline" className="ml-2">Assigned</Badge>
+                  </p>
+                )}
+              </div>
+              
+              <div className="space-y-1">
+                <p className="text-muted-foreground">Delivery Address:</p>
+                <p className="text-xs">{order.delivery_address?.address || 'N/A'}</p>
+                {schedule && (
+                  <div className="mt-2">
+                    <DeliveryScheduleDisplay schedule={schedule} />
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
       </CardContent>
     </Card>

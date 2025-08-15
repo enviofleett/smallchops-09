@@ -92,123 +92,75 @@ Deno.serve(async (req) => {
       defaultStartDate = start.toISOString().split('T')[0]
     }
 
-    // Build aggregation query
-    const dateFormat = period === 'weekly' 
-      ? "DATE_TRUNC('week', order_time)::date"
-      : "DATE_TRUNC('month', order_time)::date"
-
-    const { data: reportData, error: queryError } = await supabase.rpc('execute', {
-      query: `
-        SELECT 
-          ${dateFormat} as period_start,
-          ${period === 'weekly' 
-            ? "DATE_TRUNC('week', order_time)::date + INTERVAL '6 days'" 
-            : "DATE_TRUNC('month', order_time)::date + INTERVAL '1 month - 1 day'"
-          } as period_end,
-          COALESCE(SUM(delivery_fee), 0) as total_shipping_fees,
-          COUNT(*) as order_count
-        FROM orders 
-        WHERE 
-          order_type = 'delivery' 
-          AND payment_status = 'paid'
-          AND order_time >= $1::date 
-          AND order_time <= $2::date
-        GROUP BY ${dateFormat}
-        ORDER BY period_start DESC
-      `,
-      params: [defaultStartDate, defaultEndDate]
-    })
+    // Direct query using Supabase client - no raw SQL execution
+    console.log('Fetching orders for shipping fees report...')
+    
+    const { data: ordersData, error: queryError } = await supabase
+      .from('orders')
+      .select('delivery_fee, order_time')
+      .eq('order_type', 'delivery')
+      .eq('payment_status', 'paid')
+      .gte('order_time', defaultStartDate)
+      .lte('order_time', defaultEndDate)
 
     if (queryError) {
-      console.error('Query error:', queryError)
-      
-      // Fallback to direct table query
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('orders')
-        .select('delivery_fee, order_time')
-        .eq('order_type', 'delivery')
-        .eq('payment_status', 'paid')
-        .gte('order_time', defaultStartDate)
-        .lte('order_time', defaultEndDate)
-
-      if (fallbackError) {
-        console.error('Fallback query error:', fallbackError)
-        return new Response(
-          JSON.stringify({ error: 'Failed to fetch shipping fees data' }),
-          { status: 500, headers: corsHeaders }
-        )
-      }
-
-      // Process fallback data manually
-      const groupedData: { [key: string]: { total: number, count: number } } = {}
-      
-      fallbackData?.forEach(order => {
-        const date = new Date(order.order_time)
-        let periodKey: string
-        
-        if (period === 'weekly') {
-          // Get start of week (Monday)
-          const startOfWeek = new Date(date)
-          startOfWeek.setDate(date.getDate() - date.getDay() + 1)
-          periodKey = startOfWeek.toISOString().split('T')[0]
-        } else {
-          // Get start of month
-          periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
-        }
-
-        if (!groupedData[periodKey]) {
-          groupedData[periodKey] = { total: 0, count: 0 }
-        }
-        
-        groupedData[periodKey].total += Number(order.delivery_fee || 0)
-        groupedData[periodKey].count += 1
-      })
-
-      // Convert to report format
-      const buckets: ReportBucket[] = Object.entries(groupedData).map(([startDate, data]) => {
-        const start = new Date(startDate)
-        const end = new Date(start)
-        
-        if (period === 'weekly') {
-          end.setDate(start.getDate() + 6)
-        } else {
-          end.setMonth(start.getMonth() + 1)
-          end.setDate(0) // Last day of month
-        }
-
-        return {
-          start_date: startDate,
-          end_date: end.toISOString().split('T')[0],
-          total_shipping_fees: data.total,
-          order_count: data.count,
-          period_label: period === 'weekly' 
-            ? `Week of ${start.toLocaleDateString()}`
-            : `${start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
-        }
-      }).sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
-
+      console.error('Orders query error:', queryError)
       return new Response(
-        JSON.stringify({
-          success: true,
-          period,
-          buckets,
-          total_fees: buckets.reduce((sum, bucket) => sum + bucket.total_shipping_fees, 0),
-          total_orders: buckets.reduce((sum, bucket) => sum + bucket.order_count, 0)
+        JSON.stringify({ 
+          error: 'Failed to fetch shipping fees data',
+          details: queryError.message 
         }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        { status: 500, headers: corsHeaders }
       )
     }
 
-    // Process successful query data
-    const buckets: ReportBucket[] = (reportData || []).map((row: any) => ({
-      start_date: row.period_start,
-      end_date: row.period_end,
-      total_shipping_fees: Number(row.total_shipping_fees || 0),
-      order_count: Number(row.order_count || 0),
-      period_label: period === 'weekly' 
-        ? `Week of ${new Date(row.period_start).toLocaleDateString()}`
-        : `${new Date(row.period_start).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
-    }))
+    // Process data manually for grouping
+    const groupedData: { [key: string]: { total: number, count: number } } = {}
+    
+    ordersData?.forEach(order => {
+      const date = new Date(order.order_time)
+      let periodKey: string
+      
+      if (period === 'weekly') {
+        // Get start of week (Monday)
+        const startOfWeek = new Date(date)
+        startOfWeek.setDate(date.getDate() - date.getDay() + 1)
+        periodKey = startOfWeek.toISOString().split('T')[0]
+      } else {
+        // Get start of month
+        periodKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-01`
+      }
+
+      if (!groupedData[periodKey]) {
+        groupedData[periodKey] = { total: 0, count: 0 }
+      }
+      
+      groupedData[periodKey].total += Number(order.delivery_fee || 0)
+      groupedData[periodKey].count += 1
+    })
+
+    // Convert to report format
+    const buckets: ReportBucket[] = Object.entries(groupedData).map(([startDate, data]) => {
+      const start = new Date(startDate)
+      const end = new Date(start)
+      
+      if (period === 'weekly') {
+        end.setDate(start.getDate() + 6)
+      } else {
+        end.setMonth(start.getMonth() + 1)
+        end.setDate(0) // Last day of month
+      }
+
+      return {
+        start_date: startDate,
+        end_date: end.toISOString().split('T')[0],
+        total_shipping_fees: data.total,
+        order_count: data.count,
+        period_label: period === 'weekly' 
+          ? `Week of ${start.toLocaleDateString()}`
+          : `${start.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}`
+      }
+    }).sort((a, b) => new Date(b.start_date).getTime() - new Date(a.start_date).getTime())
 
     const totalFees = buckets.reduce((sum, bucket) => sum + bucket.total_shipping_fees, 0)
     const totalOrders = buckets.reduce((sum, bucket) => sum + bucket.order_count, 0)
@@ -229,6 +181,11 @@ Deno.serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
+
+    // This section is no longer needed but kept for reference
+    if (false) {
+      // This fallback section is no longer needed as we use direct query above
+    }
 
   } catch (error) {
     console.error('Shipping fees report error:', error)

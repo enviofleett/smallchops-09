@@ -4334,6 +4334,65 @@ export type Database = {
           },
         ]
       }
+      payment_processing_status: {
+        Row: {
+          created_at: string | null
+          current_order_status:
+            | Database["public"]["Enums"]["order_status"]
+            | null
+          error_message: string | null
+          id: string
+          order_id: string | null
+          order_number: string | null
+          order_type: Database["public"]["Enums"]["order_type"] | null
+          overall_status: string | null
+          payment_reference: string | null
+          processing_stage: string | null
+          reference_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_order_status?:
+            | Database["public"]["Enums"]["order_status"]
+            | null
+          error_message?: string | null
+          id?: string
+          order_id?: string | null
+          order_number?: string | null
+          order_type?: Database["public"]["Enums"]["order_type"] | null
+          overall_status?: string | null
+          payment_reference?: string | null
+          processing_stage?: string | null
+          reference_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_order_status?:
+            | Database["public"]["Enums"]["order_status"]
+            | null
+          error_message?: string | null
+          id?: string
+          order_id?: string | null
+          order_number?: string | null
+          order_type?: Database["public"]["Enums"]["order_type"] | null
+          overall_status?: string | null
+          payment_reference?: string | null
+          processing_stage?: string | null
+          reference_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_processing_status_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_rate_limits: {
         Row: {
           attempts: number | null
@@ -6594,31 +6653,6 @@ export type Database = {
         }
         Relationships: []
       }
-      payment_processing_status: {
-        Row: {
-          created_at: string | null
-          current_order_status:
-            | Database["public"]["Enums"]["order_status"]
-            | null
-          error_message: string | null
-          order_id: string | null
-          order_number: string | null
-          order_type: Database["public"]["Enums"]["order_type"] | null
-          overall_status: string | null
-          payment_reference: string | null
-          processing_stage: string | null
-          reference_type: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payment_processing_logs_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       payment_system_health: {
         Row: {
           amount_mismatches: number | null
@@ -7027,6 +7061,24 @@ export type Database = {
           total_invitations: number
         }[]
       }
+      get_admin_payment_status: {
+        Args: {
+          p_limit?: number
+          p_order_id?: string
+          p_payment_reference?: string
+        }
+        Returns: {
+          created_at: string
+          error_message: string
+          order_id: string
+          order_number: string
+          order_type: string
+          overall_status: string
+          payment_reference: string
+          processing_stage: string
+          reference_type: string
+        }[]
+      }
       get_all_customers_display: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -7062,6 +7114,17 @@ export type Database = {
       get_customer_analytics_safe: {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: Json
+      }
+      get_customer_payment_status: {
+        Args: { p_order_id: string }
+        Returns: {
+          error_message: string
+          order_id: string
+          order_number: string
+          overall_status: string
+          payment_reference: string
+          processing_stage: string
+        }[]
       }
       get_dashboard_data: {
         Args: Record<PropertyKey, never>
@@ -7575,6 +7638,10 @@ export type Database = {
       recover_stuck_payment: {
         Args: { p_order_number: string; p_paystack_reference: string }
         Returns: Json
+      }
+      refresh_payment_processing_status: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       release_delivery_slot: {
         Args: { p_order_id?: string; p_slot_id: string }

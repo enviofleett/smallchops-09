@@ -7011,6 +7011,10 @@ export type Database = {
         }
         Returns: string
       }
+      create_payment_intent: {
+        Args: { p_amount: number; p_currency?: string; p_order_id: string }
+        Returns: Json
+      }
       current_user_email: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -7642,6 +7646,10 @@ export type Database = {
       migrate_pay_to_txn_reference: {
         Args: { pay_ref: string }
         Returns: string
+      }
+      migrate_payment_references: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       minimal_payment_test_insert: {
         Args: { p_amount: number; p_order_id: string }

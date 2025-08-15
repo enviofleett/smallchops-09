@@ -58,6 +58,9 @@ verify_jwt = false
 [functions.paystack-webhook-secure]
 verify_jwt = false
 
+[functions.payment-health-check]
+verify_jwt = false
+
 [functions.unsubscribe-email]
 verify_jwt = false
 

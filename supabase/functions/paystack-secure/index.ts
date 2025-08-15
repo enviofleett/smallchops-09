@@ -165,10 +165,10 @@ const handlePaymentRequest = async (req: Request) => {
       timestamp: new Date().toISOString()
     })
 
-    // Initialize Supabase client
+    // Initialize Supabase client with SERVICE ROLE for database writes
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     // Get environment-specific Paystack configuration

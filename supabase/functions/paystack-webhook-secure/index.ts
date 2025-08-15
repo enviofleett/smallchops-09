@@ -1,485 +1,277 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getPaystackConfig } from '../_shared/paystack-config.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
-};
-
-// Paystack's official IP addresses for webhook validation
-const PAYSTACK_IPS = [
-  '52.31.139.75',
-  '52.49.173.169', 
-  '52.214.14.220'
-];
-
-interface PaystackWebhookPayload {
-  event: string;
-  data: {
-    id: string;
-    reference: string;
-    amount: number;
-    status: string;
-    gateway_response: string;
-    paid_at?: string;
-    channel: string;
-    fees?: number;
-    authorization?: {
-      authorization_code: string;
-      card_type: string;
-      last4: string;
-      exp_month: string;
-      exp_year: string;
-      bank: string;
-    };
-    customer?: {
-      email: string;
-      customer_code: string;
-    };
-    metadata?: any;
-  };
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-// Security function to verify webhook signature using HMAC-SHA512
-async function verifyPaystackSignature(
-  body: string, 
-  signature: string, 
-  secret: string
-): Promise<boolean> {
+// Verify Paystack webhook signature
+async function verifyPaystackSignature(payload: string, signature: string, secret: string): Promise<boolean> {
   try {
-    const encoder = new TextEncoder();
+    const encoder = new TextEncoder()
     const key = await crypto.subtle.importKey(
       'raw',
       encoder.encode(secret),
       { name: 'HMAC', hash: 'SHA-512' },
       false,
       ['sign']
-    );
+    )
     
-    const sigBuf = await crypto.subtle.sign('HMAC', key, encoder.encode(body));
-    const computedSig = Array.from(new Uint8Array(sigBuf))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+    const hash = await crypto.subtle.sign('HMAC', key, encoder.encode(payload))
+    const hashArray = Array.from(new Uint8Array(hash))
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
     
-    return computedSig === signature;
+    return hashHex === signature
   } catch (error) {
-    console.error('Signature verification error:', error);
-    return false;
-  }
-}
-
-// Function to validate Paystack IP addresses
-function validatePaystackIP(clientIP: string | null): boolean {
-  if (!clientIP) return false;
-  
-  // Handle comma-separated IPs (proxies)
-  const actualIP = clientIP.split(',')[0].trim();
-  return PAYSTACK_IPS.includes(actualIP);
-}
-
-// Security incident logging
-async function logSecurityIncident(
-  supabase: any,
-  type: string, 
-  description: string, 
-  severity: string, 
-  metadata?: any
-): Promise<void> {
-  try {
-    await supabase.from('security_incidents').insert({
-      type,
-      description,
-      severity,
-      ip_address: metadata?.ip,
-      user_agent: metadata?.userAgent,
-      request_data: metadata?.requestData,
-      created_at: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Failed to log security incident:', error);
-  }
-}
-
-// Asynchronous webhook processing function
-async function processWebhookAsync(
-  supabase: any,
-  webhookData: PaystackWebhookPayload,
-  eventId: string
-): Promise<{ success: boolean; message: string }> {
-  try {
-    console.log(`Processing webhook event: ${webhookData.event} for reference: ${webhookData.data.reference}`);
-    
-    let result: { success: boolean; message: string };
-    
-    switch (webhookData.event) {
-      case 'charge.success':
-        result = await processChargeSuccess(supabase, webhookData.data);
-        break;
-      case 'charge.failed':
-        result = await processChargeFailed(supabase, webhookData.data);
-        break;
-      case 'transfer.success':
-        result = await processTransferSuccess(supabase, webhookData.data);
-        break;
-      case 'transfer.failed':
-        result = await processTransferFailed(supabase, webhookData.data);
-        break;
-      default:
-        console.log(`Unhandled webhook event: ${webhookData.event}`);
-        result = { success: true, message: 'Event ignored' };
-    }
-    
-    // Update webhook processing status
-    await supabase
-      .from('webhook_events')
-      .update({
-        processed: true,
-        processing_result: result,
-        processed_at: new Date().toISOString()
-      })
-      .eq('paystack_event_id', eventId);
-    
-    return result;
-  } catch (error) {
-    console.error('Async webhook processing error:', error);
-    return { success: false, message: error.message };
-  }
-}
-
-// Process successful charge events
-async function processChargeSuccess(supabase: any, data: any): Promise<{ success: boolean; message: string }> {
-  try {
-    // Double-verify payment with Paystack API before processing
-    const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-    if (!secretKey) {
-      throw new Error('Paystack secret key not configured');
-    }
-    
-    const verifyResponse = await fetch(
-      `https://api.paystack.co/transaction/verify/${encodeURIComponent(data.reference)}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${secretKey}`,
-          'Content-Type': 'application/json'
-        }
-      }
-    );
-    
-    const verifyData = await verifyResponse.json();
-    
-    if (!verifyData.status || verifyData.data?.status !== 'success') {
-      console.warn('Payment verification failed:', verifyData.message);
-      return { success: false, message: 'Payment verification failed' };
-    }
-    
-    // Use RPC function for atomic payment processing
-    await supabase.rpc('handle_successful_payment', {
-      p_reference: data.reference,
-      p_paid_at: data.paid_at ? new Date(data.paid_at).toISOString() : new Date().toISOString(),
-      p_gateway_response: data.gateway_response,
-      p_fees: data.fees ? data.fees / 100 : 0,
-      p_channel: data.channel,
-      p_authorization_code: data.authorization?.authorization_code,
-      p_card_type: data.authorization?.card_type,
-      p_last4: data.authorization?.last4,
-      p_exp_month: data.authorization?.exp_month,
-      p_exp_year: data.authorization?.exp_year,
-      p_bank: data.authorization?.bank
-    });
-    
-    // Trigger real-time notifications using pg_notify
-    await supabase.rpc('pg_notify', {
-      channel: 'payment_success',
-      payload: JSON.stringify({
-        reference: data.reference,
-        amount: data.amount,
-        timestamp: new Date().toISOString()
-      })
-    });
-    
-    return { success: true, message: 'Payment processed successfully' };
-  } catch (error) {
-    console.error('Error processing charge success:', error);
-    return { success: false, message: error.message };
-  }
-}
-
-// Process failed charge events
-async function processChargeFailed(supabase: any, data: any): Promise<{ success: boolean; message: string }> {
-  try {
-    // Update payment transaction status
-    await supabase
-      .from('payment_transactions')
-      .update({
-        status: 'failed',
-        gateway_response: data.gateway_response,
-        updated_at: new Date().toISOString()
-      })
-      .eq('provider_reference', data.reference);
-    
-    // Update associated order status
-    const { data: transaction } = await supabase
-      .from('payment_transactions')
-      .select('order_id')
-      .eq('provider_reference', data.reference)
-      .single();
-    
-    if (transaction?.order_id) {
-      await supabase
-        .from('orders')
-        .update({
-          payment_status: 'failed',
-          status: 'cancelled',
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', transaction.order_id);
-    }
-    
-    return { success: true, message: 'Failed payment processed' };
-  } catch (error) {
-    console.error('Error processing charge failure:', error);
-    return { success: false, message: error.message };
-  }
-}
-
-// Process transfer success events
-async function processTransferSuccess(supabase: any, data: any): Promise<{ success: boolean; message: string }> {
-  try {
-    await supabase
-      .from('payment_refunds')
-      .update({
-        status: 'completed',
-        updated_at: new Date().toISOString()
-      })
-      .eq('provider_refund_id', data.reference);
-    
-    return { success: true, message: 'Transfer success processed' };
-  } catch (error) {
-    console.error('Error processing transfer success:', error);
-    return { success: false, message: error.message };
-  }
-}
-
-// Process transfer failed events
-async function processTransferFailed(supabase: any, data: any): Promise<{ success: boolean; message: string }> {
-  try {
-    await supabase
-      .from('payment_refunds')
-      .update({
-        status: 'failed',
-        updated_at: new Date().toISOString()
-      })
-      .eq('provider_refund_id', data.reference);
-    
-    return { success: true, message: 'Transfer failure processed' };
-  } catch (error) {
-    console.error('Error processing transfer failure:', error);
-    return { success: false, message: error.message };
+    console.error('Signature verification failed:', error)
+    return false
   }
 }
 
 serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
-  
-  // Only accept POST requests
-  if (req.method !== 'POST') {
-    return new Response('Method not allowed', { 
-      status: 405, 
-      headers: corsHeaders 
-    });
-  }
-  
-  let supabase: any;
-  let rawBody: string;
-  let clientIP: string | null = null;
-  
+
   try {
-    // Initialize Supabase client
-    supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { persistSession: false } }
-    );
-    
-    // Get client IP for validation
-    clientIP = req.headers.get('cf-connecting-ip') || 
-               req.headers.get('x-forwarded-for') || 
-               req.headers.get('x-real-ip');
-    
-    // IP validation for production - allow bypass in development/test environment
-    const isDevelopment = Deno.env.get('ENVIRONMENT') !== 'production';
-    const validIP = validatePaystackIP(clientIP);
-    
-    if (!validIP && !isDevelopment) {
-      // In production, log but don't block - Paystack IPs can change
-      await logSecurityIncident(
-        supabase,
-        'suspicious_webhook_ip',
-        `Webhook from non-standard IP: ${clientIP}`,
-        'medium',
-        { ip: clientIP, userAgent: req.headers.get('user-agent') }
-      );
-      console.warn('Non-standard webhook IP detected:', clientIP);
+    if (req.method !== 'POST') {
+      return new Response('Method not allowed', { 
+        status: 405, 
+        headers: corsHeaders 
+      })
     }
-    
-    // Get raw body for signature verification
-    rawBody = await req.text();
-    
-    // Verify Paystack signature
-    const paystackSignature = req.headers.get('x-paystack-signature');
-    if (!paystackSignature) {
-      await logSecurityIncident(
-        supabase,
-        'missing_webhook_signature',
-        'Missing x-paystack-signature header',
-        'critical',
-        { ip: clientIP }
-      );
-      
-      return new Response('Missing signature', { 
+
+    const payload = await req.text()
+    const signature = req.headers.get('x-paystack-signature')
+
+    if (!signature) {
+      console.error('Missing webhook signature')
+      return new Response('Unauthorized', { 
         status: 401, 
         headers: corsHeaders 
-      });
+      })
     }
+
+    // Get Paystack configuration for webhook secret
+    const paystackConfig = getPaystackConfig(req)
     
-    const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-    console.log('🔍 Webhook environment check:', {
-      hasSecretKey: !!secretKey,
-      keyType: secretKey ? (secretKey.startsWith('sk_test_') ? 'test' : secretKey.startsWith('sk_live_') ? 'live' : 'unknown') : 'none'
-    });
-    
-    if (!secretKey) {
-      console.error('❌ Paystack secret key not configured');
-      await logSecurityIncident(
-        supabase,
-        'missing_secret_key',
-        'PAYSTACK_SECRET_KEY environment variable not found',
-        'critical',
-        { ip: clientIP }
-      );
-      return new Response('Server misconfigured', { 
+    if (!paystackConfig.webhookSecret) {
+      console.error('Webhook secret not configured')
+      return new Response('Webhook secret not configured', { 
         status: 500, 
         headers: corsHeaders 
-      });
+      })
     }
-    
-    console.log('🔐 Verifying webhook signature...');
+
+    // Verify webhook signature
     const isValidSignature = await verifyPaystackSignature(
-      rawBody, 
-      paystackSignature, 
-      secretKey
-    );
-    
-    console.log('✅ Signature validation result:', {
-      isValid: isValidSignature,
-      signatureLength: paystackSignature.length,
-      bodyLength: rawBody.length
-    });
-    
+      payload, 
+      signature, 
+      paystackConfig.webhookSecret
+    )
+
     if (!isValidSignature) {
-      await logSecurityIncident(
-        supabase,
-        'invalid_webhook_signature',
-        'Invalid webhook signature',
-        'critical',
-        { 
-          ip: clientIP,
-          signature: paystackSignature,
-          bodyLength: rawBody.length
-        }
-      );
-      
-      return new Response('Invalid signature', { 
+      console.error('Invalid webhook signature')
+      return new Response('Unauthorized', { 
         status: 401, 
         headers: corsHeaders 
-      });
+      })
     }
-    
-    // Parse webhook data
-    const webhookData: PaystackWebhookPayload = JSON.parse(rawBody);
-    
-    // Validate webhook structure
-    if (!webhookData.event || !webhookData.data || !webhookData.data.reference) {
-      return new Response('Invalid webhook structure', { 
-        status: 400, 
-        headers: corsHeaders 
-      });
-    }
-    
-    // Check for duplicate events (prevent replay attacks)
-    const eventId = `${webhookData.event}-${webhookData.data.reference}-${webhookData.data.id || Date.now()}`;
-    const { data: existingEvent } = await supabase
-      .from('webhook_events')
-      .select('paystack_event_id')
-      .eq('paystack_event_id', eventId)
-      .maybeSingle();
-    
-    if (existingEvent) {
-      console.log('Duplicate webhook event ignored:', eventId);
-      return new Response('Event already processed', { 
-        status: 200, 
-        headers: corsHeaders 
-      });
-    }
-    
-    // Log webhook event immediately
-    const { error: logError } = await supabase
-      .from('webhook_events')
-      .insert({
-        paystack_event_id: eventId,
-        event_type: webhookData.event,
-        event_data: webhookData,
-        processed: false,
-        received_at: new Date().toISOString()
-      });
-    
-    if (logError) {
-      console.error('Failed to log webhook event:', logError);
-    }
-    
-    // Return immediate 200 OK response to prevent Paystack retries
-    const response = new Response('Webhook received', { 
-      status: 200, 
-      headers: corsHeaders 
-    });
-    
-    // Process webhook asynchronously in background
-    EdgeRuntime.waitUntil(
-      processWebhookAsync(supabase, webhookData, eventId)
-        .then(result => {
-          console.log(`Webhook ${eventId} processing completed:`, result);
-        })
-        .catch(error => {
-          console.error(`Webhook ${eventId} processing failed:`, error);
-        })
-    );
-    
-    return response;
-    
-  } catch (error) {
-    console.error('Webhook processing error:', error);
-    
-    // Log the error if supabase is available
-    if (supabase) {
-      await logSecurityIncident(
-        supabase,
-        'webhook_processing_error',
-        `Webhook processing failed: ${error.message}`,
-        'high',
-        { 
-          error: error.message,
-          ip: clientIP,
-          bodyLength: rawBody?.length || 0
+
+    console.log('✅ Webhook signature verified')
+
+    const webhookData = JSON.parse(payload)
+    const { event, data } = webhookData
+
+    console.log(`🎯 Processing webhook event: ${event}`, {
+      reference: data?.reference,
+      status: data?.status,
+      amount: data?.amount
+    })
+
+    // Initialize Supabase client
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    )
+
+    switch (event) {
+      case 'charge.success': {
+        const reference = data.reference
+        const amount = data.amount / 100 // Convert from kobo
+        
+        console.log(`💰 Processing successful payment: ${reference}, Amount: ₦${amount}`)
+
+        // Update payment transaction status
+        const { data: paymentTransaction, error: ptUpdateError } = await supabase
+          .from('payment_transactions')
+          .update({
+            status: 'paid',
+            paystack_status: 'success',
+            paid_at: new Date(data.paid_at),
+            channel: data.channel,
+            fees: data.fees || 0,
+            gateway_response: data.gateway_response,
+            auth_data: data.authorization || {},
+            metadata: {
+              ...(data.metadata || {}),
+              webhook_processed_at: new Date().toISOString(),
+              paystack_fees: data.fees,
+              customer: data.customer
+            },
+            updated_at: new Date().toISOString()
+          })
+          .or(`reference.eq.${reference},paystack_reference.eq.${reference}`)
+          .select('order_id')
+          .single()
+
+        if (ptUpdateError) {
+          console.error('Failed to update payment transaction:', ptUpdateError)
+          // Continue processing to update order anyway
         }
-      );
+
+        // Get order_id from payment transaction or webhook metadata
+        const orderId = paymentTransaction?.order_id || data.metadata?.order_id
+
+        if (orderId) {
+          // Update order status
+          const { error: orderUpdateError } = await supabase
+            .from('orders')
+            .update({
+              payment_status: 'paid',
+              status: 'confirmed',
+              paystack_reference: reference,
+              paid_at: new Date(data.paid_at),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', orderId)
+
+          if (orderUpdateError) {
+            console.error('Failed to update order:', orderUpdateError)
+          } else {
+            console.log(`✅ Order ${orderId} marked as paid`)
+          }
+
+          // Log successful payment processing
+          await supabase
+            .from('audit_logs')
+            .insert({
+              action: 'webhook_payment_success',
+              category: 'Payment Processing',
+              message: `Payment confirmed via webhook: ${reference}`,
+              entity_id: orderId,
+              new_values: {
+                reference,
+                amount,
+                channel: data.channel,
+                environment: paystackConfig.environment
+              }
+            })
+        } else {
+          console.error('No order_id found for payment:', reference)
+        }
+
+        break
+      }
+
+      case 'charge.failed': {
+        const reference = data.reference
+        
+        console.log(`❌ Processing failed payment: ${reference}`)
+
+        // Update payment transaction status
+        await supabase
+          .from('payment_transactions')
+          .update({
+            status: 'failed',
+            paystack_status: 'failed',
+            gateway_response: data.gateway_response,
+            metadata: {
+              ...(data.metadata || {}),
+              webhook_processed_at: new Date().toISOString(),
+              failure_reason: data.gateway_response
+            },
+            updated_at: new Date().toISOString()
+          })
+          .or(`reference.eq.${reference},paystack_reference.eq.${reference}`)
+
+        // Get order_id and update order status
+        const { data: paymentTransaction } = await supabase
+          .from('payment_transactions')
+          .select('order_id')
+          .or(`reference.eq.${reference},paystack_reference.eq.${reference}`)
+          .single()
+
+        if (paymentTransaction?.order_id) {
+          await supabase
+            .from('orders')
+            .update({
+              payment_status: 'failed',
+              status: 'payment_failed',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', paymentTransaction.order_id)
+
+          console.log(`✅ Order ${paymentTransaction.order_id} marked as payment failed`)
+        }
+
+        break
+      }
+
+      default:
+        console.log(`ℹ️ Unhandled webhook event: ${event}`)
     }
+
+    return new Response(
+      JSON.stringify({ 
+        success: true, 
+        message: 'Webhook processed successfully',
+        event,
+        environment: paystackConfig.environment
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
+
+  } catch (error) {
+    console.error('Webhook processing error:', error)
     
-    return new Response('Internal server error', { 
-      status: 500, 
-      headers: corsHeaders 
-    });
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: 'Webhook processing failed',
+        message: error.message
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
   }
-});
+})
+
+/*
+🔐 SECURE PAYSTACK WEBHOOK HANDLER
+- ✅ Verifies webhook signatures using environment-specific secrets
+- ✅ Processes charge.success and charge.failed events
+- ✅ Updates payment_transactions and orders tables
+- ✅ Environment-aware configuration
+- ✅ Comprehensive logging and audit trails
+
+🔧 SETUP:
+1. Configure webhook URL in Paystack dashboard:
+   https://your-project.supabase.co/functions/v1/paystack-webhook-secure
+
+2. Set webhook secret in Supabase:
+   - PAYSTACK_WEBHOOK_SECRET_TEST (for test mode)
+   - PAYSTACK_WEBHOOK_SECRET_LIVE (for live mode)
+
+3. Enable these events in Paystack:
+   - charge.success
+   - charge.failed
+*/

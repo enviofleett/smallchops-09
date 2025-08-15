@@ -31,10 +31,11 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
-    if (!paystackSecretKey) {
-      throw new Error('Paystack secret key not configured')
-    }
+    // Import environment-specific configuration
+    const { getPaystackConfig } = await import('../_shared/paystack-config.ts')
+    const paystackConfig = getPaystackConfig(req)
+    
+    console.log(`🔑 Using ${paystackConfig.environment} environment with key: ${paystackConfig.secretKey.substring(0, 10)}...`)
 
     const { order_id, amount, customer_email, redirect_url, metadata } = await req.json() as PaymentRequest
 
@@ -117,7 +118,7 @@ serve(async (req) => {
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${paystackSecretKey}`,
+        'Authorization': `Bearer ${paystackConfig.secretKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(paystackPayload)

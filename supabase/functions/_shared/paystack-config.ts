@@ -78,22 +78,19 @@ export function getPaystackConfig(request?: Request): PaystackConfig {
   let publicKey: string | undefined
   let webhookSecret: string | undefined
   
-  // Always use test mode for now until production keys are configured
-  // Force test mode since we have PAYSTACK_SECRET_KEY configured
-  const forceTestForDevelopment = true
-  
-  if (forceTestForDevelopment || envResult.isTestMode) {
-    // Use the main PAYSTACK_SECRET_KEY which should be a test key
-    secretKey = Deno.env.get('PAYSTACK_SECRET_KEY') || Deno.env.get('PAYSTACK_SECRET_KEY_TEST')
-    publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY') || Deno.env.get('PAYSTACK_PUBLIC_KEY_TEST')
-    webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET') || Deno.env.get('PAYSTACK_WEBHOOK_SECRET_TEST')
+  // PRODUCTION FIX: Remove forced test mode - use environment detection
+  if (envResult.isTestMode) {
+    // Use test environment keys explicitly
+    secretKey = Deno.env.get('PAYSTACK_SECRET_KEY_TEST') || Deno.env.get('PAYSTACK_SECRET_KEY')
+    publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY_TEST') || Deno.env.get('PAYSTACK_PUBLIC_KEY')
+    webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET_TEST') || Deno.env.get('PAYSTACK_WEBHOOK_SECRET')
     
     console.log('🔧 Using TEST mode configuration')
   } else {
-    // Production mode - use live keys
-    secretKey = Deno.env.get('PAYSTACK_SECRET_KEY_LIVE') || Deno.env.get('PAYSTACK_SECRET_KEY')
-    publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY_LIVE') || Deno.env.get('PAYSTACK_PUBLIC_KEY')
-    webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET_LIVE') || Deno.env.get('PAYSTACK_WEBHOOK_SECRET')
+    // Production mode - use live keys explicitly
+    secretKey = Deno.env.get('PAYSTACK_SECRET_KEY_LIVE')
+    publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY_LIVE')
+    webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET_LIVE')
     
     console.log('🚀 Using LIVE mode configuration')
   }

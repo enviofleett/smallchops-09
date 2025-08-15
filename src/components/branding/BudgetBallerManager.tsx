@@ -178,8 +178,7 @@ export const BudgetBallerManager = () => {
         </p>
       </CardHeader>
       <CardContent>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-6">
+        <div className="space-y-6">
             {/* Basic Information */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -369,13 +368,16 @@ export const BudgetBallerManager = () => {
             </div>
 
             <div className="flex justify-end">
-              <Button type="submit" disabled={saveMutation.isPending}>
-                <Save className="h-4 w-4 mr-2" />
-                {saveMutation.isPending ? 'Saving...' : 'Save Changes'}
-              </Button>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(handleSubmit)}>
+                  <Button type="submit" disabled={saveMutation.isPending}>
+                    <Save className="h-4 w-4 mr-2" />
+                    {saveMutation.isPending ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                </form>
+              </Form>
             </div>
-          </form>
-        </Form>
+        </div>
       </CardContent>
     </Card>
   );

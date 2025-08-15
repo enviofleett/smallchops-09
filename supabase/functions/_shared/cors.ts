@@ -14,17 +14,26 @@ export function getAllowedOrigins(): string[] {
 
 export function getCorsHeaders(origin?: string | null): Record<string, string> {
   const allowedOrigins = getAllowedOrigins();
+  const envType = Deno.env.get('DENO_ENV') || 'development';
   
-  // Check if origin is allowed
+  // For production, enforce strict origin checking
   let allowOrigin = '*';
   
-  if (origin && !allowedOrigins.includes('*')) {
-    const normalizedOrigin = origin.toLowerCase();
-    if (allowedOrigins.includes(normalizedOrigin)) {
-      allowOrigin = origin; // Use original case
+  if (envType === 'production' && !allowedOrigins.includes('*')) {
+    if (origin) {
+      const normalizedOrigin = origin.toLowerCase();
+      if (allowedOrigins.includes(normalizedOrigin)) {
+        allowOrigin = origin; // Use original case
+      } else {
+        // Reject unauthorized origins in production
+        allowOrigin = 'null';
+      }
     } else {
-      allowOrigin = allowedOrigins[0] || '*';
+      allowOrigin = 'null';
     }
+  } else if (origin && !allowedOrigins.includes('*')) {
+    const normalizedOrigin = origin.toLowerCase();
+    allowOrigin = allowedOrigins.includes(normalizedOrigin) ? origin : allowedOrigins[0] || '*';
   }
     
   return {
@@ -32,6 +41,7 @@ export function getCorsHeaders(origin?: string | null): Record<string, string> {
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Max-Age': '86400', // 24 hours
+    'Access-Control-Allow-Credentials': 'true',
   };
 }
 

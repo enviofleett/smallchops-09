@@ -200,8 +200,7 @@ export const ComprehensiveBrandingTab = () => {
           </TabsTrigger>
         </TabsList>
 
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        <div className="space-y-6">
             
             <TabsContent value="identity" className="space-y-6">
               <div className="grid gap-6 lg:grid-cols-2">
@@ -297,18 +296,21 @@ export const ComprehensiveBrandingTab = () => {
 
             {!previewMode && (
               <div className="flex justify-end gap-4 pt-6 border-t">
-                <Button type="submit" disabled={isSubmitting} className="gap-2">
-                  {isSubmitting ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <Save className="h-4 w-4" />
-                  )}
-                  Save Branding Settings
-                </Button>
+                <Form {...form}>
+                  <form onSubmit={form.handleSubmit(onSubmit)}>
+                    <Button type="submit" disabled={isSubmitting} className="gap-2">
+                      {isSubmitting ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4" />
+                      )}
+                      Save Branding Settings
+                    </Button>
+                  </form>
+                </Form>
               </div>
             )}
-          </form>
-        </Form>
+        </div>
       </Tabs>
     </div>
   );

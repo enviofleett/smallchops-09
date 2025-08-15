@@ -119,42 +119,23 @@ export const usePaymentStatus = (
 
   const fallbackPaymentStatusQuery = useCallback(async (orderIdToResolve: string) => {
     try {
-      // Try the new public orders_with_payment view first
+      // Use direct orders table instead of non-existent view
       const { data: orderWithPayment, error: viewError } = await supabase
-        .from('orders_with_payment')
+        .from('orders')
         .select(`
           id,
           payment_status,
           paid_at,
-          status,
-          computed_payment_status,
-          payment_reference,
-          transaction_status,
-          transaction_amount
+          status
         `)
         .eq('id', orderIdToResolve)
         .maybeSingle();
 
       let order = orderWithPayment;
       
-      if (viewError || !orderWithPayment) {
-        console.warn('orders_with_payment view failed, using direct orders table:', viewError);
-        // Fallback to direct orders table
-        const { data: directOrder, error: orderError } = await supabase
-          .from('orders')
-          .select('id, payment_status, paid_at, status')
-          .eq('id', orderIdToResolve)
-          .maybeSingle();
-
-        if (orderError) throw orderError;
-        // Ensure fallback order has all required fields for type checking
-        order = directOrder ? {
-          ...directOrder,
-          computed_payment_status: directOrder.payment_status === 'paid' ? 'paid' : 'pending',
-          payment_reference: null,
-          transaction_status: null,
-          transaction_amount: null
-        } : null;
+      if (viewError) {
+        console.warn('Direct orders query failed:', viewError);
+        throw viewError;
       }
 
       // Transactions table (latest first)
@@ -166,39 +147,23 @@ export const usePaymentStatus = (
 
       if (txError) throw txError;
 
-      // Use computed payment status if available from the view
-      if (order && 'computed_payment_status' in order) {
-        const needsReconciliation = order.computed_payment_status === 'processing' || 
-                                  (order.payment_status !== 'paid' && order.transaction_status === 'success');
-        
-        setPaymentStatus({
-          isPaid: order.computed_payment_status === 'paid',
-          paidAt: order.paid_at,
-          paymentMethod: order.computed_payment_status === 'paid' ? 'processed' : null,
-          source: 'order',
-          lastUpdated: new Date().toISOString(),
-          needsReconciliation,
-          orderStatus: order.status || 'pending',
-        });
-      } else {
-        // Fallback to transaction checking logic
-        const successfulTx = transactions?.find(
-          (tx) => tx.status === 'success' || tx.status === 'paid'
-        );
+      // Use transaction checking logic
+      const successfulTx = transactions?.find(
+        (tx) => tx.status === 'success' || tx.status === 'paid'
+      );
 
-        const needsReconciliation = order?.payment_status !== 'paid' && !!successfulTx;
+      const needsReconciliation = order?.payment_status !== 'paid' && !!successfulTx;
 
-        setPaymentStatus({
-          isPaid: order?.payment_status === 'paid' || !!successfulTx,
-          paidAt: order?.paid_at || successfulTx?.paid_at || null,
-          paymentMethod:
-            successfulTx?.channel || (order?.payment_status === 'paid' ? 'processed' : null),
-          source: needsReconciliation ? 'transaction' : 'order',
-          lastUpdated: new Date().toISOString(),
-          needsReconciliation,
-          orderStatus: order?.status || 'pending',
-        });
-      }
+      setPaymentStatus({
+        isPaid: order?.payment_status === 'paid' || !!successfulTx,
+        paidAt: order?.paid_at || successfulTx?.paid_at || null,
+        paymentMethod:
+          successfulTx?.channel || (order?.payment_status === 'paid' ? 'processed' : null),
+        source: needsReconciliation ? 'transaction' : 'order',
+        lastUpdated: new Date().toISOString(),
+        needsReconciliation,
+        orderStatus: order?.status || 'pending',
+      });
     } catch (fallbackError) {
       console.error('Fallback query failed:', fallbackError);
       setError('Unable to determine payment status');

@@ -35,22 +35,23 @@ export async function createPaymentIntent(
       };
     }
 
-    if (!data.success) {
-      console.error('❌ Payment intent creation rejected:', data.error);
+    const result = data as any;
+    if (!result.success) {
+      console.error('❌ Payment intent creation rejected:', result.error);
       return {
         success: false,
-        error: data.error
+        error: result.error
       };
     }
 
-    console.log('✅ Payment intent created successfully:', data.reference);
+    console.log('✅ Payment intent created successfully:', result.reference);
     
     return {
       success: true,
-      intent_id: data.intent_id,
-      reference: data.reference,
-      amount: data.amount,
-      currency: data.currency
+      intent_id: result.intent_id,
+      reference: result.reference,
+      amount: result.amount,
+      currency: result.currency
     };
 
   } catch (error) {
@@ -85,12 +86,13 @@ export async function migratePaymentReferences(): Promise<{
       };
     }
 
-    console.log('✅ Migration completed:', data);
+    const result = data as any;
+    console.log('✅ Migration completed:', result);
     
     return {
       success: true,
-      updated_orders: data.updated_orders,
-      message: data.message
+      updated_orders: result.updated_orders,
+      message: result.message
     };
 
   } catch (error) {

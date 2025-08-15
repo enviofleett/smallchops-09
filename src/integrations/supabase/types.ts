@@ -7694,6 +7694,24 @@ export type Database = {
         }
         Returns: string
       }
+      log_security_violation: {
+        Args: {
+          description: string
+          metadata?: Json
+          severity?: string
+          violation_type: string
+        }
+        Returns: string
+      }
+      log_sensitive_data_access: {
+        Args: {
+          operation: string
+          record_id?: string
+          table_name: string
+          user_context?: Json
+        }
+        Returns: undefined
+      }
       manual_payment_verification: {
         Args: { p_payment_reference: string }
         Returns: Json

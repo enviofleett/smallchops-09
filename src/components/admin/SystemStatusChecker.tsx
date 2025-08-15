@@ -6,15 +6,21 @@ import { getOrders } from '@/api/orders';
 import { getRoutes } from '@/api/routes';
 import { getDrivers } from '@/api/drivers';
 import { CheckCircle, XCircle, Clock } from 'lucide-react';
-
 export function SystemStatusChecker() {
   // Test API connections with enhanced error handling
-  const { data: ordersData, error: ordersError, isLoading: ordersLoading } = useQuery({
+  const {
+    data: ordersData,
+    error: ordersError,
+    isLoading: ordersLoading
+  } = useQuery({
     queryKey: ['system-test-orders'],
     queryFn: async () => {
       try {
         console.log('🔍 Testing Orders API...');
-        const result = await getOrders({ page: 1, pageSize: 1 });
+        const result = await getOrders({
+          page: 1,
+          pageSize: 1
+        });
         console.log('✅ Orders API success:', result);
         return result;
       } catch (error) {
@@ -23,10 +29,13 @@ export function SystemStatusChecker() {
       }
     },
     retry: 1,
-    staleTime: 30000, // 30 seconds
+    staleTime: 30000 // 30 seconds
   });
-
-  const { data: routes, error: routesError, isLoading: routesLoading } = useQuery({
+  const {
+    data: routes,
+    error: routesError,
+    isLoading: routesLoading
+  } = useQuery({
     queryKey: ['system-test-routes'],
     queryFn: async () => {
       try {
@@ -40,10 +49,13 @@ export function SystemStatusChecker() {
       }
     },
     retry: 1,
-    staleTime: 30000,
+    staleTime: 30000
   });
-
-  const { data: drivers, error: driversError, isLoading: driversLoading } = useQuery({
+  const {
+    data: drivers,
+    error: driversError,
+    isLoading: driversLoading
+  } = useQuery({
     queryKey: ['system-test-drivers'],
     queryFn: async () => {
       try {
@@ -57,9 +69,8 @@ export function SystemStatusChecker() {
       }
     },
     retry: 1,
-    staleTime: 30000,
+    staleTime: 30000
   });
-
   const getStatusBadge = (loading: boolean, error: any, data: any, apiName: string) => {
     if (loading) return <Badge variant="secondary"><Clock className="w-3 h-3 mr-1" />Loading</Badge>;
     if (error) {
@@ -68,43 +79,8 @@ export function SystemStatusChecker() {
     }
     return <Badge variant="default"><CheckCircle className="w-3 h-3 mr-1" />OK</Badge>;
   };
-
-  return (
-    <Card className="mb-6">
-      <CardHeader>
-        <CardTitle>System Status Check</CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="flex items-center justify-between">
-            <span>Orders API</span>
-            {getStatusBadge(ordersLoading, ordersError, ordersData, 'Orders')}
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Routes API</span>
-            {getStatusBadge(routesLoading, routesError, routes, 'Routes')}
-          </div>
-          <div className="flex items-center justify-between">
-            <span>Drivers API</span>
-            {getStatusBadge(driversLoading, driversError, drivers, 'Drivers')}
-          </div>
-        </div>
-        {(ordersError || routesError || driversError) && (
-          <div className="mt-4 p-3 bg-destructive/10 rounded-lg">
-            <p className="text-sm text-destructive font-medium mb-2">
-              API Connection Issues Detected:
-            </p>
-            <div className="space-y-1 text-xs">
-              {ordersError && <div>• Orders API: {ordersError.message || 'Connection failed'}</div>}
-              {routesError && <div>• Routes API: {routesError.message || 'Connection failed'}</div>}
-              {driversError && <div>• Drivers API: {driversError.message || 'Connection failed'}</div>}
-            </div>
-            <p className="text-xs mt-2 opacity-75">
-              Check browser console for detailed error information
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+  return <Card className="mb-6">
+      
+      
+    </Card>;
 }

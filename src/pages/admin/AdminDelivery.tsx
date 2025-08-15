@@ -192,11 +192,11 @@ export default function AdminDelivery() {
             <CardContent className="p-4">
               <div className="flex items-center gap-3">
                 <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                  <Route className="w-5 h-5" />
+                  <Users className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Active Routes</p>
-                  <p className="text-2xl font-bold">{deliveryMetrics.activeRoutes}</p>
+                  <p className="text-sm text-muted-foreground">Assigned</p>
+                  <p className="text-2xl font-bold">{deliveryMetrics.assigned}</p>
                 </div>
               </div>
             </CardContent>
@@ -247,45 +247,16 @@ export default function AdminDelivery() {
                 </CardContent>
               </Card>
 
-              {/* Active Routes */}
+              {/* Shipping Fees Report */}
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
-                    <Route className="w-5 h-5" />
-                    Active Routes
+                    <TrendingUp className="w-5 h-5" />
+                    Shipping Fees Report
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {routesLoading ? (
-                    <div className="space-y-3">
-                      {[...Array(3)].map((_, i) => (
-                        <div key={i} className="animate-pulse space-y-2">
-                          <div className="h-4 bg-muted rounded w-3/4"></div>
-                          <div className="h-3 bg-muted rounded w-1/2"></div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {routes?.slice(0, 5).map((route) => (
-                        <div key={route.id} className="flex items-center justify-between p-3 border rounded-lg">
-                          <div>
-                            <p className="font-medium">Route #{route.id.slice(0, 8)}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {route.total_orders} orders • {route.total_distance?.toFixed(1)} km
-                            </p>
-                          </div>
-                          <Badge variant={route.status === 'active' ? 'default' : 'secondary'}>
-                            {route.status}
-                          </Badge>
-                        </div>
-                      )) || (
-                        <p className="text-center text-muted-foreground py-4">
-                          No active routes
-                        </p>
-                      )}
-                    </div>
-                  )}
+                  <ShippingFeesReport />
                 </CardContent>
               </Card>
             </div>
@@ -312,29 +283,6 @@ export default function AdminDelivery() {
             </div>
           </TabsContent>
 
-          {/* Routes Tab */}
-          <TabsContent value="routes" className="space-y-4">
-            <div className="grid gap-4">
-              {routesLoading ? (
-                [...Array(3)].map((_, i) => (
-                  <Card key={i} className="p-6">
-                    <div className="animate-pulse space-y-3">
-                      <div className="h-4 bg-muted rounded w-1/4"></div>
-                      <div className="h-4 bg-muted rounded w-1/2"></div>
-                    </div>
-                  </Card>
-                ))
-              ) : (
-                routes?.map((route) => (
-                  <RouteCard key={route.id} route={route} />
-                )) || (
-                  <Card className="p-6">
-                    <p className="text-center text-muted-foreground">No routes found</p>
-                  </Card>
-                )
-              )}
-            </div>
-          </TabsContent>
 
           {/* Delivery Zones Tab */}
           <TabsContent value="zones" className="space-y-4">
@@ -379,6 +327,28 @@ export default function AdminDelivery() {
             </div>
           </TabsContent>
         </Tabs>
+
+        {/* Driver Registration Dialog */}
+        <DriverDialog 
+          open={isRegisterDriverOpen}
+          onOpenChange={setIsRegisterDriverOpen}
+          onSave={async (data) => {
+            console.log('Driver registration:', data);
+            setIsRegisterDriverOpen(false);
+          }}
+        />
+
+        {/* Driver Assignment Dialog */}
+        <DriverAssignDialog
+          isOpen={isDriverDialogOpen}
+          onClose={() => setIsDriverDialogOpen(false)}
+          selectedOrders={selectedOrders}
+          onSuccess={() => {
+            setSelectedOrders([]);
+            setIsDriverDialogOpen(false);
+            refetchOrders();
+          }}
+        />
       </div>
     </>
   );
@@ -400,11 +370,6 @@ function DeliveryOrderItem({ order }: { order: any }) {
 }
 
 function DeliveryOrderCard({ order }: { order: any }) {
-  const { data: deliverySchedule } = useQuery({
-    queryKey: ['delivery-schedule', order.id],
-    queryFn: () => getDeliveryScheduleByOrderId(order.id),
-  });
-
   return (
     <Card>
       <CardContent className="p-6">
@@ -418,45 +383,9 @@ function DeliveryOrderCard({ order }: { order: any }) {
           </Badge>
         </div>
 
-        {deliverySchedule && (
-          <DeliveryScheduleDisplay schedule={deliverySchedule} />
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function RouteCard({ route }: { route: any }) {
-  return (
-    <Card>
-      <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-semibold">Route #{route.id.slice(0, 8)}</h3>
-            <p className="text-sm text-muted-foreground">
-              {format(new Date(route.route_date), 'PPP')}
-            </p>
-          </div>
-          <Badge variant={route.status === 'active' ? 'default' : 'secondary'}>
-            {route.status}
-          </Badge>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4 text-sm">
-          <div>
-            <p className="text-muted-foreground">Orders</p>
-            <p className="font-medium">{route.total_orders}</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Distance</p>
-            <p className="font-medium">{route.total_distance?.toFixed(1)} km</p>
-          </div>
-          <div>
-            <p className="text-muted-foreground">Duration</p>
-            <p className="font-medium">
-              {route.estimated_duration ? `${Math.round(route.estimated_duration / 60)}h` : 'N/A'}
-            </p>
-          </div>
+        <div className="text-sm text-muted-foreground">
+          <p>Amount: ₦{order.total_amount}</p>
+          <p>Address: {order.delivery_address?.address || 'N/A'}</p>
         </div>
       </CardContent>
     </Card>

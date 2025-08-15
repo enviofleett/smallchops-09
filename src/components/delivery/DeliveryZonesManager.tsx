@@ -65,7 +65,8 @@ export const DeliveryZonesManager: React.FC = () => {
         id: editingZone?.id,
         name: formData.name,
         description: formData.description,
-        area: { type: 'polygon', coordinates: [] } // Basic GeoJSON structure
+        area: { type: 'polygon', coordinates: [] }, // Basic GeoJSON structure
+        is_active: true
       };
 
       const feeData = {
@@ -244,49 +245,58 @@ export const DeliveryZonesManager: React.FC = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {zones.map((zone) => (
-                  <TableRow key={zone.id}>
-                    <TableCell className="font-medium">{zone.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {zone.description || 'No description'}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant="secondary">
-                        ₦{zone.delivery_fees?.base_fee?.toFixed(2) || '0.00'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {zone.delivery_fees?.fee_per_km ? 
-                        `₦${zone.delivery_fees.fee_per_km.toFixed(2)}` : 
-                        'N/A'
-                      }
-                    </TableCell>
-                    <TableCell>
-                      {zone.delivery_fees?.min_order_for_free_delivery ? 
-                        `₦${zone.delivery_fees.min_order_for_free_delivery.toFixed(2)}` : 
-                        'N/A'
-                      }
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleEditZone(zone)}
-                        >
-                          <Edit className="w-4 h-4" />
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleDeleteZone(zone.id, zone.name)}
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                 {zones.map((zone) => (
+                   <TableRow key={zone.id}>
+                     <TableCell className="font-medium">
+                       <div className="flex items-center gap-2">
+                         {zone.name}
+                         {zone.is_active === false && (
+                           <Badge variant="outline" className="text-red-600 border-red-200">
+                             Inactive
+                           </Badge>
+                         )}
+                       </div>
+                     </TableCell>
+                     <TableCell className="text-muted-foreground">
+                       {zone.description || 'No description'}
+                     </TableCell>
+                     <TableCell>
+                       <Badge variant="secondary">
+                         ₦{zone.delivery_fees?.base_fee?.toFixed(2) || '0.00'}
+                       </Badge>
+                     </TableCell>
+                     <TableCell>
+                       {zone.delivery_fees?.fee_per_km ? 
+                         `₦${zone.delivery_fees.fee_per_km.toFixed(2)}/km` : 
+                         'N/A'
+                       }
+                     </TableCell>
+                     <TableCell>
+                       {zone.delivery_fees?.min_order_for_free_delivery ? 
+                         `₦${zone.delivery_fees.min_order_for_free_delivery.toFixed(2)}` : 
+                         'N/A'
+                       }
+                     </TableCell>
+                     <TableCell>
+                       <div className="flex gap-2">
+                         <Button
+                           size="sm"
+                           variant="outline"
+                           onClick={() => handleEditZone(zone)}
+                         >
+                           <Edit className="w-4 h-4" />
+                         </Button>
+                         <Button
+                           size="sm"
+                           variant="outline"
+                           onClick={() => handleDeleteZone(zone.id, zone.name)}
+                         >
+                           <Trash2 className="w-4 h-4" />
+                         </Button>
+                       </div>
+                     </TableCell>
+                   </TableRow>
+                 ))}
               </TableBody>
             </Table>
           )}

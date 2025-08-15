@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Download, Calendar, Printer } from "lucide-react";
+import { Download, Calendar, Printer, type LucideIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -80,21 +80,31 @@ export default function Reports() {
       ['Total Customers', data.stats?.totalCustomers || 0],
     ];
     
-    const csvContent = csvData.map(row => row.join(',')).join('\\n');
+    const csvContent = csvData.map(row => row.join(',')).join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv' });
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'reports.csv';
+    const dateRange = `${format(startDate, 'yyyy-MM-dd')}_to_${format(endDate, 'yyyy-MM-dd')}`;
+    a.download = `reports_${groupBy}_${dateRange}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  // Helper function to render icons safely
+  const renderIcon = (icon: LucideIcon | React.ReactElement) => {
+    if (React.isValidElement(icon)) {
+      return icon;
+    }
+    const IconComponent = icon as LucideIcon;
+    return <IconComponent className="h-4 w-4" />;
   };
 
   // KPIs mapping for grid
   const kpiData = data
     ? [
         {
-          label: "Today's Revenue",
+          label: "Total Revenue",
           value: data.stats?.totalRevenue !== undefined ? 
             (data.stats.totalRevenue === 0 ? "₦0" : 
               new Intl.NumberFormat('en-NG', { 
@@ -106,7 +116,7 @@ export default function Reports() {
             ) : "-",
           sub: "",
           icon: (
-            <svg className="w-7 h-7" viewBox="0 0 24 24" fill="none" stroke="#14b8a6" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+            <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
               <path d="M12 19V5" />
               <path d="M6 15l6-6 6 6" />
             </svg>
@@ -242,7 +252,7 @@ export default function Reports() {
       <div className="grid gap-4 md:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-4">
         {isLoading ? (
           <KpiSkeletons />
-        ) : (
+        ) : kpiData.length > 0 ? (
           kpiData.map((kpi, index) => (
             <Card key={index} className="overflow-hidden">
               <CardContent className="p-4 md:p-6">
@@ -251,7 +261,7 @@ export default function Reports() {
                     {kpi.label}
                   </CardTitle>
                    <div className={`p-2 rounded-md ${kpi.iconClass}`}>
-                     {typeof kpi.icon === 'function' ? <kpi.icon className="h-4 w-4" /> : kpi.icon}
+                     {renderIcon(kpi.icon)}
                    </div>
                 </div>
                  <div className="space-y-1">
@@ -260,6 +270,10 @@ export default function Reports() {
               </CardContent>
             </Card>
           ))
+        ) : (
+          <div className="col-span-full text-center py-8">
+            <p className="text-muted-foreground">No data available for the selected period</p>
+          </div>
         )}
       </div>
 

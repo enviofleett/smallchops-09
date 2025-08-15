@@ -48,53 +48,57 @@ const Settings = () => {
     }
   });
   const isAdmin = userProfile?.role === 'admin';
-  return <div className="container mx-auto py-4 md:py-6 space-y-6 px-4">
-      <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
-        <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center flex-shrink-0">
-          <SettingsIcon className="w-6 h-6 text-primary-foreground" />
-        </div>
-        <div>
-          <h1 className="text-2xl md:text-3xl font-bold">Settings</h1>
-          <p className="text-muted-foreground">Manage your business settings and preferences</p>
+  return <div className="container mx-auto py-4 md:py-6 space-y-4 md:space-y-6 px-4 max-w-7xl">
+      <div className="flex flex-col space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
+          <div className="w-12 h-12 bg-gradient-to-br from-primary to-primary/80 rounded-lg flex items-center justify-center flex-shrink-0">
+            <SettingsIcon className="w-6 h-6 text-primary-foreground" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold truncate">Settings</h1>
+            <p className="text-sm md:text-base text-muted-foreground">Manage your business settings and preferences</p>
+          </div>
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <div className="overflow-x-auto pb-2">
-          <TabsList className="grid w-full min-w-[480px] grid-cols-3 lg:grid-cols-4 lg:min-w-0">
-            <TabsTrigger value="communications" className="text-xs sm:text-sm">Comms</TabsTrigger>
-            <TabsTrigger value="payments" className="text-xs sm:text-sm">Payments</TabsTrigger>
-            {isAdmin && <TabsTrigger value="admin" className="text-xs sm:text-sm">Admin</TabsTrigger>}
-            {isAdmin && <TabsTrigger value="developer" className="text-xs sm:text-sm">Dev</TabsTrigger>}
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4 md:space-y-6">
+        <div className="overflow-x-auto pb-2 -mx-4 px-4">
+          <TabsList className="grid w-full min-w-[400px] sm:min-w-[480px] grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 lg:min-w-0 h-auto p-1">
+            <TabsTrigger value="communications" className="text-xs sm:text-sm px-2 py-2 data-[state=active]:bg-background">Comms</TabsTrigger>
+            <TabsTrigger value="payments" className="text-xs sm:text-sm px-2 py-2 data-[state=active]:bg-background">Payments</TabsTrigger>
+            {isAdmin && <TabsTrigger value="admin" className="text-xs sm:text-sm px-2 py-2 data-[state=active]:bg-background">Admin</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="developer" className="text-xs sm:text-sm px-2 py-2 data-[state=active]:bg-background">Dev</TabsTrigger>}
           </TabsList>
         </div>
 
-        <TabsContent value="communications" className="space-y-6">
-          <Tabs defaultValue="branding" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="branding">Branding</TabsTrigger>
-              <TabsTrigger value="content">Content</TabsTrigger>
-              <TabsTrigger value="cooms">Support</TabsTrigger>
-              <TabsTrigger value="email-processing">Queue</TabsTrigger>
-            </TabsList>
+        <TabsContent value="communications" className="space-y-4 md:space-y-6">
+          <Tabs defaultValue="branding" className="space-y-4 md:space-y-6">
+            <div className="overflow-x-auto pb-2 -mx-4 px-4">
+              <TabsList className="grid w-full min-w-[320px] grid-cols-2 sm:grid-cols-4 h-auto p-1">
+                <TabsTrigger value="branding" className="text-xs sm:text-sm px-2 py-2">Branding</TabsTrigger>
+                <TabsTrigger value="content" className="text-xs sm:text-sm px-2 py-2">Content</TabsTrigger>
+                <TabsTrigger value="cooms" className="text-xs sm:text-sm px-2 py-2">Support</TabsTrigger>
+                <TabsTrigger value="email-processing" className="text-xs sm:text-sm px-2 py-2">Queue</TabsTrigger>
+              </TabsList>
+            </div>
             
-            <TabsContent value="branding">
+            <TabsContent value="branding" className="space-y-4 md:space-y-6">
               <ComprehensiveBrandingTab />
             </TabsContent>
             
-            <TabsContent value="content">
+            <TabsContent value="content" className="space-y-4 md:space-y-6">
               <ContentManagementTab />
             </TabsContent>
             
-            <TabsContent value="cooms">
+            <TabsContent value="cooms" className="space-y-4 md:space-y-6">
               <WhatsAppSupportTab />
             </TabsContent>
             
-            <TabsContent value="email-processing">
+            <TabsContent value="email-processing" className="space-y-4 md:space-y-6">
               <Card>
-                <CardHeader>
-                  <CardTitle>Email Queue Processing</CardTitle>
-                  <CardDescription>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg md:text-xl">Email Queue Processing</CardTitle>
+                  <CardDescription className="text-sm">
                     Monitor and manage email queue processing and delivery
                   </CardDescription>
                 </CardHeader>
@@ -106,18 +110,20 @@ const Settings = () => {
           </Tabs>
         </TabsContent>
 
-        <TabsContent value="payments" className="space-y-6">
-          <Tabs defaultValue="payment-providers" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="payment-providers">Payment Providers</TabsTrigger>
-              <TabsTrigger value="pickup-points">Pickup Points</TabsTrigger>
-            </TabsList>
+        <TabsContent value="payments" className="space-y-4 md:space-y-6">
+          <Tabs defaultValue="payment-providers" className="space-y-4 md:space-y-6">
+            <div className="overflow-x-auto pb-2 -mx-4 px-4">
+              <TabsList className="grid w-full min-w-[300px] grid-cols-2 h-auto p-1">
+                <TabsTrigger value="payment-providers" className="text-xs sm:text-sm px-2 py-2">Payment Providers</TabsTrigger>
+                <TabsTrigger value="pickup-points" className="text-xs sm:text-sm px-2 py-2">Pickup Points</TabsTrigger>
+              </TabsList>
+            </div>
             
-            <TabsContent value="payment-providers">
+            <TabsContent value="payment-providers" className="space-y-4 md:space-y-6">
               <Card>
-                <CardHeader>
-                  <CardTitle>Payment Settings</CardTitle>
-                  <CardDescription>
+                <CardHeader className="pb-4">
+                  <CardTitle className="text-lg md:text-xl">Payment Settings</CardTitle>
+                  <CardDescription className="text-sm">
                     Configure payment providers and processing options
                   </CardDescription>
                 </CardHeader>
@@ -127,7 +133,7 @@ const Settings = () => {
               </Card>
             </TabsContent>
             
-            <TabsContent value="pickup-points">
+            <TabsContent value="pickup-points" className="space-y-4 md:space-y-6">
               <PickupPointsManager />
             </TabsContent>
           </Tabs>
@@ -135,38 +141,40 @@ const Settings = () => {
 
 
 
-        {isAdmin && <TabsContent value="admin" className="space-y-6">
+        {isAdmin && <TabsContent value="admin" className="space-y-4 md:space-y-6">
             <AdminUserControl />
           </TabsContent>}
 
 
-        {isAdmin && <TabsContent value="developer" className="space-y-6">
-            <Tabs defaultValue="auth-endpoints" className="space-y-6">
-              <TabsList className="grid w-full grid-cols-9">
-                <TabsTrigger value="auth-endpoints">Auth API</TabsTrigger>
-                <TabsTrigger value="buying-logic">Buying Logic</TabsTrigger>
-                <TabsTrigger value="checkout">Checkout</TabsTrigger>
-                <TabsTrigger value="payments-webhooks">Payments/Webhooks</TabsTrigger>
-                <TabsTrigger value="email">Email</TabsTrigger>
-                <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
-                <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
-                <TabsTrigger value="production-readiness">Production</TabsTrigger>
-                <TabsTrigger value="performance">Performance</TabsTrigger>
-              </TabsList>
+        {isAdmin && <TabsContent value="developer" className="space-y-4 md:space-y-6">
+            <Tabs defaultValue="auth-endpoints" className="space-y-4 md:space-y-6">
+              <div className="overflow-x-auto pb-2 -mx-4 px-4">
+                <TabsList className="grid w-full min-w-[800px] sm:min-w-[900px] grid-cols-3 sm:grid-cols-5 lg:grid-cols-9 h-auto p-1 gap-1">
+                  <TabsTrigger value="auth-endpoints" className="text-xs px-1 py-2 h-auto whitespace-nowrap">Auth API</TabsTrigger>
+                  <TabsTrigger value="buying-logic" className="text-xs px-1 py-2 h-auto whitespace-nowrap">Buying Logic</TabsTrigger>
+                  <TabsTrigger value="checkout" className="text-xs px-1 py-2 h-auto whitespace-nowrap">Checkout</TabsTrigger>
+                  <TabsTrigger value="payments-webhooks" className="text-xs px-1 py-2 h-auto whitespace-nowrap">Payments</TabsTrigger>
+                  <TabsTrigger value="email" className="text-xs px-1 py-2 h-auto whitespace-nowrap">Email</TabsTrigger>
+                  <TabsTrigger value="oauth" className="text-xs px-1 py-2 h-auto whitespace-nowrap">OAuth</TabsTrigger>
+                  <TabsTrigger value="registration-health" className="text-xs px-1 py-2 h-auto whitespace-nowrap">Reg Health</TabsTrigger>
+                  <TabsTrigger value="production-readiness" className="text-xs px-1 py-2 h-auto whitespace-nowrap">Production</TabsTrigger>
+                  <TabsTrigger value="performance" className="text-xs px-1 py-2 h-auto whitespace-nowrap">Performance</TabsTrigger>
+                </TabsList>
+              </div>
               
-              <TabsContent value="auth-endpoints">
+              <TabsContent value="auth-endpoints" className="space-y-4 md:space-y-6">
                 <AuthenticationEndpointsTab />
               </TabsContent>
               
-              <TabsContent value="buying-logic">
+              <TabsContent value="buying-logic" className="space-y-4 md:space-y-6">
                 <BuyingLogicEndpointsTab />
               </TabsContent>
 
-              <TabsContent value="checkout">
+              <TabsContent value="checkout" className="space-y-4 md:space-y-6">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Checkout Settings</CardTitle>
-                    <CardDescription>Enable or disable guest checkout</CardDescription>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg md:text-xl">Checkout Settings</CardTitle>
+                    <CardDescription className="text-sm">Enable or disable guest checkout</CardDescription>
                   </CardHeader>
                   <CardContent>
                     <AdminCheckoutSettingsCard />
@@ -174,32 +182,34 @@ const Settings = () => {
                 </Card>
               </TabsContent>
               
-              <TabsContent value="payments-webhooks">
+              <TabsContent value="payments-webhooks" className="space-y-4 md:space-y-6">
                 <PaymentsWebhooksPanel />
               </TabsContent>
               
-              <TabsContent value="email">
-                <Tabs defaultValue="communications" className="space-y-6">
-                  <TabsList className="grid w-full grid-cols-4">
-                    <TabsTrigger value="communications">Settings</TabsTrigger>
-                    <TabsTrigger value="processing">Processing</TabsTrigger>
-                    <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
-                    <TabsTrigger value="analytics">Analytics</TabsTrigger>
-                  </TabsList>
+              <TabsContent value="email" className="space-y-4 md:space-y-6">
+                <Tabs defaultValue="communications" className="space-y-4 md:space-y-6">
+                  <div className="overflow-x-auto pb-2 -mx-4 px-4">
+                    <TabsList className="grid w-full min-w-[320px] grid-cols-2 sm:grid-cols-4 h-auto p-1">
+                      <TabsTrigger value="communications" className="text-xs sm:text-sm px-2 py-2">Settings</TabsTrigger>
+                      <TabsTrigger value="processing" className="text-xs sm:text-sm px-2 py-2">Processing</TabsTrigger>
+                      <TabsTrigger value="monitoring" className="text-xs sm:text-sm px-2 py-2">Monitoring</TabsTrigger>
+                      <TabsTrigger value="analytics" className="text-xs sm:text-sm px-2 py-2">Analytics</TabsTrigger>
+                    </TabsList>
+                  </div>
                   
-                  <TabsContent value="communications">
+                  <TabsContent value="communications" className="space-y-4 md:space-y-6">
                     <Card>
-                      <CardContent>
+                      <CardContent className="pt-6">
                         <CommunicationsTab />
                       </CardContent>
                     </Card>
                   </TabsContent>
                   
-                  <TabsContent value="processing">
+                  <TabsContent value="processing" className="space-y-4 md:space-y-6">
                     <Card>
-                      <CardHeader>
-                        <CardTitle>Email Processing & Queue Management</CardTitle>
-                        <CardDescription>
+                      <CardHeader className="pb-4">
+                        <CardTitle className="text-lg md:text-xl">Email Processing & Queue Management</CardTitle>
+                        <CardDescription className="text-sm">
                           Process queued emails and manage email queue
                         </CardDescription>
                       </CardHeader>
@@ -209,35 +219,35 @@ const Settings = () => {
                     </Card>
                   </TabsContent>
                   
-                  <TabsContent value="monitoring">
+                  <TabsContent value="monitoring" className="space-y-4 md:space-y-6">
                     <EmailDeliveryMonitor />
                   </TabsContent>
                   
-                  <TabsContent value="analytics">
+                  <TabsContent value="analytics" className="space-y-4 md:space-y-6">
                     <EmailHealthDashboard />
                   </TabsContent>
                 </Tabs>
               </TabsContent>
               
-              <TabsContent value="oauth">
+              <TabsContent value="oauth" className="space-y-4 md:space-y-6">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Google OAuth Configuration</CardTitle>
-                    <CardDescription>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg md:text-xl">Google OAuth Configuration</CardTitle>
+                    <CardDescription className="text-sm">
                       Setup Google OAuth authentication for customer login
                     </CardDescription>
                   </CardHeader>
-                  <CardContent>
-                <div className="space-y-6">
+                  <CardContent className="space-y-4 md:space-y-6">
+                <div className="space-y-4 md:space-y-6">
                   
                   {/* Google OAuth Setup Instructions */}
                   <div className="bg-blue-50 dark:bg-blue-950 p-4 rounded-lg">
-                    <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3">🔐 Google OAuth Setup Instructions</h3>
-                    <div className="space-y-4 text-sm text-blue-800 dark:text-blue-200">
+                    <h3 className="font-semibold text-blue-900 dark:text-blue-100 mb-3 text-sm md:text-base">🔐 Google OAuth Setup Instructions</h3>
+                    <div className="space-y-3 md:space-y-4 text-xs md:text-sm text-blue-800 dark:text-blue-200">
                       <div>
                         <h4 className="font-medium mb-2">1. Google Cloud Console Setup</h4>
-                        <ul className="space-y-1 ml-4">
-                          <li>• Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline">Google Cloud Console</a></li>
+                        <ul className="space-y-1 ml-4 text-xs md:text-sm">
+                          <li>• Go to <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="underline hover:no-underline">Google Cloud Console</a></li>
                           <li>• Create a new project or select existing project</li>
                           <li>• Enable the Google+ API</li>
                         </ul>
@@ -245,17 +255,17 @@ const Settings = () => {
                       
                       <div>
                         <h4 className="font-medium mb-2">2. OAuth Consent Screen</h4>
-                        <ul className="space-y-1 ml-4">
+                        <ul className="space-y-1 ml-4 text-xs md:text-sm">
                           <li>• Go to APIs & Services → OAuth consent screen</li>
                           <li>• Choose "External" user type</li>
-                          <li>• Add authorized domains: <code className="bg-muted px-1 py-0.5 rounded">oknnklksdiqaifhxaccs.supabase.co</code></li>
+                          <li>• Add authorized domains: <code className="bg-muted px-1 py-0.5 rounded text-xs">oknnklksdiqaifhxaccs.supabase.co</code></li>
                           <li>• Add your production domain when ready</li>
                         </ul>
                       </div>
                       
                       <div>
                         <h4 className="font-medium mb-2">3. Create OAuth Credentials</h4>
-                        <ul className="space-y-1 ml-4">
+                        <ul className="space-y-1 ml-4 text-xs md:text-sm">
                           <li>• Go to APIs & Services → Credentials</li>
                           <li>• Click "Create Credentials" → "OAuth Client ID"</li>
                           <li>• Choose "Web application"</li>
@@ -267,11 +277,11 @@ const Settings = () => {
 
                   {/* Required URLs */}
                   <div className="bg-green-50 dark:bg-green-950 p-4 rounded-lg">
-                    <h3 className="font-semibold text-green-900 dark:text-green-100 mb-3">🌐 Required URLs for Google OAuth</h3>
-                    <div className="space-y-3 text-sm">
+                    <h3 className="font-semibold text-green-900 dark:text-green-100 mb-3 text-sm md:text-base">🌐 Required URLs for Google OAuth</h3>
+                    <div className="space-y-3 text-xs md:text-sm">
                       <div>
                         <h4 className="font-medium text-green-800 dark:text-green-200 mb-1">Authorized JavaScript Origins:</h4>
-                        <div className="bg-muted p-2 rounded font-mono text-xs space-y-1">
+                        <div className="bg-muted p-2 rounded font-mono text-xs space-y-1 overflow-x-auto">
                           <div>https://oknnklksdiqaifhxaccs.supabase.co</div>
                           <div>http://localhost:3000 (for development)</div>
                           <div>https://your-production-domain.com (when live)</div>
@@ -280,7 +290,7 @@ const Settings = () => {
                       
                       <div>
                         <h4 className="font-medium text-green-800 dark:text-green-200 mb-1">Authorized Redirect URIs:</h4>
-                        <div className="bg-muted p-2 rounded font-mono text-xs space-y-1">
+                        <div className="bg-muted p-2 rounded font-mono text-xs space-y-1 overflow-x-auto">
                           <div>https://oknnklksdiqaifhxaccs.supabase.co/auth/v1/callback</div>
                           <div>http://localhost:54321/auth/v1/callback (for local dev)</div>
                         </div>
@@ -290,8 +300,8 @@ const Settings = () => {
 
                   {/* Supabase Configuration */}
                   <div className="bg-amber-50 dark:bg-amber-950 p-4 rounded-lg">
-                    <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-3">⚙️ Supabase Dashboard Configuration</h3>
-                    <div className="space-y-3 text-sm text-amber-800 dark:text-amber-200">
+                    <h3 className="font-semibold text-amber-900 dark:text-amber-100 mb-3 text-sm md:text-base">⚙️ Supabase Dashboard Configuration</h3>
+                    <div className="space-y-3 text-xs md:text-sm text-amber-800 dark:text-amber-200">
                       <div>
                         <h4 className="font-medium mb-2">1. Enable Google Provider</h4>
                         <ul className="space-y-1 ml-4">
@@ -305,7 +315,7 @@ const Settings = () => {
                         <h4 className="font-medium mb-2">2. Configure Redirect URLs</h4>
                         <ul className="space-y-1 ml-4">
                           <li>• Go to Authentication → URL Configuration</li>
-                          <li>• Set Site URL: <code className="bg-muted px-1 py-0.5 rounded">https://your-domain.com</code></li>
+                          <li>• Set Site URL: <code className="bg-muted px-1 py-0.5 rounded text-xs">https://your-domain.com</code></li>
                           <li>• Add Redirect URLs for each environment</li>
                         </ul>
                       </div>
@@ -314,26 +324,26 @@ const Settings = () => {
 
                   {/* Implementation Status */}
                   <div className="bg-purple-50 dark:bg-purple-950 p-4 rounded-lg">
-                    <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-3">✅ Implementation Status</h3>
-                    <div className="space-y-2 text-sm text-purple-800 dark:text-purple-200">
+                    <h3 className="font-semibold text-purple-900 dark:text-purple-100 mb-3 text-sm md:text-base">✅ Implementation Status</h3>
+                    <div className="space-y-2 text-xs md:text-sm text-purple-800 dark:text-purple-200">
                       <div className="flex items-center space-x-2">
-                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
                         <span>Google OAuth button added to customer login modal</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
                         <span>Google OAuth button added to customer signup modal</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
                         <span>Automatic customer account creation for Google users</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        <span className="w-2 h-2 bg-green-500 rounded-full flex-shrink-0"></span>
                         <span>Redirect to customer portal after successful authentication</span>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <span className="w-2 h-2 bg-yellow-500 rounded-full"></span>
+                        <span className="w-2 h-2 bg-yellow-500 rounded-full flex-shrink-0"></span>
                         <span>Requires Google OAuth credentials configuration in Supabase</span>
                       </div>
                     </div>
@@ -341,14 +351,14 @@ const Settings = () => {
 
                   {/* Security & Production Notes */}
                   <div className="bg-red-50 dark:bg-red-950 p-4 rounded-lg">
-                    <h3 className="font-semibold text-red-900 dark:text-red-100 mb-3">🔒 Security & Production Checklist</h3>
-                    <div className="space-y-2 text-sm text-red-800 dark:text-red-200">
+                    <h3 className="font-semibold text-red-900 dark:text-red-100 mb-3 text-sm md:text-base">🔒 Security & Production Checklist</h3>
+                    <div className="space-y-2 text-xs md:text-sm text-red-800 dark:text-red-200">
                       <div className="flex items-start space-x-2">
-                        <span className="w-2 h-2 bg-red-500 rounded-full mt-2"></span>
+                        <span className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></span>
                         <span><strong>Domain Verification:</strong> Ensure all domains are verified in Google Cloud Console</span>
                       </div>
                       <div className="flex items-start space-x-2">
-                        <span className="w-2 h-2 bg-red-500 rounded-full mt-2"></span>
+                        <span className="w-2 h-2 bg-red-500 rounded-full mt-2 flex-shrink-0"></span>
                         <span><strong>SSL/HTTPS:</strong> All URLs must use HTTPS in production</span>
                       </div>
                       <div className="flex items-start space-x-2">
@@ -1441,11 +1451,11 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                 </Card>
               </TabsContent>
               
-              <TabsContent value="registration-health">
+              <TabsContent value="registration-health" className="space-y-4 md:space-y-6">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Registration System Monitoring</CardTitle>
-                    <CardDescription>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg md:text-xl">Registration System Monitoring</CardTitle>
+                    <CardDescription className="text-sm">
                       Monitor and debug customer registration system health
                     </CardDescription>
                   </CardHeader>
@@ -1455,18 +1465,18 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                 </Card>
               </TabsContent>
 
-              <TabsContent value="production-readiness">
-                <div className="space-y-6">
+              <TabsContent value="production-readiness" className="space-y-4 md:space-y-6">
+                <div className="space-y-4 md:space-y-6">
                   <ProductionReadinessStatus />
                   <ProductionHealthMonitor />
                 </div>
               </TabsContent>
 
-              <TabsContent value="performance">
+              <TabsContent value="performance" className="space-y-4 md:space-y-6">
                 <Card>
-                  <CardHeader>
-                    <CardTitle>Performance Monitoring & Debugging</CardTitle>
-                    <CardDescription>
+                  <CardHeader className="pb-4">
+                    <CardTitle className="text-lg md:text-xl">Performance Monitoring & Debugging</CardTitle>
+                    <CardDescription className="text-sm">
                       Monitor application performance metrics, detect issues, and optimize user experience
                     </CardDescription>
                   </CardHeader>

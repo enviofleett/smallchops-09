@@ -107,14 +107,10 @@ serve(async (req) => {
 
     console.log(`[VERIFY-PAYMENT-UNIFIED] Calling unified verification RPC`);
     const { data: rpcData, error: rpcError } = await supabase.rpc('verify_and_update_payment_status', {
-      p_order_id: orderId,
-      p_reference: ref,                 // may be normalized to txn_* inside RPC
-      p_provider_ref: vr.data.reference,
-      p_provider: "paystack",
-      p_new_state: providerStatus,
-      p_amount: amountNaira,
-      p_currency: vr.data.currency ?? "NGN",
-      p_raw: vr as unknown as Record<string, unknown>
+      payment_ref: ref,
+      new_status: providerStatus === 'paid' ? 'confirmed' : 'failed',
+      payment_amount: amountNaira,
+      payment_gateway_response: vr as unknown as Record<string, unknown>
     });
 
     if (rpcError) {

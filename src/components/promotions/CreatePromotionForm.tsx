@@ -6,6 +6,7 @@ import { format } from "date-fns";
 import { CalendarIcon, Plus, Percent, DollarSign, Gift, Truck, Shuffle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCreatePromotion } from "@/hooks/usePromotions";
+import { toast } from "@/hooks/use-toast";
 import {
   Form,
   FormItem,
@@ -13,6 +14,7 @@ import {
   FormControl,
   FormMessage,
   FormField,
+  FormDescription,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -34,36 +36,76 @@ import { Switch } from "@/components/ui/switch";
 import { DaysSelector } from "./DaysSelector";
 
 const PromotionFormSchema = z.object({
-  name: z.string().min(2, "Name is required"),
-  description: z.string().max(256).optional(),
+  name: z.string().min(2, "Name is required").transform(val => val.trim()),
+  description: z.string().max(256).optional().transform(val => val?.trim()),
   type: z.enum([
     "percentage",
     "fixed_amount", 
     "buy_one_get_one",
     "free_delivery",
   ]),
-  value: z
-    .union([z.number().min(0), z.nan()])
-    .optional()
-    .transform(val => isNaN(val as any) ? undefined : val),
-  min_order_amount: z
-    .union([z.number().min(0), z.nan()])
-    .optional()
-    .transform(val => isNaN(val as any) ? undefined : val),
-  max_discount_amount: z
-    .union([z.number().min(0), z.nan()])
-    .optional()
-    .transform(val => isNaN(val as any) ? undefined : val),
-  usage_limit: z
-    .union([z.number().min(1), z.nan()])
-    .optional()
-    .transform(val => isNaN(val as any) ? undefined : val),
-  code: z.string().optional(),
+  value: z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    },
+    z.number().min(0).optional()
+  ),
+  min_order_amount: z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    },
+    z.number().min(0).optional()
+  ),
+  max_discount_amount: z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    },
+    z.number().min(0).optional()
+  ),
+  usage_limit: z.preprocess(
+    (val) => {
+      if (val === "" || val === null || val === undefined) return undefined;
+      const num = Number(val);
+      return isNaN(num) ? undefined : num;
+    },
+    z.number().min(1).optional()
+  ),
+  code: z.string().optional().transform(val => val?.trim().toUpperCase()),
   applicable_categories: z.array(z.string()).optional(),
   applicable_products: z.array(z.string()).optional(),
   applicable_days: z.array(z.string()).optional(),
   valid_from: z.date().optional(),
   valid_until: z.date().optional(),
+}).refine((data) => {
+  // Business logic validation
+  if (data.type === "percentage" && data.value !== undefined) {
+    return data.value >= 1 && data.value <= 100;
+  }
+  if (data.type === "fixed_amount" && data.value !== undefined) {
+    return data.value > 0;
+  }
+  if (data.type === "free_delivery" && data.min_order_amount === undefined) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Invalid configuration for selected promotion type",
+  path: ["value"]
+}).refine((data) => {
+  // Date range validation
+  if (data.valid_from && data.valid_until) {
+    return data.valid_until >= data.valid_from;
+  }
+  return true;
+}, {
+  message: "End date must be the same or after start date",
+  path: ["valid_until"]
 });
 
 type PromotionFormData = z.infer<typeof PromotionFormSchema>;
@@ -98,6 +140,7 @@ export default function CreatePromotionForm({
   });
 
   const watchType = form.watch("type");
+  const watchValidFrom = form.watch("valid_from");
   
   // Generate random promotion code
   const generatePromotionCode = () => {
@@ -147,26 +190,41 @@ export default function CreatePromotionForm({
     );
     createMutation.mutate(cleaned, {
       onSuccess: () => {
+        toast({
+          title: "Success",
+          description: "Promotion created successfully!",
+        });
         form.reset();
         onSuccess?.();
+      },
+      onError: (error) => {
+        toast({
+          title: "Error",
+          description: error?.message || "Failed to create promotion. Please try again.",
+          variant: "destructive",
+        });
       },
     });
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 max-h-[85vh] overflow-y-auto">
+      <div className="flex items-center justify-between sticky top-0 bg-background pb-2">
         <h3 className="text-lg font-semibold">Create New Promotion</h3>
       </div>
 
       <Form {...form}>
         <form
-          className="space-y-4 md:space-y-6"
+          className="space-y-4 pb-20 md:pb-6"
           onSubmit={form.handleSubmit(handleSubmit)}
           autoComplete="off"
           noValidate
         >
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+        {/* Basics Section */}
+        <div className="space-y-1">
+          <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Basics</h4>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Name */}
           <FormField
             control={form.control}
@@ -175,7 +233,7 @@ export default function CreatePromotionForm({
               <FormItem>
                 <FormLabel>
                   Name
-                  <span className="text-red-500">*</span>
+                  <span className="text-destructive">*</span>
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -251,8 +309,12 @@ export default function CreatePromotionForm({
           />
         </div>
 
-        {/* Value and Configuration Fields */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+        {/* Configuration Section */}
+        <div className="space-y-1">
+          <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Configuration</h4>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Value field - different labels based on type */}
           {watchType !== "free_delivery" && (
             <FormField
@@ -261,9 +323,11 @@ export default function CreatePromotionForm({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>
-                    {watchType === "percentage" && "Discount Percentage (1-100)"}
-                    {watchType === "fixed_amount" && "Discount Amount (₦)"}
-                    {watchType === "buy_one_get_one" && "Free Item Discount % (0-100)"}
+                    {watchType === "percentage" && "Discount Percentage"}
+                    {watchType === "fixed_amount" && "Discount Amount"}
+                    {watchType === "buy_one_get_one" && "Free Item Discount %"}
+                    {(watchType === "percentage" || watchType === "buy_one_get_one") && <span className="text-destructive">*</span>}
+                    {watchType === "fixed_amount" && <span className="text-destructive">*</span>}
                   </FormLabel>
                   <FormControl>
                     <Input
@@ -273,6 +337,7 @@ export default function CreatePromotionForm({
                         "e.g., 100 (completely free)"
                       }
                       type="number"
+                      inputMode="numeric"
                       min={0}
                       max={watchType === "percentage" ? 100 : undefined}
                       {...field}
@@ -280,6 +345,11 @@ export default function CreatePromotionForm({
                       disabled={disabled}
                     />
                   </FormControl>
+                  <FormDescription>
+                    {watchType === "percentage" && "Enter 1-100 for percentage discount"}
+                    {watchType === "fixed_amount" && "Enter amount in ₦ (e.g., 500 for ₦500 off)"}
+                    {watchType === "buy_one_get_one" && "Enter 0-100 for discount on free item"}
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -293,8 +363,8 @@ export default function CreatePromotionForm({
             render={({ field }) => (
               <FormItem>
                 <FormLabel>
-                  Minimum Order Amount (₦)
-                  {watchType === "free_delivery" && " *"}
+                  Minimum Order Amount
+                  {watchType === "free_delivery" && <span className="text-destructive">*</span>}
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -302,12 +372,18 @@ export default function CreatePromotionForm({
                       watchType === "free_delivery" ? "e.g., 3000" : "Optional, e.g., 1000"
                     }
                     type="number"
+                    inputMode="numeric"
                     min={0}
                     {...field}
                     value={field.value ?? ""}
                     disabled={disabled}
                   />
                 </FormControl>
+                <FormDescription>
+                  {watchType === "free_delivery" 
+                    ? "Required threshold for free delivery" 
+                    : "Optional minimum purchase requirement"}
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
@@ -320,17 +396,21 @@ export default function CreatePromotionForm({
               name="max_discount_amount"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Maximum Discount Cap (₦)</FormLabel>
+                  <FormLabel>Maximum Discount Cap</FormLabel>
                   <FormControl>
                     <Input
                       placeholder="Optional, e.g., 2000"
                       type="number"
+                      inputMode="numeric"
                       min={0}
                       {...field}
                       value={field.value ?? ""}
                       disabled={disabled}
                     />
                   </FormControl>
+                  <FormDescription>
+                    Optional cap on total discount amount in ₦
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
@@ -348,25 +428,32 @@ export default function CreatePromotionForm({
                   <Input
                     placeholder="Optional, e.g., 100"
                     type="number"
+                    inputMode="numeric"
                     min={1}
                     {...field}
                     value={field.value ?? ""}
                     disabled={disabled}
                   />
                 </FormControl>
+                <FormDescription>
+                  Total number of times this promotion can be used
+                </FormDescription>
                 <FormMessage />
               </FormItem>
             )}
           />
         </div>
 
-        {/* Promotion Code Section */}
-        <div className="space-y-4">
+        {/* Code Section */}
+        <div className="space-y-1">
+          <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Promotion Code</h4>
+        </div>
+
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <FormLabel>Promotion Code</FormLabel>
+            <span className="text-sm text-muted-foreground">Auto-generate code</span>
             <div className="flex items-center gap-2">
               <Shuffle className="w-4 h-4" />
-              <span className="text-sm">Auto-generate</span>
               <Switch checked={generateCode} onCheckedChange={setGenerateCode} />
             </div>
           </div>
@@ -402,12 +489,18 @@ export default function CreatePromotionForm({
           />
         </div>
 
+        {/* Schedule Section */}
+        <div className="space-y-1">
+          <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Schedule</h4>
+        </div>
+        
         {/* Days Selection */}
         <FormField
           control={form.control}
           name="applicable_days"
           render={({ field }) => (
             <FormItem>
+              <FormLabel>Applicable Days</FormLabel>
               <FormControl>
                 <DaysSelector
                   selectedDays={field.value || []}
@@ -415,13 +508,16 @@ export default function CreatePromotionForm({
                   disabled={disabled}
                 />
               </FormControl>
+              <FormDescription>
+                Select specific days or leave empty for all days
+              </FormDescription>
               <FormMessage />
             </FormItem>
           )}
         />
 
         {/* Dates */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Start Date */}
           <FormField
             control={form.control}
@@ -451,6 +547,7 @@ export default function CreatePromotionForm({
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
+                      disabled={(date) => date < new Date()}
                       initialFocus
                       className={cn("p-3 pointer-events-auto")}
                     />
@@ -490,6 +587,11 @@ export default function CreatePromotionForm({
                       mode="single"
                       selected={field.value}
                       onSelect={field.onChange}
+                      disabled={(date) => {
+                        if (date < new Date()) return true;
+                        if (watchValidFrom && date < watchValidFrom) return true;
+                        return false;
+                      }}
                       initialFocus
                       className={cn("p-3 pointer-events-auto")}
                     />
@@ -501,11 +603,29 @@ export default function CreatePromotionForm({
           />
         </div>
 
-        <div className="flex items-center gap-3 justify-end">
+        {/* Desktop Submit */}
+        <div className="hidden md:flex items-center gap-3 justify-end">
           <Button
             type="submit"
             disabled={disabled || createMutation.isPending}
-            className="w-full md:w-auto"
+            className="w-auto"
+          >
+            {createMutation.isPending ? (
+              <span className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+            ) : (
+              <Plus className="w-4 h-4 mr-2" />
+            )}
+            Create Promotion
+          </Button>
+        </div>
+
+        {/* Mobile Sticky Submit */}
+        <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg z-50">
+          <Button
+            type="submit"
+            disabled={disabled || createMutation.isPending}
+            className="w-full min-h-[44px]"
+            size="lg"
           >
             {createMutation.isPending ? (
               <span className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />

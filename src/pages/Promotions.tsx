@@ -324,11 +324,11 @@ export default function PromotionsPage() {
 
       {/* Create Promotion Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-xl w-full p-0">
-          <DialogHeader className="p-6 pb-2">
+        <DialogContent className="max-w-2xl w-full max-h-[85vh] p-0 overflow-hidden">
+          <DialogHeader className="p-4 pb-2 border-b">
             <DialogTitle>Create Promotion</DialogTitle>
           </DialogHeader>
-          <div className="p-6 pt-0">
+          <div className="p-4">
             <CreatePromotionForm
               onSuccess={() => setDialogOpen(false)}
             />

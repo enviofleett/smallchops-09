@@ -1150,13 +1150,6 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "communication_events_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
-            referencedColumns: ["id"]
-          },
         ]
       }
       communication_logs: {
@@ -2172,13 +2165,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "delivery_notifications_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -3593,13 +3579,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "order_assignments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "orders_with_payment"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "order_assignments_rider_id_fkey"
             columns: ["rider_id"]
             isOneToOne: false
@@ -3651,13 +3630,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_delivery_schedule_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -3714,13 +3686,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -3802,13 +3767,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_status_changes_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -4299,6 +4257,59 @@ export type Database = {
         }
         Relationships: []
       }
+      payment_intents: {
+        Row: {
+          amount: number
+          client_secret: string | null
+          created_at: string | null
+          currency: string
+          expires_at: string | null
+          id: string
+          metadata: Json | null
+          order_id: string
+          provider: string
+          reference: string
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          amount: number
+          client_secret?: string | null
+          created_at?: string | null
+          currency?: string
+          expires_at?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id: string
+          provider?: string
+          reference: string
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          amount?: number
+          client_secret?: string | null
+          created_at?: string | null
+          currency?: string
+          expires_at?: string | null
+          id?: string
+          metadata?: Json | null
+          order_id?: string
+          provider?: string
+          reference?: string
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_intents_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       payment_polling_state: {
         Row: {
           created_at: string
@@ -4374,13 +4385,6 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "payment_processing_logs_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
-            referencedColumns: ["id"]
-          },
         ]
       }
       payment_processing_status: {
@@ -4438,13 +4442,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: true
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_processing_status_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -4664,13 +4661,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "payment_transactions_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -4936,13 +4926,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_reviews_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -5310,13 +5293,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "promotion_usage_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -5689,13 +5665,6 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "route_order_assignments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -6725,60 +6694,6 @@ export type Database = {
       }
     }
     Views: {
-      orders_with_payment: {
-        Row: {
-          computed_payment_status: string | null
-          created_at: string | null
-          currency: string | null
-          customer_email: string | null
-          customer_id: string | null
-          customer_name: string | null
-          customer_phone: string | null
-          delivery_address: Json | null
-          delivery_zone_id: string | null
-          gateway_response: string | null
-          id: string | null
-          order_number: string | null
-          order_time: string | null
-          order_type: Database["public"]["Enums"]["order_type"] | null
-          paid_at: string | null
-          payment_method: string | null
-          payment_reference: string | null
-          payment_status: Database["public"]["Enums"]["payment_status"] | null
-          paystack_reference: string | null
-          pickup_point_id: string | null
-          provider_reference: string | null
-          status: Database["public"]["Enums"]["order_status"] | null
-          total_amount: number | null
-          transaction_amount: number | null
-          transaction_created_at: string | null
-          transaction_status: string | null
-          updated_at: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "orders_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customer_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_delivery_zone_id_fkey"
-            columns: ["delivery_zone_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_zones"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_pickup_point_id_fkey"
-            columns: ["pickup_point_id"]
-            isOneToOne: false
-            referencedRelation: "pickup_points"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       payment_flow_health: {
         Row: {
           completed_orders: number | null

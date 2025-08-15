@@ -12,7 +12,9 @@ import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
 import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
-import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown } from 'lucide-react';
+import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck } from 'lucide-react';
+import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
+import { supabase } from '@/integrations/supabase/client';
 import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { format } from 'date-fns';
@@ -23,6 +25,7 @@ export default function AdminOrders() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
+  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'due_today' | 'upcoming'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
 
@@ -45,6 +48,39 @@ export default function AdminOrders() {
   const orders = ordersData?.orders || [];
   const totalCount = ordersData?.count || 0;
   const totalPages = Math.ceil(totalCount / 20);
+
+  // Fetch delivery schedules for all orders
+  const orderIds = orders.map(order => order.id);
+  const { schedules: deliverySchedules } = useOrderDeliverySchedules(orderIds);
+
+  // Filter orders by delivery schedule
+  const filteredOrders = React.useMemo(() => {
+    if (deliveryFilter === 'all') return orders;
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    return orders.filter(order => {
+      // Only apply delivery filter to paid delivery orders
+      if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
+        return true; // Show non-delivery or unpaid orders when filtering for all
+      }
+      
+      const schedule = deliverySchedules[order.id];
+      if (!schedule) return false;
+      
+      const deliveryDate = new Date(schedule.delivery_date);
+      deliveryDate.setHours(0, 0, 0, 0);
+      
+      if (deliveryFilter === 'due_today') {
+        return deliveryDate.getTime() === today.getTime();
+      } else if (deliveryFilter === 'upcoming') {
+        return deliveryDate.getTime() > today.getTime();
+      }
+      
+      return false;
+    });
+  }, [orders, deliverySchedules, deliveryFilter]);
 
   // Get order counts by status for tab badges
   const orderCounts = {
@@ -177,19 +213,38 @@ export default function AdminOrders() {
         {/* Filters */}
         <Card>
           <CardContent className="p-4">
-            <form onSubmit={handleSearch} className="flex gap-4">
-              <div className="flex-1">
-                <Input type="text" placeholder="Search by order number, customer name, or email..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full" />
+            <div className="space-y-4">
+              <form onSubmit={handleSearch} className="flex gap-4">
+                <div className="flex-1">
+                  <Input type="text" placeholder="Search by order number, customer name, or email..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full" />
+                </div>
+                <Button type="submit" variant="outline">
+                  <Search className="w-4 h-4 mr-2" />
+                  Search
+                </Button>
+                <Button variant="outline">
+                  <Download className="w-4 h-4 mr-2" />
+                  Export
+                </Button>
+              </form>
+              
+              <div className="flex items-center gap-4">
+                <div className="flex items-center gap-2">
+                  <Truck className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Delivery Schedule:</span>
+                </div>
+                <Select value={deliveryFilter} onValueChange={(value: 'all' | 'due_today' | 'upcoming') => setDeliveryFilter(value)}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Orders</SelectItem>
+                    <SelectItem value="due_today">Due Today</SelectItem>
+                    <SelectItem value="upcoming">Upcoming Deliveries</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
-              <Button type="submit" variant="outline">
-                <Search className="w-4 h-4 mr-2" />
-                Search
-              </Button>
-              <Button variant="outline">
-                <Download className="w-4 h-4 mr-2" />
-                Export
-              </Button>
-            </form>
+            </div>
           </CardContent>
         </Card>
 
@@ -234,19 +289,19 @@ export default function AdminOrders() {
                   <p className="text-red-600 font-medium">Error loading orders</p>
                   <p className="text-sm text-muted-foreground">Please try again later</p>
                 </div>
-              </Card> : orders.length === 0 ? <Card className="p-6">
+              </Card> : filteredOrders.length === 0 ? <Card className="p-6">
                 <div className="text-center">
                   <Package className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
                   <p className="font-medium">No orders found</p>
                   <p className="text-sm text-muted-foreground">
-                    {searchQuery ? 'Try adjusting your search criteria' : 'No orders match the current filter'}
+                    {searchQuery || deliveryFilter !== 'all' ? 'Try adjusting your search criteria or filters' : 'No orders match the current filter'}
                   </p>
                 </div>
               </Card> : <>
                 {/* Orders List */}
                 <div className="space-y-4">
-                  {orders.map(order => <div key={order.id} onClick={() => handleOrderClick(order)} className="cursor-pointer transition-transform hover:scale-[1.01]">
-                      <AdminOrderCard order={order} />
+                  {filteredOrders.map(order => <div key={order.id} onClick={() => handleOrderClick(order)} className="cursor-pointer transition-transform hover:scale-[1.01]">
+                      <AdminOrderCard order={order} deliverySchedule={deliverySchedules[order.id]} />
                     </div>)}
                 </div>
 
@@ -284,16 +339,26 @@ export default function AdminOrders() {
 
 // Admin-specific order card component
 function AdminOrderCard({
-  order
+  order,
+  deliverySchedule
 }: {
   order: OrderWithItems;
+  deliverySchedule?: any;
 }) {
-  const {
-    data: deliverySchedule
-  } = useQuery({
-    queryKey: ['delivery-schedule', order.id],
-    queryFn: () => getDeliveryScheduleByOrderId(order.id),
-    enabled: order.order_type === 'delivery'
+  // Fetch delivery zone information if we have a delivery address
+  const { data: deliveryZone } = useQuery({
+    queryKey: ['delivery-zone', order.delivery_zone_id],
+    queryFn: async () => {
+      if (!order.delivery_zone_id) return null;
+      const { data, error } = await supabase
+        .from('delivery_zones')
+        .select('name')
+        .eq('id', order.delivery_zone_id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!order.delivery_zone_id
   });
   const {
     data: detailedOrderData,
@@ -382,13 +447,66 @@ function AdminOrderCard({
               </div> : <p className="text-sm text-muted-foreground">Product details not available</p>}
           </div>}
 
-        {deliverySchedule && <div className="mt-4 p-3 bg-muted rounded-lg">
-            <p className="text-sm font-medium">Delivery Scheduled:</p>
-            <p className="text-sm">
-              {format(new Date(deliverySchedule.delivery_date), 'PPP')} | {' '}
-              {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-            </p>
-          </div>}
+        {/* Delivery Information for paid delivery orders */}
+        {order.order_type === 'delivery' && order.payment_status === 'paid' && (
+          <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-3">
+            <div className="flex items-center gap-2 mb-2">
+              <MapPin className="w-4 h-4 text-primary" />
+              <h4 className="font-medium text-sm">Delivery Information</h4>
+            </div>
+            
+            {/* Delivery Address */}
+            {order.delivery_address && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Delivery Address</p>
+                <p className="text-sm">
+                  {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
+                    ? `${(order.delivery_address as any).street || ''} ${(order.delivery_address as any).city || ''} ${(order.delivery_address as any).state || ''}`.trim()
+                    : typeof order.delivery_address === 'string' 
+                      ? order.delivery_address
+                      : 'Address details available'
+                  }
+                </p>
+              </div>
+            )}
+            
+            {/* Delivery Zone */}
+            {deliveryZone && (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Delivery Zone</p>
+                <p className="text-sm font-medium">{deliveryZone.name}</p>
+              </div>
+            )}
+            
+            {/* Delivery Schedule */}
+            {deliverySchedule ? (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Scheduled Delivery</p>
+                <div className="flex items-center gap-4 text-sm">
+                  <span className="font-medium">
+                    {format(new Date(deliverySchedule.delivery_date), 'PPP')}
+                  </span>
+                  <span className="text-muted-foreground">
+                    {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                  </span>
+                  {deliverySchedule.is_flexible && (
+                    <Badge variant="outline" className="text-xs">Flexible</Badge>
+                  )}
+                </div>
+                {deliverySchedule.special_instructions && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Note: {deliverySchedule.special_instructions}
+                  </p>
+                )}
+              </div>
+            ) : (
+              <div>
+                <p className="text-xs text-muted-foreground mb-1">Delivery Schedule</p>
+                <p className="text-sm text-amber-600">⚠️ Schedule not set</p>
+              </div>
+            )}
+          </div>
+        )}
       </CardContent>
     </Card>;
 }

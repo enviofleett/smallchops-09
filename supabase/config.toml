@@ -100,3 +100,6 @@ verify_jwt = false
 
 [functions.welcome-email-queue-processor]
 verify_jwt = false
+
+[functions.welcome-email-queue-processor]
+verify_jwt = false

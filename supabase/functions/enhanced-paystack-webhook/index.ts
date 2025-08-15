@@ -3,8 +3,55 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
 };
+
+// Paystack's official webhook IP addresses
+const PAYSTACK_IPS = [
+  '52.31.139.75',
+  '52.49.173.169', 
+  '52.214.14.220'
+]
+
+// Verify webhook origin by IP
+function verifyPaystackIP(request: Request): boolean {
+  const forwardedFor = request.headers.get('x-forwarded-for')
+  const realIP = request.headers.get('x-real-ip')
+  const cfConnectingIP = request.headers.get('cf-connecting-ip')
+  
+  const clientIP = cfConnectingIP || realIP || forwardedFor?.split(',')[0]?.trim()
+  
+  if (!clientIP) {
+    console.warn('Could not determine client IP')
+    return false
+  }
+  
+  console.log(`Webhook request from IP: ${clientIP}`)
+  return PAYSTACK_IPS.includes(clientIP)
+}
+
+// Verify signature using secret key
+async function verifyPaystackSignature(payload: string, signature: string, secret: string): Promise<boolean> {
+  try {
+    const encoder = new TextEncoder()
+    const key = await crypto.subtle.importKey(
+      'raw',
+      encoder.encode(secret),
+      { name: 'HMAC', hash: 'SHA-512' },
+      false,
+      ['sign']
+    )
+    
+    const hash = await crypto.subtle.sign('HMAC', key, encoder.encode(payload))
+    const hashArray = Array.from(new Uint8Array(hash))
+    const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
+    
+    return hashHex === signature
+  } catch (error) {
+    console.error('Signature verification failed:', error)
+    return false
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -12,13 +59,33 @@ serve(async (req) => {
   }
 
   try {
+    const payload = await req.text();
+    const signature = req.headers.get('x-paystack-signature');
+    
+    // Security validation
+    const isValidIP = verifyPaystackIP(req);
+    let isValidSignature = false;
+    
+    const webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
+    if (signature && webhookSecret) {
+      isValidSignature = await verifyPaystackSignature(payload, signature, webhookSecret);
+    }
+    
+    // Allow if either IP is valid OR signature is valid
+    if (!isValidIP && !isValidSignature) {
+      console.error('Webhook security validation failed');
+      return new Response('Unauthorized', { status: 401, headers: corsHeaders });
+    }
+    
+    console.log(`Webhook verified via: ${isValidIP ? 'IP' : ''}${isValidIP && isValidSignature ? ' + ' : ''}${isValidSignature ? 'Signature' : ''}`);
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { persistSession: false } }
     );
 
-    const body = await req.json();
+    const body = JSON.parse(payload);
     const event = body.event;
     const data = body.data;
 

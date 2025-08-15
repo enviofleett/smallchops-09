@@ -8,7 +8,40 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-// Verify Paystack webhook signature
+// Paystack's official webhook IP addresses for whitelisting
+const PAYSTACK_IPS = [
+  '52.31.139.75',
+  '52.49.173.169', 
+  '52.214.14.220'
+]
+
+// Verify webhook origin by IP whitelisting
+function verifyPaystackIP(request: Request): boolean {
+  const forwardedFor = request.headers.get('x-forwarded-for')
+  const realIP = request.headers.get('x-real-ip')
+  const cfConnectingIP = request.headers.get('cf-connecting-ip')
+  
+  // Get the actual client IP
+  const clientIP = cfConnectingIP || realIP || forwardedFor?.split(',')[0]?.trim()
+  
+  if (!clientIP) {
+    console.warn('⚠️ Could not determine client IP address')
+    return false
+  }
+  
+  console.log(`🔍 Webhook request from IP: ${clientIP}`)
+  
+  const isValidIP = PAYSTACK_IPS.includes(clientIP)
+  if (isValidIP) {
+    console.log('✅ IP address verified as Paystack webhook server')
+  } else {
+    console.warn(`❌ Invalid IP address: ${clientIP}. Expected one of: ${PAYSTACK_IPS.join(', ')}`)
+  }
+  
+  return isValidIP
+}
+
+// Verify Paystack webhook signature using HMAC SHA-512
 async function verifyPaystackSignature(payload: string, signature: string, secret: string): Promise<boolean> {
   try {
     const encoder = new TextEncoder()
@@ -24,9 +57,12 @@ async function verifyPaystackSignature(payload: string, signature: string, secre
     const hashArray = Array.from(new Uint8Array(hash))
     const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('')
     
-    return hashHex === signature
+    const isValid = hashHex === signature
+    console.log(`🔐 Signature verification: ${isValid ? 'VALID' : 'INVALID'}`)
+    
+    return isValid
   } catch (error) {
-    console.error('Signature verification failed:', error)
+    console.error('❌ Signature verification failed:', error)
     return false
   }
 }
@@ -47,41 +83,58 @@ serve(async (req) => {
     const payload = await req.text()
     const signature = req.headers.get('x-paystack-signature')
 
-    if (!signature) {
-      console.error('Missing webhook signature')
-      return new Response('Unauthorized', { 
-        status: 401, 
-        headers: corsHeaders 
-      })
-    }
-
     // Get Paystack configuration for webhook secret
     const paystackConfig = getPaystackConfig(req)
     
-    if (!paystackConfig.webhookSecret) {
-      console.error('Webhook secret not configured')
-      return new Response('Webhook secret not configured', { 
-        status: 500, 
-        headers: corsHeaders 
-      })
+    // Security validation with both methods
+    const requireBothMethods = Deno.env.get('PAYSTACK_WEBHOOK_REQUIRE_BOTH') === 'true'
+    
+    // Method 1: IP Whitelisting
+    const isValidIP = verifyPaystackIP(req)
+    
+    // Method 2: Signature verification (if secret is available)
+    let isValidSignature = false
+    if (signature && paystackConfig.webhookSecret) {
+      isValidSignature = await verifyPaystackSignature(
+        payload, 
+        signature, 
+        paystackConfig.webhookSecret
+      )
+    } else if (signature) {
+      console.warn('⚠️ Webhook signature provided but no secret configured')
+    } else {
+      console.warn('⚠️ No webhook signature provided')
     }
 
-    // Verify webhook signature
-    const isValidSignature = await verifyPaystackSignature(
-      payload, 
-      signature, 
-      paystackConfig.webhookSecret
-    )
+    // Security decision logic
+    let securityPassed = false
+    let securityMethod = ''
 
-    if (!isValidSignature) {
-      console.error('Invalid webhook signature')
+    if (requireBothMethods) {
+      // Strict mode: both IP and signature must be valid
+      securityPassed = isValidIP && isValidSignature
+      securityMethod = 'IP + Signature (strict)'
+    } else {
+      // Flexible mode: either IP OR signature is sufficient
+      securityPassed = isValidIP || isValidSignature
+      securityMethod = isValidIP ? 
+        (isValidSignature ? 'IP + Signature' : 'IP only') : 
+        'Signature only'
+    }
+
+    if (!securityPassed) {
+      console.error(`❌ Webhook security validation failed. Method: ${securityMethod}`)
+      console.error(`- IP valid: ${isValidIP}`)
+      console.error(`- Signature valid: ${isValidSignature}`)
+      console.error(`- Require both: ${requireBothMethods}`)
+      
       return new Response('Unauthorized', { 
         status: 401, 
         headers: corsHeaders 
       })
     }
 
-    console.log('✅ Webhook signature verified')
+    console.log(`✅ Webhook security verified via: ${securityMethod}`)
 
     const webhookData = JSON.parse(payload)
     const { event, data } = webhookData

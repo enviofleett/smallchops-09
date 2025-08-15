@@ -270,96 +270,66 @@ export const useMultiplePaymentStatuses = (orderIds: string[] = []) => {
       setIsLoading(true);
       setError(null);
 
-      // Prefer enriched view if available
+      // Use direct orders query since orders_with_payment view doesn't exist
       const { data: ordersWithPayment, error: viewError } = await supabase
-        .from('orders_with_payment')
-        .select(`
-          id,
-          payment_status,
-          paid_at,
-          status,
-          final_paid,
-          final_paid_at,
-          payment_channel,
-          payment_method,
-          payment_tx_status,
-          needs_reconciliation
-        `)
+        .from('orders')
+        .select('id, payment_status, paid_at, status')
         .in('id', orderIds);
 
-      let ordersData: any[] | null = ordersWithPayment;
-
-      if (viewError || !ordersWithPayment) {
-        console.warn('orders_with_payment view not accessible, using fallback');
-        const { data: fallbackOrders, error: fallbackError } = await supabase
-          .from('orders')
-          .select('id, payment_status, paid_at, status')
-          .in('id', orderIds);
-        if (fallbackError) throw fallbackError;
-        ordersData = fallbackOrders;
+      if (viewError) {
+        console.warn('Failed to query orders:', viewError);
+        throw viewError;
       }
 
       const newStatuses: Record<string, PaymentStatus> = {};
 
-      for (const order of ordersData || []) {
-        if ('final_paid' in order) {
-          newStatuses[order.id] = {
-            isPaid: order.final_paid || false,
-            paidAt: order.final_paid_at,
-            paymentMethod: order.payment_method || order.payment_channel,
-            source: 'order',
-            lastUpdated: new Date().toISOString(),
-            needsReconciliation: order.needs_reconciliation || false,
-            orderStatus: order.status || 'pending',
-          };
-        } else {
-          const needsTransactionCheck = order.payment_status !== 'paid';
-          if (needsTransactionCheck) {
-            try {
-              const { data: transactions } = await supabase
-                .from('payment_transactions')
-                .select('status, paid_at, channel')
-                .eq('order_id', order.id)
-                .order('created_at', { ascending: false })
-                .limit(1);
+      for (const order of ordersWithPayment || []) {
+        const needsTransactionCheck = order.payment_status !== 'paid';
+        if (needsTransactionCheck) {
+          try {
+            const { data: transactions } = await supabase
+              .from('payment_transactions')
+              .select('status, paid_at, channel')
+              .eq('order_id', order.id)
+              .order('created_at', { ascending: false })
+              .limit(1);
 
-              const successfulTx = transactions?.find(
-                (tx) => tx.status === 'success' || tx.status === 'paid'
-              );
+            const successfulTx = transactions?.find(
+              (tx) => tx.status === 'success' || tx.status === 'paid'
+            );
 
-              newStatuses[order.id] = {
-                isPaid: order.payment_status === 'paid' || !!successfulTx,
-                paidAt: order.paid_at || successfulTx?.paid_at || null,
-                paymentMethod:
-                  successfulTx?.channel || (order.payment_status === 'paid' ? 'processed' : null),
-                source: 'order',
-                lastUpdated: new Date().toISOString(),
-                needsReconciliation: !!successfulTx && order.payment_status !== 'paid',
-                orderStatus: order.status || 'pending',
-              };
-            } catch (txError) {
-              console.error('Error checking transactions for order', order.id, txError);
-              newStatuses[order.id] = {
-                isPaid: order.payment_status === 'paid',
-                paidAt: order.paid_at,
-                paymentMethod: order.payment_status === 'paid' ? 'processed' : null,
-                source: 'order',
-                lastUpdated: new Date().toISOString(),
-                needsReconciliation: false,
-                orderStatus: order.status || 'pending',
-              };
-            }
-          } else {
             newStatuses[order.id] = {
-              isPaid: true,
+              isPaid: order.payment_status === 'paid' || !!successfulTx,
+              paidAt: order.paid_at || successfulTx?.paid_at || null,
+              paymentMethod:
+                successfulTx?.channel || (order.payment_status === 'paid' ? 'processed' : null),
+              source: 'order',
+              lastUpdated: new Date().toISOString(),
+              needsReconciliation: !!successfulTx && order.payment_status !== 'paid',
+              orderStatus: order.status || 'pending',
+            };
+          } catch (txError) {
+            console.error('Error checking transactions for order', order.id, txError);
+            newStatuses[order.id] = {
+              isPaid: order.payment_status === 'paid',
               paidAt: order.paid_at,
-              paymentMethod: 'processed',
+              paymentMethod: order.payment_status === 'paid' ? 'processed' : null,
               source: 'order',
               lastUpdated: new Date().toISOString(),
               needsReconciliation: false,
               orderStatus: order.status || 'pending',
             };
           }
+        } else {
+          newStatuses[order.id] = {
+            isPaid: true,
+            paidAt: order.paid_at,
+            paymentMethod: 'processed',
+            source: 'order',
+            lastUpdated: new Date().toISOString(),
+            needsReconciliation: false,
+            orderStatus: order.status || 'pending',
+          };
         }
       }
 

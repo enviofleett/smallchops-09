@@ -7274,6 +7274,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_current_logo: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       get_customer_analytics_safe: {
         Args: { p_end_date?: string; p_start_date?: string }
         Returns: Json
@@ -7599,13 +7603,13 @@ export type Database = {
       log_customer_operation: {
         Args: {
           p_admin_id?: string
+          p_changes?: Json
           p_customer_id: string
-          p_details?: Json
           p_ip_address?: unknown
           p_operation: string
           p_user_agent?: string
         }
-        Returns: string
+        Returns: undefined
       }
       log_payment_error: {
         Args: {

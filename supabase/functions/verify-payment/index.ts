@@ -81,7 +81,14 @@ serve(async (req) => {
 
     console.log('[VERIFY-PAYMENT] Payment verified successfully, updating order status')
 
-    // Step 3: Update order using the enhanced function
+    // Step 3: Update order using the enhanced function with improved error handling
+    console.log('[VERIFY-PAYMENT] Calling verify_and_update_payment_status with:', {
+      payment_ref: reference,
+      new_status: 'confirmed',
+      payment_amount: paymentData.data.amount / 100,
+      has_gateway_response: !!paymentData.data
+    })
+
     const { data: updateResult, error: updateError } = await supabase
       .rpc('verify_and_update_payment_status', {
         payment_ref: reference,
@@ -91,7 +98,12 @@ serve(async (req) => {
       })
 
     if (updateError) {
-      console.error('[VERIFY-PAYMENT] Database update error:', updateError)
+      console.error('[VERIFY-PAYMENT] Database update error details:', {
+        message: updateError.message,
+        details: updateError.details,
+        hint: updateError.hint,
+        code: updateError.code
+      })
       throw new Error(`Database update failed: ${updateError.message}`)
     }
 

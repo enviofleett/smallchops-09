@@ -89,29 +89,74 @@ serve(async (req) => {
       has_gateway_response: !!paymentData.data
     })
 
-    const { data: updateResult, error: updateError } = await supabase
-      .rpc('verify_and_update_payment_status', {
-        payment_ref: reference,
-        new_status: 'confirmed',
-        payment_amount: paymentData.data.amount / 100, // Convert from kobo to naira
-        payment_gateway_response: paymentData.data
-      })
+    // Enhanced retry logic with exponential backoff
+    let updateResult;
+    let updateAttempts = 0;
+    const maxRetries = 3;
+    
+    while (updateAttempts < maxRetries) {
+      try {
+        const { data, error } = await supabase
+          .rpc('verify_and_update_payment_status', {
+            payment_ref: reference,
+            new_status: 'confirmed',
+            payment_amount: paymentData.data.amount / 100, // Convert from kobo to naira
+            payment_gateway_response: paymentData.data
+          });
 
-    if (updateError) {
-      console.error('[VERIFY-PAYMENT] Database update error details:', {
-        message: updateError.message,
-        details: updateError.details,
-        hint: updateError.hint,
-        code: updateError.code,
-        sqlstate: updateError.code
-      })
-      
-      // Check for specific ambiguous column error
-      if (updateError.message?.includes('ambiguous') || updateError.message?.includes('updated_at')) {
-        console.error('[VERIFY-PAYMENT] Column ambiguity error detected - this should be fixed by the database migration')
+        if (error) {
+          console.error(`[VERIFY-PAYMENT] RPC Error (attempt ${updateAttempts + 1}):`, {
+            message: error.message,
+            details: error.details,
+            hint: error.hint,
+            code: error.code
+          });
+          
+          // Handle specific error types
+          if (error.message?.includes('ambiguous') || error.message?.includes('column reference')) {
+            console.error('[VERIFY-PAYMENT] Database schema error - function needs update');
+            throw new Error(`Database schema error: ${error.message}`);
+          }
+          
+          if (error.message?.includes('No order found')) {
+            console.error('[VERIFY-PAYMENT] Order not found for reference:', reference);
+            throw new Error(`Order not found for reference: ${reference}`);
+          }
+          
+          if (error.message?.includes('Unauthorized')) {
+            console.error('[VERIFY-PAYMENT] Authorization error');
+            throw new Error(`Authorization error: ${error.message}`);
+          }
+          
+          if (updateAttempts === maxRetries - 1) {
+            throw new Error(`Failed to update order after ${maxRetries} attempts: ${error.message}`);
+          }
+          
+          // Exponential backoff: 1s, 2s, 3s
+          updateAttempts++;
+          console.log(`[VERIFY-PAYMENT] Retrying in ${updateAttempts} seconds...`);
+          await new Promise(resolve => setTimeout(resolve, 1000 * updateAttempts));
+          continue;
+        }
+        
+        updateResult = data;
+        console.log('[VERIFY-PAYMENT] Order update successful:', {
+          attempts: updateAttempts + 1,
+          result_count: Array.isArray(updateResult) ? updateResult.length : 1
+        });
+        break;
+        
+      } catch (rpcError) {
+        console.error(`[VERIFY-PAYMENT] RPC Exception (attempt ${updateAttempts + 1}):`, rpcError);
+        
+        if (updateAttempts === maxRetries - 1) {
+          throw new Error(`Failed to update order after ${maxRetries} attempts: ${rpcError.message}`);
+        }
+        
+        updateAttempts++;
+        console.log(`[VERIFY-PAYMENT] Exception retry in ${updateAttempts} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 1000 * updateAttempts));
       }
-      
-      throw new Error(`Database update failed: ${updateError.message}`)
     }
 
     if (!updateResult || updateResult.length === 0) {

@@ -19,6 +19,8 @@ import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
 import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
 import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
+import { useDeliveryValidation } from "@/hooks/useDeliveryValidation";
+import { getDeliveryZonesWithFees, DeliveryZoneWithFee } from '@/api/delivery';
 
 import {
   Select,
@@ -120,6 +122,14 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
   const [paymentData, setPaymentData] = useState<any>(null);
   const [lastPaymentError, setLastPaymentError] = useState<string | null>(null);
   const [showRecoveryOption, setShowRecoveryOption] = useState(false);
+  const [zones, setZones] = useState<DeliveryZoneWithFee[]>([]);
+  const [zonesLoading, setZonesLoading] = useState(false);
+  
+  const {
+    isValidating,
+    performCompleteValidation,
+    showValidationResults
+  } = useDeliveryValidation();
 
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: session?.user?.email || '',
@@ -219,6 +229,26 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     }
   }, [session, authCustomerAccount, customerAccount]);
 
+  // Load delivery zones when component mounts
+  React.useEffect(() => {
+    const fetchZones = async () => {
+      setZonesLoading(true);
+      try {
+        const zonesData = await getDeliveryZonesWithFees();
+        setZones(zonesData);
+      } catch (error) {
+        console.error('Failed to load delivery zones:', error);
+        toast.error('Failed to load delivery zones');
+      } finally {
+        setZonesLoading(false);
+      }
+    };
+
+    if (checkoutStep === 'details') {
+      fetchZones();
+    }
+  }, [checkoutStep]);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -226,6 +256,33 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     setIsSubmitting(false);
     setPaymentData(null);
     setLastPaymentError(null);
+    
+    // Validate delivery zone and address for delivery orders
+    if (formData.fulfillment_type === 'delivery') {
+      const validationResult = await performCompleteValidation(
+        formData.delivery_zone_id,
+        zones,
+        {
+          address_line_1: formData.delivery_address.address_line_1,
+          city: formData.delivery_address.city,
+          state: formData.delivery_address.state,
+          selectedZoneId: formData.delivery_zone_id
+        },
+        cart?.summary?.subtotal || 0,
+        deliveryFee
+      );
+
+      if (!validationResult.isValid) {
+        showValidationResults(validationResult);
+        setIsSubmitting(false);
+        return;
+      }
+
+      // Show warnings but continue
+      if (validationResult.warnings.length > 0) {
+        showValidationResults(validationResult);
+      }
+    }
     
     // Add a small delay to ensure cleanup
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -825,6 +882,8 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                       setDeliveryFee(fee);
                     }}
                     orderSubtotal={cart?.summary?.subtotal || 0}
+                    isRequired={true}
+                    showValidationError={!formData.delivery_zone_id}
                   />
                 </div>
               )}

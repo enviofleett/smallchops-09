@@ -48,14 +48,15 @@ export const DeliveryZoneSelector: React.FC<DeliveryZoneSelectorProps> = ({
       return 0;
     }
     
-    let totalFee = base_fee;
+    // Start with base fee
+    let totalFee = base_fee || 0;
     
     // Add distance-based fee if configured
     // TODO: Integrate with mapping service for actual distance calculation
+    // For now, we only use base fee as distance calculation requires address
     if (fee_per_km && fee_per_km > 0) {
-      // For now, assume average distance within zone (this should be replaced with actual distance)
-      const estimatedDistance = 5; // km - placeholder value
-      totalFee += fee_per_km * estimatedDistance;
+      // This would be calculated based on delivery address distance
+      // totalFee += (calculatedDistance * fee_per_km);
     }
     
     return totalFee;

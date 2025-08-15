@@ -4387,7 +4387,7 @@ export type Database = {
           {
             foreignKeyName: "payment_processing_status_order_id_fkey"
             columns: ["order_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
@@ -6785,6 +6785,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      check_payment_security_health: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       check_payment_system_health: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -7079,6 +7083,27 @@ export type Database = {
           reference_type: string
         }[]
       }
+      get_admin_payment_status_secure: {
+        Args: {
+          p_limit?: number
+          p_order_id?: string
+          p_overall_status?: string
+          p_payment_reference?: string
+        }
+        Returns: {
+          created_at: string
+          current_order_status: string
+          error_message: string
+          order_id: string
+          order_number: string
+          order_type: string
+          overall_status: string
+          payment_reference: string
+          processing_stage: string
+          reference_type: string
+          updated_at: string
+        }[]
+      }
       get_all_customers_display: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -7119,6 +7144,18 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: {
           error_message: string
+          order_id: string
+          order_number: string
+          overall_status: string
+          payment_reference: string
+          processing_stage: string
+        }[]
+      }
+      get_customer_payment_status_secure: {
+        Args: { p_order_id: string }
+        Returns: {
+          error_message: string
+          last_updated: string
           order_id: string
           order_number: string
           overall_status: string

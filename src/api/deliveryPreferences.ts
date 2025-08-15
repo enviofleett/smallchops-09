@@ -16,8 +16,8 @@ export interface DeliveryPreferences {
   updated_at?: string;
 }
 
-// Using the actual delivery_time_slots table structure from the database
-export interface DeliveryTimeSlot {
+// Using the new delivery_time_slots table structure
+export interface DatabaseDeliveryTimeSlot {
   id?: string;
   date: string;
   start_time: string;
@@ -67,20 +67,26 @@ export const upsertDeliveryPreferences = async (preferences: Omit<DeliveryPrefer
 };
 
 // Delivery Time Slots API
-export const getAvailableTimeSlots = async (startDate?: string, endDate?: string): Promise<DeliveryTimeSlot[]> => {
+export const getAvailableTimeSlots = async (startDate?: string, endDate?: string): Promise<DatabaseDeliveryTimeSlot[]> => {
   const { data, error } = await supabase
-    .from('delivery_time_slots')
-    .select('*')
-    .gte('date', startDate || new Date().toISOString().split('T')[0])
-    .lte('date', endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
-    .order('date')
-    .order('start_time');
+    .rpc('get_available_delivery_slots', {
+      p_start_date: startDate || new Date().toISOString().split('T')[0],
+      p_end_date: endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
+    });
 
   if (error) throw error;
-  return data || [];
+  return (data || []).map((slot: any) => ({
+    id: slot.slot_id,
+    date: slot.date,
+    start_time: slot.start_time,
+    end_time: slot.end_time,
+    max_capacity: slot.max_capacity,
+    current_bookings: slot.current_bookings,
+    is_available: slot.is_available
+  }));
 };
 
-export const createTimeSlot = async (timeSlot: Omit<DeliveryTimeSlot, 'id' | 'created_at' | 'updated_at'>): Promise<DeliveryTimeSlot> => {
+export const createTimeSlot = async (timeSlot: Omit<DatabaseDeliveryTimeSlot, 'id' | 'created_at' | 'updated_at'>): Promise<DatabaseDeliveryTimeSlot> => {
   const { data, error } = await supabase
     .from('delivery_time_slots')
     .insert(timeSlot)
@@ -91,7 +97,7 @@ export const createTimeSlot = async (timeSlot: Omit<DeliveryTimeSlot, 'id' | 'cr
   return data;
 };
 
-export const updateTimeSlot = async (id: string, updates: Partial<DeliveryTimeSlot>): Promise<DeliveryTimeSlot> => {
+export const updateTimeSlot = async (id: string, updates: Partial<DatabaseDeliveryTimeSlot>): Promise<DatabaseDeliveryTimeSlot> => {
   const { data, error } = await supabase
     .from('delivery_time_slots')
     .update(updates)

@@ -46,13 +46,12 @@ export const usePaymentStatus = (
         setIsLoading(true);
         setError(null);
 
-        // Use the optimized RPC function with the new public view
+        // Prefer secure RPC for consolidated status
         const { data: statusData, error: statusError } = await supabase
           .rpc('get_order_payment_status', { p_order_id: orderIdToResolve });
 
         if (statusError) {
-          console.error('RPC get_order_payment_status failed:', statusError);
-          // Fallback to the new public orders_with_payment view
+          // Fallback to direct queries if RPC fails
           return await fallbackPaymentStatusQuery(orderIdToResolve);
         }
 
@@ -119,24 +118,14 @@ export const usePaymentStatus = (
 
   const fallbackPaymentStatusQuery = useCallback(async (orderIdToResolve: string) => {
     try {
-      // Use direct orders table instead of non-existent view
-      const { data: orderWithPayment, error: viewError } = await supabase
+      // Orders table
+      const { data: order, error: orderError } = await supabase
         .from('orders')
-        .select(`
-          id,
-          payment_status,
-          paid_at,
-          status
-        `)
+        .select('payment_status, paid_at, status')
         .eq('id', orderIdToResolve)
         .maybeSingle();
 
-      let order = orderWithPayment;
-      
-      if (viewError) {
-        console.warn('Direct orders query failed:', viewError);
-        throw viewError;
-      }
+      if (orderError) throw orderError;
 
       // Transactions table (latest first)
       const { data: transactions, error: txError } = await supabase
@@ -147,7 +136,6 @@ export const usePaymentStatus = (
 
       if (txError) throw txError;
 
-      // Use transaction checking logic
       const successfulTx = transactions?.find(
         (tx) => tx.status === 'success' || tx.status === 'paid'
       );
@@ -282,9 +270,9 @@ export const useMultiplePaymentStatuses = (orderIds: string[] = []) => {
       setIsLoading(true);
       setError(null);
 
-      // Query orders directly with payment information
+      // Prefer enriched view if available
       const { data: ordersWithPayment, error: viewError } = await supabase
-        .from('orders')
+        .from('orders_with_payment')
         .select(`
           id,
           payment_status,

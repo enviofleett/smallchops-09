@@ -15,43 +15,27 @@ export interface PaymentVerificationResultV2 {
 
 /**
  * Enhanced payment verification compatible with React Router
- * Uses the unified verify-payment-unified edge function
+ * Uses the verify-payment edge function with improved response handling
  */
 export async function verifyPaymentV2(reference: string): Promise<PaymentVerificationResultV2> {
   try {
     console.log('🔍 Starting enhanced payment verification for reference:', reference);
     
-    // Use the unified edge function with proper parameters
-    const url = new URL(`https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/verify-payment-unified`);
-    
-    // Extract order_id from reference or use a placeholder
-    // In production, we should have order_id from context
-    const orderId = 'unknown'; // This should be passed as a parameter
-    
-    url.searchParams.set('order_id', orderId);
-    url.searchParams.set('reference', reference);
-
-    const response = await fetch(url.toString(), {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA`,
-        'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA',
-        'Content-Type': 'application/json'
-      }
+    // Call the verify-payment Edge Function directly
+    const { data, error } = await supabase.functions.invoke('verify-payment', {
+      body: { reference }
     });
 
-    if (!response.ok) {
-      console.error('❌ Edge function HTTP error:', response.status, response.statusText);
-      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    if (error) {
+      console.error('❌ Edge function error:', error);
+      throw new Error(error.message || 'Payment verification failed');
     }
 
-    const data = await response.json();
-
     if (!data.success) {
-      console.error('❌ Payment verification failed:', data.error || data.message);
+      console.error('❌ Payment verification failed:', data.message);
       return {
         success: false,
-        message: data.error || data.message || 'Payment verification failed',
+        message: data.message || 'Payment verification failed',
         error: data.error
       };
     }
@@ -59,16 +43,16 @@ export async function verifyPaymentV2(reference: string): Promise<PaymentVerific
     console.log('✅ Payment verification successful:', data);
     
     // Transform the response to match our V2 interface
-    const orderData = data.data;
+    const order = data.order;
     return {
       success: true,
-      message: 'Payment verified successfully',
-      order: orderData ? {
-        order_id: orderData.order_id,
-        order_number: orderData.order_number,
-        status: orderData.status,
-        amount: orderData.amount,
-        updated_at: orderData.updated_at
+      message: data.message || 'Payment verified successfully',
+      order: order ? {
+        order_id: order.order_id || order.id,
+        order_number: order.order_number,
+        status: order.status,
+        amount: order.amount,
+        updated_at: order.updated_at
       } : undefined
     };
 

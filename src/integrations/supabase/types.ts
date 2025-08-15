@@ -7735,6 +7735,21 @@ export type Database = {
         }
         Returns: Json
       }
+      update_order_payment_status: {
+        Args: {
+          new_status?: string
+          payment_amount?: number
+          payment_gateway_response?: Json
+          payment_ref: string
+        }
+        Returns: {
+          order_id: string
+          order_number: string
+          payment_status: string
+          status: string
+          total_amount: number
+        }[]
+      }
       validate_admin_access: {
         Args: Record<PropertyKey, never>
         Returns: boolean

@@ -136,7 +136,7 @@ export default function AdminDelivery() {
         <meta name="description" content="Manage delivery operations, track routes, and monitor delivery performance." />
       </Helmet>
 
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
         {/* System Status Check */}
         <SystemStatusChecker />
         
@@ -148,21 +148,28 @@ export default function AdminDelivery() {
               Monitor delivery operations, routes, and performance metrics
             </p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 w-full sm:w-auto">
             <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
                   className={cn(
-                    "w-[200px] sm:w-[240px] justify-start text-left font-normal",
+                    "w-full sm:w-[240px] justify-start text-left font-normal text-sm",
                     !selectedDate && "text-muted-foreground"
                   )}
                 >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                  <CalendarIcon className="mr-2 h-4 w-4 flex-shrink-0" />
+                  <span className="truncate">
+                    {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                  </span>
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-auto p-0" align="start">
+              <PopoverContent 
+                className="w-auto p-0 z-50" 
+                align="start"
+                side="bottom"
+                sideOffset={4}
+              >
                 <Calendar
                   mode="single"
                   selected={selectedDate}
@@ -173,7 +180,7 @@ export default function AdminDelivery() {
                     }
                   }}
                   initialFocus
-                  className="pointer-events-auto"
+                  className="pointer-events-auto bg-background border rounded-md shadow-lg"
                 />
               </PopoverContent>
             </Popover>
@@ -182,87 +189,91 @@ export default function AdminDelivery() {
 
         {/* Error Banner */}
         {ordersError && (
-          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-destructive" />
-              <p className="text-sm text-destructive font-medium">
-                Failed to load orders data
-              </p>
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 sm:p-4 mx-2 sm:mx-0">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-destructive font-medium">
+                  Failed to load orders data
+                </p>
+                <p className="text-xs text-destructive/80 mt-1 break-words">
+                  {ordersError instanceof Error ? ordersError.message : 'Unknown error occurred'}
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-destructive/80 mt-1">
-              {ordersError instanceof Error ? ordersError.message : 'Unknown error occurred'}
-            </p>
           </div>
         )}
 
         {/* Server Cap Warning */}
         {deliveryOrdersData?.count === 1000 && (
-          <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
-            <div className="flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-warning" />
-              <p className="text-sm text-warning font-medium">
-                Maximum data limit reached (1000 orders)
-              </p>
+          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 sm:p-4 mx-2 sm:mx-0">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-orange-600 font-medium">
+                  Maximum data limit reached (1000 orders)
+                </p>
+                <p className="text-xs text-orange-600/80 mt-1 break-words">
+                  Some orders may not be displayed. Consider narrowing your date range.
+                </p>
+              </div>
             </div>
-            <p className="text-xs text-warning/80 mt-1">
-              Some orders may not be displayed. Consider narrowing your date range.
-            </p>
           </div>
         )}
 
         {/* Delivery Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
-          <Card>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mx-2 sm:mx-0">
+          <Card className="overflow-hidden">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-primary/10 text-primary rounded-lg flex-shrink-0">
                   <Package className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Total Deliveries</p>
-                  <p className="text-lg sm:text-2xl font-bold">{deliveryMetrics.totalDeliveries}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Total</p>
+                  <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{deliveryMetrics.totalDeliveries}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="overflow-hidden">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-orange-500/10 text-orange-600 rounded-lg flex-shrink-0">
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">In Progress</p>
-                  <p className="text-lg sm:text-2xl font-bold">{deliveryMetrics.inProgress}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Progress</p>
+                  <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{deliveryMetrics.inProgress}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="overflow-hidden">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-purple-500/10 text-purple-600 rounded-lg flex-shrink-0">
                   <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0">
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Out for Delivery</p>
-                  <p className="text-lg sm:text-2xl font-bold">{deliveryMetrics.outForDelivery}</p>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Delivery</p>
+                  <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{deliveryMetrics.outForDelivery}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="overflow-hidden">
             <CardContent className="p-3 sm:p-4">
               <div className="flex items-center gap-2 sm:gap-3">
                 <div className="p-1.5 sm:p-2 bg-green-500/10 text-green-600 rounded-lg flex-shrink-0">
                   <Users className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-xs sm:text-sm text-muted-foreground truncate">Assigned</p>
-                  <p className="text-lg sm:text-2xl font-bold">{deliveryMetrics.assigned}</p>
+                  <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{deliveryMetrics.assigned}</p>
                 </div>
               </div>
             </CardContent>
@@ -330,22 +341,22 @@ export default function AdminDelivery() {
           </TabsContent>
 
           {/* Delivery Orders Tab */}
-          <TabsContent value="orders" className="space-y-4">
+          <TabsContent value="orders" className="space-y-4 px-2 sm:px-0">
             {/* Header */}
             <div className="border-b pb-4">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold">Ready Delivery Orders</h2>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-lg sm:text-xl font-semibold truncate">Ready Delivery Orders</h2>
                   <p className="text-sm text-muted-foreground">
                     Showing only orders with status READY
                   </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Badge variant="outline">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <Badge variant="outline" className="text-xs">
                     Ready: {readyOrders.length}
                   </Badge>
                   {selectedOrders.length > 0 && (
-                    <Badge variant="secondary">
+                    <Badge variant="secondary" className="text-xs">
                       Selected: {selectedOrders.length}
                     </Badge>
                   )}
@@ -354,12 +365,12 @@ export default function AdminDelivery() {
             </div>
 
             {/* Controls */}
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-4">
               <Select value={deliveryWindowFilter} onValueChange={setDeliveryWindowFilter}>
-                <SelectTrigger className="w-full sm:w-48">
+                <SelectTrigger className="w-full sm:w-48 h-9 text-sm bg-background border-input">
                   <SelectValue placeholder="Filter by time window" />
                 </SelectTrigger>
-                <SelectContent>
+                <SelectContent className="bg-background border-border shadow-lg z-50">
                   {deliveryWindows.map((window) => (
                     <SelectItem key={window} value={window}>
                       {window === 'all' ? 'All Time Windows' : 
@@ -370,7 +381,7 @@ export default function AdminDelivery() {
                 </SelectContent>
               </Select>
               
-              <div className="flex items-center gap-4 w-full sm:w-auto">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 w-full sm:w-auto">
                 {readyFilteredOrders.length > 0 && (
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -390,7 +401,7 @@ export default function AdminDelivery() {
                 {selectedOrders.length > 0 && (
                   <Button 
                     onClick={() => setIsDriverDialogOpen(true)}
-                    className="ml-auto"
+                    className="w-full sm:w-auto sm:ml-auto"
                     size="sm"
                   >
                     <span className="hidden sm:inline">Assign Driver</span>
@@ -403,21 +414,21 @@ export default function AdminDelivery() {
 
             {/* Error state for schedules */}
             {schedulesError && (
-              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
-                <p className="text-sm text-destructive">
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 sm:p-4">
+                <p className="text-sm text-destructive break-words">
                   Failed to load delivery schedules. Some features may not work properly.
                 </p>
               </div>
             )}
 
-            <div className="grid gap-4">
+            <div className="grid gap-3 sm:gap-4">
               {ordersLoading ? (
-                [...Array(5)].map((_, i) => (
-                  <Card key={i} className="p-6">
+                [...Array(3)].map((_, i) => (
+                  <Card key={i} className="p-4 sm:p-6">
                     <div className="animate-pulse space-y-3">
-                      <div className="h-4 bg-muted rounded w-1/4"></div>
-                      <div className="h-4 bg-muted rounded w-1/2"></div>
-                      <div className="h-4 bg-muted rounded w-1/3"></div>
+                      <div className="h-4 bg-muted rounded w-3/4 sm:w-1/4"></div>
+                      <div className="h-4 bg-muted rounded w-full sm:w-1/2"></div>
+                      <div className="h-4 bg-muted rounded w-2/3 sm:w-1/3"></div>
                     </div>
                   </Card>
                 ))
@@ -445,10 +456,10 @@ export default function AdminDelivery() {
               
               {!ordersLoading && readyFilteredOrders.length === 0 && (
                 <Card>
-                  <CardContent className="p-12 text-center">
-                    <Package className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
-                    <h3 className="text-lg font-semibold mb-2">No ready orders</h3>
-                    <p className="text-muted-foreground">
+                  <CardContent className="p-8 sm:p-12 text-center">
+                    <Package className="w-10 h-10 sm:w-12 sm:h-12 text-muted-foreground mx-auto mb-4" />
+                    <h3 className="text-base sm:text-lg font-semibold mb-2">No ready orders</h3>
+                    <p className="text-sm sm:text-base text-muted-foreground break-words">
                       {deliveryWindowFilter === 'all' 
                         ? 'No ready orders found for the selected date'
                         : 'No ready orders in this time window'
@@ -502,10 +513,15 @@ function DeliveryOrderItem({ order }: { order: any }) {
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg">
       <div>
-        <p className="font-medium">#{order.order_number}</p>
-        <p className="text-sm text-muted-foreground">{order.customer_name}</p>
+        <p className="font-medium truncate">{order.order_number}</p>
+        <p className="text-sm text-muted-foreground truncate">{order.customer_name}</p>
       </div>
-      <Badge variant={order.status === 'out_for_delivery' ? 'default' : 'secondary'}>
+      <Badge variant={
+        order.status === 'confirmed' ? 'default' :
+        order.status === 'preparing' ? 'secondary' :
+        order.status === 'ready' ? 'outline' :
+        order.status === 'out_for_delivery' ? 'default' : 'secondary'
+      }>
         {order.status.replace('_', ' ')}
       </Badge>
     </div>
@@ -514,74 +530,88 @@ function DeliveryOrderItem({ order }: { order: any }) {
 
 function DeliveryOrderCard({ 
   order, 
+  schedule, 
   onSelect, 
-  isSelected,
-  schedule,
-  onAssignDriver
+  isSelected, 
+  onAssignDriver 
 }: { 
   order: any; 
-  onSelect?: (selected: boolean) => void;
-  isSelected?: boolean;
-  schedule?: any;
-  onAssignDriver?: () => void;
+  schedule: any; 
+  onSelect: (selected: boolean) => void;
+  isSelected: boolean;
+  onAssignDriver: () => void;
 }) {
-  
   return (
-    <Card className={isSelected ? 'ring-2 ring-primary' : ''}>
-      <CardContent className="p-6">
-        <div className="flex items-start gap-4">
-          {onSelect && (
+    <Card className="relative overflow-hidden">
+      <CardHeader className="pb-2 sm:pb-3">
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3 min-w-0 flex-1">
             <Checkbox
               checked={isSelected}
               onCheckedChange={onSelect}
-              className="mt-1"
+              className="flex-shrink-0 mt-1"
             />
-          )}
-          
-          <div className="flex-1">
-            <div className="flex items-center justify-between mb-4">
-              <div>
-                <h3 className="font-semibold">Order #{order.order_number}</h3>
-                <p className="text-sm text-muted-foreground">{order.customer_name}</p>
-              </div>
-              <div className="flex items-center gap-2">
-                <Badge variant="secondary">
-                  {order.status.replace('_', ' ').toUpperCase()}
-                </Badge>
-                {onAssignDriver && (
-                  <Button
-                    size="sm"
-                    variant={order.assigned_rider_id ? "outline" : "default"}
-                    onClick={onAssignDriver}
-                  >
-                    {order.assigned_rider_id ? "Reassign" : "Assign Driver"}
-                  </Button>
-                )}
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-              <div className="space-y-1">
-                <p><span className="text-muted-foreground">Amount:</span> ₦{order.total_amount?.toLocaleString()}</p>
-                <p><span className="text-muted-foreground">Phone:</span> {order.customer_phone}</p>
-                {order.assigned_rider_id && (
-                  <p><span className="text-muted-foreground">Assigned Driver:</span> 
-                    <Badge variant="outline" className="ml-2">Assigned</Badge>
-                  </p>
-                )}
-              </div>
-              
-              <div className="space-y-1">
-                <p className="text-muted-foreground">Delivery Address:</p>
-                <p className="text-xs">{order.delivery_address?.address || 'N/A'}</p>
-                {schedule && (
-                  <div className="mt-2">
-                    <DeliveryScheduleDisplay schedule={schedule} />
-                  </div>
-                )}
-              </div>
+            <div className="min-w-0 flex-1">
+              <p className="font-semibold text-sm sm:text-base truncate">{order.order_number}</p>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">{order.customer_name}</p>
             </div>
           </div>
+          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-2 flex-shrink-0">
+            {order.assigned_rider_id ? (
+              <Button 
+                size="sm" 
+                variant="outline"
+                onClick={onAssignDriver}
+                className="text-xs h-7 px-2"
+              >
+                <span className="hidden sm:inline">Reassign</span>
+                <span className="sm:hidden">Re</span>
+              </Button>
+            ) : (
+              <Button 
+                size="sm"
+                onClick={onAssignDriver}
+                className="text-xs h-7 px-2"
+              >
+                <span className="hidden sm:inline">Assign</span>
+                <span className="sm:hidden">As</span>
+              </Button>
+            )}
+            <Badge variant="outline" className="text-xs px-1">Ready</Badge>
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-0 pb-3 sm:pb-4">
+        <div className="space-y-2 sm:space-y-3">
+          {/* Delivery Schedule */}
+          {schedule && (
+            <div className="bg-muted/30 rounded-md p-2 sm:p-3">
+              <DeliveryScheduleDisplay 
+                schedule={schedule}
+              />
+            </div>
+          )}
+          
+          {/* Order Details */}
+          <div className="flex items-center justify-between text-sm">
+            <span className="text-muted-foreground">Total:</span>
+            <span className="font-medium text-sm sm:text-base">₦{order.total_amount?.toLocaleString()}</span>
+          </div>
+          
+          {order.delivery_address && (
+            <div className="flex items-start gap-2 text-xs sm:text-sm">
+              <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <p className="text-muted-foreground text-xs">Address:</p>
+                <p className="text-xs sm:text-sm break-words leading-relaxed">
+                  {typeof order.delivery_address === 'string' 
+                    ? order.delivery_address 
+                    : order.delivery_address?.street || 'Address not available'
+                  }
+                </p>
+              </div>
+            </div>
+          )}
         </div>
       </CardContent>
     </Card>

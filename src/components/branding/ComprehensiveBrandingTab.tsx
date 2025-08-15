@@ -160,143 +160,143 @@ export const ComprehensiveBrandingTab = () => {
   };
 
   return (
-    <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Brand Management</h1>
-          <p className="text-muted-foreground">
-            Manage your complete brand identity and monitor consistency across all touchpoints.
-          </p>
+    <Form {...form}>
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Brand Management</h1>
+            <p className="text-muted-foreground">
+              Manage your complete brand identity and monitor consistency across all touchpoints.
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              onClick={() => setPreviewMode(!previewMode)}
+              className="gap-2"
+            >
+              <Eye className="h-4 w-4" />
+              {previewMode ? 'Edit Mode' : 'Preview'}
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handleExportBrandKit}
+              className="gap-2"
+            >
+              <Download className="h-4 w-4" />
+              Export Brand Kit
+            </Button>
+          </div>
         </div>
-        <div className="flex gap-2">
-          <Button
-            variant="outline"
-            onClick={() => setPreviewMode(!previewMode)}
-            className="gap-2"
-          >
-            <Eye className="h-4 w-4" />
-            {previewMode ? 'Edit Mode' : 'Preview'}
-          </Button>
-          <Button
-            variant="outline"
-            onClick={handleExportBrandKit}
-            className="gap-2"
-          >
-            <Download className="h-4 w-4" />
-            Export Brand Kit
-          </Button>
-        </div>
-      </div>
 
-      <Tabs defaultValue="identity" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="identity" className="flex items-center gap-2">
-            <FileImage className="h-4 w-4" />
-            Brand Identity
-          </TabsTrigger>
-          <TabsTrigger value="hero" className="flex items-center gap-2">
-            <FileImage className="h-4 w-4" />
-            Hero Content
-          </TabsTrigger>
-        </TabsList>
+        <Tabs defaultValue="identity" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="identity" className="flex items-center gap-2">
+              <FileImage className="h-4 w-4" />
+              Brand Identity
+            </TabsTrigger>
+            <TabsTrigger value="hero" className="flex items-center gap-2">
+              <FileImage className="h-4 w-4" />
+              Hero Content
+            </TabsTrigger>
+          </TabsList>
 
-        <div className="space-y-6">
-            
-            <TabsContent value="identity" className="space-y-6">
-              <div className="grid gap-6 lg:grid-cols-2">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Primary Logo</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <FormField
-                      control={form.control}
-                      name="logo_url"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormControl>
-                            <EnhancedLogoUpload
-                              value={field.value}
-                              onChange={field.onChange}
-                              disabled={previewMode}
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </CardContent>
-                </Card>
-
-                <div className="space-y-4">
+          <div className="space-y-6">
+              
+              <TabsContent value="identity" className="space-y-6">
+                <div className="grid gap-6 lg:grid-cols-2">
                   <Card>
                     <CardHeader>
-                      <CardTitle>Business Information</CardTitle>
+                      <CardTitle>Primary Logo</CardTitle>
                     </CardHeader>
-                    <CardContent className="space-y-4">
+                    <CardContent>
                       <FormField
                         control={form.control}
-                        name="name"
+                        name="logo_url"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Business Name</FormLabel>
                             <FormControl>
-                              <Input {...field} disabled={previewMode} />
+                              <EnhancedLogoUpload
+                                value={field.value}
+                                onChange={field.onChange}
+                                disabled={previewMode}
+                              />
                             </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="tagline"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Tagline</FormLabel>
-                            <FormControl>
-                              <Input {...field} disabled={previewMode} placeholder="Your compelling value proposition" />
-                            </FormControl>
-                            <FormDescription>
-                              A short, memorable phrase that captures your brand essence
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="logo_alt_text"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel>Logo Alt Text</FormLabel>
-                            <FormControl>
-                              <Input {...field} disabled={previewMode} placeholder="Company Logo" />
-                            </FormControl>
-                            <FormDescription>
-                              Accessibility description for your logo
-                            </FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}
                       />
                     </CardContent>
                   </Card>
+
+                  <div className="space-y-4">
+                    <Card>
+                      <CardHeader>
+                        <CardTitle>Business Information</CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <FormField
+                          control={form.control}
+                          name="name"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Business Name</FormLabel>
+                              <FormControl>
+                                <Input {...field} disabled={previewMode} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="tagline"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Tagline</FormLabel>
+                              <FormControl>
+                                <Input {...field} disabled={previewMode} placeholder="Your compelling value proposition" />
+                              </FormControl>
+                              <FormDescription>
+                                A short, memorable phrase that captures your brand essence
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="logo_alt_text"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>Logo Alt Text</FormLabel>
+                              <FormControl>
+                                <Input {...field} disabled={previewMode} placeholder="Company Logo" />
+                              </FormControl>
+                              <FormDescription>
+                                Accessibility description for your logo
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      </CardContent>
+                    </Card>
+                  </div>
                 </div>
-              </div>
-            </TabsContent>
+              </TabsContent>
 
-            <TabsContent value="hero" className="space-y-6">
-              <div className="grid gap-6">
-                <HeroImagesManager />
-                <BudgetBallerManager />
-              </div>
-            </TabsContent>
+              <TabsContent value="hero" className="space-y-6">
+                <div className="grid gap-6">
+                  <HeroImagesManager />
+                  <BudgetBallerManager />
+                </div>
+              </TabsContent>
 
-            {!previewMode && (
-              <div className="flex justify-end gap-4 pt-6 border-t">
-                <Form {...form}>
+              {!previewMode && (
+                <div className="flex justify-end gap-4 pt-6 border-t">
                   <form onSubmit={form.handleSubmit(onSubmit)}>
                     <Button type="submit" disabled={isSubmitting} className="gap-2">
                       {isSubmitting ? (
@@ -307,11 +307,11 @@ export const ComprehensiveBrandingTab = () => {
                       Save Branding Settings
                     </Button>
                   </form>
-                </Form>
-              </div>
-            )}
-        </div>
-      </Tabs>
-    </div>
+                </div>
+              )}
+          </div>
+        </Tabs>
+      </div>
+    </Form>
   );
 };

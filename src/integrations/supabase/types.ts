@@ -7,7 +7,7 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
+  // Allows to automatically instanciate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
     PostgrestVersion: "12.2.12 (cd3cf9e)"
@@ -765,7 +765,6 @@ export type Database = {
           business_hours: Json | null
           created_at: string
           default_vat_rate: number | null
-          delivery_scheduling_config: Json | null
           facebook_url: string | null
           favicon_url: string | null
           id: string
@@ -788,7 +787,6 @@ export type Database = {
           twitter_url: string | null
           updated_at: string
           website_url: string | null
-          whatsapp_support_number: string | null
           working_hours: string | null
           youtube_url: string | null
         }
@@ -802,7 +800,6 @@ export type Database = {
           business_hours?: Json | null
           created_at?: string
           default_vat_rate?: number | null
-          delivery_scheduling_config?: Json | null
           facebook_url?: string | null
           favicon_url?: string | null
           id?: string
@@ -825,7 +822,6 @@ export type Database = {
           twitter_url?: string | null
           updated_at?: string
           website_url?: string | null
-          whatsapp_support_number?: string | null
           working_hours?: string | null
           youtube_url?: string | null
         }
@@ -839,7 +835,6 @@ export type Database = {
           business_hours?: Json | null
           created_at?: string
           default_vat_rate?: number | null
-          delivery_scheduling_config?: Json | null
           facebook_url?: string | null
           favicon_url?: string | null
           id?: string
@@ -862,7 +857,6 @@ export type Database = {
           twitter_url?: string | null
           updated_at?: string
           website_url?: string | null
-          whatsapp_support_number?: string | null
           working_hours?: string | null
           youtube_url?: string | null
         }
@@ -1148,6 +1142,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "communication_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -1650,16 +1651,12 @@ export type Database = {
       customer_otp_codes: {
         Row: {
           attempts: number | null
-          correlation_id: string | null
           created_at: string | null
           created_by_ip: unknown | null
           customer_id: string | null
           email: string
           expires_at: string
-          failed_attempts: number | null
           id: string
-          ip_address: unknown | null
-          locked_until: string | null
           max_attempts: number | null
           otp_code: string
           otp_type: string
@@ -1668,16 +1665,12 @@ export type Database = {
         }
         Insert: {
           attempts?: number | null
-          correlation_id?: string | null
           created_at?: string | null
           created_by_ip?: unknown | null
           customer_id?: string | null
           email: string
           expires_at: string
-          failed_attempts?: number | null
           id?: string
-          ip_address?: unknown | null
-          locked_until?: string | null
           max_attempts?: number | null
           otp_code: string
           otp_type: string
@@ -1686,16 +1679,12 @@ export type Database = {
         }
         Update: {
           attempts?: number | null
-          correlation_id?: string | null
           created_at?: string | null
           created_by_ip?: unknown | null
           customer_id?: string | null
           email?: string
           expires_at?: string
-          failed_attempts?: number | null
           id?: string
-          ip_address?: unknown | null
-          locked_until?: string | null
           max_attempts?: number | null
           otp_code?: string
           otp_type?: string
@@ -1876,39 +1865,6 @@ export type Database = {
           request_count?: number
           tier?: string
           window_start?: string
-        }
-        Relationships: []
-      }
-      customer_registration_rate_limits: {
-        Row: {
-          attempts: number
-          blocked_until: string | null
-          created_at: string
-          email_lower: string
-          first_attempt_at: string
-          id: string
-          ip_address: unknown | null
-          last_attempt_at: string
-        }
-        Insert: {
-          attempts?: number
-          blocked_until?: string | null
-          created_at?: string
-          email_lower: string
-          first_attempt_at?: string
-          id?: string
-          ip_address?: unknown | null
-          last_attempt_at?: string
-        }
-        Update: {
-          attempts?: number
-          blocked_until?: string | null
-          created_at?: string
-          email_lower?: string
-          first_attempt_at?: string
-          id?: string
-          ip_address?: unknown | null
-          last_attempt_at?: string
         }
         Relationships: []
       }
@@ -2167,6 +2123,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "delivery_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
         ]
       }
       delivery_performance_metrics: {
@@ -2284,39 +2247,50 @@ export type Database = {
       }
       delivery_time_slots: {
         Row: {
-          created_at: string | null
-          current_bookings: number
-          date: string
+          created_at: string
+          current_bookings: number | null
+          day_of_week: number
           end_time: string
           id: string
-          is_available: boolean | null
-          max_capacity: number
+          is_active: boolean | null
+          max_capacity: number | null
           start_time: string
-          updated_at: string | null
+          updated_at: string
+          zone_id: string | null
         }
         Insert: {
-          created_at?: string | null
-          current_bookings?: number
-          date: string
+          created_at?: string
+          current_bookings?: number | null
+          day_of_week: number
           end_time: string
           id?: string
-          is_available?: boolean | null
-          max_capacity?: number
+          is_active?: boolean | null
+          max_capacity?: number | null
           start_time: string
-          updated_at?: string | null
+          updated_at?: string
+          zone_id?: string | null
         }
         Update: {
-          created_at?: string | null
-          current_bookings?: number
-          date?: string
+          created_at?: string
+          current_bookings?: number | null
+          day_of_week?: number
           end_time?: string
           id?: string
-          is_available?: boolean | null
-          max_capacity?: number
+          is_active?: boolean | null
+          max_capacity?: number | null
           start_time?: string
-          updated_at?: string | null
+          updated_at?: string
+          zone_id?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "delivery_time_slots_zone_id_fkey"
+            columns: ["zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       delivery_tracking: {
         Row: {
@@ -2381,151 +2355,6 @@ export type Database = {
           id?: string
           name?: string
           updated_at?: string
-        }
-        Relationships: []
-      }
-      dispatch_analytics: {
-        Row: {
-          average_completion_time_minutes: number | null
-          cancelled_assignments: number
-          completed_assignments: number
-          created_at: string
-          customer_rating: number | null
-          date: string
-          earnings: number | null
-          fuel_cost: number | null
-          id: string
-          rider_id: string
-          total_assignments: number
-          total_distance_km: number | null
-          updated_at: string
-        }
-        Insert: {
-          average_completion_time_minutes?: number | null
-          cancelled_assignments?: number
-          completed_assignments?: number
-          created_at?: string
-          customer_rating?: number | null
-          date?: string
-          earnings?: number | null
-          fuel_cost?: number | null
-          id?: string
-          rider_id: string
-          total_assignments?: number
-          total_distance_km?: number | null
-          updated_at?: string
-        }
-        Update: {
-          average_completion_time_minutes?: number | null
-          cancelled_assignments?: number
-          completed_assignments?: number
-          created_at?: string
-          customer_rating?: number | null
-          date?: string
-          earnings?: number | null
-          fuel_cost?: number | null
-          id?: string
-          rider_id?: string
-          total_assignments?: number
-          total_distance_km?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "dispatch_analytics_rider_id_fkey"
-            columns: ["rider_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      driver_delivery_analytics: {
-        Row: {
-          average_customer_rating: number | null
-          created_at: string | null
-          date: string
-          deliveries_completed: number | null
-          deliveries_failed: number | null
-          delivery_fees_collected: number | null
-          driver_id: string
-          fuel_cost: number | null
-          id: string
-          total_delivery_time_minutes: number | null
-          total_distance_km: number | null
-          updated_at: string | null
-        }
-        Insert: {
-          average_customer_rating?: number | null
-          created_at?: string | null
-          date: string
-          deliveries_completed?: number | null
-          deliveries_failed?: number | null
-          delivery_fees_collected?: number | null
-          driver_id: string
-          fuel_cost?: number | null
-          id?: string
-          total_delivery_time_minutes?: number | null
-          total_distance_km?: number | null
-          updated_at?: string | null
-        }
-        Update: {
-          average_customer_rating?: number | null
-          created_at?: string | null
-          date?: string
-          deliveries_completed?: number | null
-          deliveries_failed?: number | null
-          delivery_fees_collected?: number | null
-          driver_id?: string
-          fuel_cost?: number | null
-          id?: string
-          total_delivery_time_minutes?: number | null
-          total_distance_km?: number | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "driver_delivery_analytics_driver_id_fkey"
-            columns: ["driver_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      driver_invitations: {
-        Row: {
-          accepted_at: string | null
-          created_at: string
-          driver_data: Json
-          email: string
-          expires_at: string
-          id: string
-          invitation_token: string
-          invited_by: string | null
-          status: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          created_at?: string
-          driver_data?: Json
-          email: string
-          expires_at?: string
-          id?: string
-          invitation_token?: string
-          invited_by?: string | null
-          status?: string
-        }
-        Update: {
-          accepted_at?: string | null
-          created_at?: string
-          driver_data?: Json
-          email?: string
-          expires_at?: string
-          id?: string
-          invitation_token?: string
-          invited_by?: string | null
-          status?: string
         }
         Relationships: []
       }
@@ -3527,113 +3356,6 @@ export type Database = {
         }
         Relationships: []
       }
-      order_assignments: {
-        Row: {
-          accepted_at: string | null
-          actual_delivery_time: string | null
-          assigned_at: string
-          assigned_by: string | null
-          cancelled_at: string | null
-          completed_at: string | null
-          estimated_delivery_time: string | null
-          id: string
-          notes: string | null
-          order_id: string
-          rider_id: string
-          status: string
-        }
-        Insert: {
-          accepted_at?: string | null
-          actual_delivery_time?: string | null
-          assigned_at?: string
-          assigned_by?: string | null
-          cancelled_at?: string | null
-          completed_at?: string | null
-          estimated_delivery_time?: string | null
-          id?: string
-          notes?: string | null
-          order_id: string
-          rider_id: string
-          status?: string
-        }
-        Update: {
-          accepted_at?: string | null
-          actual_delivery_time?: string | null
-          assigned_at?: string
-          assigned_by?: string | null
-          cancelled_at?: string | null
-          completed_at?: string | null
-          estimated_delivery_time?: string | null
-          id?: string
-          notes?: string | null
-          order_id?: string
-          rider_id?: string
-          status?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_assignments_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_assignments_rider_id_fkey"
-            columns: ["rider_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      order_delivery_schedule: {
-        Row: {
-          created_at: string
-          delivery_date: string
-          delivery_time_end: string
-          delivery_time_start: string
-          id: string
-          is_flexible: boolean
-          order_id: string
-          requested_at: string
-          special_instructions: string | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          delivery_date: string
-          delivery_time_end: string
-          delivery_time_start: string
-          id?: string
-          is_flexible?: boolean
-          order_id: string
-          requested_at?: string
-          special_instructions?: string | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          delivery_date?: string
-          delivery_time_end?: string
-          delivery_time_start?: string
-          id?: string
-          is_flexible?: boolean
-          order_id?: string
-          requested_at?: string
-          special_instructions?: string | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_delivery_schedule_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       order_items: {
         Row: {
           cost_price: number | null
@@ -3689,6 +3411,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "order_items_product_id_fkey"
             columns: ["product_id"]
             isOneToOne: false
@@ -3736,41 +3465,6 @@ export type Database = {
         }
         Relationships: []
       }
-      order_status_changes: {
-        Row: {
-          changed_at: string | null
-          changed_by: string | null
-          id: string
-          new_status: string
-          old_status: string | null
-          order_id: string | null
-        }
-        Insert: {
-          changed_at?: string | null
-          changed_by?: string | null
-          id?: string
-          new_status: string
-          old_status?: string | null
-          order_id?: string | null
-        }
-        Update: {
-          changed_at?: string | null
-          changed_by?: string | null
-          id?: string
-          new_status?: string
-          old_status?: string | null
-          order_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "order_status_changes_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       orders: {
         Row: {
           assigned_rider_id: string | null
@@ -3809,7 +3503,6 @@ export type Database = {
           total_vat: number | null
           updated_at: string
           updated_by: string | null
-          user_id: string | null
         }
         Insert: {
           assigned_rider_id?: string | null
@@ -3848,7 +3541,6 @@ export type Database = {
           total_vat?: number | null
           updated_at?: string
           updated_by?: string | null
-          user_id?: string | null
         }
         Update: {
           assigned_rider_id?: string | null
@@ -3887,7 +3579,6 @@ export type Database = {
           total_vat?: number | null
           updated_at?: string
           updated_by?: string | null
-          user_id?: string | null
         }
         Relationships: [
           {
@@ -3909,6 +3600,13 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_time_slot_id_fkey"
+            columns: ["delivery_time_slot_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_time_slots"
             referencedColumns: ["id"]
           },
           {
@@ -4257,59 +3955,6 @@ export type Database = {
         }
         Relationships: []
       }
-      payment_intents: {
-        Row: {
-          amount: number
-          client_secret: string | null
-          created_at: string | null
-          currency: string
-          expires_at: string | null
-          id: string
-          metadata: Json | null
-          order_id: string
-          provider: string
-          reference: string
-          status: string
-          updated_at: string | null
-        }
-        Insert: {
-          amount: number
-          client_secret?: string | null
-          created_at?: string | null
-          currency?: string
-          expires_at?: string | null
-          id?: string
-          metadata?: Json | null
-          order_id: string
-          provider?: string
-          reference: string
-          status?: string
-          updated_at?: string | null
-        }
-        Update: {
-          amount?: number
-          client_secret?: string | null
-          created_at?: string | null
-          currency?: string
-          expires_at?: string | null
-          id?: string
-          metadata?: Json | null
-          order_id?: string
-          provider?: string
-          reference?: string
-          status?: string
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payment_intents_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       payment_polling_state: {
         Row: {
           created_at: string
@@ -4342,109 +3987,6 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
-      }
-      payment_processing_logs: {
-        Row: {
-          created_at: string | null
-          error_message: string | null
-          fulfillment_type: string | null
-          id: string
-          metadata: Json | null
-          order_id: string | null
-          payment_reference: string | null
-          processing_stage: string | null
-          reference_type: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          error_message?: string | null
-          fulfillment_type?: string | null
-          id?: string
-          metadata?: Json | null
-          order_id?: string | null
-          payment_reference?: string | null
-          processing_stage?: string | null
-          reference_type?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          error_message?: string | null
-          fulfillment_type?: string | null
-          id?: string
-          metadata?: Json | null
-          order_id?: string | null
-          payment_reference?: string | null
-          processing_stage?: string | null
-          reference_type?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payment_processing_logs_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: false
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      payment_processing_status: {
-        Row: {
-          created_at: string | null
-          current_order_status:
-            | Database["public"]["Enums"]["order_status"]
-            | null
-          error_message: string | null
-          id: string
-          order_id: string | null
-          order_number: string | null
-          order_type: Database["public"]["Enums"]["order_type"] | null
-          overall_status: string | null
-          payment_reference: string | null
-          processing_stage: string | null
-          reference_type: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          current_order_status?:
-            | Database["public"]["Enums"]["order_status"]
-            | null
-          error_message?: string | null
-          id?: string
-          order_id?: string | null
-          order_number?: string | null
-          order_type?: Database["public"]["Enums"]["order_type"] | null
-          overall_status?: string | null
-          payment_reference?: string | null
-          processing_stage?: string | null
-          reference_type?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          current_order_status?:
-            | Database["public"]["Enums"]["order_status"]
-            | null
-          error_message?: string | null
-          id?: string
-          order_id?: string | null
-          order_number?: string | null
-          order_type?: Database["public"]["Enums"]["order_type"] | null
-          overall_status?: string | null
-          payment_reference?: string | null
-          processing_stage?: string | null
-          reference_type?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "payment_processing_status_order_id_fkey"
-            columns: ["order_id"]
-            isOneToOne: true
-            referencedRelation: "orders"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       payment_rate_limits: {
         Row: {
@@ -4518,6 +4060,13 @@ export type Database = {
             foreignKeyName: "payment_refunds_transaction_id_fkey"
             columns: ["transaction_id"]
             isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["tx_id"]
+          },
+          {
+            foreignKeyName: "payment_refunds_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
             referencedRelation: "payment_transactions"
             referencedColumns: ["id"]
           },
@@ -4555,6 +4104,13 @@ export type Database = {
           transaction_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "payment_status_tracking_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["tx_id"]
+          },
           {
             foreignKeyName: "payment_status_tracking_transaction_id_fkey"
             columns: ["transaction_id"]
@@ -4661,6 +4217,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
         ]
@@ -4926,6 +4489,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -5296,6 +4866,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "promotion_usage_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "promotion_usage_promotion_id_fkey"
             columns: ["promotion_id"]
             isOneToOne: false
@@ -5414,39 +4991,6 @@ export type Database = {
           valid_from?: string
           valid_until?: string | null
           value?: number
-        }
-        Relationships: []
-      }
-      public_holidays: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          date: string
-          description: string | null
-          id: string
-          is_active: boolean
-          name: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          date: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          name: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          date?: string
-          description?: string | null
-          id?: string
-          is_active?: boolean
-          name?: string
-          updated_at?: string
         }
         Relationships: []
       }
@@ -5665,6 +5209,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_order_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_with_payment"
             referencedColumns: ["id"]
           },
           {
@@ -6648,52 +6199,98 @@ export type Database = {
         }
         Relationships: []
       }
-      zone_delivery_analytics: {
+    }
+    Views: {
+      orders_with_payment: {
         Row: {
-          average_delivery_time_minutes: number | null
+          assigned_rider_id: string | null
           created_at: string | null
-          date: string
-          id: string
-          successful_deliveries: number | null
-          total_deliveries: number | null
-          total_delivery_fees: number | null
+          created_by: string | null
+          customer_email: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          delivery_address: Json | null
+          delivery_fee: number | null
+          delivery_time: string | null
+          delivery_time_slot_id: string | null
+          delivery_zone_id: string | null
+          discount_amount: number | null
+          final_paid: boolean | null
+          final_paid_at: string | null
+          guest_session_id: string | null
+          id: string | null
+          order_number: string | null
+          order_time: string | null
+          order_type: Database["public"]["Enums"]["order_type"] | null
+          paid_at: string | null
+          payment_channel: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          pickup_point_id: string | null
+          pickup_time: string | null
+          preferred_delivery_time: string | null
+          special_instructions: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          subtotal: number | null
+          subtotal_cost: number | null
+          tax_amount: number | null
+          total_amount: number | null
+          total_vat: number | null
+          tx_channel: string | null
+          tx_id: string | null
+          tx_paid_at: string | null
+          tx_provider_reference: string | null
+          tx_status: string | null
           updated_at: string | null
-          zone_id: string
-        }
-        Insert: {
-          average_delivery_time_minutes?: number | null
-          created_at?: string | null
-          date: string
-          id?: string
-          successful_deliveries?: number | null
-          total_deliveries?: number | null
-          total_delivery_fees?: number | null
-          updated_at?: string | null
-          zone_id: string
-        }
-        Update: {
-          average_delivery_time_minutes?: number | null
-          created_at?: string | null
-          date?: string
-          id?: string
-          successful_deliveries?: number | null
-          total_deliveries?: number | null
-          total_delivery_fees?: number | null
-          updated_at?: string | null
-          zone_id?: string
+          updated_by: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "zone_delivery_analytics_zone_id_fkey"
-            columns: ["zone_id"]
+            foreignKeyName: "orders_assigned_rider_id_fkey"
+            columns: ["assigned_rider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_assigned_rider_profile_fkey"
+            columns: ["assigned_rider_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_time_slot_id_fkey"
+            columns: ["delivery_time_slot_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_time_slots"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_zone_id_fkey"
+            columns: ["delivery_zone_id"]
             isOneToOne: false
             referencedRelation: "delivery_zones"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "orders_pickup_point_id_fkey"
+            columns: ["pickup_point_id"]
+            isOneToOne: false
+            referencedRelation: "pickup_points"
+            referencedColumns: ["id"]
+          },
         ]
       }
-    }
-    Views: {
       payment_flow_health: {
         Row: {
           completed_orders: number | null
@@ -6743,10 +6340,6 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
-      assign_rider_to_order: {
-        Args: { p_assigned_by?: string; p_order_id: string; p_rider_id: string }
-        Returns: string
-      }
       bulk_safe_delete_products: {
         Args: { product_ids: string[] }
         Returns: Json
@@ -6756,24 +6349,16 @@ export type Database = {
         Returns: Json
       }
       calculate_bogo_discount: {
-        Args: { p_cart_items: Json; p_promotion_id: string }
+        Args: { p_promotion_id: string; p_cart_items: Json }
         Returns: Json
       }
       calculate_brand_consistency_score: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      calculate_daily_delivery_analytics: {
-        Args: { target_date?: string }
-        Returns: undefined
-      }
       calculate_daily_email_metrics: {
         Args: Record<PropertyKey, never> | { target_date?: string }
         Returns: Json
-      }
-      calculate_delivery_metrics: {
-        Args: { target_date?: string }
-        Returns: undefined
       }
       calculate_profile_completion: {
         Args: { customer_uuid: string }
@@ -6800,29 +6385,29 @@ export type Database = {
         Returns: boolean
       }
       check_customer_operation_rate_limit: {
-        Args: { p_admin_id: string; p_limit?: number; p_operation: string }
+        Args: { p_admin_id: string; p_operation: string; p_limit?: number }
         Returns: boolean
       }
       check_customer_rate_limit: {
         Args: {
           p_customer_id?: string
-          p_endpoint?: string
           p_ip_address?: unknown
+          p_endpoint?: string
           p_tier?: string
         }
         Returns: boolean
       }
       check_email_rate_limit: {
-        Args: { p_email_type?: string; p_identifier: string }
+        Args: { p_identifier: string; p_email_type?: string }
         Returns: boolean
       }
       check_enhanced_rate_limit: {
         Args: {
-          p_ip_address?: string
-          p_limit_per_hour?: number
-          p_limit_per_minute?: number
-          p_operation_type?: string
           p_user_id?: string
+          p_ip_address?: string
+          p_operation_type?: string
+          p_limit_per_minute?: number
+          p_limit_per_hour?: number
         }
         Returns: boolean
       }
@@ -6830,24 +6415,16 @@ export type Database = {
         Args: { p_email: string } | { p_email: string; p_ip_address?: unknown }
         Returns: Json
       }
-      check_otp_rate_limit_secure: {
-        Args: { p_email: string }
-        Returns: Json
-      }
       check_payment_flow_health: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
-      check_payment_security_health: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
       check_payment_system_health: {
         Args: Record<PropertyKey, never>
         Returns: {
-          description: string
           metric: string
           value: number
+          description: string
         }[]
       }
       check_paystack_production_readiness: {
@@ -6862,21 +6439,8 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
-      check_rate_limit: {
-        Args: {
-          p_identifier: string
-          p_limit_type?: string
-          p_max_requests?: number
-          p_window_minutes?: number
-        }
-        Returns: Json
-      }
       check_rate_limit_with_reputation: {
         Args: { p_identifier: string; p_identifier_type?: string }
-        Returns: Json
-      }
-      check_registration_rate_limit_secure: {
-        Args: { p_email: string; p_ip_address?: unknown }
         Returns: Json
       }
       check_upload_rate_limit: {
@@ -6885,15 +6449,11 @@ export type Database = {
       }
       check_user_permission: {
         Args: {
+          user_id_param: string
           menu_key_param: string
           required_level_param?: string
-          user_id_param: string
         }
         Returns: boolean
-      }
-      clean_expired_sessions: {
-        Args: Record<PropertyKey, never>
-        Returns: number
       }
       cleanup_email_processing_data: {
         Args: Record<PropertyKey, never>
@@ -6908,10 +6468,6 @@ export type Database = {
         Returns: undefined
       }
       cleanup_expired_otp_codes: {
-        Args: Record<PropertyKey, never>
-        Returns: number
-      }
-      cleanup_expired_otps: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
@@ -6937,60 +6493,43 @@ export type Database = {
       }
       confirm_payment_atomic: {
         Args: {
-          p_amount: number
-          p_confirmed_at: string
-          p_paystack_data: Json
           p_reference: string
+          p_amount: number
+          p_paystack_data: Json
+          p_confirmed_at: string
         }
         Returns: Json
       }
       convert_guest_cart_to_customer: {
-        Args: { p_customer_id: string; p_guest_session_id: string }
+        Args: { p_guest_session_id: string; p_customer_id: string }
         Returns: Json
       }
       create_admin_session: {
         Args: {
+          p_user_id: string
           p_ip_address?: unknown
           p_user_agent?: string
-          p_user_id: string
         }
         Returns: string
       }
-      create_customer_account_secure: {
-        Args: {
-          p_email: string
-          p_name: string
-          p_password_hash?: string
-          p_phone?: string
-        }
-        Returns: Json
-      }
       create_customer_with_validation: {
         Args: {
-          p_admin_id?: string
-          p_email: string
-          p_ip_address?: unknown
           p_name: string
+          p_email: string
           p_phone?: string
+          p_admin_id?: string
           p_send_welcome_email?: boolean
+          p_ip_address?: unknown
           p_user_agent?: string
-        }
-        Returns: Json
-      }
-      create_driver_with_profile: {
-        Args: {
-          p_create_profile?: boolean
-          p_driver_data: Json
-          p_send_invitation?: boolean
         }
         Returns: Json
       }
       create_logo_version: {
         Args: {
-          p_dimensions: Json
+          p_logo_url: string
           p_file_size: number
           p_file_type: string
-          p_logo_url: string
+          p_dimensions: Json
           p_uploaded_by: string
         }
         Returns: string
@@ -7002,18 +6541,14 @@ export type Database = {
       create_order_with_items: {
         Args: {
           p_customer_id: string
-          p_delivery_address?: Json
-          p_delivery_zone_id?: string
           p_fulfillment_type: string
+          p_delivery_address?: Json
+          p_pickup_point_id?: string
+          p_delivery_zone_id?: string
           p_guest_session_id?: string
           p_items?: Json
-          p_pickup_point_id?: string
         }
         Returns: string
-      }
-      create_payment_intent: {
-        Args: { p_amount: number; p_currency?: string; p_order_id: string }
-        Returns: Json
       }
       current_user_email: {
         Args: Record<PropertyKey, never>
@@ -7029,13 +6564,13 @@ export type Database = {
       }
       debug_payment_transaction_insert: {
         Args: {
+          p_order_id: string
+          p_customer_email: string
           p_amount: number
           p_currency?: string
-          p_customer_email: string
-          p_order_id: string
           p_payment_method?: string
-          p_status?: string
           p_transaction_type?: string
+          p_status?: string
         }
         Returns: Json
       }
@@ -7050,11 +6585,11 @@ export type Database = {
       detect_orphaned_customer_records: {
         Args: Record<PropertyKey, never>
         Returns: {
-          communication_events_count: number
           email: string
+          has_customer_record: boolean
           has_auth_user: boolean
           has_customer_account: boolean
-          has_customer_record: boolean
+          communication_events_count: number
           issue_type: string
         }[]
       }
@@ -7073,9 +6608,9 @@ export type Database = {
       find_or_create_customer: {
         Args: {
           p_email: string
-          p_is_guest?: boolean
           p_name: string
           p_phone?: string
+          p_is_guest?: boolean
         }
         Returns: {
           customer_id: string
@@ -7105,60 +6640,21 @@ export type Database = {
       get_active_paystack_config: {
         Args: Record<PropertyKey, never>
         Returns: {
-          environment: string
           public_key: string
-          secret_key: string
           test_mode: boolean
+          secret_key: string
           webhook_secret: string
+          environment: string
         }[]
       }
       get_admin_invitation_metrics: {
         Args: Record<PropertyKey, never>
         Returns: {
+          total_invitations: number
+          pending_invitations: number
           accepted_invitations: number
           expired_invitations: number
-          pending_invitations: number
           success_rate: number
-          total_invitations: number
-        }[]
-      }
-      get_admin_payment_status: {
-        Args: {
-          p_limit?: number
-          p_order_id?: string
-          p_payment_reference?: string
-        }
-        Returns: {
-          created_at: string
-          error_message: string
-          order_id: string
-          order_number: string
-          order_type: string
-          overall_status: string
-          payment_reference: string
-          processing_stage: string
-          reference_type: string
-        }[]
-      }
-      get_admin_payment_status_secure: {
-        Args: {
-          p_limit?: number
-          p_order_id?: string
-          p_overall_status?: string
-          p_payment_reference?: string
-        }
-        Returns: {
-          created_at: string
-          current_order_status: string
-          error_message: string
-          order_id: string
-          order_number: string
-          order_type: string
-          overall_status: string
-          payment_reference: string
-          processing_stage: string
-          reference_type: string
-          updated_at: string
         }[]
       }
       get_all_customers_display: {
@@ -7168,78 +6664,30 @@ export type Database = {
       get_all_customers_for_analytics: {
         Args: Record<PropertyKey, never>
         Returns: {
-          customer_email: string
           customer_id: string
           customer_name: string
+          customer_email: string
           customer_phone: string
           is_registered: boolean
           registration_date: string
-        }[]
-      }
-      get_available_delivery_slots: {
-        Args: { p_end_date?: string; p_start_date?: string }
-        Returns: {
-          available_spots: number
-          current_bookings: number
-          date: string
-          end_time: string
-          is_available: boolean
-          max_capacity: number
-          slot_id: string
-          start_time: string
         }[]
       }
       get_best_smtp_provider: {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
-      get_current_logo: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
       get_customer_analytics_safe: {
-        Args: { p_end_date?: string; p_start_date?: string }
+        Args: { p_start_date?: string; p_end_date?: string }
         Returns: Json
-      }
-      get_customer_payment_status: {
-        Args: { p_order_id: string }
-        Returns: {
-          error_message: string
-          order_id: string
-          order_number: string
-          overall_status: string
-          payment_reference: string
-          processing_stage: string
-        }[]
-      }
-      get_customer_payment_status_secure: {
-        Args: { p_order_id: string }
-        Returns: {
-          error_message: string
-          last_updated: string
-          order_id: string
-          order_number: string
-          overall_status: string
-          payment_reference: string
-          processing_stage: string
-        }[]
       }
       get_dashboard_data: {
         Args: Record<PropertyKey, never>
         Returns: {
-          total_customers: number
-          total_orders: number
           total_products: number
+          total_orders: number
+          total_customers: number
           total_revenue: number
         }[]
-      }
-      get_delivery_reports: {
-        Args: { end_date?: string; start_date?: string }
-        Returns: Json
-      }
-      get_detailed_order_with_products: {
-        Args: { p_order_id: string }
-        Returns: Json
       }
       get_email_health_status: {
         Args: Record<PropertyKey, never>
@@ -7254,14 +6702,14 @@ export type Database = {
         }[]
       }
       get_hourly_email_stats: {
-        Args: { end_time: string; start_time: string }
+        Args: { start_time: string; end_time: string }
         Returns: {
+          hour_bucket: string
+          total_sent: number
+          successful_delivered: number
+          failed_attempts: number
           bounce_rate: number
           delivery_rate: number
-          failed_attempts: number
-          hour_bucket: string
-          successful_delivered: number
-          total_sent: number
         }[]
       }
       get_order_linking_stats: {
@@ -7271,71 +6719,76 @@ export type Database = {
       get_order_payment_status: {
         Args: { p_order_id: string }
         Returns: {
-          computed_payment_status: string
           order_id: string
-          order_number: string
-          payment_reference: string
           payment_status: string
-          total_amount: number
+          order_status: string
+          paid_at: string
+          final_paid: boolean
+          final_paid_at: string
+          payment_channel: string
+          computed_payment_method: string
+          needs_reconciliation: boolean
+          latest_tx_status: string
+          latest_tx_reference: string
         }[]
       }
       get_orders_with_payment: {
-        Args: { p_customer_email?: string; p_order_id?: string }
+        Args: { p_order_id?: string; p_customer_email?: string }
         Returns: {
-          assigned_rider_id: string
-          created_at: string
-          created_by: string
-          customer_email: string
-          customer_id: string
-          customer_name: string
-          customer_phone: string
-          delivery_address: Json
-          delivery_fee: number
-          delivery_time: string
-          delivery_time_slot_id: string
-          delivery_zone_id: string
-          discount_amount: number
-          final_paid: boolean
-          final_paid_at: string
-          guest_session_id: string
           id: string
           order_number: string
-          order_time: string
+          customer_id: string
+          customer_name: string
+          customer_email: string
+          customer_phone: string
           order_type: Database["public"]["Enums"]["order_type"]
-          paid_at: string
-          payment_channel: string
+          status: Database["public"]["Enums"]["order_status"]
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          subtotal: number
+          tax_amount: number
+          delivery_fee: number
+          discount_amount: number
+          total_amount: number
+          delivery_address: Json
+          pickup_time: string
+          delivery_time: string
+          special_instructions: string
           payment_method: string
           payment_reference: string
-          payment_status: Database["public"]["Enums"]["payment_status"]
-          pickup_point_id: string
-          pickup_time: string
-          preferred_delivery_time: string
-          special_instructions: string
-          status: Database["public"]["Enums"]["order_status"]
-          subtotal: number
-          subtotal_cost: number
-          tax_amount: number
-          total_amount: number
-          total_vat: number
-          tx_channel: string
-          tx_id: string
-          tx_paid_at: string
-          tx_provider_reference: string
-          tx_status: string
+          assigned_rider_id: string
+          order_time: string
+          created_at: string
           updated_at: string
+          created_by: string
           updated_by: string
+          delivery_zone_id: string
+          preferred_delivery_time: string
+          pickup_point_id: string
+          delivery_time_slot_id: string
+          subtotal_cost: number
+          total_vat: number
+          guest_session_id: string
+          paid_at: string
+          tx_id: string
+          tx_status: string
+          tx_paid_at: string
+          tx_channel: string
+          tx_provider_reference: string
+          final_paid: boolean
+          final_paid_at: string
+          payment_channel: string
         }[]
       }
       get_payment_flow_health: {
         Args: Record<PropertyKey, never>
         Returns: {
-          completed_orders: number
-          completion_rate_percent: number
-          paid_orders: number
-          payment_pending: number
-          pending_orders: number
           period: string
           total_orders: number
+          completed_orders: number
+          pending_orders: number
+          paid_orders: number
+          payment_pending: number
+          completion_rate_percent: number
         }[]
       }
       get_payment_health_summary: {
@@ -7349,29 +6802,29 @@ export type Database = {
       get_production_metrics: {
         Args: Record<PropertyKey, never>
         Returns: {
+          total_products: number
           total_paid_orders: number
           total_paying_customers: number
-          total_products: number
           total_revenue: number
         }[]
       }
       get_public_delivery_zones: {
         Args: Record<PropertyKey, never>
         Returns: {
-          base_fee: number
-          description: string
-          fee_per_km: number
           id: string
-          min_order_for_free_delivery: number
           name: string
+          description: string
+          base_fee: number
+          fee_per_km: number
+          min_order_for_free_delivery: number
         }[]
       }
       get_public_paystack_config: {
         Args: Record<PropertyKey, never>
         Returns: {
-          environment: string
           public_key: string
           test_mode: boolean
+          environment: string
         }[]
       }
       get_queued_communication_events: {
@@ -7415,21 +6868,17 @@ export type Database = {
       }
       handle_successful_payment: {
         Args: {
+          p_paystack_reference: string
+          p_order_reference?: string
           p_amount?: number
           p_currency?: string
-          p_order_reference?: string
           p_paystack_data?: Json
-          p_paystack_reference: string
         }
         Returns: Json
       }
       has_email_consent: {
-        Args: { consent_type?: string; email_address: string }
+        Args: { email_address: string; consent_type?: string }
         Returns: boolean
-      }
-      hash_password: {
-        Args: { password_text: string }
-        Returns: string
       }
       health_check: {
         Args: Record<PropertyKey, never>
@@ -7437,13 +6886,13 @@ export type Database = {
       }
       increment_promotion_usage: {
         Args: {
+          p_promotion_id: string
+          p_order_id: string
           p_customer_email: string
           p_discount_amount: number
+          p_original_amount: number
           p_final_amount: number
           p_metadata?: Json
-          p_order_id: string
-          p_original_amount: number
-          p_promotion_id: string
         }
         Returns: undefined
       }
@@ -7452,10 +6901,6 @@ export type Database = {
         Returns: Json
       }
       is_admin: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
-      is_admin_secure: {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
@@ -7468,42 +6913,42 @@ export type Database = {
         Returns: undefined
       }
       link_order_to_customer_account: {
-        Args: { p_customer_email: string; p_order_id: string }
+        Args: { p_order_id: string; p_customer_email: string }
         Returns: undefined
       }
       log_admin_action: {
         Args: {
           action_type: string
-          entity_id: string
           entity_type: string
-          message?: string
-          new_values?: Json
+          entity_id: string
           old_values?: Json
+          new_values?: Json
+          message?: string
         }
         Returns: undefined
       }
       log_admin_management_action: {
         Args: {
+          action_type: string
+          target_user_id?: string
+          target_email?: string
           action_data?: Json
           action_result?: string
-          action_type: string
-          target_email?: string
-          target_user_id?: string
         }
         Returns: undefined
       }
       log_api_request: {
         Args: {
-          p_customer_id?: string
           p_endpoint: string
-          p_error_details?: Json
-          p_ip_address?: unknown
           p_method: string
+          p_ip_address?: unknown
+          p_user_agent?: string
           p_request_payload?: Json
           p_response_status?: number
           p_response_time_ms?: number
+          p_customer_id?: string
           p_session_id?: string
-          p_user_agent?: string
+          p_error_details?: Json
         }
         Returns: string
       }
@@ -7511,129 +6956,101 @@ export type Database = {
         Args: {
           p_action: string
           p_field_name: string
-          p_ip_address?: unknown
-          p_metadata?: Json
-          p_new_value: string
           p_old_value: string
+          p_new_value: string
+          p_metadata?: Json
+          p_ip_address?: unknown
           p_user_agent?: string
         }
         Returns: string
       }
       log_customer_operation: {
         Args: {
-          p_admin_id?: string
-          p_changes?: Json
+          p_action: string
           p_customer_id: string
+          p_details: Json
+          p_admin_id?: string
           p_ip_address?: unknown
-          p_operation: string
           p_user_agent?: string
         }
-        Returns: undefined
+        Returns: string
       }
       log_payment_error: {
         Args: {
           p_error_code: string
-          p_error_context?: Json
           p_error_message: string
-          p_order_id?: string
-          p_severity?: string
-          p_transaction_reference?: string
+          p_error_context?: Json
           p_user_id?: string
+          p_order_id?: string
+          p_transaction_reference?: string
+          p_severity?: string
         }
         Returns: string
       }
       log_payment_security_event: {
         Args: {
-          details?: Json
           event_type: string
-          ip_address?: unknown
           severity?: string
+          details?: Json
+          ip_address?: unknown
           user_agent?: string
         }
         Returns: string
       }
       log_payment_verification_attempt: {
         Args: {
+          p_reference: string
+          p_user_id?: string
+          p_success?: boolean
           p_error_message?: string
           p_ip_address?: unknown
-          p_reference: string
-          p_success?: boolean
-          p_user_id?: string
         }
         Returns: undefined
       }
       log_profile_activity: {
         Args: {
-          p_action_type: string
           p_customer_id: string
+          p_action_type: string
           p_field_changed?: string
-          p_ip_address?: unknown
-          p_new_value?: string
           p_old_value?: string
+          p_new_value?: string
+          p_ip_address?: unknown
           p_user_agent?: string
         }
         Returns: string
       }
       log_registration_debug: {
         Args: {
+          p_message: string
+          p_level?: string
           p_category?: string
           p_details?: Json
-          p_ip_address?: unknown
-          p_level?: string
-          p_message: string
-          p_session_id?: string
-          p_user_agent?: string
           p_user_id?: string
+          p_session_id?: string
+          p_ip_address?: unknown
+          p_user_agent?: string
         }
         Returns: string
       }
       log_security_event: {
-        Args:
-          | {
-              p_description: string
-              p_event_type: string
-              p_metadata?: Json
-              p_severity?: string
-            }
-          | {
-              p_description?: string
-              p_event_type: string
-              p_ip_address?: unknown
-              p_metadata?: Json
-              p_severity?: string
-              p_user_agent?: string
-              p_user_id?: string
-            }
+        Args: {
+          p_event_type: string
+          p_description: string
+          p_severity?: string
+          p_metadata?: Json
+        }
         Returns: string
       }
       log_security_incident: {
         Args: {
-          p_details?: Json
-          p_endpoint?: string
           p_incident_type: string
-          p_ip_address?: unknown
           p_severity?: string
+          p_ip_address?: unknown
           p_user_agent?: string
+          p_endpoint?: string
+          p_details?: Json
         }
         Returns: string
-      }
-      log_security_violation: {
-        Args: {
-          description: string
-          metadata?: Json
-          severity?: string
-          violation_type: string
-        }
-        Returns: string
-      }
-      log_sensitive_data_access: {
-        Args: {
-          operation: string
-          record_id?: string
-          table_name: string
-          user_context?: Json
-        }
-        Returns: undefined
       }
       manual_payment_verification: {
         Args: { p_payment_reference: string }
@@ -7647,16 +7064,8 @@ export type Database = {
         Args: { pay_ref: string }
         Returns: string
       }
-      migrate_payment_references: {
-        Args: Record<PropertyKey, never>
-        Returns: Json
-      }
       minimal_payment_test_insert: {
-        Args: { p_amount: number; p_order_id: string }
-        Returns: Json
-      }
-      monitor_payment_security: {
-        Args: Record<PropertyKey, never>
+        Args: { p_order_id: string; p_amount: number }
         Returns: Json
       }
       order_needs_reconciliation: {
@@ -7665,10 +7074,6 @@ export type Database = {
       }
       pg_notify: {
         Args: { channel: string; payload: string }
-        Returns: undefined
-      }
-      populate_delivery_slots: {
-        Args: { end_date: string; start_date: string }
         Returns: undefined
       }
       process_email_queue_manual: {
@@ -7686,12 +7091,12 @@ export type Database = {
       reconcile_payment_status: {
         Args: { p_order_id?: string }
         Returns: {
-          new_order_status: string
-          new_payment_status: string
-          old_order_status: string
-          old_payment_status: string
           order_id: string
           was_updated: boolean
+          old_payment_status: string
+          new_payment_status: string
+          old_order_status: string
+          new_order_status: string
         }[]
       }
       reconcile_payment_status_batch: {
@@ -7705,44 +7110,44 @@ export type Database = {
       record_health_metric: {
         Args: {
           p_metric_name: string
-          p_metric_type?: string
           p_metric_value: number
-          p_severity?: string
+          p_metric_type?: string
           p_tags?: Json
+          p_severity?: string
         }
         Returns: string
       }
       record_payment_metric: {
         Args: {
-          p_metadata?: Json
           p_metric_name: string
-          p_metric_unit?: string
           p_metric_value: number
+          p_metric_unit?: string
+          p_metadata?: Json
         }
         Returns: undefined
       }
       record_performance_metric: {
         Args: {
-          p_cache_hit?: boolean
-          p_database_query_time_ms?: number
           p_endpoint: string
-          p_error_details?: Json
-          p_ip_address?: unknown
           p_method: string
-          p_request_size_bytes?: number
-          p_response_size_bytes?: number
           p_response_time_ms: number
           p_status_code: number
-          p_user_agent?: string
           p_user_id?: string
+          p_ip_address?: unknown
+          p_user_agent?: string
+          p_request_size_bytes?: number
+          p_response_size_bytes?: number
+          p_database_query_time_ms?: number
+          p_cache_hit?: boolean
+          p_error_details?: Json
         }
         Returns: string
       }
       record_smtp_health_metric: {
         Args: {
+          p_provider_name: string
           p_metric_type: string
           p_metric_value: number
-          p_provider_name: string
           p_threshold_value?: number
         }
         Returns: undefined
@@ -7759,28 +7164,12 @@ export type Database = {
         Args: { p_order_number: string; p_paystack_reference: string }
         Returns: Json
       }
-      refresh_payment_processing_status: {
-        Args: Record<PropertyKey, never>
-        Returns: undefined
-      }
-      release_delivery_slot: {
-        Args: { p_order_id?: string; p_slot_id: string }
-        Returns: Json
-      }
       requeue_failed_welcome_emails: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
-      reserve_delivery_slot: {
-        Args: { p_order_id?: string; p_slot_id: string }
-        Returns: Json
-      }
       safe_delete_product: {
         Args: { product_id: string }
-        Returns: Json
-      }
-      safe_get_order_details: {
-        Args: { p_order_id: string }
         Returns: Json
       }
       setup_admin_permissions: {
@@ -7789,9 +7178,9 @@ export type Database = {
       }
       sync_payment_to_order_status: {
         Args: {
-          p_order_status?: string
-          p_payment_status: string
           p_transaction_id: string
+          p_payment_status: string
+          p_order_status?: string
         }
         Returns: undefined
       }
@@ -7803,73 +7192,42 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: {
           component: string
-          message: string
           status: string
+          message: string
         }[]
       }
       update_admin_role: {
-        Args: { p_new_role: string; p_user_id: string }
+        Args: { p_user_id: string; p_new_role: string }
         Returns: Json
       }
       update_customer_with_validation: {
         Args: {
-          p_admin_id?: string
           p_customer_id: string
-          p_email?: string
-          p_ip_address?: unknown
           p_name?: string
+          p_email?: string
           p_phone?: string
+          p_admin_id?: string
+          p_ip_address?: unknown
           p_user_agent?: string
         }
         Returns: Json
       }
-      update_order_payment_status: {
-        Args: {
-          new_status?: string
-          payment_amount?: number
-          payment_gateway_response?: Json
-          payment_ref: string
-        }
-        Returns: {
-          order_id: string
-          order_number: string
-          payment_status: string
-          status: string
-          total_amount: number
-        }[]
-      }
-      update_order_with_payment_reference: {
-        Args: {
-          new_payment_reference: string
-          order_fulfillment_type?: string
-          order_uuid: string
-        }
-        Returns: Json
-      }
-      validate_admin_access: {
-        Args: Record<PropertyKey, never>
-        Returns: boolean
-      }
       validate_admin_invitation_token: {
         Args: { token: string }
         Returns: {
-          email: string
-          expires_at: string
           invitation_id: string
-          is_valid: boolean
+          email: string
           role: string
+          is_valid: boolean
+          expires_at: string
         }[]
       }
       validate_admin_permission: {
         Args: { required_permission?: string }
         Returns: boolean
       }
-      validate_admin_permissions: {
-        Args: { p_required_permission: string; p_user_id: string }
-        Returns: boolean
-      }
       validate_admin_session: {
-        Args: { p_ip_address?: unknown; p_session_token: string }
+        Args: { p_session_token: string; p_ip_address?: unknown }
         Returns: Json
       }
       validate_order_data: {
@@ -7884,106 +7242,45 @@ export type Database = {
         Args: { p_email: string; p_otp_code: string; p_otp_type: string }
         Returns: Json
       }
-      validate_password_strength: {
-        Args: { password_text: string }
-        Returns: boolean
-      }
       validate_paystack_webhook_ip: {
         Args: { request_ip: unknown }
         Returns: boolean
       }
       validate_promotion_usage: {
         Args: {
-          p_customer_email?: string
-          p_order_amount: number
-          p_promotion_code?: string
           p_promotion_id: string
+          p_order_amount: number
+          p_customer_email?: string
+          p_promotion_code?: string
         }
         Returns: Json
-      }
-      verify_and_update_payment_status: {
-        Args:
-          | {
-              new_status: string
-              payment_amount?: number
-              payment_gateway_response?: Json
-              payment_ref: string
-            }
-          | {
-              p_amount: number
-              p_currency: string
-              p_new_state: string
-              p_order_id: string
-              p_provider: string
-              p_provider_ref: string
-              p_raw: Json
-              p_reference: string
-            }
-        Returns: {
-          amount: number
-          customer_email: string
-          order_id: string
-          order_number: string
-          order_type: string
-          payment_reference: string
-          status: string
-          updated_at: string
-        }[]
-      }
-      verify_and_update_payment_status_secure: {
-        Args: {
-          new_status: string
-          payment_amount?: number
-          payment_gateway_response?: Json
-          payment_ref: string
-        }
-        Returns: {
-          amount: number
-          customer_email: string
-          order_id: string
-          order_number: string
-          order_type: string
-          payment_reference: string
-          status: string
-          updated_at: string
-        }[]
       }
       verify_customer_otp: {
         Args:
           | {
               p_email: string
-              p_ip_address?: string
               p_otp_code: string
               p_otp_type: string
+              p_ip_address?: string
             }
           | {
               p_email: string
-              p_ip_address?: unknown
               p_otp_code: string
               p_otp_type: string
+              p_ip_address?: unknown
             }
-        Returns: Json
-      }
-      verify_customer_otp_secure: {
-        Args: {
-          p_correlation_id?: string
-          p_email: string
-          p_ip_address?: unknown
-          p_otp_code: string
-          p_otp_type: string
-        }
         Returns: Json
       }
       verify_payment_atomic: {
         Args: {
-          p_paystack_data: Json
           p_reference: string
+          p_paystack_data: Json
           p_verified_at: string
         }
         Returns: Json
       }
       verify_webhook_signature: {
-        Args: { p_payload: string; p_secret: string; p_signature: string }
+        Args: { p_payload: string; p_signature: string; p_secret: string }
         Returns: boolean
       }
     }

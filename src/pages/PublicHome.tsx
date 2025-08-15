@@ -20,8 +20,6 @@ import { useImagePreloader } from '@/hooks/useImagePreloader';
 import { PerformanceMonitor } from '@/utils/performance';
 import { OptimizedImage } from '@/components/OptimizedImage';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
-import { ProgressiveLoader } from '@/components/ui/progressive-loader';
-import { CheckoutButton } from '@/components/ui/checkout-button';
 
 // Memoized components for better performance
 const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
@@ -102,14 +100,12 @@ const PublicHome = () => {
     '/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png'
   ]);
 
-  // Fetch products with discounts (STABILITY OPTIMIZED)
-  const { data: products = [], isLoading: isLoadingProducts, error: productsError, refetch: refetchProducts } = useQuery({
+  // Fetch products with discounts (PRODUCTION OPTIMIZED)
+  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
     queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
     queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
-    staleTime: 90 * 1000, // 90 seconds for fresher data
-    gcTime: 5 * 60 * 1000, // 5 minutes cache
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes (renamed from cacheTime)
   });
 
   // Fetch categories (PRODUCTION OPTIMIZED)
@@ -193,7 +189,7 @@ const PublicHome = () => {
                 <div className="pt-2">
                   <Button 
                     onClick={() => navigate('/products')}
-                    className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg"
+                    className="bg-red-600 hover:bg-red-700 text-white px-6 sm:px-8 py-3 sm:py-4 text-base sm:text-lg rounded-full shadow-lg w-full sm:w-auto"
                   >
                     Order Now & Enjoy!
                   </Button>
@@ -301,82 +297,88 @@ const PublicHome = () => {
                 </div>
               </div>
 
-              {/* Products with Progressive Loading */}
-              <ProgressiveLoader
-                isLoading={isLoadingProducts}
-                error={productsError}
-                data={products}
-                skeletonType="product"
-                retryFn={() => refetchProducts()}
-                timeout={8000}
-              >
-                {filteredProducts.length === 0 ? (
-                  <div className="text-center py-8 sm:py-12">
-                    <h3 className="text-lg sm:text-xl font-semibold mb-2">No products found</h3>
-                    <p className="text-gray-600 mb-4 px-4">
-                      {searchTerm ? 'Try adjusting your search terms.' : 'No products available yet.'}
-                    </p>
+              {/* Loading State */}
+              {isLoadingProducts ? (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <Card key={i} className="animate-pulse">
+                      <CardContent className="p-0">
+                        <div className="aspect-square bg-gray-200 rounded-t-lg"></div>
+                        <div className="p-3 sm:p-4 space-y-2">
+                          <div className="h-4 bg-gray-200 rounded"></div>
+                          <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                          <div className="h-6 bg-gray-200 rounded w-1/2"></div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="text-center py-8 sm:py-12">
+                  <h3 className="text-lg sm:text-xl font-semibold mb-2">No products found</h3>
+                  <p className="text-gray-600 mb-4 px-4">
+                    {searchTerm ? 'Try adjusting your search terms.' : 'No products available yet.'}
+                  </p>
+                </div>
+              ) : (
+                <>
+                  {/* Products Grid - Mobile optimized */}
+                  <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-8">
+                    {currentProducts.map((product) => (
+                      <MemoizedProductCard
+                        key={product.id}
+                        product={product}
+                        onAddToCart={handleAddToCart}
+                        navigate={navigate}
+                      />
+                    ))}
                   </div>
-                ) : (
-                  <>
-                    {/* Products Grid - Mobile optimized */}
-                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-8">
-                      {currentProducts.map((product) => (
-                        <MemoizedProductCard
-                          key={product.id}
-                          product={product}
-                          onAddToCart={handleAddToCart}
-                          navigate={navigate}
-                        />
-                      ))}
-                    </div>
 
-                    {/* Pagination - Mobile optimized */}
-                    {totalPages > 1 && (
-                      <div className="flex justify-center items-center space-x-2 flex-wrap gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                          disabled={currentPage <= 1}
-                          className="text-xs sm:text-sm px-2 sm:px-3"
-                        >
-                          Prev
-                        </Button>
-                        
-                        {/* Show fewer page numbers on mobile */}
-                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                          const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                          if (pageNum <= totalPages) {
-                            return (
-                              <Button
-                                key={pageNum}
-                                variant={currentPage === pageNum ? "default" : "outline"}
-                                size="sm"
-                                onClick={() => setCurrentPage(pageNum)}
-                                className="w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm"
-                              >
-                                {pageNum}
-                              </Button>
-                            );
-                          }
-                          return null;
-                        })}
-                        
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-                          disabled={currentPage >= totalPages}
-                          className="text-xs sm:text-sm px-2 sm:px-3"
-                        >
-                          Next
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </ProgressiveLoader>
+                  {/* Pagination - Mobile optimized */}
+                  {totalPages > 1 && (
+                    <div className="flex justify-center items-center space-x-2 flex-wrap gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                        disabled={currentPage <= 1}
+                        className="text-xs sm:text-sm px-2 sm:px-3"
+                      >
+                        Prev
+                      </Button>
+                      
+                      {/* Show fewer page numbers on mobile */}
+                      {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                        const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                        if (pageNum <= totalPages) {
+                          return (
+                            <Button
+                              key={pageNum}
+                              variant={currentPage === pageNum ? "default" : "outline"}
+                              size="sm"
+                              onClick={() => setCurrentPage(pageNum)}
+                              className="w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm"
+                            >
+                              {pageNum}
+                            </Button>
+                          );
+                        }
+                        return null;
+                      })}
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                        disabled={currentPage >= totalPages}
+                        className="text-xs sm:text-sm px-2 sm:px-3"
+                      >
+                        Next
+                      </Button>
+                    </div>
+                  )}
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -384,9 +386,6 @@ const PublicHome = () => {
 
       {/* Footer */}
       <PublicFooter />
-      
-      {/* Floating Checkout Button */}
-      <CheckoutButton />
     </div>
     </>
   );

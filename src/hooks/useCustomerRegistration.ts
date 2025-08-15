@@ -9,14 +9,6 @@ interface RegistrationData {
   phone?: string;
 }
 
-interface RegistrationResponse {
-  success: boolean;
-  error?: string;
-  requiresOtpVerification?: boolean;
-  email?: string;
-  correlation_id?: string;
-}
-
 interface OTPVerificationData {
   email: string;
   otpCode: string;
@@ -25,20 +17,10 @@ interface OTPVerificationData {
   phone?: string;
 }
 
-interface OTPVerificationResponse {
-  success: boolean;
-  error?: string;
-  customer_id?: string;
-  auth_user_id?: string;
-  welcome_email_sent?: boolean;
-  correlation_id?: string;
-}
-
 export const useCustomerRegistration = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [registrationStep, setRegistrationStep] = useState<'registration' | 'otp_verification' | 'completed'>('registration');
   const [registrationEmail, setRegistrationEmail] = useState<string>('');
-  const [correlationId, setCorrelationId] = useState<string>('');
   const { toast } = useToast();
 
   const initiateRegistration = async (data: RegistrationData) => {
@@ -66,19 +48,17 @@ export const useCustomerRegistration = () => {
 
       if (response?.success) {
         setRegistrationEmail(data.email.toLowerCase());
-        setCorrelationId(response.correlation_id || '');
         setRegistrationStep('otp_verification');
         
         toast({
           title: "Verification code sent",
-          description: "Please check your email for the 6-character verification code.",
+          description: "Please check your email for the verification code.",
         });
 
         return { 
           success: true, 
           requiresOtpVerification: true,
-          email: data.email.toLowerCase(),
-          correlation_id: response.correlation_id
+          email: data.email.toLowerCase()
         };
       }
 
@@ -132,8 +112,7 @@ export const useCustomerRegistration = () => {
           success: true, 
           customer_id: response.customer_id,
           auth_user_id: response.auth_user_id,
-          welcome_email_sent: response.welcome_email_sent,
-          correlation_id: response.correlation_id
+          welcome_email_sent: response.welcome_email_sent
         };
       }
 
@@ -200,14 +179,12 @@ export const useCustomerRegistration = () => {
   const resetRegistrationFlow = () => {
     setRegistrationStep('registration');
     setRegistrationEmail('');
-    setCorrelationId('');
   };
 
   return {
     isLoading,
     registrationStep,
     registrationEmail,
-    correlationId,
     initiateRegistration,
     verifyOTPAndCompleteRegistration,
     resendOTP,

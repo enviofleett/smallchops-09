@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { SecurityMonitor } from '@/lib/security-utils';
 
 interface CustomerAccount {
   id: string;
@@ -175,22 +174,6 @@ export const useCustomerAuth = () => {
   };
 
   const logout = async () => {
-    // Log security event for logout
-    try {
-      await SecurityMonitor.logEvent(
-        'customer_logout',
-        'low',
-        'Customer logged out successfully',
-        {
-          customer_id: authState.customerAccount?.id,
-          email: authState.customerAccount?.email,
-          timestamp: new Date().toISOString()
-        }
-      );
-    } catch (error) {
-      console.error('Failed to log logout event:', error);
-    }
-
     // Clear cart and shopping data before signing out
     localStorage.removeItem('restaurant_cart');
     localStorage.removeItem('guest_session');
@@ -208,89 +191,6 @@ export const useCustomerAuth = () => {
     
     const { error } = await supabase.auth.signOut();
     if (error) throw error;
-  };
-
-  // Secure customer registration function
-  const secureRegister = async (email: string, password: string, name: string, phone?: string) => {
-    try {
-      const result = await SecurityMonitor.secureCustomerAuth('register', {
-        email,
-        password,
-        name,
-        phone
-      });
-
-      if (result.success) {
-        // Log successful registration
-        await SecurityMonitor.logEvent(
-          'customer_registration_success',
-          'low',
-          'Customer registered successfully via secure auth',
-          {
-            customer_id: result.customer_id,
-            email: email
-          }
-        );
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Secure registration error:', error);
-      await SecurityMonitor.logEvent(
-        'customer_registration_error',
-        'medium',
-        'Customer registration failed with exception',
-        {
-          email: email,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      );
-      
-      return {
-        success: false,
-        error: 'Registration failed. Please try again.'
-      };
-    }
-  };
-
-  // Secure OTP verification function
-  const secureVerifyOTP = async (email: string, otpCode: string) => {
-    try {
-      const result = await SecurityMonitor.secureCustomerAuth('verify_otp', {
-        email,
-        otpCode
-      });
-
-      if (result.success) {
-        await SecurityMonitor.logEvent(
-          'customer_otp_verification_success',
-          'low',
-          'Customer OTP verified successfully',
-          {
-            customer_id: result.customer_id,
-            email: email
-          }
-        );
-      }
-
-      return result;
-    } catch (error) {
-      console.error('Secure OTP verification error:', error);
-      await SecurityMonitor.logEvent(
-        'customer_otp_verification_error',
-        'medium',
-        'Customer OTP verification failed with exception',
-        {
-          email: email,
-          error: error instanceof Error ? error.message : 'Unknown error'
-        }
-      );
-
-      return {
-        success: false,
-        error: 'OTP verification failed. Please try again.'
-      };
-    }
   };
 
   const updateCustomerAccount = async (updates: Partial<CustomerAccount>) => {
@@ -318,7 +218,5 @@ export const useCustomerAuth = () => {
     logout,
     updateCustomerAccount,
     refetch: refreshAccount,
-    secureRegister,
-    secureVerifyOTP,
   };
 };

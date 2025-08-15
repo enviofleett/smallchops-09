@@ -7,7 +7,6 @@ import { AdminUserControl } from "@/components/settings/AdminUserControl";
 import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
 import { PaymentSettingsTab } from "@/components/payments/PaymentSettingsTab";
 import { ContentManagementTab } from "@/components/blog/ContentManagementTab";
-import { WhatsAppSupportTab } from "@/components/settings/WhatsAppSupportTab";
 import { EmailProcessingTab } from "@/components/settings/EmailProcessingTab";
 import { EmailDeliveryMonitor } from "@/components/settings/EmailDeliveryMonitor";
 import { EmailHealthDashboard } from "@/components/admin/EmailHealthDashboard";
@@ -20,7 +19,6 @@ import { BuyingLogicEndpointsTab } from "@/components/settings/BuyingLogicEndpoi
 import { PickupPointsManager } from "@/components/admin/PickupPointsManager";
 import { ProductionHealthMonitor } from "@/components/admin/ProductionHealthMonitor";
 import { ProductionReadinessStatus } from "@/components/admin/ProductionReadinessStatus";
-import { PerformanceDebugger } from "@/components/monitoring/PerformanceDebugger";
 import RegistrationHealth from "./RegistrationHealth";
 import AdminCheckoutSettingsCard from '@/components/admin/settings/AdminCheckoutSettingsCard';
 import PaymentsWebhooksPanel from '@/components/admin/dev/PaymentsWebhooksPanel';
@@ -71,10 +69,9 @@ const Settings = () => {
 
         <TabsContent value="communications" className="space-y-6">
           <Tabs defaultValue="branding" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="branding">Branding</TabsTrigger>
               <TabsTrigger value="content">Content</TabsTrigger>
-              <TabsTrigger value="cooms">Support</TabsTrigger>
               <TabsTrigger value="email-processing">Queue</TabsTrigger>
             </TabsList>
             
@@ -84,10 +81,6 @@ const Settings = () => {
             
             <TabsContent value="content">
               <ContentManagementTab />
-            </TabsContent>
-            
-            <TabsContent value="cooms">
-              <WhatsAppSupportTab />
             </TabsContent>
             
             <TabsContent value="email-processing">
@@ -151,7 +144,6 @@ const Settings = () => {
                 <TabsTrigger value="oauth">OAuth Config</TabsTrigger>
                 <TabsTrigger value="registration-health">Registration Health</TabsTrigger>
                 <TabsTrigger value="production-readiness">Production</TabsTrigger>
-                <TabsTrigger value="performance">Performance</TabsTrigger>
               </TabsList>
               
               <TabsContent value="auth-endpoints">
@@ -1460,20 +1452,6 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
                   <ProductionReadinessStatus />
                   <ProductionHealthMonitor />
                 </div>
-              </TabsContent>
-
-              <TabsContent value="performance">
-                <Card>
-                  <CardHeader>
-                    <CardTitle>Performance Debugger</CardTitle>
-                    <CardDescription>
-                      Monitor web performance metrics, system health, and network activity
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <PerformanceDebugger />
-                  </CardContent>
-                </Card>
               </TabsContent>
             </Tabs>
           </TabsContent>}

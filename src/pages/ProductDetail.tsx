@@ -28,7 +28,6 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { getProductWithDiscounts, getProductsWithDiscounts } from '@/api/productsWithDiscounts';
 import { useProductReviews, useProductRatingSummary, useVoteOnReview } from '@/hooks/useProductReviews';
-import { WhatsAppSupportWidget } from '@/components/ui/WhatsAppSupportWidget';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { StarRating } from '@/components/ui/star-rating';
 import { FavoriteButton } from '@/components/ui/favorite-button';
@@ -401,7 +400,13 @@ const ProductDetail = () => {
 
               {/* Support Information */}
               <div className="border-t pt-4">
-                <WhatsAppSupportWidget />
+                <div className="flex items-center gap-3 p-4 bg-muted/50 rounded-lg">
+                  <Phone className="h-5 w-5 text-primary flex-shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium text-foreground">Need help placing this order?</p>
+                    <p className="text-sm text-muted-foreground">Please call us on <span className="font-medium text-foreground">0807 301 1100</span></p>
+                  </div>
+                </div>
               </div>
             </div>
 

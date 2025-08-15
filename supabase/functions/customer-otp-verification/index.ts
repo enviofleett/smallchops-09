@@ -52,18 +52,14 @@ serve(async (req) => {
       ? forwarded.split(',')[0].trim() 
       : realIP || '127.0.0.1';
 
-    // Generate correlation ID for tracking
-    const correlationId = crypto.randomUUID();
-    
-    // Verify OTP using enhanced secure function
+    // Verify OTP using database function
     const { data: verificationResult, error: verificationError } = await supabaseAdmin.rpc(
-      'verify_customer_otp_secure',
+      'verify_customer_otp',
       {
         p_email: email,
         p_otp_code: otpCode,
         p_otp_type: otpType,
-        p_ip_address: clientIP,
-        p_correlation_id: correlationId
+        p_ip_address: clientIP
       }
     );
 
@@ -148,20 +144,19 @@ serve(async (req) => {
           console.warn('Welcome email failed:', welcomeEmailResult.error);
         }
 
-        // Log successful registration with correlation ID
+        // Log successful registration
         await supabaseAdmin
           .from('customer_auth_audit')
           .insert({
             customer_id: verificationResult.customer_id,
             email: email,
-            action: 'registration_completed',
+            action: 'registration',
             success: true,
             ip_address: clientIP,
             metadata: {
               auth_user_id: authData.user.id,
               registration_method: 'otp',
-              welcome_email_sent: !welcomeEmailResult.error,
-              correlation_id: verificationResult.correlation_id || correlationId
+              welcome_email_sent: !welcomeEmailResult.error
             }
           });
 
@@ -172,8 +167,7 @@ serve(async (req) => {
             customer_id: verificationResult.customer_id,
             auth_user_id: authData.user.id,
             email_verified: true,
-            welcome_email_sent: !welcomeEmailResult.error,
-            correlation_id: verificationResult.correlation_id || correlationId
+            welcome_email_sent: !welcomeEmailResult.error
           }),
           { 
             status: 200, 

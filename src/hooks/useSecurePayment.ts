@@ -135,10 +135,10 @@ export const useSecurePayment = () => {
           throw new Error('Invalid payment reference format');
         }
 
-        const { data, error } = await supabase.functions.invoke('verify-payment-unified', {
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
           body: {
-            order_id: orderId,
-            reference
+            reference,
+            order_id: orderId
           }
         });
 

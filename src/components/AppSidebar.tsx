@@ -37,7 +37,7 @@ const coreOperations = [
   {
     icon: ShoppingCart,
     label: 'Orders',
-    path: '/admin/orders'
+    path: '/orders'
   },
   {
     icon: Tag,
@@ -64,8 +64,8 @@ const management = [
   },
   {
     icon: Truck,
-    label: 'Delivery Management',
-    path: '/admin/delivery'
+    label: 'Delivery & Pickup',
+    path: '/delivery-pickup'
   },
   {
     icon: Trophy,

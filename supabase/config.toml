@@ -10,24 +10,14 @@ max_rows = 1000
 [auth]
 enabled = true
 port = 54322
-site_url = "https://startersmallchops.com"
-additional_redirect_urls = ["https://startersmallchops.com/auth/callback", "https://startersmallchops.com/email-verification"]
+site_url = "https://preview--smallchops-09.lovable.app"
+additional_redirect_urls = ["https://preview--smallchops-09.lovable.app", "http://localhost:3000"]
 jwt_expiry = 3600
-refresh_token_rotation_enabled = true
-security_update_password_require_reauthentication = true
 enable_signup = true
-enable_confirmations = true
-
-[auth.email]
-enable_signup = true
-double_confirm_changes = true
-enable_confirmations = true
-
-[auth.external.google]
-enabled = true
-client_id = "env(GOOGLE_CLIENT_ID)"
-secret = "env(GOOGLE_CLIENT_SECRET)"
-redirect_uri = "https://oknnklksdiqaifhxaccs.supabase.co/auth/v1/callback"
+enable_email_confirmations = true
+enable_email_autoconfirm = false
+enable_phone_confirmations = false
+enable_phone_autoconfirm = false
 
 [functions.secure-payment-processor]
 verify_jwt = false
@@ -96,10 +86,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.payment-health-check]
-verify_jwt = false
-
-[functions.welcome-email-queue-processor]
-verify_jwt = false
-
-[functions.welcome-email-queue-processor]
 verify_jwt = false

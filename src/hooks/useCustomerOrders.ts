@@ -89,19 +89,19 @@ export const useCustomerOrders = () => {
       }
     },
     enabled: isAuthenticated && !!(user?.email || customerAccount?.email),
-    // Balanced refetch strategy to reduce flickering
-    refetchOnMount: true,
-    refetchOnWindowFocus: false,
-    // Longer stale time for better stability
-    staleTime: 2 * 60 * 1000, // 2 minutes
-    // Poll only while there are pending payments but less frequently
+    // Always refetch on mount and focus to avoid stale pending states
+    refetchOnMount: 'always',
+    refetchOnWindowFocus: true,
+    // Keep data fresh; payments may settle within seconds
+    staleTime: 10 * 1000,
+    // Poll only while there are pending payments
     refetchInterval: (data) => {
       const list = Array.isArray((data as any)?.orders) ? (data as any).orders : [];
       const hasPending = list.some((o: any) => (o?.payment_status || '').toLowerCase() !== 'paid');
-      return hasPending ? 30 * 1000 : false; // 30 seconds instead of 10
+      return hasPending ? 10 * 1000 : false;
     },
-    retry: 1,
-    retryDelay: 2000,
+    retry: 2,
+    retryDelay: 1000,
   });
 
   // Realtime: refresh on customer-specific orders changes

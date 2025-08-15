@@ -6,7 +6,7 @@ import { useProfileActivity } from '@/hooks/useCustomerProfile';
 import { format, formatDistanceToNow } from 'date-fns';
 
 export function ProfileActivityLog() {
-  const { activity: activities = [], isLoading } = useProfileActivity();
+  const { data: activities = [], isLoading } = useProfileActivity();
 
   const getActivityIcon = (actionType: string) => {
     switch (actionType) {

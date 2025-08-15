@@ -217,7 +217,29 @@ async function handlePost(supabase: any, req: Request, user: any) {
       message: 'Invalid or empty JSON body' 
     }
   }
-  
+
+  const action = body.action || 'create_invitation'
+  console.log(`[ADMIN-POST] Processing action: ${action}`)
+
+  switch (action) {
+    case 'create_invitation':
+      return await createInvitation(supabase, body, user)
+    case 'update_permissions':
+      return await updatePermissions(supabase, body, user)
+    case 'delete_invitation':
+      return await deleteInvitation(supabase, body, user)
+    case 'resend_invitation':
+      return await resendInvitation(supabase, body, user)
+    default:
+      throw { 
+        status: 400, 
+        code: 'INVALID_ACTION', 
+        message: `Invalid action: ${action}` 
+      }
+  }
+}
+
+async function createInvitation(supabase: any, body: any, user: any) {
   console.log('[ADMIN-POST] Sending admin invitation to:', body.email)
   
   // Enhanced input validation
@@ -298,6 +320,199 @@ async function handlePost(supabase: any, req: Request, user: any) {
     success: true, 
     message: 'Invitation sent successfully',
     data: { invitation_id: invitation.id }
+  })
+}
+
+async function updatePermissions(supabase: any, body: any, user: any) {
+  console.log('[ADMIN-PERMISSIONS] Updating permissions for user:', body.userId)
+  
+  if (!body.userId || !body.permissions) {
+    throw { 
+      status: 400, 
+      code: 'REQUIRED_FIELDS', 
+      message: 'User ID and permissions are required' 
+    }
+  }
+
+  // Validate target user exists and is admin
+  const { data: targetUser, error: userError } = await supabase
+    .from('profiles')
+    .select('id, name, role')
+    .eq('id', body.userId)
+    .eq('role', 'admin')
+    .single()
+
+  if (userError || !targetUser) {
+    throw { 
+      status: 404, 
+      code: 'USER_NOT_FOUND', 
+      message: 'Target admin user not found' 
+    }
+  }
+
+  // Delete existing permissions
+  await supabase
+    .from('user_permissions')
+    .delete()
+    .eq('user_id', body.userId)
+
+  // Insert new permissions
+  const permissionInserts = Object.entries(body.permissions)
+    .filter(([_, level]) => level !== 'none')
+    .map(([menuKey, level]) => ({
+      user_id: body.userId,
+      menu_key: menuKey,
+      permission_level: level,
+      granted_by: user.id,
+      granted_at: new Date().toISOString()
+    }))
+
+  if (permissionInserts.length > 0) {
+    const { error: insertError } = await supabase
+      .from('user_permissions')
+      .insert(permissionInserts)
+
+    if (insertError) {
+      throw { 
+        status: 500, 
+        code: 'DB_ERROR', 
+        message: `Failed to update permissions: ${insertError.message}` 
+      }
+    }
+  }
+
+  // Log the permission update
+  await supabase
+    .from('user_permission_audit')
+    .insert({
+      user_id: body.userId,
+      menu_key: 'bulk_update',
+      action: 'permissions_updated',
+      permission_level: 'edit',
+      changed_by: user.id,
+      new_values: body.permissions
+    })
+
+  console.log(`[ADMIN-PERMISSIONS] Successfully updated permissions for ${targetUser.name}`)
+  return jsonResponse({
+    success: true,
+    message: `Permissions updated for ${targetUser.name}`
+  })
+}
+
+async function deleteInvitation(supabase: any, body: any, user: any) {
+  console.log('[ADMIN-INVITATION] Deleting invitation:', body.invitationId)
+  
+  if (!body.invitationId) {
+    throw { 
+      status: 400, 
+      code: 'REQUIRED_FIELDS', 
+      message: 'Invitation ID is required' 
+    }
+  }
+
+  const { data: invitation, error: deleteError } = await supabase
+    .from('admin_invitations')
+    .delete()
+    .eq('id', body.invitationId)
+    .select()
+    .single()
+
+  if (deleteError) {
+    throw { 
+      status: 500, 
+      code: 'DB_ERROR', 
+      message: `Failed to delete invitation: ${deleteError.message}` 
+    }
+  }
+
+  // Log the deletion
+  await supabase
+    .from('audit_logs')
+    .insert({
+      action: 'invitation_deleted',
+      category: 'Admin Management',
+      message: `Admin invitation deleted: ${invitation.email}`,
+      user_id: user.id,
+      entity_id: body.invitationId,
+      old_values: invitation
+    })
+
+  return jsonResponse({
+    success: true,
+    message: 'Invitation deleted successfully'
+  })
+}
+
+async function resendInvitation(supabase: any, body: any, user: any) {
+  console.log('[ADMIN-INVITATION] Resending invitation:', body.invitationId)
+  
+  if (!body.invitationId) {
+    throw { 
+      status: 400, 
+      code: 'REQUIRED_FIELDS', 
+      message: 'Invitation ID is required' 
+    }
+  }
+
+  // Get existing invitation
+  const { data: invitation, error: fetchError } = await supabase
+    .from('admin_invitations')
+    .select('*')
+    .eq('id', body.invitationId)
+    .single()
+
+  if (fetchError || !invitation) {
+    throw { 
+      status: 404, 
+      code: 'INVITATION_NOT_FOUND', 
+      message: 'Invitation not found' 
+    }
+  }
+
+  // Generate new token and extend expiry
+  const newToken = crypto.randomUUID()
+  const newExpiryDate = new Date()
+  newExpiryDate.setDate(newExpiryDate.getDate() + 7)
+
+  const { error: updateError } = await supabase
+    .from('admin_invitations')
+    .update({
+      invitation_token: newToken,
+      expires_at: newExpiryDate.toISOString(),
+      status: 'pending'
+    })
+    .eq('id', body.invitationId)
+
+  if (updateError) {
+    throw { 
+      status: 500, 
+      code: 'DB_ERROR', 
+      message: `Failed to update invitation: ${updateError.message}` 
+    }
+  }
+
+  // Send new invitation email
+  try {
+    await supabase.functions.invoke('supabase-auth-email-sender', {
+      body: {
+        templateId: 'admin_invitation',
+        to: invitation.email,
+        variables: {
+          role: invitation.role,
+          companyName: 'Starters Small Chops',
+          invitation_url: `${Deno.env.get('SUPABASE_URL')}/auth/v1/verify?token=${newToken}&type=signup&redirect_to=${encodeURIComponent('https://startersmallchops.com/admin')}`
+        },
+        emailType: 'transactional'
+      }
+    })
+  } catch (emailError) {
+    console.warn('[ADMIN-INVITATION] Failed to send resend email:', emailError)
+  }
+
+  return jsonResponse({
+    success: true,
+    message: 'Invitation resent successfully'
   })
 }
 

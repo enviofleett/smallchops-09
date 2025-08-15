@@ -51,6 +51,13 @@ export const UserPermissionsMatrix = ({ selectedUser }: UserPermissionsMatrixPro
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Update currentUser when selectedUser prop changes
+  useEffect(() => {
+    if (selectedUser) {
+      setCurrentUser(selectedUser);
+    }
+  }, [selectedUser]);
+
   // Fetch admin users
   const { data: adminUsers } = useQuery({
     queryKey: ['admin-users'],
@@ -214,42 +221,42 @@ export const UserPermissionsMatrix = ({ selectedUser }: UserPermissionsMatrixPro
     const isExpanded = expandedMenus.has(menu.key);
 
     return (
-      <div key={menu.key} className={`${level > 0 ? 'ml-6 border-l-2 border-border pl-4' : ''}`}>
+      <div key={menu.key} className={`${level > 0 ? 'ml-3 sm:ml-6 border-l-2 border-border pl-3 sm:pl-4' : ''}`}>
         <Card className="mb-3">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center space-x-3">
+          <CardHeader className="pb-3 px-3 sm:px-6">
+            <div className="flex flex-col space-y-3 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <div className="flex items-start space-x-2 sm:space-x-3 flex-1">
                 {hasChildren && (
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => toggleExpanded(menu.key)}
-                    className="p-1 h-8 w-8"
+                    className="p-1 h-6 w-6 sm:h-8 sm:w-8 mt-1 sm:mt-0 flex-shrink-0"
                   >
-                    {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+                    {isExpanded ? <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4" /> : <ChevronRight className="h-3 w-3 sm:h-4 sm:w-4" />}
                   </Button>
                 )}
-                <div className="flex-1">
-                  <CardTitle className="text-base">{menu.label}</CardTitle>
-                  <CardDescription className="text-sm flex items-center gap-2">
-                    Current: 
+                <div className="flex-1 min-w-0">
+                  <CardTitle className="text-sm sm:text-base break-words">{menu.label}</CardTitle>
+                  <CardDescription className="text-xs sm:text-sm flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 mt-1">
+                    <span>Current:</span>
                     <Badge 
                       variant={
                         permissionLevels.find(p => p.value === permissions[menu.key])?.color as any || 'destructive'
                       }
-                      className="text-xs"
+                      className="text-xs w-fit"
                     >
                       {permissionLevels.find(p => p.value === permissions[menu.key])?.label || 'No Access'}
                     </Badge>
                   </CardDescription>
                 </div>
               </div>
-              <div className="w-48">
+              <div className="w-full sm:w-48 flex-shrink-0">
                 <Select
                   value={permissions[menu.key] || 'none'}
                   onValueChange={(value) => handlePermissionChange(menu.key, value)}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -295,7 +302,7 @@ export const UserPermissionsMatrix = ({ selectedUser }: UserPermissionsMatrixPro
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6">
       {!selectedUser && (
         <Card>
           <CardHeader>
@@ -328,29 +335,30 @@ export const UserPermissionsMatrix = ({ selectedUser }: UserPermissionsMatrixPro
       {currentUser && menuStructure && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="w-5 h-5" />
-              Permissions for {currentUser.name}
-            </CardTitle>
-            <CardDescription>
-              Configure access levels for different sections and sub-sections
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-6">
-              <div className="flex items-center justify-between">
-                <Badge variant="secondary" className="text-sm">
+            <div className="flex flex-col space-y-4 sm:flex-row sm:items-center sm:justify-between sm:space-y-0">
+              <div>
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                  <Shield className="w-5 h-5" />
+                  Permissions for {currentUser.name}
+                </CardTitle>
+                <CardDescription className="text-sm">
+                  Configure access levels for different sections and sub-sections
+                </CardDescription>
+              </div>
+              <div className="flex flex-col space-y-2 sm:flex-row sm:items-center sm:space-y-0 sm:space-x-3">
+                <Badge variant="secondary" className="text-sm w-fit">
                   {currentUser.role}
                 </Badge>
-                <Button onClick={handleSavePermissions} disabled={isSubmitting} size="lg">
+                <Button onClick={handleSavePermissions} disabled={isSubmitting} className="w-full sm:w-auto">
                   <Save className="w-4 h-4 mr-2" />
                   {isSubmitting ? "Saving..." : "Save Permissions"}
                 </Button>
               </div>
-              
-              <div className="space-y-4">
-                {menuStructure.map(menu => renderMenuPermissions(menu))}
-              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-4">
+              {menuStructure.map(menu => renderMenuPermissions(menu))}
             </div>
           </CardContent>
         </Card>

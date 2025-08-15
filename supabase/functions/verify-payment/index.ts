@@ -124,7 +124,13 @@ serve(async (req) => {
         JSON.stringify({ 
           success: true, 
           message: 'Payment verified and order updated successfully',
-          order: updateResult[0],
+          order: {
+            order_id: updateResult[0].order_id,
+            order_number: updateResult[0].order_number,
+            status: updateResult[0].status,
+            amount: updateResult[0].amount,
+            updated_at: updateResult[0].updated_at
+          },
           payment_data: {
             amount: paymentData.data.amount / 100,
             reference: paymentData.data.reference,

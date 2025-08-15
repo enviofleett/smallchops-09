@@ -30,6 +30,7 @@ export interface BusinessSettings {
   social_card_url?: string;
   brand_guidelines?: string;
   logo_usage_rules?: string;
+  whatsapp_support_number?: string;
   created_at: string;
   updated_at: string;
   allow_guest_checkout?: boolean;

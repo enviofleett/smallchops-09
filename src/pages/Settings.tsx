@@ -7,6 +7,7 @@ import { AdminUserControl } from "@/components/settings/AdminUserControl";
 import { CommunicationsTab } from "@/components/settings/CommunicationsTab";
 import { PaymentSettingsTab } from "@/components/payments/PaymentSettingsTab";
 import { ContentManagementTab } from "@/components/blog/ContentManagementTab";
+import { WhatsAppSupportTab } from "@/components/settings/WhatsAppSupportTab";
 import { EmailProcessingTab } from "@/components/settings/EmailProcessingTab";
 import { EmailDeliveryMonitor } from "@/components/settings/EmailDeliveryMonitor";
 import { EmailHealthDashboard } from "@/components/admin/EmailHealthDashboard";
@@ -69,9 +70,10 @@ const Settings = () => {
 
         <TabsContent value="communications" className="space-y-6">
           <Tabs defaultValue="branding" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
               <TabsTrigger value="branding">Branding</TabsTrigger>
               <TabsTrigger value="content">Content</TabsTrigger>
+              <TabsTrigger value="cooms">Support</TabsTrigger>
               <TabsTrigger value="email-processing">Queue</TabsTrigger>
             </TabsList>
             
@@ -81,6 +83,10 @@ const Settings = () => {
             
             <TabsContent value="content">
               <ContentManagementTab />
+            </TabsContent>
+            
+            <TabsContent value="cooms">
+              <WhatsAppSupportTab />
             </TabsContent>
             
             <TabsContent value="email-processing">

@@ -270,9 +270,9 @@ export const useMultiplePaymentStatuses = (orderIds: string[] = []) => {
       setIsLoading(true);
       setError(null);
 
-      // Query orders directly with payment information
+      // Prefer enriched view if available
       const { data: ordersWithPayment, error: viewError } = await supabase
-        .from('orders')
+        .from('orders_with_payment')
         .select(`
           id,
           payment_status,

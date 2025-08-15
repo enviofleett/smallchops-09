@@ -6694,18 +6694,6 @@ export type Database = {
       }
     }
     Views: {
-      delivery_zone_monitoring: {
-        Row: {
-          delivery_orders: number | null
-          missing_zone_orders: number | null
-          order_date: string | null
-          payment_status_mismatches: number | null
-          pending_orders: number | null
-          total_orders: number | null
-          zone_completion_rate: number | null
-        }
-        Relationships: []
-      }
       payment_flow_health: {
         Row: {
           completed_orders: number | null

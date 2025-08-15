@@ -18,7 +18,8 @@ import {
   ChevronRight,
   Phone,
   Mail,
-  AlertTriangle
+  AlertTriangle,
+  Calendar
 } from 'lucide-react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { PublicHeader } from '@/components/layout/PublicHeader';
@@ -30,8 +31,9 @@ import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { EnhancedOrdersSection } from '@/components/customer/EnhancedOrdersSection';
 import { EnhancedWishlistSection } from '@/components/customer/EnhancedWishlistSection';
 import { TransactionHistoryTab } from '@/components/purchase-history/TransactionHistoryTab';
+import { CustomerBookingsSection } from '@/components/customer/CustomerBookingsSection';
 
-type ProfileSection = 'orders' | 'wishlist' | 'payment' | 'address' | 'help';
+type ProfileSection = 'orders' | 'tracking' | 'wishlist' | 'payment' | 'address' | 'help' | 'bookings';
 
 // Loading skeleton component
 const ContentSkeleton = () => (
@@ -57,8 +59,9 @@ export default function CustomerProfile() {
 
   // Memoize sidebar items to prevent unnecessary re-renders
   const sidebarItems = useMemo(() => [
-    { id: 'orders' as const, label: 'My Order', icon: ShoppingBag },
-    { id: 'wishlist' as const, label: 'Wishlist', icon: Heart },
+    { id: 'orders' as const, label: 'My Orders', icon: ShoppingBag, path: '/purchase-history' },
+    { id: 'bookings' as const, label: 'Catering Bookings', icon: Calendar },
+    { id: 'wishlist' as const, label: 'Wishlist', icon: Heart, path: '/customer-favorites' },
     { id: 'payment' as const, label: 'Payment Method', icon: CreditCard },
     { id: 'address' as const, label: 'Delivery Address', icon: MapPin },
     { id: 'help' as const, label: 'Help', icon: HelpCircle },
@@ -120,6 +123,11 @@ export default function CustomerProfile() {
     switch (activeSection) {
       case 'orders':
         return <EnhancedOrdersSection />;
+      case 'tracking':
+        // This will be handled by navigation, fallback to orders
+        return <EnhancedOrdersSection />;
+      case 'bookings':
+        return <CustomerBookingsSection />;
       case 'wishlist':
         return <EnhancedWishlistSection />;
       case 'payment':
@@ -139,47 +147,57 @@ export default function CustomerProfile() {
       
       <div className="container mx-auto px-4 py-6">
         <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar */}
-          <div className="lg:w-80 bg-white rounded-lg shadow-sm border border-border p-6">
+          {/* Mobile-responsive Sidebar */}
+          <div className="lg:w-80 bg-white rounded-lg shadow-sm border border-border p-4 lg:p-6">
             <h1 className="text-xl font-bold mb-6">Account</h1>
             
-            {/* Navigation */}
+            {/* Navigation - Mobile optimized */}
             <nav className="space-y-1">
               {sidebarItems.map((item) => (
                 <button
                   key={item.id}
-                  onClick={() => setActiveSection(item.id)}
-                  className={`w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors ${
+                  onClick={() => {
+                    if (item.path) {
+                      navigate(item.path);
+                    } else {
+                      setActiveSection(item.id);
+                    }
+                  }}
+                  className={`w-full flex items-center justify-between px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-colors ${
                     activeSection === item.id
                       ? 'bg-orange-50 text-orange-600 border border-orange-200'
                       : 'hover:bg-gray-50 text-gray-700'
                   }`}
                 >
-                  <div className="flex items-center gap-3">
-                    <item.icon className="w-5 h-5" />
-                    <span className="font-medium">{item.label}</span>
+                  <div className="flex items-center gap-2 lg:gap-3">
+                    <item.icon className="w-4 h-4 lg:w-5 lg:h-5 flex-shrink-0" />
+                    <span className="font-medium text-sm lg:text-base">{item.label}</span>
                   </div>
-                  <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                  {item.path ? (
+                    <ChevronRight className="w-3 h-3 lg:w-4 lg:h-4 text-gray-400 flex-shrink-0" />
+                  ) : (
+                    <MoreHorizontal className="w-3 h-3 lg:w-4 lg:h-4 text-gray-400 flex-shrink-0" />
+                  )}
                 </button>
               ))}
               
               <div className="pt-4 border-t border-gray-200 mt-4">
                 <button
                   onClick={handleLogout}
-                  className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-left transition-colors hover:bg-gray-50 text-gray-700"
+                  className="w-full flex items-center justify-between px-3 lg:px-4 py-2 lg:py-3 rounded-lg text-left transition-colors hover:bg-gray-50 text-gray-700"
                 >
-                  <div className="flex items-center gap-3">
-                    <LogOut className="w-5 h-5" />
-                    <span className="font-medium">Logout</span>
+                  <div className="flex items-center gap-2 lg:gap-3">
+                    <LogOut className="w-4 h-4 lg:w-5 lg:h-5 flex-shrink-0" />
+                    <span className="font-medium text-sm lg:text-base">Logout</span>
                   </div>
-                  <MoreHorizontal className="w-4 h-4 text-gray-400" />
+                  <MoreHorizontal className="w-3 h-3 lg:w-4 lg:h-4 text-gray-400 flex-shrink-0" />
                 </button>
               </div>
             </nav>
           </div>
 
-          {/* Main Content */}
-          <div className="flex-1">
+          {/* Main Content - Mobile optimized */}
+          <div className="flex-1 min-w-0">
             <ErrorBoundary fallback={<SectionErrorFallback section={activeSection} />}>
               {renderContent()}
             </ErrorBoundary>
@@ -206,102 +224,6 @@ function SectionErrorFallback({ section }: { section: string }) {
   );
 }
 
-// Optimized Orders Section with comprehensive error handling
-function OrdersSection() {
-  const { data: ordersData, isLoading: ordersLoading, error: ordersError } = useCustomerOrders();
-  const { handleError } = useErrorHandler();
-
-  // Handle query errors
-  if (ordersError) {
-    console.error('Orders query error:', ordersError);
-    handleError(ordersError, 'loading orders');
-    return (
-      <Card className="p-8 text-center">
-        <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">Unable to load orders</h3>
-        <p className="text-gray-500 mb-4">There was a problem loading your orders. Please try again.</p>
-        <Button onClick={() => window.location.reload()}>
-          Refresh Page
-        </Button>
-      </Card>
-    );
-  }
-
-  if (ordersLoading) {
-    return <ContentSkeleton />;
-  }
-
-  // Safe data access with null checks
-  const orders = Array.isArray(ordersData?.orders) ? ordersData.orders : [];
-
-  if (orders.length === 0) {
-    return (
-      <Card className="p-8 text-center">
-        <ShoppingBag className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">No orders yet</h3>
-        <p className="text-gray-500 mb-4">You haven't placed any orders yet</p>
-        <Button onClick={() => window.location.href = '/products'}>
-          Start Shopping
-        </Button>
-      </Card>
-    );
-  }
-
-  return (
-    <div className="flex gap-6">
-      {/* Orders List */}
-      <div className="flex-1 space-y-4">
-        {orders.slice(0, 3).map((order) => {
-          try {
-            return <OrderCard key={order?.id || Math.random()} order={order} />;
-          } catch (error) {
-            console.error('Error rendering order card:', error);
-            return (
-              <Card key={order?.id || Math.random()} className="p-6 border border-red-200">
-                <p className="text-red-600">Error loading order details</p>
-              </Card>
-            );
-          }
-        })}
-      </div>
-
-      {/* Order History Sidebar */}
-      <div className="w-80 bg-white rounded-lg border border-gray-200 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold">Order History</h3>
-          <Button variant="ghost" size="sm" className="text-orange-600">
-            View All
-          </Button>
-        </div>
-        
-        <div className="space-y-3">
-          {orders.slice(0, 5).map((order) => {
-            // Safe access to order properties
-            const orderNumber = order?.order_number || 'N/A';
-            const orderTime = order?.order_time ? new Date(order.order_time).toLocaleDateString() : 'N/A';
-            const totalAmount = typeof order?.total_amount === 'number' ? order.total_amount : 0;
-            const status = order?.status || 'unknown';
-            
-            return (
-              <div key={order?.id || Math.random()} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
-                <div>
-                  <p className="font-medium text-sm">Order {orderNumber}</p>
-                  <p className="text-xs text-gray-500">{orderTime}</p>
-                </div>
-                <div className="text-right">
-                  <p className="font-medium text-sm">₦{totalAmount.toLocaleString()}</p>
-                  <Badge variant={status === 'delivered' ? 'default' : 'secondary'} className="text-xs">
-                    {status}
-                  </Badge>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Memoized Order Card component with comprehensive null safety
 const OrderCard = React.memo(({ order }: { order: any }) => {
@@ -431,81 +353,6 @@ const OrderCard = React.memo(({ order }: { order: any }) => {
 
 OrderCard.displayName = 'OrderCard';
 
-// Wishlist Section Component with error handling
-function WishlistSection() {
-  const { customerAccount } = useCustomerAuth();
-  const { favorites, isLoading: favoritesLoading, error: favoritesError } = useCustomerFavorites(customerAccount?.id || '');
-  const { handleError } = useErrorHandler();
-
-  if (favoritesError) {
-    console.error('Favorites error:', favoritesError);
-    handleError(favoritesError, 'loading favorites');
-    return (
-      <Card className="p-8 text-center">
-        <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-        <h3 className="text-lg font-semibold mb-2">Unable to load wishlist</h3>
-        <p className="text-gray-500 mb-4">There was a problem loading your wishlist.</p>
-        <Button onClick={() => window.location.reload()}>
-          Refresh Page
-        </Button>
-      </Card>
-    );
-  }
-
-  if (favoritesLoading) {
-    return <ContentSkeleton />;
-  }
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h2 className="text-2xl font-bold mb-2">My Wishlist</h2>
-        <p className="text-gray-500">Your favorite items saved for later</p>
-      </div>
-
-      {!Array.isArray(favorites) || favorites.length === 0 ? (
-        <Card className="p-8 text-center">
-          <Heart className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold mb-2">Your wishlist is empty</h3>
-          <p className="text-gray-500 mb-4">Save items you love to your wishlist</p>
-          <Button onClick={() => window.location.href = '/products'}>
-            Browse Products
-          </Button>
-        </Card>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {favorites.map((product) => {
-            // Safe access to product properties
-            const productId = product?.id || Math.random();
-            const productName = product?.name || 'Product';
-            const productDescription = product?.description || '';
-            const productPrice = typeof product?.price === 'number' ? product.price : 0;
-            const productImage = product?.image_url || '/placeholder.svg';
-            
-            return (
-              <Card key={productId} className="p-4">
-                <img
-                  src={productImage}
-                  alt={productName}
-                  className="w-full h-32 object-cover rounded-lg mb-3"
-                  onError={(e) => {
-                    e.currentTarget.src = '/placeholder.svg';
-                  }}
-                />
-                <h3 className="font-semibold mb-1">{productName}</h3>
-                <p className="text-gray-500 text-sm mb-2">{productDescription}</p>
-                <div className="flex items-center justify-between">
-                  <span className="font-bold">₦{productPrice.toLocaleString()}</span>
-                  <Button size="sm">Add to Cart</Button>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
 
 // Payment Section - simplified without payment details column
 function PaymentSection() {

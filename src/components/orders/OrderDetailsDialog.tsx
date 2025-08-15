@@ -12,6 +12,9 @@ import { format } from 'date-fns';
 import { User, Phone, MapPin, Calendar, Hash, X, RefreshCw, ShieldCheck } from 'lucide-react';
 import { formatAddressMultiline } from '@/utils/formatAddress';
 import { supabase } from '@/integrations/supabase/client';
+import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
+import { ComprehensiveDeliveryInfo } from './ComprehensiveDeliveryInfo';
+import { useOrderDeliveryInfo } from '@/hooks/useOrderDeliveryInfo';
 
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -28,6 +31,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
   const [verifying, setVerifying] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
   const [verifyState, setVerifyState] = useState<'idle'|'success'|'failed'|'pending'>('idle');
+  const { data: deliveryInfo, isLoading: loadingDelivery } = useOrderDeliveryInfo(order.id);
 
   useEffect(() => {
     setSelectedStatus(order.status);
@@ -41,6 +45,13 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
     queryFn: getDispatchRiders,
     retry: 2,
     refetchOnWindowFocus: false,
+  });
+
+  // Fetch delivery schedule for this order
+  const { data: deliverySchedule, isLoading: isLoadingSchedule } = useQuery({
+    queryKey: ['deliverySchedule', order.id],
+    queryFn: () => getDeliveryScheduleByOrderId(order.id),
+    enabled: order.order_type === 'delivery',
   });
 
   // Log any errors with dispatch riders
@@ -170,7 +181,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
               </div>
             </div>
 
-            <h3 className="font-semibold text-lg mb-4 mt-6">Order Information</h3>
+             <h3 className="font-semibold text-lg mb-4 mt-6">Order Information</h3>
              <div className="space-y-3 text-sm">
                 <div className="flex items-center">
                     <Hash className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
@@ -181,6 +192,27 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                     <span className="break-words">{format(new Date(order.order_time), 'MMM d, yyyy h:mm a')}</span>
                 </div>
              </div>
+
+             {/* Delivery Schedule Section */}
+             {order.order_type === 'delivery' && (
+               <div className="mt-6">
+                 <h3 className="font-semibold text-lg mb-4">Delivery Schedule</h3>
+                 {loadingDelivery ? (
+                    <div className="bg-muted/50 rounded-lg p-4 animate-pulse">
+                      <div className="h-4 bg-muted rounded mb-2"></div>
+                      <div className="h-3 bg-muted rounded w-2/3"></div>
+                    </div>
+                  ) : deliveryInfo ? (
+                    <ComprehensiveDeliveryInfo deliveryInfo={deliveryInfo as any} showTitle={false} />
+                  ) : (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                      <p className="text-sm text-yellow-800">
+                        No delivery information found for this order.
+                      </p>
+                    </div>
+                  )}
+               </div>
+             )}
           </div>
           <div>
             <h3 className="font-semibold text-lg mb-4">Order Actions</h3>
@@ -280,10 +312,37 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                 </div>
               </div>
             </div>
-             <div className="mt-6 border-t pt-4">
-                <h4 className="font-semibold">Order Total</h4>
-                <p className="text-2xl font-bold">{formatCurrency(order.total_amount)}</p>
-            </div>
+             
+             {/* Order Items Breakdown */}
+             {order.order_items && order.order_items.length > 0 && (
+               <div className="mt-6">
+                 <h4 className="font-semibold mb-3">Order Items ({order.order_items.length})</h4>
+                 <div className="space-y-2 max-h-60 overflow-y-auto">
+                   {order.order_items.map((item: any, index: number) => (
+                     <div key={item.id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                       <div className="flex-1 min-w-0">
+                         <h5 className="font-medium text-sm break-words">{item.product_name}</h5>
+                         <p className="text-xs text-gray-500">Qty: {item.quantity} × {formatCurrency(item.unit_price)}</p>
+                         {item.special_instructions && (
+                           <p className="text-xs text-orange-600 italic mt-1">{item.special_instructions}</p>
+                         )}
+                       </div>
+                       <div className="text-right">
+                         <span className="font-medium text-sm">{formatCurrency(item.total_price)}</span>
+                         {item.vat_amount > 0 && (
+                           <p className="text-xs text-gray-500">VAT: {formatCurrency(item.vat_amount)}</p>
+                         )}
+                       </div>
+                     </div>
+                   ))}
+                 </div>
+               </div>
+             )}
+             
+             <div className="mt-6 pt-4 border-t">
+               <h4 className="font-semibold">Order Total</h4>
+               <p className="text-2xl font-bold">{formatCurrency(order.total_amount)}</p>
+             </div>
           </div>
         </div>
         <DialogFooter className="flex flex-col sm:flex-row gap-3 sm:gap-0">

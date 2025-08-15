@@ -11,6 +11,7 @@ import { getCategories } from '@/api/categories';
 import { ProductWithDiscount } from '@/lib/discountCalculations';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
+import { CheckoutButton } from '@/components/ui/checkout-button';
 
 interface ProductCatalogProps {
   onToggleFavorite?: (productId: string) => void;
@@ -224,6 +225,9 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
           </CardContent>
         </Card>
       )}
+      
+      {/* Floating Checkout Button */}
+      <CheckoutButton />
     </div>
   );
 }

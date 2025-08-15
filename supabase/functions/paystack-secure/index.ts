@@ -29,6 +29,94 @@ const logError = (context: string, error: any, metadata: any = {}) => {
   console.error('PAYMENT_ERROR:', JSON.stringify(errorLog));
 };
 
+// Reference validation and normalization
+const normalizePaymentReference = (reference: string): string | null => {
+  if (!reference || typeof reference !== 'string') return null;
+  
+  const trimmed = reference.trim();
+  
+  // Valid formats: txn_timestamp_uuid, checkout_sessionid, pay_legacy
+  if (trimmed.match(/^txn_\d+_[a-f0-9-]{36}$/)) return trimmed;
+  if (trimmed.match(/^checkout_[a-zA-Z0-9]+$/)) return trimmed;
+  if (trimmed.match(/^pay_[a-zA-Z0-9]+$/)) return trimmed;
+  
+  console.warn('⚠️ Unknown reference format:', trimmed);
+  return trimmed; // Allow unknown formats but log them
+};
+
+// Fallback recovery strategies
+const tryReferenceRecovery = async (reference: string, supabase: any) => {
+  console.log('🔍 Attempting reference recovery for:', reference);
+  
+  try {
+    // Try to find payment by similar reference patterns
+    const { data: payments } = await supabase
+      .from('payment_transactions')
+      .select('*')
+      .or(`provider_reference.ilike.%${reference}%,metadata->>original_reference.eq.${reference}`)
+      .limit(1);
+    
+    if (payments && payments.length > 0) {
+      const payment = payments[0];
+      console.log('✅ Found payment via reference recovery');
+      
+      return new Response(JSON.stringify({
+        status: true,
+        data: {
+          reference: payment.provider_reference,
+          amount: payment.amount,
+          status: payment.status === 'paid' ? 'success' : payment.status,
+          currency: payment.currency || 'NGN',
+          paid_at: payment.paid_at,
+          channel: payment.metadata?.channel || 'card'
+        }
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  } catch (error) {
+    console.error('Reference recovery failed:', error);
+  }
+  
+  return null;
+};
+
+// Database recovery for failed API calls
+const tryDatabaseRecovery = async (reference: string, supabase: any) => {
+  console.log('🗄️ Attempting database recovery for:', reference);
+  
+  try {
+    // Look for any payment with this reference regardless of status
+    const { data: payment } = await supabase
+      .from('payment_transactions')
+      .select('*')
+      .eq('provider_reference', reference)
+      .single();
+    
+    if (payment) {
+      console.log('✅ Found payment in database during recovery');
+      
+      return new Response(JSON.stringify({
+        status: true,
+        data: {
+          reference: payment.provider_reference,
+          amount: payment.amount,
+          status: payment.status === 'paid' ? 'success' : 'pending',
+          currency: payment.currency || 'NGN',
+          paid_at: payment.paid_at,
+          channel: payment.metadata?.channel || 'card'
+        }
+      }), {
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+  } catch (error) {
+    console.error('Database recovery failed:', error);
+  }
+  
+  return null;
+};
+
 interface PaystackVerificationResponse {
   status: boolean;
   message: string;
@@ -200,8 +288,54 @@ const handlePaymentRequest = async (req: Request) => {
           throw new Error('Payment reference is required for verification')
         }
 
+        // Enhanced reference validation and normalization
+        const normalizedReference = normalizePaymentReference(reference);
+        if (!normalizedReference) {
+          console.error(`❌ Invalid payment reference format: ${reference}`);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Invalid payment reference format',
+            code: 'INVALID_REFERENCE',
+            retryable: false,
+            reference
+          }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        // Try database fallback first for recently processed payments
+        try {
+          const { data: existingPayment } = await supabase
+            .from('payment_transactions')
+            .select('*')
+            .eq('provider_reference', normalizedReference)
+            .eq('status', 'paid')
+            .single();
+
+          if (existingPayment) {
+            console.log('✅ Payment found in database, skipping API call');
+            return new Response(JSON.stringify({
+              status: true,
+              data: {
+                reference: existingPayment.provider_reference,
+                amount: existingPayment.amount,
+                status: 'success',
+                currency: existingPayment.currency || 'NGN',
+                paid_at: existingPayment.paid_at,
+                channel: existingPayment.metadata?.channel || 'card'
+              }
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        } catch (dbError) {
+          console.log('Database fallback failed, proceeding with API verification');
+        }
+
         let retryCount = 0;
         let verifyResponse;
+        let lastError;
         
         while (retryCount < MAX_RETRIES) {
           try {
@@ -209,7 +343,7 @@ const handlePaymentRequest = async (req: Request) => {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), PAYSTACK_TIMEOUT);
             
-            verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+            verifyResponse = await fetch(`https://api.paystack.co/transaction/verify/${normalizedReference}`, {
               method: 'GET',
               headers: {
                 'Authorization': `Bearer ${paystackSecretKey}`,
@@ -223,24 +357,51 @@ const handlePaymentRequest = async (req: Request) => {
             if (verifyResponse.ok) break; // Success, exit retry loop
             
             const errorText = await verifyResponse.text();
-            throw new Error(`Paystack API error (${verifyResponse.status}): ${errorText}`);
+            lastError = new Error(`Paystack API error (${verifyResponse.status}): ${errorText}`);
+            
+            // Don't retry for 4xx errors (client errors)
+            if (verifyResponse.status >= 400 && verifyResponse.status < 500) {
+              console.error(`❌ Paystack verification HTTP error: ${verifyResponse.status} ${errorText}`);
+              
+              // Check if payment reference was not found - try fallback strategies
+              if (verifyResponse.status === 400 && errorText.includes('Transaction reference not found')) {
+                const fallbackResult = await tryReferenceRecovery(normalizedReference, supabase);
+                if (fallbackResult) return fallbackResult;
+              }
+              
+              throw lastError;
+            }
+            
+            throw lastError;
             
           } catch (error) {
+            lastError = error;
             retryCount++;
-            logError('PAYSTACK_VERIFY_ATTEMPT', error, { attempt: retryCount, reference });
+            logError('PAYSTACK_VERIFY_ATTEMPT', error, { attempt: retryCount, reference: normalizedReference });
             
             if (retryCount >= MAX_RETRIES) {
-              console.error('Paystack API failed after retries:', error);
+              console.error('❌ Paystack verification failed after retries:', error);
+              
+              // Try database recovery as final fallback
+              const dbFallback = await tryDatabaseRecovery(normalizedReference, supabase);
+              if (dbFallback) return dbFallback;
+              
               return new Response(JSON.stringify({
                 success: false,
                 error: 'Payment verification temporarily unavailable',
                 code: 'VERIFICATION_TIMEOUT',
                 retryable: true,
-                reference
+                reference: normalizedReference,
+                details: lastError.message
               }), {
-                status: 503, // Service Unavailable instead of 500
+                status: 503,
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }
               });
+            }
+            
+            // Only retry for 5xx errors (server errors) or network errors
+            if (verifyResponse && verifyResponse.status >= 400 && verifyResponse.status < 500) {
+              break; // Don't retry client errors
             }
             
             // Exponential backoff: wait 1s, 2s, 4s
@@ -252,6 +413,11 @@ const handlePaymentRequest = async (req: Request) => {
         
         if (!verificationData.status) {
           console.error('❌ Paystack verification failed:', verificationData)
+          
+          // Try database recovery for failed API calls
+          const dbFallback = await tryDatabaseRecovery(normalizedReference, supabase);
+          if (dbFallback) return dbFallback;
+          
           throw new Error(`Paystack verification failed: ${verificationData.message}`)
         }
 

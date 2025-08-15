@@ -13,16 +13,12 @@ interface DeliveryZoneDropdownProps {
   selectedZoneId?: string;
   onZoneSelect: (zoneId: string, deliveryFee: number) => void;
   orderSubtotal: number;
-  isRequired?: boolean;
-  showValidationError?: boolean;
 }
 
 export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
   selectedZoneId,
   onZoneSelect,
-  orderSubtotal,
-  isRequired = false,
-  showValidationError = false
+  orderSubtotal
 }) => {
   const [zones, setZones] = useState<DeliveryZoneWithFee[]>([]);
   const [loading, setLoading] = useState(true);
@@ -101,9 +97,9 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
 
   return (
     <div className="space-y-3">
-      <h3 className={`text-sm font-semibold flex items-center ${showValidationError ? 'text-destructive' : ''}`}>
-        <Truck className={`h-4 w-4 mr-2 ${showValidationError ? 'text-destructive' : 'text-primary'}`} />
-        Select Delivery Zone {isRequired ? '*' : ''}
+      <h3 className="text-sm font-semibold flex items-center">
+        <Truck className="h-4 w-4 mr-2 text-primary" />
+        Select Delivery Zone *
       </h3>
       
       <Popover open={open} onOpenChange={setOpen}>
@@ -112,11 +108,7 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
             variant="outline"
             role="combobox"
             aria-expanded={open}
-            className={`w-full h-auto min-h-[44px] justify-between bg-background transition-colors ${
-              showValidationError 
-                ? 'border-destructive hover:border-destructive/80' 
-                : 'border-border hover:border-primary/50'
-            }`}
+            className="w-full h-auto min-h-[44px] justify-between bg-background border-border hover:border-primary/50 transition-colors"
           >
             {selectedZone ? (
               <div className="flex items-center justify-between w-full py-1">
@@ -209,12 +201,6 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
         </PopoverContent>
       </Popover>
 
-      {showValidationError && (
-        <div className="text-xs text-destructive bg-destructive/10 p-2 rounded-md border border-destructive/20">
-          ⚠️ Please select a delivery zone to continue
-        </div>
-      )}
-      
       {selectedZone?.delivery_fees?.min_order_for_free_delivery && orderSubtotal < selectedZone.delivery_fees.min_order_for_free_delivery && (
         <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-md">
           💡 Tip: Add ₦{(selectedZone.delivery_fees.min_order_for_free_delivery - orderSubtotal).toFixed(2)} more to qualify for free delivery!

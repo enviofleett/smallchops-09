@@ -13,14 +13,13 @@ import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle } from "lucide-
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
+import { DeliveryScheduler } from "./DeliveryScheduler";
 import { PaystackPaymentHandler } from "@/components/payments/PaystackPaymentHandler";
 import { storeRedirectUrl } from "@/utils/redirect";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
 import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
 import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
-import { useDeliveryValidation } from "@/hooks/useDeliveryValidation";
-import { getDeliveryZonesWithFees, DeliveryZoneWithFee } from '@/api/delivery';
 
 import {
   Select,
@@ -57,6 +56,11 @@ interface CheckoutData {
   delivery_zone_id?: string;
   fulfillment_type: 'delivery' | 'pickup';
   pickup_point_id?: string;
+  delivery_date?: string;
+  delivery_time_slot?: {
+    start_time: string;
+    end_time: string;
+  };
 }
 
 interface EnhancedCheckoutFlowProps {
@@ -122,14 +126,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
   const [paymentData, setPaymentData] = useState<any>(null);
   const [lastPaymentError, setLastPaymentError] = useState<string | null>(null);
   const [showRecoveryOption, setShowRecoveryOption] = useState(false);
-  const [zones, setZones] = useState<DeliveryZoneWithFee[]>([]);
-  const [zonesLoading, setZonesLoading] = useState(false);
-  
-  const {
-    isValidating,
-    performCompleteValidation,
-    showValidationResults
-  } = useDeliveryValidation();
 
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: session?.user?.email || '',
@@ -159,30 +155,25 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     [cart?.summary?.total_amount, currentDeliveryFee]
   );
 
-  // Recovery and initialization effect
+  // Initialization effect - skip recovery UI completely
   useEffect(() => {
     if (isOpen) {
-      // Check for recoverable state when checkout opens
-      if (hasRecoverableState()) {
-        const recovered = recoverState();
-        if (recovered) {
-          const retryInfo = getRetryInfo();
-          console.log('🔄 Checkout state recovery available:', {
-            step: recovered.checkoutStep,
-            retryCount: retryInfo.retryCount,
-            canRetry: retryInfo.canRetry
-          });
-          
-          if (retryInfo.canRetry) {
-            setShowRecoveryOption(true);
-            setLastPaymentError(retryInfo.lastError?.message || 'Previous payment attempt failed');
-          } else {
-            clearState(); // Clear if max retries exceeded
-          }
-        }
+      // Clear any previous state without showing recovery UI
+      clearState();
+      
+      // For empty cart, redirect to browse products first
+      if (isEmpty && isAuthenticated) {
+        setCheckoutStep('choice'); // Show options to browse or continue
+      } else if (!isAuthenticated) {
+        setCheckoutStep('choice');
+      } else {
+        setCheckoutStep('details');
       }
     }
-  }, [isOpen]);
+  }, [isOpen, isAuthenticated]);
+
+  // Check if cart is empty
+  const isEmpty = !cart?.items?.length;
 
   // Clear payment state when component mounts or step changes
   useEffect(() => {
@@ -199,12 +190,10 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     }
   }, [formData, checkoutStep, deliveryFee]);
 
-  const handleContinueAsGuest = useCallback(async () => {
-    if (!guestSession) {
-      await generateGuestSession();
-    }
-    setCheckoutStep('details');
-  }, [guestSession, generateGuestSession]);
+  // Guest checkout completely disabled - this function now just redirects to login
+  const handleContinueAsGuest = useCallback(() => {
+    handleLogin();
+  }, []);
 
   const handleLogin = useCallback(() => {
     storeRedirectUrl(window.location.pathname + window.location.search);
@@ -213,10 +202,12 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
   }, [onClose, navigate]);
 
   React.useEffect(() => {
-    if (isAuthenticated && checkoutStep === 'choice') {
+    if (isAuthenticated) {
       setCheckoutStep('details');
+    } else {
+      setCheckoutStep('choice');
     }
-  }, [isAuthenticated, checkoutStep]);
+  }, [isAuthenticated]);
 
   React.useEffect(() => {
     if (session?.user || authCustomerAccount) {
@@ -229,60 +220,23 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
     }
   }, [session, authCustomerAccount, customerAccount]);
 
-  // Load delivery zones when component mounts
-  React.useEffect(() => {
-    const fetchZones = async () => {
-      setZonesLoading(true);
-      try {
-        const zonesData = await getDeliveryZonesWithFees();
-        setZones(zonesData);
-      } catch (error) {
-        console.error('Failed to load delivery zones:', error);
-        toast.error('Failed to load delivery zones');
-      } finally {
-        setZonesLoading(false);
-      }
-    };
-
-    if (checkoutStep === 'details') {
-      fetchZones();
-    }
-  }, [checkoutStep]);
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate required fields only for delivery orders
+    if (formData.fulfillment_type === 'delivery' && (!formData.delivery_date || !formData.delivery_time_slot)) {
+      toast({
+        title: "Delivery Schedule Required",
+        description: "Please select a delivery date and time before proceeding.",
+        variant: "destructive",
+      });
+      return;
+    }
     
     // Clear any previous payment state and errors
     setIsSubmitting(false);
     setPaymentData(null);
     setLastPaymentError(null);
-    
-    // Validate delivery zone and address for delivery orders
-    if (formData.fulfillment_type === 'delivery') {
-      const validationResult = await performCompleteValidation(
-        formData.delivery_zone_id,
-        zones,
-        {
-          address_line_1: formData.delivery_address.address_line_1,
-          city: formData.delivery_address.city,
-          state: formData.delivery_address.state,
-          selectedZoneId: formData.delivery_zone_id
-        },
-        cart?.summary?.subtotal || 0,
-        deliveryFee
-      );
-
-      if (!validationResult.isValid) {
-        showValidationResults(validationResult);
-        setIsSubmitting(false);
-        return;
-      }
-
-      // Show warnings but continue
-      if (validationResult.warnings.length > 0) {
-        showValidationResults(validationResult);
-      }
-    }
     
     // Add a small delay to ensure cleanup
     await new Promise(resolve => setTimeout(resolve, 100));
@@ -328,8 +282,13 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         total_amount: total,
         delivery_fee: formData.fulfillment_type === 'delivery' ? deliveryFee : 0,
         delivery_zone_id: formData.fulfillment_type === 'delivery' && formData.delivery_zone_id ? formData.delivery_zone_id : null,
+        delivery_schedule: {
+          delivery_date: formData.delivery_date,
+          delivery_time_start: formData.delivery_time_slot?.start_time,
+          delivery_time_end: formData.delivery_time_slot?.end_time
+        },
         payment_method: 'paystack',
-        guest_session_id: !isAuthenticated ? guestSession?.sessionId : null,
+        guest_session_id: null, // Guest checkout disabled
         timestamp: new Date().toISOString()
       };
 
@@ -616,39 +575,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         </CardHeader>
         
         <CardContent>
-          {/* Recovery Option Banner */}
-          {showRecoveryOption && (
-            <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg">
-              <div className="flex items-start gap-3">
-                <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-                <div className="flex-1">
-                  <h4 className="font-medium text-amber-800">Previous Checkout Found</h4>
-                  <p className="text-sm text-amber-700 mt-1">
-                    {lastPaymentError || 'Your previous checkout attempt was interrupted.'}
-                  </p>
-                  <div className="flex gap-2 mt-3">
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={handleRecoverCheckout}
-                      className="border-amber-300 text-amber-700 hover:bg-amber-100"
-                    >
-                      <RefreshCw className="h-4 w-4 mr-1" />
-                      Recover & Retry
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={handleDiscardRecovery}
-                      className="text-amber-600"
-                    >
-                      Start Fresh
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="space-y-4 mb-6">
             <div className="flex items-center justify-between">
@@ -690,7 +616,30 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
               totalAmount={total}
               onContinueAsGuest={handleContinueAsGuest}
               onLogin={handleLogin}
+              isEmpty={isEmpty}
+              onBrowseProducts={() => {
+                onClose();
+                navigate('/');
+              }}
             />
+          )}
+
+          {checkoutStep === 'choice' && isAuthenticated && isEmpty && (
+            <div className="text-center space-y-4 py-8">
+              <div className="text-6xl mb-4">🛍️</div>
+              <h3 className="text-xl font-semibold">Your cart is empty</h3>
+              <p className="text-muted-foreground">
+                Add some delicious items to get started with delivery scheduling!
+              </p>
+              <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                <Button onClick={() => { onClose(); navigate('/'); }}>
+                  Browse Products
+                </Button>
+                <Button variant="outline" onClick={onClose}>
+                  Close
+                </Button>
+              </div>
+            </div>
           )}
 
           {checkoutStep === 'details' && (
@@ -751,11 +700,38 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <Truck className="h-5 w-5" />
-                  Fulfillment Options
-                </h3>
+               {/* Delivery Scheduling Section - Always visible */}
+               <div className="space-y-4 border-2 border-primary/20 rounded-lg p-6 bg-primary/5">
+                 <h3 className="font-semibold text-lg flex items-center gap-2 text-primary">
+                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
+                   </svg>
+                   Schedule Your Delivery
+                 </h3>
+                 <p className="text-sm text-muted-foreground">
+                   Choose your preferred delivery date and time window
+                 </p>
+                 <DeliveryScheduler
+                   selectedDate={formData.delivery_date}
+                   selectedTimeSlot={formData.delivery_time_slot}
+                   onScheduleChange={(date, timeSlot) => {
+                     console.log('📅 Schedule changed:', { date, timeSlot });
+                     setFormData(prev => ({ 
+                       ...prev, 
+                       delivery_date: date, 
+                       delivery_time_slot: timeSlot,
+                       fulfillment_type: 'delivery'
+                     }));
+                   }}
+                   className="w-full"
+                 />
+               </div>
+
+               <div className="space-y-4">
+                 <h3 className="font-semibold text-lg flex items-center gap-2">
+                   <Truck className="h-5 w-5" />
+                   Fulfillment Options
+                 </h3>
                 <RadioGroup
                   value={formData.fulfillment_type}
                   onValueChange={(value: 'delivery' | 'pickup') => {
@@ -795,11 +771,13 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
               </div>
 
               {formData.fulfillment_type === 'delivery' && (
-                <div className="space-y-4">
-                  <h3 className="font-semibold text-lg flex items-center gap-2">
-                    <MapPin className="h-5 w-5" />
-                    Delivery Address
-                  </h3>
+                <>
+
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-lg flex items-center gap-2">
+                      <MapPin className="h-5 w-5" />
+                      Delivery Address
+                    </h3>
                   <div className="grid grid-cols-1 gap-4">
                     <div>
                       <Label htmlFor="address_line_1">Street Address *</Label>
@@ -882,13 +860,12 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                       setDeliveryFee(fee);
                     }}
                     orderSubtotal={cart?.summary?.subtotal || 0}
-                    isRequired={true}
-                    showValidationError={!formData.delivery_zone_id}
-                  />
-                </div>
-              )}
+                   />
+                 </div>
+                 </>
+               )}
 
-              {formData.fulfillment_type === 'pickup' && (
+               {formData.fulfillment_type === 'pickup' && (
                 <div className="space-y-4">
                   <PickupPointSelector
                     selectedPointId={formData.pickup_point_id}
@@ -914,7 +891,15 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                 </Button>
                 <Button 
                   type="submit" 
-                  disabled={isSubmitting || items.length === 0} 
+                  disabled={
+                    isSubmitting || 
+                    items.length === 0 || 
+                    !formData.customer_email ||
+                    !formData.customer_name ||
+                    !formData.customer_phone ||
+                    (formData.fulfillment_type === 'delivery' && (!formData.delivery_date || !formData.delivery_time_slot || !formData.delivery_zone_id)) ||
+                    (formData.fulfillment_type === 'pickup' && !formData.pickup_point_id)
+                  }
                   className="flex-1"
                 >
                   {isSubmitting ? "Processing..." : "Continue to Payment"}

@@ -1,306 +1,474 @@
+// Production Email Processor - Consolidated & Secure
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.0';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Environment-aware CORS headers
+const getAllowedOrigins = () => {
+  const envType = Deno.env.get('DENO_ENV') || 'development';
+  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS') || '*';
+  
+  if (envType === 'production') {
+    return allowedOrigins.split(',').map(origin => origin.trim());
+  }
+  
+  return ['*']; // Allow all in development
 };
 
-interface ProcessingResult {
-  success: boolean;
-  processed: number;
-  successful: number;
-  failed: number;
-  errors: string[];
-  duration: number;
-}
-
-// Enhanced email validation and normalization
-function validateAndNormalizeEmailPayload(event: any): any {
-  console.log(`🔍 Validating email event: ${event.id}`);
-  
-  // Ensure all required fields are present
-  if (!event.recipient_email) {
-    throw new Error('Missing recipient email address');
-  }
-
-  // Normalize template key
-  let templateId = event.template_key;
-  if (!templateId) {
-    // Set default template based on event type
-    templateId = event.event_type === 'customer_welcome' ? 'welcome_customer' : 'order_confirmed';
-    console.log(`⚠️ No template_key found, using default: ${templateId}`);
-  }
-
-  // Build standardized payload
-  const payload = {
-    templateId,
-    recipient: {
-      email: event.recipient_email,
-      name: event.variables?.customer_name || event.variables?.customerName || 'Valued Customer'
-    },
-    variables: {
-      ...event.variables,
-      business_name: 'Starters Small Chops',
-      customer_email: event.recipient_email,
-      event_type: event.event_type,
-      order_id: event.order_id
-    },
-    emailType: event.email_type || 'transactional'
+const getCorsHeaders = (origin?: string | null) => {
+  const allowedOrigins = getAllowedOrigins();
+  const allowOrigin = allowedOrigins.includes('*') || 
+    (origin && allowedOrigins.includes(origin)) ? 
+    (origin || '*') : allowedOrigins[0];
+    
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
   };
+};
 
-  console.log(`✅ Email payload validated for template: ${templateId}`);
-  return payload;
-}
-
-// Enhanced SMTP health check before processing
-async function checkSMTPHealth(supabase: any): Promise<boolean> {
-  try {
-    console.log('🏥 Checking SMTP health before processing...');
-    
-    const { data: healthResult, error } = await supabase.functions.invoke('smtp-health-monitor', {
-      body: {}
-    });
-
-    if (error) {
-      console.error('Health check failed:', error);
-      return false;
-    }
-
-    const isHealthy = healthResult?.healthy && healthResult?.success;
-    console.log(`Health status: ${isHealthy ? 'HEALTHY' : 'UNHEALTHY'}`);
-    
-    return isHealthy;
-  } catch (error) {
-    console.error('SMTP health check error:', error);
-    return false;
-  }
-}
-
-// Process emails with enhanced error handling and validation
-async function processEmailBatch(supabase: any, priority: 'high' | 'normal' = 'normal'): Promise<ProcessingResult> {
-  const startTime = Date.now();
-  const result: ProcessingResult = {
-    success: true,
-    processed: 0,
-    successful: 0,
-    failed: 0,
-    errors: [],
-    duration: 0
+interface EmailRequest {
+  to: string;
+  subject: string;
+  html?: string;
+  text?: string;
+  templateId?: string;
+  templateKey?: string;
+  recipient?: {
+    email: string;
+    name?: string;
   };
+  variables?: Record<string, string>;
+  emailType?: string;
+  priority?: 'high' | 'normal' | 'low';
+}
 
-  try {
-    console.log(`🚀 Starting ${priority} priority email processing...`);
-
-    // Check SMTP health first
-    const isHealthy = await checkSMTPHealth(supabase);
-    if (!isHealthy) {
-      throw new Error('SMTP system is unhealthy - aborting processing to prevent failures');
-    }
-
-    // Get configuration
-    const { data: config } = await supabase
-      .from('enhanced_email_config')
-      .select('*')
-      .limit(1)
-      .maybeSingle();
-
-    const batchSize = config?.batch_size || 10;
-    const maxRetries = config?.max_retries || 3;
-
-    // Fetch emails to process
-    const priorityFilter = priority === 'high' ? ['high'] : ['normal', 'low'];
-    
-    const { data: emails, error: fetchError } = await supabase
-      .from('communication_events')
-      .select('*')
-      .eq('status', 'queued')
-      .in('priority', priorityFilter)
-      .lt('retry_count', maxRetries)
-      .order('created_at', { ascending: true })
-      .limit(batchSize);
-
-    if (fetchError) {
-      throw new Error(`Failed to fetch emails: ${fetchError.message}`);
-    }
-
-    if (!emails || emails.length === 0) {
-      console.log('✅ No emails to process');
-      result.duration = Date.now() - startTime;
-      return result;
-    }
-
-    console.log(`📧 Processing ${emails.length} emails...`);
-    result.processed = emails.length;
-
-    // Process each email
-    for (const email of emails) {
-      try {
-        // Update status to processing
-        await supabase
-          .from('communication_events')
-          .update({ 
-            status: 'processing',
-            processed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', email.id);
-
-        // Validate and normalize email payload
-        const emailPayload = validateAndNormalizeEmailPayload(email);
-
-        // Determine email sender based on priority and reliability
-        const emailSender = priority === 'high' ? 'enhanced-smtp-sender' : 'smtp-email-sender';
-        
-        console.log(`📤 Sending email ${email.id} via ${emailSender}`);
-
-        // Send email with comprehensive error handling
-        const { data: emailResult, error: emailError } = await supabase.functions.invoke(emailSender, {
-          body: emailPayload
-        });
-
-        if (emailError) {
-          throw new Error(`Email sender error: ${emailError.message}`);
-        }
-
-        // Update status to sent
-        await supabase
-          .from('communication_events')
-          .update({
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            delivery_status: 'delivered',
-            external_id: emailResult?.messageId || null
-          })
-          .eq('id', email.id);
-
-        // Log successful delivery
-        await supabase
-          .from('email_delivery_confirmations')
-          .insert({
-            email_id: email.id,
-            recipient_email: email.recipient_email,
-            delivery_status: 'delivered',
-            provider_response: emailResult,
-            delivered_at: new Date().toISOString()
-          });
-
-        result.successful++;
-        console.log(`✅ Email ${email.id} sent successfully`);
-
-      } catch (emailError) {
-        console.error(`❌ Failed to send email ${email.id}:`, emailError);
-        
-        const newRetryCount = (email.retry_count || 0) + 1;
-        const shouldRetry = newRetryCount < maxRetries;
-        
-        // Calculate exponential backoff for retry
-        const backoffMinutes = Math.min(60, Math.pow(2, newRetryCount) * 5);
-        const nextRetryAt = new Date(Date.now() + backoffMinutes * 60 * 1000);
-
-        // Update email with error info
-        await supabase
-          .from('communication_events')
-          .update({
-            status: shouldRetry ? 'queued' : 'failed',
-            retry_count: newRetryCount,
-            error_message: emailError.message,
-            last_error: emailError.message,
-            updated_at: new Date().toISOString(),
-            ...(shouldRetry && { processed_at: nextRetryAt.toISOString() })
-          })
-          .eq('id', email.id);
-
-        result.failed++;
-        result.errors.push(`Email ${email.id}: ${emailError.message}`);
-      }
-
-      // Small delay between emails to respect rate limits
-      await new Promise(resolve => setTimeout(resolve, 200));
-    }
-
-    // Log comprehensive results
-    console.log(`🎯 Processing complete:`);
-    console.log(`   ✅ Successful: ${result.successful}`);
-    console.log(`   ❌ Failed: ${result.failed}`);
-    console.log(`   ⏱️ Duration: ${Date.now() - startTime}ms`);
-
-    // Record metrics
-    await supabase.from('email_processing_metrics').insert({
-      processing_type: `production_${priority}`,
-      emails_processed: result.processed,
-      emails_successful: result.successful,
-      emails_failed: result.failed,
-      processing_duration_ms: Date.now() - startTime,
-      failure_rate: result.processed > 0 ? (result.failed / result.processed) * 100 : 0
-    });
-
-    // Log audit entry
-    await supabase.from('audit_logs').insert({
-      action: 'production_email_processing',
-      category: 'Email Processing',
-      message: `Processed ${result.processed} ${priority} priority emails: ${result.successful} sent, ${result.failed} failed`,
-      new_values: {
-        priority,
-        processed: result.processed,
-        successful: result.successful,
-        failed: result.failed,
-        duration_ms: Date.now() - startTime,
-        timestamp: new Date().toISOString()
-      }
-    });
-
-  } catch (error) {
-    console.error('❌ Email processing error:', error);
-    result.success = false;
-    result.errors.push(`Processing error: ${error.message}`);
-  }
-
-  result.duration = Date.now() - startTime;
+// Template variable replacement function
+function replaceVariables(template: string, variables: Record<string, string>): string {
+  let result = template;
+  Object.entries(variables).forEach(([key, value]) => {
+    const regex = new RegExp(`{{${key}}}`, 'g');
+    result = result.replace(regex, value || '');
+  });
   return result;
 }
 
+// Native SMTP implementation with enhanced security
+async function sendViaSMTP(config: any, emailData: any) {
+  const { host, port, auth, secure } = config;
+  const { from, to, subject, html, text } = emailData;
+
+  console.log(`📧 SMTP Connection: ${host}:${port} (${secure ? 'SSL/TLS' : 'STARTTLS'})`);
+
+  let conn: Deno.TlsConn | Deno.Conn | null = null;
+
+  try {
+    // Enhanced connection with timeout
+    const connectPromise = secure || port === 465
+      ? Deno.connectTls({ hostname: host, port: port })
+      : Deno.connect({ hostname: host, port: port });
+    
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error(`Connection timeout after 30s to ${host}:${port}`)), 30000);
+    });
+
+    conn = await Promise.race([connectPromise, timeoutPromise]) as Deno.TlsConn | Deno.Conn;
+
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+
+    // Helper to send SMTP commands
+    async function sendCommand(command: string): Promise<string> {
+      if (!conn) throw new Error('No connection available');
+      
+      // Mask sensitive data in logs
+      const cmdToLog = command.startsWith('AUTH PLAIN') || command.includes('PASS') 
+        ? command.replace(/PASS .+/, 'PASS ***').replace(/AUTH PLAIN .+/, 'AUTH PLAIN ***')
+        : command;
+      
+      console.log(`SMTP > ${cmdToLog}`);
+      
+      await conn.write(encoder.encode(command + '\r\n'));
+      
+      const buffer = new Uint8Array(1024);
+      const bytesRead = await conn.read(buffer);
+      
+      if (bytesRead === null) {
+        throw new Error('Connection closed unexpectedly');
+      }
+      
+      const response = decoder.decode(buffer.slice(0, bytesRead)).trim();
+      console.log(`SMTP < ${response}`);
+      
+      return response;
+    }
+
+    // Read initial greeting
+    const buffer = new Uint8Array(1024);
+    const bytesRead = await conn.read(buffer);
+    if (bytesRead === null) throw new Error('No greeting received');
+    
+    const greeting = decoder.decode(buffer.slice(0, bytesRead)).trim();
+    console.log(`SMTP < ${greeting}`);
+    
+    if (!greeting.startsWith('220')) {
+      throw new Error(`Invalid greeting: ${greeting}`);
+    }
+
+    // Send EHLO
+    let response = await sendCommand(`EHLO ${host}`);
+    if (!response.startsWith('250')) {
+      throw new Error(`EHLO failed: ${response}`);
+    }
+
+    // STARTTLS for non-secure connections
+    if (!secure && port === 587) {
+      console.log('🔐 Initiating STARTTLS...');
+      response = await sendCommand('STARTTLS');
+      if (!response.startsWith('220')) {
+        throw new Error(`STARTTLS failed: ${response}`);
+      }
+      
+      // Close and upgrade to TLS
+      conn.close();
+      
+      console.log('🔄 Upgrading to TLS connection...');
+      conn = await Deno.connectTls({ hostname: host, port: port });
+      
+      // Send EHLO again after TLS upgrade
+      response = await sendCommand(`EHLO ${host}`);
+      if (!response.startsWith('250')) {
+        throw new Error(`EHLO after STARTTLS failed: ${response}`);
+      }
+      console.log('✅ TLS upgrade successful');
+    }
+
+    // Authentication using AUTH PLAIN
+    const authString = btoa(`\0${auth.user}\0${auth.pass}`);
+    response = await sendCommand(`AUTH PLAIN ${authString}`);
+    
+    if (!response.startsWith('235')) {
+      throw new Error(`Authentication failed: ${response}`);
+    }
+
+    // Send email
+    const fromEmail = from.includes('<') ? from.match(/<([^>]+)>/)?.[1] || from : from;
+    response = await sendCommand(`MAIL FROM:<${fromEmail}>`);
+    if (!response.startsWith('250')) {
+      throw new Error(`MAIL FROM failed: ${response}`);
+    }
+
+    response = await sendCommand(`RCPT TO:<${to}>`);
+    if (!response.startsWith('250')) {
+      throw new Error(`RCPT TO failed: ${response}`);
+    }
+
+    response = await sendCommand('DATA');
+    if (!response.startsWith('354')) {
+      throw new Error(`DATA failed: ${response}`);
+    }
+
+    // Construct email with proper headers
+    const messageId = `prod-email-${Date.now()}@${host}`;
+    const emailContent = [
+      `Message-ID: <${messageId}>`,
+      `Date: ${new Date().toUTCString()}`,
+      `From: ${from}`,
+      `To: ${to}`,
+      `Subject: ${subject}`,
+      'MIME-Version: 1.0',
+      html ? 'Content-Type: text/html; charset=UTF-8' : 'Content-Type: text/plain; charset=UTF-8',
+      '',
+      html || text || '',
+      '.'
+    ].join('\r\n');
+
+    await conn.write(encoder.encode(emailContent + '\r\n'));
+    
+    const dataBuffer = new Uint8Array(1024);
+    const dataRead = await conn.read(dataBuffer);
+    if (dataRead === null) throw new Error('No response to DATA');
+    
+    const dataResponse = decoder.decode(dataBuffer.slice(0, dataRead)).trim();
+    console.log(`SMTP < ${dataResponse}`);
+    
+    if (!dataResponse.startsWith('250')) {
+      throw new Error(`Email sending failed: ${dataResponse}`);
+    }
+
+    await sendCommand('QUIT');
+    conn.close();
+    conn = null;
+
+    console.log('✅ Email sent successfully via SMTP');
+    
+    return {
+      messageId,
+      accepted: [to],
+      rejected: [],
+      response: dataResponse
+    };
+
+  } catch (error) {
+    if (conn) {
+      try {
+        conn.close();
+      } catch (closeError) {
+        console.error('Error closing connection:', closeError);
+      }
+    }
+    console.error('❌ SMTP error:', error);
+    throw error;
+  }
+}
+
 serve(async (req) => {
-  // Handle CORS preflight requests
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
+  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { 
+      status: 405, 
+      headers: corsHeaders 
+    });
   }
 
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { priority = 'normal' } = await req.json().catch(() => ({}));
-
-    console.log('=== Production Email Processor Started ===');
-    console.log(`Priority: ${priority}`);
-
-    // Process email batch
-    const result = await processEmailBatch(supabase, priority);
-
-    return new Response(JSON.stringify({
-      success: result.success,
-      message: `Processed ${result.processed} emails: ${result.successful} successful, ${result.failed} failed`,
-      details: result
-    }), {
-      status: result.success ? 200 : 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    const requestBody: EmailRequest = await req.json();
+    
+    console.log('📨 Production Email Processor Request:', {
+      to: requestBody.to || requestBody.recipient?.email,
+      templateId: requestBody.templateId || requestBody.templateKey,
+      subject: requestBody.subject
     });
+
+    // Normalize email data
+    let emailData = {
+      to: requestBody.to || requestBody.recipient?.email,
+      subject: requestBody.subject || '',
+      html: requestBody.html || '',
+      text: requestBody.text || '',
+      variables: requestBody.variables || {},
+      templateKey: requestBody.templateId || requestBody.templateKey,
+      emailType: requestBody.emailType || 'transactional'
+    };
+
+    if (!emailData.to) {
+      throw new Error('Recipient email is required');
+    }
+
+    // Check rate limits using new secure function
+    const { data: rateLimitResult } = await supabase.rpc('check_email_rate_limit', {
+      p_recipient_email: emailData.to
+    });
+
+    if (rateLimitResult && !rateLimitResult.allowed) {
+      console.log(`🚫 Rate limit exceeded for ${emailData.to}: ${rateLimitResult.reason}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Rate limit exceeded',
+          details: rateLimitResult
+        }),
+        { 
+          status: 429, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
+    // Process template if specified
+    if (emailData.templateKey) {
+      console.log('🎨 Processing template:', emailData.templateKey);
+      
+      const { data: template, error: templateError } = await supabase
+        .from('enhanced_email_templates')
+        .select('*')
+        .eq('template_key', emailData.templateKey)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (template && !templateError) {
+        // Get business settings for variables
+        const { data: businessSettings } = await supabase
+          .from('business_settings')
+          .select('name, email, website_url, primary_color, secondary_color')
+          .limit(1)
+          .maybeSingle();
+
+        // Merge variables with defaults
+        const allVariables = {
+          companyName: businessSettings?.name || 'Starters Small Chops',
+          supportEmail: businessSettings?.email || 'support@startersmallchops.com',
+          websiteUrl: businessSettings?.website_url || 'https://startersmallchops.com',
+          primaryColor: businessSettings?.primary_color || '#f59e0b',
+          secondaryColor: businessSettings?.secondary_color || '#d97706',
+          customerName: requestBody.recipient?.name || 'Valued Customer',
+          ...emailData.variables
+        };
+
+        emailData.subject = replaceVariables(template.subject_template, allVariables);
+        emailData.html = replaceVariables(template.html_template, allVariables);
+        emailData.text = template.text_template 
+          ? replaceVariables(template.text_template, allVariables)
+          : emailData.html.replace(/<[^>]*>/g, '');
+
+        console.log('✅ Template processed successfully');
+      } else {
+        console.warn('⚠️ Template not found, using direct content');
+      }
+    }
+
+    // Ensure we have content
+    if (!emailData.subject) {
+      emailData.subject = 'Notification from Starters Small Chops';
+    }
+
+    if (!emailData.html && emailData.text) {
+      emailData.html = `<p>${emailData.text.replace(/\n/g, '<br>')}</p>`;
+    }
+
+    // Get active email provider
+    const { data: provider } = await supabase.rpc('get_active_email_provider');
+    
+    if (!provider || provider.length === 0) {
+      throw new Error('No active email provider configured');
+    }
+
+    const emailProvider = provider[0];
+    console.log('📡 Using email provider:', emailProvider.provider_name);
+
+    // Get SMTP settings from communication_settings (backward compatibility)
+    const { data: smtpSettings, error: settingsError } = await supabase
+      .from('communication_settings')
+      .select('*')
+      .eq('use_smtp', true)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (settingsError || !smtpSettings) {
+      throw new Error('SMTP configuration not found');
+    }
+
+    console.log('⚙️ SMTP Settings loaded:', {
+      host: smtpSettings.smtp_host,
+      port: smtpSettings.smtp_port,
+      user: smtpSettings.smtp_user,
+      secure: smtpSettings.smtp_secure
+    });
+
+    // Validate SMTP configuration
+    if (!smtpSettings.smtp_host || !smtpSettings.smtp_user || !smtpSettings.smtp_pass || !smtpSettings.sender_email) {
+      throw new Error('Incomplete SMTP configuration');
+    }
+
+    // Configure SMTP
+    const smtpConfig = {
+      host: smtpSettings.smtp_host,
+      port: smtpSettings.smtp_port || 587,
+      secure: smtpSettings.smtp_secure !== false,
+      auth: {
+        user: smtpSettings.smtp_user,
+        pass: smtpSettings.smtp_pass,
+      },
+    };
+
+    // Prepare email for sending
+    const finalEmailData = {
+      from: smtpSettings.sender_name 
+        ? `"${smtpSettings.sender_name}" <${smtpSettings.sender_email}>`
+        : smtpSettings.sender_email,
+      to: emailData.to,
+      subject: emailData.subject,
+      html: emailData.html,
+      text: emailData.text || (emailData.html ? emailData.html.replace(/<[^>]*>/g, '') : ''),
+    };
+
+    console.log('📤 Sending email...');
+    const startTime = Date.now();
+    
+    // Send email via SMTP
+    const result = await sendViaSMTP(smtpConfig, finalEmailData);
+    const deliveryTime = Date.now() - startTime;
+
+    // Log email delivery using new secure function
+    await supabase.rpc('log_email_delivery', {
+      p_message_id: result.messageId,
+      p_recipient_email: emailData.to,
+      p_subject: emailData.subject,
+      p_provider: 'production_smtp',
+      p_status: 'sent',
+      p_template_key: emailData.templateKey,
+      p_variables: emailData.variables,
+      p_smtp_response: result.response
+    });
+
+    console.log('✅ Email sent and logged successfully');
+    console.log(`📊 Delivery time: ${deliveryTime}ms`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        messageId: result.messageId,
+        provider: 'production_smtp',
+        deliveryTime,
+        templateUsed: emailData.templateKey || null,
+        rateLimitInfo: rateLimitResult
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
 
   } catch (error) {
-    console.error('=== Production Email Processor Error ===');
-    console.error('Error message:', error.message);
+    console.error('❌ Production Email Processor Error:', error);
     
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message,
-      message: 'Email processing failed'
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    // Log failed delivery
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      const requestData = await req.text().then(t => JSON.parse(t)).catch(() => ({}));
+      
+      await supabase.rpc('log_email_delivery', {
+        p_message_id: `failed-${Date.now()}`,
+        p_recipient_email: requestData.to || requestData.recipient?.email || 'unknown',
+        p_subject: requestData.subject || 'Failed Email',
+        p_provider: 'production_smtp',
+        p_status: 'failed',
+        p_template_key: requestData.templateId || requestData.templateKey,
+        p_variables: requestData.variables || {},
+        p_smtp_response: error.message
+      });
+    } catch (logError) {
+      console.error('Failed to log delivery error:', logError);
+    }
+
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message,
+        provider: 'production_smtp',
+        timestamp: new Date().toISOString()
+      }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
   }
 });

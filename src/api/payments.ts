@@ -98,64 +98,51 @@ export class PaymentsAPI {
   }
 
   /**
-   * Verify a payment transaction with enhanced error handling
+   * Verify a payment transaction using unified verification system
    */
-  static async verifyPayment(reference: string): Promise<VerifyPaymentResponse> {
+  static async verifyPayment(reference: string, orderId?: string): Promise<VerifyPaymentResponse> {
     try {
-      // Prefer secure verifier that performs atomic updates
-      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference }
-      });
-
-      const normalize = (res: any): VerifyPaymentResponse => {
-        // paystack-verify returns { success, amount (NGN), ... }
-        if (res?.success === true) {
-          return {
-            success: true,
-            data: {
-              status: 'success',
-              amount: typeof res.amount === 'number' ? res.amount : 0,
-              customer: res.customer ?? null,
-              metadata: res.metadata ?? null,
-              paid_at: res.paid_at ?? '',
-              channel: res.channel ?? ''
-            }
-          };
+      console.log(`[PaymentsAPI] Verifying payment - reference: ${reference}, orderId: ${orderId}`);
+      
+      // Use unified verification function
+      const { data, error } = await supabase.functions.invoke('verify-payment-unified', {
+        body: {
+          order_id: orderId,
+          reference: reference
         }
-        // paystack-secure returns { status: true, data: {...} }
-        if (res?.status === true) {
-          return {
-            success: true,
-            data: {
-              status: res.data?.status || 'success',
-              amount: typeof res.data?.amount === 'number' ? res.data.amount / 100 : 0,
-              customer: res.data?.customer,
-              metadata: res.data?.metadata,
-              paid_at: res.data?.paid_at,
-              channel: res.data?.channel
-            }
-          };
-        }
-        return { success: false, error: res?.error || res?.message || 'Payment verification failed' };
-      };
-
-      if (!primaryError && primaryData) {
-        const normalized = normalize(primaryData);
-        if (normalized.success) return normalized;
-      }
-
-      // Fallback to secure verifier
-      const { data, error } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference }
       });
 
       if (error) {
-        return { success: false, error: error.message };
+        console.error('[PaymentsAPI] Verification error:', error);
+        return { 
+          success: false, 
+          error: error.message || 'Payment verification failed' 
+        };
       }
 
-      return normalize(data);
+      if (!data?.success) {
+        console.error('[PaymentsAPI] Verification failed:', data);
+        return { 
+          success: false, 
+          error: data?.error || 'Payment verification failed' 
+        };
+      }
+
+      console.log('[PaymentsAPI] Verification successful:', data);
+      
+      return {
+        success: true,
+        data: {
+          status: data.provider_status === 'paid' ? 'success' : 'failed',
+          amount: data.amount || 0,
+          customer: null,
+          metadata: data.data?.[0] || null,
+          paid_at: new Date().toISOString(),
+          channel: 'online'
+        }
+      };
     } catch (error) {
-      console.error('Payment verification error:', error);
+      console.error('[PaymentsAPI] Payment verification error:', error);
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Payment verification failed'

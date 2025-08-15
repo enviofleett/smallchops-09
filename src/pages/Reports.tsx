@@ -1,7 +1,12 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { Download, Calendar, Printer } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { Calendar as CalendarComponent } from "@/components/ui/calendar";
 import ReportTabs from "@/components/ReportTabs";
 import { RevenueBreakdown } from "@/components/reports/RevenueBreakdown";
 import { fetchReportsData } from "@/api/reports";
@@ -37,10 +42,20 @@ function KpiSkeletons() {
 export default function Reports() {
   const { handleError } = useErrorHandler();
 
+  // State for filters
+  const [groupBy, setGroupBy] = useState<'week' | 'month'>('week');
+  const [startDate, setStartDate] = useState<Date>(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000));
+  const [endDate, setEndDate] = useState<Date>(new Date());
+
   // Fetch analytics from API via react-query
   const { data, isLoading, error } = useQuery({
-    queryKey: ["reports/analytics"],
-    queryFn: () => fetchReportsData(3), // Pass retry count as argument
+    queryKey: ["reports/analytics", groupBy, startDate.toISOString().split('T')[0], endDate.toISOString().split('T')[0]],
+    queryFn: () => fetchReportsData({ 
+      groupBy, 
+      startDate: startDate.toISOString().split('T')[0], 
+      endDate: endDate.toISOString().split('T')[0],
+      retryCount: 3 
+    }),
     staleTime: 2 * 60 * 1000, // 2min cache for live data
     refetchInterval: 5 * 60 * 1000, // Auto-refresh every 5 minutes for live updates
     retry: false // Disable react-query retry since fetchReportsData handles its own retry logic
@@ -136,9 +151,67 @@ export default function Reports() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-          <div className="flex items-center space-x-2 text-sm text-muted-foreground bg-muted/50 px-3 py-2 rounded-md">
-            <Calendar className="h-4 w-4" />
-            <span>Last 30 days</span>
+          {/* Time Period Filter */}
+          <Select value={groupBy} onValueChange={(value: 'week' | 'month') => setGroupBy(value)}>
+            <SelectTrigger className="w-full sm:w-auto">
+              <SelectValue placeholder="Select period" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="week">Weekly</SelectItem>
+              <SelectItem value="month">Monthly</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Date Range Picker */}
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full sm:w-auto justify-start text-left font-normal",
+                    !startDate && "text-muted-foreground"
+                  )}
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {startDate ? format(startDate, "MMM d, yyyy") : <span>Start date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={startDate}
+                  onSelect={(date) => date && setStartDate(date)}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-full sm:w-auto justify-start text-left font-normal",
+                    !endDate && "text-muted-foreground"
+                  )}
+                >
+                  <Calendar className="mr-2 h-4 w-4" />
+                  {endDate ? format(endDate, "MMM d, yyyy") : <span>End date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <CalendarComponent
+                  mode="single"
+                  selected={endDate}
+                  onSelect={(date) => date && setEndDate(date)}
+                  initialFocus
+                  disabled={(date) => date < startDate}
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
           </div>
           
           <div className="flex gap-2">

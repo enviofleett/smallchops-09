@@ -26,7 +26,7 @@ export default function ReportTabs({ reportsData, isLoading }: {
           <div className="mb-2 text-gray-500 text-sm">
             Daily revenue for the past week
           </div>
-          <RevenueBarChart data={reportsData?.revenueTrends} isLoading={isLoading} />
+          <RevenueBarChart data={reportsData?.revenueSeries} isLoading={isLoading} />
         </div>
       </TabsContent>
       <TabsContent value="orders" className="p-0">

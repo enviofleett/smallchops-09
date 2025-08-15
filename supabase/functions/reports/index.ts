@@ -15,6 +15,34 @@ serve(async (req) => {
   }
 
   try {
+    // Check authentication and admin role
+    const authHeader = req.headers.get("authorization");
+    if (!authHeader) {
+      console.error("No authorization header");
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // Parse request body for parameters
+    let requestBody = {};
+    if (req.method === "POST") {
+      try {
+        requestBody = await req.json();
+      } catch (e) {
+        console.log("No JSON body provided, using defaults");
+      }
+    }
+
+    const { 
+      groupBy = 'week', 
+      startDate = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      endDate = new Date().toISOString().split('T')[0]
+    } = requestBody as { groupBy?: 'week' | 'month'; startDate?: string; endDate?: string };
+
+    console.log(`Reports parameters: groupBy=${groupBy}, startDate=${startDate}, endDate=${endDate}`);
+
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     
@@ -23,7 +51,6 @@ serve(async (req) => {
       throw new Error("Missing Supabase environment variables");
     }
 
-    const authHeader = req.headers.get("authorization");
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
       auth: {
         autoRefreshToken: false,
@@ -31,7 +58,31 @@ serve(async (req) => {
       }
     });
 
-    console.log("Fetching dashboard analytics data with enhanced error handling");
+    // Verify user is admin
+    const { data: userData, error: userError } = await supabase.auth.getUser(authHeader.replace('Bearer ', ''));
+    if (userError || !userData.user) {
+      console.error("Invalid token:", userError);
+      return new Response(JSON.stringify({ error: "Invalid token" }), {
+        status: 401,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', userData.user.id)
+      .single();
+
+    if (!profile || profile.role !== 'admin') {
+      console.error("User is not admin");
+      return new Response(JSON.stringify({ error: "Admin access required" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    console.log(`Fetching analytics data for ${groupBy} grouping from ${startDate} to ${endDate}`);
 
     // Initialize default values for fallback
     let totalProducts = 0;
@@ -87,65 +138,58 @@ serve(async (req) => {
       console.error("Error fetching basic stats:", statsError);
     }
 
-    // Get revenue trends (last 7 days) with error handling
-    let revenueTrendsFormatted = [];
+    // Get revenue and order trends with date range filtering and proper grouping
+    let revenueSeries = [];
+    let orderSeries = [];
+    
     try {
-      const { data: revenueTrends, error: revenueError } = await supabase
+      const { data: paidOrders, error: ordersError } = await supabase
         .from('orders')
         .select('order_time, total_amount')
-        .gte('order_time', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .eq('payment_status', 'paid')
+        .gte('order_time', `${startDate}T00:00:00.000Z`)
+        .lte('order_time', `${endDate}T23:59:59.999Z`)
         .order('order_time', { ascending: true });
 
-      if (revenueError) {
-        console.error("Revenue trends query error:", revenueError);
+      if (ordersError) {
+        console.error("Paid orders query error:", ordersError);
       } else {
-        // Group revenue by date
-        const revenueByDate = (revenueTrends || []).reduce((acc, order) => {
-          const date = new Date(order.order_time).toISOString().split('T')[0];
-          acc[date] = (acc[date] || 0) + (order.total_amount || 0);
+        // Group data by week or month
+        const groupedData = (paidOrders || []).reduce((acc, order) => {
+          const orderDate = new Date(order.order_time);
+          let groupKey: string;
+          let label: string;
+
+          if (groupBy === 'month') {
+            groupKey = `${orderDate.getFullYear()}-${String(orderDate.getMonth() + 1).padStart(2, '0')}`;
+            label = orderDate.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+          } else {
+            // Week grouping - get Monday of the week
+            const monday = new Date(orderDate);
+            monday.setDate(orderDate.getDate() - orderDate.getDay() + 1);
+            groupKey = `${monday.getFullYear()}-W${String(Math.ceil((monday.getTime() - new Date(monday.getFullYear(), 0, 1).getTime()) / (7 * 24 * 60 * 60 * 1000))).padStart(2, '0')}`;
+            label = `Week of ${monday.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+          }
+
+          if (!acc[groupKey]) {
+            acc[groupKey] = { label, revenue: 0, orders: 0 };
+          }
+          acc[groupKey].revenue += order.total_amount || 0;
+          acc[groupKey].orders += 1;
           return acc;
-        }, {} as Record<string, number>);
+        }, {} as Record<string, { label: string; revenue: number; orders: number }>);
 
-        revenueTrendsFormatted = Object.entries(revenueByDate).map(([date, revenue]) => ({
-          day: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
-          name: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          revenue,
-          orders: 0 // Will be populated separately
-        }));
-        console.log(`Revenue trends: ${revenueTrendsFormatted.length} data points`);
+        // Convert to arrays for charts
+        revenueSeries = Object.entries(groupedData)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([_, data]) => data);
+        
+        orderSeries = [...revenueSeries]; // Same data structure
+        
+        console.log(`Revenue/Order series: ${revenueSeries.length} data points for ${groupBy} grouping`);
       }
-    } catch (revenueError) {
-      console.error("Error fetching revenue trends:", revenueError);
-    }
-
-    // Get order trends (last 7 days) with error handling
-    let orderTrendsFormatted = [];
-    try {
-      const { data: orderTrends, error: orderTrendsError } = await supabase
-        .from('orders')
-        .select('order_time')
-        .gte('order_time', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
-        .order('order_time', { ascending: true });
-
-      if (orderTrendsError) {
-        console.error("Order trends query error:", orderTrendsError);
-      } else {
-        const ordersByDate = (orderTrends || []).reduce((acc, order) => {
-          const date = new Date(order.order_time).toISOString().split('T')[0];
-          acc[date] = (acc[date] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-
-        orderTrendsFormatted = Object.entries(ordersByDate).map(([date, orders]) => ({
-          day: new Date(date).toLocaleDateString('en-US', { weekday: 'short' }),
-          name: new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
-          revenue: 0, // Will be merged with revenue data
-          orders
-        }));
-        console.log(`Order trends: ${orderTrendsFormatted.length} data points`);
-      }
-    } catch (orderTrendsError) {
-      console.error("Error fetching order trends:", orderTrendsError);
+    } catch (analyticsError) {
+      console.error("Error fetching analytics data:", analyticsError);
     }
 
     // Get top customers by orders with error handling
@@ -246,11 +290,13 @@ serve(async (req) => {
         totalCustomers,
         totalRevenue
       },
-      revenueTrends: revenueTrendsFormatted,
-      orderTrends: orderTrendsFormatted,
+      revenueSeries,
+      orderSeries,
       topCustomersByOrders: topCustomersByOrdersFormatted,
       topCustomersBySpending: topCustomersBySpendingFormatted,
-      recentOrders: recentOrders
+      recentOrders: recentOrders,
+      dateRange: { startDate, endDate },
+      groupBy
     };
 
     console.log("Dashboard data retrieved successfully:", {
@@ -258,11 +304,13 @@ serve(async (req) => {
       totalOrders,
       totalCustomers,
       totalRevenue,
-      revenueTrendsCount: revenueTrendsFormatted.length,
-      orderTrendsCount: orderTrendsFormatted.length,
+      revenueSeriesCount: revenueSeries.length,
+      orderSeriesCount: orderSeries.length,
       topCustomersByOrdersCount: topCustomersByOrdersFormatted.length,
       topCustomersBySpendingCount: topCustomersBySpendingFormatted.length,
-      recentOrdersCount: recentOrders.length
+      recentOrdersCount: recentOrders.length,
+      groupBy,
+      dateRange: `${startDate} to ${endDate}`
     });
 
     return new Response(JSON.stringify(dashboardData), {
@@ -280,11 +328,13 @@ serve(async (req) => {
         totalCustomers: 0,
         totalRevenue: 0
       },
-      revenueTrends: [],
-      orderTrends: [],
+      revenueSeries: [],
+      orderSeries: [],
       topCustomersByOrders: [],
       topCustomersBySpending: [],
-      recentOrders: []
+      recentOrders: [],
+      dateRange: { startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0] },
+      groupBy: 'week'
     };
 
     return new Response(JSON.stringify(fallbackData), {

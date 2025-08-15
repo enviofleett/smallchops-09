@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 
 interface RevenueBarChartProps {
-  data?: any[];
+  data?: Array<{ label: string; revenue: number; orders: number }>;
   isLoading?: boolean;
 }
 
@@ -40,15 +40,8 @@ const RevenueBarChart: React.FC<RevenueBarChartProps> = ({ data, isLoading }) =>
     );
   }
 
-  // Format data for chart
-  const formattedData = chartData.map((item) => ({
-    date: new Date(item.date).toLocaleDateString('en-US', { 
-      month: 'short', 
-      day: 'numeric' 
-    }),
-    revenue: item.revenue || 0,
-    orders: item.orders || 0
-  }));
+  // Data is already in the correct format
+  const formattedData = chartData;
 
   return (
     <Card>
@@ -60,7 +53,7 @@ const RevenueBarChart: React.FC<RevenueBarChartProps> = ({ data, isLoading }) =>
           <BarChart data={formattedData}>
             <CartesianGrid strokeDasharray="3 3" />
             <XAxis 
-              dataKey="date" 
+              dataKey="label" 
               fontSize={12}
               tick={{ fill: 'hsl(var(--muted-foreground))' }}
             />

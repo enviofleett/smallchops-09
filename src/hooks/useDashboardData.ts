@@ -51,7 +51,7 @@ export const useDashboardData = () => {
       
       // Progressive retry strategy
       const maxRetries = retryCount < 2 ? 3 : 1; // Reduce retries after initial failures
-      const result = await fetchReportsData(maxRetries);
+      const result = await fetchReportsData({ retryCount: maxRetries });
       
       // Validate the returned data structure
       if (result && typeof result === 'object') {

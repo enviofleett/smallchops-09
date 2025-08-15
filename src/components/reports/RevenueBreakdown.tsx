@@ -30,8 +30,8 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({ data, isLoad
   }
 
   const stats = data?.stats || {};
-  const revenueTrends = data?.revenueTrends || [];
-  const orderTrends = data?.orderTrends || [];
+  const revenueSeries = data?.revenueSeries || [];
+  const orderSeries = data?.orderSeries || [];
 
   // Calculate percentage changes (mock data for demo)
   const revenueChange = 15.2;
@@ -129,14 +129,14 @@ export const RevenueBreakdown: React.FC<RevenueBreakdownProps> = ({ data, isLoad
         </div>
 
         {/* Recent Revenue Trends */}
-        {revenueTrends.length > 0 && (
+        {revenueSeries.length > 0 && (
           <div className="mt-6">
             <h4 className="text-sm font-medium mb-3">Recent Revenue Trends</h4>
             <div className="space-y-2">
-              {revenueTrends.slice(0, 5).map((trend: any, index: number) => (
+              {revenueSeries.slice(0, 5).map((trend: any, index: number) => (
                 <div key={index} className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">
-                    {new Date(trend.date).toLocaleDateString()}
+                    {trend.label}
                   </span>
                   <span className="font-medium">
                     {formatValue(trend.revenue || 0, 'currency')}

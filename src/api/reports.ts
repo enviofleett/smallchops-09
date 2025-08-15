@@ -5,7 +5,15 @@ import { supabase } from "@/integrations/supabase/client";
  * API utility for fetching analytics data from the Supabase reports Edge Function.
  * Enhanced with retry logic and better error handling for production use.
  */
-export async function fetchReportsData(retryCount = 3) {
+export async function fetchReportsData(
+  params: {
+    groupBy?: 'week' | 'month';
+    startDate?: string;
+    endDate?: string;
+    retryCount?: number;
+  } = {}
+) {
+  const { groupBy = 'week', startDate, endDate, retryCount = 3 } = params;
   let lastError: Error | null = null;
   
   for (let attempt = 1; attempt <= retryCount; attempt++) {
@@ -16,7 +24,8 @@ export async function fetchReportsData(retryCount = 3) {
       console.log('Calling reports function via Supabase client...');
       
       const { data, error } = await supabase.functions.invoke('reports', {
-        method: 'GET'
+        method: 'POST',
+        body: { groupBy, startDate, endDate }
       });
       
       if (error) {
@@ -41,11 +50,13 @@ export async function fetchReportsData(retryCount = 3) {
       // Return the properly extracted data with fallback structure
       return extractedData || {
         stats: { totalProducts: 0, totalOrders: 0, totalCustomers: 0, totalRevenue: 0 },
-        revenueTrends: [],
-        orderTrends: [],
+        revenueSeries: [],
+        orderSeries: [],
         topCustomersByOrders: [],
         topCustomersBySpending: [],
-        recentOrders: []
+        recentOrders: [],
+        dateRange: { startDate: new Date().toISOString().split('T')[0], endDate: new Date().toISOString().split('T')[0] },
+        groupBy: 'week'
       };
       
     } catch (error) {

@@ -67,3 +67,20 @@ export const deleteDeliverySchedule = async (id: string): Promise<void> => {
 
   if (error) throw error;
 };
+
+export const getSchedulesByOrderIds = async (orderIds: string[]): Promise<Record<string, DeliverySchedule>> => {
+  if (orderIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('order_delivery_schedule')
+    .select('*')
+    .in('order_id', orderIds);
+
+  if (error) throw error;
+  
+  // Convert array to map for easy lookup
+  return (data || []).reduce((acc, schedule) => {
+    acc[schedule.order_id] = schedule;
+    return acc;
+  }, {} as Record<string, DeliverySchedule>);
+};

@@ -1,16 +1,19 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useQuery } from '@tanstack/react-query';
 import { getOrders } from '@/api/orders';
-import { getRoutes } from '@/api/routes';
 import { useDeliveryZones } from '@/hooks/useDeliveryTracking';
 import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
-import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
+import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
+import { DriverAssignDialog } from '@/components/admin/delivery/DriverAssignDialog';
+import { ShippingFeesReport } from '@/components/admin/delivery/ShippingFeesReport';
+import { DriverDialog } from '@/components/delivery/DriverDialog';
 import { 
   MapPin, 
   Truck, 
@@ -18,20 +21,23 @@ import {
   Users,
   Package,
   TrendingUp,
-  Navigation,
-  Route,
-  Timer,
-  CheckCircle
+  UserPlus,
+  CheckSquare,
+  Square
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, isToday, parseISO } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 
 export default function AdminDelivery() {
   const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [activeTab, setActiveTab] = useState('overview');
+  const [selectedOrders, setSelectedOrders] = useState<any[]>([]);
+  const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false);
+  const [isRegisterDriverOpen, setIsRegisterDriverOpen] = useState(false);
+  const [deliveryWindowFilter, setDeliveryWindowFilter] = useState<string>('all');
 
-  // Fetch delivery orders for today
-  const { data: deliveryOrdersData, isLoading: ordersLoading } = useQuery({
+  // Fetch delivery orders - only paid delivery orders
+  const { data: deliveryOrdersData, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['delivery-orders', selectedDate],
     queryFn: () => getOrders({
       page: 1,
@@ -41,27 +47,64 @@ export default function AdminDelivery() {
     refetchInterval: 30000,
   });
 
-  // Filter for delivery orders only
+  // Filter for paid delivery orders only
   const deliveryOrders = deliveryOrdersData?.orders?.filter(order => 
     order.order_type === 'delivery' && 
+    order.payment_status === 'paid' &&
     ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
   ) || [];
 
-  // Fetch delivery routes
-  const { data: routes, isLoading: routesLoading } = useQuery({
-    queryKey: ['delivery-routes', selectedDate],
-    queryFn: () => getRoutes(selectedDate),
+  // Fetch delivery schedules in bulk for better performance
+  const orderIds = deliveryOrders.map(order => order.id);
+  const { data: deliverySchedules = {} } = useQuery({
+    queryKey: ['delivery-schedules-bulk', orderIds],
+    queryFn: () => getSchedulesByOrderIds(orderIds),
+    enabled: orderIds.length > 0,
   });
 
   // Fetch delivery zones
   const { zones, loading: zonesLoading } = useDeliveryZones();
+
+  // Generate hourly delivery windows
+  const deliveryWindows = useMemo(() => {
+    const windows = ['all'];
+    for (let hour = 8; hour <= 20; hour++) {
+      const startTime = `${hour.toString().padStart(2, '0')}:00`;
+      const endTime = `${(hour + 1).toString().padStart(2, '0')}:00`;
+      windows.push(`${startTime}-${endTime}`);
+    }
+    windows.push('due-now');
+    return windows;
+  }, []);
+
+  // Filter orders by delivery window
+  const filteredOrders = useMemo(() => {
+    if (deliveryWindowFilter === 'all') return deliveryOrders;
+    if (deliveryWindowFilter === 'due-now') {
+      const now = new Date();
+      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      
+      return deliveryOrders.filter(order => {
+        const schedule = deliverySchedules[order.id];
+        if (!schedule) return false;
+        return currentTime >= schedule.delivery_time_start && currentTime <= schedule.delivery_time_end;
+      });
+    }
+    
+    const [startHour] = deliveryWindowFilter.split('-');
+    return deliveryOrders.filter(order => {
+      const schedule = deliverySchedules[order.id];
+      if (!schedule) return false;
+      return schedule.delivery_time_start.startsWith(startHour);
+    });
+  }, [deliveryOrders, deliveryWindowFilter, deliverySchedules]);
 
   // Calculate delivery metrics
   const deliveryMetrics = {
     totalDeliveries: deliveryOrders.length,
     inProgress: deliveryOrders.filter(o => ['preparing', 'ready'].includes(o.status)).length,
     outForDelivery: deliveryOrders.filter(o => o.status === 'out_for_delivery').length,
-    activeRoutes: routes?.filter(r => r.status === 'active').length || 0,
+    assigned: deliveryOrders.filter(o => o.assigned_rider_id).length,
   };
 
   return (
@@ -94,9 +137,9 @@ export default function AdminDelivery() {
                 <SelectItem value={format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')}>Yesterday</SelectItem>
               </SelectContent>
             </Select>
-            <Button>
-              <Route className="w-4 h-4 mr-2" />
-              Plan Routes
+            <Button onClick={() => setIsRegisterDriverOpen(true)}>
+              <UserPlus className="w-4 h-4 mr-2" />
+              Register Driver
             </Button>
           </div>
         </div>
@@ -162,10 +205,9 @@ export default function AdminDelivery() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="orders">Delivery Orders</TabsTrigger>
-            <TabsTrigger value="routes">Routes</TabsTrigger>
             <TabsTrigger value="zones">Delivery Zones</TabsTrigger>
           </TabsList>
 

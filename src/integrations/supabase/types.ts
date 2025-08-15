@@ -2037,6 +2037,7 @@ export type Database = {
       delivery_analytics: {
         Row: {
           average_delivery_time: number | null
+          completed_deliveries: number | null
           created_at: string
           customer_rating: number | null
           date: string
@@ -2051,6 +2052,7 @@ export type Database = {
         }
         Insert: {
           average_delivery_time?: number | null
+          completed_deliveries?: number | null
           created_at?: string
           customer_rating?: number | null
           date: string
@@ -2065,6 +2067,7 @@ export type Database = {
         }
         Update: {
           average_delivery_time?: number | null
+          completed_deliveries?: number | null
           created_at?: string
           customer_rating?: number | null
           date?: string

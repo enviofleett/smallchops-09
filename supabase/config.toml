@@ -105,3 +105,9 @@ verify_jwt = false
 
 [functions.payment-environment-manager]
 verify_jwt = false
+
+[functions.admin-orders-manager]
+verify_jwt = true
+
+[functions.shipping-fees-report]
+verify_jwt = true

@@ -13,6 +13,8 @@ interface GetOrdersParams {
   pageSize?: number;
   status?: OrderStatus | 'all';
   searchQuery?: string;
+  startDate?: string;
+  endDate?: string;
 }
 
 /**
@@ -24,6 +26,8 @@ export const getOrders = async ({
   pageSize = 10,
   status = 'all',
   searchQuery = '',
+  startDate,
+  endDate,
 }: GetOrdersParams): Promise<{ orders: OrderWithItems[]; count: number }> => {
   try {
     const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
@@ -32,7 +36,9 @@ export const getOrders = async ({
         page,
         pageSize,
         status,
-        searchQuery
+        searchQuery,
+        startDate,
+        endDate
       }
     });
 

@@ -68,45 +68,35 @@ export const ShippingFeesReport: React.FC = () => {
 
   if (error) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Shipping Fees Report
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">
-            <p className="text-destructive">Failed to load shipping fees report</p>
-            <p className="text-sm text-muted-foreground mt-1">
-              {error instanceof Error ? error.message : 'Unknown error occurred'}
-            </p>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="text-center py-8">
+        <p className="text-destructive">Failed to load shipping fees report</p>
+        <p className="text-sm text-muted-foreground mt-1">
+          {error instanceof Error 
+            ? error.message.includes('Invalid authorization') || error.message.includes('Admin access required')
+              ? 'Access denied. Admin permissions required.'
+              : error.message
+            : 'Unknown error occurred'
+          }
+        </p>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center gap-2">
-            <TrendingUp className="w-5 h-5" />
-            Shipping Fees Report
-          </CardTitle>
-          <Select value={period} onValueChange={(value: 'weekly' | 'monthly') => setPeriod(value)}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="weekly">Weekly</SelectItem>
-              <SelectItem value="monthly">Monthly</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-      <CardContent>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Shipping Fees Report</h3>
+        <Select value={period} onValueChange={(value: 'weekly' | 'monthly') => setPeriod(value)}>
+          <SelectTrigger className="w-32">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="weekly">Weekly</SelectItem>
+            <SelectItem value="monthly">Monthly</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+      <div>
         {isLoading ? (
           <div className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -206,7 +196,7 @@ export const ShippingFeesReport: React.FC = () => {
             <p className="text-muted-foreground">No data available</p>
           </div>
         )}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 };

@@ -6,6 +6,8 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useQuery } from '@tanstack/react-query';
 import { getOrders } from '@/api/orders';
 import { useDeliveryZones } from '@/hooks/useDeliveryTracking';
@@ -23,30 +25,38 @@ import {
   Users,
   Package,
   TrendingUp,
-  UserPlus,
+  CalendarIcon,
   CheckSquare,
-  Square
+  Square,
+  AlertTriangle
 } from 'lucide-react';
 import { format, isToday, parseISO } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
+import { cn } from '@/lib/utils';
 
 export default function AdminDelivery() {
-  const [selectedDate, setSelectedDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedOrders, setSelectedOrders] = useState<any[]>([]);
   const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false);
   const [isRegisterDriverOpen, setIsRegisterDriverOpen] = useState(false);
   const [deliveryWindowFilter, setDeliveryWindowFilter] = useState<string>('all');
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
 
-  // Fetch delivery orders - only paid delivery orders
-  const { data: deliveryOrdersData, isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
-    queryKey: ['delivery-orders', selectedDate],
+  const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
+  const isSelectedDateToday = isToday(selectedDate);
+
+  // Fetch delivery orders - all orders for the selected date
+  const { data: deliveryOrdersData, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
+    queryKey: ['delivery-orders', selectedDateString],
     queryFn: () => getOrders({
       page: 1,
-      pageSize: 100,
+      pageSize: 1000, // Get all orders for the date
       status: undefined,
+      startDate: selectedDateString,
+      endDate: selectedDateString,
     }),
-    refetchInterval: 30000,
+    refetchInterval: isSelectedDateToday ? 30000 : undefined, // Only poll for today
   });
 
   // Filter for paid delivery orders only (all statuses for metrics)
@@ -131,84 +141,128 @@ export default function AdminDelivery() {
         <SystemStatusChecker />
         
         {/* Header */}
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Delivery Management</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Delivery Management</h1>
+            <p className="text-sm sm:text-base text-muted-foreground">
               Monitor delivery operations, routes, and performance metrics
             </p>
           </div>
           <div className="flex gap-2">
-            <Select value={selectedDate} onValueChange={setSelectedDate}>
-              <SelectTrigger className="w-40">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={format(new Date(), 'yyyy-MM-dd')}>Today</SelectItem>
-                <SelectItem value={format(new Date(Date.now() + 86400000), 'yyyy-MM-dd')}>Tomorrow</SelectItem>
-                <SelectItem value={format(new Date(Date.now() - 86400000), 'yyyy-MM-dd')}>Yesterday</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button onClick={() => setIsRegisterDriverOpen(true)}>
-              <UserPlus className="w-4 h-4 mr-2" />
-              Register Driver
-            </Button>
+            <Popover open={isCalendarOpen} onOpenChange={setIsCalendarOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  className={cn(
+                    "w-[200px] sm:w-[240px] justify-start text-left font-normal",
+                    !selectedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {selectedDate ? format(selectedDate, "PPP") : <span>Pick a date</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  onSelect={(date) => {
+                    if (date) {
+                      setSelectedDate(date);
+                      setIsCalendarOpen(false);
+                    }
+                  }}
+                  initialFocus
+                  className="pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
           </div>
         </div>
 
+        {/* Error Banner */}
+        {ordersError && (
+          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-destructive" />
+              <p className="text-sm text-destructive font-medium">
+                Failed to load orders data
+              </p>
+            </div>
+            <p className="text-xs text-destructive/80 mt-1">
+              {ordersError instanceof Error ? ordersError.message : 'Unknown error occurred'}
+            </p>
+          </div>
+        )}
+
+        {/* Server Cap Warning */}
+        {deliveryOrdersData?.count === 1000 && (
+          <div className="bg-warning/10 border border-warning/20 rounded-lg p-4">
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-warning" />
+              <p className="text-sm text-warning font-medium">
+                Maximum data limit reached (1000 orders)
+              </p>
+            </div>
+            <p className="text-xs text-warning/80 mt-1">
+              Some orders may not be displayed. Consider narrowing your date range.
+            </p>
+          </div>
+        )}
+
         {/* Delivery Metrics */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                  <Package className="w-5 h-5" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-primary/10 text-primary rounded-lg flex-shrink-0">
+                  <Package className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Deliveries</p>
-                  <p className="text-2xl font-bold">{deliveryMetrics.totalDeliveries}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Total Deliveries</p>
+                  <p className="text-lg sm:text-2xl font-bold">{deliveryMetrics.totalDeliveries}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
-                  <Clock className="w-5 h-5" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-orange-500/10 text-orange-600 rounded-lg flex-shrink-0">
+                  <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">In Progress</p>
-                  <p className="text-2xl font-bold">{deliveryMetrics.inProgress}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
-                  <Truck className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Out for Delivery</p>
-                  <p className="text-2xl font-bold">{deliveryMetrics.outForDelivery}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">In Progress</p>
+                  <p className="text-lg sm:text-2xl font-bold">{deliveryMetrics.inProgress}</p>
                 </div>
               </div>
             </CardContent>
           </Card>
 
           <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                  <Users className="w-5 h-5" />
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-purple-500/10 text-purple-600 rounded-lg flex-shrink-0">
+                  <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Assigned</p>
-                  <p className="text-2xl font-bold">{deliveryMetrics.assigned}</p>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Out for Delivery</p>
+                  <p className="text-lg sm:text-2xl font-bold">{deliveryMetrics.outForDelivery}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-3 sm:p-4">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <div className="p-1.5 sm:p-2 bg-green-500/10 text-green-600 rounded-lg flex-shrink-0">
+                  <Users className="w-4 h-4 sm:w-5 sm:h-5" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Assigned</p>
+                  <p className="text-lg sm:text-2xl font-bold">{deliveryMetrics.assigned}</p>
                 </div>
               </div>
             </CardContent>
@@ -217,11 +271,11 @@ export default function AdminDelivery() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-4">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="orders">Delivery Orders</TabsTrigger>
-            <TabsTrigger value="drivers">Drivers</TabsTrigger>
-            <TabsTrigger value="zones">Delivery Zones</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
+            <TabsTrigger value="orders" className="text-xs sm:text-sm">Delivery Orders</TabsTrigger>
+            <TabsTrigger value="drivers" className="text-xs sm:text-sm">Drivers</TabsTrigger>
+            <TabsTrigger value="zones" className="text-xs sm:text-sm">Zones</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -300,9 +354,9 @@ export default function AdminDelivery() {
             </div>
 
             {/* Controls */}
-            <div className="flex items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
               <Select value={deliveryWindowFilter} onValueChange={setDeliveryWindowFilter}>
-                <SelectTrigger className="w-48">
+                <SelectTrigger className="w-full sm:w-48">
                   <SelectValue placeholder="Filter by time window" />
                 </SelectTrigger>
                 <SelectContent>
@@ -316,30 +370,35 @@ export default function AdminDelivery() {
                 </SelectContent>
               </Select>
               
-              {readyFilteredOrders.length > 0 && (
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    checked={selectedOrders.length === readyFilteredOrders.length}
-                    onCheckedChange={(checked) => {
-                      if (checked) {
-                        setSelectedOrders(readyFilteredOrders);
-                      } else {
-                        setSelectedOrders([]);
-                      }
-                    }}
-                  />
-                  <span className="text-sm text-muted-foreground">Select All in View</span>
-                </div>
-              )}
-              
-              {selectedOrders.length > 0 && (
-                <Button 
-                  onClick={() => setIsDriverDialogOpen(true)}
-                  className="ml-auto"
-                >
-                  Assign Driver ({selectedOrders.length})
-                </Button>
-              )}
+              <div className="flex items-center gap-4 w-full sm:w-auto">
+                {readyFilteredOrders.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      checked={selectedOrders.length === readyFilteredOrders.length}
+                      onCheckedChange={(checked) => {
+                        if (checked) {
+                          setSelectedOrders(readyFilteredOrders);
+                        } else {
+                          setSelectedOrders([]);
+                        }
+                      }}
+                    />
+                    <span className="text-sm text-muted-foreground">Select All in View</span>
+                  </div>
+                )}
+                
+                {selectedOrders.length > 0 && (
+                  <Button 
+                    onClick={() => setIsDriverDialogOpen(true)}
+                    className="ml-auto"
+                    size="sm"
+                  >
+                    <span className="hidden sm:inline">Assign Driver</span>
+                    <span className="sm:hidden">Assign</span>
+                    <span className="ml-1">({selectedOrders.length})</span>
+                  </Button>
+                )}
+              </div>
             </div>
 
             {/* Error state for schedules */}

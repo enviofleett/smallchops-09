@@ -12,6 +12,8 @@ interface OrdersRequest {
   pageSize?: number;
   status?: string;
   searchQuery?: string;
+  startDate?: string;
+  endDate?: string;
   orderId?: string;
   orderIds?: string[];
   updates?: Record<string, any>;
@@ -66,7 +68,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     switch (action) {
       case 'list': {
-        const { page = 1, pageSize = 10, status = 'all', searchQuery = '' } = requestBody;
+        const { page = 1, pageSize = 10, status = 'all', searchQuery = '', startDate, endDate } = requestBody;
         const from = (page - 1) * pageSize;
         const to = from + pageSize - 1;
 
@@ -86,6 +88,14 @@ const handler = async (req: Request): Promise<Response> => {
           query = query.or(
             `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
           );
+        }
+
+        // Add date filtering
+        if (startDate) {
+          query = query.gte('order_time', startDate + 'T00:00:00.000Z');
+        }
+        if (endDate) {
+          query = query.lte('order_time', endDate + 'T23:59:59.999Z');
         }
 
         const { data, error, count } = await query

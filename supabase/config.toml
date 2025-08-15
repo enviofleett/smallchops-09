@@ -87,3 +87,9 @@ verify_jwt = false
 
 [functions.payment-health-check]
 verify_jwt = false
+
+[functions.test-paystack-credentials]
+verify_jwt = false
+
+[functions.verify-payment-unified]
+verify_jwt = false

@@ -32,13 +32,9 @@ export interface PublicHoliday {
 }
 
 export interface DeliveryTimeSlot {
-  slot_id?: string;
   start_time: string;
   end_time: string;
   available: boolean;
-  available_spots?: number;
-  max_capacity?: number;
-  current_bookings?: number;
   reason?: string;
 }
 
@@ -117,16 +113,16 @@ class DeliverySchedulingService {
     return {
       minimum_lead_time_minutes: 90,
       max_advance_booking_days: 30,
-      default_delivery_duration_minutes: 60, // Changed to 1 hour slots
+      default_delivery_duration_minutes: 120,
       allow_same_day_delivery: true,
       business_hours: {
-        monday: { open: '08:00', close: '18:00', is_open: true }, // 8 AM - 6 PM
-        tuesday: { open: '08:00', close: '18:00', is_open: true },
-        wednesday: { open: '08:00', close: '18:00', is_open: true },
-        thursday: { open: '08:00', close: '18:00', is_open: true },
-        friday: { open: '08:00', close: '18:00', is_open: true },
-        saturday: { open: '08:00', close: '18:00', is_open: true },
-        sunday: { open: '10:00', close: '18:00', is_open: false }, // Closed Sundays
+        monday: { open: '09:00', close: '21:00', is_open: true },
+        tuesday: { open: '09:00', close: '21:00', is_open: true },
+        wednesday: { open: '09:00', close: '21:00', is_open: true },
+        thursday: { open: '09:00', close: '21:00', is_open: true },
+        friday: { open: '09:00', close: '21:00', is_open: true },
+        saturday: { open: '09:00', close: '21:00', is_open: true },
+        sunday: { open: '10:00', close: '20:00', is_open: true },
       }
     };
   }
@@ -191,46 +187,46 @@ class DeliverySchedulingService {
     return { available: true };
   }
 
-  async generateTimeSlots(date: Date): Promise<DeliveryTimeSlot[]> {
-    try {
-      const dateStr = format(date, 'yyyy-MM-dd');
-      
-      // Get available slots from database
-      const { data, error } = await supabase
-        .rpc('get_available_delivery_slots', {
-          p_start_date: dateStr,
-          p_end_date: dateStr
-        });
+  generateTimeSlots(date: Date): DeliveryTimeSlot[] {
+    if (!this.config) return [];
 
-      if (error) {
-        console.error('Error fetching delivery slots:', error);
-        return [];
-      }
+    const dayOfWeek = format(date, 'EEEE').toLowerCase() as keyof typeof this.config.business_hours;
+    const businessHours = this.config.business_hours[dayOfWeek];
 
-      const minDeliveryTime = this.getMinimumDeliveryTime();
+    if (!businessHours.is_open) return [];
+
+    const slots: DeliveryTimeSlot[] = [];
+    const openTime = this.parseTime(businessHours.open);
+    const closeTime = this.parseTime(businessHours.close);
+    const slotDuration = this.config.default_delivery_duration_minutes;
+    const minDeliveryTime = this.getMinimumDeliveryTime();
+
+    let currentTime = openTime;
+
+    while (currentTime < closeTime) {
+      const slotEnd = addMinutes(currentTime, slotDuration);
       
-      return (data || []).map((slot: any) => {
-        const slotDateTime = new Date(`${slot.date}T${slot.start_time}`);
-        const isPastDeadline = isBefore(slotDateTime, minDeliveryTime);
-        const isAvailable = slot.is_available && !isPastDeadline;
-        
-        return {
-          slot_id: slot.slot_id,
-          start_time: slot.start_time.slice(0, 5), // Format as HH:mm
-          end_time: slot.end_time.slice(0, 5),
-          available: isAvailable,
-          available_spots: slot.available_spots,
-          max_capacity: slot.max_capacity,
-          current_bookings: slot.current_bookings,
-          reason: !isAvailable 
-            ? (isPastDeadline ? 'Too soon - minimum lead time required' : 'Slot fully booked')
-            : undefined
-        };
+      // Don't create slot if it would end after closing time
+      if (isAfter(slotEnd, closeTime)) break;
+
+      const slotDateTime = this.combineDateAndTime(date, currentTime);
+      const slotEndDateTime = this.combineDateAndTime(date, slotEnd);
+
+      // Check if slot is available (not in the past)
+      const available = !isBefore(slotDateTime, minDeliveryTime);
+      
+      slots.push({
+        start_time: format(currentTime, 'HH:mm'),
+        end_time: format(slotEnd, 'HH:mm'),
+        available,
+        reason: available ? undefined : 'Too soon - minimum lead time required'
       });
-    } catch (error) {
-      console.error('Failed to generate time slots:', error);
-      return [];
+
+      // Move to next slot (2-hour intervals)
+      currentTime = addMinutes(currentTime, slotDuration);
     }
+
+    return slots;
   }
 
   private parseTime(timeStr: string): Date {
@@ -264,7 +260,7 @@ class DeliverySchedulingService {
         
         const slot: DeliverySlot = {
           date: format(currentDate, 'yyyy-MM-dd'),
-          time_slots: availability.available ? await this.generateTimeSlots(currentDate) : [],
+          time_slots: availability.available ? this.generateTimeSlots(currentDate) : [],
           is_holiday: !!holiday,
           holiday_name: holiday?.name,
           is_business_day: availability.available
@@ -282,7 +278,7 @@ class DeliverySchedulingService {
     }
   }
 
-  async validateDeliverySlot(date: string, startTime: string, endTime: string): Promise<{ valid: boolean; error?: string }> {
+  validateDeliverySlot(date: string, startTime: string, endTime: string): { valid: boolean; error?: string } {
     if (!this.config) return { valid: false, error: 'Configuration not loaded' };
 
     const deliveryDate = parseISO(date);
@@ -292,7 +288,7 @@ class DeliverySchedulingService {
       return { valid: false, error: availability.reason };
     }
 
-    const timeSlots = await this.generateTimeSlots(deliveryDate);
+    const timeSlots = this.generateTimeSlots(deliveryDate);
     const selectedSlot = timeSlots.find(slot => 
       slot.start_time === startTime && slot.end_time === endTime
     );
@@ -306,44 +302,6 @@ class DeliverySchedulingService {
     }
 
     return { valid: true };
-  }
-
-  // New method to reserve a delivery slot
-  async reserveDeliverySlot(slotId: string, orderId?: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { data, error } = await supabase.rpc('reserve_delivery_slot', {
-        p_slot_id: slotId,
-        p_order_id: orderId || null
-      });
-
-      if (error) throw error;
-      
-      return (data as any)?.success 
-        ? { success: true }
-        : { success: false, error: (data as any)?.error };
-    } catch (error) {
-      console.error('Failed to reserve delivery slot:', error);
-      return { success: false, error: 'Failed to reserve slot' };
-    }
-  }
-
-  // New method to release a delivery slot
-  async releaseDeliverySlot(slotId: string, orderId?: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const { data, error } = await supabase.rpc('release_delivery_slot', {
-        p_slot_id: slotId,
-        p_order_id: orderId || null
-      });
-
-      if (error) throw error;
-      
-      return (data as any)?.success 
-        ? { success: true }
-        : { success: false, error: (data as any)?.error };
-    } catch (error) {
-      console.error('Failed to release delivery slot:', error);
-      return { success: false, error: 'Failed to release slot' };
-    }
   }
 }
 

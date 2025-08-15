@@ -29,8 +29,7 @@ import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { format } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
-import { DeliveryManagementNotice } from '@/components/delivery/DeliveryManagementNotice';
-
+import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -112,9 +111,6 @@ export default function AdminOrders() {
       <div className="space-y-6">
         {/* System Status Check */}
         <SystemStatusChecker />
-        
-        {/* Delivery Management Notice */}
-        <DeliveryManagementNotice />
         {/* Performance Monitor */}
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div className="flex items-center gap-2 text-blue-700">
@@ -224,6 +220,10 @@ export default function AdminOrders() {
           </CardContent>
         </Card>
 
+        {/* Performance Debugger */}
+        {import.meta.env.DEV && (
+          <PerformanceDebugger />
+        )}
 
         {/* Orders Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>
@@ -461,28 +461,13 @@ function AdminOrderCard({ order }: { order: OrderWithItems }) {
           </div>
         )}
 
-        {/* Delivery Information */}
-        {order.order_type === 'delivery' && (
+        {deliverySchedule && (
           <div className="mt-4 p-3 bg-muted rounded-lg">
-            <div className="flex items-center gap-2 mb-2">
-              <Package className="w-4 h-4" />
-              <p className="text-sm font-medium">Delivery Details</p>
-            </div>
-            
-            {deliverySchedule ? (
-              <div className="space-y-1 text-sm">
-                <p><span className="text-muted-foreground">Scheduled:</span> {format(new Date(deliverySchedule.delivery_date), 'PPP')}</p>
-                <p><span className="text-muted-foreground">Time Window:</span> {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</p>
-                {typeof order.delivery_address === 'string' && (
-                  <p><span className="text-muted-foreground">Address:</span> {order.delivery_address}</p>
-                )}
-                {deliverySchedule.special_instructions && (
-                  <p><span className="text-muted-foreground">Instructions:</span> {deliverySchedule.special_instructions}</p>
-                )}
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">Delivery details not available</p>
-            )}
+            <p className="text-sm font-medium">Delivery Scheduled:</p>
+            <p className="text-sm">
+              {format(new Date(deliverySchedule.delivery_date), 'PPP')} | {' '}
+              {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+            </p>
           </div>
         )}
       </CardContent>

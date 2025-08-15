@@ -13,8 +13,7 @@ import { User, Phone, MapPin, Calendar, Hash, X, RefreshCw, ShieldCheck } from '
 import { formatAddressMultiline } from '@/utils/formatAddress';
 import { supabase } from '@/integrations/supabase/client';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
-import { ComprehensiveDeliveryInfo } from './ComprehensiveDeliveryInfo';
-import { useOrderDeliveryInfo } from '@/hooks/useOrderDeliveryInfo';
+import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
 
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -31,7 +30,6 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
   const [verifying, setVerifying] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
   const [verifyState, setVerifyState] = useState<'idle'|'success'|'failed'|'pending'>('idle');
-  const { data: deliveryInfo, isLoading: loadingDelivery } = useOrderDeliveryInfo(order.id);
 
   useEffect(() => {
     setSelectedStatus(order.status);
@@ -197,20 +195,20 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
              {order.order_type === 'delivery' && (
                <div className="mt-6">
                  <h3 className="font-semibold text-lg mb-4">Delivery Schedule</h3>
-                 {loadingDelivery ? (
-                    <div className="bg-muted/50 rounded-lg p-4 animate-pulse">
-                      <div className="h-4 bg-muted rounded mb-2"></div>
-                      <div className="h-3 bg-muted rounded w-2/3"></div>
-                    </div>
-                  ) : deliveryInfo ? (
-                    <ComprehensiveDeliveryInfo deliveryInfo={deliveryInfo as any} showTitle={false} />
-                  ) : (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                      <p className="text-sm text-yellow-800">
-                        No delivery information found for this order.
-                      </p>
-                    </div>
-                  )}
+                 {isLoadingSchedule ? (
+                   <div className="bg-gray-100 rounded-lg p-4 animate-pulse">
+                     <div className="h-4 bg-gray-300 rounded mb-2"></div>
+                     <div className="h-3 bg-gray-300 rounded w-2/3"></div>
+                   </div>
+                 ) : deliverySchedule ? (
+                   <DeliveryScheduleDisplay schedule={deliverySchedule} className="mb-0" />
+                 ) : (
+                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                     <p className="text-sm text-yellow-800">
+                       No delivery schedule found for this order.
+                     </p>
+                   </div>
+                 )}
                </div>
              )}
           </div>

@@ -9,9 +9,8 @@ import { useQuery } from '@tanstack/react-query';
 import { getOrders } from '@/api/orders';
 import { getRoutes } from '@/api/routes';
 import { useDeliveryZones } from '@/hooks/useDeliveryTracking';
-import { ComprehensiveDeliveryInfo } from '@/components/orders/ComprehensiveDeliveryInfo';
-import { useOrderDeliveryInfo } from '@/hooks/useOrderDeliveryInfo';
-import { EnhancedDeliveryDashboard } from '@/components/delivery/EnhancedDeliveryDashboard';
+import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
+import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { 
   MapPin, 
   Truck, 
@@ -252,7 +251,23 @@ export default function AdminDelivery() {
 
           {/* Delivery Orders Tab */}
           <TabsContent value="orders" className="space-y-4">
-            <EnhancedDeliveryDashboard />
+            <div className="grid gap-4">
+              {ordersLoading ? (
+                [...Array(5)].map((_, i) => (
+                  <Card key={i} className="p-6">
+                    <div className="animate-pulse space-y-3">
+                      <div className="h-4 bg-muted rounded w-1/4"></div>
+                      <div className="h-4 bg-muted rounded w-1/2"></div>
+                      <div className="h-4 bg-muted rounded w-1/3"></div>
+                    </div>
+                  </Card>
+                ))
+              ) : (
+                deliveryOrders.map((order) => (
+                  <DeliveryOrderCard key={order.id} order={order} />
+                ))
+              )}
+            </div>
           </TabsContent>
 
           {/* Routes Tab */}
@@ -343,7 +358,10 @@ function DeliveryOrderItem({ order }: { order: any }) {
 }
 
 function DeliveryOrderCard({ order }: { order: any }) {
-  const { data: deliveryInfo } = useOrderDeliveryInfo(order.id);
+  const { data: deliverySchedule } = useQuery({
+    queryKey: ['delivery-schedule', order.id],
+    queryFn: () => getDeliveryScheduleByOrderId(order.id),
+  });
 
   return (
     <Card>
@@ -358,8 +376,8 @@ function DeliveryOrderCard({ order }: { order: any }) {
           </Badge>
         </div>
 
-        {deliveryInfo && (
-          <ComprehensiveDeliveryInfo deliveryInfo={deliveryInfo as any} showTitle={false} />
+        {deliverySchedule && (
+          <DeliveryScheduleDisplay schedule={deliverySchedule} />
         )}
       </CardContent>
     </Card>

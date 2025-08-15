@@ -1,10 +1,41 @@
-// verify-payment/index.ts - Updated with enhanced error handling
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+interface VerificationRequest {
+  reference: string
+  order_id?: string
+}
+
+interface PaystackVerificationResponse {
+  status: boolean
+  message: string
+  data: {
+    id: number
+    domain: string
+    status: 'success' | 'failed' | 'abandoned'
+    reference: string
+    amount: number
+    paid_at: string
+    created_at: string
+    channel: string
+    currency: string
+    customer: {
+      id: number
+      email: string
+    }
+    authorization: {
+      authorization_code: string
+      bin: string
+      last4: string
+      exp_month: string
+      exp_year: string
+      channel: string
+      card_type: string
+      bank: string
+      country_code: string
+    }
+  }
 }
 
 serve(async (req) => {
@@ -13,178 +44,379 @@ serve(async (req) => {
   }
 
   try {
-    const { reference } = await req.json()
+    console.log('[VERIFY-PAYMENT] Payment verification started')
     
-    if (!reference) {
-      throw new Error('Payment reference is required')
-    }
-
-    const supabase = createClient(
+    const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log(`[VERIFY-PAYMENT] Starting verification for reference: ${reference}`)
-
-    // Step 1: Verify payment with Paystack
+    // CRITICAL FIX: Enhanced Paystack secret key validation  
     const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
     if (!paystackSecretKey) {
-      throw new Error('Paystack secret key not configured')
-    }
-
-    const paystackResponse = await fetch(
-      `https://api.paystack.co/transaction/verify/${reference}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${paystackSecretKey}`,
-          'Content-Type': 'application/json',
-        },
+      console.error('[VERIFY-PAYMENT] ERROR - PAYSTACK_SECRET_KEY not configured')
+      
+      // Try to get from Supabase configuration as fallback
+      const { data: configData, error: configError } = await supabaseClient
+        .rpc('get_active_paystack_config')
+      
+      if (configError || !configData?.secret_key) {
+        console.error('[VERIFY-PAYMENT] ERROR - No Paystack configuration found anywhere')
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: 'Payment service configuration error',
+            code: 'PAYSTACK_KEY_MISSING',
+            details: 'Paystack secret key not configured'
+          }),
+          { 
+            status: 503, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
       }
-    )
-
-    if (!paystackResponse.ok) {
-      console.error(`[VERIFY-PAYMENT] Paystack API error: ${paystackResponse.status}`)
-      throw new Error(`Paystack API error: ${paystackResponse.statusText}`)
+      
+      // Use secret key from database configuration
+      console.log('[VERIFY-PAYMENT] Using Paystack key from database configuration')
+      const paystackKey = configData.secret_key
+    } else {
+      console.log('[VERIFY-PAYMENT] Using Paystack key from environment variables')
+      const paystackKey = paystackSecretKey
     }
 
-    const paymentData = await paystackResponse.json()
+    // Get the final secret key to use
+    const finalSecretKey = paystackSecretKey || paystackKey
     
-    console.log('[VERIFY-PAYMENT] Paystack verification response:', {
-      status: paymentData.status,
-      data_status: paymentData.data?.status,
-      reference: paymentData.data?.reference,
-      amount: paymentData.data?.amount,
-      gateway_response: paymentData.data?.gateway_response
-    })
-
-    // Step 2: Check payment status
-    if (paymentData.status !== 'success' || paymentData.data?.status !== 'success') {
-      console.log('[VERIFY-PAYMENT] Payment verification failed:', paymentData.message)
+    // Validate secret key format
+    if (!finalSecretKey || (!finalSecretKey.startsWith('sk_test_') && !finalSecretKey.startsWith('sk_live_'))) {
+      console.error('[VERIFY-PAYMENT] ERROR - Invalid PAYSTACK_SECRET_KEY format')
       
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'Payment verification failed',
-          paystack_message: paymentData.message,
-          paystack_data: {
-            status: paymentData.data?.status,
-            gateway_response: paymentData.data?.gateway_response
-          }
+        JSON.stringify({
+          success: false,
+          error: 'Payment service configuration error',
+          code: 'INVALID_KEY_FORMAT'
         }),
         { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400 
+          status: 503, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       )
     }
 
-    console.log('[VERIFY-PAYMENT] Payment verified successfully, updating order status')
+    console.log('[VERIFY-PAYMENT] Secret key validation passed:', finalSecretKey.substring(0, 10) + '...')
 
-    // Step 3: Update order using the enhanced function
-    const { data: updateResult, error: updateError } = await supabase
-      .rpc('verify_and_update_payment_status', {
-        payment_ref: reference,
-        new_status: 'confirmed',
-        payment_amount: paymentData.data.amount / 100, // Convert from kobo to naira
-        payment_gateway_response: paymentData.data
+    const { reference, order_id } = await req.json() as VerificationRequest
+
+    if (!reference) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Payment reference is required',
+          code: 'MISSING_REFERENCE'
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    console.log('[VERIFY-PAYMENT] Processing reference:', reference)
+
+    // ENHANCED FIX: Multi-format reference handling with fallback
+    let ordersQuery = supabaseClient
+      .from('orders')
+      .select('id, total_amount, status, payment_reference, paystack_reference, order_number')
+
+    // Try multiple reference lookup strategies
+    if (reference.startsWith('txn_')) {
+      // Backend-generated reference
+      ordersQuery = ordersQuery.or(`payment_reference.eq.${reference},paystack_reference.eq.${reference}`)
+    } else if (reference.startsWith('pay_')) {
+      // Frontend-generated reference - look for associated backend reference
+      console.log('[VERIFY-PAYMENT] WARNING - Frontend reference detected, attempting lookup')
+      ordersQuery = ordersQuery.or(`payment_reference.eq.${reference},paystack_reference.eq.${reference}`)
+    } else {
+      // Unknown format - try all fields
+      ordersQuery = ordersQuery.or(`payment_reference.eq.${reference},paystack_reference.eq.${reference},order_number.eq.${reference}`)
+    }
+
+    console.log('[VERIFY-PAYMENT] Verifying with Paystack API')
+
+    // Verify with Paystack with enhanced error handling
+    let paystackResponse: Response
+    let paystackData: PaystackVerificationResponse
+
+    try {
+      paystackResponse = await fetch(
+        `https://api.paystack.co/transaction/verify/${reference}`,
+        {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${finalSecretKey}`,
+            'Content-Type': 'application/json',
+          }
+        }
+      )
+
+      paystackData = await paystackResponse.json()
+    } catch (networkError) {
+      console.error('[VERIFY-PAYMENT] Network error with Paystack:', networkError)
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Payment verification service unavailable',
+          code: 'NETWORK_ERROR',
+          retryable: true
+        }),
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    if (!paystackResponse.ok || !paystackData.status) {
+      console.error('[VERIFY-PAYMENT] Paystack verification failed:', {
+        status: paystackResponse.status,
+        response: paystackData
       })
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Payment verification failed',
+          code: 'PAYSTACK_VERIFICATION_FAILED',
+          details: paystackData.message || 'Unknown error'
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    const paymentData = paystackData.data
+    const isSuccessful = paymentData.status === 'success'
+
+    console.log('[VERIFY-PAYMENT] Paystack verification result:', {
+      reference,
+      status: paymentData.status,
+      amount: paymentData.amount,
+      paid_at: paymentData.paid_at
+    })
+
+    // Find order with enhanced lookup
+    const { data: orders, error: fetchError } = await ordersQuery
+
+    if (fetchError) {
+      console.error('[VERIFY-PAYMENT] Error fetching order:', fetchError)
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Database error while finding order',
+          code: 'DB_FETCH_ERROR',
+          retryable: true
+        }),
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    if (!orders || orders.length === 0) {
+      // ENHANCED FIX: Create orphaned payment record for tracking
+      try {
+        await supabaseClient
+          .from('payment_transactions')
+          .insert({
+            provider_reference: reference,
+            amount: paymentData.amount / 100,
+            currency: paymentData.currency || 'NGN',
+            status: 'orphaned',
+            gateway_response: 'Order not found during verification',
+            metadata: {
+              paystack_data: paymentData,
+              verification_timestamp: new Date().toISOString()
+            }
+          })
+        
+        console.log('[VERIFY-PAYMENT] Created orphaned payment record for reference:', reference)
+      } catch (orphanError) {
+        console.error('[VERIFY-PAYMENT] Failed to create orphaned payment record:', orphanError)
+      }
+
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Order not found for this payment reference',
+          code: 'ORDER_NOT_FOUND',
+          reference,
+          suggestion: 'Please contact support with your payment reference'
+        }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    const order = orders[0]
+
+    // ENHANCED FIX: Amount verification with tolerance
+    const expectedAmount = Math.round(order.total_amount * 100)
+    const paidAmount = paymentData.amount
+    const tolerance = Math.max(1, Math.round(expectedAmount * 0.01)) // 1% tolerance or 1 kobo minimum
+
+    if (Math.abs(expectedAmount - paidAmount) > tolerance) {
+      console.error('[VERIFY-PAYMENT] Amount mismatch detected:', {
+        order_id: order.id,
+        expected: expectedAmount,
+        paid: paidAmount,
+        tolerance,
+        difference: Math.abs(expectedAmount - paidAmount),
+        reference
+      })
+      
+      // Log to security incidents
+      try {
+        await supabaseClient
+          .from('security_incidents')
+          .insert({
+            type: 'amount_mismatch',
+            description: 'Payment amount does not match order amount',
+            reference,
+            expected_amount: expectedAmount / 100,
+            received_amount: paidAmount / 100,
+            metadata: {
+              order_id: order.id,
+              paystack_data: paymentData
+            }
+          })
+      } catch (logError) {
+        console.error('[VERIFY-PAYMENT] Failed to log security incident:', logError)
+      }
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Payment amount does not match order amount',
+          code: 'AMOUNT_MISMATCH',
+          expected: expectedAmount / 100,
+          paid: paidAmount / 100,
+          reference
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // Update order status with atomic transaction
+    const newStatus = isSuccessful ? 'confirmed' : 'failed'
+    const paymentStatus = isSuccessful ? 'paid' : 'failed'
+    
+    const updateData = {
+      status: newStatus,
+      payment_status: paymentStatus,
+      paid_at: isSuccessful ? new Date().toISOString() : null,
+      payment_verified_at: new Date().toISOString(),
+      paystack_reference: paymentData.reference, // Ensure reference is stored
+      updated_at: new Date().toISOString()
+    }
+
+    const { error: updateError } = await supabaseClient
+      .from('orders')
+      .update(updateData)
+      .eq('id', order.id)
 
     if (updateError) {
-      console.error('[VERIFY-PAYMENT] Database update error:', updateError)
-      throw new Error(`Database update failed: ${updateError.message}`)
-    }
-
-    if (!updateResult || updateResult.length === 0) {
-      console.error('[VERIFY-PAYMENT] No order found for reference:', reference)
-      
-      // Try to find order with different reference format
-      const { data: orderSearch } = await supabase
-        .from('orders')
-        .select('id, order_number, payment_reference, status, fulfillment_type')
-        .or(`payment_reference.eq.${reference},payment_reference.eq.txn_${reference.replace('pay_', '')},payment_reference.eq.pay_${reference.replace('txn_', '')}`)
-        .limit(5)
-
-      console.log('[VERIFY-PAYMENT] Order search results:', orderSearch)
+      console.error('[VERIFY-PAYMENT] Failed to update order:', updateError)
       
       return new Response(
-        JSON.stringify({ 
-          success: false, 
-          message: 'No order found for this payment reference',
-          reference_searched: reference,
-          possible_matches: orderSearch || []
+        JSON.stringify({
+          success: false,
+          error: 'Failed to update order status',
+          code: 'DB_UPDATE_ERROR',
+          retryable: true,
+          reference
         }),
         { 
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 404 
+          status: 503, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       )
     }
 
-    const updatedOrder = updateResult[0]
-    console.log('[VERIFY-PAYMENT] Order updated successfully:', {
-      order_id: updatedOrder.order_id,
-      order_number: updatedOrder.order_number,
-      status: updatedOrder.status,
-      fulfillment_type: updatedOrder.fulfillment_type
-    })
-
-    // Step 4: Send confirmation based on fulfillment type
+    // Create/update payment transaction record
     try {
-      if (updatedOrder.fulfillment_type === 'delivery') {
-        console.log('[VERIFY-PAYMENT] Processing delivery confirmation')
-        // Additional delivery-specific processing can go here
-      } else {
-        console.log('[VERIFY-PAYMENT] Processing pickup confirmation')
-        // Additional pickup-specific processing can go here
-      }
-    } catch (confirmationError) {
-      console.warn('[VERIFY-PAYMENT] Confirmation processing failed:', confirmationError.message)
-      // Don't fail the payment verification if confirmation fails
+      await supabaseClient
+        .from('payment_transactions')
+        .upsert({
+          provider_reference: paymentData.reference,
+          order_id: order.id,
+          amount: paidAmount / 100,
+          currency: paymentData.currency || 'NGN',
+          status: isSuccessful ? 'paid' : 'failed',
+          gateway_response: `Payment ${paymentData.status}`,
+          metadata: paymentData,
+          paid_at: isSuccessful ? paymentData.paid_at : null,
+          processed_at: new Date().toISOString()
+        })
+      
+      console.log('[VERIFY-PAYMENT] Payment transaction record updated')
+    } catch (transactionError) {
+      console.error('[VERIFY-PAYMENT] Failed to update payment transaction:', transactionError)
+      // Don't fail the verification if transaction record update fails
     }
 
-    // Step 5: Return success response
+    console.log('[VERIFY-PAYMENT] SUCCESS - Order updated successfully:', {
+      order_id: order.id,
+      status: newStatus,
+      payment_status: paymentStatus,
+      reference,
+      amount: paidAmount / 100
+    })
+
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Payment verified and order updated successfully',
-        order: {
-          id: updatedOrder.order_id,
-          order_number: updatedOrder.order_number,
-          status: updatedOrder.status,
-          amount: updatedOrder.amount,
-          fulfillment_type: updatedOrder.fulfillment_type,
-          payment_reference: updatedOrder.payment_reference,
-          customer_email: updatedOrder.customer_email
-        },
-        payment_data: {
-          amount: paymentData.data.amount / 100,
-          reference: paymentData.data.reference,
-          status: paymentData.data.status,
-          gateway_response: paymentData.data.gateway_response,
-          paid_at: paymentData.data.paid_at
-        }
+      JSON.stringify({
+        success: isSuccessful,
+        payment_status: paymentData.status,
+        reference: paymentData.reference,
+        order_id: order.id,
+        amount: paidAmount / 100,
+        paid_at: paymentData.paid_at,
+        channel: paymentData.channel,
+        customer_email: paymentData.customer.email
       }),
       { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 200 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
 
   } catch (error) {
-    console.error('[VERIFY-PAYMENT] Error:', error.message)
-    console.error('[VERIFY-PAYMENT] Stack:', error.stack)
+    console.error('[VERIFY-PAYMENT] ERROR in verify-payment - ' + JSON.stringify({
+      message: error.message,
+      stack: error.stack
+    }))
     
     return new Response(
-      JSON.stringify({ 
-        success: false, 
-        message: 'Payment verification failed',
-        error: error.message,
-        timestamp: new Date().toISOString()
+      JSON.stringify({
+        success: false,
+        error: 'Payment verification service error',
+        code: 'INTERNAL_ERROR',
+        message: error.message,
+        retryable: true
       }),
       { 
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500 
+        status: 503, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
   }

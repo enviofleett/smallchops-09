@@ -7,8 +7,6 @@ export interface PasswordValidation {
   valid: boolean;
   errors: string[];
   score: 'weak' | 'fair' | 'good' | 'strong';
-  isProductionReady: boolean;
-  strengthPercentage: number;
 }
 
 /**
@@ -19,118 +17,54 @@ export function validatePasswordStrength(password: string): PasswordValidation {
   const errors: string[] = [];
   let score: 'weak' | 'fair' | 'good' | 'strong' = 'weak';
 
-  // Enhanced production-ready validation
-  
-  // Minimum length check (increased to 12 for production)
-  if (password.length < 12) {
-    errors.push('Password must be at least 12 characters long');
+  // Length check
+  if (password.length < 8) {
+    errors.push('Password must be at least 8 characters long');
   }
 
-  // Character type checks (all required for production)
+  // Character type checks
   const hasUppercase = /[A-Z]/.test(password);
   const hasLowercase = /[a-z]/.test(password);
   const hasNumbers = /\d/.test(password);
   const hasSpecialChars = /[!@#$%^&*(),.?":{}|<>]/.test(password);
 
-  if (!hasUppercase) {
-    errors.push('Password must contain at least one uppercase letter');
-  }
-
-  if (!hasLowercase) {
-    errors.push('Password must contain at least one lowercase letter');
+  if (!hasLowercase && !hasUppercase) {
+    errors.push('Password must contain at least one letter');
   }
 
   if (!hasNumbers) {
     errors.push('Password must contain at least one number');
   }
 
-  if (!hasSpecialChars) {
-    errors.push('Password must contain at least one special character');
-  }
-
-  // Expanded common password check
+  // Common password check
   const commonPasswords = [
     'password', '123456', '123456789', 'qwerty', 'abc123',
     'password123', 'admin', 'letmein', 'welcome', '12345678',
-    'password1', 'admin123', 'root', 'user', 'test', 'iloveyou',
-    'princess', 'rockyou', 'sunshine', 'football', 'charlie',
-    'aa123456', 'login', 'starwars', 'hello', 'freedom', 'whatever'
+    'password1', 'admin123', 'root', 'user', 'test'
   ];
 
-  if (commonPasswords.some(common => password.toLowerCase().includes(common))) {
-    errors.push('Password contains common patterns and is not secure');
+  if (commonPasswords.includes(password.toLowerCase())) {
+    errors.push('Password is too common and easily guessable');
   }
 
-  // Check for repetitive patterns
-  if (/(.)\1{2,}/.test(password)) {
-    errors.push('Password contains too many repeated characters');
-  }
-
-  // Check for keyboard patterns
-  const keyboardPatterns = ['qwerty', 'asdf', '1234', 'abcd', 'zxcv'];
-  if (keyboardPatterns.some(pattern => password.toLowerCase().includes(pattern))) {
-    errors.push('Password contains keyboard patterns');
-  }
-
-  // Check for sequential patterns
-  if (/(?:abc|bcd|cde|def|efg|fgh|ghi|hij|ijk|jkl|klm|lmn|mno|nop|opq|pqr|qrs|rst|stu|tuv|uvw|vwx|wxy|xyz|123|234|345|456|567|678|789)/i.test(password)) {
-    errors.push('Password contains sequential patterns');
-  }
-
-  // Calculate comprehensive strength score
+  // Calculate strength score
   let strengthPoints = 0;
-  const maxPoints = 12;
-  
-  // Length scoring
-  if (password.length >= 12) strengthPoints += 2;
-  if (password.length >= 16) strengthPoints += 1;
-  if (password.length >= 20) strengthPoints += 1;
-  
-  // Character variety
+  if (password.length >= 8) strengthPoints += 1;
+  if (password.length >= 12) strengthPoints += 1;
   if (hasUppercase) strengthPoints += 1;
   if (hasLowercase) strengthPoints += 1;
   if (hasNumbers) strengthPoints += 1;
-  if (hasSpecialChars) strengthPoints += 2;
-  
-  // Multiple special characters bonus
-  if ((password.match(/[!@#$%^&*(),.?":{}|<>]/g) || []).length >= 2) {
-    strengthPoints += 1;
-  }
-  
-  // Character diversity bonus
-  const uniqueChars = new Set(password).size;
-  if (uniqueChars >= password.length * 0.7) {
-    strengthPoints += 1;
-  }
-  
-  // Mixed case bonus
-  if (hasUppercase && hasLowercase) {
-    strengthPoints += 1;
-  }
+  if (hasSpecialChars) strengthPoints += 1;
 
-  // Calculate percentage and score
-  const strengthPercentage = Math.round((strengthPoints / maxPoints) * 100);
-  
-  if (strengthPercentage >= 85) score = 'strong';
-  else if (strengthPercentage >= 65) score = 'good';
-  else if (strengthPercentage >= 45) score = 'fair';
+  if (strengthPoints >= 5) score = 'strong';
+  else if (strengthPoints >= 4) score = 'good';
+  else if (strengthPoints >= 3) score = 'fair';
   else score = 'weak';
 
-  // Production readiness check
-  const isProductionReady = password.length >= 12 && 
-                           hasUppercase && 
-                           hasLowercase && 
-                           hasNumbers && 
-                           hasSpecialChars && 
-                           !commonPasswords.some(common => password.toLowerCase().includes(common)) &&
-                           strengthPercentage >= 70;
-
   return {
-    valid: errors.length === 0,
+    valid: errors.length === 0 && strengthPoints >= 3,
     errors,
-    score,
-    isProductionReady,
-    strengthPercentage
+    score
   };
 }
 

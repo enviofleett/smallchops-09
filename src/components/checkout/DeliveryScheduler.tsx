@@ -11,8 +11,6 @@ import { useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
-import { TimeSlotSelect } from '@/components/ui/time-slot-select';
-import { supabase } from '@/integrations/supabase/client';
 
 interface DeliverySchedulerProps {
   selectedDate?: string;
@@ -35,6 +33,20 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(
     selectedDate ? parseISO(selectedDate) : undefined
   );
+
+  useEffect(() => {
+    loadAvailableSlots();
+  }, []);
+
+  useEffect(() => {
+    if (calendarDate) {
+      const dateStr = format(calendarDate, 'yyyy-MM-dd');
+      const daySlots = availableSlots.find(slot => slot.date === dateStr);
+      setSelectedDateSlots(daySlots?.time_slots || []);
+    } else {
+      setSelectedDateSlots([]);
+    }
+  }, [calendarDate, availableSlots]);
 
   const loadAvailableSlots = useCallback(async () => {
     try {
@@ -61,40 +73,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
     }
   }, []);
 
-  useEffect(() => {
-    loadAvailableSlots();
-    
-    // Set up real-time subscription for slot updates
-    const channel = supabase
-      .channel('delivery-slots-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'delivery_time_slots'
-        },
-        () => {
-          // Reload slots when any slot is updated
-          loadAvailableSlots();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [loadAvailableSlots]);
-
-  useEffect(() => {
-    if (calendarDate) {
-      const dateStr = format(calendarDate, 'yyyy-MM-dd');
-      const daySlots = availableSlots.find(slot => slot.date === dateStr);
-      setSelectedDateSlots(daySlots?.time_slots || []);
-    } else {
-      setSelectedDateSlots([]);
-    }
-  }, [calendarDate, availableSlots]);
   const isDateDisabled = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const slot = availableSlots.find(s => s.date === dateStr);
@@ -257,16 +235,39 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
               <Clock className="w-4 h-4" />
               Select Delivery Time for {format(calendarDate, 'EEEE, MMMM d')}
             </h3>
-            <TimeSlotSelect
-              slots={selectedDateSlots}
-              selectedSlot={selectedTimeSlot ? 
-                selectedDateSlots.find(slot => 
-                  slot.start_time === selectedTimeSlot.start_time && 
-                  slot.end_time === selectedTimeSlot.end_time
-                ) : undefined}
-              onSelect={handleTimeSlotSelect}
-              placeholder="Choose your preferred delivery time"
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
+              {selectedDateSlots.map((timeSlot, index) => (
+                <Button
+                  key={index}
+                  variant={
+                    selectedTimeSlot?.start_time === timeSlot.start_time &&
+                    selectedTimeSlot?.end_time === timeSlot.end_time
+                      ? "default"
+                      : "outline"
+                  }
+                  disabled={!timeSlot.available}
+                  onClick={() => handleTimeSlotSelect(timeSlot)}
+                  className={cn(
+                    "h-auto min-h-[64px] p-3 sm:p-4 flex flex-col items-center justify-center gap-1 text-center touch-manipulation",
+                    "hover:scale-105 transition-all duration-200 active:scale-95",
+                    !timeSlot.available && "opacity-50 cursor-not-allowed",
+                    "sm:min-h-[72px] rounded-lg border-2"
+                  )}
+                >
+                  <span className="font-medium text-sm sm:text-base">
+                    {timeSlot.start_time} - {timeSlot.end_time}
+                  </span>
+                  {!timeSlot.available && timeSlot.reason && (
+                    <span className="text-xs text-red-500 text-center leading-tight">
+                      {timeSlot.reason}
+                    </span>
+                  )}
+                  {timeSlot.available && (
+                    <span className="text-xs text-green-600">Available</span>
+                  )}
+                </Button>
+              ))}
+            </div>
           </div>
         )}
 

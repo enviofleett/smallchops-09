@@ -1657,12 +1657,16 @@ export type Database = {
       customer_otp_codes: {
         Row: {
           attempts: number | null
+          correlation_id: string | null
           created_at: string | null
           created_by_ip: unknown | null
           customer_id: string | null
           email: string
           expires_at: string
+          failed_attempts: number | null
           id: string
+          ip_address: unknown | null
+          locked_until: string | null
           max_attempts: number | null
           otp_code: string
           otp_type: string
@@ -1671,12 +1675,16 @@ export type Database = {
         }
         Insert: {
           attempts?: number | null
+          correlation_id?: string | null
           created_at?: string | null
           created_by_ip?: unknown | null
           customer_id?: string | null
           email: string
           expires_at: string
+          failed_attempts?: number | null
           id?: string
+          ip_address?: unknown | null
+          locked_until?: string | null
           max_attempts?: number | null
           otp_code: string
           otp_type: string
@@ -1685,12 +1693,16 @@ export type Database = {
         }
         Update: {
           attempts?: number | null
+          correlation_id?: string | null
           created_at?: string | null
           created_by_ip?: unknown | null
           customer_id?: string | null
           email?: string
           expires_at?: string
+          failed_attempts?: number | null
           id?: string
+          ip_address?: unknown | null
+          locked_until?: string | null
           max_attempts?: number | null
           otp_code?: string
           otp_type?: string
@@ -1871,6 +1883,39 @@ export type Database = {
           request_count?: number
           tier?: string
           window_start?: string
+        }
+        Relationships: []
+      }
+      customer_registration_rate_limits: {
+        Row: {
+          attempts: number
+          blocked_until: string | null
+          created_at: string
+          email_lower: string
+          first_attempt_at: string
+          id: string
+          ip_address: unknown | null
+          last_attempt_at: string
+        }
+        Insert: {
+          attempts?: number
+          blocked_until?: string | null
+          created_at?: string
+          email_lower: string
+          first_attempt_at?: string
+          id?: string
+          ip_address?: unknown | null
+          last_attempt_at?: string
+        }
+        Update: {
+          attempts?: number
+          blocked_until?: string | null
+          created_at?: string
+          email_lower?: string
+          first_attempt_at?: string
+          id?: string
+          ip_address?: unknown | null
+          last_attempt_at?: string
         }
         Relationships: []
       }
@@ -6862,6 +6907,10 @@ export type Database = {
         Args: { p_identifier: string; p_identifier_type?: string }
         Returns: Json
       }
+      check_registration_rate_limit_secure: {
+        Args: { p_email: string; p_ip_address?: unknown }
+        Returns: Json
+      }
       check_upload_rate_limit: {
         Args: { p_user_id: string }
         Returns: boolean
@@ -6891,6 +6940,10 @@ export type Database = {
         Returns: undefined
       }
       cleanup_expired_otp_codes: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      cleanup_expired_otps: {
         Args: Record<PropertyKey, never>
         Returns: number
       }
@@ -7751,6 +7804,16 @@ export type Database = {
               p_otp_code: string
               p_otp_type: string
             }
+        Returns: Json
+      }
+      verify_customer_otp_secure: {
+        Args: {
+          p_correlation_id?: string
+          p_email: string
+          p_ip_address?: unknown
+          p_otp_code: string
+          p_otp_type: string
+        }
         Returns: Json
       }
       verify_payment_atomic: {

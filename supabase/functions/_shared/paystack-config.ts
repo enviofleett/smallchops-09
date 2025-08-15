@@ -78,15 +78,19 @@ export function getPaystackConfig(request?: Request): PaystackConfig {
   let publicKey: string | undefined
   let webhookSecret: string | undefined
   
-  if (envResult.isTestMode) {
-    // Try test-specific keys first
-    secretKey = Deno.env.get('PAYSTACK_SECRET_KEY_TEST') || Deno.env.get('PAYSTACK_SECRET_KEY')
-    publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY_TEST') || Deno.env.get('PAYSTACK_PUBLIC_KEY')
-    webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET_TEST') || Deno.env.get('PAYSTACK_WEBHOOK_SECRET')
+  // Always use test mode for now until production keys are configured
+  // Force test mode since we have PAYSTACK_SECRET_KEY configured
+  const forceTestForDevelopment = true
+  
+  if (forceTestForDevelopment || envResult.isTestMode) {
+    // Use the main PAYSTACK_SECRET_KEY which should be a test key
+    secretKey = Deno.env.get('PAYSTACK_SECRET_KEY') || Deno.env.get('PAYSTACK_SECRET_KEY_TEST')
+    publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY') || Deno.env.get('PAYSTACK_PUBLIC_KEY_TEST')
+    webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET') || Deno.env.get('PAYSTACK_WEBHOOK_SECRET_TEST')
     
     console.log('🔧 Using TEST mode configuration')
   } else {
-    // Try live-specific keys first
+    // Production mode - use live keys
     secretKey = Deno.env.get('PAYSTACK_SECRET_KEY_LIVE') || Deno.env.get('PAYSTACK_SECRET_KEY')
     publicKey = Deno.env.get('PAYSTACK_PUBLIC_KEY_LIVE') || Deno.env.get('PAYSTACK_PUBLIC_KEY')
     webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET_LIVE') || Deno.env.get('PAYSTACK_WEBHOOK_SECRET')
@@ -100,14 +104,16 @@ export function getPaystackConfig(request?: Request): PaystackConfig {
     throw new Error(`No Paystack secret key found for ${envResult.environment} environment. Available keys: ${availableKeys.join(', ')}`)
   }
   
-  // Validate key format matches expected environment
-  if (envResult.isTestMode && !secretKey.startsWith('sk_test_')) {
-    console.warn('⚠️ Warning: Using non-test key in test environment:', secretKey.substring(0, 10))
-  }
+  // Determine actual mode based on key format
+  const actualIsTestMode = secretKey.startsWith('sk_test_')
+  const actualEnvironment: 'test' | 'live' = actualIsTestMode ? 'test' : 'live'
   
-  if (!envResult.isTestMode && !secretKey.startsWith('sk_live_')) {
-    console.warn('⚠️ Warning: Using non-live key in production environment:', secretKey.substring(0, 10))
-  }
+  console.log('🔑 Key format detection:', {
+    key_prefix: secretKey.substring(0, 10),
+    is_test_key: actualIsTestMode,
+    configured_mode: envResult.isTestMode ? 'test' : 'live',
+    actual_mode: actualEnvironment
+  })
   
   console.log('🔑 Using secret key:', secretKey.substring(0, 10) + '...', `(${secretKey.startsWith('sk_test_') ? 'TEST' : 'LIVE'})`)
   
@@ -115,8 +121,8 @@ export function getPaystackConfig(request?: Request): PaystackConfig {
     secretKey,
     publicKey: publicKey || '',
     webhookSecret: webhookSecret || '',
-    isTestMode: envResult.isTestMode,
-    environment: envResult.environment
+    isTestMode: actualIsTestMode, // Use actual key format, not environment detection
+    environment: actualEnvironment // Use actual key format, not environment detection
   }
 }
 

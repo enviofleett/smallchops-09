@@ -100,49 +100,60 @@ class PaystackService {
 
   async initializeTransaction(transactionData: PaystackTransaction) {
     try {
-      // Use the new secure endpoint
-      const response = await supabase.functions.invoke('paystack-secure', {
-        body: {
-          action: 'initialize',
-          ...transactionData,
-        },
+      console.log('🔐 Initializing payment via secure backend');
+      
+      // Enhanced payload with proper structure
+      const requestPayload = {
+        action: 'initialize',
+        email: transactionData.email,
+        amount: transactionData.amount,
+        callback_url: transactionData.callback_url,
+        metadata: transactionData.metadata,
+        order_id: transactionData.metadata?.order_id || transactionData.metadata?.orderId
+      };
+
+      console.log('📞 Calling paystack-secure with payload:', {
+        email: requestPayload.email,
+        amount: requestPayload.amount,
+        hasCallback: !!requestPayload.callback_url,
+        hasMetadata: !!requestPayload.metadata,
+        order_id: requestPayload.order_id
       });
 
-      // 🔍 DEBUG: Log the complete response structure
-      try {
-        console.log('Complete Paystack response:', JSON.stringify(response.data, null, 2));
-      } catch {
-        console.log('Complete Paystack response (raw):', response.data);
-      }
+      const response = await supabase.functions.invoke('paystack-secure', {
+        body: requestPayload,
+      });
+
+      console.log('📦 Backend response received:', { 
+        hasData: !!response.data,
+        hasError: !!response.error,
+        status: response.data?.status
+      });
 
       if (response.error) {
-        throw new Error(response.error.message);
+        console.error('❌ Backend initialization failed:', response.error);
+        throw new Error(response.error.message || 'Payment initialization failed');
       }
 
-      if (!response.data?.status) {
-        throw new Error(response.data?.error || 'Failed to initialize payment');
+      if (!response.data?.status || !response.data?.data) {
+        console.error('❌ Invalid backend response:', response.data);
+        throw new Error(response.data?.error || response.data?.message || 'Invalid response from payment service');
       }
 
-      // ✅ Extract and validate server-generated reference
-      const paymentUrl = response.data?.data?.authorization_url;
-      const paymentRef = response.data?.data?.reference;
-      
-      console.log('Extracted payment URL:', paymentUrl);
-      console.log('Payment reference:', paymentRef);
+      const paymentData = response.data.data;
+      console.log('✅ Payment initialized successfully:', {
+        reference: paymentData.reference,
+        hasUrl: !!paymentData.authorization_url
+      });
 
-      // Validate that we received a proper server reference
-      if (paymentRef) {
-        try {
-          assertServerReference(paymentRef);
-        } catch (error) {
-          console.error('Server returned invalid reference format:', paymentRef);
-          throw new Error('Server returned invalid payment reference format');
-        }
+      // Validate server-generated reference
+      if (paymentData.reference) {
+        assertServerReference(paymentData.reference);
       }
 
-      return response.data.data;
+      return paymentData;
     } catch (error) {
-      console.error('Failed to initialize Paystack transaction:', error);
+      console.error('❌ Payment initialization error:', error);
       throw error;
     }
   }

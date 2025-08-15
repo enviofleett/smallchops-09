@@ -218,8 +218,9 @@ const handlePaymentRequest = async (req: Request) => {
           throw new Error('Email and amount are required for payment initialization')
         }
         
-        // Generate consistent reference format
+        // Generate server-only backend reference in txn_ format
         const txnReference = `txn_${Date.now()}_${crypto.randomUUID()}`
+        console.log('✅ Server-generated reference:', txnReference)
         
         // Build proper callback URL with all necessary parameters
         const baseUrl = callback_url ? new URL(callback_url).origin : 'https://startersmallchops.com'
@@ -229,18 +230,18 @@ const handlePaymentRequest = async (req: Request) => {
         
         const paymentRequest = {
           email,
-          amount: Math.round(Number(amount) * 100), // Convert to kobo
-          reference: txnReference,
+          amount: Math.round(Number(amount) * 100).toString(), // Convert to kobo and stringify for Paystack
           currency: 'NGN',
-          callback_url: enhancedCallbackUrl,
-          metadata: {
+          reference: txnReference,
+          channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
+          metadata: JSON.stringify({
             order_id,
-            ...metadata,
-            custom_fields: []
-          }
+            customer_name: metadata?.customer_name || 'Customer',
+            order_number: metadata?.order_number || 'N/A'
+          })
         }
         
-        console.log('📤 Paystack request:', JSON.stringify(paymentRequest))
+        console.log('🚀 Sending to Paystack:', JSON.stringify(paymentRequest))
         
         // Add timeout for initialization
         const controller = new AbortController();
@@ -258,17 +259,16 @@ const handlePaymentRequest = async (req: Request) => {
         
         clearTimeout(timeoutId);
 
+        console.log('📡 Paystack response status:', initializeResponse.status)
         const initData = await initializeResponse.json()
+        console.log('📦 Paystack response data:', JSON.stringify(initData))
         
         if (!initData.status) {
           console.error('❌ Paystack initialization failed:', initData)
           throw new Error(`Paystack initialization failed: ${initData.message}`)
         }
 
-        console.log('✅ Payment initialized successfully:', {
-          reference: txnReference,
-          authorization_url: initData.data.authorization_url
-        })
+        console.log('Paystack payment initialized successfully:', txnReference)
 
         // CRITICAL FIX: Create payment transaction record during initialization
         try {

@@ -93,3 +93,12 @@ verify_jwt = false
 
 [functions.verify-payment-unified]
 verify_jwt = false
+
+[functions.payment-recovery-migration]
+verify_jwt = false
+
+[functions.payment-health-diagnostic]
+verify_jwt = false
+
+[functions.payment-environment-manager]
+verify_jwt = false

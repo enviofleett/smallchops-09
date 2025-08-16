@@ -1337,6 +1337,42 @@ export type Database = {
         }
         Relationships: []
       }
+      cron_execution_logs: {
+        Row: {
+          completed_at: string | null
+          created_at: string | null
+          duration_ms: number | null
+          error_message: string | null
+          id: string
+          result_data: Json | null
+          started_at: string | null
+          status: string
+          task_name: string
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          result_data?: Json | null
+          started_at?: string | null
+          status?: string
+          task_name: string
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string | null
+          duration_ms?: number | null
+          error_message?: string | null
+          id?: string
+          result_data?: Json | null
+          started_at?: string | null
+          status?: string
+          task_name?: string
+        }
+        Relationships: []
+      }
       customer_accounts: {
         Row: {
           avatar_url: string | null

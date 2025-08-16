@@ -244,6 +244,7 @@ async function processOrderEmail(supabase: any, event: CommunicationEvent): Prom
 
     // Invoke SMTP email sender
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+      headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
       body: {
         templateId: event.template_id || event.template_key || 'order_confirmation',
         recipient: {

@@ -129,6 +129,7 @@ serve(async (req) => {
 
         // Send welcome email using the email service
         const welcomeEmailResult = await supabaseAdmin.functions.invoke('smtp-email-sender', {
+          headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
           body: {
             templateId: 'customer_welcome',
             recipient: {

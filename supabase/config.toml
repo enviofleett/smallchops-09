@@ -111,3 +111,6 @@ verify_jwt = true
 
 [functions.shipping-fees-report]
 verify_jwt = true
+
+[functions.payment-confirmation-processor]
+verify_jwt = true

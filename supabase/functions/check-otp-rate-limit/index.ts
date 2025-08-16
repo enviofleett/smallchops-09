@@ -14,6 +14,7 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, type: 'lo
 
     // Directly invoke the SMTP sender function with the corrected payload
     const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+      headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
       body: {
         templateId: templateKey,
         recipient: {

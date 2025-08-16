@@ -45,6 +45,7 @@ serve(async (req) => {
       
       // Fallback to SMTP if Auth system fails
       await supabaseAdmin.functions.invoke('smtp-email-sender', {
+        headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
         body: {
           templateId: 'customer_welcome',
           to: customer_email,

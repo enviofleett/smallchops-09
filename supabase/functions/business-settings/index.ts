@@ -272,6 +272,7 @@ serve(async (req) => {
           console.log('Calling smtp-email-sender function...');
           
           const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('smtp-email-sender', {
+            headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
             body: {
               to: settings.sender_email, // Send test email to sender
               subject: 'SMTP Test Email - Connection Successful',

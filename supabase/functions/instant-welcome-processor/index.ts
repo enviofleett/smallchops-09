@@ -83,6 +83,7 @@ Deno.serve(async (req) => {
 
         // Call SMTP email sender directly with template
         const { data: emailResult, error: emailError } = await supabase.functions.invoke('smtp-email-sender', {
+          headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
           body: {
             templateId: event.template_key || 'welcome_customer',
             recipient: {

@@ -263,6 +263,7 @@ serve(async (req) => {
 
           // Send real-time notification to customer via SMTP
           await supabase.functions.invoke('smtp-email-sender', {
+            headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
             body: {
               templateId: 'delivery_update',
               recipient: {

@@ -216,9 +216,15 @@ serve(async (req) => {
       }
     );
 
-    const { data: isAdminData, error: adminErr } = await supabaseUser.rpc('is_admin');
-    if (adminErr || !isAdminData) {
-      return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // Check if it's a service role token or admin user
+    const token = authHeader.replace('Bearer ', '');
+    const isServiceRole = token === Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    
+    if (!isServiceRole) {
+      const { data: isAdminData, error: adminErr } = await supabaseUser.rpc('is_admin');
+      if (adminErr || !isAdminData) {
+        return new Response(JSON.stringify({ error: 'Forbidden' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     const requestBody = await req.json();

@@ -331,18 +331,22 @@ serve(async (req) => {
       orderStatus: 'confirmed'
     })
 
-    // Try to send confirmation email (don't fail if it errors)
+    // Trigger email processors to handle confirmation emails (via database trigger)
+    // The database trigger `trigger_payment_confirmation_email` will queue the email
+    // Now immediately trigger email processors to send it
     try {
-      await supabaseClient.functions.invoke('send-order-confirmation', {
-        body: {
-          orderId: order.id,
-          customerEmail: order.customer_email,
-          orderNumber: order.order_number
-        }
-      })
+      await Promise.all([
+        supabaseClient.functions.invoke('enhanced-email-processor', {
+          headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` }
+        }),
+        supabaseClient.functions.invoke('instant-email-processor', {
+          headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` }
+        })
+      ]);
+      console.log('Email processors triggered successfully');
     } catch (emailError) {
-      console.log('Failed to send confirmation email:', emailError)
-      // Don't fail payment verification if email fails
+      console.log('Failed to trigger email processors:', emailError);
+      // Don't fail payment verification if email processing fails
     }
 
     return new Response(

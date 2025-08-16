@@ -110,6 +110,7 @@ const handler = async (req: Request): Promise<Response> => {
         if (channel === 'email') {
           // Send email using existing email service
           const { data: emailResult, error: emailError } = await supabase.functions.invoke('smtp-email-sender', {
+            headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
             body: {
               to: request.recipient,
               subject: processedSubject,

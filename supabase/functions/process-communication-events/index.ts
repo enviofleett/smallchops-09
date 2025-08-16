@@ -229,6 +229,7 @@ async function processOrderStatusUpdate(supabase: any, event: any): Promise<bool
   }
 
   const { error } = await supabase.functions.invoke('smtp-email-sender', {
+    headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
 
@@ -261,6 +262,7 @@ async function processPriceChangeNotification(supabase: any, event: any): Promis
   }
 
   const { error } = await supabase.functions.invoke('smtp-email-sender', {
+    headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
 
@@ -293,6 +295,7 @@ async function processPromotionAlert(supabase: any, event: any): Promise<boolean
   }
 
   const { error } = await supabase.functions.invoke('smtp-email-sender', {
+    headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
 
@@ -323,6 +326,7 @@ async function processWelcomeEmail(supabase: any, event: any): Promise<boolean> 
   }
 
   const { error } = await supabase.functions.invoke('smtp-email-sender', {
+    headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
 
@@ -356,6 +360,7 @@ async function processOrderEmail(supabase: any, event: any): Promise<boolean> {
   }
 
   const { error } = await supabase.functions.invoke('smtp-email-sender', {
+    headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
 
@@ -401,6 +406,7 @@ async function processCustomerWelcomeEmail(supabase: any, event: any): Promise<b
   }
 
   const { error } = await supabase.functions.invoke('smtp-email-sender', {
+    headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
 

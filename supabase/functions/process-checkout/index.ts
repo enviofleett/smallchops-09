@@ -371,7 +371,7 @@ serve(async (req) => {
           body: {
             action: 'initialize',
             email: customer_email,
-            amount: total_amount, // Amount already in kobo from database
+            amount: total_amount / 100, // Convert from kobo to naira for paystack-secure function
             reference: authoritativePaymentReference, // 🔧 Use backend-generated reference
             callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?reference=${authoritativePaymentReference}&order_id=${orderId}&source=process_checkout`,
             metadata: {

@@ -146,7 +146,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
               Schedule Your Order
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Choose your preferred date and 2-hour window
+              Choose your preferred date and 1-hour window
             </p>
           </CardHeader>
         )}

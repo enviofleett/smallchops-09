@@ -113,16 +113,16 @@ class DeliverySchedulingService {
     return {
       minimum_lead_time_minutes: 90,
       max_advance_booking_days: 30,
-      default_delivery_duration_minutes: 120,
+      default_delivery_duration_minutes: 60,
       allow_same_day_delivery: true,
       business_hours: {
-        monday: { open: '09:00', close: '21:00', is_open: true },
-        tuesday: { open: '09:00', close: '21:00', is_open: true },
-        wednesday: { open: '09:00', close: '21:00', is_open: true },
-        thursday: { open: '09:00', close: '21:00', is_open: true },
-        friday: { open: '09:00', close: '21:00', is_open: true },
-        saturday: { open: '09:00', close: '21:00', is_open: true },
-        sunday: { open: '10:00', close: '20:00', is_open: true },
+        monday: { open: '08:00', close: '18:00', is_open: true },
+        tuesday: { open: '08:00', close: '18:00', is_open: true },
+        wednesday: { open: '08:00', close: '18:00', is_open: true },
+        thursday: { open: '08:00', close: '18:00', is_open: true },
+        friday: { open: '08:00', close: '18:00', is_open: true },
+        saturday: { open: '08:00', close: '18:00', is_open: true },
+        sunday: { open: '08:00', close: '18:00', is_open: true },
       }
     };
   }
@@ -222,7 +222,7 @@ class DeliverySchedulingService {
         reason: available ? undefined : 'Too soon - minimum lead time required'
       });
 
-      // Move to next slot (2-hour intervals)
+      // Move to next slot (1-hour intervals)
       currentTime = addMinutes(currentTime, slotDuration);
     }
 

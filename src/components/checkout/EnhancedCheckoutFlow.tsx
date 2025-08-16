@@ -777,37 +777,22 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                     </CardContent>
                   </Card>
 
-                  {/* Delivery Scheduling - Only show when delivery is selected */}
-                  {formData.fulfillment_type === 'delivery' && (
-                    <Card className="border-primary/20 bg-primary/5">
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-primary">
-                          <Clock className="h-5 w-5" />
-                          Schedule Your Delivery
-                        </CardTitle>
-                        <CardDescription>
-                          Choose your preferred delivery date and time window
-                        </CardDescription>
-                      </CardHeader>
-                      <CardContent>
-                        <DeliveryScheduler
-                          selectedDate={formData.delivery_date}
-                          selectedTimeSlot={formData.delivery_time_slot}
-                          onScheduleChange={(date, timeSlot) => {
-                            console.log('📅 Schedule changed:', { date, timeSlot });
-                            setFormData(prev => ({ 
-                              ...prev, 
-                              delivery_date: date, 
-                              delivery_time_slot: timeSlot,
-                              fulfillment_type: 'delivery'
-                            }));
-                          }}
-                          showHeader={false}
-                          className="w-full"
-                        />
-                      </CardContent>
-                    </Card>
-                  )}
+                  {/* Schedule Your Order - Show for BOTH delivery and pickup */}
+                  <DeliveryScheduler
+                    selectedDate={formData.delivery_date}
+                    selectedTimeSlot={formData.delivery_time_slot}
+                    onScheduleChange={(date, timeSlot) => {
+                      console.log('📅 Schedule changed:', { date, timeSlot });
+                      setFormData(prev => ({ 
+                        ...prev, 
+                        delivery_date: date, 
+                        delivery_time_slot: timeSlot
+                        // Keep existing fulfillment_type, don't force change
+                      }));
+                    }}
+                    showHeader={true}
+                    className="w-full"
+                  />
 
                   {/* Delivery Address - Only show when delivery is selected */}
                   {formData.fulfillment_type === 'delivery' && (

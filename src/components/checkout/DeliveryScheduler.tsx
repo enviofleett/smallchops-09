@@ -143,10 +143,10 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <CalendarIcon className="h-5 w-5 text-primary" />
-              Schedule Your Delivery
+              Schedule Your Order
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              Choose your preferred delivery date and time
+              Choose your preferred date and 2-hour window
             </p>
           </CardHeader>
         )}
@@ -177,7 +177,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
 
         {/* Calendar Section */}
         <div className="space-y-4">
-          <h3 className="font-medium">Select Delivery Date</h3>
+          <h3 className="font-medium">Select Date</h3>
           <div className="w-full overflow-hidden">
             <Calendar
               mode="single"
@@ -239,7 +239,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
           <div className="space-y-4">
             <h3 className="font-medium text-sm sm:text-base flex items-center gap-2">
               <Clock className="w-4 h-4" />
-              Select Delivery Time for {format(calendarDate, 'EEEE, MMMM d')}
+              Select Time for {format(calendarDate, 'EEEE, MMMM d')}
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
               {selectedDateSlots.map((timeSlot, index) => (
@@ -289,7 +289,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         {/* Summary */}
         {selectedDate && selectedTimeSlot && (
           <div className="pt-4 border-t">
-            <h4 className="font-medium mb-2">Delivery Schedule Summary</h4>
+            <h4 className="font-medium mb-2">Schedule Summary</h4>
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
               <Badge variant="secondary" className="whitespace-nowrap">
                 {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')}
@@ -299,7 +299,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground mt-2">
-              Please ensure someone is available to receive the delivery during this time window.
+              Please ensure you're available during this time window.
             </p>
           </div>
         )}

@@ -80,12 +80,10 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
           <span>₦{(subTotalInclVat ?? subtotal).toLocaleString()}</span>
         </div>
         
-        {deliveryFee > 0 && (
-          <div className="flex items-center justify-between text-sm">
-            <span>Delivery Fee</span>
-            <span>₦{deliveryFee.toLocaleString()}</span>
-          </div>
-        )}
+        <div className="flex items-center justify-between text-sm">
+          <span>Delivery Fee</span>
+          <span>{deliveryFee > 0 ? `₦${deliveryFee.toLocaleString()}` : '₦0'}</span>
+        </div>
         
         <Separator />
         

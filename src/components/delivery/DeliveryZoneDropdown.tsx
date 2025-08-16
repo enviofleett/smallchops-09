@@ -138,7 +138,7 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
           </Button>
         </PopoverTrigger>
         
-        <PopoverContent className="w-full p-0 z-[200] bg-popover border shadow-lg" align="start" sideOffset={4}>
+        <PopoverContent className="w-full p-0 z-[300] bg-popover/95 backdrop-blur-sm border shadow-xl" align="start" sideOffset={4}>
           <Command>
             <CommandInput placeholder="Search delivery zones..." className="h-9" />
             <CommandEmpty>No delivery zone found.</CommandEmpty>

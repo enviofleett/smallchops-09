@@ -179,21 +179,21 @@ export const getDeliveryAnalytics = async (filters?: {
     const successfulDeliveries = deliveryData?.reduce((sum, d) => sum + d.completed_deliveries, 0) || 0;
     const failedDeliveries = deliveryData?.reduce((sum, d) => sum + d.failed_deliveries, 0) || 0;
 
-    // Calculate averages
+    // Calculate averages - Fixed column name
     const avgDeliveryTime = deliveryData?.length > 0
-      ? deliveryData.reduce((sum, d) => sum + (d.average_delivery_time_minutes || 0), 0) / deliveryData.length
+      ? deliveryData.reduce((sum, d) => sum + (d.average_delivery_time || 0), 0) / deliveryData.length
       : 0;
 
     const customerSatisfactionScore = ratings.length > 0
       ? ratings.reduce((sum, r) => sum + (r.overall_rating || 0), 0) / ratings.length
       : 0;
 
-    // Transform delivery_analytics data for daily metrics
+    // Transform delivery_analytics data for daily metrics - Fixed column name
     const dailyMetrics = (deliveryData || []).map(data => ({
       date: data.date,
       deliveries: data.total_deliveries,
       successRate: data.total_deliveries > 0 ? (data.completed_deliveries / data.total_deliveries) * 100 : 0,
-      avgTime: data.average_delivery_time_minutes || 0
+      avgTime: data.average_delivery_time || 0
     })).sort((a, b) => a.date.localeCompare(b.date));
 
     // Get driver performance from performance metrics

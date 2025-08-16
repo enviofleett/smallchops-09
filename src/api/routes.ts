@@ -79,7 +79,11 @@ export const assignOrdersToRoute = async (routeId: string, orderIds: string[]): 
     .select();
 
   if (error) throw error;
-  return data || [];
+  // Type cast to handle the string -> union type conversion
+  return (data || []).map(item => ({
+    ...item,
+    delivery_status: item.delivery_status as 'pending' | 'en_route' | 'delivered' | 'failed'
+  }));
 };
 
 export const getRouteAssignments = async (routeId: string): Promise<RouteOrderAssignment[]> => {
@@ -90,7 +94,11 @@ export const getRouteAssignments = async (routeId: string): Promise<RouteOrderAs
     .order('sequence_number', { ascending: true });
 
   if (error) throw error;
-  return data || [];
+  // Type cast to handle the string -> union type conversion
+  return (data || []).map(item => ({
+    ...item,
+    delivery_status: item.delivery_status as 'pending' | 'en_route' | 'delivered' | 'failed'
+  }));
 };
 
 export const updateDeliveryStatus = async (

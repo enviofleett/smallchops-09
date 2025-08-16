@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCustomerProfile } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
-import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock } from "lucide-react";
+import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink } from "lucide-react";
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
@@ -438,27 +438,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           paymentUrlLength: paymentUrl?.length
         });
         
-        // Fallback: if no URL but we have a reference, try to re-initialize payment to get the URL
-        if ((!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) && paymentObj.reference) {
-          console.warn('⚠️ Missing payment URL; attempting fallback initialization via paystack-secure...');
-          const initBody = {
-            action: 'initialize',
-            email: sanitizedData.customer_email,
-            amount: Math.round((totalAmount || sanitizedData.total_amount) * 100),
-            metadata: {
-              order_id: orderId,
-              customer_name: sanitizedData.customer_name,
-              order_number: orderNumber
-            },
-            callback_url: `${window.location.origin}/payment/callback?order_id=${orderId}`
-          };
-          const { data: initResp, error: initErr } = await supabase.functions.invoke('paystack-secure', { body: initBody });
-          console.log('🔁 Fallback init response:', { initResp, initErr });
-          if (!initErr && initResp?.status && (initResp.data?.authorization_url || initResp.authorization_url)) {
-            authUrl = initResp.data?.authorization_url || initResp.authorization_url;
-            paymentUrl = initResp.data?.authorization_url || initResp.authorization_url;
-          }
-        }
+        // No complex fallback logic - just use the URL we got from process-checkout
         
         // Final validation for URL
         if (!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) {
@@ -590,18 +570,28 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                       You'll be redirected to our secure payment provider (Paystack)
                     </p>
                     
-                    {paymentData && (
-                      <PaystackPaymentHandler 
-                        orderId={paymentData.orderId || paymentData.order_id}
-                        amount={paymentData.amount}
-                        email={paymentData.email}
-                        orderNumber={paymentData.orderNumber}
-                        successUrl={paymentData.paymentUrl}
-                        onSuccess={handlePaymentSuccess}
-                        onError={handlePaymentError}
-                        onClose={() => setCheckoutStep('details')}
-                      />
-                    )}
+                     {paymentData && paymentData.paymentUrl && (
+                       <div className="space-y-4">
+                         <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
+                           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+                             <span>Order: {paymentData.orderNumber}</span>
+                             <span>•</span>
+                             <span>₦{paymentData.amount?.toLocaleString()}</span>
+                           </div>
+                           <Button 
+                             onClick={() => window.open(paymentData.paymentUrl, '_blank')}
+                             size="lg"
+                             className="w-full h-12 font-semibold"
+                           >
+                             <ExternalLink className="h-4 w-4 mr-2" />
+                             Complete Payment - ₦{paymentData.amount?.toLocaleString()}
+                           </Button>
+                         </div>
+                         <p className="text-xs text-muted-foreground text-center">
+                           Clicking will open Paystack in a new tab for secure payment
+                         </p>
+                       </div>
+                     )}
 
                     {lastPaymentError && (
                       <div className="p-4 border border-red-200 bg-red-50 rounded-lg">

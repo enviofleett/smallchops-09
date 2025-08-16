@@ -390,6 +390,33 @@ export type Database = {
         }
         Relationships: []
       }
+      automation_activity_logs: {
+        Row: {
+          action: string
+          created_at: string | null
+          data: Json | null
+          id: string
+          processed_at: string | null
+          status: string
+        }
+        Insert: {
+          action: string
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          processed_at?: string | null
+          status: string
+        }
+        Update: {
+          action?: string
+          created_at?: string | null
+          data?: Json | null
+          id?: string
+          processed_at?: string | null
+          status?: string
+        }
+        Relationships: []
+      }
       blog_articles: {
         Row: {
           author_id: string | null
@@ -1084,8 +1111,11 @@ export type Database = {
           payload: Json | null
           priority: string | null
           processed_at: string | null
+          processing_started_at: string | null
+          processing_time_ms: number | null
           recipient_email: string | null
           retry_count: number
+          scheduled_at: string | null
           sent_at: string | null
           status: Database["public"]["Enums"]["communication_event_status"]
           template_id: string | null
@@ -1108,8 +1138,11 @@ export type Database = {
           payload?: Json | null
           priority?: string | null
           processed_at?: string | null
+          processing_started_at?: string | null
+          processing_time_ms?: number | null
           recipient_email?: string | null
           retry_count?: number
+          scheduled_at?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
           template_id?: string | null
@@ -1132,8 +1165,11 @@ export type Database = {
           payload?: Json | null
           priority?: string | null
           processed_at?: string | null
+          processing_started_at?: string | null
+          processing_time_ms?: number | null
           recipient_email?: string | null
           retry_count?: number
+          scheduled_at?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["communication_event_status"]
           template_id?: string | null
@@ -1312,10 +1348,13 @@ export type Database = {
           email_verification_token: string | null
           email_verified: boolean | null
           id: string
+          last_order_date: string | null
+          marketing_consent: boolean | null
           name: string
           phone: string | null
           phone_verified: boolean | null
           profile_completion_percentage: number | null
+          reactivation_email_sent: string | null
           updated_at: string
           user_id: string | null
         }
@@ -1329,10 +1368,13 @@ export type Database = {
           email_verification_token?: string | null
           email_verified?: boolean | null
           id?: string
+          last_order_date?: string | null
+          marketing_consent?: boolean | null
           name: string
           phone?: string | null
           phone_verified?: boolean | null
           profile_completion_percentage?: number | null
+          reactivation_email_sent?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -1346,10 +1388,13 @@ export type Database = {
           email_verification_token?: string | null
           email_verified?: boolean | null
           id?: string
+          last_order_date?: string | null
+          marketing_consent?: boolean | null
           name?: string
           phone?: string | null
           phone_verified?: boolean | null
           profile_completion_percentage?: number | null
+          reactivation_email_sent?: string | null
           updated_at?: string
           user_id?: string | null
         }
@@ -2740,6 +2785,141 @@ export type Database = {
         }
         Relationships: []
       }
+      email_automation_errors: {
+        Row: {
+          action_index: number
+          created_at: string | null
+          error_message: string
+          flow_id: string
+          id: string
+          resolved_at: string | null
+          retry_count: number | null
+          trigger_data: Json
+        }
+        Insert: {
+          action_index: number
+          created_at?: string | null
+          error_message: string
+          flow_id: string
+          id?: string
+          resolved_at?: string | null
+          retry_count?: number | null
+          trigger_data?: Json
+        }
+        Update: {
+          action_index?: number
+          created_at?: string | null
+          error_message?: string
+          flow_id?: string
+          id?: string
+          resolved_at?: string | null
+          retry_count?: number | null
+          trigger_data?: Json
+        }
+        Relationships: []
+      }
+      email_automation_logs: {
+        Row: {
+          created_at: string | null
+          flow_type: string
+          id: string
+          recipient_email: string
+          sent_at: string | null
+          status: string
+          template_key: string
+          variables: Json | null
+        }
+        Insert: {
+          created_at?: string | null
+          flow_type: string
+          id?: string
+          recipient_email: string
+          sent_at?: string | null
+          status?: string
+          template_key: string
+          variables?: Json | null
+        }
+        Update: {
+          created_at?: string | null
+          flow_type?: string
+          id?: string
+          recipient_email?: string
+          sent_at?: string | null
+          status?: string
+          template_key?: string
+          variables?: Json | null
+        }
+        Relationships: []
+      }
+      email_automation_queue: {
+        Row: {
+          action_index: number
+          created_at: string | null
+          error_message: string | null
+          execute_at: string
+          flow_id: string
+          id: string
+          processed_at: string | null
+          retry_count: number | null
+          status: string
+          trigger_data: Json
+          updated_at: string | null
+        }
+        Insert: {
+          action_index?: number
+          created_at?: string | null
+          error_message?: string | null
+          execute_at: string
+          flow_id: string
+          id?: string
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string
+          trigger_data?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          action_index?: number
+          created_at?: string | null
+          error_message?: string | null
+          execute_at?: string
+          flow_id?: string
+          id?: string
+          processed_at?: string | null
+          retry_count?: number | null
+          status?: string
+          trigger_data?: Json
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      email_batch_logs: {
+        Row: {
+          failed: number
+          id: string
+          priority: string
+          processed_at: string | null
+          successful: number
+          total_processed: number
+        }
+        Insert: {
+          failed?: number
+          id?: string
+          priority: string
+          processed_at?: string | null
+          successful?: number
+          total_processed?: number
+        }
+        Update: {
+          failed?: number
+          id?: string
+          priority?: string
+          processed_at?: string | null
+          successful?: number
+          total_processed?: number
+        }
+        Relationships: []
+      }
       email_bounce_tracking: {
         Row: {
           bounce_count: number | null
@@ -2815,6 +2995,45 @@ export type Database = {
           is_active?: boolean | null
           unsubscribed_at?: string | null
           user_agent?: string | null
+        }
+        Relationships: []
+      }
+      email_dead_letter_queue: {
+        Row: {
+          final_error: string
+          id: string
+          moved_to_dlq_at: string | null
+          original_communication_event_id: string
+          recipient_email: string
+          resolution_notes: string | null
+          resolved_at: string | null
+          template_key: string
+          total_attempts: number
+          variables: Json | null
+        }
+        Insert: {
+          final_error: string
+          id?: string
+          moved_to_dlq_at?: string | null
+          original_communication_event_id: string
+          recipient_email: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          template_key: string
+          total_attempts: number
+          variables?: Json | null
+        }
+        Update: {
+          final_error?: string
+          id?: string
+          moved_to_dlq_at?: string | null
+          original_communication_event_id?: string
+          recipient_email?: string
+          resolution_notes?: string | null
+          resolved_at?: string | null
+          template_key?: string
+          total_attempts?: number
+          variables?: Json | null
         }
         Relationships: []
       }
@@ -3083,6 +3302,54 @@ export type Database = {
           event_data?: Json | null
           id?: string
           reason?: string
+        }
+        Relationships: []
+      }
+      email_system_health_logs: {
+        Row: {
+          checked_at: string | null
+          id: string
+          queue_stats: Json
+          stuck_emails_found: number | null
+        }
+        Insert: {
+          checked_at?: string | null
+          id?: string
+          queue_stats?: Json
+          stuck_emails_found?: number | null
+        }
+        Update: {
+          checked_at?: string | null
+          id?: string
+          queue_stats?: Json
+          stuck_emails_found?: number | null
+        }
+        Relationships: []
+      }
+      email_trigger_logs: {
+        Row: {
+          created_at: string | null
+          event_type: string
+          id: string
+          processed_at: string | null
+          status: string
+          trigger_data: Json
+        }
+        Insert: {
+          created_at?: string | null
+          event_type: string
+          id?: string
+          processed_at?: string | null
+          status?: string
+          trigger_data?: Json
+        }
+        Update: {
+          created_at?: string | null
+          event_type?: string
+          id?: string
+          processed_at?: string | null
+          status?: string
+          trigger_data?: Json
         }
         Relationships: []
       }
@@ -6932,8 +7199,10 @@ export type Database = {
         Returns: boolean
       }
       check_email_rate_limit: {
-        Args: { p_email_type?: string; p_identifier: string }
-        Returns: boolean
+        Args:
+          | { email_address: string; time_window_minutes?: number }
+          | { p_email_type?: string; p_identifier: string }
+        Returns: Json
       }
       check_enhanced_rate_limit: {
         Args: {
@@ -7509,8 +7778,11 @@ export type Database = {
           payload: Json | null
           priority: string | null
           processed_at: string | null
+          processing_started_at: string | null
+          processing_time_ms: number | null
           recipient_email: string | null
           retry_count: number
+          scheduled_at: string | null
           sent_at: string | null
           status: Database["public"]["Enums"]["communication_event_status"]
           template_id: string | null
@@ -7553,6 +7825,10 @@ export type Database = {
       health_check: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      increment_email_rate_limit: {
+        Args: { email_address: string }
+        Returns: undefined
       }
       increment_promotion_usage: {
         Args: {

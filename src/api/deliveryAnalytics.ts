@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface DeliveryPerformanceMetrics {
@@ -148,7 +149,7 @@ export const createCustomerRating = async (rating: Omit<CustomerSatisfactionRati
   return data as any;
 };
 
-// Analytics Dashboard Data
+// Analytics Dashboard Data - Updated to use the new delivery_analytics table
 export const getDeliveryAnalytics = async (filters?: {
   startDate?: string;
   endDate?: string;
@@ -157,55 +158,45 @@ export const getDeliveryAnalytics = async (filters?: {
     const startDate = filters?.startDate || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const endDate = filters?.endDate || new Date().toISOString().split('T')[0];
 
-    // Get performance metrics
+    // Get delivery analytics from the new table
+    const { data: deliveryData, error: deliveryError } = await supabase
+      .from('delivery_analytics')
+      .select('*')
+      .gte('date', startDate)
+      .lte('date', endDate)
+      .order('date', { ascending: false });
+
+    if (deliveryError) throw deliveryError;
+
+    // Get performance metrics for driver data
     const metrics = await getDeliveryMetrics({ startDate, endDate });
     
     // Get customer ratings
     const ratings = await getCustomerRatings({ startDate, endDate });
 
-    // Calculate totals
-    const totalDeliveries = metrics.reduce((sum, m) => sum + m.total_deliveries, 0);
-    const successfulDeliveries = metrics.reduce((sum, m) => sum + m.successful_deliveries, 0);
-    const failedDeliveries = metrics.reduce((sum, m) => sum + m.failed_deliveries, 0);
-    const onTimeDeliveries = metrics.reduce((sum, m) => sum + m.on_time_deliveries, 0);
+    // Calculate totals from delivery_analytics
+    const totalDeliveries = deliveryData?.reduce((sum, d) => sum + d.total_deliveries, 0) || 0;
+    const successfulDeliveries = deliveryData?.reduce((sum, d) => sum + d.completed_deliveries, 0) || 0;
+    const failedDeliveries = deliveryData?.reduce((sum, d) => sum + d.failed_deliveries, 0) || 0;
 
     // Calculate averages
-    const avgDeliveryTime = metrics.length > 0
-      ? metrics.reduce((sum, m) => sum + (m.average_delivery_time || 0), 0) / metrics.length
+    const avgDeliveryTime = deliveryData?.length > 0
+      ? deliveryData.reduce((sum, d) => sum + (d.average_delivery_time_minutes || 0), 0) / deliveryData.length
       : 0;
 
     const customerSatisfactionScore = ratings.length > 0
       ? ratings.reduce((sum, r) => sum + (r.overall_rating || 0), 0) / ratings.length
       : 0;
 
-    // Group metrics by date for daily trends
-    const dailyMetricsMap = new Map<string, {
-      deliveries: number;
-      successful: number;
-      avgTime: number;
-      count: number;
-    }>();
-
-    metrics.forEach(metric => {
-      const date = metric.metric_date;
-      const existing = dailyMetricsMap.get(date) || { deliveries: 0, successful: 0, avgTime: 0, count: 0 };
-      
-      dailyMetricsMap.set(date, {
-        deliveries: existing.deliveries + metric.total_deliveries,
-        successful: existing.successful + metric.successful_deliveries,
-        avgTime: existing.avgTime + (metric.average_delivery_time || 0),
-        count: existing.count + 1
-      });
-    });
-
-    const dailyMetrics = Array.from(dailyMetricsMap.entries()).map(([date, data]) => ({
-      date,
-      deliveries: data.deliveries,
-      successRate: data.deliveries > 0 ? (data.successful / data.deliveries) * 100 : 0,
-      avgTime: data.count > 0 ? data.avgTime / data.count : 0
+    // Transform delivery_analytics data for daily metrics
+    const dailyMetrics = (deliveryData || []).map(data => ({
+      date: data.date,
+      deliveries: data.total_deliveries,
+      successRate: data.total_deliveries > 0 ? (data.completed_deliveries / data.total_deliveries) * 100 : 0,
+      avgTime: data.average_delivery_time_minutes || 0
     })).sort((a, b) => a.date.localeCompare(b.date));
 
-    // Get driver performance (placeholder - would need driver names from joins)
+    // Get driver performance from performance metrics
     const driverPerformanceMap = new Map<string, {
       totalDeliveries: number;
       successful: number;
@@ -236,7 +227,7 @@ export const getDeliveryAnalytics = async (filters?: {
       avgRating: data.ratings.length > 0 ? data.ratings.reduce((a, b) => a + b, 0) / data.ratings.length : 0
     }));
 
-    // Zone performance (placeholder)
+    // Zone performance (placeholder for now)
     const zonePerformance: any[] = [];
 
     return {
@@ -244,7 +235,7 @@ export const getDeliveryAnalytics = async (filters?: {
       successfulDeliveries,
       failedDeliveries,
       averageDeliveryTime: avgDeliveryTime,
-      onTimeDeliveryRate: totalDeliveries > 0 ? (onTimeDeliveries / totalDeliveries) * 100 : 0,
+      onTimeDeliveryRate: successfulDeliveries > 0 ? (successfulDeliveries / totalDeliveries) * 100 : 0,
       customerSatisfactionScore,
       dailyMetrics,
       driverPerformance,

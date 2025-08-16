@@ -17,13 +17,15 @@ interface DeliverySchedulerProps {
   selectedTimeSlot?: { start_time: string; end_time: string };
   onScheduleChange: (date: string, timeSlot: { start_time: string; end_time: string }) => void;
   className?: string;
+  showHeader?: boolean;
 }
 
 export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
   selectedDate,
   selectedTimeSlot,
   onScheduleChange,
-  className
+  className,
+  showHeader = true
 }) => {
   console.log('🚀 DeliveryScheduler component initializing');
   const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
@@ -116,12 +118,14 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
     return (
       <DeliverySchedulingErrorBoundary>
         <Card className={className}>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <CalendarIcon className="h-5 w-5" />
-              Choose Delivery Date & Time
-            </CardTitle>
-          </CardHeader>
+          {showHeader && (
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <CalendarIcon className="h-5 w-5" />
+                Choose Delivery Date & Time
+              </CardTitle>
+            </CardHeader>
+          )}
           <CardContent>
             <div className="flex items-center justify-center p-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
@@ -135,15 +139,17 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
   return (
     <DeliverySchedulingErrorBoundary>
       <Card className={`border-primary/20 ${className}`}>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <CalendarIcon className="h-5 w-5 text-primary" />
-            Schedule Your Delivery
-          </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Choose your preferred delivery date and time
-          </p>
-        </CardHeader>
+        {showHeader && (
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5 text-primary" />
+              Schedule Your Delivery
+            </CardTitle>
+            <p className="text-sm text-muted-foreground">
+              Choose your preferred delivery date and time
+            </p>
+          </CardHeader>
+        )}
         <CardContent className="space-y-6">
         {error && (
           <Alert variant="destructive">

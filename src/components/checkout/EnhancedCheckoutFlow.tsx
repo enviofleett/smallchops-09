@@ -9,18 +9,27 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCustomerProfile } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
-import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle } from "lucide-react";
+import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock } from "lucide-react";
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
 import { DeliveryScheduler } from "./DeliveryScheduler";
+import { OrderSummaryCard } from "./OrderSummaryCard";
 import { PaystackPaymentHandler } from "@/components/payments/PaystackPaymentHandler";
 import { storeRedirectUrl } from "@/utils/redirect";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
 import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
 import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
+import { cn } from "@/lib/utils";
 
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogClose,
+} from "@/components/ui/dialog";
 import {
   Select,
   SelectContent,
@@ -219,6 +228,22 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
       }));
     }
   }, [session, authCustomerAccount, customerAccount]);
+
+  const isFormValid = useMemo(() => {
+    if (!formData.customer_email || !formData.customer_name || !formData.customer_phone) {
+      return false;
+    }
+    
+    if (formData.fulfillment_type === 'delivery') {
+      return !!(formData.delivery_date && formData.delivery_time_slot && formData.delivery_zone_id);
+    }
+    
+    if (formData.fulfillment_type === 'pickup') {
+      return !!formData.pickup_point_id;
+    }
+    
+    return false;
+  }, [formData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -555,393 +580,408 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <CardHeader className="flex flex-row items-center justify-between">
-          <div>
-            <CardTitle>Secure Checkout</CardTitle>
-            <CardDescription>
-              {checkoutStep === 'choice' 
-                ? 'Choose how you want to proceed with your order'
-                : checkoutStep === 'details'
-                ? 'Complete your order details and choose your payment method'
-                : 'Complete your payment'
-              }
-            </CardDescription>
-          </div>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            <X className="h-4 w-4" />
-          </Button>
-        </CardHeader>
-        
-        <CardContent>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className={cn(
+        "max-w-screen-md w-full h-full max-h-screen p-0 gap-0",
+        "sm:max-w-3xl sm:h-auto sm:max-h-[90vh] sm:rounded-lg sm:p-6 sm:gap-6"
+      )}>
+        <DialogHeader className="p-4 pb-0 sm:p-0">
+          <DialogTitle className="flex items-center gap-2">
+            <ShoppingBag className="h-5 w-5" />
+            Secure Checkout
+          </DialogTitle>
+          <DialogClose className="absolute right-4 top-4 sm:right-6 sm:top-6" />
+        </DialogHeader>
 
-          <div className="space-y-4 mb-6">
-            <div className="flex items-center justify-between">
-              <h3 className="font-semibold text-lg">Order Summary</h3>
-            </div>
-            <div className="bg-muted/50 p-4 rounded-lg space-y-2">
-              {items.map((item) => (
-                <div key={item.id} className="flex justify-between text-sm">
-                  <span>{item.product_name} × {item.quantity}</span>
-                  <span>₦{(item.price * item.quantity).toLocaleString()}</span>
-                </div>
-              ))}
-              <Separator />
-              <div className="flex justify-between">
-                <span>Subtotal:</span>
-                <span>₦{(cart?.summary?.subtotal || 0).toLocaleString()}</span>
-              </div>
-              {checkoutStep !== 'choice' && formData.fulfillment_type === 'delivery' && deliveryFee > 0 && (
-                <div className="flex justify-between">
-                  <span>Delivery Fee:</span>
-                  <span>₦{deliveryFee.toLocaleString()}</span>
-                </div>
-              )}
-              {checkoutStep !== 'choice' && formData.fulfillment_type === 'pickup' && (
-                <div className="flex justify-between text-green-600">
-                  <span>Pickup (No delivery fee):</span>
-                  <span>FREE</span>
-                </div>
-              )}
-              <div className="flex justify-between font-semibold text-lg pt-2 border-t">
-                <span>Total:</span>
-                <span>₦{total.toLocaleString()}</span>
-              </div>
-            </div>
-          </div>
-
-          {checkoutStep === 'choice' && !isAuthenticated && (
-            <GuestOrLoginChoice
-              totalAmount={total}
-              onContinueAsGuest={handleContinueAsGuest}
-              onLogin={handleLogin}
-              isEmpty={isEmpty}
-              onBrowseProducts={() => {
-                onClose();
-                navigate('/');
-              }}
-            />
-          )}
-
-          {checkoutStep === 'choice' && isAuthenticated && isEmpty && (
-            <div className="text-center space-y-4 py-8">
-              <div className="text-6xl mb-4">🛍️</div>
-              <h3 className="text-xl font-semibold">Your cart is empty</h3>
-              <p className="text-muted-foreground">
-                Add some delicious items to get started with delivery scheduling!
-              </p>
-              <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                <Button onClick={() => { onClose(); navigate('/'); }}>
-                  Browse Products
-                </Button>
-                <Button variant="outline" onClick={onClose}>
-                  Close
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {checkoutStep === 'details' && (
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-4">
-                <h3 className="font-semibold text-lg flex items-center gap-2">
-                  <Mail className="h-5 w-5" />
-                  Contact Information
-                  {isAuthenticated && (
-                    <span className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded-full">
-                      Signed in as {authCustomerAccount?.name || session?.user?.email}
-                    </span>
-                  )}
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="customer_name">Full Name *</Label>
-                    <Input
-                      id="customer_name"
-                      value={formData.customer_name}
-                      onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                      placeholder="Enter your full name"
-                      disabled={isAuthenticated}
-                      required
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="customer_phone">Phone Number *</Label>
-                    <div className="relative">
-                      <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        id="customer_phone"
-                        value={formData.customer_phone}
-                        onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
-                        placeholder="e.g., +234 801 234 5678"
-                        className="pl-10"
-                        disabled={isAuthenticated && !!authCustomerAccount?.phone}
-                        required
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div>
-                  <Label htmlFor="customer_email">Email Address *</Label>
-                  <div className="relative">
-                    <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      id="customer_email"
-                      type="email"
-                      value={formData.customer_email}
-                      onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
-                      placeholder="your.email@example.com"
-                      className="pl-10"
-                      disabled={isAuthenticated}
-                      required
-                    />
-                  </div>
-                </div>
-              </div>
-
-               {/* Delivery Scheduling Section - Always visible */}
-               <div className="space-y-4 border-2 border-primary/20 rounded-lg p-6 bg-primary/5">
-                 <h3 className="font-semibold text-lg flex items-center gap-2 text-primary">
-                   <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 002 2z" />
-                   </svg>
-                   Schedule Your Delivery
-                 </h3>
-                 <p className="text-sm text-muted-foreground">
-                   Choose your preferred delivery date and time window
-                 </p>
-                 <DeliveryScheduler
-                   selectedDate={formData.delivery_date}
-                   selectedTimeSlot={formData.delivery_time_slot}
-                   onScheduleChange={(date, timeSlot) => {
-                     console.log('📅 Schedule changed:', { date, timeSlot });
-                     setFormData(prev => ({ 
-                       ...prev, 
-                       delivery_date: date, 
-                       delivery_time_slot: timeSlot,
-                       fulfillment_type: 'delivery'
-                     }));
-                   }}
-                   className="w-full"
-                 />
-               </div>
-
-               <div className="space-y-4">
-                 <h3 className="font-semibold text-lg flex items-center gap-2">
-                   <Truck className="h-5 w-5" />
-                   Fulfillment Options
-                 </h3>
-                <RadioGroup
-                  value={formData.fulfillment_type}
-                  onValueChange={(value: 'delivery' | 'pickup') => {
-                    setFormData({ ...formData, fulfillment_type: value });
-                    if (value === 'pickup') {
-                      setDeliveryFee(0);
-                    }
-                  }}
-                  className="grid grid-cols-1 md:grid-cols-2 gap-4"
-                >
-                  <Card className="cursor-pointer hover:border-primary transition-colors">
-                    <CardContent className="flex items-center space-x-3 p-4">
-                      <RadioGroupItem value="delivery" id="delivery" />
-                      <Truck className="h-5 w-5 text-primary" />
-                      <div className="flex-1">
-                        <Label htmlFor="delivery" className="text-sm font-medium cursor-pointer">
-                          Home Delivery
-                        </Label>
-                        <p className="text-xs text-muted-foreground">Get your order delivered to your address</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="cursor-pointer hover:border-primary transition-colors">
-                    <CardContent className="flex items-center space-x-3 p-4">
-                      <RadioGroupItem value="pickup" id="pickup" />
-                      <MapPin className="h-5 w-5 text-primary" />
-                      <div className="flex-1">
-                        <Label htmlFor="pickup" className="text-sm font-medium cursor-pointer">
-                          Store Pickup
-                        </Label>
-                        <p className="text-xs text-muted-foreground">Pick up your order from our store location</p>
-                      </div>
-                    </CardContent>
-                  </Card>
-                </RadioGroup>
-              </div>
-
-              {formData.fulfillment_type === 'delivery' && (
-                <>
-
-                  <div className="space-y-4">
-                    <h3 className="font-semibold text-lg flex items-center gap-2">
-                      <MapPin className="h-5 w-5" />
-                      Delivery Address
-                    </h3>
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <Label htmlFor="address_line_1">Street Address *</Label>
-                      <Input
-                        id="address_line_1"
-                        value={formData.delivery_address.address_line_1}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          delivery_address: { ...formData.delivery_address, address_line_1: e.target.value }
-                        })}
-                        placeholder="House number and street name"
-                        required
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="address_line_2">Apartment/Unit (Optional)</Label>
-                      <Input
-                        id="address_line_2"
-                        value={formData.delivery_address.address_line_2}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          delivery_address: { ...formData.delivery_address, address_line_2: e.target.value }
-                        })}
-                        placeholder="Apartment, suite, unit, etc."
-                      />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="city">City *</Label>
-                        <Input
-                          id="city"
-                          value={formData.delivery_address.city}
-                          onChange={(e) => setFormData({
-                            ...formData,
-                            delivery_address: { ...formData.delivery_address, city: e.target.value }
-                          })}
-                          placeholder="e.g., Lagos"
-                          required
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="state">State *</Label>
-                        <Select
-                          value={formData.delivery_address.state}
-                          onValueChange={(value) => setFormData({
-                            ...formData,
-                            delivery_address: { ...formData.delivery_address, state: value }
-                          })}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select state" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="Lagos">Lagos</SelectItem>
-                            <SelectItem value="Abuja">Abuja</SelectItem>
-                            <SelectItem value="Ogun">Ogun</SelectItem>
-                            <SelectItem value="Rivers">Rivers</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="landmark">Landmark (Optional)</Label>
-                      <Input
-                        id="landmark"
-                        value={formData.delivery_address.landmark}
-                        onChange={(e) => setFormData({
-                          ...formData,
-                          delivery_address: { ...formData.delivery_address, landmark: e.target.value }
-                        })}
-                        placeholder="Nearest landmark or additional directions"
-                      />
-                    </div>
-                  </div>
-
-                  <DeliveryZoneDropdown
-                    selectedZoneId={formData.delivery_zone_id}
-                    onZoneSelect={(zoneId, fee) => {
-                      setFormData({ ...formData, delivery_zone_id: zoneId });
-                      setDeliveryFee(fee);
-                    }}
-                    orderSubtotal={cart?.summary?.subtotal || 0}
-                   />
-                 </div>
-                 </>
-               )}
-
-               {formData.fulfillment_type === 'pickup' && (
-                <div className="space-y-4">
-                  <PickupPointSelector
-                    selectedPointId={formData.pickup_point_id}
-                    onSelect={(pickupPoint) => {
-                      setFormData({ 
-                        ...formData, 
-                        pickup_point_id: pickupPoint?.id || '' 
-                      });
-                    }}
-                  />
-                </div>
-              )}
-
-              <div className="flex gap-4 pt-6">
-                <Button 
-                  type="button" 
-                  onClick={() => isAuthenticated ? onClose() : setCheckoutStep('choice')} 
-                  variant="outline" 
-                  className="flex-1"
-                  disabled={isSubmitting}
-                >
-                  {isAuthenticated ? 'Cancel' : 'Back'}
-                </Button>
-                <Button 
-                  type="submit" 
-                  disabled={
-                    isSubmitting || 
-                    items.length === 0 || 
-                    !formData.customer_email ||
-                    !formData.customer_name ||
-                    !formData.customer_phone ||
-                    (formData.fulfillment_type === 'delivery' && (!formData.delivery_date || !formData.delivery_time_slot || !formData.delivery_zone_id)) ||
-                    (formData.fulfillment_type === 'pickup' && !formData.pickup_point_id)
-                  }
-                  className="flex-1"
-                >
-                  {isSubmitting ? "Processing..." : "Continue to Payment"}
-                </Button>
-              </div>
-            </form>
-          )}
-
-          {checkoutStep === 'payment' && paymentData && (
-            <div className="space-y-6">
-              <div className="text-center">
-                <h3 className="font-semibold text-lg mb-2">Complete Payment</h3>
-                <p className="text-muted-foreground">
-                  Secure payment powered by Paystack
-                </p>
-              </div>
-
-              <PaystackPaymentHandler
-                orderId={paymentData.orderId || paymentData.order_id}
-                amount={paymentData.amount}
-                email={paymentData.email}
-                orderNumber={paymentData.orderNumber}
-                successUrl={paymentData.paymentUrl}
-                onSuccess={handlePaymentSuccess}
-                onError={handlePaymentError}
-                onClose={() => setCheckoutStep('details')}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 sm:p-0">
+            {/* Mobile Order Summary - Collapsible */}
+            <div className="md:hidden">
+              <OrderSummaryCard
+                items={items}
+                subtotal={cart?.summary?.subtotal || 0}
+                deliveryFee={currentDeliveryFee}
+                total={total}
+                collapsibleOnMobile={true}
               />
-
-              <div className="flex gap-4">
-                <Button 
-                  variant="outline" 
-                  onClick={() => setCheckoutStep('details')} 
-                  className="flex-1"
-                >
-                  Back to Details
-                </Button>
-              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+
+            {/* Main Content */}
+            <div className="md:col-span-2 space-y-6">
+              {checkoutStep === 'choice' && !isAuthenticated && (
+                <GuestOrLoginChoice
+                  totalAmount={total}
+                  onContinueAsGuest={handleContinueAsGuest}
+                  onLogin={handleLogin}
+                  isEmpty={isEmpty}
+                  onBrowseProducts={() => {
+                    onClose();
+                    navigate('/');
+                  }}
+                />
+              )}
+
+              {checkoutStep === 'choice' && isAuthenticated && isEmpty && (
+                <div className="text-center space-y-4 py-8">
+                  <div className="text-6xl mb-4">🛍️</div>
+                  <h3 className="text-xl font-semibold">Your cart is empty</h3>
+                  <p className="text-muted-foreground">
+                    Add some delicious items to get started with delivery scheduling!
+                  </p>
+                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                    <Button onClick={() => { onClose(); navigate('/'); }}>
+                      Browse Products
+                    </Button>
+                    <Button variant="outline" onClick={onClose}>
+                      Close
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              {checkoutStep === 'details' && (
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  {/* Contact Information */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Mail className="h-5 w-5" />
+                        Contact Information
+                        {isAuthenticated && (
+                          <span className="text-sm text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                            Signed in as {authCustomerAccount?.name || session?.user?.email}
+                          </span>
+                        )}
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor="customer_name">Full Name *</Label>
+                          <Input
+                            id="customer_name"
+                            value={formData.customer_name}
+                            onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
+                            placeholder="Enter your full name"
+                            disabled={isAuthenticated}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor="customer_phone">Phone Number *</Label>
+                          <div className="relative">
+                            <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                            <Input
+                              id="customer_phone"
+                              type="tel"
+                              inputMode="tel"
+                              value={formData.customer_phone}
+                              onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
+                              placeholder="e.g., +234 801 234 5678"
+                              className="pl-10"
+                              disabled={isAuthenticated && !!authCustomerAccount?.phone}
+                              required
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div>
+                        <Label htmlFor="customer_email">Email Address *</Label>
+                        <div className="relative">
+                          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Input
+                            id="customer_email"
+                            type="email"
+                            value={formData.customer_email}
+                            onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
+                            placeholder="your.email@example.com"
+                            className="pl-10"
+                            disabled={isAuthenticated}
+                            required
+                          />
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  {/* Fulfillment Options */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Truck className="h-5 w-5" />
+                        Fulfillment Options
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <RadioGroup
+                        value={formData.fulfillment_type}
+                        onValueChange={(value: 'delivery' | 'pickup') => {
+                          setFormData({ ...formData, fulfillment_type: value });
+                          if (value === 'pickup') {
+                            setDeliveryFee(0);
+                          }
+                        }}
+                        className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+                      >
+                        <Card className="cursor-pointer hover:border-primary transition-colors">
+                          <CardContent className="flex items-center space-x-3 p-4">
+                            <RadioGroupItem value="delivery" id="delivery" />
+                            <Truck className="h-5 w-5 text-primary" />
+                            <div className="flex-1">
+                              <Label htmlFor="delivery" className="text-sm font-medium cursor-pointer">
+                                Home Delivery
+                              </Label>
+                              <p className="text-xs text-muted-foreground">Get your order delivered to your address</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+
+                        <Card className="cursor-pointer hover:border-primary transition-colors">
+                          <CardContent className="flex items-center space-x-3 p-4">
+                            <RadioGroupItem value="pickup" id="pickup" />
+                            <MapPin className="h-5 w-5 text-primary" />
+                            <div className="flex-1">
+                              <Label htmlFor="pickup" className="text-sm font-medium cursor-pointer">
+                                Store Pickup
+                              </Label>
+                              <p className="text-xs text-muted-foreground">Pick up your order from our store location</p>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      </RadioGroup>
+                    </CardContent>
+                  </Card>
+
+                  {/* Delivery Scheduling - Only show when delivery is selected */}
+                  {formData.fulfillment_type === 'delivery' && (
+                    <Card className="border-primary/20 bg-primary/5">
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-primary">
+                          <Clock className="h-5 w-5" />
+                          Schedule Your Delivery
+                        </CardTitle>
+                        <CardDescription>
+                          Choose your preferred delivery date and time window
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <DeliveryScheduler
+                          selectedDate={formData.delivery_date}
+                          selectedTimeSlot={formData.delivery_time_slot}
+                          onScheduleChange={(date, timeSlot) => {
+                            console.log('📅 Schedule changed:', { date, timeSlot });
+                            setFormData(prev => ({ 
+                              ...prev, 
+                              delivery_date: date, 
+                              delivery_time_slot: timeSlot,
+                              fulfillment_type: 'delivery'
+                            }));
+                          }}
+                          showHeader={false}
+                          className="w-full"
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Delivery Address - Only show when delivery is selected */}
+                  {formData.fulfillment_type === 'delivery' && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <MapPin className="h-5 w-5" />
+                          Delivery Address
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="grid grid-cols-1 gap-4">
+                          <div>
+                            <Label htmlFor="address_line_1">Street Address *</Label>
+                            <Input
+                              id="address_line_1"
+                              value={formData.delivery_address.address_line_1}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                delivery_address: { ...formData.delivery_address, address_line_1: e.target.value }
+                              })}
+                              placeholder="House number and street name"
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="address_line_2">Apartment/Unit (Optional)</Label>
+                            <Input
+                              id="address_line_2"
+                              value={formData.delivery_address.address_line_2}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                delivery_address: { ...formData.delivery_address, address_line_2: e.target.value }
+                              })}
+                              placeholder="Apartment, suite, unit, etc."
+                            />
+                          </div>
+                          <div className="grid grid-cols-2 gap-4">
+                            <div>
+                              <Label htmlFor="city">City *</Label>
+                              <Input
+                                id="city"
+                                value={formData.delivery_address.city}
+                                onChange={(e) => setFormData({
+                                  ...formData,
+                                  delivery_address: { ...formData.delivery_address, city: e.target.value }
+                                })}
+                                placeholder="e.g., Lagos"
+                                required
+                              />
+                            </div>
+                            <div>
+                              <Label htmlFor="state">State *</Label>
+                              <Select
+                                value={formData.delivery_address.state}
+                                onValueChange={(value) => setFormData({
+                                  ...formData,
+                                  delivery_address: { ...formData.delivery_address, state: value }
+                                })}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select state" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Lagos">Lagos</SelectItem>
+                                  <SelectItem value="Abuja">Abuja</SelectItem>
+                                  <SelectItem value="Ogun">Ogun</SelectItem>
+                                  <SelectItem value="Rivers">Rivers</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          </div>
+                          <div>
+                            <Label htmlFor="landmark">Landmark (Optional)</Label>
+                            <Input
+                              id="landmark"
+                              value={formData.delivery_address.landmark}
+                              onChange={(e) => setFormData({
+                                ...formData,
+                                delivery_address: { ...formData.delivery_address, landmark: e.target.value }
+                              })}
+                              placeholder="Nearest landmark or additional directions"
+                            />
+                          </div>
+                        </div>
+
+                        <DeliveryZoneDropdown
+                          selectedZoneId={formData.delivery_zone_id}
+                          onZoneSelect={(zoneId, fee) => {
+                            setFormData({ ...formData, delivery_zone_id: zoneId });
+                            setDeliveryFee(fee);
+                          }}
+                          orderSubtotal={cart?.summary?.subtotal || 0}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+
+                  {/* Pickup Point Selection - Only show when pickup is selected */}
+                  {formData.fulfillment_type === 'pickup' && (
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2">
+                          <MapPin className="h-5 w-5" />
+                          Pickup Location
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <PickupPointSelector
+                          selectedPointId={formData.pickup_point_id}
+                          onSelect={(pickupPoint) => {
+                            setFormData({ 
+                              ...formData, 
+                              pickup_point_id: pickupPoint?.id || '' 
+                            });
+                          }}
+                        />
+                      </CardContent>
+                    </Card>
+                  )}
+                </form>
+              )}
+
+              {checkoutStep === 'payment' && paymentData && (
+                <div className="space-y-6">
+                  <div className="text-center">
+                    <h3 className="font-semibold text-lg mb-2">Complete Payment</h3>
+                    <p className="text-muted-foreground">
+                      Secure payment powered by Paystack
+                    </p>
+                  </div>
+
+                  <PaystackPaymentHandler
+                    orderId={paymentData.orderId || paymentData.order_id}
+                    amount={paymentData.amount}
+                    email={paymentData.email}
+                    orderNumber={paymentData.orderNumber}
+                    successUrl={paymentData.paymentUrl}
+                    onSuccess={handlePaymentSuccess}
+                    onError={handlePaymentError}
+                    onClose={() => setCheckoutStep('details')}
+                  />
+
+                  <div className="flex gap-4">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => setCheckoutStep('details')} 
+                      className="flex-1"
+                    >
+                      Back to Details
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Desktop Order Summary - Sticky */}
+            <div className="hidden md:block">
+              <OrderSummaryCard
+                items={items}
+                subtotal={cart?.summary?.subtotal || 0}
+                deliveryFee={currentDeliveryFee}
+                total={total}
+                sticky={true}
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile Sticky CTA */}
+        {checkoutStep === 'details' && (
+          <div className="md:hidden sticky bottom-0 left-0 right-0 bg-background border-t p-4 safe-area-bottom">
+            <div className="flex items-center justify-between mb-3">
+              <span className="font-medium">Total</span>
+              <span className="text-lg font-bold">₦{total.toLocaleString()}</span>
+            </div>
+            <div className="flex gap-3">
+              <Button 
+                type="button" 
+                onClick={() => isAuthenticated ? onClose() : setCheckoutStep('choice')} 
+                variant="outline" 
+                className="flex-1"
+                disabled={isSubmitting}
+              >
+                {isAuthenticated ? 'Cancel' : 'Back'}
+              </Button>
+              <Button 
+                type="submit" 
+                onClick={handleSubmit}
+                disabled={isSubmitting || items.length === 0 || !isFormValid}
+                className="flex-1"
+              >
+                {isSubmitting ? "Processing..." : "Continue to Payment"}
+              </Button>
+            </div>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   );
 });
 

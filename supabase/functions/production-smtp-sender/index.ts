@@ -123,8 +123,8 @@ async function sendSMTPEmailWithResilience(config: SMTPConfig, emailData: EmailR
     
     // Construct email message with compliance headers to reduce spam/blocks
     const messageId = `production-smtp-${Date.now()}@${config.host}`;
-    const fromAddress = Deno.env.get('SENDER_EMAIL') || config.username || `no-reply@${config.host}`;
     const senderName = Deno.env.get('SENDER_NAME') || 'Smallchops';
+    const fromAddress = Deno.env.get('SENDER_EMAIL') || config.username || `no-reply@${config.host}`;
     const unsubscribeMailto = `mailto:${fromAddress}?subject=unsubscribe`;
     const projectRef = (Deno.env.get('SUPABASE_URL') || '').replace('https://', '').split('.')[0];
     const unsubFunctionUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/unsubscribe-email?email=${encodeURIComponent(emailData.to)}`;

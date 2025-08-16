@@ -50,6 +50,7 @@ const PaymentCallbackRedirect = withLazyLoading(() => import("./pages/PaymentCal
 const Unsubscribe = withLazyLoading(() => import("./pages/Unsubscribe"));
 const AdminSetup = withLazyLoading(() => import("./pages/AdminSetup"));
 const CustomerRegister = withLazyLoading(() => import("./pages/CustomerRegister"));
+const SimpleRegisterPage = withLazyLoading(() => import("./pages/SimpleRegisterPage"));
 const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfile"));
 const AuthPage = withLazyLoading(() => import("./pages/AuthPage"));
 const AdminAuth = withLazyLoading(() => import("./pages/admin/AdminAuth"));
@@ -182,7 +183,6 @@ const App = () => {
               {/* Legacy redirects */}
               <Route path="/login" element={<Navigate to="/auth" replace />} />
               <Route path="/admin/login" element={<Navigate to="/admin/auth" replace />} />
-              <Route path="/register" element={<Navigate to="/auth?view=register" replace />} />
               
               {/* Customer routes */}
               <Route path="/customer-portal" element={<Navigate to="/" replace />} />
@@ -203,6 +203,9 @@ const App = () => {
               {/* Misc routes */}
               <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/admin-setup/:token" element={<AdminSetup />} />
+              
+              {/* Simple registration routes */}
+              <Route path="/simple-register" element={<SimpleRegisterPage />} />
               
               {/* Legacy customer registration route */}
               <Route path="/customer-register" element={<CustomerRegister />} />

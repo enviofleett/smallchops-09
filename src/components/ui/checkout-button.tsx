@@ -16,9 +16,18 @@ export const CheckoutButton: React.FC = () => {
   if (isEmpty) {
     return null;
   }
-  return <>
-      
+  return (
+    <>
+      <Button 
+        onClick={() => setShowCheckout(true)}
+        size="lg"
+        className="h-12 w-full font-semibold"
+      >
+        <ShoppingCart className="h-5 w-5 mr-2" />
+        Checkout ₦{(cart.summary?.total_amount || 0).toLocaleString()}
+      </Button>
 
       <EnhancedCheckoutFlow isOpen={showCheckout} onClose={() => setShowCheckout(false)} />
-    </>;
+    </>
+  );
 };

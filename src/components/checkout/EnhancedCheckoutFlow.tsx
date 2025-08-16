@@ -464,210 +464,243 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         if (!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) {
           console.error('❌ No payment URL found:', paymentObj);
           setLastPaymentError('Payment URL not available');
-          handlePaymentFailure({ type: 'no_payment_url', responseData: paymentObj });
-          throw new Error('No payment URL in response');
+          throw new Error('No payment URL available');
         }
         
-        console.log('✅ Valid payment URL found:', paymentUrl);
+        console.log('✅ Payment URL validated:', paymentUrl);
         
-        // Save order details for success page
-        const orderDetails = {
-          orderId,
-          orderNumber,
-          totalAmount,
-          customerEmail: sanitizedData.customer_email,
-          customerName: sanitizedData.customer_name,
-          fulfillmentType: sanitizedData.fulfillment_type,
-          deliveryAddress: sanitizedData.delivery_address,
-          orderItems: sanitizedData.order_items
+        const processedPaymentData = {
+          orderId: orderId,
+          orderNumber: orderNumber,
+          amount: totalAmount || sanitizedData.total_amount,
+          email: sanitizedData.customer_email,
+          paymentUrl: paymentUrl,
+          ...paymentObj
         };
-        sessionStorage.setItem('orderDetails', JSON.stringify(orderDetails));
         
-        // Clear cart and checkout state
-        clearCart();
-        clearState();
+        console.log('✅ Processed payment data:', processedPaymentData);
         
-        logPaymentAttempt(sanitizedData, 'success', { 
-          orderId, 
-          orderNumber, 
-          paymentUrl,
-          reference: paymentObj.reference 
+        setPaymentData(processedPaymentData);
+        setCheckoutStep('payment');
+        setIsSubmitting(false);
+        
+        logPaymentAttempt(sanitizedData, 'success');
+        
+        toast({
+          title: "Payment Initialized",
+          description: "Redirecting to secure payment...",
         });
-        
-        // Remember reference and order details for callback fallback across tabs
-        try {
-          if (paymentObj?.reference) {
-            sessionStorage.setItem('paystack_last_reference', paymentObj.reference);
-            localStorage.setItem('paystack_last_reference', paymentObj.reference);
-          }
-          const details = JSON.stringify({ orderId, orderNumber, reference: paymentObj?.reference });
-          sessionStorage.setItem('orderDetails', details);
-          localStorage.setItem('orderDetails', details);
-        } catch {}
-        
-        console.log('🚀 Redirecting to payment URL:', paymentUrl);
-        try {
-          const url = paymentUrl as string;
-          if (window.top && window.top !== window.self) {
-            // Break out of Lovable preview iframe
-            (window.top as Window).location.href = url;
-          } else {
-            window.location.href = url;
-          }
-        } catch {
-          // Fallback: open new tab if cross-frame navigation is blocked
-          window.open(paymentUrl as string, '_blank', 'noopener,noreferrer');
-        }
         
       } else {
-        console.error('❌ Checkout response indicates failure:', parsedData);
-        const errorMessage = parsedData?.message || parsedData?.error || "Failed to process checkout";
-        handlePaymentFailure({ type: 'checkout_failed', message: errorMessage });
-        logPaymentAttempt(sanitizedData, 'failure', { error: errorMessage });
-        toast({
-          title: "Checkout Failed",
-          description: errorMessage,
-          variant: "destructive",
-        });
+        console.error('❌ Server responded with success: false');
+        console.error('❌ Response details:', parsedData);
+        throw new Error(parsedData?.message || 'Unknown error from server');
       }
-
-    } catch (error) {
-      console.error('💥 Checkout error caught in try-catch:', error);
-      console.error('💥 Error type:', typeof error);
-      console.error('💥 Error stack:', error instanceof Error ? error.stack : 'No stack trace');
-      const errorMessage = error instanceof Error ? error.message : "Failed to process checkout. Please try again.";
-      setLastPaymentError(errorMessage);
+      
+    } catch (error: any) {
+      console.error('🚨 Checkout submission error:', error);
+      setIsSubmitting(false);
+      setLastPaymentError(error?.message || 'An unexpected error occurred');
+      
+      logPaymentAttempt(null, 'failure', error?.message);
       
       toast({
         title: "Checkout Error",
-        description: errorMessage,
+        description: generateUserFriendlyErrorMessage(error?.message),
         variant: "destructive",
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  const handlePaymentSuccess = useCallback((reference: string) => {
-    markCheckoutInProgress(reference);
-    markPaymentCompleted(); // Clear recovery state
+  const handlePaymentSuccess = useCallback(() => {
+    markPaymentCompleted();
     clearCart();
+    clearState();
+    onClose();
     
     toast({
       title: "Payment Successful!",
-      description: "Your payment has been processed successfully.",
+      description: "Your order has been confirmed. You'll receive an email confirmation shortly.",
     });
     
-    window.location.href = `/payment/callback?reference=${reference}&status=success`;
-  }, [markCheckoutInProgress, clearCart, markPaymentCompleted]);
+    navigate('/orders');
+  }, [clearCart, clearState, onClose, navigate, markPaymentCompleted]);
 
   const handlePaymentError = useCallback((error: string) => {
-    console.error('❌ Payment error:', error);
-    handlePaymentFailure({ type: 'payment_gateway_error', message: error });
+    console.error('💳 Payment error:', error);
     setLastPaymentError(error);
+    handlePaymentFailure({ type: 'payment_error', message: error });
+    setCheckoutStep('details');
     
     toast({
       title: "Payment Failed",
-      description: error || "Your payment was not successful. Please try again.",
+      description: error,
       variant: "destructive",
     });
-    
-    setCheckoutStep('details');
-    setShowRecoveryOption(true); // Show recovery option after payment failure
   }, [handlePaymentFailure]);
-
-  // Recovery functions
-  const handleRecoverCheckout = useCallback(() => {
-    const recovered = recoverState();
-    if (recovered) {
-      setFormData(recovered.formData);
-      setDeliveryFee(recovered.deliveryFee);
-      setCheckoutStep(recovered.checkoutStep as 'choice' | 'details' | 'payment');
-      setShowRecoveryOption(false);
-      setLastPaymentError(null);
-      
-      toast({
-        title: "Checkout Recovered",
-        description: "Your previous checkout data has been restored.",
-      });
-    }
-  }, [recoverState]);
-
-  const handleDiscardRecovery = useCallback(() => {
-    clearState();
-    setShowRecoveryOption(false);
-    setLastPaymentError(null);
-  }, [clearState]);
 
   if (!isOpen) return null;
 
-  return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className={cn(
-        "max-w-screen-md w-full h-full max-h-screen p-0 gap-0",
-        "sm:max-w-3xl sm:h-auto sm:max-h-[90vh] sm:rounded-lg sm:p-6 sm:gap-6"
-      )}>
-        <DialogHeader className="p-4 pb-0 sm:p-0">
-          <DialogTitle className="flex items-center gap-2">
-            <ShoppingBag className="h-5 w-5" />
-            Secure Checkout
-          </DialogTitle>
-          <DialogClose className="absolute right-4 top-4 sm:right-6 sm:top-6" />
-        </DialogHeader>
-
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-4 sm:p-0">
+  // If on payment step, show payment section within the main dialog
+  if (checkoutStep === 'payment') {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-4xl h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ShoppingBag className="h-5 w-5" />
+              Complete Your Payment
+            </DialogTitle>
+            <DialogClose className="absolute right-4 top-4" />
+          </DialogHeader>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-6">
             {/* Mobile Order Summary - Collapsible */}
             <div className="md:hidden">
               <OrderSummaryCard
                 items={items}
-                subtotal={cart?.summary?.subtotal || 0}
+                subtotal={cart?.summary?.total_amount || 0}
                 deliveryFee={currentDeliveryFee}
                 total={total}
-                vatAmount={cart?.summary?.total_vat || 0}
-                subTotalExVat={cart?.summary?.subtotal_cost ?? ((cart?.summary?.subtotal || 0) - (cart?.summary?.total_vat || 0))}
-                subTotalInclVat={cart?.summary?.subtotal || 0}
                 collapsibleOnMobile={true}
               />
             </div>
 
             {/* Main Content */}
             <div className="md:col-span-2 space-y-6">
-              {checkoutStep === 'choice' && !isAuthenticated && (
-                <GuestOrLoginChoice
-                  totalAmount={total}
-                  onContinueAsGuest={handleContinueAsGuest}
-                  onLogin={handleLogin}
-                  isEmpty={isEmpty}
-                  onBrowseProducts={() => {
-                    onClose();
-                    navigate('/');
-                  }}
-                />
-              )}
+              <Card id="section-click-to-pay">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="h-5 w-5" />
+                    Click to Pay
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    onClick={() => setCheckoutStep('details')}
+                    className="w-full mb-4"
+                  >
+                    ← Back to Details
+                  </Button>
 
-              {checkoutStep === 'choice' && isAuthenticated && isEmpty && (
-                <div className="text-center space-y-4 py-8">
-                  <div className="text-6xl mb-4">🛍️</div>
-                  <h3 className="text-xl font-semibold">Your cart is empty</h3>
-                  <p className="text-muted-foreground">
-                    Add some delicious items to get started with delivery scheduling!
-                  </p>
-                  <div className="flex flex-col sm:flex-row gap-3 justify-center">
-                    <Button onClick={() => { onClose(); navigate('/'); }}>
-                      Browse Products
-                    </Button>
-                    <Button variant="outline" onClick={onClose}>
-                      Close
-                    </Button>
+                  <div className="text-center space-y-3">
+                    <p className="text-sm text-muted-foreground">
+                      You'll be redirected to our secure payment provider (Paystack)
+                    </p>
+                    
+                    {paymentData && (
+                      <PaystackPaymentHandler 
+                        orderId={paymentData.orderId || paymentData.order_id}
+                        amount={paymentData.amount}
+                        email={paymentData.email}
+                        orderNumber={paymentData.orderNumber}
+                        successUrl={paymentData.paymentUrl}
+                        onSuccess={handlePaymentSuccess}
+                        onError={handlePaymentError}
+                        onClose={() => setCheckoutStep('details')}
+                      />
+                    )}
+
+                    {lastPaymentError && (
+                      <div className="p-4 border border-red-200 bg-red-50 rounded-lg">
+                        <p className="text-red-800 text-sm">{lastPaymentError}</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm"
+                          onClick={() => setCheckoutStep('details')}
+                          className="mt-2"
+                        >
+                          Try Again
+                        </Button>
+                      </div>
+                    )}
                   </div>
-                </div>
-              )}
+                </CardContent>
+              </Card>
+            </div>
 
-              {checkoutStep === 'details' && (
+            {/* Desktop Order Summary - Sticky */}
+            <div className="hidden md:block">
+              <OrderSummaryCard
+                items={items}
+                subtotal={cart?.summary?.total_amount || 0}
+                deliveryFee={currentDeliveryFee}
+                total={total}
+                sticky={true}
+              />
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Main checkout form
+  return (
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="max-w-6xl h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <ShoppingBag className="h-5 w-5" />
+            {checkoutStep === 'choice' ? 'Get Started' : 'Checkout'}
+          </DialogTitle>
+          <DialogClose className="absolute right-4 top-4" />
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-6">
+          {/* Mobile Order Summary - only show on details step */}
+          {checkoutStep === 'details' && (
+            <div className="md:hidden">
+              <OrderSummaryCard
+                items={items}
+                subtotal={cart?.summary?.total_amount || 0}
+                deliveryFee={currentDeliveryFee}
+                total={total}
+                collapsibleOnMobile={true}
+              />
+            </div>
+          )}
+
+          {/* Main Content */}
+          <div className="md:col-span-2">
+            {checkoutStep === 'choice' && !isAuthenticated && (
+              <GuestOrLoginChoice
+                totalAmount={total}
+                onContinueAsGuest={handleContinueAsGuest}
+                onLogin={handleLogin}
+                isEmpty={isEmpty}
+                onBrowseProducts={() => {
+                  onClose();
+                  navigate('/');
+                }}
+              />
+            )}
+
+            {checkoutStep === 'choice' && isAuthenticated && isEmpty && (
+              <div className="text-center space-y-4 py-8">
+                <div className="text-6xl mb-4">🛍️</div>
+                <h3 className="text-xl font-semibold">Your cart is empty</h3>
+                <p className="text-muted-foreground">
+                  Add some delicious items to get started with delivery scheduling!
+                </p>
+                <div className="flex flex-col sm:flex-row gap-3 justify-center">
+                  <Button onClick={() => { onClose(); navigate('/'); }}>
+                    Browse Products
+                  </Button>
+                  <Button variant="outline" onClick={onClose}>
+                    Close
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {checkoutStep === 'details' && (
+              <div className="space-y-6">
                 <form onSubmit={handleSubmit} className="space-y-6">
                   {/* Contact Information */}
-                  <Card>
+                  <Card id="section-contact-information">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Mail className="h-5 w-5" />
@@ -680,47 +713,41 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                       </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-4">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                          <Label htmlFor="customer_name">Full Name *</Label>
+                          <Label htmlFor="email">Email *</Label>
                           <Input
-                            id="customer_name"
-                            value={formData.customer_name}
-                            onChange={(e) => setFormData({ ...formData, customer_name: e.target.value })}
-                            placeholder="Enter your full name"
-                            disabled={isAuthenticated}
+                            id="email"
+                            type="email"
+                            value={formData.customer_email}
+                            onChange={(e) => setFormData(prev => ({ ...prev, customer_email: e.target.value }))}
                             required
+                            disabled={isAuthenticated}
+                            className="mt-1"
                           />
                         </div>
                         <div>
-                          <Label htmlFor="customer_phone">Phone Number *</Label>
-                          <div className="relative">
-                            <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input
-                              id="customer_phone"
-                              type="tel"
-                              inputMode="tel"
-                              value={formData.customer_phone}
-                              onChange={(e) => setFormData({ ...formData, customer_phone: e.target.value })}
-                              placeholder="e.g., +234 801 234 5678"
-                              className="pl-10"
-                              disabled={isAuthenticated && !!authCustomerAccount?.phone}
-                              required
-                            />
-                          </div>
+                          <Label htmlFor="name">Full Name *</Label>
+                          <Input
+                            id="name"
+                            value={formData.customer_name}
+                            onChange={(e) => setFormData(prev => ({ ...prev, customer_name: e.target.value }))}
+                            required
+                            disabled={isAuthenticated}
+                            className="mt-1"
+                          />
                         </div>
                       </div>
                       <div>
-                        <Label htmlFor="customer_email">Email Address *</Label>
+                        <Label htmlFor="phone">Phone Number *</Label>
                         <div className="relative">
-                          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                          <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                           <Input
-                            id="customer_email"
-                            type="email"
-                            value={formData.customer_email}
-                            onChange={(e) => setFormData({ ...formData, customer_email: e.target.value })}
-                            placeholder="your.email@example.com"
-                            className="pl-10"
+                            id="phone"
+                            value={formData.customer_phone}
+                            onChange={(e) => setFormData(prev => ({ ...prev, customer_phone: e.target.value }))}
+                            placeholder="Enter your phone number"
+                            className="pl-10 mt-1"
                             disabled={isAuthenticated}
                             required
                           />
@@ -730,7 +757,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                   </Card>
 
                   {/* Fulfillment Options */}
-                  <Card>
+                  <Card id="section-fulfillment-options">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">
                         <Truck className="h-5 w-5" />
@@ -740,158 +767,177 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                     <CardContent>
                       <RadioGroup
                         value={formData.fulfillment_type}
-                        onValueChange={(value: 'delivery' | 'pickup') => {
-                          setFormData({ ...formData, fulfillment_type: value });
-                          if (value === 'pickup') {
-                            setDeliveryFee(0);
-                          }
-                        }}
-                        className="grid grid-cols-1 sm:grid-cols-2 gap-4"
+                        onValueChange={(value: 'delivery' | 'pickup') => 
+                          setFormData(prev => ({ ...prev, fulfillment_type: value }))
+                        }
+                        className="grid grid-cols-1 md:grid-cols-2 gap-4"
                       >
-                        <Card className="cursor-pointer hover:border-primary transition-colors">
-                          <CardContent className="flex items-center space-x-3 p-4">
-                            <RadioGroupItem value="delivery" id="delivery" />
-                            <Truck className="h-5 w-5 text-primary" />
-                            <div className="flex-1">
-                              <Label htmlFor="delivery" className="text-sm font-medium cursor-pointer">
-                                Home Delivery
-                              </Label>
-                              <p className="text-xs text-muted-foreground">Get your order delivered to your address</p>
+                        <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                          <RadioGroupItem value="delivery" id="delivery" />
+                          <Label htmlFor="delivery" className="flex-1 cursor-pointer">
+                            <div>
+                              <div className="font-medium">Home Delivery</div>
+                              <div className="text-sm text-muted-foreground">
+                                Get your order delivered to your doorstep
+                              </div>
                             </div>
-                          </CardContent>
-                        </Card>
-
-                        <Card className="cursor-pointer hover:border-primary transition-colors">
-                          <CardContent className="flex items-center space-x-3 p-4">
-                            <RadioGroupItem value="pickup" id="pickup" />
-                            <MapPin className="h-5 w-5 text-primary" />
-                            <div className="flex-1">
-                              <Label htmlFor="pickup" className="text-sm font-medium cursor-pointer">
-                                Store Pickup
-                              </Label>
-                              <p className="text-xs text-muted-foreground">Pick up your order from our store location</p>
+                          </Label>
+                        </div>
+                        <div className="flex items-center space-x-2 p-4 border rounded-lg">
+                          <RadioGroupItem value="pickup" id="pickup" />
+                          <Label htmlFor="pickup" className="flex-1 cursor-pointer">
+                            <div>
+                              <div className="font-medium">Pickup</div>
+                              <div className="text-sm text-muted-foreground">
+                                Collect from one of our pickup points
+                              </div>
                             </div>
-                          </CardContent>
-                        </Card>
+                          </Label>
+                        </div>
                       </RadioGroup>
                     </CardContent>
                   </Card>
 
-                  {/* Schedule Your Order - Show for BOTH delivery and pickup */}
-                  <DeliveryScheduler
-                    selectedDate={formData.delivery_date}
-                    selectedTimeSlot={formData.delivery_time_slot}
-                    onScheduleChange={(date, timeSlot) => {
-                      console.log('📅 Schedule changed:', { date, timeSlot });
-                      setFormData(prev => ({ 
-                        ...prev, 
-                        delivery_date: date, 
-                        delivery_time_slot: timeSlot
-                        // Keep existing fulfillment_type, don't force change
-                      }));
-                    }}
-                    showHeader={true}
-                    className="w-full"
-                  />
+                  {/* Schedule Your Order */}
+                  <Card id="section-schedule-your-order">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <Clock className="h-5 w-5" />
+                        Schedule Your Order
+                      </CardTitle>
+                      <CardDescription>
+                        {formData.fulfillment_type === 'delivery' 
+                          ? 'Choose your preferred delivery date and 1-hour time window'
+                          : 'Choose your preferred pickup date and 1-hour time window'
+                        }
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <DeliveryScheduler
+                        selectedDate={formData.delivery_date}
+                        selectedTimeSlot={formData.delivery_time_slot}
+                        onScheduleChange={(date, timeSlot) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            delivery_date: date,
+                            delivery_time_slot: timeSlot
+                          }));
+                        }}
+                      />
+                    </CardContent>
+                  </Card>
 
-                  {/* Delivery Address - Only show when delivery is selected */}
+                  {/* Delivery Zone or Pickup Point - Conditionally placed after scheduling */}
                   {formData.fulfillment_type === 'delivery' && (
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <MapPin className="h-5 w-5" />
-                          Delivery Address
+                          Delivery Location
                         </CardTitle>
                       </CardHeader>
                       <CardContent className="space-y-4">
-                        <div className="grid grid-cols-1 gap-4">
+                        <div>
+                          <Label>Delivery Zone *</Label>
+                          <DeliveryZoneDropdown
+                            selectedZoneId={formData.delivery_zone_id}
+                            onZoneSelect={(zoneId, fee) => {
+                              setFormData(prev => ({ ...prev, delivery_zone_id: zoneId }));
+                              setDeliveryFee(fee);
+                            }}
+                            orderSubtotal={cart?.summary?.total_amount || 0}
+                          />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div>
-                            <Label htmlFor="address_line_1">Street Address *</Label>
+                            <Label htmlFor="address_line_1">Address Line 1 *</Label>
                             <Input
                               id="address_line_1"
                               value={formData.delivery_address.address_line_1}
-                              onChange={(e) => setFormData({
-                                ...formData,
-                                delivery_address: { ...formData.delivery_address, address_line_1: e.target.value }
-                              })}
-                              placeholder="House number and street name"
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                delivery_address: { ...prev.delivery_address, address_line_1: e.target.value }
+                              }))}
                               required
+                              className="mt-1"
                             />
                           </div>
                           <div>
-                            <Label htmlFor="address_line_2">Apartment/Unit (Optional)</Label>
+                            <Label htmlFor="address_line_2">Address Line 2</Label>
                             <Input
                               id="address_line_2"
                               value={formData.delivery_address.address_line_2}
-                              onChange={(e) => setFormData({
-                                ...formData,
-                                delivery_address: { ...formData.delivery_address, address_line_2: e.target.value }
-                              })}
-                              placeholder="Apartment, suite, unit, etc."
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label htmlFor="city">City *</Label>
-                              <Input
-                                id="city"
-                                value={formData.delivery_address.city}
-                                onChange={(e) => setFormData({
-                                  ...formData,
-                                  delivery_address: { ...formData.delivery_address, city: e.target.value }
-                                })}
-                                placeholder="e.g., Lagos"
-                                required
-                              />
-                            </div>
-                            <div>
-                              <Label htmlFor="state">State *</Label>
-                              <Select
-                                value={formData.delivery_address.state}
-                                onValueChange={(value) => setFormData({
-                                  ...formData,
-                                  delivery_address: { ...formData.delivery_address, state: value }
-                                })}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue placeholder="Select state" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Lagos">Lagos</SelectItem>
-                                  <SelectItem value="Abuja">Abuja</SelectItem>
-                                  <SelectItem value="Ogun">Ogun</SelectItem>
-                                  <SelectItem value="Rivers">Rivers</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          <div>
-                            <Label htmlFor="landmark">Landmark (Optional)</Label>
-                            <Input
-                              id="landmark"
-                              value={formData.delivery_address.landmark}
-                              onChange={(e) => setFormData({
-                                ...formData,
-                                delivery_address: { ...formData.delivery_address, landmark: e.target.value }
-                              })}
-                              placeholder="Nearest landmark or additional directions"
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                delivery_address: { ...prev.delivery_address, address_line_2: e.target.value }
+                              }))}
+                              className="mt-1"
                             />
                           </div>
                         </div>
-
-                        <DeliveryZoneDropdown
-                          selectedZoneId={formData.delivery_zone_id}
-                          onZoneSelect={(zoneId, fee) => {
-                            setFormData({ ...formData, delivery_zone_id: zoneId });
-                            setDeliveryFee(fee);
-                          }}
-                          orderSubtotal={cart?.summary?.subtotal || 0}
-                        />
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                          <div>
+                            <Label htmlFor="city">City *</Label>
+                            <Input
+                              id="city"
+                              value={formData.delivery_address.city}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                delivery_address: { ...prev.delivery_address, city: e.target.value }
+                              }))}
+                              required
+                              className="mt-1"
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor="state">State *</Label>
+                            <Select
+                              value={formData.delivery_address.state}
+                              onValueChange={(value) => setFormData(prev => ({
+                                ...prev,
+                                delivery_address: { ...prev.delivery_address, state: value }
+                              }))}
+                            >
+                              <SelectTrigger className="mt-1">
+                                <SelectValue placeholder="Select state" />
+                              </SelectTrigger>
+                              <SelectContent className="z-[300] bg-popover">
+                                <SelectItem value="Lagos">Lagos</SelectItem>
+                                <SelectItem value="Abuja">Abuja</SelectItem>
+                                <SelectItem value="Ogun">Ogun</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div>
+                            <Label htmlFor="postal_code">Postal Code</Label>
+                            <Input
+                              id="postal_code"
+                              value={formData.delivery_address.postal_code}
+                              onChange={(e) => setFormData(prev => ({
+                                ...prev,
+                                delivery_address: { ...prev.delivery_address, postal_code: e.target.value }
+                              }))}
+                              className="mt-1"
+                            />
+                          </div>
+                        </div>
+                        <div>
+                          <Label htmlFor="landmark">Landmark</Label>
+                          <Input
+                            id="landmark"
+                            value={formData.delivery_address.landmark}
+                            onChange={(e) => setFormData(prev => ({
+                              ...prev,
+                              delivery_address: { ...prev.delivery_address, landmark: e.target.value }
+                            }))}
+                            className="mt-1"
+                            placeholder="Nearby landmark for easier location"
+                          />
+                        </div>
                       </CardContent>
                     </Card>
                   )}
 
-                  {/* Pickup Point Selection - Only show when pickup is selected */}
                   {formData.fulfillment_type === 'pickup' && (
                     <Card>
                       <CardHeader>
@@ -901,117 +947,71 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <PickupPointSelector
-                          selectedPointId={formData.pickup_point_id}
-                          onSelect={(pickupPoint) => {
-                            setFormData({ 
-                              ...formData, 
-                              pickup_point_id: pickupPoint?.id || '' 
-                            });
-                          }}
-                        />
+                        <div>
+                          <Label>Choose Pickup Point *</Label>
+                          <PickupPointSelector
+                            selectedPointId={formData.pickup_point_id}
+                            onSelect={(pickupPoint) => {
+                              setFormData(prev => ({ 
+                                ...prev, 
+                                pickup_point_id: pickupPoint?.id || '' 
+                              }));
+                            }}
+                          />
+                        </div>
                       </CardContent>
                     </Card>
                   )}
 
-                  {/* Form Footer - In-flow for mobile */}
-                  <div className="mt-8 pt-6 border-t border-border">
-                    <div className="flex flex-col gap-4">
-                      <div className="flex items-center justify-between text-sm md:text-base">
-                        <span className="text-muted-foreground">Total Amount:</span>
-                        <span className="text-xl font-bold text-primary">₦{total.toLocaleString()}</span>
-                      </div>
-                      
-                      <div className="flex gap-3">
-                        <Button 
-                          type="button" 
-                          onClick={() => isAuthenticated ? onClose() : setCheckoutStep('choice')} 
-                          variant="outline" 
-                          className="flex-1 md:w-auto md:flex-none"
-                          disabled={isSubmitting}
-                        >
-                          {isAuthenticated ? 'Cancel' : 'Back'}
-                        </Button>
-                        
-                        <Button 
-                          type="submit" 
-                          size="lg"
-                          className="flex-1 md:flex-[2] h-12 text-base font-semibold shadow-md hover:shadow-lg transition-all duration-200" 
-                          disabled={!isFormValid || isSubmitting}
-                        >
-                          {isSubmitting ? (
-                            <div className="flex items-center gap-2">
-                              <RefreshCw className="h-4 w-4 animate-spin" />
-                              Processing...
-                            </div>
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              Continue to Payment
-                              <span className="text-sm opacity-80">₦{total.toLocaleString()}</span>
-                            </div>
-                          )}
-                        </Button>
-                      </div>
-                      
-                      {!isFormValid && (
-                        <p className="text-xs text-center text-muted-foreground">
-                          Please complete all required fields to continue
-                        </p>
-                      )}
-                    </div>
-                  </div>
+                  {/* Click to Pay Section */}
+                  <Card id="section-click-to-pay">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <ShoppingBag className="h-5 w-5" />
+                        Click to Pay
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-3">
+                      <p className="text-sm text-muted-foreground">
+                        You'll be redirected to our secure payment provider (Paystack).
+                      </p>
+                      <Button 
+                        type="submit" 
+                        size="lg" 
+                        className="h-12 w-full font-semibold"
+                        disabled={!isFormValid || isSubmitting}
+                      >
+                        {isSubmitting ? (
+                          <>
+                            <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                            Processing...
+                          </>
+                        ) : (
+                          <>
+                            Click to Pay ₦{total.toLocaleString()}
+                          </>
+                        )}
+                      </Button>
+                    </CardContent>
+                  </Card>
                 </form>
-              )}
+              </div>
+            )}
+          </div>
 
-              {checkoutStep === 'payment' && paymentData && (
-                <div className="space-y-6">
-                  <div className="text-center">
-                    <h3 className="font-semibold text-lg mb-2">Complete Payment</h3>
-                    <p className="text-muted-foreground">
-                      Secure payment powered by Paystack
-                    </p>
-                  </div>
-
-                  <PaystackPaymentHandler
-                    orderId={paymentData.orderId || paymentData.order_id}
-                    amount={paymentData.amount}
-                    email={paymentData.email}
-                    orderNumber={paymentData.orderNumber}
-                    successUrl={paymentData.paymentUrl}
-                    onSuccess={handlePaymentSuccess}
-                    onError={handlePaymentError}
-                    onClose={() => setCheckoutStep('details')}
-                  />
-
-                  <div className="flex gap-4">
-                    <Button 
-                      variant="outline" 
-                      onClick={() => setCheckoutStep('details')} 
-                      className="flex-1"
-                    >
-                      Back to Details
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Desktop Order Summary - Sticky */}
+          {/* Desktop Order Summary - only show on details step */}
+          {checkoutStep === 'details' && (
             <div className="hidden md:block">
               <OrderSummaryCard
                 items={items}
-                subtotal={cart?.summary?.subtotal || 0}
+                subtotal={cart?.summary?.total_amount || 0}
                 deliveryFee={currentDeliveryFee}
                 total={total}
-                vatAmount={cart?.summary?.total_vat || 0}
-                subTotalExVat={cart?.summary?.subtotal_cost ?? ((cart?.summary?.subtotal || 0) - (cart?.summary?.total_vat || 0))}
-                subTotalInclVat={cart?.summary?.subtotal || 0}
                 sticky={true}
               />
             </div>
-          </div>
+          )}
         </div>
-
       </DialogContent>
     </Dialog>
   );

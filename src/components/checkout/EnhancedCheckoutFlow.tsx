@@ -425,20 +425,25 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         
         console.log('✅ Order details extracted:', { orderNumber, totalAmount, orderId });
         
-        // Extract payment URL with fallbacks
+        // Extract payment URL with robust fallbacks
         let authUrl = paymentObj.authorization_url;
         let paymentUrl = paymentObj.payment_url || authUrl;
+        
+        // Client-side fallback: build URL from access_code if needed
+        if (!paymentUrl && paymentObj.access_code) {
+          paymentUrl = `https://checkout.paystack.com/${paymentObj.access_code}`;
+          console.log('🔧 Built fallback payment URL from access_code:', paymentUrl);
+        }
         
         console.log('🔍 URL extraction debug:', {
           authUrl: authUrl,
           paymentUrl: paymentUrl,
+          accessCode: paymentObj.access_code,
           authUrlType: typeof authUrl,
           paymentUrlType: typeof paymentUrl,
           authUrlLength: authUrl?.length,
           paymentUrlLength: paymentUrl?.length
         });
-        
-        // No complex fallback logic - just use the URL we got from process-checkout
         
         // Final validation for URL
         if (!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) {

@@ -371,7 +371,7 @@ serve(async (req) => {
           body: {
             action: 'initialize',
             email: customer_email,
-            amount: total_amount / 100, // Convert from kobo to naira for paystack-secure function
+            amount: total_amount, // Amount already in naira from database
             reference: authoritativePaymentReference, // 🔧 Use backend-generated reference
             callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?reference=${authoritativePaymentReference}&order_id=${orderId}&source=process_checkout`,
             metadata: {
@@ -449,6 +449,12 @@ serve(async (req) => {
         const inner = resp?.data ?? resp;
         authorizationUrl = inner?.authorization_url ?? inner?.data?.authorization_url ?? null;
         accessCode = inner?.access_code ?? inner?.data?.access_code ?? null;
+
+        // Build fallback URL from access_code if authorization_url is missing
+        if (!authorizationUrl && accessCode) {
+          authorizationUrl = `https://checkout.paystack.com/${accessCode}`;
+          console.log('🔧 Built fallback authorization URL from access_code:', authorizationUrl);
+        }
 
         if (!authorizationUrl) {
           lastError = `Authorization URL missing from payment response. Response structure: ${JSON.stringify(response)}`;

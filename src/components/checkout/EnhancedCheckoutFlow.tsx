@@ -234,12 +234,16 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
       return false;
     }
     
+    // Both fulfillment types require a scheduled date and time window
+    const hasSchedule = !!(formData.delivery_date && formData.delivery_time_slot);
+    if (!hasSchedule) return false;
+    
     if (formData.fulfillment_type === 'delivery') {
-      return !!(formData.delivery_date && formData.delivery_time_slot && formData.delivery_zone_id);
+      return !!formData.delivery_zone_id; // zone is mandatory for delivery
     }
     
     if (formData.fulfillment_type === 'pickup') {
-      return !!formData.pickup_point_id;
+      return !!formData.pickup_point_id; // pickup point is mandatory for pickup
     }
     
     return false;
@@ -248,11 +252,29 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validate required fields only for delivery orders
-    if (formData.fulfillment_type === 'delivery' && (!formData.delivery_date || !formData.delivery_time_slot)) {
+    // Validate schedule for both fulfillment types
+    if (!formData.delivery_date || !formData.delivery_time_slot) {
       toast({
-        title: "Delivery Schedule Required",
-        description: "Please select a delivery date and time before proceeding.",
+        title: "Schedule Required",
+        description: "Please select a date and time window before proceeding.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Additional validations by type
+    if (formData.fulfillment_type === 'delivery' && !formData.delivery_zone_id) {
+      toast({
+        title: "Delivery Zone Required",
+        description: "Please select your delivery zone to continue.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (formData.fulfillment_type === 'pickup' && !formData.pickup_point_id) {
+      toast({
+        title: "Pickup Location Required",
+        description: "Please choose a pickup point to continue.",
         variant: "destructive",
       });
       return;
@@ -602,6 +624,9 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                 subtotal={cart?.summary?.subtotal || 0}
                 deliveryFee={currentDeliveryFee}
                 total={total}
+                vatAmount={cart?.summary?.total_vat || 0}
+                subTotalExVat={cart?.summary?.subtotal_cost ?? ((cart?.summary?.subtotal || 0) - (cart?.summary?.total_vat || 0))}
+                subTotalInclVat={cart?.summary?.subtotal || 0}
                 collapsibleOnMobile={true}
               />
             </div>
@@ -993,6 +1018,9 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                 subtotal={cart?.summary?.subtotal || 0}
                 deliveryFee={currentDeliveryFee}
                 total={total}
+                vatAmount={cart?.summary?.total_vat || 0}
+                subTotalExVat={cart?.summary?.subtotal_cost ?? ((cart?.summary?.subtotal || 0) - (cart?.summary?.total_vat || 0))}
+                subTotalInclVat={cart?.summary?.subtotal || 0}
                 sticky={true}
               />
             </div>

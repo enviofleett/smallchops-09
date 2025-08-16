@@ -16,9 +16,12 @@ interface CartItem {
 
 interface OrderSummaryCardProps {
   items: CartItem[];
-  subtotal: number;
+  subtotal: number; // subtotal incl. VAT
   deliveryFee: number;
   total: number;
+  vatAmount?: number;
+  subTotalExVat?: number;
+  subTotalInclVat?: number;
   sticky?: boolean;
   collapsibleOnMobile?: boolean;
   className?: string;
@@ -29,6 +32,9 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
   subtotal,
   deliveryFee,
   total,
+  vatAmount,
+  subTotalExVat,
+  subTotalInclVat,
   sticky = false,
   collapsibleOnMobile = false,
   className
@@ -58,9 +64,20 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
 
       {/* Totals */}
       <div className="space-y-2">
+        {/* VAT-aware breakdown */}
         <div className="flex items-center justify-between text-sm">
-          <span>Subtotal</span>
-          <span>₦{subtotal.toLocaleString()}</span>
+          <span>Sub Total (excl. VAT)</span>
+          <span>₦{(subTotalExVat ?? (subtotal - (vatAmount ?? 0))).toLocaleString()}</span>
+        </div>
+
+        <div className="flex items-center justify-between text-sm text-muted-foreground">
+          <span>VAT</span>
+          <span>₦{(vatAmount ?? 0).toLocaleString()}</span>
+        </div>
+
+        <div className="flex items-center justify-between text-sm font-medium">
+          <span>Sub Total (incl. VAT)</span>
+          <span>₦{(subTotalInclVat ?? subtotal).toLocaleString()}</span>
         </div>
         
         {deliveryFee > 0 && (

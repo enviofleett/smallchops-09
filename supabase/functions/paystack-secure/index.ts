@@ -7,11 +7,33 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0/dist/module/index.js'
 import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-}
+// Production-ready CORS configuration
+const getAllowedOrigins = () => {
+  const origins = [
+    'https://startersmallchops.com',
+    'https://www.startersmallchops.com'
+  ];
+  
+  // Allow Lovable preview domains in development
+  const host = Deno.env.get('HTTP_HOST') || '';
+  if (host.includes('lovableproject.com')) {
+    origins.push(`https://${host}`);
+  }
+  
+  return origins;
+};
+
+const getCorsHeaders = (origin: string | null) => {
+  const allowedOrigins = getAllowedOrigins();
+  const allowOrigin = origin && allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+  
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true'
+  };
+};
 
 // Timeout configuration
 const PAYSTACK_TIMEOUT = 10000; // 10 seconds
@@ -145,6 +167,9 @@ interface PaystackVerificationResponse {
 }
 
 const handlePaymentRequest = async (req: Request) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })

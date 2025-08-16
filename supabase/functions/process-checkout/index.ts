@@ -1,28 +1,22 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-// Production-ready CORS configuration
+// Production-ready CORS configuration - restrict to production domains
 function getCorsHeaders(origin: string | null): Record<string, string> {
   const allowedOrigins = [
-    'https://oknnklksdiqaifhxaccs.supabase.co',
-    'https://oknnklksdiqaifhxaccs.lovable.app',
-    'https://preview--smallchops-09.lovable.app',
     'https://startersmallchops.com',
-    'https://www.startersmallchops.com',
-    'http://localhost:3000',
-    'http://localhost:5173'
+    'https://www.startersmallchops.com'
   ];
-
-  const customDomain = Deno.env.get('CUSTOM_DOMAIN');
-  if (customDomain) {
-    allowedOrigins.push(`https://${customDomain}`);
+  
+  // Allow Lovable preview domains for development only
+  if (origin && origin.includes('lovableproject.com')) {
+    allowedOrigins.push(origin);
   }
 
-  const isDev = Deno.env.get('DENO_ENV') === 'development';
   const isAllowed = origin && allowedOrigins.includes(origin);
 
   return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : (isDev ? '*' : allowedOrigins[0]),
+    'Access-Control-Allow-Origin': isAllowed ? origin : allowedOrigins[0],
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
     'Access-Control-Max-Age': '86400',

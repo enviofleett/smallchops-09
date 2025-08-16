@@ -903,6 +903,53 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                       </CardContent>
                     </Card>
                   )}
+
+                  {/* Form Footer - In-flow for mobile */}
+                  <div className="mt-8 pt-6 border-t border-border">
+                    <div className="flex flex-col gap-4">
+                      <div className="flex items-center justify-between text-sm md:text-base">
+                        <span className="text-muted-foreground">Total Amount:</span>
+                        <span className="text-xl font-bold text-primary">₦{total.toLocaleString()}</span>
+                      </div>
+                      
+                      <div className="flex gap-3">
+                        <Button 
+                          type="button" 
+                          onClick={() => isAuthenticated ? onClose() : setCheckoutStep('choice')} 
+                          variant="outline" 
+                          className="flex-1 md:w-auto md:flex-none"
+                          disabled={isSubmitting}
+                        >
+                          {isAuthenticated ? 'Cancel' : 'Back'}
+                        </Button>
+                        
+                        <Button 
+                          type="submit" 
+                          size="lg"
+                          className="flex-1 md:flex-[2] h-12 text-base font-semibold shadow-md hover:shadow-lg transition-all duration-200" 
+                          disabled={!isFormValid || isSubmitting}
+                        >
+                          {isSubmitting ? (
+                            <div className="flex items-center gap-2">
+                              <RefreshCw className="h-4 w-4 animate-spin" />
+                              Processing...
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              Continue to Payment
+                              <span className="text-sm opacity-80">₦{total.toLocaleString()}</span>
+                            </div>
+                          )}
+                        </Button>
+                      </div>
+                      
+                      {!isFormValid && (
+                        <p className="text-xs text-center text-muted-foreground">
+                          Please complete all required fields to continue
+                        </p>
+                      )}
+                    </div>
+                  </div>
                 </form>
               )}
 
@@ -952,34 +999,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           </div>
         </div>
 
-        {/* Mobile Sticky CTA */}
-        {checkoutStep === 'details' && (
-          <div className="md:hidden sticky bottom-0 left-0 right-0 bg-background border-t p-4 safe-area-bottom">
-            <div className="flex items-center justify-between mb-3">
-              <span className="font-medium">Total</span>
-              <span className="text-lg font-bold">₦{total.toLocaleString()}</span>
-            </div>
-            <div className="flex gap-3">
-              <Button 
-                type="button" 
-                onClick={() => isAuthenticated ? onClose() : setCheckoutStep('choice')} 
-                variant="outline" 
-                className="flex-1"
-                disabled={isSubmitting}
-              >
-                {isAuthenticated ? 'Cancel' : 'Back'}
-              </Button>
-              <Button 
-                type="submit" 
-                onClick={handleSubmit}
-                disabled={isSubmitting || items.length === 0 || !isFormValid}
-                className="flex-1"
-              >
-                {isSubmitting ? "Processing..." : "Continue to Payment"}
-              </Button>
-            </div>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

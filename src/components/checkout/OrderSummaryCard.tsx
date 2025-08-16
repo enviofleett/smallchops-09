@@ -83,22 +83,24 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
   // Mobile: Collapsible version
   if (collapsibleOnMobile) {
     return (
-      <div className={cn("md:hidden", className)}>
-        <Accordion type="single" collapsible defaultValue="order-summary">
-          <AccordionItem value="order-summary" className="border rounded-lg">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline">
-              <div className="flex items-center gap-2">
-                <ShoppingCart className="h-4 w-4" />
-                <span className="font-medium">Order Summary</span>
-                <span className="text-sm text-muted-foreground">
-                  ({items.length} items)
-                </span>
-              </div>
-              <div className="text-right">
-                <p className="font-semibold">₦{total.toLocaleString()}</p>
+      <div className={cn("md:hidden mb-6", className)}>
+        <Accordion type="single" collapsible>
+          <AccordionItem value="order-summary" className="border border-border rounded-lg shadow-sm">
+            <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 transition-colors">
+              <div className="flex items-center justify-between w-full">
+                <div className="flex items-center gap-2">
+                  <ShoppingCart className="h-4 w-4 text-primary" />
+                  <span className="font-medium">Order Summary</span>
+                  <span className="text-sm text-muted-foreground">
+                    ({items.length} {items.length === 1 ? 'item' : 'items'})
+                  </span>
+                </div>
+                <div className="text-right">
+                  <p className="font-semibold text-primary">₦{total.toLocaleString()}</p>
+                </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4">
+            <AccordionContent className="px-4 pb-4 pt-2">
               {orderContent}
             </AccordionContent>
           </AccordionItem>

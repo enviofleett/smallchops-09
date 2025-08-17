@@ -8,8 +8,8 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
     'https://www.startersmallchops.com'
   ];
   
-  // Allow Lovable preview domains for development only
-  if (origin && origin.includes('lovableproject.com')) {
+  // Allow Lovable preview domains for development
+  if (origin && (origin.includes('lovableproject.com') || origin.includes('lovable.app'))) {
     allowedOrigins.push(origin);
   }
 

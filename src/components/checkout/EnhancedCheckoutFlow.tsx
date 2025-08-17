@@ -385,82 +385,45 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
       if (parsedData?.success === true) {
         console.log('✅ Success response received, analyzing structure...');
         
-        // Detect and handle nested response structures from Supabase
-        let workingData = parsedData;
-        console.log('🔍 Initial data keys:', Object.keys(parsedData));
+        // Normalize response using validator utility
+        const normalizedData = normalizePaymentData(parsedData);
+        console.log('🔧 Normalized payment data:', normalizedData);
         
-        // Handle possible nested data structures (Supabase sometimes wraps responses)
-        if (parsedData.data && typeof parsedData.data === 'object' && !parsedData.payment) {
-          console.log('📦 Found nested data structure, unwrapping...');
-          workingData = parsedData.data;
-          console.log('🔍 Unwrapped data keys:', Object.keys(workingData));
-        }
-        
-        // Locate payment object with fallbacks
-        let paymentObj = workingData.payment;
-        if (!paymentObj && workingData.data?.payment) {
-          console.log('📦 Payment object found in nested location...');
-          paymentObj = workingData.data.payment;
-        }
-        
-        console.log('🔍 Payment object located:', !!paymentObj);
-        if (paymentObj) {
-          console.log('🔍 Payment object keys:', Object.keys(paymentObj));
-          console.log('🔍 Authorization URL:', paymentObj.authorization_url);
-          console.log('🔍 Payment URL:', paymentObj.payment_url);
-        }
-        
-        // Validate we have essential data
-        if (!paymentObj) {
-          console.error('❌ No payment object found in response structure');
+        // Extract payment details
+        const payment = normalizedData.payment;
+        if (!payment) {
+          console.error('❌ No payment object found after normalization');
           setLastPaymentError('Payment initialization failed - no payment data');
           handlePaymentFailure({ type: 'no_payment_object', responseData: parsedData });
           throw new Error('No payment object in response');
         }
         
-        // Extract order details early for potential fallback
-        const orderNumber = workingData.order_number || workingData.data?.order_number;
-        const totalAmount = workingData.total_amount || workingData.data?.total_amount;
-        const orderId = workingData.order_id || workingData.data?.order_id;
-        
-        console.log('✅ Order details extracted:', { orderNumber, totalAmount, orderId });
-        
-        // Extract payment URL with robust fallbacks
-        let authUrl = paymentObj.authorization_url;
-        let paymentUrl = paymentObj.payment_url || authUrl;
-        
-        // Client-side fallback: build URL from access_code if needed
-        if (!paymentUrl && paymentObj.access_code) {
-          paymentUrl = `https://checkout.paystack.com/${paymentObj.access_code}`;
-          console.log('🔧 Built fallback payment URL from access_code:', paymentUrl);
+        // Get payment URL with access_code fallback
+        let paymentUrl = payment.payment_url || payment.authorization_url;
+        if (!paymentUrl && (payment as any).access_code) {
+          paymentUrl = `https://checkout.paystack.com/${(payment as any).access_code}`;
+          console.log('🔧 Built payment URL from access_code:', paymentUrl);
         }
         
-        console.log('🔍 URL extraction debug:', {
-          authUrl: authUrl,
-          paymentUrl: paymentUrl,
-          accessCode: paymentObj.access_code,
-          authUrlType: typeof authUrl,
-          paymentUrlType: typeof paymentUrl,
-          authUrlLength: authUrl?.length,
-          paymentUrlLength: paymentUrl?.length
+        console.log('🔍 Payment URL availability check:', {
+          hasPaymentUrl: !!paymentUrl,
+          urlValue: paymentUrl,
+          accessCode: (payment as any).access_code
         });
         
-        // Final validation for URL
         if (!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) {
-          console.error('❌ No payment URL found:', paymentObj);
+          console.error('❌ No payment URL available after all fallbacks');
           setLastPaymentError('Payment URL not available');
           throw new Error('No payment URL available');
         }
         
-        console.log('✅ Payment URL validated:', paymentUrl);
-        
         const processedPaymentData = {
-          orderId: orderId,
-          orderNumber: orderNumber,
-          amount: totalAmount || sanitizedData.total_amount,
+          orderId: normalizedData.order_id,
+          orderNumber: normalizedData.order_number,
+          amount: normalizedData.total_amount || sanitizedData.total_amount,
           email: sanitizedData.customer_email,
           paymentUrl: paymentUrl,
-          ...paymentObj
+          ...payment
         };
         
         console.log('✅ Processed payment data:', processedPaymentData);
@@ -478,20 +441,43 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         
       } else {
         console.error('❌ Server responded with success: false');
-        console.error('❌ Response details:', parsedData);
-        throw new Error(parsedData?.message || 'Unknown error from server');
+        
+        // Validate and generate user-friendly error message
+        const validationResult = validatePaymentInitializationData(parsedData || {});
+        const userFriendlyError = generateUserFriendlyErrorMessage(validationResult);
+        
+        console.error('Error details:', {
+          validation: validationResult,
+          userMessage: userFriendlyError,
+          rawData: parsedData
+        });
+        
+        setLastPaymentError(userFriendlyError);
+        handlePaymentFailure({ type: 'checkout_failure', responseData: parsedData });
+        
+        throw new Error(userFriendlyError);
       }
       
     } catch (error: any) {
       console.error('🚨 Checkout submission error:', error);
       setIsSubmitting(false);
-      setLastPaymentError(error?.message || 'An unexpected error occurred');
       
-      logPaymentAttempt(null, 'failure', error?.message);
+      // Provide safe fallback for error message
+      const errorMessage = error?.message || 'An unexpected error occurred';
+      setLastPaymentError(errorMessage);
+      
+      logPaymentAttempt(null, 'failure', errorMessage);
+      
+      // Generate user-friendly error with safe fallback
+      const validationResult = validatePaymentInitializationData({
+        success: false,
+        error: errorMessage
+      });
+      const userFriendlyError = generateUserFriendlyErrorMessage(validationResult);
       
       toast({
         title: "Checkout Error",
-        description: generateUserFriendlyErrorMessage(error?.message),
+        description: userFriendlyError,
         variant: "destructive",
       });
     }

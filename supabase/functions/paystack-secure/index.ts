@@ -16,7 +16,7 @@ const getAllowedOrigins = () => {
   
   // Allow Lovable preview domains in development
   const host = Deno.env.get('HTTP_HOST') || '';
-  if (host.includes('lovableproject.com')) {
+  if (host.includes('lovableproject.com') || host.includes('lovable.app')) {
     origins.push(`https://${host}`);
   }
   

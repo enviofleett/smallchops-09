@@ -471,16 +471,14 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         
         console.log('✅ Processed payment data:', processedPaymentData);
         
+        // Mark checkout in progress to persist cart
+        markCheckoutInProgress(processedPaymentData.reference);
+        
         setPaymentData(processedPaymentData);
         setCheckoutStep('payment');
         setIsSubmitting(false);
         
         logPaymentAttempt(sanitizedData, 'success');
-        
-        toast({
-          title: "Payment Initialized",
-          description: "Redirecting to secure payment...",
-        });
         
       } else {
         console.error('❌ Server responded with success: false');
@@ -608,48 +606,38 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                     ← Back to Details
                   </Button>
 
-                  <div className="text-center space-y-3">
-                    <p className="text-sm text-muted-foreground">
-                      You'll be redirected to our secure payment provider (Paystack)
-                    </p>
-                    
-                     {paymentData && paymentData.paymentUrl && (
-                       <div className="space-y-4">
-                         <div className="bg-primary/5 border border-primary/20 rounded-lg p-4">
-                           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
-                             <span>Order: {paymentData.orderNumber}</span>
-                             <span>•</span>
-                             <span>₦{paymentData.amount?.toLocaleString()}</span>
-                           </div>
-                           <Button 
-                             onClick={() => window.open(paymentData.paymentUrl, '_blank')}
-                             size="lg"
-                             className="w-full h-12 font-semibold"
-                           >
-                             <ExternalLink className="h-4 w-4 mr-2" />
-                             Complete Payment - ₦{paymentData.amount?.toLocaleString()}
-                           </Button>
-                         </div>
-                         <p className="text-xs text-muted-foreground text-center">
-                           Clicking will open Paystack in a new tab for secure payment
-                         </p>
-                       </div>
-                     )}
-
-                    {lastPaymentError && (
-                      <div className="p-4 border border-red-200 bg-red-50 rounded-lg">
-                        <p className="text-red-800 text-sm">{lastPaymentError}</p>
-                        <Button 
-                          variant="outline" 
-                          size="sm"
-                          onClick={() => setCheckoutStep('details')}
-                          className="mt-2"
-                        >
-                          Try Again
-                        </Button>
+                  {paymentData && paymentData.paymentUrl && (
+                    <div className="text-center space-y-6 py-8">
+                      <div className="space-y-3">
+                        <h3 className="text-lg font-medium">You'll be redirected to our secure payment provider (Paystack)</h3>
+                        <p className="text-base">Complete payment - ₦{paymentData.amount?.toLocaleString()}</p>
+                        <p className="text-sm text-muted-foreground">Please make sure you complete your payment to avoid order cancellation</p>
                       </div>
-                    )}
-                  </div>
+                      
+                      <Button 
+                        onClick={() => window.open(paymentData.paymentUrl, '_blank')}
+                        size="lg"
+                        className="w-full max-w-md mx-auto h-14 text-lg font-semibold"
+                      >
+                        <ExternalLink className="h-5 w-5 mr-2" />
+                        Complete Payment
+                      </Button>
+                    </div>
+                  )}
+
+                  {lastPaymentError && (
+                    <div className="p-4 border border-red-200 bg-red-50 rounded-lg">
+                      <p className="text-red-800 text-sm">{lastPaymentError}</p>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => setCheckoutStep('details')}
+                        className="mt-2"
+                      >
+                        Try Again
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>

@@ -5,11 +5,14 @@ import { Button } from '@/components/ui/button';
 import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
 import { useSecurePayment } from '@/hooks/useSecurePayment';
 import { cleanupPaymentCache, validateStoredReference } from '@/utils/paymentCacheCleanup';
+import { paymentCompletionCoordinator } from '@/utils/paymentCompletion';
+import { useCart } from '@/hooks/useCart';
 
 export const PaymentCallbackPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { verifySecurePayment, isProcessing } = useSecurePayment();
+  const { clearCart } = useCart();
   
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'failed'>('loading');
   const [orderDetails, setOrderDetails] = useState<any>(null);
@@ -56,10 +59,21 @@ export const PaymentCallbackPage: React.FC = () => {
             reference: (result as any).reference
           });
           
-          // Clear any remaining payment cache
-          setTimeout(() => {
-            cleanupPaymentCache();
-          }, 1000);
+          // Use payment completion coordinator for cart clearing with 15-second delay
+          paymentCompletionCoordinator.coordinatePaymentCompletion(
+            {
+              reference: reference,
+              orderNumber: (result as any).order_id,
+              amount: (result as any).amount
+            },
+            {
+              onClearCart: clearCart,
+              onNavigate: () => {
+                // Clean up payment cache after cart is cleared
+                cleanupPaymentCache();
+              }
+            }
+          );
           
         } else {
           console.error('❌ Payment verification failed:', (result as any).error);

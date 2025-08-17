@@ -469,35 +469,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         
         console.log('✅ Processed payment data:', processedPaymentData);
         
-        // INDEPENDENT: Create delivery schedule (non-blocking, payment-safe)
-        if (sanitizedData.delivery_schedule && parsedData.order_id) {
-          try {
-            console.log('🗓️ Creating delivery schedule independently...');
-            const scheduleData = {
-              order_id: parsedData.order_id,
-              delivery_date: sanitizedData.delivery_schedule.delivery_date,
-              delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
-              delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
-              is_flexible: false, // Default to false for production reliability
-              special_instructions: sanitizedData.delivery_schedule.special_instructions || null
-            };
-
-            const { error: scheduleError } = await supabase
-              .from('order_delivery_schedule')
-              .insert(scheduleData);
-
-            if (scheduleError) {
-              console.warn('⚠️ Non-blocking: Delivery schedule creation failed:', scheduleError);
-              // Silent failure - doesn't affect payment success
-            } else {
-              console.log('✅ Delivery schedule created successfully for order:', parsedData.order_id);
-            }
-          } catch (scheduleErr) {
-            console.warn('⚠️ Non-blocking: Delivery schedule creation error:', scheduleErr);
-            // Completely silent failure - payment flow continues normally
-          }
-        }
-        
         // Mark checkout in progress to persist cart
         markCheckoutInProgress(processedPaymentData.reference);
         

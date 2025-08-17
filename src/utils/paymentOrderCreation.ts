@@ -105,10 +105,10 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
 
     console.log('✅ Payment initialized:', paymentData.data);
 
-    // INDEPENDENT: Create delivery schedule if provided (non-blocking)
+    // INDEPENDENT: Create delivery schedule if provided (non-blocking with upsert)
     if (params.deliverySchedule && order.id) {
       try {
-        console.log('🗓️ Creating delivery schedule independently...');
+        console.log('🗓️ Creating delivery schedule with upsert pattern...');
         const scheduleData = {
           order_id: order.id,
           delivery_date: params.deliverySchedule.delivery_date,
@@ -120,16 +120,19 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
 
         const { error: scheduleError } = await supabase
           .from('order_delivery_schedule')
-          .insert(scheduleData);
+          .upsert(scheduleData, { 
+            onConflict: 'order_id',
+            ignoreDuplicates: false 
+          });
 
         if (scheduleError) {
-          console.warn('⚠️ Non-blocking: Delivery schedule creation failed:', scheduleError);
+          console.warn('⚠️ Non-blocking: Delivery schedule upsert failed:', scheduleError);
           // Don't throw - this is independent of payment success
         } else {
-          console.log('✅ Delivery schedule created successfully');
+          console.log('✅ Delivery schedule upserted successfully');
         }
       } catch (scheduleErr) {
-        console.warn('⚠️ Non-blocking: Delivery schedule creation error:', scheduleErr);
+        console.warn('⚠️ Non-blocking: Delivery schedule upsert error:', scheduleErr);
         // Silent failure - doesn't affect payment flow
       }
     }

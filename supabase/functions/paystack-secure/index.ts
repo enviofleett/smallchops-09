@@ -176,7 +176,7 @@ const handlePaymentRequest = async (req: Request) => {
   }
 
   try {
-    console.log('🔄 Paystack secure function called')
+    console.log('🔄 Paystack secure function called [v2025-08-17-production-fix]')
     const requestBody = await req.json()
     console.log('📨 Request payload:', JSON.stringify(requestBody))
     
@@ -288,9 +288,24 @@ const handlePaymentRequest = async (req: Request) => {
         const initData = await initializeResponse.json()
         console.log('📦 Paystack response data:', JSON.stringify(initData))
         
+        // CRITICAL DEBUG: Log the specific fields we need
+        console.log('🔍 Paystack response analysis:', {
+          status: initData.status,
+          hasData: !!initData.data,
+          authUrl: initData.data?.authorization_url,
+          accessCode: initData.data?.access_code,
+          reference: initData.data?.reference
+        });
+        
         if (!initData.status) {
           console.error('❌ Paystack initialization failed:', initData)
           throw new Error(`Paystack initialization failed: ${initData.message}`)
+        }
+
+        // Validate that we have the required data
+        if (!initData.data?.authorization_url || !initData.data?.access_code) {
+          console.error('❌ CRITICAL: Missing authorization_url or access_code in Paystack response')
+          throw new Error('Paystack response missing required payment data')
         }
 
         console.log('Paystack payment initialized successfully:', txnReference)
@@ -326,15 +341,20 @@ const handlePaymentRequest = async (req: Request) => {
           // Continue with payment initialization
         }
 
+        // Build the response with validation
+        const responseData = {
+          status: true,
+          data: {
+            authorization_url: initData.data.authorization_url,
+            access_code: initData.data.access_code,
+            reference: txnReference
+          }
+        };
+        
+        console.log('📤 Sending response from paystack-secure:', JSON.stringify(responseData, null, 2));
+        
         return new Response(
-          JSON.stringify({
-            status: true,
-            data: {
-              authorization_url: initData.data.authorization_url,
-              access_code: initData.data.access_code,
-              reference: txnReference
-            }
-          }),
+          JSON.stringify(responseData),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }

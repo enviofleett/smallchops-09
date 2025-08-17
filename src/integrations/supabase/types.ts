@@ -1188,6 +1188,90 @@ export type Database = {
           },
         ]
       }
+      communication_events_archive: {
+        Row: {
+          created_at: string
+          delivery_status: string | null
+          email_provider: string | null
+          email_type: string | null
+          error_message: string | null
+          event_type: string
+          external_id: string | null
+          id: string
+          last_error: string | null
+          order_id: string | null
+          payload: Json | null
+          priority: string | null
+          processed_at: string | null
+          processing_started_at: string | null
+          processing_time_ms: number | null
+          recipient_email: string | null
+          retry_count: number
+          scheduled_at: string | null
+          sent_at: string | null
+          status: Database["public"]["Enums"]["communication_event_status"]
+          template_id: string | null
+          template_key: string | null
+          template_variables: Json | null
+          updated_at: string
+          variables: Json | null
+        }
+        Insert: {
+          created_at?: string
+          delivery_status?: string | null
+          email_provider?: string | null
+          email_type?: string | null
+          error_message?: string | null
+          event_type: string
+          external_id?: string | null
+          id?: string
+          last_error?: string | null
+          order_id?: string | null
+          payload?: Json | null
+          priority?: string | null
+          processed_at?: string | null
+          processing_started_at?: string | null
+          processing_time_ms?: number | null
+          recipient_email?: string | null
+          retry_count?: number
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["communication_event_status"]
+          template_id?: string | null
+          template_key?: string | null
+          template_variables?: Json | null
+          updated_at?: string
+          variables?: Json | null
+        }
+        Update: {
+          created_at?: string
+          delivery_status?: string | null
+          email_provider?: string | null
+          email_type?: string | null
+          error_message?: string | null
+          event_type?: string
+          external_id?: string | null
+          id?: string
+          last_error?: string | null
+          order_id?: string | null
+          payload?: Json | null
+          priority?: string | null
+          processed_at?: string | null
+          processing_started_at?: string | null
+          processing_time_ms?: number | null
+          recipient_email?: string | null
+          retry_count?: number
+          scheduled_at?: string | null
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["communication_event_status"]
+          template_id?: string | null
+          template_key?: string | null
+          template_variables?: Json | null
+          updated_at?: string
+          variables?: Json | null
+        }
+        Relationships: []
+      }
       communication_logs: {
         Row: {
           channel: string
@@ -2039,6 +2123,45 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      customer_satisfaction_ratings_archive: {
+        Row: {
+          created_at: string
+          customer_id: string | null
+          delivery_rating: number | null
+          delivery_time_rating: number | null
+          driver_id: string | null
+          driver_rating: number | null
+          feedback: string | null
+          id: string
+          order_id: string | null
+          overall_rating: number | null
+        }
+        Insert: {
+          created_at?: string
+          customer_id?: string | null
+          delivery_rating?: number | null
+          delivery_time_rating?: number | null
+          driver_id?: string | null
+          driver_rating?: number | null
+          feedback?: string | null
+          id?: string
+          order_id?: string | null
+          overall_rating?: number | null
+        }
+        Update: {
+          created_at?: string
+          customer_id?: string | null
+          delivery_rating?: number | null
+          delivery_time_rating?: number | null
+          driver_id?: string | null
+          driver_rating?: number | null
+          feedback?: string | null
+          id?: string
+          order_id?: string | null
+          overall_rating?: number | null
+        }
+        Relationships: []
       }
       customers: {
         Row: {
@@ -3994,6 +4117,51 @@ export type Database = {
           },
         ]
       }
+      order_assignments_archive: {
+        Row: {
+          accepted_at: string | null
+          actual_delivery_time: string | null
+          assigned_at: string
+          assigned_by: string | null
+          cancelled_at: string | null
+          completed_at: string | null
+          estimated_delivery_time: string | null
+          id: string
+          notes: string | null
+          order_id: string
+          rider_id: string
+          status: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          actual_delivery_time?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          estimated_delivery_time?: string | null
+          id?: string
+          notes?: string | null
+          order_id: string
+          rider_id: string
+          status?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          actual_delivery_time?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          cancelled_at?: string | null
+          completed_at?: string | null
+          estimated_delivery_time?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string
+          rider_id?: string
+          status?: string
+        }
+        Relationships: []
+      }
       order_delivery_schedule: {
         Row: {
           created_at: string
@@ -4104,6 +4272,54 @@ export type Database = {
           },
         ]
       }
+      order_items_archive: {
+        Row: {
+          cost_price: number | null
+          customizations: Json | null
+          discount_amount: number | null
+          id: string
+          order_id: string
+          product_id: string
+          product_name: string
+          quantity: number
+          special_instructions: string | null
+          total_price: number
+          unit_price: number
+          vat_amount: number | null
+          vat_rate: number | null
+        }
+        Insert: {
+          cost_price?: number | null
+          customizations?: Json | null
+          discount_amount?: number | null
+          id?: string
+          order_id: string
+          product_id: string
+          product_name: string
+          quantity?: number
+          special_instructions?: string | null
+          total_price: number
+          unit_price: number
+          vat_amount?: number | null
+          vat_rate?: number | null
+        }
+        Update: {
+          cost_price?: number | null
+          customizations?: Json | null
+          discount_amount?: number | null
+          id?: string
+          order_id?: string
+          product_id?: string
+          product_name?: string
+          quantity?: number
+          special_instructions?: string | null
+          total_price?: number
+          unit_price?: number
+          vat_amount?: number | null
+          vat_rate?: number | null
+        }
+        Relationships: []
+      }
       order_modifications: {
         Row: {
           created_at: string
@@ -4177,6 +4393,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      order_status_changes_archive: {
+        Row: {
+          changed_at: string | null
+          changed_by: string | null
+          id: string
+          new_status: string
+          old_status: string | null
+          order_id: string | null
+        }
+        Insert: {
+          changed_at?: string | null
+          changed_by?: string | null
+          id?: string
+          new_status: string
+          old_status?: string | null
+          order_id?: string | null
+        }
+        Update: {
+          changed_at?: string | null
+          changed_by?: string | null
+          id?: string
+          new_status?: string
+          old_status?: string | null
+          order_id?: string | null
+        }
+        Relationships: []
       }
       orders: {
         Row: {
@@ -4345,6 +4588,138 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      orders_archive: {
+        Row: {
+          assigned_rider_id: string | null
+          created_at: string
+          created_by: string | null
+          customer_email: string | null
+          customer_id: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address: Json | null
+          delivery_fee: number | null
+          delivery_status: string | null
+          delivery_time: string | null
+          delivery_time_slot_id: string | null
+          delivery_zone_id: string | null
+          discount_amount: number | null
+          estimated_delivery_date: string | null
+          guest_session_id: string | null
+          id: string
+          order_number: string
+          order_time: string
+          order_type: Database["public"]["Enums"]["order_type"]
+          paid_at: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          payment_verified_at: string | null
+          paystack_reference: string | null
+          pickup_point_id: string | null
+          pickup_ready: boolean | null
+          pickup_time: string | null
+          preferred_delivery_time: string | null
+          reference_updated_at: string | null
+          special_instructions: string | null
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          subtotal_cost: number | null
+          tax_amount: number
+          total_amount: number
+          total_vat: number | null
+          updated_at: string
+          updated_by: string | null
+          user_id: string | null
+        }
+        Insert: {
+          assigned_rider_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string | null
+          customer_id?: string | null
+          customer_name: string
+          customer_phone: string
+          delivery_address?: Json | null
+          delivery_fee?: number | null
+          delivery_status?: string | null
+          delivery_time?: string | null
+          delivery_time_slot_id?: string | null
+          delivery_zone_id?: string | null
+          discount_amount?: number | null
+          estimated_delivery_date?: string | null
+          guest_session_id?: string | null
+          id?: string
+          order_number: string
+          order_time?: string
+          order_type?: Database["public"]["Enums"]["order_type"]
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          payment_verified_at?: string | null
+          paystack_reference?: string | null
+          pickup_point_id?: string | null
+          pickup_ready?: boolean | null
+          pickup_time?: string | null
+          preferred_delivery_time?: string | null
+          reference_updated_at?: string | null
+          special_instructions?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          subtotal_cost?: number | null
+          tax_amount?: number
+          total_amount?: number
+          total_vat?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          assigned_rider_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          customer_email?: string | null
+          customer_id?: string | null
+          customer_name?: string
+          customer_phone?: string
+          delivery_address?: Json | null
+          delivery_fee?: number | null
+          delivery_status?: string | null
+          delivery_time?: string | null
+          delivery_time_slot_id?: string | null
+          delivery_zone_id?: string | null
+          discount_amount?: number | null
+          estimated_delivery_date?: string | null
+          guest_session_id?: string | null
+          id?: string
+          order_number?: string
+          order_time?: string
+          order_type?: Database["public"]["Enums"]["order_type"]
+          paid_at?: string | null
+          payment_method?: string | null
+          payment_reference?: string | null
+          payment_status?: Database["public"]["Enums"]["payment_status"]
+          payment_verified_at?: string | null
+          paystack_reference?: string | null
+          pickup_point_id?: string | null
+          pickup_ready?: boolean | null
+          pickup_time?: string | null
+          preferred_delivery_time?: string | null
+          reference_updated_at?: string | null
+          special_instructions?: string | null
+          status?: Database["public"]["Enums"]["order_status"]
+          subtotal?: number
+          subtotal_cost?: number | null
+          tax_amount?: number
+          total_amount?: number
+          total_vat?: number | null
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
       }
       otp_codes: {
         Row: {
@@ -4865,6 +5240,57 @@ export type Database = {
           },
         ]
       }
+      payment_processing_status_archive: {
+        Row: {
+          created_at: string | null
+          current_order_status:
+            | Database["public"]["Enums"]["order_status"]
+            | null
+          error_message: string | null
+          id: string
+          order_id: string | null
+          order_number: string | null
+          order_type: Database["public"]["Enums"]["order_type"] | null
+          overall_status: string | null
+          payment_reference: string | null
+          processing_stage: string | null
+          reference_type: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          current_order_status?:
+            | Database["public"]["Enums"]["order_status"]
+            | null
+          error_message?: string | null
+          id?: string
+          order_id?: string | null
+          order_number?: string | null
+          order_type?: Database["public"]["Enums"]["order_type"] | null
+          overall_status?: string | null
+          payment_reference?: string | null
+          processing_stage?: string | null
+          reference_type?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          current_order_status?:
+            | Database["public"]["Enums"]["order_status"]
+            | null
+          error_message?: string | null
+          id?: string
+          order_id?: string | null
+          order_number?: string | null
+          order_type?: Database["public"]["Enums"]["order_type"] | null
+          overall_status?: string | null
+          payment_reference?: string | null
+          processing_stage?: string | null
+          reference_type?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       payment_rate_limits: {
         Row: {
           attempts: number | null
@@ -5083,6 +5509,99 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      payment_transactions_archive: {
+        Row: {
+          account_name: string | null
+          amount: number
+          authorization_code: string | null
+          bank: string | null
+          card_type: string | null
+          channel: string | null
+          created_at: string | null
+          currency: string | null
+          customer_email: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          exp_month: string | null
+          exp_year: string | null
+          fees: number | null
+          gateway_response: string | null
+          id: string
+          last4: string | null
+          metadata: Json | null
+          order_id: string | null
+          paid_at: string | null
+          payment_method: string | null
+          processed_at: string | null
+          provider_reference: string | null
+          provider_response: Json | null
+          provider_transaction_id: string | null
+          status: string
+          transaction_type: string
+          updated_at: string | null
+        }
+        Insert: {
+          account_name?: string | null
+          amount: number
+          authorization_code?: string | null
+          bank?: string | null
+          card_type?: string | null
+          channel?: string | null
+          created_at?: string | null
+          currency?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          exp_month?: string | null
+          exp_year?: string | null
+          fees?: number | null
+          gateway_response?: string | null
+          id?: string
+          last4?: string | null
+          metadata?: Json | null
+          order_id?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          processed_at?: string | null
+          provider_reference?: string | null
+          provider_response?: Json | null
+          provider_transaction_id?: string | null
+          status: string
+          transaction_type?: string
+          updated_at?: string | null
+        }
+        Update: {
+          account_name?: string | null
+          amount?: number
+          authorization_code?: string | null
+          bank?: string | null
+          card_type?: string | null
+          channel?: string | null
+          created_at?: string | null
+          currency?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          customer_phone?: string | null
+          exp_month?: string | null
+          exp_year?: string | null
+          fees?: number | null
+          gateway_response?: string | null
+          id?: string
+          last4?: string | null
+          metadata?: Json | null
+          order_id?: string | null
+          paid_at?: string | null
+          payment_method?: string | null
+          processed_at?: string | null
+          provider_reference?: string | null
+          provider_response?: Json | null
+          provider_transaction_id?: string | null
+          status?: string
+          transaction_type?: string
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       payment_verification_logs: {
         Row: {

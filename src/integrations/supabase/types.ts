@@ -8387,6 +8387,10 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: string
       }
+      handle_email_webhook: {
+        Args: { webhook_data: Json; webhook_type?: string }
+        Returns: boolean
+      }
       handle_successful_payment: {
         Args: {
           p_amount?: number
@@ -8657,6 +8661,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      process_email_queue_secure: {
+        Args: { batch_size?: number; priority_filter?: string }
+        Returns: Json
+      }
       process_stuck_emails: {
         Args: Record<PropertyKey, never>
         Returns: number
@@ -8848,6 +8856,10 @@ export type Database = {
       }
       validate_admin_session: {
         Args: { p_ip_address?: unknown; p_session_token: string }
+        Returns: Json
+      }
+      validate_email_template: {
+        Args: { template_data: Json }
         Returns: Json
       }
       validate_order_data: {

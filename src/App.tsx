@@ -54,7 +54,7 @@ const AdminSetup = withLazyLoading(() => import("./pages/AdminSetup"));
 const CustomerRegister = withLazyLoading(() => import("./pages/CustomerRegister"));
 const SimpleRegisterPage = withLazyLoading(() => import("./pages/SimpleRegisterPage"));
 const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfile"));
-const AuthPage = withLazyLoading(() => import("./pages/auth/AuthPage"));
+const AuthPage = withLazyLoading(() => import("./pages/AuthPage"));
 const AdminAuth = withLazyLoading(() => import("./pages/admin/AdminAuth"));
 const Cart = withLazyLoading(() => import("./pages/Cart"));
 const Booking = withLazyLoading(() => import("./pages/Booking"));

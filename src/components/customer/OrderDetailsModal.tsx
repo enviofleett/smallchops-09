@@ -290,6 +290,33 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   )}
 
+                  {/* Fulfillment Channel */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        {order.order_type === 'delivery' ? (
+                          <Truck className="h-4 w-4 text-muted-foreground" />
+                        ) : (
+                          <Package className="h-4 w-4 text-muted-foreground" />
+                        )}
+                        <div>
+                          <p className="text-sm text-muted-foreground">Fulfillment Channel</p>
+                          <p className="font-medium">
+                            {order.order_type === 'delivery' ? 'Home Delivery' : 'Store Pickup'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Badge className={getStatusColor(order.status)}>
+                          {order.status.replace('_', ' ').toUpperCase()}
+                        </Badge>
+                      </div>
+                      <p className="text-sm text-muted-foreground mt-1">Current Status</p>
+                    </div>
+                  </div>
+
                   {deliverySchedule && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div>

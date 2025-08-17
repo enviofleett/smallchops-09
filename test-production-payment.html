@@ -16,13 +16,15 @@
     </style>
 </head>
 <body>
-    <h1>🚀 Production Payment System Test</h1>
+    <h1>🚀 Production Payment System Test v2025-08-17</h1>
     <div id="results"></div>
     
-    <h2>Tests</h2>
+    <h2>Available Tests</h2>
     <button class="primary" onclick="testProcessCheckout()">Test process-checkout Function</button>
     <button class="primary" onclick="testPaystackSecure()">Test paystack-secure Function</button>
     <button class="primary" onclick="testFullFlow()">Test Full Payment Flow</button>
+    <button class="primary" onclick="testHotfixValidation()">Validate Hotfix Implementation</button>
+    <button class="primary" onclick="clearResults()">Clear Results</button>
 
     <script>
         const SUPABASE_URL = 'https://oknnklksdiqaifhxaccs.supabase.co';
@@ -31,9 +33,17 @@
         function addResult(message, type = 'info') {
             const div = document.createElement('div');
             div.className = `test-result ${type}`;
-            div.innerHTML = message;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
             document.getElementById('results').appendChild(div);
             console.log(`[${type.toUpperCase()}] ${message}`);
+            
+            // Auto-scroll to bottom
+            div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            addResult('🧹 Results cleared', 'info');
         }
 
         async function testProcessCheckout() {
@@ -82,15 +92,29 @@
                 const data = await response.json();
                 
                 if (response.ok && data.success) {
+                    const paymentUrl = data.payment?.payment_url || data.payment?.authorization_url;
+                    const reference = data.payment?.reference;
+                    const accessCode = data.payment?.access_code;
+                    
                     addResult(`✅ process-checkout: PASSED<br>
+                        Version: ${data.version || 'Unknown'}<br>
                         Order ID: ${data.order_id}<br>
-                        Payment URL: ${data.payment?.payment_url ? '✅ Present' : '❌ Missing'}<br>
-                        Reference: ${data.payment?.reference}`, 'success');
+                        Order Number: ${data.order_number}<br>
+                        Payment URL: ${paymentUrl ? '✅ Present' : '❌ Missing'}<br>
+                        Authorization URL: ${data.payment?.authorization_url ? '✅ Present' : '❌ Missing'}<br>
+                        Access Code: ${accessCode ? '✅ Present' : '❌ Missing'}<br>
+                        Reference: ${reference}<br>
+                        Reference Type: ${reference?.startsWith('txn_') ? '✅ New Format' : '⚠️ Old Format'}`, 'success');
+                        
+                    // Test the payment URL
+                    if (paymentUrl) {
+                        addResult(`🔗 <a href="${paymentUrl}" target="_blank">Test Payment URL</a>`, 'info');
+                    }
                 } else {
                     addResult(`❌ process-checkout: FAILED<br>
                         Status: ${response.status}<br>
-                        Error: ${data.error || 'Unknown error'}<br>
-                        <pre>${JSON.stringify(data, null, 2)}</pre>`, 'error');
+                        Error: ${data.error || data.message || 'Unknown error'}<br>
+                        <details><summary>Raw Response</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`, 'error');
                 }
             } catch (error) {
                 addResult(`❌ process-checkout: ERROR<br>${error.message}`, 'error');
@@ -124,15 +148,25 @@
                 const data = await response.json();
                 
                 if (response.ok && data.status) {
+                    const authUrl = data.data?.authorization_url;
+                    const accessCode = data.data?.access_code;
+                    const reference = data.data?.reference;
+                    
                     addResult(`✅ paystack-secure: PASSED<br>
-                        Authorization URL: ${data.data?.authorization_url ? '✅ Present' : '❌ Missing'}<br>
-                        Access Code: ${data.data?.access_code ? '✅ Present' : '❌ Missing'}<br>
-                        Reference: ${data.data?.reference}`, 'success');
+                        Authorization URL: ${authUrl ? '✅ Present' : '❌ Missing'}<br>
+                        Access Code: ${accessCode ? '✅ Present' : '❌ Missing'}<br>
+                        Reference: ${reference}<br>
+                        Message: ${data.message || 'N/A'}`, 'success');
+                        
+                    // Test the authorization URL
+                    if (authUrl) {
+                        addResult(`🔗 <a href="${authUrl}" target="_blank">Test Authorization URL</a>`, 'info');
+                    }
                 } else {
                     addResult(`❌ paystack-secure: FAILED<br>
                         Status: ${response.status}<br>
-                        Error: ${data.error || 'Unknown error'}<br>
-                        <pre>${JSON.stringify(data, null, 2)}</pre>`, 'error');
+                        Error: ${data.error || data.message || 'Unknown error'}<br>
+                        <details><summary>Raw Response</summary><pre>${JSON.stringify(data, null, 2)}</pre></details>`, 'error');
                 }
             } catch (error) {
                 addResult(`❌ paystack-secure: ERROR<br>${error.message}`, 'error');
@@ -176,10 +210,80 @@
             }
         }
 
+        async function testHotfixValidation() {
+            addResult('🧪 Testing hotfix implementation...', 'info');
+            
+            try {
+                // Test 1: Check process-checkout returns complete payment data
+                const checkoutTest = await fetch(`${SUPABASE_URL}/functions/v1/process-checkout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({
+                        customer_email: 'hotfix-test@example.com',
+                        customer_name: 'Hotfix Test User',
+                        customer_phone: '+2348123456789',
+                        fulfillment_type: 'pickup',
+                        pickup_point_id: '00000000-0000-0000-0000-000000000001',
+                        order_items: [{
+                            product_id: '00000000-0000-0000-0000-000000000001',
+                            quantity: 1,
+                            unit_price: 500,
+                            total_price: 500,
+                            product_name: 'Hotfix Test Product'
+                        }],
+                        total_amount: 500,
+                        delivery_fee: 0,
+                        delivery_schedule: {
+                            delivery_date: '2025-08-18',
+                            delivery_time_start: '14:00',
+                            delivery_time_end: '15:00'
+                        },
+                        payment_method: 'paystack'
+                    })
+                });
+                
+                const checkoutData = await checkoutTest.json();
+                
+                const validations = {
+                    'Response Success': checkoutData.success === true,
+                    'Payment URL Present': !!(checkoutData.payment?.payment_url || checkoutData.payment?.authorization_url),
+                    'Access Code Present': !!checkoutData.payment?.access_code,
+                    'Reference Format': checkoutData.payment?.reference?.startsWith('txn_'),
+                    'Order ID Present': !!checkoutData.order_id,
+                    'Order Number Present': !!checkoutData.order_number
+                };
+                
+                let allPassed = true;
+                let validationResults = '<br><strong>Validation Results:</strong><br>';
+                
+                for (const [test, passed] of Object.entries(validations)) {
+                    const icon = passed ? '✅' : '❌';
+                    validationResults += `${icon} ${test}<br>`;
+                    if (!passed) allPassed = false;
+                }
+                
+                if (allPassed) {
+                    addResult(`✅ HOTFIX VALIDATION: PASSED${validationResults}`, 'success');
+                } else {
+                    addResult(`⚠️ HOTFIX VALIDATION: ISSUES FOUND${validationResults}`, 'error');
+                }
+                
+                // Show raw data for debugging
+                addResult(`📋 Raw checkout response:<br><details><summary>Show Details</summary><pre>${JSON.stringify(checkoutData, null, 2)}</pre></details>`, 'info');
+                
+            } catch (error) {
+                addResult(`❌ Hotfix validation error: ${error.message}`, 'error');
+            }
+        }
+
         // Auto-run basic health checks on page load
         document.addEventListener('DOMContentLoaded', () => {
-            addResult('🚀 Production Payment Test Suite Loaded', 'info');
+            addResult('🚀 Production Payment Test Suite v2025-08-17 Loaded', 'info');
             addResult(`Environment: ${SUPABASE_URL}`, 'info');
+            addResult('🎯 Ready to test hotfix implementation', 'info');
         });
     </script>
 </body>

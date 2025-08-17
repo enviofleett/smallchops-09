@@ -1,6 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
+const VERSION = "v2025-08-17-hotfix-complete-payment-data";
+
 // Production-ready CORS configuration - restrict to production domains
 function getCorsHeaders(origin: string | null): Record<string, string> {
   const allowedOrigins = [
@@ -611,6 +613,7 @@ serve(async (req) => {
     
     const response = {
       success: true,
+      version: VERSION,
       order_id: orderId,
       order_number: orderDetails.order_number,
       total_amount: total_amount,
@@ -623,7 +626,7 @@ serve(async (req) => {
       message: 'Order created and payment initialized successfully'
     };
 
-    console.log('✅ Final response being sent:', JSON.stringify(response, null, 2));
+    console.log(`✅ Final response being sent [${VERSION}]:`, JSON.stringify(response, null, 2));
     console.log('🎉 Checkout process completed successfully');
 
     return new Response(

@@ -392,8 +392,8 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         const paymentData = parsedData.payment || parsedData.data || parsedData;
         console.log('🔍 Extracted payment data:', paymentData);
         
-        // ✅ ENHANCED: Normalize payment response with comprehensive fallback logic
-        console.log('🔄 Normalizing payment response...');
+        // ✅ ENHANCED: Comprehensive payment URL extraction with fallback to paystack-secure
+        console.log('🔄 Normalizing payment response with fallback mechanism...');
         
         // Try payment.payment_url first (preferred)
         let payment_url = paymentData?.payment_url;
@@ -408,20 +408,52 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           payment_url = parsedData?.authorization_url;
         }
         
+        // If still no URL but we have a reference, try paystack-secure fallback
+        if (!payment_url && paymentData?.reference) {
+          console.log('⚠️ Missing payment URL, attempting paystack-secure fallback...');
+          
+          try {
+            // Call paystack-secure directly to get authorization URL
+            const fallbackResponse = await supabase.functions.invoke('paystack-secure', {
+              body: {
+                action: 'initialize',
+                email: sanitizedData.customer_email,
+                amount: sanitizedData.total_amount * 100, // Convert to kobo
+                reference: paymentData.reference,
+                metadata: {
+                  order_id: parsedData.order_id,
+                  customer_name: sanitizedData.customer_name,
+                  order_number: parsedData.order_number,
+                  fallback_recovery: true
+                }
+              }
+            });
+            
+            console.log('🔍 Fallback paystack-secure response:', fallbackResponse);
+            
+            if (fallbackResponse.data?.status && fallbackResponse.data?.data?.authorization_url) {
+              payment_url = fallbackResponse.data.data.authorization_url;
+              console.log('✅ Fallback authorization URL obtained:', payment_url);
+            }
+          } catch (fallbackError) {
+            console.error('❌ Fallback to paystack-secure failed:', fallbackError);
+          }
+        }
+        
         // Final fallback: build from access_code
         if (!payment_url && paymentData?.access_code) {
           payment_url = `https://checkout.paystack.com/${paymentData.access_code}`;
           console.log('🔧 Built payment_url from access_code:', payment_url);
         }
         
-        console.log('🔍 Final payment_url:', payment_url);
+        console.log('🔍 Final payment_url after all attempts:', payment_url);
         
         if (!payment_url) {
-          console.error('❌ Payment initialization incomplete - missing authorization URL from server');
+          console.error('❌ Payment initialization failed - no authorization URL available');
           console.error('❌ Full response structure:', JSON.stringify(parsedData, null, 2));
           
-          const configError = 'Payment initialization incomplete - missing authorization URL from server';
-          setLastPaymentError('Payment system configuration issue. Please contact support.');
+          const configError = 'Payment initialization failed - unable to get authorization URL. Please try again.';
+          setLastPaymentError(configError);
           handlePaymentFailure({ type: 'config_error', responseData: parsedData });
           throw new Error(configError);
         }

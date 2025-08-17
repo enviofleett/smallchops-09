@@ -562,96 +562,67 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
 
   if (!isOpen) return null;
 
-  // If on payment step, show payment section within the main dialog
+  // If on payment step, show simplified payment UI
   if (checkoutStep === 'payment') {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShoppingBag className="h-5 w-5" />
-              Complete Your Payment
-            </DialogTitle>
+            <DialogTitle className="text-center">Complete Payment</DialogTitle>
             <DialogClose className="absolute right-4 top-4" />
           </DialogHeader>
           
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-6">
-            {/* Mobile Order Summary - Collapsible */}
-            <div className="md:hidden">
-              <OrderSummaryCard
-                items={items}
-                subtotal={cart?.summary?.total_amount || 0}
-                deliveryFee={currentDeliveryFee}
-                total={total}
-                collapsibleOnMobile={true}
-              />
-            </div>
+          <div className="py-8 px-4 text-center space-y-6">
+            {paymentData && paymentData.paymentUrl ? (
+              <>
+                <div className="space-y-4">
+                  <p className="text-muted-foreground">
+                    You'll be redirected to our secure payment provider (Paystack) complete payment - ₦{paymentData.amount?.toLocaleString()}
+                  </p>
+                </div>
+                
+                <Button 
+                  onClick={() => window.open(paymentData.paymentUrl, '_blank')}
+                  size="lg"
+                  className="w-full h-12 text-lg font-semibold"
+                >
+                  Complete Payment - ₦{paymentData.amount?.toLocaleString()}
+                </Button>
+                
+                <Button 
+                  variant="outline" 
+                  onClick={() => setCheckoutStep('details')}
+                  className="w-full"
+                >
+                  ← Back to Details
+                </Button>
+              </>
+            ) : (
+              <div className="space-y-4">
+                <p className="text-muted-foreground">Preparing payment...</p>
+                <Button 
+                  variant="outline" 
+                  onClick={() => setCheckoutStep('details')}
+                  className="w-full"
+                >
+                  ← Back to Details
+                </Button>
+              </div>
+            )}
 
-            {/* Main Content */}
-            <div className="md:col-span-2 space-y-6">
-              <Card id="section-click-to-pay">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="h-5 w-5" />
-                    Click to Pay
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Button 
-                    type="button" 
-                    variant="outline" 
-                    onClick={() => setCheckoutStep('details')}
-                    className="w-full mb-4"
-                  >
-                    ← Back to Details
-                  </Button>
-
-                  {paymentData && paymentData.paymentUrl && (
-                    <div className="text-center space-y-6 py-8">
-                      <div className="space-y-3">
-                        <h3 className="text-lg font-medium">You'll be redirected to our secure payment provider (Paystack)</h3>
-                        <p className="text-base">Complete payment - ₦{paymentData.amount?.toLocaleString()}</p>
-                        <p className="text-sm text-muted-foreground">Please make sure you complete your payment to avoid order cancellation</p>
-                      </div>
-                      
-                      <Button 
-                        onClick={() => window.open(paymentData.paymentUrl, '_blank')}
-                        size="lg"
-                        className="w-full max-w-md mx-auto h-14 text-lg font-semibold"
-                      >
-                        <ExternalLink className="h-5 w-5 mr-2" />
-                        Complete Payment
-                      </Button>
-                    </div>
-                  )}
-
-                  {lastPaymentError && (
-                    <div className="p-4 border border-red-200 bg-red-50 rounded-lg">
-                      <p className="text-red-800 text-sm">{lastPaymentError}</p>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => setCheckoutStep('details')}
-                        className="mt-2"
-                      >
-                        Try Again
-                      </Button>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Desktop Order Summary - Sticky */}
-            <div className="hidden md:block">
-              <OrderSummaryCard
-                items={items}
-                subtotal={cart?.summary?.total_amount || 0}
-                deliveryFee={currentDeliveryFee}
-                total={total}
-                sticky={true}
-              />
-            </div>
+            {lastPaymentError && (
+              <div className="p-4 border border-destructive/20 bg-destructive/5 rounded-lg">
+                <p className="text-destructive text-sm">{lastPaymentError}</p>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setCheckoutStep('details')}
+                  className="mt-2 w-full"
+                >
+                  Try Again
+                </Button>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

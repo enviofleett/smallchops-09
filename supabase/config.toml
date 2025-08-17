@@ -117,3 +117,6 @@ verify_jwt = true
 
 [functions.payment-confirmation-processor]
 verify_jwt = true
+
+[functions.finalize-customer-registration]
+verify_jwt = true

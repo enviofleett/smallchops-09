@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { useCustomerRegistration } from '@/hooks/useCustomerRegistration';
+import { useSupabaseAuthRegistration } from '@/hooks/useSupabaseAuthRegistration';
 import { Mail, User, Lock, Loader2, CheckCircle, RotateCcw } from 'lucide-react';
 
 interface SimpleRegistrationProps {
@@ -21,12 +21,13 @@ export const SimpleRegistration: React.FC<SimpleRegistrationProps> = ({ onComple
     verifyOTPAndCompleteRegistration,
     resendOTP,
     resetRegistrationFlow
-  } = useCustomerRegistration();
+  } = useSupabaseAuthRegistration();
 
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
+    phone: '',
     otp: ''
   });
 
@@ -58,7 +59,8 @@ export const SimpleRegistration: React.FC<SimpleRegistrationProps> = ({ onComple
     const result = await initiateRegistration({
       name: formData.name.trim(),
       email: formData.email.trim().toLowerCase(),
-      password: formData.password
+      password: formData.password,
+      phone: formData.phone.trim() || undefined
     });
 
     if (result.success) {
@@ -83,9 +85,10 @@ export const SimpleRegistration: React.FC<SimpleRegistrationProps> = ({ onComple
 
     const result = await verifyOTPAndCompleteRegistration({
       email: registrationEmail,
-      otpCode: formData.otp.trim(),
+      token: formData.otp.trim(),
       password: formData.password,
-      name: formData.name.trim()
+      name: formData.name.trim(),
+      phone: formData.phone || undefined
     });
 
     if (result.success) {
@@ -95,7 +98,7 @@ export const SimpleRegistration: React.FC<SimpleRegistrationProps> = ({ onComple
       });
       
       // Reset form
-      setFormData({ name: '', email: '', password: '', otp: '' });
+      setFormData({ name: '', email: '', password: '', phone: '', otp: '' });
       
       // Call completion handler
       onComplete?.();
@@ -114,7 +117,7 @@ export const SimpleRegistration: React.FC<SimpleRegistrationProps> = ({ onComple
 
   const handleStartOver = () => {
     resetRegistrationFlow();
-    setFormData({ name: '', email: '', password: '', otp: '' });
+    setFormData({ name: '', email: '', password: '', phone: '', otp: '' });
   };
 
   if (registrationStep === 'completed') {
@@ -240,6 +243,20 @@ export const SimpleRegistration: React.FC<SimpleRegistrationProps> = ({ onComple
                 placeholder="Enter your email"
                 className="pl-10"
                 required
+                disabled={isLoading}
+              />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="phone">Phone Number (Optional)</Label>
+            <div className="relative">
+              <Input
+                id="phone"
+                type="tel"
+                value={formData.phone}
+                onChange={(e) => handleInputChange('phone', e.target.value)}
+                placeholder="Enter your phone number"
                 disabled={isLoading}
               />
             </div>

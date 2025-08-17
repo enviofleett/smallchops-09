@@ -13,6 +13,7 @@ import { PurchaseAnalyticsTab } from '@/components/purchase-history/PurchaseAnal
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { getCustomerAnalytics, CustomerAnalytics } from '@/api/purchaseHistory';
 import { useToast } from '@/hooks/use-toast';
+import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 
 export default function PurchaseHistory() {
   const { customerEmail } = useParams<{ customerEmail: string }>();
@@ -69,8 +70,14 @@ export default function PurchaseHistory() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-background">
+        <div className="container mx-auto px-4 py-8">
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold mb-2">Purchase History</h1>
+            <p className="text-muted-foreground">Loading your purchase history...</p>
+          </div>
+          <SkeletonLoader variant="list" count={5} />
+        </div>
       </div>
     );
   }

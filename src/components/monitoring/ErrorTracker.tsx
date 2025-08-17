@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { isNetworkError } from '@/utils/networkUtils';
 
 interface ErrorData {
   message: string;
@@ -10,6 +11,8 @@ interface ErrorData {
   timestamp: number;
   userAgent: string;
   userId?: string;
+  isNetworkError?: boolean;
+  errorType?: 'network' | 'runtime' | 'syntax' | 'unknown';
 }
 
 class ErrorTracker {
@@ -65,11 +68,32 @@ class ErrorTracker {
   }
 
   captureError(errorData: ErrorData) {
-    this.errors.push(errorData);
-    console.error('Error captured:', errorData);
+    // Enhance error data with network status
+    const enhancedErrorData = {
+      ...errorData,
+      isNetworkError: isNetworkError({ message: errorData.message }),
+      errorType: this.categorizeError(errorData.message)
+    };
+    
+    this.errors.push(enhancedErrorData);
+    console.error('Error captured:', enhancedErrorData);
     
     // Send to Supabase for storage
-    this.sendToSupabase(errorData);
+    this.sendToSupabase(enhancedErrorData);
+  }
+
+  private categorizeError(message: string): 'network' | 'runtime' | 'syntax' | 'unknown' {
+    const lowerMessage = message.toLowerCase();
+    
+    if (isNetworkError({ message })) {
+      return 'network';
+    } else if (lowerMessage.includes('syntax') || lowerMessage.includes('unexpected token')) {
+      return 'syntax';
+    } else if (lowerMessage.includes('reference') || lowerMessage.includes('undefined')) {
+      return 'runtime';
+    }
+    
+    return 'unknown';
   }
 
   private async sendToSupabase(errorData: ErrorData) {
@@ -87,7 +111,9 @@ class ErrorTracker {
           url: errorData.url,
           line: errorData.line,
           column: errorData.column,
-          timestamp: errorData.timestamp
+          timestamp: errorData.timestamp,
+          isNetworkError: errorData.isNetworkError,
+          errorType: errorData.errorType
         }
       });
     } catch (error) {

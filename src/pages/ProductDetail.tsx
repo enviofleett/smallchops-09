@@ -35,6 +35,7 @@ import { FavoriteButton } from '@/components/ui/favorite-button';
 import { DiscountBadge } from '@/components/ui/discount-badge';
 import { ProductWithDiscount, formatCurrency } from '@/lib/discountCalculations';
 import { sanitizeHtml } from '@/utils/htmlSanitizer';
+import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 
 // Remove the mock Review interface since we're using the real one from API
 
@@ -246,8 +247,12 @@ const ProductDetail = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-white">
+        <PublicHeader />
+        <div className="container mx-auto px-4 py-6 sm:py-8">
+          <SkeletonLoader variant="detail" />
+        </div>
+        <PublicFooter />
       </div>
     );
   }

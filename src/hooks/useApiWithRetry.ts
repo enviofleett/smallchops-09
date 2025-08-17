@@ -1,5 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useErrorHandler } from "./useErrorHandler";
+import { withTimeout, isNetworkError, getRetryDelay } from "@/utils/networkUtils";
+import { requestQueue } from "@/utils/requestQueue";
 
 interface RetryOptions {
   maxRetries?: number;
@@ -12,18 +14,21 @@ export const useApiWithRetry = () => {
   const { handleError } = useErrorHandler();
 
   const defaultRetryCondition = (error: any) => {
-    // Retry on network errors, 5xx errors, or specific CORS errors
-    return (
-      error?.message?.includes('Network') ||
-      error?.message?.includes('Failed to fetch') ||
-      error?.message?.includes('CORS') ||
-      error?.status >= 500 ||
-      error?.code === 'NETWORK_ERROR' ||
-      error?.code === 'TIMEOUT'
-    );
+    return isNetworkError(error);
   };
 
   const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const invokeWithTimeout = async (functionName: string, options: any = {}, timeoutMs: number = 10000) => {
+    return withTimeout(supabase.functions.invoke(functionName, options), timeoutMs);
+  };
+
+  const queueFailedWrite = (operation: () => Promise<any>) => {
+    if (!navigator.onLine) {
+      return requestQueue.add(operation);
+    }
+    return operation();
+  };
 
   const invokeWithRetry = async (
     functionName: string,
@@ -59,8 +64,8 @@ export const useApiWithRetry = () => {
           break;
         }
         
-        // Calculate delay with exponential backoff
-        const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
+        // Calculate delay with exponential backoff and jitter
+        const delay = getRetryDelay(attempt, baseDelay, maxDelay);
         console.log(`Retrying ${functionName} in ${delay}ms...`);
         await sleep(delay);
       }
@@ -106,8 +111,8 @@ export const useApiWithRetry = () => {
           break;
         }
         
-        // Calculate delay with exponential backoff
-        const delay = Math.min(baseDelay * Math.pow(2, attempt), maxDelay);
+        // Calculate delay with exponential backoff and jitter
+        const delay = getRetryDelay(attempt, baseDelay, maxDelay);
         console.log(`Retrying ${table} query in ${delay}ms...`);
         await sleep(delay);
       }
@@ -121,6 +126,8 @@ export const useApiWithRetry = () => {
 
   return {
     invokeWithRetry,
-    queryWithRetry
+    queryWithRetry,
+    invokeWithTimeout,
+    queueFailedWrite
   };
 };

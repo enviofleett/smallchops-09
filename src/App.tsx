@@ -16,6 +16,8 @@ import DynamicFavicon from "./components/seo/DynamicFavicon";
 import { initializeConsoleCleanup, validatePaystackCSP, suppressWebSocketErrors } from "./utils/consoleCleanup";
 import { logEnvironmentStatus, validateEnvironment, createEnvironmentErrorElement } from "./utils/environmentValidator";
 import { ErrorTrackerComponent } from "./components/monitoring/ErrorTracker";
+import { NetworkProvider } from "./components/network/NetworkProvider";
+import { OnlineStatusBanner } from "./components/network/OnlineStatusBanner";
 
 // Initialize payment monitoring and cache busting
 initPaymentMonitoring();
@@ -149,12 +151,14 @@ const App = () => {
   >
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <ErrorTrackerComponent />
-        <Toaster />
-        <Sonner />
-        <DynamicFavicon />
-        <AuthProvider>
-          <BrowserRouter>
+        <NetworkProvider>
+          <ErrorTrackerComponent />
+          <Toaster />
+          <Sonner />
+          <DynamicFavicon />
+          <OnlineStatusBanner />
+          <AuthProvider>
+            <BrowserRouter>
             <Routes>
               {/* Customer store at root */}
               <Route path="/" element={<PublicHome />} />
@@ -234,6 +238,7 @@ const App = () => {
             </Routes>
           </BrowserRouter>
         </AuthProvider>
+        </NetworkProvider>
       </TooltipProvider>
     </QueryClientProvider>
   </ErrorBoundaryWrapper>

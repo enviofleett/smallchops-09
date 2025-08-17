@@ -8,6 +8,7 @@ import { CartSummary } from '@/components/cart/CartSummary';
 import { CheckoutButton } from '@/components/ui/checkout-button';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
+import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 
 
 export default function Cart() {

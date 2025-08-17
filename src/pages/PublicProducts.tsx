@@ -9,6 +9,7 @@ import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
 import { getCategories } from '@/api/categories';
+import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { PriceDisplay } from '@/components/ui/price-display';
@@ -253,18 +254,7 @@ const PublicProducts = () => {
               {/* Loading State */}
               {isLoadingProducts ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
-                  {Array.from({ length: 8 }).map((_, i) => (
-                    <Card key={i} className="animate-pulse">
-                      <CardContent className="p-0">
-                        <div className="aspect-square bg-gray-200 rounded-t-lg"></div>
-                        <div className="p-3 sm:p-4 space-y-2">
-                          <div className="h-4 bg-gray-200 rounded"></div>
-                          <div className="h-3 bg-gray-200 rounded w-2/3"></div>
-                          <div className="h-6 bg-gray-200 rounded w-1/2"></div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                  <SkeletonLoader variant="product" count={8} />
                 </div>
               ) : filteredProducts.length === 0 ? (
                 <div className="text-center py-12">

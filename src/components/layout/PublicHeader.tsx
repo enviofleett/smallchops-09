@@ -6,6 +6,7 @@ import { useCart } from '@/hooks/useCart';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
+import { AuthButton } from '@/components/auth/AuthButton';
 
 export const PublicHeader = () => {
   return (
@@ -16,7 +17,8 @@ export const PublicHeader = () => {
 };
 
 const PublicHeaderContent = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isMenuOpen, setIsMenuOpen] = useState(false); // Keep for backward compatibility
   const { getItemCount } = useCart();
   const { data: settings, error } = useBusinessSettings();
   const { isAuthenticated, customerAccount, isLoading } = useCustomerAuth();
@@ -138,42 +140,23 @@ const PublicHeaderContent = () => {
               )}
             </Button>
 
-            {/* User Account - Mobile optimized */}
-            <div className="flex items-center gap-1 sm:gap-2">
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => {
-                  if (isAuthenticated) {
-                    navigate('/customer-profile');
-                  } else {
-                    navigate('/auth');
-                  }
-                }}
-              >
-                <User className="h-5 w-5" />
-              </Button>
-              {isAuthenticated && customerAccount && !isLoading && (
-                <span className="hidden md:block text-sm font-medium text-foreground">
-                  {customerAccount.name ? customerAccount.name.split(' ')[0] : 'Customer'}
-                </span>
-              )}
-            </div>
+            {/* User Authentication */}
+            <AuthButton variant="ghost" size="icon" showText={false} />
 
             {/* Mobile Menu Toggle */}
             <Button
               variant="ghost"
               size="icon"
               className="lg:hidden"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
             >
-              {isMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+              {isMobileMenuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
             </Button>
           </div>
         </div>
 
         {/* Mobile Menu - Improved */}
-        {isMenuOpen && (
+        {isMobileMenuOpen && (
           <div className="lg:hidden border-t border-border py-4 bg-background">
             <div className="space-y-4">
               {/* Mobile Search */}
@@ -191,21 +174,21 @@ const PublicHeaderContent = () => {
                 <Link 
                   to="/" 
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMenuOpen(false)}
+                  onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Home
                 </Link>
                 <Link 
                   to="/products" 
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMenuOpen(false)}
+                  onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Shop
                 </Link>
                 <Link 
                   to="/booking" 
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMenuOpen(false)}
+                  onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Booking
                 </Link>
@@ -213,7 +196,7 @@ const PublicHeaderContent = () => {
                   <button 
                     className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full"
                     onClick={() => {
-                      setIsMenuOpen(false);
+                      setIsMobileMenuOpen(false);
                       navigate('/track-order');
                     }}
                   >
@@ -223,7 +206,7 @@ const PublicHeaderContent = () => {
                 <button 
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full"
                   onClick={() => {
-                    setIsMenuOpen(false);
+                    setIsMobileMenuOpen(false);
                     if (isAuthenticated) {
                       navigate('/customer-favorites');
                     } else {
@@ -236,14 +219,14 @@ const PublicHeaderContent = () => {
                 <Link 
                   to="/about" 
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMenuOpen(false)}
+                  onClick={() => setIsMobileMenuOpen(false)}
                 >
                   About
                 </Link>
                 <Link 
                   to="/contact" 
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
-                  onClick={() => setIsMenuOpen(false)}
+                  onClick={() => setIsMobileMenuOpen(false)}
                 >
                   Contact
                 </Link>

@@ -198,15 +198,15 @@ export function EnhancedOrderCard({
                 totalAmount={order.total_amount}
               />
 
-              {/* Delivery Schedule */}
-              {order.order_type === 'delivery' && deliverySchedule && (
-                <div className="space-y-4">
-                  <DeliveryScheduleDisplay 
-                    schedule={deliverySchedule} 
-                    className="h-fit"
-                  />
-                </div>
-              )}
+              {/* Delivery Information */}
+              <div className="space-y-4">
+                <DeliveryScheduleDisplay 
+                  schedule={deliverySchedule} 
+                  orderType={order.order_type}
+                  orderStatus={order.status}
+                  className="h-fit"
+                />
+              </div>
             </div>
           </div>
         </CollapsibleContent>

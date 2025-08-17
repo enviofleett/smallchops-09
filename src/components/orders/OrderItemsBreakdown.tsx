@@ -24,6 +24,7 @@ interface OrderItemsBreakdownProps {
   totalVat: number;
   totalDiscount: number;
   grandTotal: number;
+  deliveryFee?: number;
   showDetailed?: boolean;
   className?: string;
 }
@@ -34,6 +35,7 @@ export function OrderItemsBreakdown({
   totalVat, 
   totalDiscount, 
   grandTotal,
+  deliveryFee = 0,
   showDetailed = true,
   className = ""
 }: OrderItemsBreakdownProps) {
@@ -124,9 +126,9 @@ export function OrderItemsBreakdown({
 
         {/* Order Totals */}
         <Separator />
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Subtotal</span>
+            <span className="text-gray-600">Items Subtotal</span>
             <span className="font-medium">{formatCurrency(subtotal)}</span>
           </div>
           
@@ -137,6 +139,13 @@ export function OrderItemsBreakdown({
             </div>
           )}
           
+          {deliveryFee > 0 && (
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Delivery Fee</span>
+              <span className="font-medium">{formatCurrency(deliveryFee)}</span>
+            </div>
+          )}
+          
           {totalVat > 0 && (
             <div className="flex justify-between text-sm">
               <span className="text-gray-600">VAT (7.5%)</span>
@@ -144,10 +153,21 @@ export function OrderItemsBreakdown({
             </div>
           )}
           
-          <Separator />
-          <div className="flex justify-between text-lg font-bold">
-            <span>Total</span>
+          <Separator className="my-2" />
+          
+          <div className="flex justify-between text-base font-semibold">
+            <span>Order Total</span>
             <span className="text-primary">{formatCurrency(grandTotal)}</span>
+          </div>
+          
+          <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-50 rounded">
+            <div className="flex justify-between">
+              <span>Payment Status:</span>
+              <span className="font-medium">Processing via Paystack</span>
+            </div>
+            <div className="text-xs text-gray-400 mt-1">
+              All prices are inclusive of applicable taxes
+            </div>
           </div>
         </div>
       </div>

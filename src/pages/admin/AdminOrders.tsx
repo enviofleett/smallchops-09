@@ -493,30 +493,39 @@ function AdminOrderCard({
                 <p className="text-xs text-muted-foreground mb-1">
                   {order.order_type === 'delivery' ? 'Scheduled Delivery' : 'Scheduled Pickup'}
                 </p>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="font-medium">
-                    {format(new Date(deliverySchedule.delivery_date), 'PPP')}
-                  </span>
-                   <span className="text-muted-foreground">
-                     {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                     <span className="text-xs text-blue-600 ml-1">(1-hour window)</span>
-                   </span>
-                  {deliverySchedule.is_flexible && (
-                    <Badge variant="outline" className="text-xs">Flexible</Badge>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-4 text-sm">
+                    <span className="font-medium text-primary">
+                      {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
+                    </span>
+                    <span className="text-muted-foreground bg-muted px-2 py-1 rounded text-xs">
+                      {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                    </span>
+                    {deliverySchedule.is_flexible && (
+                      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                        Flexible Time
+                      </Badge>
+                    )}
+                  </div>
+                  {deliverySchedule.special_instructions && (
+                    <div className="text-xs p-2 bg-amber-50 border border-amber-200 rounded">
+                      <strong className="text-amber-800">Special Instructions:</strong>
+                      <p className="text-amber-700 mt-1">{deliverySchedule.special_instructions}</p>
+                    </div>
                   )}
+                  <div className="text-xs text-muted-foreground">
+                    Requested: {format(new Date(deliverySchedule.requested_at), 'MMM d, h:mm a')}
+                  </div>
                 </div>
-                 {deliverySchedule.special_instructions && (
-                   <p className="text-xs text-muted-foreground mt-1 p-2 bg-blue-50 rounded">
-                     <strong>Special Instructions:</strong> {deliverySchedule.special_instructions}
-                   </p>
-                 )}
               </div>
             ) : (
               <div>
                 <p className="text-xs text-muted-foreground mb-1">
                   {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
                 </p>
-                <p className="text-sm text-amber-600">⚠️ Schedule not set</p>
+                <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+                  ⚠️ Schedule not yet set - Customer will receive confirmation once scheduled
+                </div>
               </div>
             )}
           </div>

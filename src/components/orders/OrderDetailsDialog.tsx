@@ -14,6 +14,7 @@ import { formatAddressMultiline } from '@/utils/formatAddress';
 import { supabase } from '@/integrations/supabase/client';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
+import { OrderItemsBreakdown } from './OrderItemsBreakdown';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 
 interface OrderDetailsDialogProps {
@@ -349,29 +350,18 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
               </div>
             </div>
              
-             {/* Order Items Breakdown */}
+             {/* Enhanced Order Items Breakdown */}
              {order.order_items && order.order_items.length > 0 && (
                <div className="mt-6">
-                 <h4 className="font-semibold mb-3">Order Items ({order.order_items.length})</h4>
-                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                   {order.order_items.map((item: any, index: number) => (
-                     <div key={item.id || index} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                       <div className="flex-1 min-w-0">
-                         <h5 className="font-medium text-sm break-words">{item.product_name}</h5>
-                         <p className="text-xs text-gray-500">Qty: {item.quantity} × {formatCurrency(item.unit_price)}</p>
-                         {item.special_instructions && (
-                           <p className="text-xs text-orange-600 italic mt-1">{item.special_instructions}</p>
-                         )}
-                       </div>
-                       <div className="text-right">
-                         <span className="font-medium text-sm">{formatCurrency(item.total_price)}</span>
-                         {item.vat_amount > 0 && (
-                           <p className="text-xs text-gray-500">VAT: {formatCurrency(item.vat_amount)}</p>
-                         )}
-                       </div>
-                     </div>
-                   ))}
-                 </div>
+                  <OrderItemsBreakdown 
+                    items={order.order_items}
+                    subtotal={order.subtotal || 0}
+                    totalVat={order.total_vat || 0}
+                    totalDiscount={order.discount_amount || 0}
+                    deliveryFee={order.delivery_fee || 0}
+                    grandTotal={order.total_amount}
+                    showDetailed={true}
+                  />
                </div>
              )}
              

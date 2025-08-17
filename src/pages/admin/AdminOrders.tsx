@@ -1,509 +1,468 @@
-import React, { useState } from 'react';
-import { Helmet } from 'react-helmet-async';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Search, ExternalLink, Package, Clock, CheckCircle, AlertCircle } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 import { useQuery } from '@tanstack/react-query';
 import { getOrders, OrderWithItems } from '@/api/orders';
-import { OrderStatus } from '@/types/orders';
+import { useOptimizedMonitoring } from '@/hooks/useOptimizedMonitoring';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
-import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
-import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
-import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck } from 'lucide-react';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { supabase } from '@/integrations/supabase/client';
-import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
-import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
-import { format } from 'date-fns';
-import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 
-export default function AdminOrders() {
-  const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+const AdminOrders = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
-  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'due_today' | 'upcoming'>('all');
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
+  const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
+  const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'with_schedule' | 'without_schedule'>('all');
 
-  // Fetch orders with pagination and filters
-  const {
-    data: ordersData,
-    isLoading,
-    error,
-    refetch
-  } = useQuery({
-    queryKey: ['admin-orders', currentPage, statusFilter, searchQuery],
-    queryFn: () => getOrders({
+  // Fetch orders with optimized monitoring
+  const { data: ordersResponse, isLoading, error, refetch } = useOptimizedMonitoring(
+    ['admin-orders', activeTab, debouncedSearchQuery, currentPage.toString()],
+    () => getOrders({
       page: currentPage,
-      pageSize: 20,
-      status: statusFilter === 'all' ? undefined : statusFilter,
-      searchQuery: searchQuery || undefined
+      pageSize: 10,
+      status: activeTab === 'all' ? undefined : activeTab as any,
+      searchQuery: debouncedSearchQuery || undefined
     }),
-    refetchInterval: 30000 // Refresh every 30 seconds
-  });
-  const orders = ordersData?.orders || [];
-  const totalCount = ordersData?.count || 0;
-  const totalPages = Math.ceil(totalCount / 20);
+    {
+      type: 'dashboard',
+      priority: 'medium',
+      enabled: true
+    }
+  );
 
-  // Fetch delivery schedules for all orders
-  const orderIds = orders.map(order => order.id);
+  const orders = ordersResponse?.orders || [];
+  const totalOrders = ordersResponse?.count || 0;
+  const totalPages = Math.ceil(totalOrders / 10);
+
+  // Get order IDs for delivery schedules
+  const orderIds = useMemo(() => orders.map(order => order.id), [orders]);
+  
+  // Fetch delivery schedules for displayed orders
   const { schedules: deliverySchedules } = useOrderDeliverySchedules(orderIds);
 
-  // Filter orders by delivery schedule
-  const filteredOrders = React.useMemo(() => {
+  // Filter orders based on delivery schedule presence
+  const filteredOrders = useMemo(() => {
     if (deliveryFilter === 'all') return orders;
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    
+    const ordersWithSchedules = new Set(
+      Object.values(deliverySchedules || {}).map(schedule => schedule.order_id) || []
+    );
+
     return orders.filter(order => {
-      // Only apply delivery filter to paid delivery orders
-      if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
-        return true; // Show non-delivery or unpaid orders when filtering for all
-      }
-      
-      const schedule = deliverySchedules[order.id];
-      if (!schedule) return false;
-      
-      const deliveryDate = new Date(schedule.delivery_date);
-      deliveryDate.setHours(0, 0, 0, 0);
-      
-      if (deliveryFilter === 'due_today') {
-        return deliveryDate.getTime() === today.getTime();
-      } else if (deliveryFilter === 'upcoming') {
-        return deliveryDate.getTime() > today.getTime();
-      }
-      
-      return false;
+      const hasSchedule = ordersWithSchedules.has(order.id);
+      return deliveryFilter === 'with_schedule' ? hasSchedule : !hasSchedule;
     });
   }, [orders, deliverySchedules, deliveryFilter]);
 
-  // Get order counts by status for tab badges
-  const orderCounts = {
-    all: totalCount,
-    pending: orders.filter(o => o.status === 'pending').length,
-    confirmed: orders.filter(o => o.status === 'confirmed').length,
-    preparing: orders.filter(o => o.status === 'preparing').length,
-    out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
-    delivered: orders.filter(o => o.status === 'delivered').length
+  const handleSearch = () => {
+    setCurrentPage(1);
+    // No need to manually refetch, debounced query will trigger automatically
   };
+
   const handleOrderClick = (order: OrderWithItems) => {
     setSelectedOrder(order);
-    setIsDialogOpen(true);
+    setIsOrderDialogOpen(true);
   };
-  const handleSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    setCurrentPage(1);
-    refetch();
-  };
+
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    setStatusFilter(value as 'all' | OrderStatus);
     setCurrentPage(1);
   };
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'out_for_delivery':
-        return 'bg-blue-100 text-blue-800';
-      case 'preparing':
-        return 'bg-orange-100 text-orange-800';
-      case 'confirmed':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'pending':
-        return 'bg-gray-100 text-gray-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-  return <>
-      <Helmet>
-        <title>Order Management - Admin Dashboard</title>
-        <meta name="description" content="Manage all orders, track deliveries, and monitor order status in real-time." />
-      </Helmet>
 
-      <div className="space-y-6">
-        {/* System Status Check */}
-        <SystemStatusChecker />
-        {/* Performance Monitor */}
-        
-        
-        {/* Header */}
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold">Order Management</h1>
-            <p className="text-muted-foreground">
-              Monitor and manage all customer orders and deliveries
-            </p>
+  // Quick stats
+  const stats = useMemo(() => {
+    if (!orders.length) return { pending: 0, preparing: 0, ready: 0, outForDelivery: 0, delivered: 0 };
+    
+    return orders.reduce((acc, order) => {
+      switch (order.status) {
+        case 'pending':
+          acc.pending++;
+          break;
+        case 'preparing':
+          acc.preparing++;
+          break;
+        case 'ready':
+          acc.ready++;
+          break;
+        case 'out_for_delivery':
+          acc.outForDelivery++;
+          break;
+        case 'delivered':
+          acc.delivered++;
+          break;
+      }
+      return acc;
+    }, { pending: 0, preparing: 0, ready: 0, outForDelivery: 0, delivered: 0 });
+  }, [orders]);
+
+  if (isLoading) {
+    return (
+      <div className="container mx-auto p-6 space-y-6">
+        <div className="flex justify-between items-center">
+          <h1 className="text-3xl font-bold">Orders Management</h1>
+        </div>
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+          {[...Array(5)].map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+        <div className="space-y-4">
+          {[...Array(3)].map((_, i) => (
+            <Skeleton key={i} className="h-32" />
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <Card>
+          <CardContent className="p-6">
+            <p className="text-red-600">Error loading orders: {error.message}</p>
+            <Button onClick={() => refetch()} className="mt-4">Retry</Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      <div className="flex justify-between items-center">
+        <h1 className="text-3xl font-bold">Orders Management</h1>
+        <div className="flex gap-2">
+          <div className="relative">
+            <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search orders..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              className="pl-10 w-64"
+            />
           </div>
-          <Button>
-            <Plus className="w-4 h-4 mr-2" />
-            Create Order
+          <Button onClick={handleSearch}>Search</Button>
+          <Button variant="outline">
+            Export
           </Button>
         </div>
+      </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-orange-100 text-orange-600 rounded-lg">
-                  <Clock className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Pending Orders</p>
-                  <p className="text-2xl font-bold">{orderCounts.pending}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-blue-100 text-blue-600 rounded-lg">
-                  <Package className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">In Progress</p>
-                  <p className="text-2xl font-bold">
-                    {orderCounts.preparing + orderCounts.out_for_delivery}
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-green-100 text-green-600 rounded-lg">
-                  <CheckCircle className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Delivered</p>
-                  <p className="text-2xl font-bold">{orderCounts.delivered}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 bg-purple-100 text-purple-600 rounded-lg">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Total Orders</p>
-                  <p className="text-2xl font-bold">{orderCounts.all}</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Filters */}
+      {/* Quick Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
         <Card>
           <CardContent className="p-4">
-            <div className="space-y-4">
-              <form onSubmit={handleSearch} className="flex gap-4">
-                <div className="flex-1">
-                  <Input type="text" placeholder="Search by order number, customer name, or email..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full" />
-                </div>
-                <Button type="submit" variant="outline">
-                  <Search className="w-4 h-4 mr-2" />
-                  Search
-                </Button>
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
-              </form>
-              
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <Truck className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm font-medium">Delivery Schedule:</span>
-                </div>
-                <Select value={deliveryFilter} onValueChange={(value: 'all' | 'due_today' | 'upcoming') => setDeliveryFilter(value)}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Orders</SelectItem>
-                    <SelectItem value="due_today">Due Today</SelectItem>
-                    <SelectItem value="upcoming">Upcoming Deliveries</SelectItem>
-                  </SelectContent>
-                </Select>
+            <div className="flex items-center space-x-2">
+              <Clock className="h-4 w-4 text-yellow-500" />
+              <div>
+                <p className="text-sm font-medium">Pending</p>
+                <p className="text-2xl font-bold">{stats.pending}</p>
               </div>
             </div>
           </CardContent>
         </Card>
-
-        {/* Orders Tabs */}
-        <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="all">
-              All Orders ({orderCounts.all})
-            </TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending ({orderCounts.pending})
-            </TabsTrigger>
-            <TabsTrigger value="confirmed">
-              Confirmed ({orderCounts.confirmed})
-            </TabsTrigger>
-            <TabsTrigger value="preparing">
-              Preparing ({orderCounts.preparing})
-            </TabsTrigger>
-            <TabsTrigger value="out_for_delivery">
-              Out for Delivery ({orderCounts.out_for_delivery})
-            </TabsTrigger>
-            <TabsTrigger value="delivered">
-              Delivered ({orderCounts.delivered})
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value={activeTab} className="space-y-4">
-            {isLoading ? <div className="space-y-4">
-                {[...Array(5)].map((_, i) => <Card key={i} className="p-6">
-                    <div className="animate-pulse space-y-3">
-                      <div className="h-4 bg-muted rounded w-1/4"></div>
-                      <div className="h-4 bg-muted rounded w-1/2"></div>
-                      <div className="h-4 bg-muted rounded w-1/3"></div>
-                    </div>
-                  </Card>)}
-              </div> : error ? <Card className="p-6">
-                <div className="text-center">
-                  <AlertCircle className="w-8 h-8 mx-auto text-red-500 mb-2" />
-                  <p className="text-red-600 font-medium">Error loading orders</p>
-                  <p className="text-sm text-muted-foreground">Please try again later</p>
-                </div>
-              </Card> : filteredOrders.length === 0 ? <Card className="p-6">
-                <div className="text-center">
-                  <Package className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
-                  <p className="font-medium">No orders found</p>
-                  <p className="text-sm text-muted-foreground">
-                    {searchQuery || deliveryFilter !== 'all' ? 'Try adjusting your search criteria or filters' : 'No orders match the current filter'}
-                  </p>
-                </div>
-              </Card> : <>
-                {/* Orders List */}
-                <div className="space-y-4">
-                  {filteredOrders.map(order => <div key={order.id} onClick={() => handleOrderClick(order)} className="cursor-pointer transition-transform hover:scale-[1.01]">
-                      <AdminOrderCard order={order} deliverySchedule={deliverySchedules[order.id]} />
-                    </div>)}
-                </div>
-
-                {/* Pagination */}
-                {totalPages > 1 && <div className="flex items-center justify-between">
-                    <p className="text-sm text-muted-foreground">
-                      Showing {(currentPage - 1) * 20 + 1} to{' '}
-                      {Math.min(currentPage * 20, totalCount)} of {totalCount} orders
-                    </p>
-                    <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
-                        Previous
-                      </Button>
-                      <span className="px-3 py-1 text-sm">
-                        Page {currentPage} of {totalPages}
-                      </span>
-                      <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
-                        Next
-                      </Button>
-                    </div>
-                  </div>}
-              </>}
-          </TabsContent>
-        </Tabs>
-
-        {/* Order Details Dialog */}
-        {selectedOrder && <OrderDetailsDialog order={selectedOrder} isOpen={isDialogOpen} onClose={() => {
-        setIsDialogOpen(false);
-        setSelectedOrder(null);
-        refetch(); // Refresh orders after dialog closes
-      }} />}
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <Package className="h-4 w-4 text-blue-500" />
+              <div>
+                <p className="text-sm font-medium">Preparing</p>
+                <p className="text-2xl font-bold">{stats.preparing}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="h-4 w-4 text-green-500" />
+              <div>
+                <p className="text-sm font-medium">Ready</p>
+                <p className="text-2xl font-bold">{stats.ready}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <AlertCircle className="h-4 w-4 text-orange-500" />
+              <div>
+                <p className="text-sm font-medium">Out for Delivery</p>
+                <p className="text-2xl font-bold">{stats.outForDelivery}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center space-x-2">
+              <CheckCircle className="h-4 w-4 text-green-600" />
+              <div>
+                <p className="text-sm font-medium">Delivered</p>
+                <p className="text-2xl font-bold">{stats.delivered}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
-    </>;
+
+      {/* Orders Tabs */}
+      <Tabs value={activeTab} onValueChange={handleTabChange}>
+        <TabsList>
+          <TabsTrigger value="all">All Orders ({totalOrders})</TabsTrigger>
+          <TabsTrigger value="pending">Pending</TabsTrigger>
+          <TabsTrigger value="preparing">Preparing</TabsTrigger>
+          <TabsTrigger value="ready">Ready</TabsTrigger>
+          <TabsTrigger value="out_for_delivery">Out for Delivery</TabsTrigger>
+          <TabsTrigger value="delivered">Delivered</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value={activeTab} className="space-y-4">
+          {/* Delivery Filter */}
+          <div className="flex gap-2">
+            <Button
+              variant={deliveryFilter === 'all' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setDeliveryFilter('all')}
+            >
+              All Orders
+            </Button>
+            <Button
+              variant={deliveryFilter === 'with_schedule' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setDeliveryFilter('with_schedule')}
+            >
+              Scheduled
+            </Button>
+            <Button
+              variant={deliveryFilter === 'without_schedule' ? 'default' : 'outline'}
+              size="sm"
+              onClick={() => setDeliveryFilter('without_schedule')}
+            >
+              Unscheduled
+            </Button>
+          </div>
+
+          {/* Orders List */}
+          <div className="space-y-4">
+            {filteredOrders.map((order) => (
+              <AdminOrderCard
+                key={order.id}
+                order={order}
+                onOrderClick={handleOrderClick}
+              />
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex justify-center space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+                disabled={currentPage === 1}
+              >
+                Previous
+              </Button>
+              <span className="flex items-center px-3">
+                Page {currentPage} of {totalPages}
+              </span>
+              <Button
+                variant="outline"
+                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                disabled={currentPage === totalPages}
+              >
+                Next
+              </Button>
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Order Details Dialog */}
+      {selectedOrder && (
+        <OrderDetailsDialog
+          isOpen={isOrderDialogOpen}
+          onClose={() => {
+            setIsOrderDialogOpen(false);
+            setSelectedOrder(null);
+          }}
+          order={selectedOrder}
+        />
+      )}
+    </div>
+  );
+};
+
+interface AdminOrderCardProps {
+  order: OrderWithItems;
+  onOrderClick: (order: OrderWithItems) => void;
 }
 
-// Admin-specific order card component
-function AdminOrderCard({
-  order,
-  deliverySchedule
-}: {
-  order: OrderWithItems;
-  deliverySchedule?: any;
-}) {
-  // Fetch delivery zone information if we have a delivery address
-  const { data: deliveryZone } = useQuery({
-    queryKey: ['delivery-zone', order.delivery_zone_id],
-    queryFn: async () => {
-      if (!order.delivery_zone_id) return null;
-      const { data, error } = await supabase
-        .from('delivery_zones')
-        .select('name')
-        .eq('id', order.delivery_zone_id)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!order.delivery_zone_id
-  });
-  const {
-    data: detailedOrderData,
-    isLoading: isLoadingDetails
-  } = useDetailedOrderData(order.id);
+const AdminOrderCard = ({ order, onOrderClick }: AdminOrderCardProps) => {
   const [showProductDetails, setShowProductDetails] = useState(false);
+  
+  // Use delivery zone data from the main orders payload instead of separate query
+  const deliveryZoneName = order.delivery_zones?.name || 'Unknown Zone';
+  
+  // Only fetch detailed order data when needed
+  const { data: detailedOrder } = useDetailedOrderData(order.id, {
+    enabled: showProductDetails
+  });
+
+  const getStatusBadgeColor = (status: string) => {
+    switch (status) {
+      case 'pending': return 'bg-yellow-100 text-yellow-800';
+      case 'preparing': return 'bg-blue-100 text-blue-800';
+      case 'ready': return 'bg-green-100 text-green-800';
+      case 'out_for_delivery': return 'bg-orange-100 text-orange-800';
+      case 'delivered': return 'bg-green-100 text-green-800';
+      case 'cancelled': return 'bg-red-100 text-red-800';
+      default: return 'bg-gray-100 text-gray-800';
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN'
     }).format(amount);
   };
-  const getStatusBadgeColor = (status: string) => {
-    switch (status) {
-      case 'delivered':
-        return 'bg-green-100 text-green-800';
-      case 'out_for_delivery':
-        return 'bg-blue-100 text-blue-800';
-      case 'preparing':
-        return 'bg-orange-100 text-orange-800';
-      case 'confirmed':
-        return 'bg-yellow-100 text-yellow-800';
-      case 'pending':
-        return 'bg-gray-100 text-gray-800';
-      case 'cancelled':
-        return 'bg-red-100 text-red-800';
-      default:
-        return 'bg-gray-100 text-gray-800';
-    }
-  };
-  return <Card className="hover:shadow-md transition-shadow">
+
+  return (
+    <Card className="w-full">
       <CardContent className="p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="font-semibold text-lg">Order #{order.order_number}</h3>
-            <p className="text-sm text-muted-foreground">
-              {format(new Date(order.order_time), 'PPp')}
-            </p>
-          </div>
-          <Badge className={getStatusBadgeColor(order.status)}>
-            {order.status.replace('_', ' ').toUpperCase()}
-          </Badge>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
-            <p className="text-sm text-muted-foreground">Customer</p>
-            <p className="font-medium">{order.customer_name || 'N/A'}</p>
-            <p className="text-sm text-muted-foreground">{order.customer_email}</p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Order Type & Amount</p>
-            <p className="font-medium capitalize">{order.order_type}</p>
-            <p className="text-lg font-bold text-primary">
-              {formatCurrency(order.total_amount)}
-            </p>
-          </div>
-          
-          <div>
-            <p className="text-sm text-muted-foreground">Items & Payment</p>
-            <div className="flex items-center gap-2">
-              <span className="font-medium">{order.order_items?.length || 0} items</span>
-              <Button variant="ghost" size="sm" onClick={e => {
-              e.stopPropagation();
-              setShowProductDetails(!showProductDetails);
-            }} className="h-6 px-2 text-xs">
-                <ChevronDown className={`w-3 h-3 transition-transform ${showProductDetails ? 'rotate-180' : ''}`} />
-                Products
-              </Button>
-            </div>
-            <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
-              {order.payment_status}
-            </Badge>
-          </div>
-        </div>
-
-        {/* Product Details Expansion */}
-        {showProductDetails && <div className="mt-4 border-t pt-4">
-            {isLoadingDetails ? <div className="space-y-2">
-                <div className="h-4 bg-muted animate-pulse rounded" />
-                <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
-              </div> : detailedOrderData?.items ? <div className="space-y-2">
-                <h4 className="font-medium text-sm mb-2">Product Details</h4>
-                {detailedOrderData.items.map((item: any) => <ProductDetailCard key={item.id} item={item} showReorderButton={false} />)}
-              </div> : <p className="text-sm text-muted-foreground">Product details not available</p>}
-          </div>}
-
-        {/* Delivery Information for paid delivery orders */}
-        {order.order_type === 'delivery' && order.payment_status === 'paid' && (
-          <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-3">
-            <div className="flex items-center gap-2 mb-2">
-              <MapPin className="w-4 h-4 text-primary" />
-              <h4 className="font-medium text-sm">Delivery Information</h4>
+        <div className="flex items-start justify-between">
+          <div className="space-y-2">
+            <div className="flex items-center space-x-2">
+              <h3 className="font-semibold text-lg">Order #{order.order_number}</h3>
+              <Badge className={getStatusBadgeColor(order.status)}>
+                {order.status.replace('_', ' ').toUpperCase()}
+              </Badge>
             </div>
             
-            {/* Delivery Address */}
-            {order.delivery_address && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Delivery Address</p>
-                <p className="text-sm">
-                  {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
-                    ? `${(order.delivery_address as any).street || ''} ${(order.delivery_address as any).city || ''} ${(order.delivery_address as any).state || ''}`.trim()
-                    : typeof order.delivery_address === 'string' 
-                      ? order.delivery_address
-                      : 'Address details available'
-                  }
-                </p>
-              </div>
-            )}
-            
-            {/* Delivery Zone */}
-            {deliveryZone && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Delivery Zone</p>
-                <p className="text-sm font-medium">{deliveryZone.name}</p>
-              </div>
-            )}
-            
-            {/* Delivery Schedule */}
-            {deliverySchedule ? (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Scheduled Delivery</p>
-                <div className="flex items-center gap-4 text-sm">
-                  <span className="font-medium">
-                    {format(new Date(deliverySchedule.delivery_date), 'PPP')}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                  </span>
-                  {deliverySchedule.is_flexible && (
-                    <Badge variant="outline" className="text-xs">Flexible</Badge>
+            <div className="text-sm text-muted-foreground space-y-1">
+              <p><strong>Customer:</strong> {order.customer_name}</p>
+              <p><strong>Email:</strong> {order.customer_email}</p>
+              {order.customer_phone && (
+                <p><strong>Phone:</strong> {order.customer_phone}</p>
+              )}
+              <p><strong>Type:</strong> {order.order_type}</p>
+              <p><strong>Total:</strong> {formatCurrency(order.total_amount)}</p>
+              <p><strong>Items:</strong> {order.order_items?.length || 0}</p>
+              
+              {order.order_type === 'delivery' && order.delivery_zone_id && (
+                <div>
+                  <p className="text-sm text-muted-foreground">
+                    Delivery to {deliveryZoneName}
+                  </p>
+                  {order.delivery_address && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      {typeof order.delivery_address === 'string' 
+                        ? order.delivery_address 
+                        : JSON.stringify(order.delivery_address)}
+                    </p>
                   )}
                 </div>
-                {deliverySchedule.special_instructions && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Note: {deliverySchedule.special_instructions}
-                  </p>
-                )}
-              </div>
-            ) : (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Delivery Schedule</p>
-                <p className="text-sm text-amber-600">⚠️ Schedule not set</p>
-              </div>
-            )}
+              )}
+            </div>
           </div>
+          
+          <div className="flex flex-col space-y-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onOrderClick(order)}
+            >
+              <ExternalLink className="h-4 w-4 mr-1" />
+              View Details
+            </Button>
+            
+            <button
+              onClick={() => setShowProductDetails(!showProductDetails)}
+              className="text-xs text-blue-600 hover:underline"
+            >
+              {showProductDetails ? 'Hide Details' : 'Show Details'}
+            </button>
+          </div>
+        </div>
+
+        {showProductDetails && (
+          <>
+            <Separator className="my-4" />
+            <div className="space-y-2">
+              <h4 className="font-medium">Order Items:</h4>
+              {detailedOrder?.items ? (
+                <div className="space-y-2">
+                  {detailedOrder.items.map((item: any, index: number) => (
+                    <div key={index} className="text-sm bg-gray-50 p-2 rounded">
+                      <p><strong>{item.product_name}</strong></p>
+                      <p>Quantity: {item.quantity}</p>
+                      <p>Price: {formatCurrency(item.unit_price)}</p>
+                      <p>Total: {formatCurrency(item.total_price)}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : order.order_items ? (
+                <div className="space-y-2">
+                  {order.order_items.map((item, index) => (
+                    <div key={index} className="text-sm bg-gray-50 p-2 rounded">
+                      <p><strong>{item.product_name}</strong></p>
+                      <p>Quantity: {item.quantity}</p>
+                      <p>Price: {formatCurrency(item.unit_price)}</p>
+                      <p>Total: {formatCurrency(item.total_price)}</p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <p className="text-sm text-muted-foreground">Loading product details...</p>
+              )}
+              
+              {detailedOrder?.delivery_schedule && (
+                <div className="mt-4 p-3 bg-blue-50 rounded-lg">
+                  <h4 className="font-medium text-blue-900">Delivery Schedule</h4>
+                  <p className="text-sm text-blue-800">
+                    {new Date(detailedOrder.delivery_schedule.scheduled_date).toLocaleDateString()} 
+                    {detailedOrder.delivery_schedule.time_slot && ` at ${detailedOrder.delivery_schedule.time_slot}`}
+                  </p>
+                  {detailedOrder.delivery_schedule.notes && (
+                    <p className="text-xs text-blue-700 mt-1">
+                      Notes: {detailedOrder.delivery_schedule.notes}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
         )}
+        
+        <div className="mt-4 text-xs text-muted-foreground">
+          <p>Created: {new Date(order.created_at).toLocaleString()}</p>
+          {order.updated_at !== order.created_at && (
+            <p>Updated: {new Date(order.updated_at).toLocaleString()}</p>
+          )}
+        </div>
       </CardContent>
-    </Card>;
-}
+    </Card>
+  );
+};
+
+export default AdminOrders;

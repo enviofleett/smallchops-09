@@ -6,6 +6,8 @@ import OrdersTable from '@/components/orders/OrdersTable';
 import OrdersPagination from '@/components/orders/OrdersPagination';
 import { useQuery, keepPreviousData, useMutation, useQueryClient } from '@tanstack/react-query';
 import { getOrders, OrderWithItems, deleteOrder, bulkDeleteOrders } from '@/api/orders';
+import { useOptimizedMonitoring } from '@/hooks/useOptimizedMonitoring';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { Skeleton } from '@/components/ui/skeleton';
 import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
@@ -20,6 +22,7 @@ import { runPaystackBatchVerify } from '@/utils/paystackBatchVerify';
 const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const debouncedSearchQuery = useDebouncedValue(searchQuery, 500);
   const [currentPage, setCurrentPage] = useState(1);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -61,27 +64,33 @@ const Orders = () => {
     };
   }, [queryClient]);
 
-  const { data, isLoading, isError, error } = useQuery<{
-    orders: OrderWithItems[];
-    count: number;
-  }>({
-    queryKey: ['orders', { currentPage, statusFilter, searchQuery }],
-    queryFn: () => getOrders({ 
+  const { data, isLoading, isError, error } = useOptimizedMonitoring(
+    ['orders', currentPage.toString(), statusFilter, debouncedSearchQuery],
+    () => getOrders({ 
       page: currentPage, 
       pageSize: PAGE_SIZE, 
       status: statusFilter,
-      searchQuery 
+      searchQuery: debouncedSearchQuery 
     }),
-    placeholderData: keepPreviousData,
-  });
+    {
+      type: 'dashboard',
+      priority: 'medium',
+      enabled: true
+    }
+  );
 
   const orders = data?.orders ?? [];
   const totalCount = data?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  // Derive "paid" display from payment_transactions for currently loaded orders
-  const orderIds = React.useMemo(() => orders.map(o => o.id), [orders]);
-  const refs = React.useMemo(() => orders.map(o => (o as any).payment_reference).filter(Boolean) as string[], [orders]);
+  // Only fetch payment transactions if final_paid is not available
+  const ordersWithoutFinalPaid = React.useMemo(() => 
+    orders.filter(order => (order as any).final_paid === undefined), 
+    [orders]
+  );
+  
+  const orderIds = React.useMemo(() => ordersWithoutFinalPaid.map(o => o.id), [ordersWithoutFinalPaid]);
+  const refs = React.useMemo(() => ordersWithoutFinalPaid.map(o => (o as any).payment_reference).filter(Boolean) as string[], [ordersWithoutFinalPaid]);
 
   const { data: txData } = useQuery({
     queryKey: ['payment_tx_for_orders', orderIds],

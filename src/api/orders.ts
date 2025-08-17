@@ -3,9 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { OrderStatus } from '@/types/orders';
 
-// We define a more specific type for an order that includes its line items.
+// We define a more specific type for an order that includes its line items and delivery zones.
 export type OrderWithItems = Tables<'orders'> & {
   order_items: Tables<'order_items'>[];
+  delivery_zones?: Tables<'delivery_zones'> | null;
 };
 
 interface GetOrdersParams {
@@ -63,7 +64,7 @@ export const getOrders = async ({
       .from('orders')
       .select(`*, 
         order_items (*),
-        delivery_zones (id, name, description)
+        delivery_zones (id, name, base_fee, is_active)
       `, { count: 'exact' });
 
     if (status !== 'all') {
@@ -81,12 +82,59 @@ export const getOrders = async ({
       .order('order_time', { ascending: false })
       .range(from, to);
 
+    // If query with delivery zones fails, try without them and manually fetch
     if (fallbackError) {
-      console.error('Fallback query also failed:', fallbackError);
-      throw new Error(fallbackError.message);
+      console.warn('Query with delivery zones failed, trying fallback:', fallbackError.message);
+      
+      let fallbackQuery = supabase
+        .from('orders')
+        .select(`*, order_items (*)`, { count: 'exact' });
+
+      if (status !== 'all') {
+        fallbackQuery = fallbackQuery.eq('status', status);
+      }
+
+      if (searchQuery) {
+        const searchString = `%${searchQuery}%`;
+        fallbackQuery = fallbackQuery.or(
+          `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
+        );
+      }
+
+      const { data: noZoneData, error: noZoneError, count: noZoneCount } = await fallbackQuery
+        .order('order_time', { ascending: false })
+        .range(from, to);
+
+      if (noZoneError) {
+        console.error('Fallback query also failed:', noZoneError);
+        throw new Error(noZoneError.message);
+      }
+
+      // Manually fetch delivery zones for each order
+      const ordersWithZones = await Promise.all(
+        (noZoneData || []).map(async (order: any) => {
+          if (order.delivery_zone_id) {
+            try {
+              const { data: zone } = await supabase
+                .from('delivery_zones')
+                .select('id, name, base_fee, is_active')
+                .eq('id', order.delivery_zone_id)
+                .single();
+              
+              return { ...order, delivery_zones: zone };
+            } catch (zoneError) {
+              console.warn(`Failed to fetch zone for order ${order.id}:`, zoneError);
+              return { ...order, delivery_zones: null };
+            }
+          }
+          return { ...order, delivery_zones: null };
+        })
+      );
+
+      return { orders: ordersWithZones as unknown as OrderWithItems[], count: noZoneCount || 0 };
     }
 
-    return { orders: fallbackData || [], count: count || 0 };
+    return { orders: fallbackData as unknown as OrderWithItems[] || [], count: count || 0 };
   }
 };
 
@@ -118,16 +166,46 @@ export const updateOrder = async (
       .eq('id', orderId)
       .select(`*, 
         order_items (*),
-        delivery_zones (id, name, description)
+        delivery_zones (id, name, base_fee, is_active)
       `)
       .maybeSingle();
 
+    // If update with delivery zone fails, try without zone and manually fetch
     if (fallbackError) {
-      console.error('Fallback update also failed:', fallbackError);
-      throw new Error(fallbackError.message);
+      console.warn('Update with delivery zone failed, trying without zone:', fallbackError.message);
+      
+      const { data: noZoneData, error: noZoneError } = await supabase
+        .from('orders')
+        .update(updates)
+        .eq('id', orderId)
+        .select(`*, order_items (*)`)
+        .maybeSingle();
+
+      if (noZoneError) {
+        console.error('Fallback update also failed:', noZoneError);
+        throw new Error(noZoneError.message);
+      }
+
+      // Manually fetch delivery zone
+      if (noZoneData?.delivery_zone_id) {
+        try {
+          const { data: zone } = await supabase
+            .from('delivery_zones')
+            .select('id, name, base_fee, is_active')
+            .eq('id', noZoneData.delivery_zone_id)
+            .single();
+          
+           return { ...noZoneData, delivery_zones: zone } as unknown as OrderWithItems;
+        } catch (zoneError) {
+          console.warn(`Failed to fetch zone for updated order ${orderId}:`, zoneError);
+          return { ...noZoneData, delivery_zones: null } as unknown as OrderWithItems;
+        }
+      } else {
+        return { ...noZoneData, delivery_zones: null } as unknown as OrderWithItems;
+      }
     }
 
-    return data;
+    return data as unknown as OrderWithItems;
   }
 };
 

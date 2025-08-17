@@ -76,7 +76,7 @@ const handler = async (req: Request): Promise<Response> => {
           .from('orders')
           .select(`*, 
             order_items (*),
-            delivery_zones (id, name, description)
+            delivery_zones (id, name, base_fee, is_active)
           `, { count: 'exact' });
 
         if (status !== 'all') {
@@ -102,10 +102,72 @@ const handler = async (req: Request): Promise<Response> => {
           .order('order_time', { ascending: false })
           .range(from, to);
 
-        if (error) throw error;
+        let orders = data || [];
+        let finalCount = count || 0;
+
+        // If query failed due to relationship issues, try fallback
+        if (error) {
+          console.warn('Main query failed, trying fallback:', error.message);
+          
+          let fallbackQuery = supabase
+            .from('orders')
+            .select(`*, order_items (*)`, { count: 'exact' });
+
+          if (status !== 'all') {
+            fallbackQuery = fallbackQuery.eq('status', status);
+          }
+
+          if (searchQuery) {
+            const searchString = `%${searchQuery}%`;
+            fallbackQuery = fallbackQuery.or(
+              `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
+            );
+          }
+
+          if (startDate) {
+            fallbackQuery = fallbackQuery.gte('order_time', startDate + 'T00:00:00.000Z');
+          }
+          if (endDate) {
+            fallbackQuery = fallbackQuery.lte('order_time', endDate + 'T23:59:59.999Z');
+          }
+
+          const { data: fallbackData, error: fallbackError, count: fallbackCount } = await fallbackQuery
+            .order('order_time', { ascending: false })
+            .range(from, to);
+
+          if (fallbackError) {
+            throw fallbackError;
+          }
+
+          orders = fallbackData || [];
+          finalCount = fallbackCount || 0;
+
+          // Manually fetch delivery zones for each order
+          if (orders.length > 0) {
+            const ordersWithZones = await Promise.all(
+              orders.map(async (order: any) => {
+                if (order.delivery_zone_id) {
+                  try {
+                    const { data: zone } = await supabase
+                      .from('delivery_zones')
+                .select('id, name, base_fee, is_active')
+                      .eq('id', order.delivery_zone_id)
+                      .single();
+                    
+                    return { ...order, delivery_zones: zone };
+                  } catch (zoneError) {
+                    console.warn(`Failed to fetch zone for order ${order.id}:`, zoneError);
+                    return { ...order, delivery_zones: null };
+                  }
+                }
+                return { ...order, delivery_zones: null };
+              })
+            );
+            orders = ordersWithZones;
+          }
+        }
 
         // Merge latest successful/paid transaction to compute final payment fields
-        const orders = data || [];
         let augmented = orders;
         if (orders.length > 0) {
           const orderIds = orders.map((o: any) => o.id);
@@ -134,7 +196,7 @@ const handler = async (req: Request): Promise<Response> => {
         return new Response(JSON.stringify({ 
           success: true, 
           orders: augmented, 
-          count: count || 0 
+          count: finalCount
         }), {
           status: 200,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
@@ -149,27 +211,62 @@ const handler = async (req: Request): Promise<Response> => {
           .from('orders')
           .select(`*, 
             order_items (*),
-            delivery_zones (id, name, description)
+            delivery_zones (id, name, base_fee, is_active)
           `)
           .eq('id', orderId)
           .single();
 
-        if (error) throw error;
+        let orderData = data;
+
+        // If main query fails, try fallback without delivery zone relationship
+        if (error) {
+          console.warn('Main single order query failed, trying fallback:', error.message);
+          
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('orders')
+            .select(`*, order_items (*)`)
+            .eq('id', orderId)
+            .single();
+
+          if (fallbackError) {
+            throw fallbackError;
+          }
+
+          orderData = fallbackData;
+
+          // Manually fetch delivery zone if needed
+          if (orderData?.delivery_zone_id) {
+            try {
+              const { data: zone } = await supabase
+                .from('delivery_zones')
+                .select('id, name, base_fee, is_active')
+                .eq('id', orderData.delivery_zone_id)
+                .single();
+              
+              orderData.delivery_zones = zone;
+            } catch (zoneError) {
+              console.warn(`Failed to fetch zone for order ${orderId}:`, zoneError);
+              orderData.delivery_zones = null;
+            }
+          } else {
+            orderData.delivery_zones = null;
+          }
+        }
 
         // Compute final payment fields for single order
-        let orderWithPayment = data;
-        if (data) {
+        let orderWithPayment = orderData;
+        if (orderData) {
           const { data: txs } = await supabase
             .from('payment_transactions')
             .select('id, order_id, status, paid_at, channel')
-            .eq('order_id', data.id)
+            .eq('order_id', orderData.id)
             .order('paid_at', { ascending: false, nullsFirst: false })
             .order('created_at', { ascending: false });
           const tx = (txs || []).find((t: any) => t.status === 'success' || t.status === 'paid') || null;
-          const final_paid = data.payment_status === 'paid' || !!tx;
-          const final_paid_at = data.paid_at || (tx ? tx.paid_at : null);
+          const final_paid = orderData.payment_status === 'paid' || !!tx;
+          const final_paid_at = orderData.paid_at || (tx ? tx.paid_at : null);
           const payment_channel = tx ? tx.channel : null;
-          orderWithPayment = { ...data, final_paid, final_paid_at, payment_channel };
+          orderWithPayment = { ...orderData, final_paid, final_paid_at, payment_channel };
         }
 
         return new Response(JSON.stringify({ success: true, order: orderWithPayment }), {
@@ -188,13 +285,49 @@ const handler = async (req: Request): Promise<Response> => {
           .eq('id', orderId)
           .select(`*, 
             order_items (*),
-            delivery_zones (id, name, description)
+            delivery_zones (id, name, base_fee, is_active)
           `)
           .single();
 
-        if (error) throw error;
+        let updatedOrder = data;
 
-        return new Response(JSON.stringify({ success: true, order: data }), {
+        // If update with relationship fails, try fallback
+        if (error) {
+          console.warn('Update with delivery zone failed, trying fallback:', error.message);
+          
+          const { data: fallbackData, error: fallbackError } = await supabase
+            .from('orders')
+            .update(updates)
+            .eq('id', orderId)
+            .select(`*, order_items (*)`)
+            .single();
+
+          if (fallbackError) {
+            throw fallbackError;
+          }
+
+          updatedOrder = fallbackData;
+
+          // Manually fetch delivery zone
+          if (updatedOrder?.delivery_zone_id) {
+            try {
+              const { data: zone } = await supabase
+                .from('delivery_zones')
+                .select('id, name, base_fee, is_active')
+                .eq('id', updatedOrder.delivery_zone_id)
+                .single();
+              
+              updatedOrder.delivery_zones = zone;
+            } catch (zoneError) {
+              console.warn(`Failed to fetch zone for updated order ${orderId}:`, zoneError);
+              updatedOrder.delivery_zones = null;
+            }
+          } else {
+            updatedOrder.delivery_zones = null;
+          }
+        }
+
+        return new Response(JSON.stringify({ success: true, order: updatedOrder }), {
           status: 200,
           headers: { 'Content-Type': 'application/json', ...corsHeaders },
         });

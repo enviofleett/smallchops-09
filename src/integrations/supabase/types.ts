@@ -4331,6 +4331,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "orders_delivery_zone_id_fkey"
+            columns: ["delivery_zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "orders_pickup_point_id_fkey"
             columns: ["pickup_point_id"]
             isOneToOne: false

@@ -101,7 +101,7 @@ class CheckoutErrorBoundary extends React.Component<
     if (this.state.hasError) {
       return (
         <div className="p-4 text-center">
-          <p className="text-destructive">Something went wrong with checkout. Please refresh and try again.</p>
+          <p className="text-muted-foreground">Please try again.</p>
         </div>
       );
     }
@@ -641,22 +641,9 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           <DialogClose className="absolute right-4 top-4" />
         </DialogHeader>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 py-6">
-          {/* Mobile Order Summary - only show on details step */}
-          {checkoutStep === 'details' && (
-            <div className="md:hidden">
-              <OrderSummaryCard
-                items={items}
-                subtotal={cart?.summary?.total_amount || 0}
-                deliveryFee={currentDeliveryFee}
-                total={total}
-                collapsibleOnMobile={true}
-              />
-            </div>
-          )}
-
+        <div className="grid grid-cols-1 gap-6 py-6">
           {/* Main Content */}
-          <div className="md:col-span-2">
+          <div className="col-span-1">
             {checkoutStep === 'choice' && !isAuthenticated && (
               <GuestOrLoginChoice
                 totalAmount={total}
@@ -990,19 +977,6 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
               </div>
             )}
           </div>
-
-          {/* Desktop Order Summary - only show on details step */}
-          {checkoutStep === 'details' && (
-            <div className="hidden md:block">
-              <OrderSummaryCard
-                items={items}
-                subtotal={cart?.summary?.total_amount || 0}
-                deliveryFee={currentDeliveryFee}
-                total={total}
-                sticky={true}
-              />
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>

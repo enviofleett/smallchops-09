@@ -3,7 +3,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/hooks/useCart";
 import { useGuestSession } from "@/hooks/useGuestSession";
-import { useAuth } from "@/contexts/AuthContext";
+import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -99,11 +99,7 @@ class CheckoutErrorBoundary extends React.Component<
 
   render() {
     if (this.state.hasError) {
-      return (
-        <div className="p-4 text-center">
-          <p className="text-muted-foreground">Please try again.</p>
-        </div>
-      );
+      return null; // Don't show any error message at all
     }
 
     return this.props.children;
@@ -116,7 +112,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
 }) => {
   const { cart, clearCart } = useCart();
   const { profile: customerAccount } = useCustomerProfile();
-  const { isAuthenticated, customerAccount: authCustomerAccount, session } = useAuth();
+  const { isAuthenticated, customerAccount: authCustomerAccount, session } = useCustomerAuth();
   const { guestSession, generateGuestSession } = useGuestSession();
   const { markCheckoutInProgress } = useOrderProcessing();
   const navigate = useNavigate();

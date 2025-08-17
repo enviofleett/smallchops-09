@@ -6,6 +6,7 @@ import { Separator } from '@/components/ui/separator';
 import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone } from 'lucide-react';
 import { formatAddressMultiline } from '@/utils/formatAddress';
 import { format } from 'date-fns';
+import type { PickupPoint } from '@/hooks/usePickupPoints';
 
 interface OrderItem {
   id: string;
@@ -40,6 +41,7 @@ interface Order {
   order_time: string;
   order_type: 'delivery' | 'pickup';
   delivery_address?: any;
+  pickup_point_id?: string;
   customer_phone?: string;
   order_items: OrderItem[];
   paid_at?: string;
@@ -48,6 +50,7 @@ interface Order {
 interface OrderDetailsModalProps {
   order: Order | null;
   deliverySchedule?: DeliverySchedule | null;
+  pickupPoint?: PickupPoint | null;
   isOpen: boolean;
   onClose: () => void;
 }
@@ -55,6 +58,7 @@ interface OrderDetailsModalProps {
 export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   order,
   deliverySchedule,
+  pickupPoint,
   isOpen,
   onClose,
 }) => {
@@ -297,80 +301,136 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             </CardContent>
           </Card>
 
-          {/* Delivery Information */}
-          {(order.order_type === 'delivery' || deliverySchedule) && (
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
+          {/* Fulfillment Information */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                {order.order_type === 'delivery' ? (
                   <Truck className="h-5 w-5" />
-                  Delivery Information
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {order.delivery_address && (
+                ) : (
+                  <Package className="h-5 w-5" />
+                )}
+                {order.order_type === 'delivery' ? 'Delivery Information' : 'Pickup Information'}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                {/* Fulfillment Channel */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      {order.order_type === 'delivery' ? (
+                        <Truck className="h-4 w-4 text-muted-foreground" />
+                      ) : (
+                        <Package className="h-4 w-4 text-muted-foreground" />
+                      )}
+                      <div className="min-w-0">
+                        <p className="text-sm text-muted-foreground">Fulfillment Channel</p>
+                        <p className="font-medium">
+                          {order.order_type === 'delivery' ? 'Home Delivery' : 'Store Pickup'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Badge className={getStatusColor(order.status)}>
+                        {order.status.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">Current Status</p>
+                  </div>
+                </div>
+
+                {/* Delivery Address - only for delivery orders */}
+                {order.order_type === 'delivery' && order.delivery_address && (
+                  <div>
+                    <div className="flex items-start gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-muted-foreground">Delivery Address</p>
+                        <p className="font-medium whitespace-pre-line break-words">
+                          {formatAddressMultiline(order.delivery_address)}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Pickup Point Information - only for pickup orders */}
+                {order.order_type === 'pickup' && pickupPoint && (
+                  <div className="space-y-3">
                     <div>
                       <div className="flex items-start gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm text-muted-foreground">Delivery Address</p>
-                          <p className="font-medium whitespace-pre-line break-words">
-                            {formatAddressMultiline(order.delivery_address)}
-                          </p>
+                          <p className="text-sm text-muted-foreground">Pickup Location</p>
+                          <p className="font-medium">{pickupPoint.name}</p>
+                          <p className="text-sm text-muted-foreground break-words">{pickupPoint.address}</p>
                         </div>
                       </div>
                     </div>
-                  )}
+                    
+                    {pickupPoint.contact_phone && (
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Phone className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Pickup Location Phone</p>
+                            <p className="font-medium">{pickupPoint.contact_phone}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
 
-                  {/* Fulfillment Channel */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        {order.order_type === 'delivery' ? (
-                          <Truck className="h-4 w-4 text-muted-foreground" />
-                        ) : (
-                          <Package className="h-4 w-4 text-muted-foreground" />
-                        )}
-                        <div className="min-w-0">
-                          <p className="text-sm text-muted-foreground">Fulfillment Channel</p>
-                          <p className="font-medium">
-                            {order.order_type === 'delivery' ? 'Home Delivery' : 'Store Pickup'}
-                          </p>
+                    {pickupPoint.operating_hours && (
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <Clock className="h-4 w-4 text-muted-foreground" />
+                          <div>
+                            <p className="text-sm text-muted-foreground">Operating Hours</p>
+                            <p className="font-medium text-sm">
+                              {typeof pickupPoint.operating_hours === 'string' 
+                                ? pickupPoint.operating_hours 
+                                : JSON.stringify(pickupPoint.operating_hours)
+                              }
+                            </p>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(order.status)}>
-                          {order.status.replace('_', ' ').toUpperCase()}
-                        </Badge>
+                    )}
+
+                    {pickupPoint.instructions && (
+                      <div>
+                        <p className="text-sm text-muted-foreground">Pickup Instructions</p>
+                        <p className="font-medium text-sm break-words">{pickupPoint.instructions}</p>
                       </div>
-                      <p className="text-sm text-muted-foreground mt-1">Current Status</p>
-                    </div>
+                    )}
                   </div>
+                )}
 
-                  {/* Delivery Location - only for delivery orders */}
-                  {order.order_type === 'delivery' && (
-                    <div className="mb-4">
-                      <div className="flex items-center gap-2">
-                        <MapPin className="h-4 w-4 text-muted-foreground" />
-                        <div className="min-w-0">
-                          <p className="text-sm text-muted-foreground">Delivery Location</p>
-                          <p className="font-medium break-words">{getDeliveryLocation()}</p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {deliverySchedule && (
+                {/* Schedule Information */}
+                {deliverySchedule && (
+                  <div className="pt-4 border-t">
+                    <h4 className="font-medium mb-3 flex items-center gap-2">
+                      <Calendar className="h-4 w-4" />
+                      {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Schedule
+                    </h4>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
                           <div className="min-w-0">
-                            <p className="text-sm text-muted-foreground">Delivery Date</p>
+                            <p className="text-sm text-muted-foreground">
+                              {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Date
+                            </p>
                             <p className="font-medium">
-                              {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG')}
+                              {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG', {
+                                weekday: 'long',
+                                year: 'numeric',
+                                month: 'long',
+                                day: 'numeric'
+                              })}
                             </p>
                           </div>
                         </div>
@@ -379,49 +439,68 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-muted-foreground" />
                           <div className="min-w-0">
-                            <p className="text-sm text-muted-foreground">Delivery Window</p>
+                            <p className="text-sm text-muted-foreground">
+                              {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Time Window
+                            </p>
                             <p className="font-medium">
                               {formatTime(deliverySchedule.delivery_time_start)} - {formatTime(deliverySchedule.delivery_time_end)}
                             </p>
                           </div>
                         </div>
                       </div>
-                      {deliverySchedule.delivery_zone && (
+                      
+                      {deliverySchedule.delivery_zone && order.order_type === 'delivery' && (
                         <div>
                           <p className="text-sm text-muted-foreground">Delivery Zone</p>
                           <p className="font-medium break-words">{deliverySchedule.delivery_zone}</p>
                         </div>
                       )}
-                      {deliverySchedule.delivery_fee && (
+                      
+                      {deliverySchedule.delivery_fee && order.order_type === 'delivery' && (
                         <div>
                           <p className="text-sm text-muted-foreground">Delivery Fee</p>
                           <p className="font-medium">{formatCurrency(Number(deliverySchedule.delivery_fee ?? 0))}</p>
                         </div>
                       )}
+                      
                       {deliverySchedule.special_instructions && (
                         <div className="sm:col-span-2">
                           <p className="text-sm text-muted-foreground">Special Instructions</p>
-                          <p className="font-medium break-words">{deliverySchedule.special_instructions}</p>
+                          <p className="font-medium break-words text-sm">{deliverySchedule.special_instructions}</p>
                         </div>
                       )}
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {order.customer_phone && (
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Phone className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">Contact Phone</p>
-                          <p className="font-medium">{order.customer_phone}</p>
-                        </div>
+                {/* Delivery Location - only for delivery orders without explicit schedule */}
+                {order.order_type === 'delivery' && !deliverySchedule && (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <MapPin className="h-4 w-4 text-muted-foreground" />
+                      <div className="min-w-0">
+                        <p className="text-sm text-muted-foreground">Delivery Location</p>
+                        <p className="font-medium break-words">{getDeliveryLocation()}</p>
                       </div>
                     </div>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          )}
+                  </div>
+                )}
+
+                {/* Contact Phone */}
+                {order.customer_phone && (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Phone className="h-4 w-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm text-muted-foreground">Contact Phone</p>
+                        <p className="font-medium">{order.customer_phone}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </DialogContent>
     </Dialog>

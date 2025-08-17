@@ -1,6 +1,7 @@
 import React from 'react';
 import { useCustomerOrders } from '@/hooks/useCustomerOrders';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
+import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
 import { OrderDetailsModal } from './OrderDetailsModal';
@@ -52,6 +53,11 @@ export function EnhancedOrdersSection() {
   
   const orderIds = React.useMemo(() => orders.map(order => order.id), [orders]);
   const { schedules } = useOrderDeliverySchedules(orderIds);
+  
+  // Get pickup point for selected order if it's a pickup order
+  const { data: pickupPoint } = usePickupPoint(
+    selectedOrder?.order_type === 'pickup' ? selectedOrder?.pickup_point_id : undefined
+  );
 
   // Handle query errors
   if (ordersError) {
@@ -171,6 +177,7 @@ export function EnhancedOrdersSection() {
       <OrderDetailsModal
         order={selectedOrder}
         deliverySchedule={selectedOrder ? schedules[selectedOrder.id] : null}
+        pickupPoint={pickupPoint}
         isOpen={isModalOpen}
         onClose={() => {
           setIsModalOpen(false);

@@ -53,7 +53,7 @@ export class PaymentsAPI {
         body: {
           action: 'initialize',
           email: request.email,
-          amount: request.amount * 100, // Convert to kobo
+          amount: request.amount, // Amount in naira, Paystack function will handle conversion
           reference: request.reference, // Use provided txn_ reference
           channels: request.channels || ['card', 'bank', 'ussd', 'mobile_money'],
           metadata: {

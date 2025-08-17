@@ -386,46 +386,36 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
 
       if (parsedData?.success === true) {
         console.log('✅ Success response received, analyzing structure...');
+        console.log('🔍 Raw parsedData for debugging:', JSON.stringify(parsedData, null, 2));
         
-        // Normalize response using validator utility
-        const normalizedData = normalizePaymentData(parsedData);
-        console.log('🔧 Normalized payment data:', normalizedData);
+        // Check if we have payment data directly in response
+        const paymentData = parsedData.payment || parsedData.data || parsedData;
+        console.log('🔍 Extracted payment data:', paymentData);
         
-        // Extract payment details
-        const payment = normalizedData.payment;
-        if (!payment) {
-          console.error('❌ No payment object found after normalization');
-          setLastPaymentError('Payment initialization failed - no payment data');
-          handlePaymentFailure({ type: 'no_payment_object', responseData: parsedData });
-          throw new Error('No payment object in response');
-        }
+        // Look for payment URL in various locations
+        const payment_url = paymentData?.payment_url || 
+                           paymentData?.authorization_url ||
+                           (paymentData?.access_code ? `https://checkout.paystack.com/${paymentData.access_code}` : null);
         
-        // Get payment URL with access_code fallback
-        let paymentUrl = payment.payment_url || payment.authorization_url;
-        if (!paymentUrl && (payment as any).access_code) {
-          paymentUrl = `https://checkout.paystack.com/${(payment as any).access_code}`;
-          console.log('🔧 Built payment URL from access_code:', paymentUrl);
-        }
+        console.log('🔍 Found payment_url:', payment_url);
         
-        console.log('🔍 Payment URL availability check:', {
-          hasPaymentUrl: !!paymentUrl,
-          urlValue: paymentUrl,
-          accessCode: (payment as any).access_code
-        });
-        
-        if (!paymentUrl || (typeof paymentUrl === 'string' && paymentUrl.trim() === '')) {
-          console.error('❌ No payment URL available after all fallbacks');
-          setLastPaymentError('Payment URL not available');
+        if (!payment_url) {
+          console.error('❌ No payment URL found in response');
+          console.error('❌ Full response structure:', JSON.stringify(parsedData, null, 2));
+          setLastPaymentError('Payment URL not available - please try again');
+          handlePaymentFailure({ type: 'no_payment_url', responseData: parsedData });
           throw new Error('No payment URL available');
         }
         
+        // Create processed payment data with the found payment URL
         const processedPaymentData = {
-          orderId: normalizedData.order_id,
-          orderNumber: normalizedData.order_number,
-          amount: normalizedData.total_amount || sanitizedData.total_amount,
+          orderId: parsedData.order_id,
+          orderNumber: parsedData.order_number,
+          amount: parsedData.total_amount || sanitizedData.total_amount,
           email: sanitizedData.customer_email,
-          paymentUrl: paymentUrl,
-          ...payment
+          paymentUrl: payment_url,
+          reference: paymentData?.reference,
+          access_code: paymentData?.access_code
         };
         
         console.log('✅ Processed payment data:', processedPaymentData);

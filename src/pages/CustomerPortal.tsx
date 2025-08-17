@@ -10,6 +10,7 @@ import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
 import { FavoritesSection } from '@/components/customers/FavoritesSection';
 import { ProductCatalog } from '@/components/products/ProductCatalog';
 import { CustomerReviewsTab } from '@/components/customer/CustomerReviewsTab';
+import { PaymentDebugger } from '@/components/admin/PaymentDebugger';
 
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -233,6 +234,11 @@ export default function CustomerPortal() {
                   </p>
                 </CardContent>
               </Card>
+            </div>
+
+            {/* Payment Debug Section (Temporary) */}
+            <div className="mb-6">
+              <PaymentDebugger />
             </div>
 
             {/* Upcoming Deliveries Section */}

@@ -147,14 +147,25 @@ export function normalizePaymentData(responseData: PaymentData): PaymentData {
 /**
  * Generate user-friendly error message based on validation result
  */
-export function generateUserFriendlyErrorMessage(validationResult: PaymentValidationResult): string {
+export function generateUserFriendlyErrorMessage(validationResult: PaymentValidationResult, responseData?: any): string {
   if (validationResult.isValid) {
     return '';
   }
 
   const { errors, missingFields } = validationResult;
 
-  if (missingFields.includes('payment')) {
+  // Check for payment data in various locations if responseData is provided
+  if (responseData) {
+    const hasPaymentData = responseData.payment || 
+                          responseData.data || 
+                          responseData.payment_url || 
+                          responseData.authorization_url ||
+                          (responseData.access_code ? true : false);
+
+    if (!hasPaymentData && missingFields.includes('payment')) {
+      return 'Payment system is temporarily unavailable. Please try again in a few moments.';
+    }
+  } else if (missingFields.includes('payment')) {
     return 'Payment system is temporarily unavailable. Please try again in a few moments.';
   }
 

@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Production Payment Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 800px; margin: 0 auto; padding: 20px; }
+        .test-result { padding: 10px; margin: 10px 0; border-radius: 4px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        button { padding: 10px 20px; margin: 5px; border: none; border-radius: 4px; cursor: pointer; }
+        .primary { background: #007bff; color: white; }
+        pre { background: #f8f9fa; padding: 10px; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🚀 Production Payment System Test</h1>
+    <div id="results"></div>
+    
+    <h2>Tests</h2>
+    <button class="primary" onclick="testProcessCheckout()">Test process-checkout Function</button>
+    <button class="primary" onclick="testPaystackSecure()">Test paystack-secure Function</button>
+    <button class="primary" onclick="testFullFlow()">Test Full Payment Flow</button>
+
+    <script>
+        const SUPABASE_URL = 'https://oknnklksdiqaifhxaccs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA';
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = message;
+            document.getElementById('results').appendChild(div);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+        }
+
+        async function testProcessCheckout() {
+            addResult('🧪 Testing process-checkout function...', 'info');
+            
+            try {
+                const testData = {
+                    customer_email: 'test@example.com',
+                    customer_name: 'Test Customer',
+                    customer_phone: '+2348123456789',
+                    fulfillment_type: 'delivery',
+                    delivery_address: {
+                        address_line_1: '123 Test Street',
+                        city: 'Lagos',
+                        state: 'Lagos',
+                        postal_code: '100001'
+                    },
+                    order_items: [{
+                        product_id: '00000000-0000-0000-0000-000000000001',
+                        quantity: 1,
+                        unit_price: 1000,
+                        total_price: 1000,
+                        product_name: 'Test Product'
+                    }],
+                    total_amount: 1000,
+                    delivery_fee: 500,
+                    delivery_zone_id: '00000000-0000-0000-0000-000000000001',
+                    delivery_schedule: {
+                        delivery_date: '2025-08-18',
+                        delivery_time_start: '10:00',
+                        delivery_time_end: '11:00'
+                    },
+                    payment_method: 'paystack',
+                    guest_session_id: null
+                };
+
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/process-checkout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.success) {
+                    addResult(`✅ process-checkout: PASSED<br>
+                        Order ID: ${data.order_id}<br>
+                        Payment URL: ${data.payment?.payment_url ? '✅ Present' : '❌ Missing'}<br>
+                        Reference: ${data.payment?.reference}`, 'success');
+                } else {
+                    addResult(`❌ process-checkout: FAILED<br>
+                        Status: ${response.status}<br>
+                        Error: ${data.error || 'Unknown error'}<br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ process-checkout: ERROR<br>${error.message}`, 'error');
+            }
+        }
+
+        async function testPaystackSecure() {
+            addResult('🧪 Testing paystack-secure function...', 'info');
+            
+            try {
+                const testData = {
+                    action: 'initialize',
+                    email: 'test@example.com',
+                    amount: 100000, // 1000 NGN
+                    reference: `txn_${Date.now()}_test`,
+                    metadata: {
+                        order_id: 'test-order-123',
+                        customer_name: 'Test Customer'
+                    }
+                };
+
+                const response = await fetch(`${SUPABASE_URL}/functions/v1/paystack-secure`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify(testData)
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.status) {
+                    addResult(`✅ paystack-secure: PASSED<br>
+                        Authorization URL: ${data.data?.authorization_url ? '✅ Present' : '❌ Missing'}<br>
+                        Access Code: ${data.data?.access_code ? '✅ Present' : '❌ Missing'}<br>
+                        Reference: ${data.data?.reference}`, 'success');
+                } else {
+                    addResult(`❌ paystack-secure: FAILED<br>
+                        Status: ${response.status}<br>
+                        Error: ${data.error || 'Unknown error'}<br>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>`, 'error');
+                }
+            } catch (error) {
+                addResult(`❌ paystack-secure: ERROR<br>${error.message}`, 'error');
+            }
+        }
+
+        async function testFullFlow() {
+            addResult('🧪 Testing full payment flow...', 'info');
+            
+            try {
+                // First test the health check
+                const healthResponse = await fetch(`${SUPABASE_URL}/functions/v1/process-checkout`, {
+                    method: 'OPTIONS'
+                });
+                
+                if (!healthResponse.ok) {
+                    throw new Error(`Health check failed: ${healthResponse.status}`);
+                }
+                
+                addResult('✅ CORS preflight check: PASSED', 'success');
+                
+                // Test version detection
+                addResult('🔍 Checking function versions...', 'info');
+                
+                const versionTest = await fetch(`${SUPABASE_URL}/functions/v1/process-checkout`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
+                    },
+                    body: JSON.stringify({ version_check: true })
+                });
+                
+                const versionData = await versionTest.json();
+                addResult(`📋 Function response: ${JSON.stringify(versionData, null, 2)}`, 'info');
+                
+                addResult('✅ Full flow test completed', 'success');
+                
+            } catch (error) {
+                addResult(`❌ Full flow: ERROR<br>${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run basic health checks on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            addResult('🚀 Production Payment Test Suite Loaded', 'info');
+            addResult(`Environment: ${SUPABASE_URL}`, 'info');
+        });
+    </script>
+</body>
+</html>

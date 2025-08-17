@@ -36,7 +36,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('🔄 Process checkout function called (v2025-08-17-1)');
+    console.log('🔄 Process checkout function called (v2025-08-17-production-fix-final)');
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',

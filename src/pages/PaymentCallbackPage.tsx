@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, PartyPopper } from 'lucide-react';
 import { useSecurePayment } from '@/hooks/useSecurePayment';
 import { cleanupPaymentCache, validateStoredReference } from '@/utils/paymentCacheCleanup';
 import { paymentCompletionCoordinator } from '@/utils/paymentCompletion';
 import { useCart } from '@/hooks/useCart';
+import startersLogo from '@/assets/starters-logo.png';
 
 export const PaymentCallbackPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -92,94 +93,100 @@ export const PaymentCallbackPage: React.FC = () => {
 
   if (isProcessing || verificationStatus === 'loading') {
     return (
-      <div className="container mx-auto py-8 px-4">
-        <Card className="max-w-md mx-auto">
-          <CardHeader className="text-center">
-            <CardTitle className="flex items-center justify-center gap-2">
-              <Loader2 className="h-5 w-5 animate-spin" />
-              Verifying Payment
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-muted-foreground">
-              Please wait while we verify your payment...
-            </p>
-          </CardContent>
-        </Card>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex flex-col">
+        {/* Header with Logo */}
+        <div className="bg-white shadow-sm border-b">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-center">
+            <img src={startersLogo} alt="Starters" className="h-12 object-contain" />
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex items-center justify-center p-4">
+          <Card className="w-full max-w-sm p-8 text-center bg-white">
+            <Loader2 className="h-16 w-16 animate-spin text-orange-500 mx-auto mb-6" />
+            <h2 className="text-xl font-semibold text-foreground mb-2">Verifying Payment</h2>
+            <p className="text-muted-foreground">Please wait while we confirm your payment...</p>
+          </Card>
+        </div>
       </div>
     );
   }
 
   if (verificationStatus === 'success') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center px-4">
-        <div className="w-full max-w-lg">
-          {/* Success Animation Container */}
-          <div className="text-center mb-8">
-            <div className="relative inline-flex items-center justify-center w-20 h-20 mb-6">
-              <div className="absolute inset-0 bg-emerald-100 rounded-full animate-pulse"></div>
-              <div className="relative bg-emerald-500 rounded-full p-4 shadow-lg">
-                <CheckCircle className="h-8 w-8 text-white" />
+      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex flex-col">
+        {/* Header with Logo */}
+        <div className="bg-white shadow-sm border-b">
+          <div className="container mx-auto px-4 py-4 flex items-center justify-center">
+            <img src={startersLogo} alt="Starters" className="h-12 object-contain" />
+          </div>
+        </div>
+
+        {/* Main Content */}
+        <div className="flex-1 flex items-center justify-center p-4">
+          <div className="w-full max-w-sm space-y-6">
+            {/* Success Icon */}
+            <div className="text-center">
+              <div className="relative inline-block">
+                <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="h-12 w-12 text-green-500" />
+                </div>
+              </div>
+              
+              <h1 className="text-2xl font-bold text-green-600 mb-2 flex items-center justify-center gap-2">
+                Payment Successful! <PartyPopper className="h-6 w-6" />
+              </h1>
+              <p className="text-muted-foreground text-sm px-4">
+                Your order has been confirmed and is being processed
+              </p>
+            </div>
+
+            {/* Amount Display */}
+            <Card className="p-6 bg-green-500 text-white text-center">
+              <p className="text-green-100 text-sm mb-2">Total Amount</p>
+              <p className="text-3xl font-bold">₦{orderDetails?.amount?.toLocaleString()}</p>
+            </Card>
+
+            {/* Status */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
+              <div className="flex items-center justify-center gap-2 text-green-700">
+                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                <span className="text-sm font-medium">Order Confirmed & Processing</span>
               </div>
             </div>
-            
-            <h1 className="text-3xl font-bold text-emerald-600 mb-2">
-              Payment Successful! 🎉
-            </h1>
-            <p className="text-lg text-muted-foreground">
-              Your order has been confirmed and is being processed
-            </p>
-          </div>
 
-          {/* Elegant Success Card */}
-          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm">
-            <CardContent className="p-8">
-              {orderDetails && (
-                <div className="space-y-6">
-                  {/* Amount Display */}
-                  <div className="text-center py-6 bg-gradient-to-r from-emerald-500 to-teal-500 rounded-xl text-white">
-                    <p className="text-sm font-medium opacity-90 mb-1">Total Amount</p>
-                    <p className="text-3xl font-bold">
-                      ₦{orderDetails.amount?.toLocaleString()}
-                    </p>
-                  </div>
+            {/* Action Buttons */}
+            <div className="space-y-3">
+              <Button 
+                onClick={() => navigate('/customer-profile')} 
+                className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-base font-medium"
+              >
+                Track Your Order
+              </Button>
+              <Button 
+                onClick={() => navigate('/')} 
+                variant="outline" 
+                className="w-full h-12 text-base border-green-200 text-green-600 hover:bg-green-50"
+              >
+                Continue Shopping
+              </Button>
+            </div>
 
-                  {/* Status Indicator */}
-                  <div className="flex items-center justify-center gap-3 py-4 bg-emerald-50 rounded-lg">
-                    <div className="w-3 h-3 bg-emerald-500 rounded-full animate-pulse"></div>
-                    <span className="text-emerald-700 font-medium">
-                      Order Confirmed & Processing
-                    </span>
-                  </div>
-
-                  {/* Action Buttons */}
-                  <div className="space-y-3 pt-4">
-                    <Button 
-                      onClick={() => navigate('/customer-profile')} 
-                      size="lg"
-                      className="w-full bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg"
-                    >
-                      Track Your Order
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => navigate('/')} 
-                      size="lg"
-                      className="w-full border-emerald-200 text-emerald-700 hover:bg-emerald-50"
-                    >
-                      Continue Shopping
-                    </Button>
-                  </div>
+            {/* Order Complete Section */}
+            <Card className="p-4 bg-white border border-gray-200">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <CheckCircle className="h-4 w-4 text-white" />
                 </div>
-              )}
-            </CardContent>
-          </Card>
-
-          {/* Additional Info */}
-          <div className="mt-6 text-center">
-            <p className="text-sm text-muted-foreground">
-              A confirmation email has been sent to you
-            </p>
+                <div>
+                  <h3 className="font-medium text-foreground mb-1">Order Complete!</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Your order is being processed. Check your order history for updates.
+                  </p>
+                </div>
+              </div>
+            </Card>
           </div>
         </div>
       </div>
@@ -187,36 +194,40 @@ export const PaymentCallbackPage: React.FC = () => {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
-      <Card className="max-w-md mx-auto">
-        <CardHeader className="text-center">
-          <CardTitle className="flex items-center justify-center gap-2 text-red-600">
-            <XCircle className="h-6 w-6" />
-            Payment Failed
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="text-center space-y-4">
-          <p className="text-muted-foreground">
-            {errorMessage || 'We could not verify your payment.'}
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex flex-col">
+      {/* Header with Logo */}
+      <div className="bg-white shadow-sm border-b">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-center">
+          <img src={startersLogo} alt="Starters" className="h-12 object-contain" />
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1 flex items-center justify-center p-4">
+        <Card className="w-full max-w-sm p-8 text-center bg-white">
+          <XCircle className="h-16 w-16 text-red-500 mx-auto mb-6" />
+          <h2 className="text-2xl font-bold text-foreground mb-2">Payment Failed</h2>
+          <p className="text-muted-foreground mb-6 text-sm">
+            {errorMessage || 'There was an issue processing your payment. Please try again.'}
           </p>
           
-          <div className="flex gap-2">
+          <div className="space-y-3">
             <Button 
-              onClick={() => navigate('/cart')} 
-              className="flex-1"
+              onClick={() => navigate('/')} 
+              className="w-full bg-red-500 hover:bg-red-600 h-12 text-base"
             >
-              Try Again
+              Return to Home
             </Button>
             <Button 
+              onClick={() => navigate('/customer-profile')} 
               variant="outline" 
-              onClick={() => navigate('/')} 
-              className="flex-1"
+              className="w-full h-12 text-base"
             >
-              Go Home
+              View Orders
             </Button>
           </div>
-        </CardContent>
-      </Card>
+        </Card>
+      </div>
     </div>
   );
 };

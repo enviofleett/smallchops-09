@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { AuthModal } from './AuthModal';
-import { useAuthContext } from './AuthProvider';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 
 interface AuthButtonProps {
@@ -19,12 +19,12 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
   showText = true 
 }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const { user, isAuthenticated, isLoading, signOut } = useAuthContext();
+  const { user, session, isAuthenticated, isLoading, logout } = useAuth();
   const { toast } = useToast();
 
   const handleSignOut = async () => {
     try {
-      await signOut();
+      await logout();
       toast({
         title: "Signed out",
         description: "You have been signed out successfully."
@@ -47,28 +47,32 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
     );
   }
 
-  if (isAuthenticated && user) {
+  if (isAuthenticated && (user || session)) {
+    const displayName = user?.name || session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'User';
+    const displayEmail = user?.email || session?.user?.email || '';
+    const avatarUrl = user?.avatar_url || session?.user?.user_metadata?.avatar_url;
+    
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant={variant} size={size} className="flex items-center gap-2">
             <Avatar className="h-6 w-6">
-              <AvatarImage src={user.user_metadata?.avatar_url} />
+              <AvatarImage src={avatarUrl} />
               <AvatarFallback>
-                {user.user_metadata?.name?.charAt(0) || user.email?.charAt(0) || 'U'}
+                {displayName.charAt(0).toUpperCase()}
               </AvatarFallback>
             </Avatar>
             {showText && (
               <span className="hidden sm:inline-block">
-                {user.user_metadata?.name || user.email?.split('@')[0]}
+                {displayName}
               </span>
             )}
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem className="flex flex-col items-start">
-            <div className="font-medium">{user.user_metadata?.name || 'User'}</div>
-            <div className="text-xs text-muted-foreground">{user.email}</div>
+            <div className="font-medium">{displayName}</div>
+            <div className="text-xs text-muted-foreground">{displayEmail}</div>
           </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={() => window.location.href = '/customer-profile'}>

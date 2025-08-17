@@ -110,8 +110,8 @@ async function initializePayment(supabaseClient, requestData) {
 
     console.log('🔑 Using Paystack secret key:', secretKey.substring(0, 10) + '...');
 
-    // FIX: Get callback URL from environment
-    const callbackUrl = `${Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com'}/checkout/success`;
+    // Use provided callback_url or default to frontend success page
+    const callbackUrl = requestData.callback_url || `${Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com'}/checkout/success`;
 
     // Prepare Paystack payload
     const paystackPayload = {

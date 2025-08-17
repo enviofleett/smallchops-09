@@ -369,7 +369,7 @@ serve(async (req) => {
             email: customer_email,
             amount: total_amount, // Amount already in naira from database
             reference: authoritativePaymentReference, // 🔧 Use backend-generated reference
-            callback_url: `${origin || 'https://startersmallchops.com'}/payment/callback?reference=${authoritativePaymentReference}&order_id=${orderId}&source=process_checkout`,
+            callback_url: `https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/payment-callback?reference=${authoritativePaymentReference}&order_id=${orderId}`,
             metadata: {
               order_id: orderId,
               customer_name: customer_name,

@@ -2115,6 +2115,53 @@ export type Database = {
         }
         Relationships: []
       }
+      deliveries: {
+        Row: {
+          actual_delivery: string | null
+          created_at: string | null
+          delivery_address: string
+          delivery_fee: number | null
+          delivery_notes: string | null
+          estimated_delivery: string | null
+          id: string
+          order_id: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          actual_delivery?: string | null
+          created_at?: string | null
+          delivery_address: string
+          delivery_fee?: number | null
+          delivery_notes?: string | null
+          estimated_delivery?: string | null
+          id?: string
+          order_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          actual_delivery?: string | null
+          created_at?: string | null
+          delivery_address?: string
+          delivery_fee?: number | null
+          delivery_notes?: string | null
+          estimated_delivery?: string | null
+          id?: string
+          order_id?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_analytics: {
         Row: {
           average_delivery_time: number | null
@@ -2208,15 +2255,7 @@ export type Database = {
           updated_at?: string
           zone_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "delivery_fees_zone_id_fkey"
-            columns: ["zone_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_zones"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       delivery_fees_backup: {
         Row: {
@@ -2344,13 +2383,6 @@ export type Database = {
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "delivery_performance_metrics_zone_id_fkey"
-            columns: ["zone_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_zones"
             referencedColumns: ["id"]
           },
         ]
@@ -2482,31 +2514,28 @@ export type Database = {
       }
       delivery_zones: {
         Row: {
-          area: Json
-          created_at: string
-          description: string | null
+          base_fee: number
+          created_at: string | null
           id: string
           is_active: boolean | null
           name: string
-          updated_at: string
+          updated_at: string | null
         }
         Insert: {
-          area: Json
-          created_at?: string
-          description?: string | null
+          base_fee?: number
+          created_at?: string | null
           id?: string
           is_active?: boolean | null
           name: string
-          updated_at?: string
+          updated_at?: string | null
         }
         Update: {
-          area?: Json
-          created_at?: string
-          description?: string | null
+          base_fee?: number
+          created_at?: string | null
           id?: string
           is_active?: boolean | null
           name?: string
-          updated_at?: string
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -4157,10 +4186,12 @@ export type Database = {
           customer_phone: string
           delivery_address: Json | null
           delivery_fee: number | null
+          delivery_status: string | null
           delivery_time: string | null
           delivery_time_slot_id: string | null
           delivery_zone_id: string | null
           discount_amount: number | null
+          estimated_delivery_date: string | null
           guest_session_id: string | null
           id: string
           order_number: string
@@ -4170,8 +4201,10 @@ export type Database = {
           payment_method: string | null
           payment_reference: string | null
           payment_status: Database["public"]["Enums"]["payment_status"]
+          payment_verified_at: string | null
           paystack_reference: string | null
           pickup_point_id: string | null
+          pickup_ready: boolean | null
           pickup_time: string | null
           preferred_delivery_time: string | null
           reference_updated_at: string | null
@@ -4196,10 +4229,12 @@ export type Database = {
           customer_phone: string
           delivery_address?: Json | null
           delivery_fee?: number | null
+          delivery_status?: string | null
           delivery_time?: string | null
           delivery_time_slot_id?: string | null
           delivery_zone_id?: string | null
           discount_amount?: number | null
+          estimated_delivery_date?: string | null
           guest_session_id?: string | null
           id?: string
           order_number: string
@@ -4209,8 +4244,10 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          payment_verified_at?: string | null
           paystack_reference?: string | null
           pickup_point_id?: string | null
+          pickup_ready?: boolean | null
           pickup_time?: string | null
           preferred_delivery_time?: string | null
           reference_updated_at?: string | null
@@ -4235,10 +4272,12 @@ export type Database = {
           customer_phone?: string
           delivery_address?: Json | null
           delivery_fee?: number | null
+          delivery_status?: string | null
           delivery_time?: string | null
           delivery_time_slot_id?: string | null
           delivery_zone_id?: string | null
           discount_amount?: number | null
+          estimated_delivery_date?: string | null
           guest_session_id?: string | null
           id?: string
           order_number?: string
@@ -4248,8 +4287,10 @@ export type Database = {
           payment_method?: string | null
           payment_reference?: string | null
           payment_status?: Database["public"]["Enums"]["payment_status"]
+          payment_verified_at?: string | null
           paystack_reference?: string | null
           pickup_point_id?: string | null
+          pickup_ready?: boolean | null
           pickup_time?: string | null
           preferred_delivery_time?: string | null
           reference_updated_at?: string | null
@@ -4284,13 +4325,6 @@ export type Database = {
             columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customer_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_delivery_zone_id_fkey"
-            columns: ["delivery_zone_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_zones"
             referencedColumns: ["id"]
           },
           {
@@ -7081,15 +7115,7 @@ export type Database = {
           updated_at?: string | null
           zone_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "zone_delivery_analytics_zone_id_fkey"
-            columns: ["zone_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_zones"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
@@ -7102,17 +7128,6 @@ export type Database = {
           pending_orders: number | null
           total_orders: number | null
           zone_completion_rate: number | null
-        }
-        Relationships: []
-      }
-      delivery_zones_migration_summary: {
-        Row: {
-          new_zones_count: number | null
-          orders_with_zones: number | null
-          orders_without_zones: number | null
-          original_zones_count: number | null
-          report_type: string | null
-          zones_consolidated: number | null
         }
         Relationships: []
       }

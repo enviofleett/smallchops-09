@@ -44,16 +44,7 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
   };
 
   const calculateDeliveryFee = (zone: DeliveryZoneWithFee): number => {
-    if (!zone.delivery_fees) return 0;
-    
-    const { base_fee, min_order_for_free_delivery } = zone.delivery_fees;
-    
-    // Check if order qualifies for free delivery
-    if (min_order_for_free_delivery && orderSubtotal >= min_order_for_free_delivery) {
-      return 0;
-    }
-    
-    return base_fee;
+    return zone.base_fee || 0;
   };
 
   const handleZoneSelect = (zoneId: string) => {
@@ -66,7 +57,6 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
 
   const selectedZone = zones.find(z => z.id === selectedZoneId);
   const selectedDeliveryFee = selectedZone ? calculateDeliveryFee(selectedZone) : 0;
-  const selectedIsFree = selectedDeliveryFee === 0 && selectedZone?.delivery_fees?.min_order_for_free_delivery;
 
   if (loading) {
     return (
@@ -119,7 +109,7 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
                 <div className="flex items-center gap-2">
                   {selectedDeliveryFee === 0 ? (
                     <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-                      {selectedIsFree ? 'FREE' : 'No Charge'}
+                      'FREE'
                     </Badge>
                   ) : (
                     <Badge variant="outline" className="text-primary border-primary/30">
@@ -146,13 +136,12 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
               <CommandList className="max-h-[200px] overflow-y-auto">
                 {zones.map((zone) => {
                   const deliveryFee = calculateDeliveryFee(zone);
-                  const isFreeDelivery = deliveryFee === 0 && zone.delivery_fees?.min_order_for_free_delivery;
                   const isSelected = selectedZoneId === zone.id;
                   
                   return (
                     <CommandItem
                       key={zone.id}
-                      value={zone.name + " " + (zone.description || "")}
+                      value={zone.name}
                       onSelect={() => {
                         handleZoneSelect(zone.id);
                         setOpen(false);
@@ -166,30 +155,12 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
                             <span className="font-medium">{zone.name}</span>
                             {isSelected && <Check className="h-4 w-4 text-primary" />}
                           </div>
-                          
-                          {zone.description && (
-                            <p className="text-sm text-muted-foreground">
-                              {zone.description}
-                            </p>
-                          )}
-                          
-                          {zone.delivery_fees?.min_order_for_free_delivery && (
-                            <p className="text-xs text-muted-foreground">
-                              Free delivery on orders above ₦{zone.delivery_fees.min_order_for_free_delivery.toFixed(2)}
-                            </p>
-                          )}
                         </div>
                         
                         <div className="ml-3">
-                          {deliveryFee === 0 ? (
-                            <Badge variant="secondary" className="bg-green-100 text-green-800 border-green-200">
-                              {isFreeDelivery ? 'FREE' : 'No Charge'}
-                            </Badge>
-                          ) : (
-                            <Badge variant="outline" className="text-primary border-primary/30">
-                              ₦{deliveryFee.toFixed(2)}
-                            </Badge>
-                          )}
+                          <Badge variant="outline" className="text-primary border-primary/30">
+                            ₦{deliveryFee.toFixed(2)}
+                          </Badge>
                         </div>
                       </div>
                     </CommandItem>
@@ -201,11 +172,6 @@ export const DeliveryZoneDropdown: React.FC<DeliveryZoneDropdownProps> = ({
         </PopoverContent>
       </Popover>
 
-      {selectedZone?.delivery_fees?.min_order_for_free_delivery && orderSubtotal < selectedZone.delivery_fees.min_order_for_free_delivery && (
-        <div className="text-xs text-muted-foreground bg-muted/30 p-2 rounded-md">
-          💡 Tip: Add ₦{(selectedZone.delivery_fees.min_order_for_free_delivery - orderSubtotal).toFixed(2)} more to qualify for free delivery!
-        </div>
-      )}
     </div>
   );
 };

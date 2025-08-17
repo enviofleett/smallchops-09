@@ -7,57 +7,67 @@ import {
   UpdatedDeliveryFee
 } from '@/types/database';
 
-export type DeliveryZoneWithFee = DeliveryZone & {
-  delivery_fees: DeliveryFee | null;
+export type DeliveryZoneWithFee = {
+  id: string;
+  name: string;
+  base_fee: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  delivery_fees?: DeliveryFee | null;
 };
 
 export const getDeliveryZonesWithFees = async (): Promise<DeliveryZoneWithFee[]> => {
   const { data, error } = await supabase
     .from('delivery_zones')
-    .select(`
-      *,
-      delivery_fees(*)
-    `);
+    .select('*')
+    .eq('is_active', true)
+    .order('name');
 
   if (error) throw error;
-  
-  // The join returns delivery_fees as an array. We expect one fee record per zone.
-  return data.map(zone => ({
-      ...zone,
-      delivery_fees: Array.isArray(zone.delivery_fees) && zone.delivery_fees.length > 0 ? zone.delivery_fees[0] : null,
-  })) as DeliveryZoneWithFee[];
+
+  return (data?.map(zone => ({
+      id: zone.id,
+      name: zone.name,
+      base_fee: zone.base_fee,
+      is_active: zone.is_active,
+      created_at: zone.created_at,
+      updated_at: zone.updated_at,
+      delivery_fees: null // Legacy compatibility
+  })) as DeliveryZoneWithFee[]);
 };
 
 export const upsertDeliveryZoneWithFee = async ({
     zone,
     fee,
 } : {
-    zone: NewDeliveryZone,
-    fee: Omit<NewDeliveryFee, 'id' | 'zone_id'> & { id?: string }
+    zone: { name: string; base_fee: number; is_active?: boolean; id?: string },
+    fee: { base_fee: number; id?: string }
 }) => {
+    const zoneData = {
+        name: zone.name,
+        base_fee: fee.base_fee,
+        is_active: zone.is_active ?? true,
+        ...(zone.id && { id: zone.id })
+    };
 
-    const { data: zoneData, error: zoneError } = await supabase
+    const { data: savedZone, error: zoneError } = await supabase
         .from('delivery_zones')
-        .upsert(zone)
+        .upsert(zoneData)
         .select()
         .single();
     
     if (zoneError) throw zoneError;
 
-    const feeDataToUpsert = {
-        ...fee,
-        zone_id: zoneData.id,
+    return {
+        id: savedZone.id,
+        name: savedZone.name,
+        base_fee: savedZone.base_fee,
+        is_active: savedZone.is_active,
+        created_at: savedZone.created_at,
+        updated_at: savedZone.updated_at,
+        delivery_fees: null
     };
-
-    const { data: feeData, error: feeError } = await supabase
-        .from('delivery_fees')
-        .upsert(feeDataToUpsert)
-        .select()
-        .single();
-    
-    if (feeError) throw feeError;
-
-    return { ...zoneData, delivery_fees: feeData };
 };
 
 export const deleteDeliveryZone = async (zoneId: string) => {

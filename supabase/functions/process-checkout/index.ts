@@ -430,6 +430,8 @@ serve(async (req) => {
         let authorizationUrl: string | null = null;
         let accessCode: string | null = null;
 
+        console.log('🔍 Raw paystack-secure response:', JSON.stringify(response, null, 2));
+
         // Some environments may return stringified JSON; normalize first
         let resp: any = response;
         if (typeof resp === 'string') {
@@ -443,6 +445,8 @@ serve(async (req) => {
         const inner = resp?.data ?? resp;
         authorizationUrl = inner?.authorization_url ?? inner?.data?.authorization_url ?? null;
         accessCode = inner?.access_code ?? inner?.data?.access_code ?? null;
+        
+        console.log('🔍 Extracted values:', { authorizationUrl, accessCode, reference: inner?.reference });
 
         // Build fallback URL from access_code if authorization_url is missing
         if (!authorizationUrl && accessCode) {

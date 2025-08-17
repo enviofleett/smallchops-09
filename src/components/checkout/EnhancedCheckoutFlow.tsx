@@ -21,6 +21,8 @@ import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
 import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
 import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
+import { safeErrorMessage, normalizePaymentResponse } from '@/utils/errorHandling';
+import { validatePaymentFlow, formatDiagnosticResults } from '@/utils/paymentDiagnostics';
 import { cn } from "@/lib/utils";
 
 import {
@@ -463,7 +465,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
       setIsSubmitting(false);
       
       // Provide safe fallback for error message
-      const errorMessage = error?.message || 'An unexpected error occurred';
+      const errorMessage = safeErrorMessage(error);
       setLastPaymentError(errorMessage);
       
       logPaymentAttempt(null, 'failure', errorMessage);

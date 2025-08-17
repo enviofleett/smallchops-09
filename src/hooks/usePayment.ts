@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { PaymentErrorHandler } from '@/lib/payment-error-handler';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { safeErrorMessage, handlePaymentError } from '@/utils/errorHandling';
 
 export interface PaymentResult {
   success: boolean;
@@ -58,17 +59,9 @@ export const usePayment = () => {
         console.warn('⚠️ Server returned invalid reference format:', response.reference, e);
       }
 
-      // Persist the authoritative reference only if valid
-      if (validServerRef) {
-        try {
-          await supabase
-            .from('orders')
-            .update({ payment_reference: response.reference, payment_method: 'paystack' })
-            .eq('id', orderId);
-        } catch (e) {
-          console.warn('Could not persist final payment_reference (will rely on metadata):', e);
-        }
-      }
+      // DO NOT update orders table from client
+      // The server-side verification will handle all database updates
+      // Legacy frontend writes removed to prevent RLS 403 errors
 
       // Store last reference and order details for callback fallback
       try {
@@ -91,11 +84,11 @@ export const usePayment = () => {
     } catch (error) {
       console.error('Payment initiation error:', error);
       handleError(error, 'payment initiation');
-      const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
+      const errorMessage = safeErrorMessage(error);
 
       return {
         success: false,
-        error: errorInfo.message
+        error: errorMessage
       };
     } finally {
       setLoading(false);
@@ -123,19 +116,19 @@ export const usePayment = () => {
         }
         return true;
       } else {
-        const errorInfo = PaymentErrorHandler.formatErrorForUser(new Error(result.error || 'Failed to process payment'));
-        toast.error(errorInfo.title, {
-          description: errorInfo.message,
+        const errorMessage = safeErrorMessage(result.error || 'Failed to process payment');
+        toast.error('Payment Failed', {
+          description: errorMessage,
           duration: 5000,
         });
         return false;
       }
     } catch (error) {
       console.error('Payment processing error:', error);
-      const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
+      const errorMessage = safeErrorMessage(error);
 
-      toast.error(errorInfo.title, {
-        description: errorInfo.message,
+      toast.error('Payment Error', {
+        description: errorMessage,
         duration: 5000,
       });
       return false;

@@ -111,42 +111,6 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
 
   return (
     <div className={`space-y-4 ${className}`}>
-      {/* Payment Information */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-lg">
-            <CreditCard className="h-5 w-5" />
-            Payment Information
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Payment Method</p>
-              <p className="font-medium">{order.payment_method || 'paystack'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Payment Status</p>
-              <Badge className={getPaymentStatusColor(order.payment_status)}>
-                {order.payment_status.toUpperCase()}
-              </Badge>
-            </div>
-            {order.payment_reference && (
-              <div className="sm:col-span-2">
-                <p className="text-sm text-muted-foreground">Payment Reference</p>
-                <p className="font-mono text-sm break-all">{order.payment_reference}</p>
-              </div>
-            )}
-            {order.paid_at && (
-              <div className="sm:col-span-2">
-                <p className="text-sm text-muted-foreground">Paid At</p>
-                <p className="font-medium">{formatDateTime(order.paid_at)}</p>
-              </div>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Fulfillment Information */}
       <Card>
         <CardHeader>

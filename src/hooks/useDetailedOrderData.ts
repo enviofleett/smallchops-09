@@ -7,7 +7,7 @@ interface DetailedOrderData {
   delivery_schedule?: any;
 }
 
-export const useDetailedOrderData = (orderId: string, options?: { enabled?: boolean }) => {
+export const useDetailedOrderData = (orderId: string) => {
   return useQuery({
     queryKey: ['detailed-order', orderId],
     queryFn: async () => {
@@ -23,7 +23,7 @@ export const useDetailedOrderData = (orderId: string, options?: { enabled?: bool
 
       return data as unknown as DetailedOrderData;
     },
-    enabled: !!orderId && (options?.enabled !== false),
+    enabled: !!orderId,
     staleTime: 1000 * 60 * 5, // 5 minutes
     refetchOnWindowFocus: false
   });

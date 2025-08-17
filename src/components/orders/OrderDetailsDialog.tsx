@@ -200,9 +200,14 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                      <div className="h-4 bg-gray-300 rounded mb-2"></div>
                      <div className="h-3 bg-gray-300 rounded w-2/3"></div>
                    </div>
-                 ) : deliverySchedule ? (
-                   <DeliveryScheduleDisplay schedule={deliverySchedule} className="mb-0" />
-                 ) : (
+                  ) : deliverySchedule ? (
+                    <DeliveryScheduleDisplay 
+                      schedule={deliverySchedule}
+                      orderType={order.order_type}
+                      orderStatus={order.status}
+                      className="mb-0" 
+                    />
+                  ) : (
                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                      <p className="text-sm text-yellow-800">
                        No delivery schedule found for this order.

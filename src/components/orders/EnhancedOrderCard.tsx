@@ -202,7 +202,9 @@ export function EnhancedOrderCard({
               {order.order_type === 'delivery' && deliverySchedule && (
                 <div className="space-y-4">
                   <DeliveryScheduleDisplay 
-                    schedule={deliverySchedule} 
+                    schedule={deliverySchedule}
+                    orderType={order.order_type}
+                    orderStatus={order.status}
                     className="h-fit"
                   />
                 </div>

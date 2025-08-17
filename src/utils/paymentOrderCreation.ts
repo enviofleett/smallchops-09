@@ -24,6 +24,13 @@ interface CreateOrderParams {
   pickupPointId?: string;
   deliveryZoneId?: string;
   guestSessionId?: string;
+  deliverySchedule?: {
+    delivery_date: string;
+    delivery_time_start: string;
+    delivery_time_end: string;
+    special_instructions?: string;
+    is_flexible?: boolean;
+  };
 }
 
 /**
@@ -97,6 +104,35 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
     }
 
     console.log('✅ Payment initialized:', paymentData.data);
+
+    // INDEPENDENT: Create delivery schedule if provided (non-blocking)
+    if (params.deliverySchedule && order.id) {
+      try {
+        console.log('🗓️ Creating delivery schedule independently...');
+        const scheduleData = {
+          order_id: order.id,
+          delivery_date: params.deliverySchedule.delivery_date,
+          delivery_time_start: params.deliverySchedule.delivery_time_start,
+          delivery_time_end: params.deliverySchedule.delivery_time_end,
+          is_flexible: params.deliverySchedule.is_flexible || false,
+          special_instructions: params.deliverySchedule.special_instructions || null
+        };
+
+        const { error: scheduleError } = await supabase
+          .from('order_delivery_schedule')
+          .insert(scheduleData);
+
+        if (scheduleError) {
+          console.warn('⚠️ Non-blocking: Delivery schedule creation failed:', scheduleError);
+          // Don't throw - this is independent of payment success
+        } else {
+          console.log('✅ Delivery schedule created successfully');
+        }
+      } catch (scheduleErr) {
+        console.warn('⚠️ Non-blocking: Delivery schedule creation error:', scheduleErr);
+        // Silent failure - doesn't affect payment flow
+      }
+    }
 
     return {
       order,

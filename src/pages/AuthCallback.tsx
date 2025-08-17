@@ -86,6 +86,7 @@ export default function AuthCallback() {
                 .from('customer_accounts')
                 .insert({
                   user_id: user.id,
+                  email: user.email || '',  // Add required email field
                   name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0],
                   email_verified: true,
                   profile_completion_percentage: 60

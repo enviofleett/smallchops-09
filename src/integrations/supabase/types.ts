@@ -1463,7 +1463,7 @@ export type Database = {
           bio: string | null
           created_at: string
           date_of_birth: string | null
-          email: string | null
+          email: string
           email_verification_expires_at: string | null
           email_verification_token: string | null
           email_verified: boolean | null
@@ -1483,7 +1483,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           date_of_birth?: string | null
-          email?: string | null
+          email: string
           email_verification_expires_at?: string | null
           email_verification_token?: string | null
           email_verified?: boolean | null
@@ -1503,7 +1503,7 @@ export type Database = {
           bio?: string | null
           created_at?: string
           date_of_birth?: string | null
-          email?: string | null
+          email?: string
           email_verification_expires_at?: string | null
           email_verification_token?: string | null
           email_verified?: boolean | null

@@ -97,7 +97,7 @@ serve(async (req) => {
         .update({
           name: name,
           phone: phone,
-          supabase_user_id: user.id,
+          user_id: user.id,  // Use user_id instead of supabase_user_id
           email_verified: true,
           updated_at: new Date().toISOString()
         })
@@ -125,7 +125,7 @@ serve(async (req) => {
           email: email.toLowerCase(),
           name: name,
           phone: phone,
-          supabase_user_id: user.id,
+          user_id: user.id,  // Use user_id instead of supabase_user_id
           email_verified: true,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()

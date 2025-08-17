@@ -93,6 +93,38 @@ export function EnhancedOrdersSection() {
         <p className="text-gray-500">Track and manage your orders</p>
       </div>
       
+      {/* Order summary stats positioned immediately after title */}
+      {orders.length > 0 && (
+        <div className="p-4 bg-muted/50 rounded-lg">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+            <div className="space-y-1">
+              <p className="text-2xl sm:text-3xl font-bold text-primary">
+                {orders.length}
+              </p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Total Orders</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-2xl sm:text-3xl font-bold text-primary">
+                ₦{orders.reduce((sum, order) => sum + (order.total_amount || 0), 0).toLocaleString()}
+              </p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Total Spent</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-2xl sm:text-3xl font-bold text-green-600">
+                {orders.filter(order => order.status === 'delivered').length}
+              </p>
+              <p className="text-xs sm:text-sm text-muted-foreground">Delivered</p>
+            </div>
+            <div className="space-y-1">
+              <p className="text-2xl sm:text-3xl font-bold text-orange-600">
+                {orders.filter(order => ['pending', 'confirmed', 'preparing', 'out_for_delivery'].includes(order.status)).length}
+              </p>
+              <p className="text-xs sm:text-sm text-muted-foreground">In Progress</p>
+            </div>
+          </div>
+        </div>
+      )}
+      
       {/* Mobile-first responsive orders list */}
       <div className="space-y-4">
         {orders.slice(0, 10).map((order) => {
@@ -132,37 +164,6 @@ export function EnhancedOrdersSection() {
             >
               View All Orders ({orders.length})
             </Button>
-          </div>
-        )}
-        
-        {orders.length > 0 && (
-          <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
-              <div className="space-y-1">
-                <p className="text-2xl sm:text-3xl font-bold text-primary">
-                  {orders.length}
-                </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Total Orders</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-2xl sm:text-3xl font-bold text-primary">
-                  ₦{orders.reduce((sum, order) => sum + (order.total_amount || 0), 0).toLocaleString()}
-                </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Total Spent</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-2xl sm:text-3xl font-bold text-green-600">
-                  {orders.filter(order => order.status === 'delivered').length}
-                </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">Delivered</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-2xl sm:text-3xl font-bold text-orange-600">
-                  {orders.filter(order => ['pending', 'confirmed', 'preparing', 'out_for_delivery'].includes(order.status)).length}
-                </p>
-                <p className="text-xs sm:text-sm text-muted-foreground">In Progress</p>
-              </div>
-            </div>
           </div>
         )}
       </div>

@@ -392,19 +392,38 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         const paymentData = parsedData.payment || parsedData.data || parsedData;
         console.log('🔍 Extracted payment data:', paymentData);
         
-        // Look for payment URL in various locations
-        const payment_url = paymentData?.payment_url || 
-                           paymentData?.authorization_url ||
-                           (paymentData?.access_code ? `https://checkout.paystack.com/${paymentData.access_code}` : null);
+        // ✅ ENHANCED: Normalize payment response with comprehensive fallback logic
+        console.log('🔄 Normalizing payment response...');
         
-        console.log('🔍 Found payment_url:', payment_url);
+        // Try payment.payment_url first (preferred)
+        let payment_url = paymentData?.payment_url;
+        
+        // Fallback to payment.authorization_url
+        if (!payment_url) {
+          payment_url = paymentData?.authorization_url;
+        }
+        
+        // Fallback to top-level authorization_url (rare)
+        if (!payment_url) {
+          payment_url = parsedData?.authorization_url;
+        }
+        
+        // Final fallback: build from access_code
+        if (!payment_url && paymentData?.access_code) {
+          payment_url = `https://checkout.paystack.com/${paymentData.access_code}`;
+          console.log('🔧 Built payment_url from access_code:', payment_url);
+        }
+        
+        console.log('🔍 Final payment_url:', payment_url);
         
         if (!payment_url) {
-          console.error('❌ No payment URL found in response');
+          console.error('❌ Payment initialization incomplete - missing authorization URL from server');
           console.error('❌ Full response structure:', JSON.stringify(parsedData, null, 2));
-          setLastPaymentError('Payment URL not available - please try again');
-          handlePaymentFailure({ type: 'no_payment_url', responseData: parsedData });
-          throw new Error('No payment URL available');
+          
+          const configError = 'Payment initialization incomplete - missing authorization URL from server';
+          setLastPaymentError('Payment system configuration issue. Please contact support.');
+          handlePaymentFailure({ type: 'config_error', responseData: parsedData });
+          throw new Error(configError);
         }
         
         // Create processed payment data with the found payment URL
@@ -454,22 +473,31 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
       console.error('🚨 Checkout submission error:', error);
       setIsSubmitting(false);
       
-      // Provide safe fallback for error message
+      // Enhanced error handling with safe message extraction
       const errorMessage = safeErrorMessage(error);
-      setLastPaymentError(errorMessage);
       
+      // Map specific errors to user-friendly messages
+      let userFriendlyMessage: string;
+      
+      if (errorMessage.includes('Payment initialization incomplete - missing authorization URL from server')) {
+        userFriendlyMessage = 'Payment system configuration issue. Please contact support.';
+      } else if (errorMessage.includes('Payment URL not available')) {
+        userFriendlyMessage = 'Unable to redirect to payment. Please try again or contact support.';
+      } else {
+        // Generate user-friendly error with safe fallback
+        const validationResult = validatePaymentInitializationData({
+          success: false,
+          error: errorMessage
+        });
+        userFriendlyMessage = generateUserFriendlyErrorMessage(validationResult);
+      }
+      
+      setLastPaymentError(userFriendlyMessage);
       logPaymentAttempt(null, 'failure', errorMessage);
-      
-      // Generate user-friendly error with safe fallback
-      const validationResult = validatePaymentInitializationData({
-        success: false,
-        error: errorMessage
-      });
-      const userFriendlyError = generateUserFriendlyErrorMessage(validationResult);
       
       toast({
         title: "Checkout Error",
-        description: userFriendlyError,
+        description: userFriendlyMessage,
         variant: "destructive",
       });
     }

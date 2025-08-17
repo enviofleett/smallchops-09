@@ -9,6 +9,7 @@ export interface PaymentValidationResult {
     reference?: string;
     total_amount?: number;
     order_number?: string;
+    access_code?: string;
   };
 }
 
@@ -66,11 +67,19 @@ export function validatePaymentInitializationData(responseData: any): PaymentVal
     result.missingFields.push('payment');
     console.error('❌ Payment validation failed: Missing payment object');
   } else {
-    // Check for payment URL (Paystack sends authorization_url which is correct)
-    if (!responseData.payment.payment_url && !responseData.payment.authorization_url) {
-      result.errors.push('Neither payment_url nor authorization_url found in payment object');
-      result.missingFields.push('payment.payment_url / payment.authorization_url');
-      console.error('❌ Payment validation failed: Missing payment URLs');
+    // ✅ ENHANCED: Check for payment URL with access_code fallback
+    const hasPaymentUrl = responseData.payment.payment_url || responseData.payment.authorization_url;
+    const hasAccessCode = responseData.payment.access_code;
+    
+    if (!hasPaymentUrl && !hasAccessCode) {
+      result.errors.push('Neither payment_url nor authorization_url found, and no access_code to build URL');
+      result.missingFields.push('payment.payment_url / payment.authorization_url / payment.access_code');
+      console.error('❌ Payment validation failed: Missing payment URLs and access_code');
+    } else if (!hasPaymentUrl && hasAccessCode) {
+      result.warnings.push('Payment URL missing but access_code present - will build URL from access_code');
+      console.log('⚠️ Will build payment URL from access_code:', hasAccessCode);
+      // Include access_code in extracted data for downstream processing
+      result.data.access_code = responseData.payment.access_code;
     } else if (responseData.payment.authorization_url) {
       console.log('✅ Found authorization_url from Paystack - this is the correct response format');
     }
@@ -154,6 +163,8 @@ export function generateUserFriendlyErrorMessage(validationResult: PaymentValida
 
   const { errors, missingFields } = validationResult;
 
+  // ✅ ENHANCED: Better distinguish config vs connectivity issues
+  
   // Check for payment data in various locations if responseData is provided
   if (responseData) {
     const hasPaymentData = responseData.payment || 
@@ -163,14 +174,17 @@ export function generateUserFriendlyErrorMessage(validationResult: PaymentValida
                           (responseData.access_code ? true : false);
 
     if (!hasPaymentData && missingFields.includes('payment')) {
-      return 'Payment system is temporarily unavailable. Please try again in a few moments.';
+      return 'Payment system configuration issue. Please contact support.';
     }
   } else if (missingFields.includes('payment')) {
-    return 'Payment system is temporarily unavailable. Please try again in a few moments.';
+    return 'Payment system configuration issue. Please contact support.';
   }
 
-  if (missingFields.includes('payment.payment_url / payment.authorization_url')) {
-    return 'Payment gateway connection failed. Please check your internet connection and try again.';
+  // Distinguish between missing URLs (config issue) vs connectivity issue
+  if (missingFields.includes('payment.payment_url / payment.authorization_url / payment.access_code')) {
+    return 'Payment system configuration issue. Please contact support.';
+  } else if (missingFields.includes('payment.payment_url / payment.authorization_url')) {
+    return 'Payment gateway connection failed. Please try again.';
   }
 
   if (missingFields.includes('payment.reference')) {

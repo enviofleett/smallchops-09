@@ -16,6 +16,88 @@ export const PaymentDebugger: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState<DiagnosticResult[]>([]);
 
+  // ✅ NEW: Debug process-checkout functionality
+  const debugProcessCheckout = async (): Promise<DiagnosticResult> => {
+    console.log('🔍 Testing process-checkout response structure...');
+    
+    try {
+      const testPayload = {
+        customer_email: 'test@debug.com',
+        customer_name: 'Debug Test',
+        customer_phone: '08012345678',
+        fulfillment_type: 'pickup',
+        pickup_point_id: '00000000-0000-0000-0000-000000000001',
+        order_items: [{
+          product_id: 'debug-test-item',
+          product_name: 'Debug Test Item',
+          quantity: 1,
+          unit_price: 1000,
+          total_price: 1000
+        }],
+        total_amount: 1000,
+        delivery_fee: 0,
+        payment_method: 'paystack',
+        delivery_schedule: {
+          delivery_date: '2025-08-20',
+          delivery_time_start: '10:00',
+          delivery_time_end: '11:00'
+        }
+      };
+      
+      const response = await supabase.functions.invoke('process-checkout', {
+        body: testPayload
+      });
+      
+      console.log('🔍 Process-checkout debug response:', response);
+      
+      if (response.error) {
+        return {
+          name: 'Process-checkout Debug',
+          status: 'fail',
+          message: `Function error: ${response.error.message}`,
+          details: response.error
+        };
+      }
+      
+      const data = response.data;
+      const payment = data?.payment || {};
+      
+      const diagnostics = {
+        success: data?.success,
+        hasOrderId: !!data?.order_id,
+        hasPaymentObject: !!data?.payment,
+        hasPaymentUrl: !!(payment.payment_url || payment.authorization_url),
+        hasAccessCode: !!payment.access_code,
+        hasReference: !!payment.reference,
+        referenceFormat: payment.reference?.startsWith('txn_') ? 'correct (txn_)' : 'incorrect',
+        computedUrl: payment.access_code ? `https://checkout.paystack.com/${payment.access_code}` : 'cannot compute'
+      };
+      
+      const issues = [];
+      if (!data?.success) issues.push('success !== true');
+      if (!payment.payment_url && !payment.authorization_url) issues.push('missing payment URLs');
+      if (!payment.access_code) issues.push('missing access_code');
+      if (!payment.reference?.startsWith('txn_')) issues.push('invalid reference format');
+      
+      return {
+        name: 'Process-checkout Debug',
+        status: issues.length === 0 ? 'pass' : 'warning',
+        message: issues.length === 0 
+          ? 'Process-checkout returns complete payment data' 
+          : `Issues found: ${issues.join(', ')}`,
+        details: diagnostics
+      };
+      
+    } catch (error: any) {
+      return {
+        name: 'Process-checkout Debug',
+        status: 'fail',
+        message: `Debug test failed: ${error.message}`,
+        details: error
+      };
+    }
+  };
+
   const runQuickDiagnostic = async () => {
     setIsRunning(true);
     const diagnostics: DiagnosticResult[] = [];
@@ -181,6 +263,10 @@ export const PaymentDebugger: React.FC = () => {
           details: error
         });
       }
+
+      // Run process-checkout debug test
+      const processCheckoutResult = await debugProcessCheckout();
+      diagnostics.push(processCheckoutResult);
 
       setResults(diagnostics);
       console.log('✅ Diagnostic completed', diagnostics);

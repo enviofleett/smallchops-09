@@ -589,29 +589,38 @@ serve(async (req) => {
       // Don't throw error here as the order and payment initialization succeeded
     }
 
-    // Return success response
+    // ✅ CRITICAL FIX: Ensure complete payment response with fallback URL construction
+    console.log('📦 Building enhanced payment response...');
+    
+    let responsePaymentUrl = finalAuthUrl;
+    
+    // FALLBACK: If authorization_url is missing but access_code exists, build the URL
+    if (!responsePaymentUrl && finalAccessCode) {
+      responsePaymentUrl = `https://checkout.paystack.com/${finalAccessCode}`;
+      console.log('🔧 Built payment URL from access_code:', responsePaymentUrl);
+    }
+    
+    if (!responsePaymentUrl) {
+      console.error('❌ CRITICAL: No payment URL available after all attempts');
+      throw new Error('Payment URL could not be generated - please try again');
+    }
+    
     const response = {
       success: true,
       order_id: orderId,
       order_number: orderDetails.order_number,
       total_amount: total_amount,
       payment: {
-        payment_url: finalAuthUrl,
-        authorization_url: finalAuthUrl,
-        reference: effectiveReference,
-        access_code: finalAccessCode
+        payment_url: responsePaymentUrl, // CRITICAL: Always include this
+        authorization_url: responsePaymentUrl, // Duplicate for compatibility
+        access_code: finalAccessCode,
+        reference: authoritativePaymentReference // Always use server txn_ reference
       },
       message: 'Order created and payment initialized successfully'
     };
 
-    console.log('🎉 Checkout process completed successfully:', response);
-    console.log('📋 Payment response details:', {
-      hasPaymentResponse: !!paymentResponse,
-      hasData: !!paymentResponse?.data,
-      authUrl: paymentResponse?.data?.authorization_url,
-      accessCode: paymentResponse?.data?.access_code,
-      reference: paymentReference
-    });
+    console.log('✅ Final response being sent:', JSON.stringify(response, null, 2));
+    console.log('🎉 Checkout process completed successfully');
 
     return new Response(
       JSON.stringify(response),

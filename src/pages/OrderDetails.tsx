@@ -11,19 +11,25 @@ import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { DeliveryScheduleCard } from '@/components/orders/DeliveryScheduleCard';
+import { FullDeliveryInformation } from '@/components/customer/FullDeliveryInformation';
 import { getDeliveryScheduleByOrderId, DeliverySchedule } from '@/api/deliveryScheduleApi';
+import { usePickupPoints } from '@/hooks/usePickupPoints';
 interface OrderDetailsData {
   id: string;
   order_number: string;
   status: string;
-  payment_status?: string | null;
+  payment_status: string;
   paid_at?: string | null;
   total_amount: number;
   order_time: string;
   customer_id?: string | null;
   customer_email?: string | null;
+  customer_phone?: string | null;
   payment_method?: string | null;
   payment_reference?: string | null;
+  order_type: 'delivery' | 'pickup';
+  delivery_address?: any;
+  pickup_point_id?: string | null;
 }
 
 interface PaymentTx {
@@ -68,6 +74,7 @@ const [deliverySchedule, setDeliverySchedule] = React.useState<DeliverySchedule 
 const [isLoadingData, setIsLoadingData] = React.useState(true);
 const [isReconciling, setIsReconciling] = React.useState(false);
 const [error, setError] = React.useState<string | null>(null);
+const { data: pickupPoints = [] } = usePickupPoints();
 
   const canView = React.useMemo(() => {
     if (!order) return false;
@@ -90,7 +97,8 @@ const loadData = React.useCallback(async () => {
       .from('orders')
       .select(`
             id, order_number, status, payment_status, paid_at, total_amount, order_time,
-            customer_id, customer_email, payment_method, payment_reference
+            customer_id, customer_email, customer_phone, payment_method, payment_reference,
+            order_type, delivery_address, pickup_point_id
           `)
       .eq('id', id)
       .maybeSingle();
@@ -180,6 +188,11 @@ const reconcileNow = async () => {
 
   const formatDateTime = (d?: string | null) => d ? new Date(d).toLocaleString() : undefined;
 
+  // Find the pickup point for this order if it's a pickup order
+  const currentPickupPoint = order.pickup_point_id 
+    ? pickupPoints.find(point => point.id === order.pickup_point_id) 
+    : null;
+
   return (
     <div className="min-h-screen bg-background">
       <Helmet>
@@ -202,41 +215,47 @@ const reconcileNow = async () => {
           </div>
         </div>
 
-        {/* Delivery Schedule - Show prominently if available */}
-        {deliverySchedule && (
-          <div className="mb-6">
-            <DeliveryScheduleCard 
-              schedule={deliverySchedule} 
-              orderStatus={order.status}
-              className="shadow-sm"
-            />
+        {/* Payment Information */}
+        <Card className="p-6 mb-6">
+          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
+            <CreditCard className="h-5 w-5" />
+            Payment Information
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <p className="text-sm text-muted-foreground">Payment Method</p>
+              <p className="font-medium">{order.payment_method || 'paystack'}</p>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Payment Status</p>
+              <Badge className={`text-xs border ${paymentBadge.cls}`}>{paymentBadge.label}</Badge>
+            </div>
+            <div>
+              <p className="text-sm text-muted-foreground">Amount</p>
+              <p className="font-semibold">{formatMoney(order.total_amount)}</p>
+            </div>
+            {order.payment_reference && (
+              <div>
+                <p className="text-sm text-muted-foreground">Payment Reference</p>
+                <p className="font-mono text-sm break-all">{order.payment_reference}</p>
+              </div>
+            )}
+            {order.paid_at && (
+              <div className="md:col-span-2">
+                <p className="text-sm text-muted-foreground">Paid At</p>
+                <p className="font-medium">{formatDateTime(order.paid_at)}</p>
+              </div>
+            )}
           </div>
-        )}
+        </Card>
 
-        {/* Status Row */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <Card className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Package className="w-4 h-4" />
-              <span className="text-sm">Order Status</span>
-            </div>
-            <Badge className={`text-xs border ${paymentBadge.cls}`}>{paymentBadge.label}</Badge>
-          </Card>
-          <Card className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
-              <span className="text-sm">Amount</span>
-            </div>
-            <span className="font-semibold">{formatMoney(order.total_amount)}</span>
-          </Card>
-          <Card className="p-4 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              <span className="text-sm">Paid At</span>
-            </div>
-            <span className="text-sm">{formatDateTime(order.paid_at) || '-'}</span>
-          </Card>
-        </div>
+        {/* Full Delivery Information Component */}
+        <FullDeliveryInformation 
+          order={order}
+          deliverySchedule={deliverySchedule}
+          pickupPoint={currentPickupPoint}
+          className="mb-6"
+        />
 
         {/* Timeline */}
         <Card className="p-6">
@@ -263,7 +282,12 @@ const reconcileNow = async () => {
             {deliverySchedule && (
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
-                <span>Delivery Scheduled: {formatDateTime(deliverySchedule.delivery_date)} at {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}</span>
+                <span>Delivery Scheduled: {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG', {
+                  weekday: 'long',
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric'
+                })} from {deliverySchedule.delivery_time_start} to {deliverySchedule.delivery_time_end}</span>
               </div>
             )}
           </div>

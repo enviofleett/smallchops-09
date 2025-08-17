@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0/dist/module/index.js'
 import { corsHeaders } from '../_shared/cors.ts'
@@ -45,7 +46,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log('[VERIFY-PAYMENT] Payment verification started')
+    console.log('[VERIFY-PAYMENT-V2] Payment verification started')
     
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -59,7 +60,7 @@ serve(async (req) => {
       const validation = validatePaystackConfig(envConfig);
       
       if (!validation.isValid) {
-        console.error('[VERIFY-PAYMENT] Paystack configuration invalid:', validation.errors);
+        console.error('[VERIFY-PAYMENT-V2] Paystack configuration invalid:', validation.errors);
         return new Response(
           JSON.stringify({
             success: false,
@@ -77,10 +78,10 @@ serve(async (req) => {
       logPaystackConfigStatus(envConfig);
       finalSecretKey = envConfig.secretKey;
       
-      console.log('[VERIFY-PAYMENT] Using environment-specific key:', finalSecretKey.substring(0, 10) + '...');
+      console.log('[VERIFY-PAYMENT-V2] Using environment-specific key:', finalSecretKey.substring(0, 10) + '...');
       
     } catch (configError) {
-      console.error('[VERIFY-PAYMENT] Environment config failed:', configError);
+      console.error('[VERIFY-PAYMENT-V2] Environment config failed:', configError);
       
       // Fallback to legacy environment variable
       const fallbackKey = Deno.env.get('PAYSTACK_SECRET_KEY');
@@ -100,7 +101,7 @@ serve(async (req) => {
       }
       
       finalSecretKey = fallbackKey;
-      console.log('[VERIFY-PAYMENT] Using fallback PAYSTACK_SECRET_KEY');
+      console.log('[VERIFY-PAYMENT-V2] Using fallback PAYSTACK_SECRET_KEY');
     }
 
     const { reference, order_id } = await req.json() as VerificationRequest
@@ -119,7 +120,7 @@ serve(async (req) => {
       )
     }
 
-    console.log('[VERIFY-PAYMENT] Verifying payment with Paystack -', { reference })
+    console.log('[VERIFY-PAYMENT-V2] Verifying payment with Paystack:', { reference })
 
     // Verify with Paystack API first
     const paystackResponse = await fetch(
@@ -134,7 +135,7 @@ serve(async (req) => {
     )
 
     if (!paystackResponse.ok) {
-      console.error('[VERIFY-PAYMENT] Paystack API error:', paystackResponse.status)
+      console.error('[VERIFY-PAYMENT-V2] Paystack API error:', paystackResponse.status)
       return new Response(
         JSON.stringify({
           success: false,
@@ -151,7 +152,7 @@ serve(async (req) => {
     const paystackData: PaystackVerificationResponse = await paystackResponse.json()
 
     if (!paystackData.status) {
-      console.error('[VERIFY-PAYMENT] Paystack verification failed:', paystackData.message)
+      console.error('[VERIFY-PAYMENT-V2] Paystack verification failed:', paystackData.message)
       return new Response(
         JSON.stringify({
           success: false,
@@ -168,7 +169,7 @@ serve(async (req) => {
     const transaction = paystackData.data
     const isSuccessful = transaction.status === 'success'
 
-    console.log('[VERIFY-PAYMENT] Paystack verification response -', {
+    console.log('[VERIFY-PAYMENT-V2] Paystack verification response:', {
       status: transaction.status,
       amount: transaction.amount,
       reference: transaction.reference,
@@ -190,60 +191,26 @@ serve(async (req) => {
       )
     }
 
-    console.log('[VERIFY-PAYMENT] Payment confirmed, updating order status')
+    console.log('[VERIFY-PAYMENT-V2] Payment confirmed, using secure RPC to update order')
 
-    // Find and update order with enhanced lookup
-    let order = null
-    
-    // Try multiple lookup strategies
-    if (order_id) {
-      // Strategy 1: Direct order ID lookup
-      const { data: orderById, error: orderError } = await supabaseClient
-        .from('orders')
-        .select('*')
-        .eq('id', order_id)
-        .single()
-      
-      if (orderById && !orderError) {
-        order = orderById
-        console.log('[VERIFY-PAYMENT] Found order by ID:', order.id)
+    // Use the secure RPC instead of direct table updates
+    const { data: rpcResult, error: rpcError } = await supabaseClient.rpc(
+      'verify_and_update_payment_status',
+      {
+        payment_ref: reference,
+        new_status: 'confirmed',
+        payment_amount: transaction.amount / 100, // Convert from kobo to Naira
+        payment_gateway_response: transaction
       }
+    );
+
+    if (rpcError) {
+      console.error('[VERIFY-PAYMENT-V2] RPC failed:', rpcError);
+      throw new Error(`Payment verification RPC failed: ${rpcError.message}`);
     }
 
-    if (!order) {
-      // Strategy 2: Lookup by payment reference  
-      const { data: orderByRef, error: refError } = await supabaseClient
-        .from('orders')
-        .select('*')
-        .or(`payment_reference.eq.${reference},paystack_reference.eq.${reference}`)
-        .single()
-      
-      if (orderByRef && !refError) {
-        order = orderByRef
-        console.log('[VERIFY-PAYMENT] Found order by reference:', order.id)
-      }
-    }
-
-    if (!order) {
-      // Strategy 3: Lookup by amount and recent timestamp
-      const amount = transaction.amount / 100 // Convert from kobo
-      const { data: ordersByAmount, error: amountError } = await supabaseClient
-        .from('orders')
-        .select('*')
-        .eq('total_amount', amount)
-        .eq('payment_status', 'pending')
-        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-        .order('created_at', { ascending: false })
-        .limit(1)
-
-      if (ordersByAmount && ordersByAmount.length > 0 && !amountError) {
-        order = ordersByAmount[0]
-        console.log('[VERIFY-PAYMENT] Found order by amount/time match:', order.id)
-      }
-    }
-
-    if (!order) {
-      console.error('[VERIFY-PAYMENT] Order not found for reference:', reference)
+    if (!rpcResult || rpcResult.length === 0) {
+      console.error('[VERIFY-PAYMENT-V2] No order found for reference:', reference);
       
       // Create orphaned payment record
       try {
@@ -261,9 +228,9 @@ serve(async (req) => {
             }
           })
         
-        console.log('[VERIFY-PAYMENT] Created orphaned payment record')
+        console.log('[VERIFY-PAYMENT-V2] Created orphaned payment record')
       } catch (orphanError) {
-        console.error('[VERIFY-PAYMENT] Failed to create orphaned payment record:', orphanError)
+        console.error('[VERIFY-PAYMENT-V2] Failed to create orphaned payment record:', orphanError)
       }
 
       return new Response(
@@ -280,30 +247,21 @@ serve(async (req) => {
       )
     }
 
-    // Update order status
-    const { error: updateError } = await supabaseClient
-      .from('orders')
-      .update({
-        payment_status: 'paid',
-        status: 'confirmed',
-        paystack_reference: transaction.reference,
-        paid_at: new Date(transaction.paid_at),
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', order.id)
+    const orderResult = rpcResult[0];
+    
+    console.log('[VERIFY-PAYMENT-V2] Order updated successfully via RPC:', {
+      orderNumber: orderResult.order_number,
+      paymentStatus: 'paid',
+      orderStatus: orderResult.status
+    })
 
-    if (updateError) {
-      console.error('[VERIFY-PAYMENT] Failed to update order:', updateError.message)
-      throw new Error(`Failed to update order: ${updateError.message}`)
-    }
-
-    // Create/update payment transaction record
+    // Create/update payment transaction record (non-blocking)
     try {
       await supabaseClient
         .from('payment_transactions')
         .upsert({
           provider_reference: transaction.reference,
-          order_id: order.id,
+          order_id: orderResult.order_id,
           amount: transaction.amount / 100,
           currency: transaction.currency || 'NGN',
           status: 'paid',
@@ -315,25 +273,13 @@ serve(async (req) => {
           onConflict: 'provider_reference'
         })
       
-      console.log('[VERIFY-PAYMENT] Payment transaction record updated')
+      console.log('[VERIFY-PAYMENT-V2] Payment transaction record updated')
     } catch (transactionError) {
-      console.error('[VERIFY-PAYMENT] Failed to update payment transaction:', transactionError)
+      console.error('[VERIFY-PAYMENT-V2] Failed to update payment transaction:', transactionError)
       // Don't fail verification if transaction record update fails
     }
 
-    // REMOVED: Delivery analytics update that was causing failures
-    // The delivery_analytics table structure was inconsistent and causing crashes
-    // This functionality should be handled by a separate analytics service
-
-    console.log('[VERIFY-PAYMENT] Order updated successfully -', {
-      orderNumber: order.order_number,
-      paymentStatus: 'paid',
-      orderStatus: 'confirmed'
-    })
-
-    // Trigger email processors to handle confirmation emails (via database trigger)
-    // The database trigger `trigger_payment_confirmation_email` will queue the email
-    // Now immediately trigger email processors to send it
+    // Trigger email processors to handle confirmation emails (non-blocking)
     try {
       await Promise.all([
         supabaseClient.functions.invoke('enhanced-email-processor', {
@@ -343,9 +289,9 @@ serve(async (req) => {
           headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` }
         })
       ]);
-      console.log('Email processors triggered successfully');
+      console.log('[VERIFY-PAYMENT-V2] Email processors triggered successfully');
     } catch (emailError) {
-      console.log('Failed to trigger email processors:', emailError);
+      console.log('[VERIFY-PAYMENT-V2] Failed to trigger email processors:', emailError);
       // Don't fail payment verification if email processing fails
     }
 
@@ -354,7 +300,8 @@ serve(async (req) => {
         success: true,
         payment_status: transaction.status,
         reference: transaction.reference,
-        order_id: order.id,
+        order_id: orderResult.order_id,
+        order_number: orderResult.order_number,
         amount: transaction.amount / 100,
         paid_at: transaction.paid_at,
         channel: transaction.channel,
@@ -367,10 +314,10 @@ serve(async (req) => {
     )
 
   } catch (error) {
-    console.error('[VERIFY-PAYMENT] ERROR in verify-payment - ' + JSON.stringify({
+    console.error('[VERIFY-PAYMENT-V2] ERROR in verify-payment:', {
       message: error.message,
       stack: error.stack
-    }))
+    })
     
     return new Response(
       JSON.stringify({
@@ -388,11 +335,12 @@ serve(async (req) => {
 })
 
 /*
-🔧 HOTFIXED VERIFY-PAYMENT FUNCTION
-- ✅ Removed delivery_analytics dependency that was causing crashes
-- ✅ Enhanced order lookup with multiple strategies (ID, reference, amount+time)
-- ✅ Graceful error handling for all database operations
+🔧 PRODUCTION-READY VERIFY-PAYMENT V2
+- ✅ Uses secure RPC verify_and_update_payment_status instead of direct table updates
+- ✅ No direct interaction with delivery_analytics or problematic triggers
+- ✅ Enhanced error handling and logging with V2 tags
+- ✅ Non-blocking email processing and transaction record updates
 - ✅ Creates orphaned payment records for unmatched payments
-- ✅ Email sending failure won't block payment verification
-- ✅ Comprehensive logging for debugging
+- ✅ Uses SUPABASE_SERVICE_ROLE_KEY for all operations
+- ✅ Comprehensive logging for debugging production issues
 */

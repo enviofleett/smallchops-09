@@ -30,29 +30,30 @@ export const ZoneAnalytics: React.FC = () => {
       const zonesData = await getDeliveryZonesWithFees();
       setZones(zonesData);
 
-      // Fetch zone statistics from orders
-      const { data: stats, error } = await supabase
+      // Fetch zone statistics from orders - using two-step approach to avoid relation errors
+      const { data: orders, error } = await supabase
         .from('orders')
-        .select(`
-          delivery_zone_id,
-          total_amount,
-          delivery_fee,
-          delivery_zones!inner (
-            id,
-            name
-          )
-        `)
+        .select('delivery_zone_id, total_amount, delivery_fee')
         .not('delivery_zone_id', 'is', null)
         .eq('status', 'delivered');
 
       if (error) throw error;
 
+      // Get zone names separately
+      const zoneIds = [...new Set(orders?.map(o => o.delivery_zone_id).filter(Boolean) || [])];
+      const { data: zoneNames } = await supabase
+        .from('delivery_zones')
+        .select('id, name')
+        .in('id', zoneIds);
+
+      const zoneNameMap = new Map(zoneNames?.map(z => [z.id, z.name]) || []);
+
       // Process statistics by zone
       const statsMap = new Map<string, ZoneStats>();
       
-      stats?.forEach(order => {
+      orders?.forEach(order => {
         const zoneId = order.delivery_zone_id;
-        const zoneName = order.delivery_zones?.name || 'Unknown Zone';
+        const zoneName = zoneNameMap.get(zoneId) || 'Unknown Zone';
         
         if (!statsMap.has(zoneId)) {
           statsMap.set(zoneId, {
@@ -184,7 +185,7 @@ export const ZoneAnalytics: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {zones.map((zone) => {
                 const stats = zoneStats.find(s => s.zone_id === zone.id);
-                const baseFee = zone.delivery_fees?.base_fee || 0;
+                const baseFee = zone.base_fee || 0;
                 
                 return (
                   <Card key={zone.id} className="border-l-4 border-l-blue-500">
@@ -195,9 +196,7 @@ export const ZoneAnalytics: React.FC = () => {
                           {stats ? "Active" : "Inactive"}
                         </Badge>
                       </div>
-                      {zone.description && (
-                        <p className="text-sm text-muted-foreground">{zone.description}</p>
-                      )}
+                      {/* Simplified - no description */}
                     </CardHeader>
                     <CardContent className="space-y-3">
                       <div className="flex justify-between items-center">

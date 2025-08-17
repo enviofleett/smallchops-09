@@ -42,85 +42,58 @@ serve(async (req) => {
     }
 
     console.log('✅ Payment verified successfully with Paystack');
+    
+    // Get payment amount from Paystack for verification
+    const paystackAmount = verificationResult.data?.amount ? verificationResult.data.amount / 100 : null;
 
-    // Step 2: Get order details BEFORE processing
-    const { data: orderData, error: orderError } = await supabase
-      .from('orders')
-      .select(`
-        *,
-        order_items (
-          id,
-          product_id,
-          quantity,
-          unit_price,
-          product_name
-        )
-      `)
-      .eq('payment_reference', reference)
-      .single();
+    // Step 2: Use secure RPC to verify and update payment status
+    const { data: orderResult, error: rpcError } = await supabase
+      .rpc('verify_and_update_payment_status', {
+        payment_ref: reference,
+        new_status: 'confirmed',
+        payment_amount: paystackAmount,
+        payment_gateway_response: verificationResult.data
+      });
 
-    if (orderError || !orderData) {
-      console.error('❌ Order not found:', orderError);
-      return createErrorResponse('Order not found', 404);
+    if (rpcError) {
+      console.error('❌ RPC verification failed:', rpcError);
+      return createErrorResponse(`Payment verification failed: ${rpcError.message}`, 500);
     }
 
-    console.log(`📦 Processing ${orderData.order_type} order:`, orderData.id);
-
-    // Step 3: Process based on fulfillment type
-    let updateData = {
-      status: 'confirmed',
-      payment_status: 'paid',
-      payment_verified_at: new Date().toISOString()
-    };
-
-    // Handle delivery-specific processing
-    if (orderData.order_type === 'delivery') {
-      console.log('🚚 Processing delivery order...');
-      
-      try {
-        const deliveryUpdate = await processDeliveryOrder(orderData, supabase);
-        updateData = { ...updateData, ...deliveryUpdate };
-        console.log('✅ Delivery processing completed');
-      } catch (deliveryError) {
-        console.error('❌ Delivery processing failed:', deliveryError.message);
-        // Don't fail the entire callback - continue with basic completion
-        console.log('⚠️ Continuing with basic order completion despite delivery error');
-      }
-    } else {
-      console.log('🏪 Processing pickup order...');
-      // Pickup orders need minimal processing
-      updateData.pickup_ready = true;
+    if (!orderResult || orderResult.length === 0) {
+      console.error('❌ No order data returned from RPC');
+      return createErrorResponse('Order processing failed', 500);
     }
 
-    // Step 4: Update order status
-    const { error: updateError } = await supabase
-      .from('orders')
-      .update(updateData)
-      .eq('id', orderData.id);
+    const orderData = orderResult[0];
+    console.log(`✅ Order ${orderData.order_number} confirmed via secure RPC`);
 
-    if (updateError) {
-      console.error('❌ Order update failed:', updateError);
-      return createErrorResponse(`Order update failed: ${updateError.message}`, 500);
-    }
-
-    // Step 5: Update payment transaction
-    const { error: paymentError } = await supabase
-      .from('payment_transactions')
-      .update({
-        status: 'completed',
-        verified_at: new Date().toISOString()
-      })
-      .eq('reference', reference);
-
-    if (paymentError) {
-      console.error('⚠️ Payment transaction update failed (non-blocking):', paymentError);
-      // Don't fail callback for this
+    // Step 3: Optional non-blocking operations (don't fail callback on these)
+    try {
+      // Update payment transaction record if it exists
+      await supabase
+        .from('payment_transactions')
+        .upsert({
+          reference: reference,
+          provider_reference: reference,
+          amount: paystackAmount || orderData.amount,
+          currency: 'NGN',
+          status: 'completed',
+          gateway_response: JSON.stringify(verificationResult.data),
+          verified_at: new Date().toISOString(),
+          order_id: orderData.order_id
+        }, {
+          onConflict: 'reference'
+        });
+    } catch (txnError) {
+      console.error('⚠️ Payment transaction update failed (non-blocking):', txnError);
+      // Continue - this shouldn't fail the callback
     }
 
     console.log('✅ Payment callback completed successfully');
 
-    // Step 6: Redirect to success page
-    const successUrl = `${Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com'}/checkout/success?ref=${reference}&order=${orderData.id}`;
+    // Step 4: Always redirect to success page (302)
+    const successUrl = `${Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com'}/checkout/success?ref=${reference}&order=${orderData.order_id}`;
     
     return new Response(null, {
       status: 302,

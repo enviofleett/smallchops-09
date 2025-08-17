@@ -4,20 +4,16 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
 import { 
   MapPin, 
   DollarSign, 
   TestTube, 
   Database, 
   ShoppingCart,
-  FileText,
   CheckCircle,
-  AlertCircle,
   Code
 } from "lucide-react";
 import { toast } from "sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { getDeliveryZonesWithFees, upsertDeliveryZoneWithFee } from "@/api/delivery";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -41,12 +37,11 @@ export const DeliveryZoneDevTools = () => {
       return upsertDeliveryZoneWithFee({
         zone: {
           name: testZoneName,
-          description: `Test zone: ${testZoneName}`,
-          area: {},
+          base_fee: parseFloat(testZoneFee),
+          is_active: true
         },
         fee: {
-          base_fee: parseFloat(testZoneFee),
-          min_order_for_free_delivery: 5000,
+          base_fee: parseFloat(testZoneFee)
         }
       });
     },
@@ -64,21 +59,20 @@ export const DeliveryZoneDevTools = () => {
   const generateSampleZones = useMutation({
     mutationFn: async () => {
       const sampleZones = [
-        { name: "Downtown", fee: 500, description: "Central business district" },
-        { name: "Airport", fee: 1500, description: "Airport vicinity" },
-        { name: "Suburbs", fee: 800, description: "Suburban areas" },
+        { name: "Downtown", fee: 500 },
+        { name: "Airport", fee: 1500 },
+        { name: "Suburbs", fee: 800 },
       ];
 
       for (const zone of sampleZones) {
         await upsertDeliveryZoneWithFee({
           zone: {
             name: zone.name,
-            description: zone.description,
-            area: {},
+            base_fee: zone.fee,
+            is_active: true
           },
           fee: {
-            base_fee: zone.fee,
-            min_order_for_free_delivery: 5000,
+            base_fee: zone.fee
           }
         });
       }
@@ -104,7 +98,7 @@ export const DeliveryZoneDevTools = () => {
 
     const productSubtotal = orderValue;
     const tax = productSubtotal * taxRate;
-    const shippingFee = selectedZone.delivery_fees?.base_fee || 0;
+    const shippingFee = selectedZone.base_fee || 0;
     const total = productSubtotal + tax + shippingFee;
 
     toast.success(`Test Calculation Complete:
@@ -271,7 +265,7 @@ export const DeliveryZoneDevTools = () => {
                     <MapPin className="w-4 h-4 text-muted-foreground" />
                     <div>
                       <div className="font-medium">{zone.name}</div>
-                      <div className="text-sm text-muted-foreground">{zone.description}</div>
+                      <div className="text-sm text-muted-foreground">Zone ID: {zone.id}</div>
                     </div>
                   </div>
                   <div className="flex items-center space-x-2">
@@ -279,7 +273,7 @@ export const DeliveryZoneDevTools = () => {
                       Active
                     </Badge>
                     <div className="text-right">
-                      <div className="font-medium">₦{zone.delivery_fees?.base_fee?.toLocaleString() || 0}</div>
+                      <div className="font-medium">₦{zone.base_fee?.toLocaleString() || 0}</div>
                       <div className="text-xs text-muted-foreground">Base Fee</div>
                     </div>
                   </div>
@@ -305,9 +299,8 @@ export const DeliveryZoneDevTools = () => {
           <div className="bg-muted p-4 rounded-lg">
             <h4 className="font-medium mb-2">Database Tables</h4>
             <div className="space-y-2 text-sm font-mono">
-              <div>• delivery_zones (id, name, description, is_active)</div>
-              <div>• delivery_fees (zone_id, base_fee, minimum_order_for_free_delivery)</div>
-              <div>• orders (delivery_zone_id, shipping_fee)</div>
+              <div>• delivery_zones (id, name, base_fee, is_active)</div>
+              <div>• orders (delivery_zone_id, delivery_fee)</div>
             </div>
           </div>
           

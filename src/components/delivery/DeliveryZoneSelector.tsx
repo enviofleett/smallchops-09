@@ -39,16 +39,8 @@ export const DeliveryZoneSelector: React.FC<DeliveryZoneSelectorProps> = ({
   };
 
   const calculateDeliveryFee = (zone: DeliveryZoneWithFee): number => {
-    if (!zone.delivery_fees) return 0;
-    
-    const { base_fee, min_order_for_free_delivery } = zone.delivery_fees;
-    
-    // Check if order qualifies for free delivery
-    if (min_order_for_free_delivery && orderSubtotal >= min_order_for_free_delivery) {
-      return 0;
-    }
-    
-    return base_fee;
+    // Return the base fee directly from the zone
+    return zone.base_fee || 0;
   };
 
   const handleZoneSelect = (zoneId: string) => {
@@ -108,7 +100,7 @@ export const DeliveryZoneSelector: React.FC<DeliveryZoneSelectorProps> = ({
           <div className="space-y-3">
             {zones.map((zone) => {
               const deliveryFee = calculateDeliveryFee(zone);
-              const isFreeDelivery = deliveryFee === 0 && zone.delivery_fees?.min_order_for_free_delivery;
+              const isFreeDelivery = false; // Simplified - no free delivery thresholds
               
               return (
                 <div key={zone.id} className="flex items-start space-x-3 p-3 border rounded-lg hover:bg-muted/50">
@@ -127,16 +119,7 @@ export const DeliveryZoneSelector: React.FC<DeliveryZoneSelectorProps> = ({
                         </Badge>
                       )}
                     </Label>
-                    {zone.description && (
-                      <p className="text-sm text-muted-foreground">
-                        {zone.description}
-                      </p>
-                    )}
-                    {zone.delivery_fees?.min_order_for_free_delivery && (
-                      <p className="text-xs text-muted-foreground">
-                        Free delivery on orders above ₦{zone.delivery_fees.min_order_for_free_delivery.toFixed(2)}
-                      </p>
-                    )}
+                    {/* Simplified zone display - no description or free delivery thresholds */}
                   </div>
                 </div>
               );

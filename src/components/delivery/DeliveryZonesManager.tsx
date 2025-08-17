@@ -13,10 +13,7 @@ import { getDeliveryZonesWithFees, upsertDeliveryZoneWithFee, deleteDeliveryZone
 interface ZoneFormData {
   id?: string;
   name: string;
-  description: string;
   base_fee: number;
-  fee_per_km: number;
-  min_order_for_free_delivery: number;
 }
 
 export const DeliveryZonesManager: React.FC = () => {
@@ -26,10 +23,7 @@ export const DeliveryZonesManager: React.FC = () => {
   const [editingZone, setEditingZone] = useState<DeliveryZoneWithFee | null>(null);
   const [formData, setFormData] = useState<ZoneFormData>({
     name: '',
-    description: '',
-    base_fee: 0,
-    fee_per_km: 0,
-    min_order_for_free_delivery: 0
+    base_fee: 0
   });
 
   useEffect(() => {
@@ -64,15 +58,13 @@ export const DeliveryZonesManager: React.FC = () => {
       const zoneData = {
         id: editingZone?.id,
         name: formData.name,
-        description: formData.description,
-        area: { type: 'polygon', coordinates: [] } // Basic GeoJSON structure
+        base_fee: formData.base_fee,
+        is_active: true
       };
 
       const feeData = {
-        id: editingZone?.delivery_fees?.id,
-        base_fee: formData.base_fee,
-        fee_per_km: formData.fee_per_km || null,
-        min_order_for_free_delivery: formData.min_order_for_free_delivery || null
+        id: editingZone?.id,
+        base_fee: formData.base_fee
       };
 
       await upsertDeliveryZoneWithFee({ zone: zoneData, fee: feeData });
@@ -92,10 +84,7 @@ export const DeliveryZonesManager: React.FC = () => {
     setFormData({
       id: zone.id,
       name: zone.name,
-      description: zone.description || '',
-      base_fee: zone.delivery_fees?.base_fee || 0,
-      fee_per_km: zone.delivery_fees?.fee_per_km || 0,
-      min_order_for_free_delivery: zone.delivery_fees?.min_order_for_free_delivery || 0
+      base_fee: zone.base_fee || 0
     });
     setDialogOpen(true);
   };
@@ -118,10 +107,7 @@ export const DeliveryZonesManager: React.FC = () => {
   const resetForm = () => {
     setFormData({
       name: '',
-      description: '',
-      base_fee: 0,
-      fee_per_km: 0,
-      min_order_for_free_delivery: 0
+      base_fee: 0
     });
     setEditingZone(null);
   };
@@ -160,15 +146,6 @@ export const DeliveryZonesManager: React.FC = () => {
                 />
               </div>
               <div>
-                <Label htmlFor="description">Description</Label>
-                <Input
-                  id="description"
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Brief description of the zone"
-                />
-              </div>
-              <div>
                 <Label htmlFor="base_fee">Base Delivery Fee (₦) *</Label>
                 <Input
                   id="base_fee"
@@ -177,30 +154,6 @@ export const DeliveryZonesManager: React.FC = () => {
                   step="0.01"
                   value={formData.base_fee}
                   onChange={(e) => setFormData(prev => ({ ...prev, base_fee: parseFloat(e.target.value) || 0 }))}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <Label htmlFor="fee_per_km">Fee per KM (₦)</Label>
-                <Input
-                  id="fee_per_km"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.fee_per_km}
-                  onChange={(e) => setFormData(prev => ({ ...prev, fee_per_km: parseFloat(e.target.value) || 0 }))}
-                  placeholder="0.00"
-                />
-              </div>
-              <div>
-                <Label htmlFor="min_order">Min Order for Free Delivery (₦)</Label>
-                <Input
-                  id="min_order"
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={formData.min_order_for_free_delivery}
-                  onChange={(e) => setFormData(prev => ({ ...prev, min_order_for_free_delivery: parseFloat(e.target.value) || 0 }))}
                   placeholder="0.00"
                 />
               </div>
@@ -236,10 +189,8 @@ export const DeliveryZonesManager: React.FC = () => {
               <TableHeader>
                 <TableRow>
                   <TableHead>Zone Name</TableHead>
-                  <TableHead>Description</TableHead>
                   <TableHead>Base Fee</TableHead>
-                  <TableHead>Per KM</TableHead>
-                  <TableHead>Free Delivery Min</TableHead>
+                  <TableHead>Status</TableHead>
                   <TableHead>Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -247,25 +198,15 @@ export const DeliveryZonesManager: React.FC = () => {
                 {zones.map((zone) => (
                   <TableRow key={zone.id}>
                     <TableCell className="font-medium">{zone.name}</TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {zone.description || 'No description'}
-                    </TableCell>
                     <TableCell>
                       <Badge variant="secondary">
-                        ₦{zone.delivery_fees?.base_fee?.toFixed(2) || '0.00'}
+                        ₦{zone.base_fee?.toFixed(2) || '0.00'}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      {zone.delivery_fees?.fee_per_km ? 
-                        `₦${zone.delivery_fees.fee_per_km.toFixed(2)}` : 
-                        'N/A'
-                      }
-                    </TableCell>
-                    <TableCell>
-                      {zone.delivery_fees?.min_order_for_free_delivery ? 
-                        `₦${zone.delivery_fees.min_order_for_free_delivery.toFixed(2)}` : 
-                        'N/A'
-                      }
+                      <Badge variant={zone.is_active ? "default" : "secondary"}>
+                        {zone.is_active ? 'Active' : 'Inactive'}
+                      </Badge>
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-2">

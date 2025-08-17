@@ -286,14 +286,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const login = async ({ email, password, captchaToken }: LoginCredentials) => {
+  const login = async ({ email, password }: LoginCredentials) => {
     try {
       const signInOptions: any = { email, password };
-      
-      // Include CAPTCHA token if provided
-      if (captchaToken) {
-        signInOptions.options = { captchaToken };
-      }
       
       const { data, error } = await supabase.auth.signInWithPassword(signInOptions);
       
@@ -329,7 +324,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const signUp = async ({ email, password, name, phone, captchaToken }: LoginCredentials & { name: string; phone?: string }) => {
+  const signUp = async ({ email, password, name, phone }: LoginCredentials & { name: string; phone?: string }) => {
     try {
       const redirectUrl = `${window.location.origin}/auth/callback`;
       const userData: Record<string, any> = { 
@@ -350,11 +345,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
           data: userData,
         },
       };
-
-      // Include CAPTCHA token if provided
-      if (captchaToken) {
-        signUpOptions.options.captchaToken = captchaToken;
-      }
 
       const { data, error } = await supabase.auth.signUp(signUpOptions);
 

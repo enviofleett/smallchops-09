@@ -29,13 +29,6 @@ export const useCustomerDirectAuth = () => {
         email,
         password,
       };
-
-      // Include Turnstile CAPTCHA token if provided
-      if (captchaToken) {
-        signInOptions.options = {
-          captchaToken
-        };
-      }
       
       const { data, error } = await supabase.auth.signInWithPassword(signInOptions);
 
@@ -94,7 +87,7 @@ export const useCustomerDirectAuth = () => {
         return { success: false, error: message };
       }
 
-      // Prepare signup options with CAPTCHA token
+      // Prepare signup options
       const signUpOptions: any = {
         email: data.email,
         password: data.password,
@@ -106,11 +99,6 @@ export const useCustomerDirectAuth = () => {
           }
         }
       };
-
-      // Include Turnstile CAPTCHA token if provided
-      if (captchaToken) {
-        signUpOptions.options.captchaToken = captchaToken;
-      }
 
       // Use secure signUp with password (not signInWithOtp)
       const { data: authData, error: authError } = await supabase.auth.signUp(signUpOptions);
@@ -218,11 +206,6 @@ export const useCustomerDirectAuth = () => {
           redirectTo: `${window.location.origin}/auth-callback`
         }
       };
-
-      // Include Turnstile CAPTCHA token if provided
-      if (captchaToken) {
-        oauthOptions.options.captchaToken = captchaToken;
-      }
       
       const { error } = await supabase.auth.signInWithOAuth(oauthOptions);
 

@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone } from 'lucide-react';
+import { formatAddressMultiline } from '@/utils/formatAddress';
+import { format } from 'date-fns';
 
 interface OrderItem {
   id: string;
@@ -58,11 +60,23 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 }) => {
   if (!order) return null;
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-NG', {
-      style: 'currency',
-      currency: 'NGN',
-    }).format(amount);
+  const formatCurrency = (value: number | string | null | undefined) => {
+    const n = Number(value);
+    const safe = Number.isFinite(n) ? n : 0;
+    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(safe);
+  };
+
+  const formatTime = (timeString: string) => {
+    if (!timeString) return '';
+    try {
+      // Handle both "HH:mm" and "HH:mm:ss" formats
+      const [hours, minutes] = timeString.split(':');
+      const date = new Date();
+      date.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      return format(date, 'h:mm a');
+    } catch {
+      return timeString;
+    }
   };
 
   const formatDateTime = (dateString: string) => {
@@ -99,13 +113,34 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     return colors[status as keyof typeof colors] || 'bg-muted text-muted-foreground';
   };
 
-  const subtotal = order.order_items.reduce((sum, item) => sum + item.total_price, 0);
-  const totalVat = order.order_items.reduce((sum, item) => sum + (item.vat_amount || 0), 0);
-  const totalDiscount = order.order_items.reduce((sum, item) => sum + (item.discount_amount || 0), 0);
+  const subtotal = order.order_items.reduce((sum, item) => sum + Number(item.total_price ?? Number(item.unit_price ?? 0) * Number(item.quantity ?? 0)), 0);
+  const totalVat = order.order_items.reduce((sum, item) => sum + Number(item.vat_amount ?? 0), 0);
+  const totalDiscount = order.order_items.reduce((sum, item) => sum + Number(item.discount_amount ?? 0), 0);
+
+  // Helper to get delivery location
+  const getDeliveryLocation = () => {
+    if (deliverySchedule?.delivery_zone) {
+      return deliverySchedule.delivery_zone;
+    }
+    if (order.delivery_address) {
+      try {
+        const addr = typeof order.delivery_address === 'string' 
+          ? JSON.parse(order.delivery_address) 
+          : order.delivery_address;
+        const parts = [];
+        if (addr.city) parts.push(addr.city);
+        if (addr.state) parts.push(addr.state);
+        return parts.join(', ') || 'N/A';
+      } catch {
+        return 'N/A';
+      }
+    }
+    return 'N/A';
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-4 sm:p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-3">
             <Package className="h-5 w-5 text-primary" />
@@ -115,7 +150,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
 
         <div className="space-y-6">
           {/* Order Header */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <Card>
               <CardContent className="pt-4">
                 <div className="space-y-2">
@@ -181,21 +216,21 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                           </p>
                         )}
                       </div>
-                      <div className="text-right ml-4">
-                        <p className="font-medium">{formatCurrency(item.total_price)}</p>
+                      <div className="text-right ml-4 min-w-0">
+                        <p className="font-medium">{formatCurrency(Number(item.total_price ?? 0))}</p>
                         <p className="text-sm text-muted-foreground">
-                          {item.quantity} × {formatCurrency(item.unit_price)}
+                          {Number(item.quantity ?? 0)} × {formatCurrency(Number(item.unit_price ?? 0))}
                         </p>
                       </div>
                     </div>
                     
-                    {(item.vat_amount || item.discount_amount) && (
+                    {(Number(item.vat_amount ?? 0) > 0 || Number(item.discount_amount ?? 0) > 0) && (
                       <div className="flex justify-between text-sm text-muted-foreground pt-2 border-t">
-                        {item.vat_amount > 0 && (
-                          <span>VAT: {formatCurrency(item.vat_amount)}</span>
+                        {Number(item.vat_amount ?? 0) > 0 && (
+                          <span>VAT: {formatCurrency(Number(item.vat_amount ?? 0))}</span>
                         )}
-                        {item.discount_amount > 0 && (
-                          <span>Discount: -{formatCurrency(item.discount_amount)}</span>
+                        {Number(item.discount_amount ?? 0) > 0 && (
+                          <span>Discount: -{formatCurrency(Number(item.discount_amount ?? 0))}</span>
                         )}
                       </div>
                     )}
@@ -241,7 +276,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Payment Method</p>
                   <p className="font-medium">{order.payment_method || 'Online Payment'}</p>
@@ -277,13 +312,10 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     <div>
                       <div className="flex items-start gap-2">
                         <MapPin className="h-4 w-4 text-muted-foreground mt-1" />
-                        <div>
+                        <div className="min-w-0 flex-1">
                           <p className="text-sm text-muted-foreground">Delivery Address</p>
-                          <p className="font-medium">
-                            {typeof order.delivery_address === 'string' 
-                              ? order.delivery_address 
-                              : JSON.stringify(order.delivery_address)
-                            }
+                          <p className="font-medium whitespace-pre-line break-words">
+                            {formatAddressMultiline(order.delivery_address)}
                           </p>
                         </div>
                       </div>
@@ -291,7 +323,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   )}
 
                   {/* Fulfillment Channel */}
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                     <div>
                       <div className="flex items-center gap-2">
                         {order.order_type === 'delivery' ? (
@@ -299,7 +331,7 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                         ) : (
                           <Package className="h-4 w-4 text-muted-foreground" />
                         )}
-                        <div>
+                        <div className="min-w-0">
                           <p className="text-sm text-muted-foreground">Fulfillment Channel</p>
                           <p className="font-medium">
                             {order.order_type === 'delivery' ? 'Home Delivery' : 'Store Pickup'}
@@ -317,12 +349,25 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     </div>
                   </div>
 
+                  {/* Delivery Location - only for delivery orders */}
+                  {order.order_type === 'delivery' && (
+                    <div className="mb-4">
+                      <div className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4 text-muted-foreground" />
+                        <div className="min-w-0">
+                          <p className="text-sm text-muted-foreground">Delivery Location</p>
+                          <p className="font-medium break-words">{getDeliveryLocation()}</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {deliverySchedule && (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <div className="flex items-center gap-2">
                           <Calendar className="h-4 w-4 text-muted-foreground" />
-                          <div>
+                          <div className="min-w-0">
                             <p className="text-sm text-muted-foreground">Delivery Date</p>
                             <p className="font-medium">
                               {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG')}
@@ -333,10 +378,10 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       <div>
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm text-muted-foreground">Delivery Time</p>
+                          <div className="min-w-0">
+                            <p className="text-sm text-muted-foreground">Delivery Window</p>
                             <p className="font-medium">
-                              {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                              {formatTime(deliverySchedule.delivery_time_start)} - {formatTime(deliverySchedule.delivery_time_end)}
                             </p>
                           </div>
                         </div>
@@ -344,19 +389,19 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                       {deliverySchedule.delivery_zone && (
                         <div>
                           <p className="text-sm text-muted-foreground">Delivery Zone</p>
-                          <p className="font-medium">{deliverySchedule.delivery_zone}</p>
+                          <p className="font-medium break-words">{deliverySchedule.delivery_zone}</p>
                         </div>
                       )}
                       {deliverySchedule.delivery_fee && (
                         <div>
                           <p className="text-sm text-muted-foreground">Delivery Fee</p>
-                          <p className="font-medium">{formatCurrency(deliverySchedule.delivery_fee)}</p>
+                          <p className="font-medium">{formatCurrency(Number(deliverySchedule.delivery_fee ?? 0))}</p>
                         </div>
                       )}
                       {deliverySchedule.special_instructions && (
-                        <div className="md:col-span-2">
+                        <div className="sm:col-span-2">
                           <p className="text-sm text-muted-foreground">Special Instructions</p>
-                          <p className="font-medium">{deliverySchedule.special_instructions}</p>
+                          <p className="font-medium break-words">{deliverySchedule.special_instructions}</p>
                         </div>
                       )}
                     </div>

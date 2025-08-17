@@ -37,8 +37,10 @@ export function OrderItemsBreakdown({
   showDetailed = true,
   className = ""
 }: OrderItemsBreakdownProps) {
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
+  const formatCurrency = (value: number | string | null | undefined) => {
+    const n = Number(value);
+    const safe = Number.isFinite(n) ? n : 0;
+    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(safe);
   };
 
   const formatCustomizations = (customizations: any) => {
@@ -93,11 +95,11 @@ export function OrderItemsBreakdown({
                       )}
                       
                       <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                        <span>Qty: {item.quantity}</span>
-                        <span>Unit: {formatCurrency(item.unit_price)}</span>
-                        {showDetailed && item.discount_amount && item.discount_amount > 0 && (
+                        <span>Qty: {Number(item.quantity ?? 0)}</span>
+                        <span>Unit: {formatCurrency(Number(item.unit_price ?? 0))}</span>
+                        {showDetailed && Number(item.discount_amount ?? 0) > 0 && (
                           <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            -{formatCurrency(item.discount_amount)} discount
+                            -{formatCurrency(Number(item.discount_amount ?? 0))} discount
                           </Badge>
                         )}
                       </div>
@@ -107,11 +109,11 @@ export function OrderItemsBreakdown({
                 
                 <div className="text-right flex-shrink-0">
                   <div className="font-semibold text-gray-900">
-                    {formatCurrency(item.total_price)}
+                    {formatCurrency(Number(item.total_price ?? 0))}
                   </div>
-                  {showDetailed && item.vat_amount && item.vat_amount > 0 && (
+                  {showDetailed && Number(item.vat_amount ?? 0) > 0 && (
                     <div className="text-xs text-gray-500 mt-1">
-                      VAT ({item.vat_rate || 7.5}%): {formatCurrency(item.vat_amount)}
+                      VAT ({item.vat_rate || 7.5}%): {formatCurrency(Number(item.vat_amount ?? 0))}
                     </div>
                   )}
                 </div>

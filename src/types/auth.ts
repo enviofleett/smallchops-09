@@ -1,10 +1,10 @@
 
 export interface User {
   id: string;
-  email: string;
   name: string;
-  role: 'admin' | 'manager' | 'staff' | 'dispatch_rider';
-  avatar_url?: string;
+  role: 'admin' | 'user';
+  avatar_url?: string | null;
+  email: string;
 }
 
 export interface AuthState {
@@ -16,9 +16,4 @@ export interface AuthState {
 export interface LoginCredentials {
   email: string;
   password: string;
-}
-
-export interface SignUpCredentials extends LoginCredentials {
-  name: string;
-  phone?: string;
 }

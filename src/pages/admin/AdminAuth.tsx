@@ -1,307 +1,198 @@
+
 import React, { useState } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { usePasswordReset } from '@/hooks/usePasswordReset';
-import { useToast } from '@/hooks/use-toast';
+import { useNavigate } from 'react-router-dom';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Eye, EyeOff, Mail, Lock, Shield, Loader2, ArrowLeft } from 'lucide-react';
-
-type AdminView = 'login' | 'signup' | 'forgot-password';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, Mail, Lock, User, ArrowLeft } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import startersLogo from '@/assets/starters-logo.png';
 
 const AdminAuth = () => {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [isLogin, setIsLogin] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [error, setError] = useState('');
+  const { login, signUp } = useAuth();
   const { toast } = useToast();
-  const { login: adminLogin, signUp: adminSignUp, isLoading: isAdminLoading } = useAuth();
-  const { sendPasswordReset, isLoading: isPasswordResetLoading } = usePasswordReset();
-  
-  
-  const [view, setView] = useState<AdminView>(() => {
-    return searchParams.get('view') === 'signup' ? 'signup' : 'login';
-  });
-  const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
-    email: '',
-    password: '',
-    role: 'admin'
-  });
+  const navigate = useNavigate();
 
-  const handleInputChange = (field: string, value: string) => {
-    setFormData(prev => ({ ...prev, [field]: value }));
-  };
-
-  const handleAdminLogin = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const result = await adminLogin({ 
-      email: formData.email, 
-      password: formData.password
-    });
-    
-    if (result.success && result.redirect) {
-      navigate(result.redirect);
+    setError('');
+    setIsLoading(true);
+
+    try {
+      if (isLogin) {
+        const result = await login({ email, password });
+        if (result.success) {
+          toast({
+            title: "Login successful",
+            description: "Welcome back to the admin dashboard.",
+          });
+          navigate(result.redirect || '/dashboard');
+        } else {
+          setError(result.error || 'Login failed');
+        }
+      } else {
+        const result = await signUp({ email, password, name });
+        if (result.success) {
+          if (result.requiresEmailVerification) {
+            toast({
+              title: "Account created",
+              description: "Please check your email to verify your account.",
+            });
+          } else {
+            toast({
+              title: "Account created",
+              description: "Your admin account has been created successfully.",
+            });
+            navigate('/dashboard');
+          }
+        } else {
+          setError(result.error || 'Registration failed');
+        }
+      }
+    } catch (error: any) {
+      console.error('Auth error:', error);
+      setError(error.message || 'An unexpected error occurred');
+    } finally {
+      setIsLoading(false);
     }
   };
-
-  const handleAdminSignUp = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    const result = await adminSignUp({ 
-      email: formData.email, 
-      password: formData.password,
-      name: '', // Optional for admin signup
-      phone: '' // Optional for admin signup
-    });
-    
-    if (result.success) {
-      toast({
-        title: "Account created successfully",
-        description: "You can now sign in with your credentials.",
-      });
-      setView('login');
-    }
-  };
-
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!formData.email) {
-      toast({ 
-        title: "Email required", 
-        description: "Please enter your email address.", 
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    const result = await sendPasswordReset(formData.email);
-    
-    if (result.success) {
-      setView('login');
-    }
-  };
-
-  const getCurrentLoadingState = () => {
-    if (view === 'login') return isAdminLoading;
-    if (view === 'signup') return isAdminLoading;
-    return isPasswordResetLoading;
-  };
-
-  const renderLoginForm = () => (
-    <form onSubmit={handleAdminLogin} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            placeholder="Enter your admin email"
-            className="pl-10"
-            required
-            disabled={getCurrentLoadingState()}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <div className="relative">
-          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            value={formData.password}
-            onChange={(e) => handleInputChange('password', e.target.value)}
-            placeholder="Enter your password"
-            className="pl-10 pr-10"
-            required
-            disabled={getCurrentLoadingState()}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-            onClick={() => setShowPassword(!showPassword)}
-            disabled={getCurrentLoadingState()}
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
-
-
-      <Button 
-        type="submit" 
-        className="w-full" 
-        disabled={getCurrentLoadingState()}
-      >
-        {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Sign In to Admin Portal
-      </Button>
-      
-      <div className="flex justify-between text-sm">
-        <button
-          type="button"
-          onClick={() => setView('signup')}
-          className="text-primary hover:underline"
-        >
-          Create admin account
-        </button>
-        <button
-          type="button"
-          onClick={() => setView('forgot-password')}
-          className="text-primary hover:underline"
-        >
-          Forgot password?
-        </button>
-      </div>
-    </form>
-  );
-
-  const renderForgotPasswordForm = () => (
-    <form onSubmit={handleForgotPassword} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            placeholder="Enter your admin email"
-            className="pl-10"
-            required
-            disabled={getCurrentLoadingState()}
-          />
-        </div>
-      </div>
-
-      <Button type="submit" className="w-full" disabled={getCurrentLoadingState()}>
-        {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Send Reset Link
-      </Button>
-
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={() => setView('login')}
-          className="text-primary hover:underline text-sm flex items-center"
-        >
-          <ArrowLeft className="mr-1 h-3 w-3" />
-          Back to login
-        </button>
-      </div>
-    </form>
-  );
-
-  const renderSignUpForm = () => (
-    <form onSubmit={handleAdminSignUp} className="space-y-4">
-      <div className="space-y-2">
-        <Label htmlFor="email">Email</Label>
-        <div className="relative">
-          <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="email"
-            type="email"
-            value={formData.email}
-            onChange={(e) => handleInputChange('email', e.target.value)}
-            placeholder="Enter your admin email"
-            className="pl-10"
-            required
-            disabled={getCurrentLoadingState()}
-          />
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="password">Password</Label>
-        <div className="relative">
-          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-          <Input
-            id="password"
-            type={showPassword ? 'text' : 'password'}
-            value={formData.password}
-            onChange={(e) => handleInputChange('password', e.target.value)}
-            placeholder="Enter your password"
-            className="pl-10 pr-10"
-            required
-            disabled={getCurrentLoadingState()}
-          />
-          <Button
-            type="button"
-            variant="ghost"
-            size="sm"
-            className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-            onClick={() => setShowPassword(!showPassword)}
-            disabled={getCurrentLoadingState()}
-          >
-            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </Button>
-        </div>
-      </div>
-
-      <Button type="submit" className="w-full" disabled={getCurrentLoadingState()}>
-        {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Create Admin Account
-      </Button>
-
-      <div className="flex justify-center">
-        <button
-          type="button"
-          onClick={() => setView('login')}
-          className="text-primary hover:underline text-sm flex items-center"
-        >
-          <ArrowLeft className="mr-1 h-3 w-3" />
-          Back to login
-        </button>
-      </div>
-    </form>
-  );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background to-secondary/20 p-4">
-      <div className="w-full max-w-md">
-        <div className="bg-card rounded-lg shadow-lg border p-8">
-          {/* Header */}
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center justify-center w-16 h-16 bg-primary/10 rounded-full mb-4">
-              <Shield className="h-8 w-8 text-primary" />
+    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
+      <Card className="w-full max-w-md">
+        <CardHeader className="text-center">
+          <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden bg-white shadow-lg">
+            <img 
+              src={startersLogo} 
+              alt="Starters" 
+              className="w-full h-full object-contain p-2"
+              loading="lazy"
+            />
+          </div>
+          <CardTitle className="text-2xl">
+            {isLogin ? 'Admin Login' : 'Create Admin Account'}
+          </CardTitle>
+          <CardDescription>
+            {isLogin 
+              ? 'Access the admin dashboard' 
+              : 'Create a new admin account'
+            }
+          </CardDescription>
+        </CardHeader>
+
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <Alert variant="destructive">
+                <AlertDescription>{error}</AlertDescription>
+              </Alert>
+            )}
+
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name</Label>
+                <div className="relative">
+                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    id="name"
+                    type="text"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    placeholder="Enter your full name"
+                    className="pl-10"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  className="pl-10"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
             </div>
-            <h1 className="text-2xl font-bold tracking-tight">
-              {view === 'login' ? 'Admin Portal' : view === 'signup' ? 'Create Admin Account' : 'Reset Password'}
-            </h1>
-            <p className="text-muted-foreground mt-2">
-              {view === 'login' 
-                ? 'Sign in to access the administration dashboard'
-                : view === 'signup'
-                ? 'Create a new admin account to access the dashboard'
-                : 'Enter your email to receive a password reset link'
-              }
-            </p>
-          </div>
 
-          {/* Form */}
-          {view === 'login' ? renderLoginForm() : view === 'signup' ? renderSignUpForm() : renderForgotPasswordForm()}
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  className="pl-10"
+                  required
+                  disabled={isLoading}
+                  minLength={isLogin ? undefined : 6}
+                />
+              </div>
+            </div>
 
-          {/* Footer */}
-          <div className="mt-8 pt-6 border-t text-center">
-            <button
-              type="button"
-              onClick={() => navigate('/')}
-              className="text-sm text-muted-foreground hover:text-primary transition-colors"
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={isLoading}
             >
-              ← Back to website
-            </button>
-          </div>
-        </div>
-      </div>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {isLogin ? 'Login' : 'Create Account'}
+            </Button>
+
+            <div className="text-center">
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setError('');
+                  setEmail('');
+                  setPassword('');
+                  setName('');
+                }}
+                disabled={isLoading}
+              >
+                {isLogin 
+                  ? "Don't have an account? Sign up" 
+                  : "Already have an account? Login"
+                }
+              </Button>
+            </div>
+
+            <div className="flex items-center justify-center">
+              <Link 
+                to="/" 
+                className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-primary"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                <span>Back to Store</span>
+              </Link>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
     </div>
   );
 };

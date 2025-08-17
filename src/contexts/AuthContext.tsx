@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { Session, User as SupabaseUser } from '@supabase/supabase-js';
 import { supabase } from '../integrations/supabase/client';
@@ -215,54 +216,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const getProfile = async (userId: string): Promise<User | null> => {
-    try {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select(`*`)
-        .eq('id', userId)
-        .maybeSingle();
-      
-      if (error) {
-        console.error('Error fetching profile:', error);
-        // Create a basic profile for new users instead of returning null
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        return {
-          id: userId,
-          name: authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'User',
-          role: 'admin',
-          avatar_url: null,
-          email: authUser?.email || '',
-        };
-      }
-
-      if (!data) {
-        console.log('No profile found for user, creating fallback:', userId);
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-        return {
-          id: userId,
-          name: authUser?.user_metadata?.name || authUser?.email?.split('@')[0] || 'User',
-          role: 'admin',
-          avatar_url: null,
-          email: authUser?.email || '',
-        };
-      }
-
-      const { data: { user: authUser } } = await supabase.auth.getUser();
-
-      return {
-        id: data.id,
-        name: data.name || '',
-        role: data.role,
-        avatar_url: data.avatar_url,
-        email: authUser?.email || '',
-      };
-    } catch (error) {
-      console.error('Profile fetch error:', error);
-      return null;
-    }
-  };
-
   const checkUser = async () => {
     setIsLoading(true);
     try {
@@ -288,9 +241,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const login = async ({ email, password }: LoginCredentials) => {
     try {
-      const signInOptions: any = { email, password };
-      
-      const { data, error } = await supabase.auth.signInWithPassword(signInOptions);
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
       
       if (error) {
         console.error('Login error:', error);
@@ -337,16 +291,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         userData.phone = phone;
       }
 
-      const signUpOptions: any = {
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
           emailRedirectTo: redirectUrl,
           data: userData,
         },
-      };
-
-      const { data, error } = await supabase.auth.signUp(signUpOptions);
+      });
 
       if (error) {
         console.error('Sign up error:', error);
@@ -416,17 +368,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       });
 
       if (error) {
-        // Log OAuth error
-        await supabase.rpc('log_security_incident', {
-          p_incident_type: 'oauth_failure',
-          p_severity: 'medium',
-          p_endpoint: '/auth/google',
-          p_details: {
-            provider: 'google',
-            error: error.message
-          }
-        });
-        
         throw error;
       }
     } catch (error: any) {

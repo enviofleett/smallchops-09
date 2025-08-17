@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCustomerProfile } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
-import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink } from "lucide-react";
+import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText } from "lucide-react";
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
@@ -72,6 +72,7 @@ interface CheckoutData {
     start_time: string;
     end_time: string;
   };
+  special_instructions?: string;
 }
 
 interface EnhancedCheckoutFlowProps {
@@ -330,7 +331,8 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         delivery_schedule: {
           delivery_date: formData.delivery_date,
           delivery_time_start: formData.delivery_time_slot?.start_time,
-          delivery_time_end: formData.delivery_time_slot?.end_time
+          delivery_time_end: formData.delivery_time_slot?.end_time,
+          special_instructions: formData.special_instructions || null
         },
         payment_method: 'paystack',
         guest_session_id: null, // Guest checkout disabled
@@ -938,7 +940,39 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                     </Card>
                   )}
 
-                  {/* Click to Pay Section */}
+                   {/* Special Instructions */}
+                  <Card id="section-special-instructions">
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Special Instructions (Optional)
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div>
+                        <Label htmlFor="special_instructions">
+                          {formData.fulfillment_type === 'delivery' ? 'Delivery Instructions' : 'Pickup Instructions'}
+                        </Label>
+                        <textarea
+                          id="special_instructions"
+                          value={formData.special_instructions || ''}
+                          onChange={(e) => setFormData(prev => ({ ...prev, special_instructions: e.target.value }))}
+                          className="mt-1 w-full min-h-[80px] p-3 border border-input rounded-md resize-y"
+                          placeholder={
+                            formData.fulfillment_type === 'delivery' 
+                              ? "e.g., Please call when you arrive, Leave at the gate, Ring the doorbell twice..."
+                              : "e.g., I'll be there at the scheduled time, Please call when ready, Ask for [Your Name]..."
+                          }
+                          maxLength={500}
+                        />
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {formData.special_instructions?.length || 0}/500 characters
+                        </p>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                   {/* Click to Pay Section */}
                   <Card id="section-click-to-pay">
                     <CardHeader>
                       <CardTitle className="flex items-center gap-2">

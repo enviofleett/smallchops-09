@@ -497,18 +497,19 @@ function AdminOrderCard({
                   <span className="font-medium">
                     {format(new Date(deliverySchedule.delivery_date), 'PPP')}
                   </span>
-                  <span className="text-muted-foreground">
-                    {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                  </span>
+                   <span className="text-muted-foreground">
+                     {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                     <span className="text-xs text-blue-600 ml-1">(1-hour window)</span>
+                   </span>
                   {deliverySchedule.is_flexible && (
                     <Badge variant="outline" className="text-xs">Flexible</Badge>
                   )}
                 </div>
-                {deliverySchedule.special_instructions && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Note: {deliverySchedule.special_instructions}
-                  </p>
-                )}
+                 {deliverySchedule.special_instructions && (
+                   <p className="text-xs text-muted-foreground mt-1 p-2 bg-blue-50 rounded">
+                     <strong>Special Instructions:</strong> {deliverySchedule.special_instructions}
+                   </p>
+                 )}
               </div>
             ) : (
               <div>

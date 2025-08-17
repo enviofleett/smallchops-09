@@ -20,10 +20,16 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
   className = "" 
 }) => {
   const formatTime = (timeString: string) => {
-    const [hours, minutes] = timeString.split(':');
-    const time = new Date();
-    time.setHours(parseInt(hours), parseInt(minutes));
-    return format(time, 'h:mm a');
+    if (!timeString) return '';
+    try {
+      // Handle both "HH:mm" and "HH:mm:ss" formats
+      const [hours, minutes] = timeString.split(':');
+      const time = new Date();
+      time.setHours(parseInt(hours), parseInt(minutes), 0, 0);
+      return format(time, 'h:mm a');
+    } catch {
+      return timeString;
+    }
   };
 
   const formatDate = (dateString: string) => {
@@ -97,7 +103,7 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
       <CardHeader className="pb-3">
         <CardTitle className="text-blue-800 flex items-center gap-2 text-lg">
           <Calendar className="w-5 h-5" />
-          Delivery Schedule
+          {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Schedule
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -132,7 +138,9 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
           <div className="flex items-center gap-2">
             <Calendar className="w-4 h-4 text-blue-600" />
             <div>
-              <p className="text-sm font-medium text-gray-700">Delivery Date</p>
+              <p className="text-sm font-medium text-gray-700">
+                {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Date
+              </p>
               <p className="text-sm text-blue-800 font-semibold">
                 {formatDate(schedule.delivery_date)}
               </p>
@@ -143,10 +151,13 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
           <div className="flex items-center gap-2">
             <Clock className="w-4 h-4 text-blue-600" />
             <div>
-              <p className="text-sm font-medium text-gray-700">Delivery Window</p>
+              <p className="text-sm font-medium text-gray-700">
+                {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Time Window
+              </p>
               <p className="text-sm text-blue-800 font-semibold">
                 {formatTime(schedule.delivery_time_start)} - {formatTime(schedule.delivery_time_end)}
               </p>
+              <p className="text-xs text-blue-600 mt-1">1-hour window</p>
             </div>
           </div>
         </div>

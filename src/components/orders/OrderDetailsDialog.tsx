@@ -9,11 +9,12 @@ import { useToast } from '@/hooks/use-toast';
 import { Constants } from '@/integrations/supabase/types';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
-import { User, Phone, MapPin, Calendar, Hash, X, RefreshCw, ShieldCheck } from 'lucide-react';
+import { User, Phone, MapPin, Calendar, Hash, X, RefreshCw, ShieldCheck, Package, Truck } from 'lucide-react';
 import { formatAddressMultiline } from '@/utils/formatAddress';
 import { supabase } from '@/integrations/supabase/client';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
+import { usePickupPoint } from '@/hooks/usePickupPoints';
 
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -48,9 +49,16 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
   // Fetch delivery schedule for this order
   const { data: deliverySchedule, isLoading: isLoadingSchedule } = useQuery({
     queryKey: ['deliverySchedule', order.id],
-    queryFn: () => getDeliveryScheduleByOrderId(order.id),
-    enabled: order.order_type === 'delivery',
+    queryFn: async () => {
+      return await getDeliveryScheduleByOrderId(order.id);
+    },
+    enabled: !!order.id
   });
+
+  // Fetch pickup point for pickup orders
+  const { data: pickupPoint } = usePickupPoint(
+    order.order_type === 'pickup' ? order.pickup_point_id : undefined
+  );
 
   // Log any errors with dispatch riders
   useEffect(() => {
@@ -169,14 +177,34 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                 <Phone className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
                 <span className="break-words">{order.customer_phone}</span>
               </div>
-              <div className="flex items-start">
-                <MapPin className="h-4 w-4 mr-3 mt-1 text-gray-500 flex-shrink-0" />
-                <div className="break-words">
-                  {formatAddressMultiline(order.delivery_address).split('\n').map((line, index) => (
-                    <div key={index} className="text-sm">{line}</div>
-                  ))}
+              
+              {/* Address/Location Information */}
+              {order.order_type === 'delivery' && order.delivery_address && (
+                <div className="flex items-start">
+                  <MapPin className="h-4 w-4 mr-3 mt-1 text-gray-500 flex-shrink-0" />
+                  <div className="break-words">
+                    <p className="text-xs text-gray-500 mb-1">Delivery Address</p>
+                    {formatAddressMultiline(order.delivery_address).split('\n').map((line, index) => (
+                      <div key={index} className="text-sm">{line}</div>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
+              
+              {/* Pickup Point Information */}
+              {order.order_type === 'pickup' && pickupPoint && (
+                <div className="flex items-start">
+                  <Package className="h-4 w-4 mr-3 mt-1 text-gray-500 flex-shrink-0" />
+                  <div className="break-words">
+                    <p className="text-xs text-gray-500 mb-1">Pickup Location</p>
+                    <div className="text-sm font-medium">{pickupPoint.name}</div>
+                    <div className="text-sm text-gray-600">{pickupPoint.address}</div>
+                    {pickupPoint.contact_phone && (
+                      <div className="text-sm text-gray-600">📞 {pickupPoint.contact_phone}</div>
+                    )}
+                  </div>
+                </div>
+              )}
             </div>
 
              <h3 className="font-semibold text-lg mb-4 mt-6">Order Information</h3>
@@ -191,31 +219,36 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                 </div>
              </div>
 
-             {/* Delivery Schedule Section */}
-             {order.order_type === 'delivery' && (
-               <div className="mt-6">
-                 <h3 className="font-semibold text-lg mb-4">Delivery Schedule</h3>
-                 {isLoadingSchedule ? (
-                   <div className="bg-gray-100 rounded-lg p-4 animate-pulse">
-                     <div className="h-4 bg-gray-300 rounded mb-2"></div>
-                     <div className="h-3 bg-gray-300 rounded w-2/3"></div>
-                   </div>
-                  ) : deliverySchedule ? (
-                    <DeliveryScheduleDisplay 
-                      schedule={deliverySchedule}
-                      orderType={order.order_type}
-                      orderStatus={order.status}
-                      className="mb-0" 
-                    />
-                  ) : (
-                   <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                     <p className="text-sm text-yellow-800">
-                       No delivery schedule found for this order.
-                     </p>
-                   </div>
+             {/* Schedule Section - for both delivery and pickup */}
+             <div className="mt-6">
+               <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
+                 {order.order_type === 'delivery' ? (
+                   <Truck className="h-5 w-5" />
+                 ) : (
+                   <Package className="h-5 w-5" />
                  )}
-               </div>
-             )}
+                 {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
+               </h3>
+               {isLoadingSchedule ? (
+                 <div className="bg-gray-100 rounded-lg p-4 animate-pulse">
+                   <div className="h-4 bg-gray-300 rounded mb-2"></div>
+                   <div className="h-3 bg-gray-300 rounded w-2/3"></div>
+                 </div>
+               ) : deliverySchedule ? (
+                  <DeliveryScheduleDisplay 
+                    schedule={deliverySchedule}
+                    orderType={order.order_type as 'delivery' | 'pickup'}
+                    orderStatus={order.status}
+                   className="mb-0" 
+                 />
+               ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                  <p className="text-sm text-yellow-800">
+                    No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
+                  </p>
+                </div>
+              )}
+             </div>
           </div>
           <div>
             <h3 className="font-semibold text-lg mb-4">Order Actions</h3>

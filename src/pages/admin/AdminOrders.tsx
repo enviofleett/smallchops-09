@@ -19,6 +19,7 @@ import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { format } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
+import { PickupPointDisplay } from '@/components/admin/PickupPointDisplay';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -444,16 +445,22 @@ function AdminOrderCard({
               </div> : <p className="text-sm text-muted-foreground">Product details not available</p>}
           </div>}
 
-        {/* Delivery Information for paid delivery orders */}
-        {order.order_type === 'delivery' && order.payment_status === 'paid' && (
+        {/* Fulfillment Information for paid orders */}
+        {order.payment_status === 'paid' && (
           <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-3">
             <div className="flex items-center gap-2 mb-2">
-              <MapPin className="w-4 h-4 text-primary" />
-              <h4 className="font-medium text-sm">Delivery Information</h4>
+              {order.order_type === 'delivery' ? (
+                <Truck className="w-4 h-4 text-primary" />
+              ) : (
+                <Package className="w-4 h-4 text-primary" />
+              )}
+              <h4 className="font-medium text-sm">
+                {order.order_type === 'delivery' ? 'Delivery Information' : 'Pickup Information'}
+              </h4>
             </div>
             
-            {/* Delivery Address */}
-            {order.delivery_address && (
+            {/* Delivery Address - for delivery orders */}
+            {order.order_type === 'delivery' && order.delivery_address && (
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Delivery Address</p>
                 <p className="text-sm">
@@ -467,18 +474,25 @@ function AdminOrderCard({
               </div>
             )}
             
-            {/* Delivery Zone */}
-            {deliveryZone && (
+            {/* Pickup Point - for pickup orders */}
+            {order.order_type === 'pickup' && order.pickup_point_id && (
+              <PickupPointDisplay pickupPointId={order.pickup_point_id} />
+            )}
+            
+            {/* Delivery Zone - for delivery orders */}
+            {order.order_type === 'delivery' && deliveryZone && (
               <div>
                 <p className="text-xs text-muted-foreground mb-1">Delivery Zone</p>
                 <p className="text-sm font-medium">{deliveryZone.name}</p>
               </div>
             )}
             
-            {/* Delivery Schedule */}
+            {/* Schedule Information */}
             {deliverySchedule ? (
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Scheduled Delivery</p>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {order.order_type === 'delivery' ? 'Scheduled Delivery' : 'Scheduled Pickup'}
+                </p>
                 <div className="flex items-center gap-4 text-sm">
                   <span className="font-medium">
                     {format(new Date(deliverySchedule.delivery_date), 'PPP')}
@@ -498,7 +512,9 @@ function AdminOrderCard({
               </div>
             ) : (
               <div>
-                <p className="text-xs text-muted-foreground mb-1">Delivery Schedule</p>
+                <p className="text-xs text-muted-foreground mb-1">
+                  {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
+                </p>
                 <p className="text-sm text-amber-600">⚠️ Schedule not set</p>
               </div>
             )}

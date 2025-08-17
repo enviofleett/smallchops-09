@@ -54,6 +54,11 @@ export function EnhancedOrdersSection() {
   const orderIds = React.useMemo(() => orders.map(order => order.id), [orders]);
   const { schedules } = useOrderDeliverySchedules(orderIds);
   
+  // Debug logging to see if schedule data exists
+  React.useEffect(() => {
+    console.log('💫 Schedule data:', { schedules, selectedOrder });
+  }, [schedules, selectedOrder]);
+  
   // Get pickup point for selected order if it's a pickup order
   const { data: pickupPoint } = usePickupPoint(
     selectedOrder?.order_type === 'pickup' ? selectedOrder?.pickup_point_id : undefined

@@ -565,7 +565,7 @@ const AuthPage = () => {
 
   const getTitle = () => {
     switch (view) {
-      case 'customer-login': return 'Welcome back';
+      case 'customer-login': return 'Welcome to Starters';
       case 'customer-register': return 'Create account';
       case 'forgot-password': return 'Reset password';
       default: return 'Welcome';

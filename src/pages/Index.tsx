@@ -13,22 +13,18 @@ const Index = () => {
     // Wait for auth to load
     if (isLoading) return;
 
-    // If admin is authenticated, show dashboard (they're already on the right page)
+    // If admin is authenticated, show dashboard
     if (isAuthenticated && userType === 'admin' && user) {
       return; // Stay on dashboard
     }
 
-    // If customer is authenticated, redirect to customer portal (public home)
+    // If customer is authenticated, they can stay on the public home
     if (isAuthenticated && userType === 'customer' && customerAccount) {
-      navigate('/', { replace: true });
-      return;
+      return; // Stay on public home (customer portal)
     }
 
-    // If no one is authenticated, redirect to auth page
-    if (!isAuthenticated) {
-      navigate('/auth', { replace: true });
-      return;
-    }
+    // If no one is authenticated, show the public customer portal (allow browsing)
+    // Don't force authentication - let customers browse freely
   }, [isAuthenticated, isLoading, userType, user, customerAccount, navigate]);
 
   if (isLoading) {
@@ -47,20 +43,9 @@ const Index = () => {
     return <Dashboard />;
   }
 
-  // Show customer portal if customer is authenticated
-  if (isAuthenticated && userType === 'customer' && customerAccount) {
-    return <CustomerPortal />;
-  }
-
-  // If we reach here, user needs to authenticate
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-background">
-      <div className="flex flex-col items-center space-y-4">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <p className="text-muted-foreground text-sm">Checking authentication...</p>
-      </div>
-    </div>
-  );
+  // Show customer portal for everyone else (authenticated customers and guests)
+  // This allows guests to browse the site freely
+  return <CustomerPortal />;
 };
 
 export default Index;

@@ -136,15 +136,15 @@ export default function AdminOrders() {
         {/* Performance Monitor */}
         
         
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header - Mobile Responsive */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold">Order Management</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl sm:text-3xl font-bold">Order Management</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
               Monitor and manage all customer orders and deliveries
             </p>
           </div>
-          <Button>
+          <Button className="w-full sm:w-auto">
             <Plus className="w-4 h-4 mr-2" />
             Create Order
           </Button>
@@ -211,31 +211,39 @@ export default function AdminOrders() {
           </Card>
         </div>
 
-        {/* Filters */}
+        {/* Filters - Mobile Responsive */}
         <Card>
           <CardContent className="p-4">
             <div className="space-y-4">
-              <form onSubmit={handleSearch} className="flex gap-4">
+              <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                 <div className="flex-1">
-                  <Input type="text" placeholder="Search by order number, customer name, or email..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="w-full" />
+                  <Input 
+                    type="text" 
+                    placeholder="Search by order number, customer name, or email..." 
+                    value={searchQuery} 
+                    onChange={e => setSearchQuery(e.target.value)} 
+                    className="w-full" 
+                  />
                 </div>
-                <Button type="submit" variant="outline">
-                  <Search className="w-4 h-4 mr-2" />
-                  Search
-                </Button>
-                <Button variant="outline">
-                  <Download className="w-4 h-4 mr-2" />
-                  Export
-                </Button>
+                <div className="flex gap-2">
+                  <Button type="submit" variant="outline" className="flex-1 sm:flex-none">
+                    <Search className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">Search</span>
+                  </Button>
+                  <Button variant="outline" className="flex-1 sm:flex-none">
+                    <Download className="w-4 h-4 mr-2" />
+                    <span className="hidden sm:inline">Export</span>
+                  </Button>
+                </div>
               </form>
               
-              <div className="flex items-center gap-4">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
                 <div className="flex items-center gap-2">
                   <Truck className="w-4 h-4 text-muted-foreground" />
                   <span className="text-sm font-medium">Delivery Schedule:</span>
                 </div>
                 <Select value={deliveryFilter} onValueChange={(value: 'all' | 'due_today' | 'upcoming') => setDeliveryFilter(value)}>
-                  <SelectTrigger className="w-48">
+                  <SelectTrigger className="w-full sm:w-48">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -457,119 +465,127 @@ function AdminOrderCard({
               </div> : <p className="text-sm text-muted-foreground">Product details not available</p>}
           </div>}
 
-        {/* Fulfillment Information for paid orders */}
+        {/* Comprehensive Delivery Information Display - matches mobile screenshot layout */}
         {order.payment_status === 'paid' && (
-          <div className="mt-4 p-4 bg-muted/50 rounded-lg space-y-3">
-            <div className="flex items-center gap-2 mb-2">
+          <div className="mt-4 border-t pt-4">
+            <div className="flex items-center gap-2 mb-3">
               {order.order_type === 'delivery' ? (
                 <Truck className="w-4 h-4 text-primary" />
               ) : (
                 <Package className="w-4 h-4 text-primary" />
               )}
-              <h4 className="font-medium text-sm">
+              <h4 className="font-medium">
                 {order.order_type === 'delivery' ? 'Delivery Information' : 'Pickup Information'}
               </h4>
             </div>
             
-            {/* Delivery Address - for delivery orders */}
-            {order.order_type === 'delivery' && order.delivery_address && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Delivery Address</p>
-                <p className="text-sm">
-                  {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
-                    ? `${(order.delivery_address as any).street || ''} ${(order.delivery_address as any).city || ''} ${(order.delivery_address as any).state || ''}`.trim()
-                    : typeof order.delivery_address === 'string' 
-                      ? order.delivery_address
-                      : 'Address details available'
-                  }
-                </p>
-              </div>
-            )}
-            
-            {/* Pickup Point - for pickup orders */}
-            {order.order_type === 'pickup' && order.pickup_point_id && (
-              <PickupPointDisplay pickupPointId={order.pickup_point_id} />
-            )}
-            
-            {/* Delivery Zone - for delivery orders */}
-            {order.order_type === 'delivery' && deliveryZone && (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">Delivery Zone</p>
-                <p className="text-sm font-medium">{deliveryZone.name}</p>
-              </div>
-            )}
-            
-            {/* Schedule Information */}
-            {deliverySchedule ? (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">
-                  {order.order_type === 'delivery' ? 'Scheduled Delivery' : 'Scheduled Pickup'}
-                </p>
-                <div className="space-y-2">
-                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm">
-                    <span className="font-medium text-primary">
-                      {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
-                    </span>
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="text-muted-foreground bg-muted px-2 py-1 rounded text-xs">
-                        {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                      </span>
-                      {deliverySchedule.is_flexible && (
-                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
-                          Flexible Time
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                  
-                  {/* Delivery Zone and Fee for delivery orders */}
-                  {order.order_type === 'delivery' && (
-                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-xs">
-                      {deliveryZone && (
-                        <div>
-                          <span className="text-muted-foreground">Zone:</span>
-                          <span className="ml-1 font-medium">{deliveryZone.name}</span>
-                        </div>
-                      )}
-                      {order.delivery_fee && Number(order.delivery_fee) > 0 && (
-                        <div>
-                          <span className="text-muted-foreground">Delivery Fee:</span>
-                          <span className="ml-1 font-medium text-green-600">
-                            {formatCurrency(Number(order.delivery_fee))}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {deliverySchedule.special_instructions && (
-                    <div className="text-xs p-2 bg-amber-50 border border-amber-200 rounded">
-                      <strong className="text-amber-800">Special Instructions:</strong>
-                      <p className="text-amber-700 mt-1 break-words">{deliverySchedule.special_instructions}</p>
-                    </div>
-                  )}
-                  
-                  <div className="text-xs text-muted-foreground">
-                    Schedule Requested: {format(new Date(deliverySchedule.requested_at), 'MMM d, h:mm a')}
-                  </div>
+            <div className="space-y-4">
+              {/* Delivery Address */}
+              {order.order_type === 'delivery' && order.delivery_address && (
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium mb-1">Delivery Address</p>
+                  <p className="text-sm font-semibold">
+                    {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
+                      ? `${(order.delivery_address as any).street || ''} ${(order.delivery_address as any).city || ''} ${(order.delivery_address as any).state || ''}`.trim()
+                      : typeof order.delivery_address === 'string' 
+                        ? order.delivery_address
+                        : 'Address details available'
+                    }
+                  </p>
                 </div>
-              </div>
-            ) : (
-              <div>
-                <p className="text-xs text-muted-foreground mb-1">
-                  {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
-                </p>
-                <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
-                  <div className="text-amber-600 text-lg">⚠️</div>
+              )}
+              
+              {/* Pickup Point */}
+              {order.order_type === 'pickup' && order.pickup_point_id && (
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium mb-1">Pickup Point</p>
+                  <PickupPointDisplay pickupPointId={order.pickup_point_id} />
+                </div>
+              )}
+              
+              {/* Delivery Zone */}
+              {order.order_type === 'delivery' && deliveryZone && (
+                <div>
+                  <p className="text-sm text-muted-foreground font-medium mb-1">Delivery Zone</p>
+                  <p className="text-sm font-semibold">{deliveryZone.name}</p>
+                </div>
+              )}
+              
+              {/* Schedule Information */}
+              {deliverySchedule ? (
+                <>
                   <div>
-                    <p className="font-medium">Schedule not yet set</p>
-                    <p className="text-xs text-amber-600 mt-1">
-                      Customer will receive confirmation once {order.order_type === 'delivery' ? 'delivery' : 'pickup'} is scheduled
+                    <p className="text-sm text-muted-foreground font-medium mb-1">
+                      {order.order_type === 'delivery' ? 'Scheduled Delivery' : 'Scheduled Pickup'}
+                    </p>
+                    <p className="text-sm font-semibold">
+                      {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
                     </p>
                   </div>
+
+                  <div className="space-y-2">
+                    <div className="bg-muted/30 p-3 rounded-lg">
+                      <p className="text-xs text-muted-foreground mb-1">Time Window</p>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-sm">
+                          {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                        </span>
+                        {deliverySchedule.is_flexible && (
+                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                            Flexible Time
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Zone and Delivery Fee on separate lines for mobile */}
+                    {order.order_type === 'delivery' && (
+                      <div className="space-y-2">
+                        {deliveryZone && (
+                          <div className="bg-muted/20 p-2 rounded">
+                            <span className="text-xs text-muted-foreground">Zone: </span>
+                            <span className="text-sm font-medium">{deliveryZone.name}</span>
+                          </div>
+                        )}
+                        {order.delivery_fee && Number(order.delivery_fee) > 0 && (
+                          <div className="bg-green-50 p-2 rounded border border-green-200">
+                            <span className="text-xs text-muted-foreground">Delivery Fee: </span>
+                            <span className="text-sm font-semibold text-green-700">
+                              {formatCurrency(Number(order.delivery_fee))}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {deliverySchedule.special_instructions && (
+                    <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg">
+                      <p className="text-sm font-medium text-orange-800 mb-1">Special Instructions:</p>
+                      <p className="text-sm text-orange-700 break-words">
+                        {deliverySchedule.special_instructions}
+                      </p>
+                    </div>
+                  )}
+                  
+                  <div className="text-xs text-muted-foreground pt-2 border-t">
+                    Schedule Requested: {format(new Date(deliverySchedule.requested_at), 'MMM d, h:mm a')}
+                  </div>
+                </>
+              ) : (
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
+                  <div className="flex items-start gap-2">
+                    <span className="text-amber-600 text-lg">⚠️</span>
+                    <div>
+                      <p className="text-sm font-medium text-amber-800">Schedule not yet set</p>
+                      <p className="text-xs text-amber-600 mt-1">
+                        Customer will receive confirmation once {order.order_type === 'delivery' ? 'delivery' : 'pickup'} is scheduled
+                      </p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         )}
       </CardContent>

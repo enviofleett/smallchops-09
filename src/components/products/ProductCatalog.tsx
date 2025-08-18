@@ -45,6 +45,11 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
       (product.description && product.description.toLowerCase().includes(searchTerm.toLowerCase()))
     )
     .sort((a, b) => {
+      // For "All" category, prioritize price sorting (most affordable first) unless user explicitly chooses different sort
+      if (selectedCategory === 'all' && sortBy === 'name') {
+        return a.price - b.price; // Sort by price low to high for "All" category
+      }
+      
       switch (sortBy) {
         case 'name':
           return a.name.localeCompare(b.name);

@@ -570,6 +570,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "bogo_allocations_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "bogo_allocations_promotion_id_fkey"
             columns: ["promotion_id"]
             isOneToOne: false
@@ -1737,6 +1744,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "customer_favorites_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products_view"
             referencedColumns: ["id"]
           },
         ]
@@ -4019,6 +4033,13 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "notification_queue_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notification_templates: {
@@ -4271,6 +4292,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products_view"
             referencedColumns: ["id"]
           },
         ]
@@ -5771,6 +5799,13 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "product_price_history_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       product_ratings_summary: {
@@ -5801,6 +5836,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: true
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_ratings_summary_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: true
+            referencedRelation: "public_products_view"
             referencedColumns: ["id"]
           },
         ]
@@ -5874,6 +5916,13 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_reviews_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "public_products_view"
             referencedColumns: ["id"]
           },
         ]
@@ -7706,6 +7755,33 @@ export type Database = {
         }
         Relationships: []
       }
+      public_products_view: {
+        Row: {
+          allergen_info: string[] | null
+          category_id: string | null
+          category_name: string | null
+          description: string | null
+          features: Json | null
+          id: string | null
+          image_url: string | null
+          is_promotional: boolean | null
+          name: string | null
+          preparation_time: number | null
+          price: number | null
+          sku: string | null
+          status: Database["public"]["Enums"]["product_status"] | null
+          stock_quantity: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "products_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       activate_admin_user: {
@@ -8387,6 +8463,26 @@ export type Database = {
         Args: { user_uuid: string }
         Returns: string
       }
+      gtrgm_compress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_decompress: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_in: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
+      gtrgm_options: {
+        Args: { "": unknown }
+        Returns: undefined
+      }
+      gtrgm_out: {
+        Args: { "": unknown }
+        Returns: unknown
+      }
       handle_email_webhook: {
         Args: { webhook_data: Json; webhook_type?: string }
         Returns: boolean
@@ -8769,9 +8865,21 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: Json
       }
+      set_limit: {
+        Args: { "": number }
+        Returns: number
+      }
       setup_admin_permissions: {
         Args: { admin_user_id: string }
         Returns: undefined
+      }
+      show_limit: {
+        Args: Record<PropertyKey, never>
+        Returns: number
+      }
+      show_trgm: {
+        Args: { "": string }
+        Returns: string[]
       }
       sync_payment_to_order_status: {
         Args: {

@@ -1,9 +1,8 @@
-
 import React, { useState, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { getProducts, createProduct, updateProduct } from '@/api/products';
-import { getCategories } from '@/api/categories';
+import { getOptimizedCategories } from '@/api/optimizedProducts';
 import { ProductWithCategory, Category } from '@/types/database';
 import { ProductFormData } from '@/lib/validations/product';
 
@@ -12,6 +11,7 @@ import ProductsFilters from '@/components/products/ProductsFilters';
 import ProductsTable from '@/components/products/ProductsTable';
 import { ProductDialog } from '@/components/products/ProductDialog';
 import { DeleteProductDialog } from '@/components/products/DeleteProductDialog';
+import { useNetworkResilience } from '@/hooks/useNetworkResilience';
 
 const Products = () => {
   const [categoryFilter, setCategoryFilter] = useState('all');
@@ -22,23 +22,32 @@ const Products = () => {
 
   const queryClient = useQueryClient();
 
-  const {
-    data: products,
-    isLoading: isLoadingProducts,
-    isError: isErrorProducts,
-    error: errorProducts
-  } = useQuery<ProductWithCategory[], Error>({
-    queryKey: ['products'],
-    queryFn: getProducts,
-  });
+  // Use network resilience wrapper for better error handling
+  const productsQuery = useNetworkResilience(
+    useQuery<ProductWithCategory[], Error>({
+      queryKey: ['products'],
+      queryFn: getProducts,
+      staleTime: 2 * 60 * 1000, // 2 minutes
+      refetchOnWindowFocus: false,
+    }),
+    {
+      fallbackData: [],
+      showToast: true,
+    }
+  );
 
-  const {
-    data: categories,
-    isLoading: isLoadingCategories,
-  } = useQuery<Category[], Error>({
-    queryKey: ['categories'],
-    queryFn: getCategories,
-  });
+  const categoriesQuery = useNetworkResilience(
+    useQuery<Category[], Error>({
+      queryKey: ['categories', 'optimized'],
+      queryFn: getOptimizedCategories,
+      staleTime: 10 * 60 * 1000, // 10 minutes
+      refetchOnWindowFocus: false,
+    }),
+    {
+      fallbackData: [],
+      showToast: false,
+    }
+  );
 
   const createMutation = useMutation({
     mutationFn: createProduct,
@@ -59,9 +68,9 @@ const Products = () => {
   });
 
   const filteredProducts = useMemo(() => {
-    if (!products) return [];
+    if (!productsQuery.data) return [];
     
-    let filtered = products;
+    let filtered = productsQuery.data;
     
     // Filter by category
     if (categoryFilter !== 'all') {
@@ -79,7 +88,7 @@ const Products = () => {
     }
     
     return filtered;
-  }, [products, categoryFilter, searchQuery]);
+  }, [productsQuery.data, categoryFilter, searchQuery]);
 
   const handleAddProduct = () => {
     setSelectedProduct(null);
@@ -98,7 +107,6 @@ const Products = () => {
 
   const handleSubmitProduct = async (data: ProductFormData & { imageFile?: File }) => {
     try {
-      // Ensure required fields are present for create/update
       const safeData = {
         ...data,
         name: data.name ?? "",
@@ -113,7 +121,6 @@ const Products = () => {
         await createMutation.mutateAsync(safeData);
       }
     } catch (error: any) {
-      // Handle SKU duplicate errors with user-friendly messages
       if (error.message?.includes('SKU') && error.message?.includes('already exists')) {
         throw new Error(error.message + ' Try modifying the SKU or leave it blank for auto-generation.');
       }
@@ -132,15 +139,15 @@ const Products = () => {
         onCategoryChange={setCategoryFilter}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        categories={categories}
-        isLoadingCategories={isLoadingCategories}
+        categories={categoriesQuery.data}
+        isLoadingCategories={categoriesQuery.isLoading}
       />
       
       <ProductsTable
         products={filteredProducts}
-        isLoading={isLoadingProducts}
-        isError={isErrorProducts}
-        error={errorProducts}
+        isLoading={productsQuery.isLoading}
+        isError={productsQuery.isError}
+        error={productsQuery.error}
         onEditProduct={handleEditProduct}
         onDeleteProduct={handleDeleteProduct}
       />
@@ -149,7 +156,7 @@ const Products = () => {
         open={isProductDialogOpen}
         onOpenChange={setIsProductDialogOpen}
         product={selectedProduct || undefined}
-        categories={categories || []}
+        categories={categoriesQuery.data || []}
         onSubmit={handleSubmitProduct}
         isSubmitting={isSubmitting}
       />

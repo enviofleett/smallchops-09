@@ -1,76 +1,127 @@
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
 
-// Environment-aware CORS headers for production security
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  // Allow any Lovable project domain for development/preview
-  const allowedOrigins = [
-    'https://oknnklksdiqaifhxaccs.lovableproject.com', // Production
-    /^https:\/\/[\w-]+\.lovableproject\.com$/, // Dev/Preview domains
-    /^https:\/\/[\w-]+\.lovable\.dev$/ // lovable.dev domains
-  ];
-  
-  const isAllowed = origin && allowedOrigins.some(allowed => 
-    typeof allowed === 'string' ? allowed === origin : allowed.test(origin)
-  );
-  
-  return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : 'https://oknnklksdiqaifhxaccs.lovableproject.com',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Max-Age': '86400',
-  };
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, if-none-match',
+  'Access-Control-Allow-Methods': 'GET, OPTIONS',
 }
 
-serve(async (req: Request) => {
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
-  
-  // Handle CORS preflight
-  if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
   }
 
-  // Query string for optional ?q=searchterm
-  const url = new URL(req.url);
-  const q = url.searchParams.get("q")?.toLowerCase();
-
-  // Supabase client for edge functions
-  const { createClient } = await import("https://esm.sh/@supabase/supabase-js@2.50.0");
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
-  let query = supabase
-    .from("products")
-    .select(
-      `
-      id, name, description, price, sku, image_url, stock_quantity, status,
-      features, is_promotional, preparation_time, allergen_info,
-      category_id,
-      categories ( id, name )
-      `
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
-    .eq("status", "active")
-    .gt("stock_quantity", 0);
 
-  if (q) {
-    query = query.or(
-      `name.ilike.%${q}%,description.ilike.%${q}%,sku.ilike.%${q}%`
-    );
-  }
+    const url = new URL(req.url)
+    const categoryId = url.searchParams.get('category_id')
+    const page = parseInt(url.searchParams.get('page') || '1')
+    const limit = Math.min(parseInt(url.searchParams.get('limit') || '20'), 50) // Max 50 items
+    const search = url.searchParams.get('q')
+    const offset = (page - 1) * limit
 
-  const { data, error } = await query.order("name", { ascending: true });
+    // Build cache key for ETag
+    const cacheKey = `products-${categoryId || 'all'}-${page}-${limit}-${search || ''}`
+    const requestETag = req.headers.get('if-none-match')
 
-  if (error) {
+    console.log(`[get-public-products] Request: category=${categoryId}, page=${page}, limit=${limit}, search=${search}`)
+
+    let query = supabase
+      .from('public_products_view')
+      .select('*', { count: 'exact' })
+
+    // Apply filters
+    if (categoryId && categoryId !== 'all') {
+      query = query.eq('category_id', categoryId)
+    }
+
+    if (search) {
+      // Use trigram search for better performance
+      query = query.or(`name.ilike.%${search}%, description.ilike.%${search}%, sku.ilike.%${search}%`)
+    }
+
+    // Apply pagination and ordering
+    query = query
+      .order('name', { ascending: true })
+      .range(offset, offset + limit - 1)
+
+    const { data: products, error, count } = await query
+
+    if (error) {
+      console.error('[get-public-products] Database error:', error)
+      throw error
+    }
+
+    console.log(`[get-public-products] Found ${products?.length || 0} products, total: ${count}`)
+
+    // Calculate pagination info
+    const totalPages = Math.ceil((count || 0) / limit)
+    const hasNextPage = page < totalPages
+    const hasPrevPage = page > 1
+
+    const response = {
+      products: products || [],
+      pagination: {
+        page,
+        limit,
+        total: count || 0,
+        totalPages,
+        hasNextPage,
+        hasPrevPage
+      },
+      timestamp: new Date().toISOString()
+    }
+
+    // Generate ETag based on data
+    const dataHash = await crypto.subtle.digest(
+      'SHA-256',
+      new TextEncoder().encode(JSON.stringify(response))
+    )
+    const etag = Array.from(new Uint8Array(dataHash))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join('')
+      .substring(0, 16)
+
+    // Check if client has cached version
+    if (requestETag === etag) {
+      return new Response(null, {
+        status: 304,
+        headers: {
+          ...corsHeaders,
+          'Cache-Control': 'public, max-age=300, stale-while-revalidate=600',
+          'ETag': etag,
+        }
+      })
+    }
+
+    return new Response(JSON.stringify(response), {
+      status: 200,
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=300, stale-while-revalidate=600', // 5min cache, 10min stale
+        'ETag': etag,
+      },
+    })
+
+  } catch (error) {
+    console.error('[get-public-products] Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+      JSON.stringify({ error: 'Failed to fetch products', details: error.message }),
+      {
+        status: 500,
+        headers: {
+          ...corsHeaders,
+          'Content-Type': 'application/json',
+        },
+      }
+    )
   }
-
-  return new Response(
-    JSON.stringify(data ?? []),
-    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-  );
-});
+})

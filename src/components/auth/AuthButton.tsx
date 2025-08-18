@@ -79,10 +79,6 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
             <User className="mr-2 h-4 w-4" />
             Profile
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => window.location.href = '/purchase-history'}>
-            <User className="mr-2 h-4 w-4" />
-            Order History
-          </DropdownMenuItem>
           <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleSignOut}>
             <LogOut className="mr-2 h-4 w-4" />

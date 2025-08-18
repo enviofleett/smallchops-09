@@ -31,7 +31,7 @@ export const useSupabaseAuthRegistration = () => {
       const { data: otpData, error } = await supabase.auth.signInWithOtp({
         email: data.email.toLowerCase(),
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth-callback`,
           data: {
             name: data.name,
             phone: data.phone,

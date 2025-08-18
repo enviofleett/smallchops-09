@@ -92,7 +92,7 @@ export const useCustomerDirectAuth = () => {
         email: data.email,
         password: data.password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth-callback`,
           data: {
             name: data.name,
             phone: data.phone
@@ -165,7 +165,7 @@ export const useCustomerDirectAuth = () => {
         type: 'signup',
         email: email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`
+          emailRedirectTo: `${window.location.origin}/auth-callback`
         }
       });
 
@@ -203,7 +203,7 @@ export const useCustomerDirectAuth = () => {
       const oauthOptions: any = {
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: `${window.location.origin}/auth-callback`
         }
       };
       

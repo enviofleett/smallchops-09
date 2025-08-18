@@ -47,7 +47,7 @@ interface OrderDetailsData {
   delivery_address?: any;
   pickup_point_id?: string | null;
   special_instructions?: string | null;
-  delivery_notes?: string | null;
+  
   estimated_delivery_date?: string | null;
 }
 
@@ -192,7 +192,7 @@ export default function OrderDetails() {
         .select(`
           id, order_number, status, payment_status, paid_at, total_amount, order_time,
           customer_id, customer_email, customer_phone, payment_method, payment_reference,
-          order_type, delivery_address, pickup_point_id, special_instructions, delivery_notes,
+          order_type, delivery_address, pickup_point_id, special_instructions,
           estimated_delivery_date
         `)
         .eq('id', id)
@@ -590,12 +590,6 @@ export default function OrderDetails() {
                     <MapPin className="h-4 w-4" />
                     {currentPickupPoint.address}
                   </p>
-                  {currentPickupPoint.phone && (
-                    <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                      <Phone className="h-4 w-4" />
-                      {currentPickupPoint.phone}
-                    </p>
-                  )}
                 </div>
               </div>
             )}
@@ -653,12 +647,12 @@ export default function OrderDetails() {
               </div>
             )}
 
-            {(order.special_instructions || order.delivery_notes) && (
+            {order.special_instructions && (
               <div>
                 <p className="text-sm text-muted-foreground mb-2">Special Instructions</p>
                 <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
                   <p className="text-sm">
-                    {order.special_instructions || order.delivery_notes}
+                    {order.special_instructions}
                   </p>
                 </div>
               </div>
@@ -764,28 +758,4 @@ export default function OrderDetails() {
       </div>
     </div>
   );
-}-medium">Payment Confirmed</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDateTime(order.paid_at || tx?.paid_at)}
-                  </p>
-                </div>
-              </div>
-            )}
-            
-            {order.status?.toLowerCase() === 'confirmed' && (
-              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                <CheckCircle className="h-5 w-5 text-blue-600" />
-                <div>
-                  <p className="font-medium">Order Confirmed</p>
-                  <p className="text-sm text-muted-foreground">
-                    {formatDateTime(order.paid_at || order.order_time)}
-                  </p>
-                </div>
-              </div>
-            )}
-            
-            {['preparing', 'ready_for_pickup', 'out_for_delivery', 'shipped', 'delivered', 'completed'].includes(order.status?.toLowerCase() || '') && (
-              <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                <StatusIcon className="h-5 w-5 text-indigo-600" />
-                <div>
-                  <p className="font
+};

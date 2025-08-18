@@ -1,299 +1,419 @@
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
-import { User, Session } from '@supabase/supabase-js';
-import { supabase } from '@/integrations/supabase/client';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import { Session, User as SupabaseUser } from '@supabase/supabase-js';
+import { supabase } from '../integrations/supabase/client';
+import { User, AuthState, LoginCredentials } from '../types/auth';
+import logger from '../lib/logger';
 import { useToast } from '@/hooks/use-toast';
 
-interface AuthContextType {
-  user: User | null;
-  session: Session | null;
-  isLoading: boolean;
-  isAuthenticated: boolean;
-  userType: string | null;
-  customerAccount: any | null;
-  signUp: (email: string, password: string, name: string, phone?: string) => Promise<{ success: boolean; error?: string; user?: User }>;
-  signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>;
-  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>;
-  signOut: () => Promise<void>;
-  logout: () => Promise<void>;
-  signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
-  signUpWithGoogle: () => Promise<{ success: boolean; error?: string }>;
-  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
+interface CustomerAccount {
+  id: string;
+  user_id: string;
+  name: string;
+  phone?: string;
+  email?: string;
+  date_of_birth?: string;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface AuthContextType extends AuthState {
+  login: (credentials: LoginCredentials) => Promise<{ success: boolean; redirect?: string; error?: string }>;
+  signUp: (credentials: LoginCredentials & { name: string; phone?: string }) => Promise<{ success: boolean; requiresEmailVerification?: boolean; error?: string }>;
+  signUpWithGoogle: () => Promise<void>;
+  logout: () => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  resendOtp: (email: string) => Promise<{ success: boolean; error?: string }>;
+  session: Session | null;
+  checkUser: () => Promise<void>;
+  userType: 'admin' | 'customer' | null;
+  customerAccount: CustomerAccount | null;
+}
+
+const AuthContext = createContext<AuthContextType | null>(null);
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (context === undefined) {
+  if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
   return context;
 };
 
-interface AuthProviderProps {
-  children: ReactNode;
-}
-
-export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
+export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
-  const [customerAccount, setCustomerAccount] = useState<any | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [customerAccount, setCustomerAccount] = useState<CustomerAccount | null>(null);
+  const [userType, setUserType] = useState<'admin' | 'customer' | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // If user signed in, load their customer account
-        if (session?.user) {
-          await loadCustomerAccount(session.user.id);
-        } else {
-          setCustomerAccount(null);
+    let mounted = true;
+    let unsubscribe: (() => void) | null = null;
+
+    const initializeAuth = async () => {
+      try {
+        // Set up auth state listener with optimized handling
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(
+          (event, session) => {
+            if (!mounted) return;
+            
+            // Only sync state updates here - no async operations
+            setSession(session);
+            
+            if (session?.user) {
+              // Defer async operations to prevent blocking
+              setTimeout(() => {
+                if (mounted) {
+                  loadUserData(session.user).finally(() => {
+                    if (mounted) setIsLoading(false);
+                  });
+                }
+              }, 0);
+            } else {
+              setUser(null);
+              setCustomerAccount(null);
+              setUserType(null);
+              setIsLoading(false);
+            }
+          }
+        );
+
+        unsubscribe = () => subscription?.unsubscribe();
+
+        // Check for existing session with timeout
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Session check timeout')), 5000);
+        });
+
+        try {
+          const { data: { session: initialSession } } = await Promise.race([
+            sessionPromise,
+            timeoutPromise
+          ]) as any;
+          
+          if (!mounted) return;
+
+          if (initialSession?.user) {
+            setSession(initialSession);
+            await loadUserData(initialSession.user);
+          }
+        } catch (timeoutError) {
+          logger.warn('Session check timed out, proceeding without session');
         }
         
-        setIsLoading(false);
-      }
-    );
+        if (mounted) {
+          setIsLoading(false);
+        }
 
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      if (session?.user) {
-        loadCustomerAccount(session.user.id);
-      } else {
-        setIsLoading(false);
+      } catch (error: any) {
+        logger.error('Auth initialization error:', error);
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
-    });
+    };
 
-    return () => subscription.unsubscribe();
+    initializeAuth();
+
+    return () => {
+      mounted = false;
+      unsubscribe?.();
+    };
   }, []);
 
-  const loadCustomerAccount = async (userId: string) => {
+  const loadUserData = async (authUser: SupabaseUser) => {
     try {
-      const { data, error } = await supabase
+      // First check if user is admin (has profile)
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', authUser.id)
+        .maybeSingle();
+
+      if (profile) {
+        // Admin user
+        setUser({
+          id: profile.id,
+          name: profile.name || '',
+          role: profile.role,
+          avatar_url: profile.avatar_url,
+          email: authUser.email || '',
+        });
+        setUserType('admin');
+        setCustomerAccount(null);
+        return;
+      }
+
+      // Check if user is customer (has customer account)
+      const { data: customerAcc } = await supabase
         .from('customer_accounts')
         .select('*')
-        .eq('user_id', userId)
-        .single();
+        .eq('user_id', authUser.id)
+        .maybeSingle();
 
-      if (error && error.code !== 'PGRST116') {
-        console.error('Error loading customer account:', error);
-      } else if (data) {
-        setCustomerAccount(data);
-      }
-    } catch (error) {
-      console.error('Error in loadCustomerAccount:', error);
-    }
-  };
-
-  const createCustomerAccount = async (user: User, name: string, phone?: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('customer_accounts')
-        .insert({
-          user_id: user.id,
-          name: name || user.email?.split('@')[0] || 'Customer',
-          phone: phone || null,
-          email_verified: true,
-        })
-        .select()
-        .single();
-
-      if (error) {
-        console.error('Error creating customer account:', error);
-        throw error;
+      if (customerAcc) {
+        // Customer user
+        setCustomerAccount(customerAcc);
+        setUserType('customer');
+        setUser(null);
+        return;
       }
 
-      setCustomerAccount(data);
-      return data;
-    } catch (error) {
-      console.error('Error in createCustomerAccount:', error);
-      throw error;
-    }
-  };
-
-  const signUp = async (email: string, password: string, name: string, phone?: string) => {
-    try {
-      setIsLoading(true);
+      // New user - determine type based on metadata or email
+      const isAdminEmail = authUser.email === 'store@startersmallchops.com' || 
+                          authUser.email?.includes('admin') || 
+                          authUser.user_metadata?.role;
       
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            name,
-            phone,
-          }
-        }
-      });
+      if (isAdminEmail) {
+        // Create admin profile
+        const { data: newProfile } = await supabase
+          .from('profiles')
+          .insert({
+            id: authUser.id,
+            name: authUser.user_metadata?.name || authUser.email?.split('@')[0] || 'Admin',
+            email: authUser.email,
+            role: 'admin'
+          })
+          .select()
+          .single();
 
+        if (newProfile) {
+          setUser({
+            id: newProfile.id,
+            name: newProfile.name,
+            role: newProfile.role,
+            avatar_url: newProfile.avatar_url,
+            email: authUser.email || '',
+          });
+          setUserType('admin');
+        }
+      } else {
+        // Create customer account with enhanced Google profile data
+        const customerName = authUser.user_metadata?.full_name || 
+                           authUser.user_metadata?.name || 
+                           `${authUser.user_metadata?.first_name || ''} ${authUser.user_metadata?.last_name || ''}`.trim() ||
+                           authUser.email?.split('@')[0] || 'Customer';
+                           
+        const { data: newCustomer } = await supabase
+          .from('customer_accounts')
+          .insert({
+            user_id: authUser.id,
+            name: customerName,
+            phone: authUser.user_metadata?.phone,
+            email: authUser.email
+          })
+          .select()
+          .single();
+
+        if (newCustomer) {
+          setCustomerAccount(newCustomer);
+          setUserType('customer');
+        }
+      }
+    } catch (error) {
+      console.error('Error loading user data:', error);
+    }
+  };
+
+  const checkUser = async () => {
+    setIsLoading(true);
+    try {
+      const { data: { session: currentSession } } = await supabase.auth.getSession();
+      setSession(currentSession);
+      if (currentSession?.user) {
+        await loadUserData(currentSession.user);
+      } else {
+        setUser(null);
+        setCustomerAccount(null);
+        setUserType(null);
+      }
+    } catch (error) {
+      console.error('Error checking user:', error);
+      setUser(null);
+      setCustomerAccount(null);
+      setUserType(null);
+      setSession(null);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const login = async ({ email, password }: LoginCredentials) => {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password
+      });
+      
       if (error) {
+        console.error('Login error:', error);
         toast({
-          title: "Registration failed",
+          title: "Login failed",
           description: error.message,
-          variant: "destructive"
+          variant: "destructive",
         });
         return { success: false, error: error.message };
       }
 
       if (data.user) {
-        // Create customer account
-        try {
-          await createCustomerAccount(data.user, name, phone);
-          toast({
-            title: "Registration successful!",
-            description: "Welcome to Starters! You can now start ordering.",
-          });
-          return { success: true, user: data.user };
-        } catch (accountError) {
-          console.error('Failed to create customer account:', accountError);
-          // User was created but customer account failed - still allow them in
-          toast({
-            title: "Registration successful!",
-            description: "Welcome to Starters! You can now start ordering.",
-          });
-          return { success: true, user: data.user };
-        }
+        // Load user data to determine correct redirect
+        await loadUserData(data.user);
+        
+        // Check if user is admin by checking profiles table
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', data.user.id)
+          .maybeSingle();
+        
+        const redirectPath = profile ? '/dashboard' : '/';
+        return { success: true, redirect: redirectPath };
       }
 
-      return { success: false, error: "Unknown error occurred" };
+      return { success: false, error: 'Login failed' };
     } catch (error: any) {
-      toast({
-        title: "Registration failed",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive"
-      });
+      console.error('Login error:', error);
       return { success: false, error: error.message };
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const signIn = async (email: string, password: string) => {
+  const signUp = async ({ email, password, name, phone }: LoginCredentials & { name: string; phone?: string }) => {
     try {
-      setIsLoading(true);
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const userData: Record<string, any> = { 
+        name, 
+        full_name: name,
+        user_type: 'customer'
+      };
       
-      const { data, error } = await supabase.auth.signInWithPassword({
+      if (phone && phone.trim()) {
+        userData.phone = phone;
+      }
+
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
+        options: {
+          emailRedirectTo: redirectUrl,
+          data: userData,
+        },
       });
 
       if (error) {
+        console.error('Sign up error:', error);
         toast({
-          title: "Login failed",
+          title: "Registration failed",
           description: error.message,
-          variant: "destructive"
+          variant: "destructive",
         });
         return { success: false, error: error.message };
       }
 
-      toast({
-        title: "Welcome back!",
-        description: "You have been successfully logged in.",
-      });
+      if (data.user && !data.user.email_confirmed_at) {
+        toast({
+          title: "Registration successful!",
+          description: "Please check your email to verify your account.",
+        });
+        return { success: true, requiresEmailVerification: true };
+      }
 
-      return { success: true, user: data.user };
+      return { success: true };
     } catch (error: any) {
-      toast({
-        title: "Login failed",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive"
-      });
+      console.error('Sign up error:', error);
       return { success: false, error: error.message };
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const signInWithGoogle = async () => {
+  const resendOtp = async (email: string) => {
     try {
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email,
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        }
+      });
+
+      if (error) {
+        console.error('Resend OTP error:', error);
+        toast({
+          title: "Failed to resend email",
+          description: error.message,
+          variant: "destructive",
+        });
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      console.error('Resend OTP error:', error);
+      return { success: false, error: error.message };
+    }
+  };
+
+  const signUpWithGoogle = async () => {
+    try {
+      const redirectUrl = `${window.location.origin}/auth/callback`;
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`
+          redirectTo: redirectUrl,
+          queryParams: {
+            access_type: 'offline',
+            prompt: 'consent',
+          }
         }
       });
 
       if (error) {
-        toast({
-          title: "Google authentication failed",
-          description: error.message,
-          variant: "destructive"
-        });
-        return { success: false, error: error.message };
+        throw error;
       }
-
-      return { success: true };
     } catch (error: any) {
+      console.error('Google sign up error:', error);
       toast({
-        title: "Google authentication failed",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive"
+        title: "Google sign up failed",
+        description: error.message || "Please try again or use email registration.",
+        variant: "destructive",
       });
-      return { success: false, error: error.message };
+      throw error;
     }
+  };
+
+  const logout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) throw error;
   };
 
   const resetPassword = async (email: string) => {
-    try {
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/callback`
-      });
-
-      if (error) {
-        return { success: false, error: error.message };
+    const send = () => supabase.auth.resetPasswordForEmail(email, { redirectTo: `${window.location.origin}/auth/reset` });
+    let { error } = await send();
+    if (error) {
+      const msg = String(error.message || '').toLowerCase();
+      if (msg.includes('timeout') || msg.includes('context deadline exceeded') || msg.includes('504')) {
+        await new Promise((r) => setTimeout(r, 1500));
+        const retry = await send();
+        if (!retry.error) return;
       }
-
-      return { success: true };
-    } catch (error: any) {
-      return { success: false, error: error.message };
-    }
-  };
-
-  const signOut = async () => {
-    try {
-      // Clear any stored data
-      localStorage.removeItem('restaurant_cart');
-      localStorage.removeItem('guest_session');
-      localStorage.removeItem('cart_abandonment_tracking');
-      
-      const { error } = await supabase.auth.signOut();
-      if (error) throw error;
-
-      toast({
-        title: "Signed out",
-        description: "You have been successfully signed out.",
-      });
-    } catch (error: any) {
-      toast({
-        title: "Sign out failed",
-        description: error.message || "An unexpected error occurred.",
-        variant: "destructive"
-      });
+      throw error;
     }
   };
 
   const value = {
-    user,
     session,
-    isLoading,
-    isAuthenticated: !!user,
-    userType: customerAccount ? 'customer' : null,
+    user,
     customerAccount,
+    userType,
+    isAuthenticated: !!session?.user,
+    isLoading,
+    login,
     signUp,
-    signIn,
-    login: signIn, // Alias for signIn
-    signOut,
-    logout: signOut, // Alias for signOut
-    signInWithGoogle,
-    signUpWithGoogle: signInWithGoogle, // Alias for signInWithGoogle
+    signUpWithGoogle,
+    logout,
     resetPassword,
+    resendOtp,
+    checkUser,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

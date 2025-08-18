@@ -1,158 +1,209 @@
-
 import React, { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { useAuth } from '@/contexts/AuthContext';
-import { useToast } from '@/hooks/use-toast';
-
-export const LoginPage = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+import { useAuth } from '../../contexts/AuthContext';
+import { useBusinessSettings } from '../../hooks/useBusinessSettings';
+import { Eye, EyeOff } from 'lucide-react';
+import startersLogo from '@/assets/starters-logo.png';
+type AuthView = 'sign_in' | 'sign_up' | 'forgot_password';
+const LoginPage = () => {
+  const {
+    login,
+    signUp,
+    resetPassword,
+    isLoading
+  } = useAuth();
+  const {
+    data: settings
+  } = useBusinessSettings();
+  const [view, setView] = useState<AuthView>('sign_in');
+  const [formData, setFormData] = useState({
+    email: '',
+    password: '',
+    name: ''
+  });
   const [showPassword, setShowPassword] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
-  
-  const { signIn } = useAuth();
-  const { toast } = useToast();
-  const navigate = useNavigate();
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const [error, setError] = useState('');
+  const [message, setMessage] = useState('');
+  const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
-
+    setError('');
+    setMessage('');
     try {
-      const result = await signIn(email, password);
-      if (result.success) {
-        navigate('/customer-portal');
-      }
-    } catch (error) {
-      console.error('Login error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleLogin = async () => {
-    setIsLoading(true);
-    try {
-      // Google auth placeholder
-      toast({
-        title: "Google Sign-In",
-        description: "Google authentication will be implemented soon."
+      await login({
+        email: formData.email,
+        password: formData.password
       });
-    } catch (error) {
-      console.error('Google login error:', error);
-    } finally {
-      setIsLoading(false);
+    } catch (err: any) {
+      console.error('Auth error:', err);
+      setError(err.message || 'An unexpected error occurred.');
     }
   };
-
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
-          <CardDescription className="text-center">
-            Sign in to your account to continue
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="Enter your email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="pl-10"
-                  required
-                />
-              </div>
+  const handleSignUp = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    try {
+      await signUp({
+        email: formData.email,
+        password: formData.password,
+        name: formData.name
+        // Note: Admin users don't need phone numbers, only customer registrations do
+      });
+      setMessage('Registration successful! Please check your email for verification.');
+      setView('sign_in');
+    } catch (err: any) {
+      console.error('Signup error:', err);
+      setError(err.message || 'Registration failed.');
+    }
+  };
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setMessage('');
+    try {
+      await resetPassword(formData.email);
+      setMessage('Password reset email sent!');
+      setView('sign_in');
+    } catch (err: any) {
+      setError(err.message || 'Failed to send reset email');
+    }
+  };
+  const renderForm = () => {
+    if (view === 'forgot_password') {
+      return <>
+          <div className="text-center mb-8">
+            <h1 className="text-2xl font-bold text-gray-800">Reset Password</h1>
+            <p className="text-gray-600 mt-2">Enter your email to receive reset instructions</p>
+          </div>
+          <form onSubmit={handleForgotPassword} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input type="email" value={formData.email} onChange={e => setFormData(prev => ({
+              ...prev,
+              email: e.target.value
+            }))} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" required />
             </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="pl-10 pr-10"
-                  required
-                />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-0 top-0 h-full px-3"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </Button>
-              </div>
+            <div className="space-y-3 pt-2">
+              <button type="submit" disabled={isLoading} className="w-full bg-orange-600 text-white py-3 rounded-xl hover:bg-orange-700 transition-colors disabled:opacity-50">
+                {isLoading ? 'Sending...' : 'Send Reset Email'}
+              </button>
+              <button type="button" onClick={() => setView('sign_in')} className="w-full text-gray-600 hover:text-gray-800 transition-colors">
+                Back to Sign In
+              </button>
             </div>
-
-            <Button
-              type="submit"
-              className="w-full"
-              disabled={isLoading}
-            >
-              {isLoading ? 'Signing in...' : 'Sign In'}
-            </Button>
           </form>
+        </>;
+    }
+    if (view === 'sign_up') {
+      return <>
+          <div className="text-center mb-8">
+            <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden bg-white shadow-lg">
+              <img src={startersLogo} alt="Starters" className="w-full h-full object-contain p-2" loading="lazy" />
+            </div>
+            <h1 className="text-2xl font-bold text-gray-800">Create Admin Account</h1>
+            <p className="text-gray-600 mt-2">Set up your dashboard access</p>
+          </div>
 
-          <div className="mt-6">
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-gray-300" />
-              </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-2 bg-white text-gray-500">Or</span>
+          <form onSubmit={handleSignUp} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
+              <input type="text" value={formData.name} onChange={e => setFormData(prev => ({
+              ...prev,
+              name: e.target.value
+            }))} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Enter your full name" required />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+              <input type="email" value={formData.email} onChange={e => setFormData(prev => ({
+              ...prev,
+              email: e.target.value
+            }))} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="admin@example.com" required />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+              <div className="relative">
+                <input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={e => setFormData(prev => ({
+                ...prev,
+                password: e.target.value
+              }))} className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Create a password (min 6 characters)" required minLength={6} />
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                  {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+                </button>
               </div>
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              className="w-full mt-4"
-              onClick={handleGoogleLogin}
-              disabled={isLoading}
-            >
-              Continue with Google
-            </Button>
+            <div className="space-y-3 pt-2">
+              <button type="submit" disabled={isLoading} className="w-full bg-orange-600 text-white py-3 rounded-xl hover:bg-orange-700 transition-colors disabled:opacity-50">
+                {isLoading ? 'Creating Account...' : 'Create Account'}
+              </button>
+              
+              <button type="button" onClick={() => setView('sign_in')} className="w-full text-gray-600 hover:text-gray-800 transition-colors">
+                Already have an account? Sign In
+              </button>
+            </div>
+          </form>
+        </>;
+    }
+    return <>
+        <div className="text-center mb-8">
+          <div className="w-24 h-24 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden bg-white shadow-lg">
+            <img src={startersLogo} alt="Starters" className="w-full h-full object-contain p-2" loading="lazy" />
+          </div>
+          <h1 className="text-2xl font-bold text-gray-800">Starters</h1>
+          <p className="text-gray-600 mt-2">
+            Premium Small Chops & Catering Services
+          </p>
+        </div>
+
+        <form onSubmit={handleSignIn} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <input type="email" value={formData.email} onChange={e => setFormData(prev => ({
+            ...prev,
+            email: e.target.value
+          }))} className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="admin@example.com" required />
           </div>
 
-          <div className="mt-6 text-center space-y-2">
-            <p className="text-sm text-gray-600">
-              Don't have an account?{' '}
-              <Link
-                to="/customer-register"
-                className="text-blue-600 hover:text-blue-500 font-medium"
-              >
-                Sign up
-              </Link>
-            </p>
-            <p className="text-sm">
-              <Link
-                to="/forgot-password"
-                className="text-blue-600 hover:text-blue-500"
-              >
-                Forgot your password?
-              </Link>
-            </p>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Password</label>
+            <div className="relative">
+              <input type={showPassword ? 'text' : 'password'} value={formData.password} onChange={e => setFormData(prev => ({
+              ...prev,
+              password: e.target.value
+            }))} className="w-full px-4 py-3 pr-12 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-orange-500" placeholder="Enter your password" required minLength={6} />
+              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600">
+                {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
+              </button>
+            </div>
           </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+
+          <div className="space-y-3 pt-2">
+            <button type="submit" disabled={isLoading} className="w-full bg-orange-600 text-white py-3 rounded-xl hover:bg-orange-700 transition-colors disabled:opacity-50">
+              {isLoading ? 'Signing In...' : 'Sign In'}
+            </button>
+            
+            <div className="flex space-x-2">
+              
+              <span className="text-gray-300">|</span>
+              <button type="button" onClick={() => setView('forgot_password')} className="flex-1 text-orange-600 hover:text-orange-700 transition-colors text-sm">
+                Forgot Password?
+              </button>
+            </div>
+          </div>
+        </form>
+      </>;
+  };
+  return <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-8">
+        {error && <div className="bg-red-50 text-red-600 p-3 rounded-xl text-sm mb-4">
+            {error}
+          </div>}
+        {message && <div className="bg-green-50 text-green-600 p-3 rounded-xl text-sm mb-4">
+            {message}
+          </div>}
+        {renderForm()}
+      </div>
+    </div>;
 };
+export default LoginPage;

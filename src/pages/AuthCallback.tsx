@@ -178,8 +178,7 @@ const AuthCallback: React.FC = () => {
         isOpen={showPhoneModal}
         onSubmit={handlePhoneSubmit}
         onClose={() => {}} // Non-dismissible
-        title="Complete Your Profile"
-        subtitle="Please provide your phone number to complete registration"
+        userEmail={userId} // Pass user ID for context
       />
       
       <PublicFooter />

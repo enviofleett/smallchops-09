@@ -35,7 +35,12 @@ export const useCustomerOrders = () => {
               product_id,
               product_name,
               quantity,
-              unit_price
+              unit_price,
+              total_price,
+              vat_amount,
+              discount_amount,
+              customizations,
+              special_instructions
             )
           `)
           .eq('customer_email', userEmail)
@@ -59,7 +64,12 @@ export const useCustomerOrders = () => {
                 product_id,
                 product_name,
                 quantity,
-                unit_price
+                unit_price,
+                total_price,
+                vat_amount,
+                discount_amount,
+                customizations,
+                special_instructions
               )
             `)
             .eq('customer_id', customerAccount.id)

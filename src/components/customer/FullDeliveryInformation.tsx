@@ -69,6 +69,15 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
     }
   };
 
+  const formatDate = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+      return format(new Date(dateString), 'dd/MM/yyyy');
+    } catch {
+      return dateString;
+    }
+  };
+
   const formatCurrency = (value: number | string | null | undefined) => {
     const n = Number(value);
     const safe = Number.isFinite(n) ? n : 0;
@@ -255,9 +264,11 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
                             {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Date
                           </p>
                           <p className="font-medium">
+                            {formatDate(deliverySchedule.delivery_date)}
+                          </p>
+                          <p className="text-xs text-muted-foreground">
                             {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG', {
                               weekday: 'long',
-                              year: 'numeric',
                               month: 'long',
                               day: 'numeric'
                             })}

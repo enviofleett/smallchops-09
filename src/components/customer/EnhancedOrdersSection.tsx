@@ -1,6 +1,6 @@
 import React from 'react';
 import { useCustomerOrders } from '@/hooks/useCustomerOrders';
-import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
+import { useCustomerOrderSchedules } from '@/hooks/useCustomerOrderSchedules';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
@@ -52,7 +52,7 @@ export function EnhancedOrdersSection() {
   }, [ordersData]);
   
   const orderIds = React.useMemo(() => orders.map(order => order.id), [orders]);
-  const { schedules } = useOrderDeliverySchedules(orderIds);
+  const { schedules } = useCustomerOrderSchedules(orderIds);
   
   // Debug logging to see if schedule data exists
   React.useEffect(() => {

@@ -251,24 +251,36 @@ export default function AdminOrders() {
 
         {/* Orders Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-6">
-            <TabsTrigger value="all">
-              All Orders ({orderCounts.all})
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1">
+            <TabsTrigger value="all" className="text-xs sm:text-sm">
+              <span className="hidden sm:inline">All Orders</span>
+              <span className="sm:hidden">All</span>
+              <span className="ml-1">({orderCounts.all})</span>
             </TabsTrigger>
-            <TabsTrigger value="pending">
-              Pending ({orderCounts.pending})
+            <TabsTrigger value="pending" className="text-xs sm:text-sm">
+              <span className="hidden sm:inline">Pending</span>
+              <span className="sm:hidden">Pend</span>
+              <span className="ml-1">({orderCounts.pending})</span>
             </TabsTrigger>
-            <TabsTrigger value="confirmed">
-              Confirmed ({orderCounts.confirmed})
+            <TabsTrigger value="confirmed" className="text-xs sm:text-sm">
+              <span className="hidden sm:inline">Confirmed</span>
+              <span className="sm:hidden">Conf</span>
+              <span className="ml-1">({orderCounts.confirmed})</span>
             </TabsTrigger>
-            <TabsTrigger value="preparing">
-              Preparing ({orderCounts.preparing})
+            <TabsTrigger value="preparing" className="text-xs sm:text-sm">
+              <span className="hidden sm:inline">Preparing</span>
+              <span className="sm:hidden">Prep</span>
+              <span className="ml-1">({orderCounts.preparing})</span>
             </TabsTrigger>
-            <TabsTrigger value="out_for_delivery">
-              Out for Delivery ({orderCounts.out_for_delivery})
+            <TabsTrigger value="out_for_delivery" className="text-xs sm:text-sm">
+              <span className="hidden sm:inline">Out for Delivery</span>
+              <span className="sm:hidden">Out</span>
+              <span className="ml-1">({orderCounts.out_for_delivery})</span>
             </TabsTrigger>
-            <TabsTrigger value="delivered">
-              Delivered ({orderCounts.delivered})
+            <TabsTrigger value="delivered" className="text-xs sm:text-sm">
+              <span className="hidden sm:inline">Delivered</span>
+              <span className="sm:hidden">Del</span>
+              <span className="ml-1">({orderCounts.delivered})</span>
             </TabsTrigger>
           </TabsList>
 
@@ -401,7 +413,7 @@ function AdminOrderCard({
           </Badge>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <p className="text-sm text-muted-foreground">Customer</p>
             <p className="font-medium">{order.customer_name || 'N/A'}</p>

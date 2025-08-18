@@ -127,46 +127,138 @@ export function OrderItemsBreakdown({
         {/* Order Totals */}
         <Separator />
         <div className="space-y-3">
-          <div className="flex justify-between text-sm">
-            <span className="text-gray-600">Items Subtotal</span>
-            <span className="font-medium">{formatCurrency(subtotal)}</span>
+          {/* Items Subtotal Breakdown */}
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="text-gray-600">Items Subtotal ({items.length} items)</span>
+              <span className="font-medium">{formatCurrency(subtotal)}</span>
+            </div>
+            
+            {/* Show individual item totals when there are multiple items */}
+            {showDetailed && items.length > 1 && (
+              <div className="pl-4 space-y-1 border-l-2 border-gray-100">
+                {items.map((item, index) => (
+                  <div key={item.id || index} className="flex justify-between text-xs text-gray-500">
+                    <span className="truncate mr-2">{item.product_name} (x{item.quantity})</span>
+                    <span>{formatCurrency(Number(item.total_price ?? 0))}</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
           
+          {/* Discount Section */}
           {totalDiscount > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-green-600">Total Discount</span>
-              <span className="font-medium text-green-600">-{formatCurrency(totalDiscount)}</span>
+            <div className="flex justify-between text-sm bg-green-50 p-2 rounded">
+              <span className="text-green-700 font-medium">
+                <span className="text-green-600">💰</span> Total Savings
+              </span>
+              <span className="font-semibold text-green-700">-{formatCurrency(totalDiscount)}</span>
             </div>
           )}
           
-          {deliveryFee > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Delivery Fee</span>
-              <span className="font-medium">{formatCurrency(deliveryFee)}</span>
-            </div>
-          )}
-          
-          {totalVat > 0 && (
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">VAT (7.5%)</span>
-              <span className="font-medium">{formatCurrency(totalVat)}</span>
-            </div>
-          )}
-          
-          <Separator className="my-2" />
-          
-          <div className="flex justify-between text-base font-semibold">
-            <span>Order Total</span>
-            <span className="text-primary">{formatCurrency(grandTotal)}</span>
+          {/* Service Fees Section */}
+          <div className="space-y-2">
+            {deliveryFee > 0 && (
+              <div className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span className="text-gray-600 flex items-center gap-1">
+                    <span>🚚</span> Delivery Fee
+                  </span>
+                  <span className="font-medium">{formatCurrency(deliveryFee)}</span>
+                </div>
+                <div className="text-xs text-gray-500 pl-6">
+                  Standard home delivery within zone
+                </div>
+              </div>
+            )}
+            
+            {/* Service Charge (if any) */}
+            {showDetailed && (
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">Service Charge</span>
+                <span className="font-medium text-gray-500">₦0.00</span>
+              </div>
+            )}
           </div>
           
-          <div className="text-xs text-gray-500 mt-2 p-2 bg-gray-50 rounded">
-            <div className="flex justify-between">
-              <span>Payment Status:</span>
-              <span className="font-medium">Processing via Paystack</span>
+          {/* Tax Breakdown */}
+          {totalVat > 0 && (
+            <div className="space-y-1">
+              <div className="flex justify-between text-sm">
+                <span className="text-gray-600">VAT (7.5%)</span>
+                <span className="font-medium">{formatCurrency(totalVat)}</span>
+              </div>
+              <div className="text-xs text-gray-500 pl-4">
+                Value Added Tax calculated on eligible items
+              </div>
             </div>
-            <div className="text-xs text-gray-400 mt-1">
-              All prices are inclusive of applicable taxes
+          )}
+          
+          {/* Calculation Summary */}
+          {showDetailed && (
+            <div className="bg-blue-50 p-3 rounded space-y-1">
+              <div className="text-xs font-medium text-blue-800 mb-2">Order Calculation:</div>
+              <div className="space-y-1 text-xs text-blue-700">
+                <div className="flex justify-between">
+                  <span>Subtotal:</span>
+                  <span>{formatCurrency(subtotal)}</span>
+                </div>
+                {totalDiscount > 0 && (
+                  <div className="flex justify-between text-green-700">
+                    <span>Savings:</span>
+                    <span>-{formatCurrency(totalDiscount)}</span>
+                  </div>
+                )}
+                {deliveryFee > 0 && (
+                  <div className="flex justify-between">
+                    <span>Delivery:</span>
+                    <span>+{formatCurrency(deliveryFee)}</span>
+                  </div>
+                )}
+                {totalVat > 0 && (
+                  <div className="flex justify-between">
+                    <span>VAT:</span>
+                    <span>+{formatCurrency(totalVat)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          
+          <Separator className="my-3" />
+          
+          {/* Final Total */}
+          <div className="bg-primary/5 p-3 rounded-lg">
+            <div className="flex justify-between items-center">
+              <span className="text-lg font-semibold text-gray-900">Order Total</span>
+              <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
+            </div>
+            
+            {/* Total Breakdown Helper */}
+            {showDetailed && (totalDiscount > 0 || deliveryFee > 0) && (
+              <div className="text-xs text-gray-600 mt-2 pt-2 border-t border-primary/10">
+                You pay {formatCurrency(grandTotal)} 
+                {totalDiscount > 0 && ` (saved ${formatCurrency(totalDiscount)})`}
+                {deliveryFee > 0 && ` including ${formatCurrency(deliveryFee)} delivery`}
+              </div>
+            )}
+          </div>
+          
+          {/* Payment & Policy Info */}
+          <div className="text-xs text-gray-500 mt-3 p-3 bg-gray-50 rounded border">
+            <div className="space-y-1">
+              <div className="flex justify-between items-center">
+                <span>Payment Method:</span>
+                <span className="font-medium text-blue-600">Paystack (Secure)</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span>Currency:</span>
+                <span className="font-medium">Nigerian Naira (₦)</span>
+              </div>
+              <div className="text-xs text-gray-400 mt-2 pt-2 border-t">
+                🔒 All transactions are secure and encrypted. Prices include applicable taxes.
+              </div>
             </div>
           </div>
         </div>

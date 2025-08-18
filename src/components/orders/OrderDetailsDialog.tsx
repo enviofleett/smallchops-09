@@ -157,7 +157,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-full sm:max-w-3xl h-full sm:h-auto max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-full sm:max-w-4xl h-full sm:h-auto max-h-[95vh] overflow-y-auto p-0 sm:p-6">
         <DialogHeader>
           <DialogTitle className="text-xl">Order Details</DialogTitle>
           <DialogClose asChild>
@@ -166,7 +166,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
             </Button>
           </DialogClose>
         </DialogHeader>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 p-4 md:p-6">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6 p-4 md:p-6">
           <div>
             <h3 className="font-semibold text-lg mb-4">Customer Information</h3>
             <div className="space-y-3 text-sm">

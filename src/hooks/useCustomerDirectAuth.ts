@@ -22,7 +22,7 @@ export const useCustomerDirectAuth = () => {
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const login = async (email: string, password: string, captchaToken?: string) => {
+  const login = async (email: string, password: string) => {
     try {
       setIsLoading(true);
       
@@ -72,7 +72,7 @@ export const useCustomerDirectAuth = () => {
     }
   };
 
-  const register = async (data: RegistrationData, captchaToken?: string) => {
+  const register = async (data: RegistrationData) => {
     try {
       setIsLoading(true);
       
@@ -305,7 +305,7 @@ export const useCustomerDirectAuth = () => {
     }
   };
 
-  const signUpWithGoogle = async (captchaToken?: string) => {
+  const signUpWithGoogle = async () => {
     try {
       setIsLoading(true);
       

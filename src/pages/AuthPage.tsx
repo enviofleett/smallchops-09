@@ -5,11 +5,9 @@ import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
 // Removed OTP registration in favor of direct signup
 import { usePasswordReset } from '@/hooks/usePasswordReset';
 import { useToast } from '@/hooks/use-toast';
-import { useCaptcha } from '@/hooks/useCaptcha';
 import AuthLayout from '@/components/auth/AuthLayout';
 import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import AuthFormValidation from '@/components/auth/AuthFormValidation';
-import CaptchaComponent from '@/components/auth/CaptchaComponent';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -31,25 +29,6 @@ const AuthPage = () => {
   const { login: customerLogin, register: customerRegister, signUpWithGoogle, isLoading: isCustomerLoading } = useCustomerDirectAuth();
   const { sendPasswordReset, isLoading: isPasswordResetLoading } = usePasswordReset();
 
-  // CAPTCHA integration
-  const {
-    captchaToken,
-    isCaptchaVerified,
-    isCaptchaRequired,
-    attemptCount,
-    isBlocked,
-    timeUntilUnblock,
-    recordFailedAttempt,
-    recordSuccessfulAttempt,
-    verifyCaptcha,
-    resetCaptcha,
-    canAttemptLogin
-  } = useCaptcha({
-    requiredAfterAttempts: 2, // Require CAPTCHA after 2 failed attempts
-    maxAttempts: 5,
-    cooldownPeriod: 300000, // 5 minutes
-    autoReset: true
-  });
 
   // State
   const [showPassword, setShowPassword] = useState(false);
@@ -132,39 +111,10 @@ const AuthPage = () => {
   const handleCustomerLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Check if blocked due to too many attempts
-    if (isBlocked) {
-      toast({
-        title: "Too many attempts",
-        description: `Please wait ${Math.ceil(timeUntilUnblock / 60)} minutes before trying again.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    // Check CAPTCHA requirement
-    if (isCaptchaRequired && !isCaptchaVerified) {
-      toast({
-        title: "CAPTCHA required",
-        description: "Please complete the security verification first.",
-        variant: "destructive"
-      });
-      return;
-    }
-    
-    const result = await customerLogin(
-      formData.email, 
-      formData.password, 
-      captchaToken || undefined
-    );
+    const result = await customerLogin(formData.email, formData.password);
     
     if (result.success && result.redirect) {
-      recordSuccessfulAttempt();
-      resetCaptcha();
       navigate(result.redirect);
-    } else {
-      recordFailedAttempt();
-      resetCaptcha(); // Reset CAPTCHA on failed attempt to require new verification
     }
   };
 
@@ -220,24 +170,7 @@ const AuthPage = () => {
   };
 
   const handleGoogleAuth = async () => {
-    // Check if blocked due to too many attempts
-    if (isBlocked) {
-      toast({
-        title: "Too many attempts",
-        description: `Please wait ${Math.ceil(timeUntilUnblock / 60)} minutes before trying again.`,
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      await signUpWithGoogle(captchaToken || undefined);
-      recordSuccessfulAttempt();
-      resetCaptcha();
-    } catch (error) {
-      recordFailedAttempt();
-      resetCaptcha();
-    }
+    await signUpWithGoogle();
   };
 
 
@@ -287,53 +220,14 @@ const AuthPage = () => {
         </div>
       </div>
 
-      {/* CAPTCHA Component - Show when required */}
-      {isCaptchaRequired && (
-        <CaptchaComponent
-          onVerify={verifyCaptcha}
-          onError={(error) => {
-            console.error('CAPTCHA error:', error);
-            toast({
-              title: "CAPTCHA Error",
-              description: "Please try refreshing the page if the issue persists.",
-              variant: "destructive"
-            });
-          }}
-          onExpire={resetCaptcha}
-          disabled={getCurrentLoadingState()}
-          required={true}
-          className="w-full"
-        />
-      )}
-
-      {/* Security Status Alert */}
-      {attemptCount > 0 && !isBlocked && (
-        <Alert variant={attemptCount >= 2 ? "destructive" : "default"}>
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            {attemptCount === 1 && "1 failed attempt. CAPTCHA will be required after 1 more failed attempt."}
-            {attemptCount >= 2 && `${attemptCount} failed attempts. CAPTCHA verification required.`}
-          </AlertDescription>
-        </Alert>
-      )}
-
-      {/* Blocked Status Alert */}
-      {isBlocked && (
-        <Alert variant="destructive">
-          <AlertTriangle className="h-4 w-4" />
-          <AlertDescription>
-            Too many failed attempts. Please wait {Math.ceil(timeUntilUnblock / 60)} minutes before trying again.
-          </AlertDescription>
-        </Alert>
-      )}
 
       <Button 
         type="submit" 
         className="w-full" 
-        disabled={getCurrentLoadingState() || isBlocked || (isCaptchaRequired && !isCaptchaVerified)}
+        disabled={getCurrentLoadingState()}
       >
         {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        {isBlocked ? `Blocked (${Math.ceil(timeUntilUnblock / 60)}m)` : 'Sign In'}
+        Sign In
       </Button>
 
       <div className="relative">

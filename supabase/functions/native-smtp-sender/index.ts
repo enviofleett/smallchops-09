@@ -48,50 +48,78 @@ class SMTPClient {
     };
   }
 
-  private async readResponse(): Promise<SMTPResponse> {
+  private async readResponse(expectMultiline: boolean = false): Promise<SMTPResponse> {
     if (!this.connection) throw new Error('No connection established');
     
-    const buffer = new Uint8Array(4096);
     let response = '';
-    let totalRead = 0;
+    let attempts = 0;
+    const maxAttempts = 10;
     
-    // Read with timeout
-    const timeoutPromise = new Promise<never>((_, reject) => {
-      setTimeout(() => reject(new Error('Response timeout')), 10000);
-    });
-    
-    try {
-      const readPromise = this.connection.conn.read(buffer);
-      const bytesRead = await Promise.race([readPromise, timeoutPromise]);
-      
-      if (bytesRead) {
-        response = this.connection.decoder.decode(buffer.subarray(0, bytesRead));
-        totalRead = bytesRead;
-      }
-      
-      // Handle multi-line responses
-      while (response.includes('-') && totalRead > 0) {
-        const additionalRead = await this.connection.conn.read(buffer);
-        if (additionalRead) {
-          response += this.connection.decoder.decode(buffer.subarray(0, additionalRead));
-          totalRead += additionalRead;
-        } else {
-          break;
+    while (attempts < maxAttempts) {
+      try {
+        const buffer = new Uint8Array(4096);
+        
+        // Add a small delay for TLS connections to ensure data is ready
+        if (this.connection.isTLS && attempts === 0) {
+          await new Promise(resolve => setTimeout(resolve, 100));
         }
+        
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          setTimeout(() => reject(new Error('Response timeout')), 10000);
+        });
+        
+        const readPromise = this.connection.conn.read(buffer);
+        const bytesRead = await Promise.race([readPromise, timeoutPromise]);
+        
+        if (bytesRead === null) {
+          throw new Error('Connection closed unexpectedly');
+        }
+        
+        if (bytesRead > 0) {
+          const chunk = this.connection.decoder.decode(buffer.subarray(0, bytesRead));
+          response += chunk;
+          
+          // Check if we have a complete response
+          if (response.includes('\n')) {
+            const lines = response.split('\n');
+            const lastLine = lines[lines.length - 2] || lines[lines.length - 1]; // Handle trailing newline
+            
+            if (lastLine && lastLine.length >= 4) {
+              const hasMoreLines = lastLine.charAt(3) === '-';
+              if (!hasMoreLines || !expectMultiline) {
+                break;
+              }
+            }
+          }
+        }
+        
+        attempts++;
+        if (attempts < maxAttempts && response.length === 0) {
+          await new Promise(resolve => setTimeout(resolve, 50)); // Small delay before retry
+        }
+      } catch (error) {
+        if (error.message === 'Response timeout') {
+          throw error;
+        }
+        throw new Error(`Failed to read response: ${error.message}`);
       }
-    } catch (error) {
-      if (error.message === 'Response timeout') {
-        throw error;
-      }
-      throw new Error(`Failed to read response: ${error.message}`);
+    }
+
+    if (response.length === 0) {
+      throw new Error('No response received from server');
     }
 
     console.log('SMTP Response:', response.trim());
     
     const lines = response.trim().split('\n');
-    const lastLine = lines[lines.length - 1];
+    const lastLine = lines[lines.length - 1].trim();
+    
+    if (lastLine.length < 3) {
+      throw new Error('Invalid SMTP response format');
+    }
+    
     const code = parseInt(lastLine.substring(0, 3));
-    const message = lastLine.substring(4);
+    const message = lastLine.substring(4) || lastLine.substring(3);
     
     return {
       code,
@@ -100,12 +128,24 @@ class SMTPClient {
     };
   }
 
-  private async sendCommand(command: string): Promise<SMTPResponse> {
+  private async sendCommand(command: string, expectMultiline: boolean = false): Promise<SMTPResponse> {
     if (!this.connection) throw new Error('No connection established');
     
     console.log('SMTP Command:', command);
-    await this.connection.conn.write(this.connection.encoder.encode(command + '\r\n'));
-    return await this.readResponse();
+    
+    try {
+      const encodedCommand = this.connection.encoder.encode(command + '\r\n');
+      await this.connection.conn.write(encodedCommand);
+      
+      // Add a small delay after sending command, especially for TLS connections
+      if (this.connection.isTLS) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      
+      return await this.readResponse(expectMultiline);
+    } catch (error) {
+      throw new Error(`Failed to send command "${command}": ${error.message}`);
+    }
   }
 
   private async connectWithTimeout(options: Deno.ConnectOptions | Deno.ConnectTlsOptions, useTLS: boolean = false): Promise<Deno.Conn | Deno.TlsConn> {

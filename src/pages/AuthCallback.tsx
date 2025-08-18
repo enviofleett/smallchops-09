@@ -1,192 +1,190 @@
-import { useEffect, useState } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { handlePostLoginRedirect } from '@/utils/redirect';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Loader2, CheckCircle, AlertCircle } from 'lucide-react';
+import { PublicHeader } from '@/components/layout/PublicHeader';
+import { PublicFooter } from '@/components/layout/PublicFooter';
 import { PhoneCollectionModal } from '@/components/auth/PhoneCollectionModal';
+import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
-export default function AuthCallback() {
-  const navigate = useNavigate();
+const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'phone_required'>('loading');
+  const [error, setError] = useState<string>('');
   const [showPhoneModal, setShowPhoneModal] = useState(false);
-  const [userEmail, setUserEmail] = useState<string>('');
+  const [userId, setUserId] = useState<string>('');
 
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        const type = searchParams.get('type');
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
           console.error('Auth callback error:', error);
-          toast({
-            title: "Authentication failed",
-            description: error.message || "Please try signing in again.",
-            variant: "destructive",
-          });
-          navigate('/auth');
+          setError(error.message);
+          setStatus('error');
           return;
         }
 
         if (data.session?.user) {
           const user = data.session.user;
-          setUserEmail(user.email || '');
-          
-          // Check user role first
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single();
+          console.log('Auth callback - user authenticated:', user.email);
 
-          // If admin user, redirect to dashboard
-          if (profile?.role === 'admin') {
-            toast({
-              title: "Welcome back!",
-              description: "You have been successfully signed in.",
-            });
-            const redirectPath = handlePostLoginRedirect('admin');
-            navigate(redirectPath);
+          // Check if user has phone number
+          const hasPhone = user.user_metadata?.phone || user.phone;
+          
+          if (!hasPhone) {
+            console.log('Phone number required for user:', user.id);
+            setUserId(user.id);
+            setStatus('phone_required');
+            setShowPhoneModal(true);
             return;
           }
 
-          // For customer users (including OAuth), check if phone number is needed
-          if (user.app_metadata?.provider === 'google') {
-            // Poll for customer account creation with exponential backoff
-            const maxAttempts = 10;
-            let attempt = 0;
-            let customerAccount = null;
-            
-            while (attempt < maxAttempts && !customerAccount) {
-              const { data } = await supabase
-                .from('customer_accounts')
-                .select('phone, id')
-                .eq('user_id', user.id)
-                .maybeSingle();
-              
-              if (data) {
-                customerAccount = data;
-                break;
-              }
-              
-              // Exponential backoff: 100ms, 200ms, 400ms, 800ms, etc.
-              const delay = Math.min(100 * Math.pow(2, attempt), 2000);
-              await new Promise(resolve => setTimeout(resolve, delay));
-              attempt++;
-            }
-            
-            // If no account found after polling, create it manually as fallback
-            if (!customerAccount) {
-              console.log('Creating customer account manually for OAuth user');
-              const { data: newAccount, error: createError } = await supabase
-                .from('customer_accounts')
-                .insert({
-                  user_id: user.id,
-                  email: user.email || '',  // Add required email field
-                  name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0],
-                  email_verified: true,
-                  profile_completion_percentage: 60
-                })
-                .select('phone, id')
-                .single();
-              
-              if (!createError && newAccount) {
-                customerAccount = newAccount;
-              }
-            }
-            
-            if (customerAccount && !customerAccount.phone) {
-              setShowPhoneModal(true);
-              setIsLoading(false);
-              return;
-            }
-          }
-
-          // Regular redirect for users with complete profiles
-          let successMessage = "You have been successfully authenticated.";
-          
-          if (type === 'recovery') {
-            successMessage = "Password reset successful. You are now logged in.";
-          } else if (user.email_confirmed_at) {
-            successMessage = "Email verified successfully. Welcome to our platform!";
-          }
+          // User is fully authenticated with phone
+          setStatus('success');
           
           toast({
             title: "Welcome!",
-            description: successMessage,
+            description: "You have been successfully authenticated.",
           });
-          const redirectPath = handlePostLoginRedirect('customer');
-          navigate(redirectPath);
+
+          // Redirect after short delay
+          setTimeout(() => {
+            const redirectTo = searchParams.get('redirect') || '/';
+            navigate(redirectTo, { replace: true });
+          }, 1500);
         } else {
-          navigate('/auth');
+          // No active session, redirect to auth page
+          console.log('No session found, redirecting to auth');
+          navigate('/auth', { replace: true });
         }
-      } catch (error: any) {
-        console.error('Callback processing error:', error);
-        toast({
-          title: "Processing failed",
-          description: "There was an issue processing your authentication.",
-          variant: "destructive",
-        });
-        navigate('/auth');
-      } finally {
-        setIsLoading(false);
+      } catch (err) {
+        console.error('Unexpected error in auth callback:', err);
+        setError('An unexpected error occurred during authentication');
+        setStatus('error');
       }
     };
 
     handleAuthCallback();
-  }, [navigate, toast, searchParams]);
+  }, [navigate, searchParams, toast]);
 
-  const handlePhoneSubmit = async (phone: string) => {
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      // Update customer account with phone number
-      await supabase
+  const handlePhoneSubmit = async (phoneNumber: string) => {
+    try {
+      // Update user metadata with phone number
+      const { error: updateError } = await supabase.auth.updateUser({
+        data: { phone: phoneNumber }
+      });
+
+      if (updateError) {
+        throw updateError;
+      }
+
+      // Also update the customer_accounts table
+      const { error: customerError } = await supabase
         .from('customer_accounts')
-        .update({ phone })
-        .eq('user_id', data.user.id);
+        .update({ phone: phoneNumber })
+        .eq('user_id', userId);
+
+      if (customerError) {
+        console.warn('Failed to update customer phone:', customerError);
+      }
+
+      setShowPhoneModal(false);
+      setStatus('success');
       
       toast({
         title: "Profile completed!",
-        description: "Your phone number has been saved successfully.",
+        description: "Your account setup is now complete.",
       });
-      
-      // Navigate with proper redirect handling
-      const redirectPath = handlePostLoginRedirect('customer');
-      navigate(redirectPath);
+
+      setTimeout(() => {
+        const redirectTo = searchParams.get('redirect') || '/';
+        navigate(redirectTo, { replace: true });
+      }, 1500);
+    } catch (error: any) {
+      console.error('Phone update error:', error);
+      toast({
+        title: "Phone update failed",
+        description: error.message || "Failed to update phone number",
+        variant: "destructive"
+      });
     }
   };
 
-  const handlePhoneSkip = () => {
-    // Phone is now required, but we keep this for backward compatibility
-    // Users will be shown the modal again until they provide a phone number
-    setShowPhoneModal(false);
-    const redirectPath = handlePostLoginRedirect('customer');
-    navigate(redirectPath);
+  const renderStatus = () => {
+    switch (status) {
+      case 'loading':
+        return (
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+            <h2 className="text-xl font-semibold mb-2">Completing authentication...</h2>
+            <p className="text-muted-foreground">Please wait while we set up your account.</p>
+          </div>
+        );
+
+      case 'success':
+        return (
+          <div className="text-center">
+            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Authentication successful!</h2>
+            <p className="text-muted-foreground">Redirecting you now...</p>
+          </div>
+        );
+
+      case 'phone_required':
+        return (
+          <div className="text-center">
+            <Loader2 className="h-12 w-12 text-primary mx-auto mb-4 animate-spin" />
+            <h2 className="text-xl font-semibold mb-2">Completing your profile...</h2>
+            <p className="text-muted-foreground">We need a few more details to set up your account.</p>
+          </div>
+        );
+
+      case 'error':
+        return (
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Authentication failed</h2>
+            <p className="text-muted-foreground mb-4">{error}</p>
+            <button
+              onClick={() => navigate('/auth')}
+              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90"
+            >
+              Try again
+            </button>
+          </div>
+        );
+
+      default:
+        return null;
+    }
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="flex flex-col items-center gap-4">
-          <CheckCircle className="h-12 w-12 text-primary animate-pulse" />
-          <p className="text-lg font-medium">Signing you in...</p>
+  return (
+    <div className="min-h-screen bg-background">
+      <PublicHeader />
+      
+      <div className="flex items-center justify-center min-h-[60vh] py-12">
+        <div className="max-w-md w-full mx-auto px-4">
+          {renderStatus()}
         </div>
       </div>
-    );
-  }
 
-  return (
-    <>
       <PhoneCollectionModal
         isOpen={showPhoneModal}
-        onClose={() => {}} // Make modal non-dismissible for required phone collection
         onSubmit={handlePhoneSubmit}
-        userEmail={userEmail}
+        onClose={() => {}} // Non-dismissible
+        title="Complete Your Profile"
+        subtitle="Please provide your phone number to complete registration"
       />
-    </>
+      
+      <PublicFooter />
+    </div>
   );
-}
+};
+
+export default AuthCallback;

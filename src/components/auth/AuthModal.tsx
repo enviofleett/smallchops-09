@@ -4,16 +4,17 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { useAuth } from '@/contexts/AuthContext';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Eye, EyeOff, Mail, Lock, User, Phone, CheckCircle } from 'lucide-react';
+import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
+import { useRegistrationFlow } from '@/hooks/useRegistrationFlow';
+import { RegistrationErrorHandler } from './RegistrationErrorHandler';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, User, Eye, EyeOff, Phone } from 'lucide-react';
-import GoogleAuthButton from './GoogleAuthButton';
 
 interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void;
+  onSuccess?: () => void;
   title?: string;
   subtitle?: string;
 }
@@ -25,290 +26,287 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   title = "Welcome",
   subtitle = "Sign in to your account or create a new one"
 }) => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState<'login' | 'register'>('login');
   const [showPassword, setShowPassword] = useState(false);
-  const [formData, setFormData] = useState({
+  const [loginData, setLoginData] = useState({ email: '', password: '' });
+  const [registerData, setRegisterData] = useState({
+    name: '',
     email: '',
     password: '',
-    name: '',
     phone: ''
   });
-  const [error, setError] = useState('');
-  
-  const { login, signUp, signUpWithGoogle } = useAuth();
+
+  const { login, isLoading: loginLoading } = useCustomerDirectAuth();
+  const { 
+    isLoading: registerLoading, 
+    error: registerError, 
+    step: registerStep,
+    registrationEmail,
+    handleRegister,
+    handleResendVerification,
+    resetFlow,
+    retryRegistration
+  } = useRegistrationFlow();
   const { toast } = useToast();
 
-  const validateNigerianPhone = (phone: string) => {
-    const cleaned = phone.replace(/\D/g, '');
-    return cleaned.length === 11 && cleaned.startsWith('0');
-  };
-
-  const formatNigerianPhone = (value: string) => {
-    const cleaned = value.replace(/\D/g, '');
-    if (cleaned.startsWith('234')) {
-      return '0' + cleaned.slice(3);
-    }
-    if (value.startsWith('+234')) {
-      return '0' + cleaned.slice(3);
-    }
-    if (cleaned.length > 0 && !cleaned.startsWith('0')) {
-      return '0' + cleaned;
-    }
-    return cleaned;
-  };
-
-  const handleInputChange = (field: string, value: string) => {
-    if (field === 'phone') {
-      value = formatNigerianPhone(value);
-    }
-    setFormData(prev => ({ ...prev, [field]: value }));
-    if (error) setError('');
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
-    setIsLoading(true);
+    
+    if (!loginData.email || !loginData.password) {
+      toast({
+        title: "Please fill in all fields",
+        variant: "destructive"
+      });
+      return;
+    }
 
-    try {
-      if (isLogin) {
-        const result = await login({ 
-          email: formData.email, 
-          password: formData.password 
-        });
-        
-        if (result.success) {
-          toast({
-            title: "Login successful",
-            description: "Welcome back!",
-          });
-          onSuccess();
-        } else {
-          setError(result.error || 'Login failed');
-        }
-      } else {
-        // Validate required fields for registration
-        if (!formData.name.trim()) {
-          setError('Full name is required');
-          setIsLoading(false);
-          return;
-        }
-        
-        if (!formData.phone.trim()) {
-          setError('Phone number is required');
-          setIsLoading(false);
-          return;
-        }
-        
-        if (!validateNigerianPhone(formData.phone)) {
-          setError('Please enter a valid Nigerian phone number (11 digits starting with 0)');
-          setIsLoading(false);
-          return;
-        }
-        
-        if (formData.password.length < 8) {
-          setError('Password must be at least 8 characters long');
-          setIsLoading(false);
-          return;
-        }
-
-        const result = await signUp({
-          email: formData.email,
-          password: formData.password,
-          name: formData.name,
-          phone: formData.phone
-        });
-        
-        if (result.success) {
-          if (result.requiresEmailVerification) {
-            toast({
-              title: "Account created",
-              description: "Please check your email to verify your account.",
-            });
-          } else {
-            toast({
-              title: "Account created",
-              description: "Welcome to Starters!",
-            });
-            onSuccess();
-          }
-        } else {
-          setError(result.error || 'Registration failed');
-        }
-      }
-    } catch (error: any) {
-      console.error('Auth error:', error);
-      setError(error.message || 'An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
+    const result = await login(loginData.email, loginData.password);
+    if (result.success) {
+      onSuccess?.();
+      onClose();
     }
   };
 
-  const handleGoogleAuth = async () => {
-    setIsLoading(true);
-    try {
-      await signUpWithGoogle();
-    } catch (error: any) {
-      setError(error.message || 'Google authentication failed');
-    } finally {
-      setIsLoading(false);
+  const handleRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!registerData.name || !registerData.email || !registerData.password || !registerData.phone) {
+      toast({
+        title: "Please fill in all fields",
+        description: "All fields are required for registration",
+        variant: "destructive"
+      });
+      return;
     }
+
+    await handleRegister(registerData);
   };
 
-  const resetForm = () => {
-    setFormData({ email: '', password: '', name: '', phone: '' });
-    setError('');
-    setShowPassword(false);
+  const handleTabChange = (value: string) => {
+    setActiveTab(value as 'login' | 'register');
+    resetFlow();
   };
 
-  const switchMode = () => {
-    setIsLogin(!isLogin);
-    resetForm();
+  const renderRegistrationStep = () => {
+    switch (registerStep) {
+      case 'verification':
+        return (
+          <div className="text-center py-6">
+            <Mail className="h-12 w-12 text-primary mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Check your email</h3>
+            <p className="text-muted-foreground mb-6">
+              We've sent a verification link to <strong>{registrationEmail}</strong>
+            </p>
+            <div className="space-y-3">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleResendVerification}
+                disabled={registerLoading}
+                className="w-full"
+              >
+                Resend verification email
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={resetFlow}
+                className="w-full"
+              >
+                Use different email
+              </Button>
+            </div>
+          </div>
+        );
+
+      case 'success':
+        return (
+          <div className="text-center py-6">
+            <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Registration successful!</h3>
+            <p className="text-muted-foreground mb-6">
+              Welcome! You can now start shopping.
+            </p>
+            <Button onClick={() => { onSuccess?.(); onClose(); }} className="w-full">
+              Continue
+            </Button>
+          </div>
+        );
+
+      default:
+        return (
+          <form onSubmit={handleRegisterSubmit} className="space-y-4">
+            {registerError && (
+              <RegistrationErrorHandler
+                error={registerError}
+                onRetry={retryRegistration}
+                onReset={resetFlow}
+              />
+            )}
+            
+            <div className="space-y-2">
+              <Label htmlFor="register-name">Full Name</Label>
+              <div className="relative">
+                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="register-name"
+                  type="text"
+                  placeholder="Enter your full name"
+                  value={registerData.name}
+                  onChange={(e) => setRegisterData(prev => ({ ...prev, name: e.target.value }))}
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="register-email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="register-email"
+                  type="email"
+                  placeholder="Enter your email"
+                  value={registerData.email}
+                  onChange={(e) => setRegisterData(prev => ({ ...prev, email: e.target.value }))}
+                  className="pl-10"
+                  required
+                />
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="register-phone">Phone Number</Label>
+              <div className="relative">
+                <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="register-phone"
+                  type="tel"
+                  placeholder="Enter your phone number"
+                  value={registerData.phone}
+                  onChange={(e) => setRegisterData(prev => ({ ...prev, phone: e.target.value }))}
+                  className="pl-10"
+                  required
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Required for order updates and delivery coordination
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="register-password">Password</Label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="register-password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Create a password"
+                  value={registerData.password}
+                  onChange={(e) => setRegisterData(prev => ({ ...prev, password: e.target.value }))}
+                  className="pl-10 pr-10"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+            </div>
+
+            <Button 
+              type="submit" 
+              className="w-full" 
+              disabled={registerLoading}
+            >
+              {registerLoading ? "Creating account..." : "Create Account"}
+            </Button>
+          </form>
+        );
+    }
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <p className="text-sm text-muted-foreground">{subtitle}</p>
+          <DialogTitle className="text-center">{title}</DialogTitle>
+          {subtitle && (
+            <p className="text-center text-muted-foreground text-sm">{subtitle}</p>
+          )}
         </DialogHeader>
-        
-        <form onSubmit={handleSubmit} className="space-y-4">
-          {error && (
-            <Alert variant="destructive">
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
+
+        <div className="mt-6">
+          {registerStep === 'form' ? (
+            <Tabs value={activeTab} onValueChange={handleTabChange}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="login">Sign In</TabsTrigger>
+                <TabsTrigger value="register">Sign Up</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="login" className="mt-6">
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="login-email">Email</Label>
+                    <div className="relative">
+                      <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="login-email"
+                        type="email"
+                        placeholder="Enter your email"
+                        value={loginData.email}
+                        onChange={(e) => setLoginData(prev => ({ ...prev, email: e.target.value }))}
+                        className="pl-10"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="login-password">Password</Label>
+                    <div className="relative">
+                      <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="login-password"
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={loginData.password}
+                        onChange={(e) => setLoginData(prev => ({ ...prev, password: e.target.value }))}
+                        className="pl-10 pr-10"
+                        required
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-3 text-muted-foreground hover:text-foreground"
+                      >
+                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <Button 
+                    type="submit" 
+                    className="w-full" 
+                    disabled={loginLoading}
+                  >
+                    {loginLoading ? "Signing in..." : "Sign In"}
+                  </Button>
+                </form>
+              </TabsContent>
+
+              <TabsContent value="register" className="mt-6">
+                {renderRegistrationStep()}
+              </TabsContent>
+            </Tabs>
+          ) : (
+            renderRegistrationStep()
           )}
-
-          {!isLogin && (
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="name"
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => handleInputChange('name', e.target.value)}
-                  placeholder="Enter your full name"
-                  className="pl-10"
-                  required={!isLogin}
-                  disabled={isLoading}
-                />
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <div className="relative">
-              <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="email"
-                type="email"
-                value={formData.email}
-                onChange={(e) => handleInputChange('email', e.target.value)}
-                placeholder="Enter your email"
-                className="pl-10"
-                required
-                disabled={isLoading}
-              />
-            </div>
-          </div>
-
-          {!isLogin && (
-            <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
-              <div className="relative">
-                <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="0801234567"
-                  className="pl-10"
-                  required={!isLogin}
-                  disabled={isLoading}
-                  maxLength={11}
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Format: 11 digits starting with 0 (e.g., 08012345678)
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <div className="relative">
-              <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                value={formData.password}
-                onChange={(e) => handleInputChange('password', e.target.value)}
-                placeholder="Enter your password"
-                className="pl-10 pr-10"
-                required
-                disabled={isLoading}
-                minLength={isLogin ? undefined : 8}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
-                onClick={() => setShowPassword(!showPassword)}
-                disabled={isLoading}
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </Button>
-            </div>
-          </div>
-
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            {isLogin ? 'Sign In' : 'Create Account'}
-          </Button>
-
-          <div className="relative">
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
-                Or continue with
-              </span>
-            </div>
-          </div>
-
-          <GoogleAuthButton 
-            onGoogleAuth={handleGoogleAuth} 
-            isLoading={isLoading}
-            text={isLogin ? "Sign in with Google" : "Sign up with Google"}
-          />
-
-          <div className="text-center">
-            <Button
-              type="button"
-              variant="link"
-              onClick={switchMode}
-              disabled={isLoading}
-            >
-              {isLogin 
-                ? "Don't have an account? Sign up" 
-                : "Already have an account? Sign in"
-              }
-            </Button>
-          </div>
-        </form>
+        </div>
       </DialogContent>
     </Dialog>
   );

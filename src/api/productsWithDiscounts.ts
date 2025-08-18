@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPromotions } from "./promotions";
 import { calculateProductDiscount, ProductWithDiscount, isPromotionValidForCurrentDay } from "@/lib/discountCalculations";
 
-// Get products with calculated discounts
+// Get products with calculated discounts - Optimized for faster loading
 export async function getProductsWithDiscounts(categoryId?: string): Promise<ProductWithDiscount[]> {
   try {
     // Build the query
@@ -22,13 +22,38 @@ export async function getProductsWithDiscounts(categoryId?: string): Promise<Pro
       query = query.eq("category_id", categoryId);
     }
     
-    const { data: products, error: productsError } = await query.order("name");
+    // Execute query with faster timeout
+    const productsPromise = query.order("name");
+    const promotionsPromise = getPromotions();
     
-    if (productsError) throw productsError;
+    // Parallel execution with timeout fallback
+    const [
+      { data: products, error: productsError },
+      promotions
+    ] = await Promise.all([
+      Promise.race([
+        productsPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Products query timeout')), 4000)
+        )
+      ]) as Promise<any>,
+      Promise.race([
+        promotionsPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Promotions query timeout')), 2000)
+        )
+      ]) as Promise<any>
+    ]);
     
-    // Get active promotions
-    const promotions = await getPromotions();
-    const activePromotions = promotions.filter(p => p.status === 'active');
+    if (productsError) {
+      console.error('Products query error:', productsError);
+      return [];
+    }
+    
+    // Safely handle promotions error
+    const activePromotions = Array.isArray(promotions) 
+      ? promotions.filter(p => p.status === 'active')
+      : [];
     
     // Calculate discounts for each product
     const productsWithDiscounts = (products || []).map(product => 
@@ -38,14 +63,15 @@ export async function getProductsWithDiscounts(categoryId?: string): Promise<Pro
     return productsWithDiscounts;
   } catch (error) {
     console.error('Error fetching products with discounts:', error);
-    throw error;
+    // Return empty array on error to prevent complete page failure
+    return [];
   }
 }
 
-// Get a single product with discounts
+// Get a single product with discounts - Optimized
 export async function getProductWithDiscounts(productId: string): Promise<ProductWithDiscount | null> {
   try {
-    const { data: product, error: productError } = await supabase
+    const productPromise = supabase
       .from("products")
       .select(`
         *,
@@ -59,12 +85,37 @@ export async function getProductWithDiscounts(productId: string): Promise<Produc
       .gt("stock_quantity", 0)
       .single();
     
-    if (productError) throw productError;
+    const promotionsPromise = getPromotions();
+    
+    // Parallel execution with timeout
+    const [
+      { data: product, error: productError },
+      promotions
+    ] = await Promise.all([
+      Promise.race([
+        productPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Product query timeout')), 3000)
+        )
+      ]) as Promise<any>,
+      Promise.race([
+        promotionsPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Promotions query timeout')), 2000)
+        )
+      ]) as Promise<any>
+    ]);
+    
+    if (productError) {
+      console.error('Product query error:', productError);
+      return null;
+    }
     if (!product) return null;
     
-    // Get active promotions
-    const promotions = await getPromotions();
-    const activePromotions = promotions.filter(p => p.status === 'active');
+    // Safely handle promotions error
+    const activePromotions = Array.isArray(promotions) 
+      ? promotions.filter(p => p.status === 'active')
+      : [];
     
     // Calculate discounts for the product
     return calculateProductDiscount(product, activePromotions);

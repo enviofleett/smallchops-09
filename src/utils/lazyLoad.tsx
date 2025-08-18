@@ -1,22 +1,40 @@
 import { lazy, Suspense, ComponentType } from 'react';
 import { Loader2 } from 'lucide-react';
 
-// Generic loading component
+// Enhanced loading component with better UX
 const LoadingSpinner = () => (
-  <div className="flex items-center justify-center min-h-[200px]">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+  <div className="flex flex-col items-center justify-center min-h-[200px] p-8">
+    <Loader2 className="h-8 w-8 animate-spin text-primary mb-2" />
+    <p className="text-sm text-muted-foreground">Loading...</p>
   </div>
 );
 
-// Higher-order component for lazy loading with suspense
+// Fast loading fallback for critical pages
+const FastLoader = () => (
+  <div className="flex items-center justify-center min-h-[100px]">
+    <div className="animate-pulse">
+      <div className="h-4 bg-muted rounded w-24"></div>
+    </div>
+  </div>
+);
+
+// Higher-order component for lazy loading with enhanced error handling
 export function withLazyLoading<T extends ComponentType<any>>(
   importFunc: () => Promise<{ default: T }>,
-  fallback: ComponentType = LoadingSpinner
+  fallback: ComponentType = LoadingSpinner,
+  useFastLoader = false
 ) {
-  const LazyComponent = lazy(importFunc);
+  const LazyComponent = lazy(() => 
+    Promise.race([
+      importFunc(),
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Component load timeout')), 10000)
+      )
+    ])
+  );
   
   return function LazyLoadedComponent(props: any) {
-    const FallbackComponent = fallback;
+    const FallbackComponent = useFastLoader ? FastLoader : fallback;
     return (
       <Suspense fallback={<FallbackComponent />}>
         <LazyComponent {...props} />
@@ -25,12 +43,18 @@ export function withLazyLoading<T extends ComponentType<any>>(
   };
 }
 
-// Preload function for critical routes
+// Enhanced preload function for critical routes
 export function preloadRoute(importFunc: () => Promise<any>) {
-  // Preload on idle or after a short delay
+  // Preload on idle or after a short delay with error handling
+  const preload = () => {
+    importFunc().catch(error => {
+      console.warn('Route preload failed:', error);
+    });
+  };
+  
   if ('requestIdleCallback' in window) {
-    requestIdleCallback(() => importFunc());
+    requestIdleCallback(preload, { timeout: 2000 });
   } else {
-    setTimeout(() => importFunc(), 100);
+    setTimeout(preload, 50); // Faster preload
   }
 }

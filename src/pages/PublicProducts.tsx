@@ -32,10 +32,13 @@ const PublicProducts = () => {
   const { toast } = useToast();
   const { customerAccount } = useCustomerAuth();
   
-  // Fetch products with discounts
-  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
+  // Fetch products with discounts - optimized for faster loading
+  const { data: products = [], isLoading: isLoadingProducts, error: productsError } = useQuery({
     queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
     queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
+    retry: 1, // Reduce retries for faster UX
+    staleTime: 60000, // 1 minute cache
+    refetchOnWindowFocus: false,
   });
 
   const { 
@@ -50,10 +53,13 @@ const PublicProducts = () => {
     products?.map(p => p.id) || []
   );
 
-  // Fetch categories
-  const { data: categories = [] } = useQuery({
+  // Fetch categories - optimized
+  const { data: categories = [], error: categoriesError } = useQuery({
     queryKey: ['categories'],
     queryFn: getCategories,
+    retry: 1,
+    staleTime: 300000, // 5 minutes cache for categories
+    refetchOnWindowFocus: false,
   });
 
   // Filter products based on search
@@ -251,10 +257,23 @@ const PublicProducts = () => {
                 </p>
               </div>
 
-              {/* Loading State */}
+              {/* Loading State & Error Handling */}
               {isLoadingProducts ? (
                 <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
                   <SkeletonLoader variant="product" count={8} />
+                </div>
+              ) : productsError ? (
+                <div className="text-center py-12">
+                  <h3 className="text-xl font-semibold mb-2">Unable to load products</h3>
+                  <p className="text-gray-600 mb-4">
+                    There was an issue loading our products. Please try again.
+                  </p>
+                  <Button 
+                    onClick={() => window.location.reload()}
+                    variant="outline"
+                  >
+                    Try Again
+                  </Button>
                 </div>
               ) : filteredProducts.length === 0 ? (
                 <div className="text-center py-12">

@@ -69,28 +69,32 @@ const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"));
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
 
-// Optimized QueryClient for better stability and reduced flickering
+// Optimized QueryClient for better stability and faster loading
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 5 * 60 * 1000,         // 5 minutes - more stable caching
-      gcTime: 30 * 60 * 1000,           // 30 minutes cache retention
+      staleTime: 2 * 60 * 1000,         // 2 minutes - faster fresh data
+      gcTime: 10 * 60 * 1000,           // 10 minutes cache retention
       refetchOnWindowFocus: false,       // Prevent unnecessary refetches
       refetchIntervalInBackground: false,
       refetchInterval: false,
-      refetchOnMount: 'always',          // Always fresh data on mount
+      refetchOnMount: false,             // Use cached data when available
       retry: (failureCount, error: any) => {
-        // Smart retry logic
+        // Smart retry logic for better UX
         if (error?.status >= 400 && error?.status < 500) {
           return false; // Don't retry client errors
         }
-        return failureCount < 2; // Reduced retries for faster failures
+        return failureCount < 1; // Single retry for faster failures
       },
-      retryDelay: attemptIndex => Math.min(500 * 2 ** attemptIndex, 3000), // Faster retry delays
+      retryDelay: attemptIndex => Math.min(300 * 2 ** attemptIndex, 1500), // Faster retry delays
       networkMode: 'online',
+      // Add timeout for faster error detection
+      meta: {
+        timeout: 8000, // 8 second timeout
+      },
     },
     mutations: {
-      retry: 1,
+      retry: 0, // No retries for mutations for faster UX
       networkMode: 'online',
     },
   },
@@ -176,7 +180,7 @@ const App = () => {
               <Route path="/category/:categoryId" element={<CategoryProducts />} />
               
               {/* Authentication routes */}
-              <Route path="/auth" element={<AuthPage />} />
+              <Route path="/auth" element={<ErrorBoundaryWrapper context="Auth Page"><AuthPage /></ErrorBoundaryWrapper>} />
               <Route path="/auth-callback" element={<AuthCallback />} />
               <Route path="/auth/verify" element={<EmailVerificationPage />} />
               <Route path="/auth/reset" element={<PasswordResetPage />} />

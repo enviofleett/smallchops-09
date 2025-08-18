@@ -20,6 +20,7 @@ import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { format } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { PickupPointDisplay } from '@/components/admin/PickupPointDisplay';
+import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -50,9 +51,16 @@ export default function AdminOrders() {
   const totalCount = ordersData?.count || 0;
   const totalPages = Math.ceil(totalCount / 20);
 
-  // Fetch delivery schedules for all orders
-  const orderIds = orders.map(order => order.id);
-  const { schedules: deliverySchedules } = useOrderDeliverySchedules(orderIds);
+  // Extract delivery schedules from orders (now included in admin function)
+  const deliverySchedules = React.useMemo(() => {
+    const scheduleMap: Record<string, any> = {};
+    orders.forEach((order: any) => {
+      if (order.delivery_schedule) {
+        scheduleMap[order.id] = order.delivery_schedule;
+      }
+    });
+    return scheduleMap;
+  }, [orders]);
 
   // Filter orders by delivery schedule
   const filteredOrders = React.useMemo(() => {
@@ -465,7 +473,7 @@ function AdminOrderCard({
               </div> : <p className="text-sm text-muted-foreground">Product details not available</p>}
           </div>}
 
-        {/* Comprehensive Delivery Information Display - matches mobile screenshot layout */}
+        {/* Enhanced Delivery Information Display using DeliveryScheduleDisplay */}
         {order.payment_status === 'paid' && (
           <div className="mt-4 border-t pt-4">
             <div className="flex items-center gap-2 mb-3">
@@ -508,72 +516,24 @@ function AdminOrderCard({
                 <div>
                   <p className="text-sm text-muted-foreground font-medium mb-1">Delivery Zone</p>
                   <p className="text-sm font-semibold">{deliveryZone.name}</p>
+                  {order.delivery_fee && Number(order.delivery_fee) > 0 && (
+                    <p className="text-sm text-green-600 font-medium">
+                      Delivery Fee: {formatCurrency(Number(order.delivery_fee))}
+                    </p>
+                  )}
                 </div>
               )}
               
-              {/* Schedule Information */}
+              {/* Delivery Schedule Display or Fallback */}
               {deliverySchedule ? (
-                <>
-                  <div>
-                    <p className="text-sm text-muted-foreground font-medium mb-1">
-                      {order.order_type === 'delivery' ? 'Scheduled Delivery' : 'Scheduled Pickup'}
-                    </p>
-                    <p className="text-sm font-semibold">
-                      {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <div className="bg-muted/30 p-3 rounded-lg">
-                      <p className="text-xs text-muted-foreground mb-1">Time Window</p>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-sm">
-                          {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                        </span>
-                        {deliverySchedule.is_flexible && (
-                          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
-                            Flexible Time
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Zone and Delivery Fee on separate lines for mobile */}
-                    {order.order_type === 'delivery' && (
-                      <div className="space-y-2">
-                        {deliveryZone && (
-                          <div className="bg-muted/20 p-2 rounded">
-                            <span className="text-xs text-muted-foreground">Zone: </span>
-                            <span className="text-sm font-medium">{deliveryZone.name}</span>
-                          </div>
-                        )}
-                        {order.delivery_fee && Number(order.delivery_fee) > 0 && (
-                          <div className="bg-green-50 p-2 rounded border border-green-200">
-                            <span className="text-xs text-muted-foreground">Delivery Fee: </span>
-                            <span className="text-sm font-semibold text-green-700">
-                              {formatCurrency(Number(order.delivery_fee))}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-
-                  {deliverySchedule.special_instructions && (
-                    <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg">
-                      <p className="text-sm font-medium text-orange-800 mb-1">Special Instructions:</p>
-                      <p className="text-sm text-orange-700 break-words">
-                        {deliverySchedule.special_instructions}
-                      </p>
-                    </div>
-                  )}
-                  
-                  <div className="text-xs text-muted-foreground pt-2 border-t">
-                    Schedule Requested: {format(new Date(deliverySchedule.requested_at), 'MMM d, h:mm a')}
-                  </div>
-                </>
+                <DeliveryScheduleDisplay 
+                  schedule={deliverySchedule}
+                  orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}
+                  orderStatus={order.status}
+                  className="mt-3"
+                />
               ) : (
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg">
+                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mt-3">
                   <div className="flex items-start gap-2">
                     <span className="text-amber-600 text-lg">⚠️</span>
                     <div>
@@ -583,6 +543,16 @@ function AdminOrderCard({
                       </p>
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Special Instructions Fallback */}
+              {!deliverySchedule?.special_instructions && order.special_instructions && (
+                <div className="bg-orange-50 border border-orange-200 p-3 rounded-lg">
+                  <p className="text-sm font-medium text-orange-800 mb-1">Order Special Instructions:</p>
+                  <p className="text-sm text-orange-700 break-words">
+                    {order.special_instructions}
+                  </p>
                 </div>
               )}
             </div>

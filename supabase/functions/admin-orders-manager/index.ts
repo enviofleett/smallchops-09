@@ -105,6 +105,26 @@ const handler = async (req: Request): Promise<Response> => {
         let orders = data || [];
         let finalCount = count || 0;
 
+        // Fetch delivery schedules for all orders (bypassing RLS with service role)
+        if (orders.length > 0) {
+          const orderIds = orders.map((order: any) => order.id);
+          const { data: schedules } = await supabase
+            .from('order_delivery_schedule')
+            .select('*')
+            .in('order_id', orderIds);
+
+          // Map schedules to orders
+          const scheduleMap = new Map();
+          (schedules || []).forEach((schedule: any) => {
+            scheduleMap.set(schedule.order_id, schedule);
+          });
+
+          orders = orders.map((order: any) => ({
+            ...order,
+            delivery_schedule: scheduleMap.get(order.id) || null
+          }));
+        }
+
         // If query failed due to relationship issues, try fallback
         if (error) {
           console.warn('Main query failed, trying fallback:', error.message);
@@ -142,25 +162,47 @@ const handler = async (req: Request): Promise<Response> => {
           orders = fallbackData || [];
           finalCount = fallbackCount || 0;
 
-          // Manually fetch delivery zones for each order
+          // Manually fetch delivery zones and schedules for each order
           if (orders.length > 0) {
+            const orderIds = orders.map((order: any) => order.id);
+            
+            // Fetch delivery schedules
+            const { data: schedules } = await supabase
+              .from('order_delivery_schedule')
+              .select('*')
+              .in('order_id', orderIds);
+
+            const scheduleMap = new Map();
+            (schedules || []).forEach((schedule: any) => {
+              scheduleMap.set(schedule.order_id, schedule);
+            });
+
             const ordersWithZones = await Promise.all(
               orders.map(async (order: any) => {
+                let orderWithZone = order;
+                
                 if (order.delivery_zone_id) {
                   try {
                     const { data: zone } = await supabase
                       .from('delivery_zones')
-                .select('id, name, base_fee, is_active')
+                      .select('id, name, base_fee, is_active')
                       .eq('id', order.delivery_zone_id)
                       .single();
                     
-                    return { ...order, delivery_zones: zone };
+                    orderWithZone = { ...order, delivery_zones: zone };
                   } catch (zoneError) {
                     console.warn(`Failed to fetch zone for order ${order.id}:`, zoneError);
-                    return { ...order, delivery_zones: null };
+                    orderWithZone = { ...order, delivery_zones: null };
                   }
+                } else {
+                  orderWithZone = { ...order, delivery_zones: null };
                 }
-                return { ...order, delivery_zones: null };
+
+                // Add delivery schedule
+                return {
+                  ...orderWithZone,
+                  delivery_schedule: scheduleMap.get(order.id) || null
+                };
               })
             );
             orders = ordersWithZones;
@@ -218,6 +260,17 @@ const handler = async (req: Request): Promise<Response> => {
 
         let orderData = data;
 
+        // Fetch delivery schedule for the single order
+        if (orderData) {
+          const { data: schedule } = await supabase
+            .from('order_delivery_schedule')
+            .select('*')
+            .eq('order_id', orderId)
+            .maybeSingle();
+          
+          orderData = { ...orderData, delivery_schedule: schedule };
+        }
+
         // If main query fails, try fallback without delivery zone relationship
         if (error) {
           console.warn('Main single order query failed, trying fallback:', error.message);
@@ -243,14 +296,23 @@ const handler = async (req: Request): Promise<Response> => {
                 .eq('id', orderData.delivery_zone_id)
                 .single();
               
-              orderData.delivery_zones = zone;
-            } catch (zoneError) {
-              console.warn(`Failed to fetch zone for order ${orderId}:`, zoneError);
-              orderData.delivery_zones = null;
-            }
-          } else {
-            orderData.delivery_zones = null;
-          }
+          orderData.delivery_zones = zone;
+        } catch (zoneError) {
+          console.warn(`Failed to fetch zone for order ${orderId}:`, zoneError);
+          orderData.delivery_zones = null;
+        }
+      } else {
+        orderData.delivery_zones = null;
+      }
+
+      // Fetch delivery schedule for fallback case too
+      const { data: schedule } = await supabase
+        .from('order_delivery_schedule')
+        .select('*')
+        .eq('order_id', orderId)
+        .maybeSingle();
+      
+      orderData = { ...orderData, delivery_schedule: schedule };
         }
 
         // Compute final payment fields for single order

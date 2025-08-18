@@ -128,35 +128,33 @@ export default function CustomerPortal() {
     );
   }
 
+  // For unauthenticated users, show public catalog only
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center p-4">
-        <Card className="w-full max-w-md">
-          <CardHeader className="text-center">
-            <CardTitle className="flex items-center justify-center gap-2">
-              <User className="h-5 w-5" />
-              Customer Portal
-            </CardTitle>
-            <CardDescription>
-              Sign in to access your account
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <Button onClick={() => setShowAuthModal(true)} className="w-full">
-              Sign In
-            </Button>
-            <div className="flex items-center justify-center space-x-2 text-sm">
-              <span className="text-muted-foreground">New customer?</span>
-              <Link to="/register" className="text-primary hover:underline font-medium">
-                Create Account
-              </Link>
+      <div className="min-h-screen bg-background">
+        <div className="border-b">
+          <div className="container mx-auto px-4 py-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <h1 className="text-2xl font-bold">Browse Our Menu</h1>
+                <p className="text-muted-foreground">Discover our delicious offerings</p>
+              </div>
+              <div className="flex items-center gap-3">
+                <Button asChild variant="outline">
+                  <Link to="/auth?view=register">Create Account</Link>
+                </Button>
+                <Button asChild>
+                  <Link to="/auth">Sign In</Link>
+                </Button>
+              </div>
             </div>
-            <div className="text-center text-sm text-muted-foreground">
-              Sign in to manage your orders and favorites
-            </div>
-          </CardContent>
-        </Card>
+          </div>
+        </div>
 
+        <div className="container mx-auto px-4 py-8">
+          {/* Show only the public product catalog */}
+          <ProductCatalog />
+        </div>
       </div>
     );
   }

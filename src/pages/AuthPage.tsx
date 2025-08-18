@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
-import { useCustomerRegistration } from '@/hooks/useCustomerRegistration';
+// Removed OTP registration in favor of direct signup
 import { usePasswordReset } from '@/hooks/usePasswordReset';
 import { useToast } from '@/hooks/use-toast';
 import { useCaptcha } from '@/hooks/useCaptcha';
@@ -17,7 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Eye, EyeOff, Mail, Lock, User, Phone, ArrowLeft, Loader2, Shield, Users, AlertTriangle } from 'lucide-react';
 
-type AuthView = 'customer-login' | 'customer-register' | 'otp-verification' | 'forgot-password';
+type AuthView = 'customer-login' | 'customer-register' | 'forgot-password';
 
 const AuthPage = () => {
   const [searchParams] = useSearchParams();
@@ -28,15 +28,7 @@ const AuthPage = () => {
   const [view, setView] = useState<AuthView>('customer-login');
   
   // Customer authentication hooks only
-  const { login: customerLogin, signUpWithGoogle, isLoading: isCustomerLoading } = useCustomerDirectAuth();
-  const { 
-    initiateRegistration, 
-    verifyOTPAndCompleteRegistration, 
-    resendOTP,
-    registrationStep,
-    registrationEmail,
-    isLoading: isRegistrationLoading 
-  } = useCustomerRegistration();
+  const { login: customerLogin, register: customerRegister, signUpWithGoogle, isLoading: isCustomerLoading } = useCustomerDirectAuth();
   const { sendPasswordReset, isLoading: isPasswordResetLoading } = usePasswordReset();
 
   // CAPTCHA integration
@@ -73,39 +65,24 @@ const AuthPage = () => {
     otp: ''
   });
 
-  // Store registration data for OTP verification
-  const [pendingRegistration, setPendingRegistration] = useState<{
-    email: string;
-    password: string;
-    name: string;
-    phone?: string;
-  } | null>(null);
+  // Removed OTP-related state for direct registration
 
-  // Redirect admins to dedicated admin auth page
+  // Redirect admins to dedicated admin auth page and handle view parameter
   useEffect(() => {
     const mode = searchParams.get('mode');
+    const view = searchParams.get('view');
+    
     if (mode === 'admin') {
       navigate('/admin/auth', { replace: true });
+    } else if (view === 'register') {
+      setView('customer-register');
     }
   }, [searchParams, navigate]);
 
-  // Handle registration step changes
-  useEffect(() => {
-    if (registrationStep === 'otp_verification' && registrationEmail) {
-      setView('otp-verification');
-    } else if (registrationStep === 'completed') {
-      setView('customer-login');
-      setPendingRegistration(null);
-      toast({
-        title: "Registration completed!",
-        description: "You can now log in with your credentials.",
-      });
-    }
-  }, [registrationStep, registrationEmail, toast]);
+  // Removed OTP registration step tracking
 
   const getCurrentLoadingState = () => {
-    if (view === 'customer-login') return isCustomerLoading;
-    if (view === 'customer-register' || view === 'otp-verification') return isRegistrationLoading;
+    if (view === 'customer-login' || view === 'customer-register') return isCustomerLoading;
     if (view === 'forgot-password') return isPasswordResetLoading;
     return false;
   };
@@ -196,67 +173,32 @@ const AuthPage = () => {
     
     if (!validateCustomerRegistration()) return;
 
-    const result = await initiateRegistration({
+    const result = await customerRegister({
       name: formData.name,
       email: formData.email,
       password: formData.password,
       phone: formData.phone
     });
 
-    if (result.success && result.requiresOtpVerification) {
-      setPendingRegistration({
-        email: formData.email,
-        password: formData.password,
-        name: formData.name,
-        phone: formData.phone
+    if (result.success) {
+      toast({
+        title: "Check your email",
+        description: "Please check your email to verify your account before signing in.",
+      });
+      setView('customer-login');
+      // Clear form data
+      setFormData({
+        email: formData.email, // Keep email for login
+        password: '',
+        confirmPassword: '',
+        name: '',
+        phone: '',
+        otp: ''
       });
     }
   };
 
-  const handleOTPVerification = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!pendingRegistration) {
-      toast({ 
-        title: "Error", 
-        description: "Registration data not found. Please restart registration.", 
-        variant: "destructive" 
-      });
-      setView('customer-register');
-      return;
-    }
-
-    if (!formData.otp || formData.otp.length !== 6) {
-      toast({ 
-        title: "Invalid OTP", 
-        description: "Please enter the 6-digit verification code.", 
-        variant: "destructive" 
-      });
-      return;
-    }
-
-    await verifyOTPAndCompleteRegistration({
-      email: pendingRegistration.email,
-      otpCode: formData.otp,
-      password: pendingRegistration.password,
-      name: pendingRegistration.name,
-      phone: pendingRegistration.phone
-    });
-  };
-
-  const handleResendOTP = async () => {
-    if (!pendingRegistration) {
-      toast({ 
-        title: "Error", 
-        description: "Registration data not found. Please restart registration.", 
-        variant: "destructive" 
-      });
-      setView('customer-register');
-      return;
-    }
-
-    await resendOTP(pendingRegistration.email);
-  };
+  // Removed OTP verification handlers for direct registration
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -582,74 +524,7 @@ const AuthPage = () => {
     </form>
   );
 
-  const renderOTPVerificationForm = () => (
-    <form onSubmit={handleOTPVerification} className="space-y-6">
-      <div className="text-center space-y-4">
-        <div className="mx-auto w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center">
-          <Mail className="h-6 w-6 text-primary" />
-        </div>
-        <div className="space-y-2">
-          <h3 className="text-lg font-semibold">Enter verification code</h3>
-          <p className="text-muted-foreground">
-            We've sent a 6-digit code to{' '}
-            <span className="font-medium">{pendingRegistration?.email}</span>
-          </p>
-        </div>
-      </div>
-
-      <div className="space-y-2">
-        <Label htmlFor="otp">Verification Code</Label>
-        <Input
-          id="otp"
-          type="text"
-          value={formData.otp}
-          onChange={(e) => handleInputChange('otp', e.target.value.replace(/\D/g, ''))}
-          placeholder="Enter 6-digit code"
-          className="text-center text-lg tracking-widest"
-          maxLength={6}
-          required
-          disabled={getCurrentLoadingState()}
-        />
-      </div>
-
-      <Button type="submit" className="w-full" disabled={getCurrentLoadingState()}>
-        {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Verify & Complete Registration
-      </Button>
-
-      <div className="space-y-4">
-        <p className="text-sm text-muted-foreground text-center">
-          Didn't receive the code? Check your spam folder or request a new one.
-        </p>
-
-        <Button 
-          type="button" 
-          variant="outline" 
-          className="w-full" 
-          onClick={handleResendOTP}
-          disabled={getCurrentLoadingState()}
-        >
-          {getCurrentLoadingState() && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-          Resend code
-        </Button>
-
-        <div className="text-center">
-          <button
-            type="button"
-            onClick={() => {
-              setView('customer-register');
-              setPendingRegistration(null);
-              setFormData(prev => ({ ...prev, otp: '' }));
-            }}
-            className="text-sm text-primary hover:underline flex items-center justify-center space-x-1"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            <span>Back to registration</span>
-          </button>
-        </div>
-      </div>
-    </form>
-  );
+  // Removed OTP verification form for direct registration
 
   const renderForgotPasswordForm = () => (
     <form onSubmit={handleForgotPassword} className="space-y-4">
@@ -692,7 +567,6 @@ const AuthPage = () => {
     switch (view) {
       case 'customer-login': return 'Welcome back';
       case 'customer-register': return 'Create account';
-      case 'otp-verification': return 'Verify your email';
       case 'forgot-password': return 'Reset password';
       default: return 'Welcome';
     }
@@ -702,7 +576,6 @@ const AuthPage = () => {
     switch (view) {
       case 'customer-login': return 'Sign in to your customer account';
       case 'customer-register': return 'Create your customer account';
-      case 'otp-verification': return 'Enter the verification code sent to your email';
       case 'forgot-password': return 'Enter your email to reset your password';
       default: return '';
     }
@@ -720,7 +593,6 @@ const AuthPage = () => {
       {/* Render appropriate form */}
       {view === 'customer-login' && renderLoginForm()}
       {view === 'customer-register' && renderCustomerRegisterForm()}
-      {view === 'otp-verification' && renderOTPVerificationForm()}
       {view === 'forgot-password' && renderForgotPasswordForm()}
     </AuthLayout>
   );

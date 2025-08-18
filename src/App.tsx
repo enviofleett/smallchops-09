@@ -208,8 +208,8 @@ const App = () => {
               <Route path="/unsubscribe" element={<Unsubscribe />} />
               <Route path="/admin-setup/:token" element={<AdminSetup />} />
               
-              {/* Simple registration routes */}
-              <Route path="/simple-register" element={<SimpleRegisterPage />} />
+              {/* Simple registration routes - removed to discourage OTP flow */}
+              {/* <Route path="/simple-register" element={<SimpleRegisterPage />} /> */}
               
               {/* Legacy customer registration route */}
               <Route path="/customer-register" element={<CustomerRegister />} />

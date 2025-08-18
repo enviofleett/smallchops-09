@@ -1,35 +1,36 @@
-import React, { useEffect, useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
+import { ArrowLeft, Package, MapPin, Clock, CreditCard, User, Phone, Mail } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
-import { 
-  ArrowLeft, 
-  Package, 
-  MapPin, 
-  Clock, 
-  CreditCard, 
-  Phone, 
-  Mail,
-  User,
-  CheckCircle,
-  AlertCircle,
-  Truck,
-  Calendar
-} from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 import { formatCurrency } from '@/lib/vatCalculations';
+import { useToast } from '@/hooks/use-toast';
 
 interface OrderItem {
   id: string;
-  product_id: string;
   product_name: string;
   quantity: number;
   unit_price: number;
   total_price: number;
-  customizations?: any;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  status: string;
+  total_amount: number;
+  created_at: string;
+  delivery_address: string;
+  delivery_fee: number;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  payment_status: string;
+  order_items: OrderItem[];
 }
 
 interface PaymentTransaction {
@@ -37,66 +38,44 @@ interface PaymentTransaction {
   reference: string;
   amount: number;
   status: string;
-  gateway_response: any;
-  created_at: string;
-  paid_at?: string;
-}
-
-interface PickupPoint {
-  id: string;
-  name: string;
-  address: string;
-  phone?: string;
-  is_active: boolean;
-}
-
-interface Order {
-  id: string;
-  order_number: string;
-  status: string;
-  payment_status: string;
-  paid_at?: string;
-  total_amount: number;
-  order_time: string;
-  customer_id: string;
+  gateway: string;
   customer_email: string;
-  customer_phone?: string;
-  payment_method?: string;
-  payment_reference?: string;
-  order_type: string;
-  delivery_address?: any;
-  pickup_point_id?: string | null;
-  special_instructions?: string | null;
-  estimated_delivery_date?: string | null;
+  customer_name: string;
+  created_at: string;
 }
 
 const OrderDetails = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
-  
   const [order, setOrder] = useState<Order | null>(null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
-  const [currentPickupPoint, setCurrentPickupPoint] = useState<PickupPoint | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchOrderDetails = async () => {
-    if (!id) return;
+  useEffect(() => {
+    if (id) {
+      fetchOrderDetails(id);
+    }
+  }, [id]);
 
+  const fetchOrderDetails = async (orderId: string) => {
     try {
       setIsLoading(true);
-
+      
       // Fetch order details
       const { data: orderData, error: orderError } = await supabase
         .from('orders')
         .select(`
-          id, order_number, status, payment_status, paid_at, total_amount, order_time,
-          customer_id, customer_email, customer_phone, payment_method, payment_reference,
-          order_type, delivery_address, pickup_point_id, special_instructions,
-          estimated_delivery_date
+          *,
+          order_items (
+            id,
+            product_name,
+            quantity,
+            unit_price,
+            total_price
+          )
         `)
-        .eq('id', id)
+        .eq('id', orderId)
         .single();
 
       if (orderError) {
@@ -111,53 +90,33 @@ const OrderDetails = () => {
 
       setOrder(orderData);
 
-      // Fetch order items
-      const { data: itemsData, error: itemsError } = await supabase
-        .from('order_items')
+      // Fetch payment transaction if exists
+      const { data: paymentData, error: paymentError } = await supabase
+        .from('payment_transactions')
         .select('*')
-        .eq('order_id', id);
+        .eq('order_id', orderId)
+        .maybeSingle();
 
-      if (itemsError) {
-        console.error('Error fetching order items:', itemsError);
-      } else {
-        setOrderItems(itemsData || []);
-      }
-
-      // Fetch payment transaction if payment reference exists
-      if (orderData.payment_reference) {
-        const { data: txData, error: txError } = await supabase
-          .from('payment_transactions')
-          .select('*')
-          .eq('reference', orderData.payment_reference)
-          .single();
-
-        if (txError) {
-          console.error('Error fetching payment transaction:', txError);
-        } else {
-          setPaymentTransaction(txData);
-        }
-      }
-
-      // Fetch pickup point details if it's a pickup order
-      if (orderData.order_type === 'pickup' && orderData.pickup_point_id) {
-        const { data: pickupData, error: pickupError } = await supabase
-          .from('pickup_points')
-          .select('*')
-          .eq('id', orderData.pickup_point_id)
-          .single();
-
-        if (pickupError) {
-          console.error('Error fetching pickup point:', pickupError);
-        } else {
-          setCurrentPickupPoint(pickupData);
-        }
+      if (!paymentError && paymentData) {
+        // Create a proper PaymentTransaction object with required reference field
+        const transaction: PaymentTransaction = {
+          id: paymentData.id,
+          reference: paymentData.reference || paymentData.transaction_id || '',
+          amount: paymentData.amount,
+          status: paymentData.status,
+          gateway: paymentData.gateway || 'unknown',
+          customer_email: paymentData.customer_email,
+          customer_name: paymentData.customer_name,
+          created_at: paymentData.created_at
+        };
+        setPaymentTransaction(transaction);
       }
 
     } catch (error) {
-      console.error('Error in fetchOrderDetails:', error);
+      console.error('Error fetching order details:', error);
       toast({
         title: "Error",
-        description: "An unexpected error occurred",
+        description: "Failed to load order details",
         variant: "destructive"
       });
     } finally {
@@ -165,123 +124,95 @@ const OrderDetails = () => {
     }
   };
 
-  useEffect(() => {
-    fetchOrderDetails();
-  }, [id]);
-
   const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
+    switch (status.toLowerCase()) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-100 text-yellow-800';
       case 'confirmed':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
+        return 'bg-blue-100 text-blue-800';
       case 'preparing':
-        return 'bg-orange-100 text-orange-800 border-orange-200';
+        return 'bg-orange-100 text-orange-800';
       case 'ready':
-      case 'ready_for_pickup':
-        return 'bg-purple-100 text-purple-800 border-purple-200';
+        return 'bg-purple-100 text-purple-800';
       case 'out_for_delivery':
-      case 'shipped':
-        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+        return 'bg-indigo-100 text-indigo-800';
       case 'delivered':
-      case 'completed':
-        return 'bg-green-100 text-green-800 border-green-200';
+        return 'bg-green-100 text-green-800';
       case 'cancelled':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
   const getPaymentStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
+    switch (status.toLowerCase()) {
       case 'paid':
-      case 'confirmed':
-        return 'bg-green-100 text-green-800 border-green-200';
+      case 'success':
+        return 'bg-green-100 text-green-800';
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+        return 'bg-yellow-100 text-yellow-800';
       case 'failed':
-      case 'cancelled':
-        return 'bg-red-100 text-red-800 border-red-200';
+        return 'bg-red-100 text-red-800';
       default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
+        return 'bg-gray-100 text-gray-800';
     }
-  };
-
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
   };
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
       </div>
     );
   }
 
   if (!order) {
     return (
-      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
-          <h1 className="text-2xl font-semibold mb-2">Order Not Found</h1>
-          <p className="text-muted-foreground mb-4">
-            The order you're looking for doesn't exist or has been removed.
-          </p>
-          <Button onClick={() => navigate('/')} className="gap-2">
-            <ArrowLeft className="h-4 w-4" />
-            Back to Home
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Order not found</h2>
+          <p className="text-gray-600 mb-4">The order you're looking for doesn't exist.</p>
+          <Button onClick={() => navigate(-1)}>
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Go Back
           </Button>
         </div>
       </div>
     );
   }
 
-  const subtotal = orderItems.reduce((sum, item) => sum + item.total_price, 0);
-  const tax = order.total_amount - subtotal;
-
   return (
-    <div className="min-h-screen bg-background">
-      <div className="container mx-auto py-8 px-4">
+    <div className="min-h-screen bg-gray-50 py-8">
+      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-8">
-          <div className="flex items-center gap-4">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => navigate('/')}
-              className="gap-2"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Back
-            </Button>
+        <div className="mb-8">
+          <Button
+            variant="ghost"
+            onClick={() => navigate(-1)}
+            className="mb-4"
+          >
+            <ArrowLeft className="w-4 h-4 mr-2" />
+            Back
+          </Button>
+          
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h1 className="text-3xl font-bold">Order Details</h1>
-              <p className="text-muted-foreground">#{order.order_number}</p>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Order #{order.order_number}
+              </h1>
+              <p className="text-gray-600 mt-1">
+                Placed on {new Date(order.created_at).toLocaleDateString()}
+              </p>
             </div>
-          </div>
-          <div className="flex gap-2">
-            <Badge className={`${getStatusColor(order.status)} border`}>
-              {order.status.replace('_', ' ').toUpperCase()}
-            </Badge>
-            <Badge className={`${getPaymentStatusColor(order.payment_status)} border`}>
-              {order.payment_status.toUpperCase()}
-            </Badge>
+            <div className="mt-4 sm:mt-0 flex gap-3">
+              <Badge className={getStatusColor(order.status)}>
+                {order.status.replace('_', ' ').toUpperCase()}
+              </Badge>
+              <Badge className={getPaymentStatusColor(order.payment_status)}>
+                {order.payment_status.toUpperCase()}
+              </Badge>
+            </div>
           </div>
         </div>
 
@@ -292,27 +223,19 @@ const OrderDetails = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
+                  <Package className="w-5 h-5" />
                   Order Items
                 </CardTitle>
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {orderItems.map((item) => (
-                    <div key={item.id} className="flex justify-between items-start p-4 border rounded-lg">
+                  {order.order_items?.map((item) => (
+                    <div key={item.id} className="flex justify-between items-center py-3 border-b last:border-b-0">
                       <div className="flex-1">
-                        <h3 className="font-medium">{item.product_name}</h3>
-                        <p className="text-sm text-muted-foreground">
+                        <h4 className="font-medium text-gray-900">{item.product_name}</h4>
+                        <p className="text-sm text-gray-600">
                           Quantity: {item.quantity} × {formatCurrency(item.unit_price)}
                         </p>
-                        {item.customizations && (
-                          <div className="mt-2">
-                            <p className="text-xs text-muted-foreground">Customizations:</p>
-                            <pre className="text-xs bg-muted p-2 rounded mt-1">
-                              {JSON.stringify(item.customizations, null, 2)}
-                            </pre>
-                          </div>
-                        )}
                       </div>
                       <div className="text-right">
                         <p className="font-medium">{formatCurrency(item.total_price)}</p>
@@ -323,129 +246,110 @@ const OrderDetails = () => {
               </CardContent>
             </Card>
 
-            {/* Delivery/Pickup Information */}
+            {/* Delivery Information */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  {order.order_type === 'delivery' ? (
-                    <>
-                      <Truck className="h-5 w-5" />
-                      Delivery Information
-                    </>
-                  ) : (
-                    <>
-                      <MapPin className="h-5 w-5" />
-                      Pickup Information
-                    </>
-                  )}
+                  <MapPin className="w-5 h-5" />
+                  Delivery Information
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                {order.order_type === 'delivery' && order.delivery_address && (
+              <CardContent>
+                <div className="space-y-3">
                   <div>
-                    <p className="text-sm text-muted-foreground mb-2">Delivery Address</p>
-                    <div className="bg-muted p-4 rounded-lg">
-                      <pre className="text-sm whitespace-pre-wrap">
-                        {typeof order.delivery_address === 'string' 
-                          ? order.delivery_address 
-                          : JSON.stringify(order.delivery_address, null, 2)
-                        }
-                      </pre>
-                    </div>
+                    <p className="font-medium text-gray-900">Delivery Address</p>
+                    <p className="text-gray-600">{order.delivery_address}</p>
                   </div>
-                )}
-
-                {order.order_type === 'pickup' && currentPickupPoint && (
                   <div>
-                    <p className="text-sm text-muted-foreground mb-2">Pickup Location</p>
-                    <div className="bg-muted p-4 rounded-lg">
-                      <h4 className="font-medium">{currentPickupPoint.name}</h4>
-                      <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                        <MapPin className="h-4 w-4" />
-                        {currentPickupPoint.address}
-                      </p>
-                      {currentPickupPoint.phone && (
-                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
-                          <Phone className="h-4 w-4" />
-                          {currentPickupPoint.phone}
-                        </p>
-                      )}
-                    </div>
+                    <p className="font-medium text-gray-900">Delivery Fee</p>
+                    <p className="text-gray-600">{formatCurrency(order.delivery_fee)}</p>
                   </div>
-                )}
-
-                {order.estimated_delivery_date && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">Estimated Delivery</p>
-                    <div className="flex items-center gap-2 text-sm">
-                      <Calendar className="h-4 w-4" />
-                      {formatDate(order.estimated_delivery_date)}
-                    </div>
-                  </div>
-                )}
-
-                {order.special_instructions && (
-                  <div>
-                    <p className="text-sm text-muted-foreground mb-2">Special Instructions</p>
-                    <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
-                      <p className="text-sm">
-                        {order.special_instructions}
-                      </p>
-                    </div>
-                  </div>
-                )}
+                </div>
               </CardContent>
             </Card>
+
+            {/* Payment Information */}
+            {paymentTransaction && (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CreditCard className="w-5 h-5" />
+                    Payment Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex justify-between">
+                      <p className="font-medium text-gray-900">Transaction Reference</p>
+                      <p className="text-gray-600">{paymentTransaction.reference}</p>
+                    </div>
+                    <div className="flex justify-between">
+                      <p className="font-medium text-gray-900">Payment Gateway</p>
+                      <p className="text-gray-600 capitalize">{paymentTransaction.gateway}</p>
+                    </div>
+                    <div className="flex justify-between">
+                      <p className="font-medium text-gray-900">Transaction Date</p>
+                      <p className="text-gray-600">
+                        {new Date(paymentTransaction.created_at).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Sidebar */}
           <div className="space-y-6">
-            {/* Order Summary */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CreditCard className="h-5 w-5" />
-                  Order Summary
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal</span>
-                  <span>{formatCurrency(subtotal)}</span>
-                </div>
-                {tax > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span>Tax & Fees</span>
-                    <span>{formatCurrency(tax)}</span>
-                  </div>
-                )}
-                <Separator />
-                <div className="flex justify-between font-medium">
-                  <span>Total</span>
-                  <span>{formatCurrency(order.total_amount)}</span>
-                </div>
-              </CardContent>
-            </Card>
-
             {/* Customer Information */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <User className="h-5 w-5" />
+                  <User className="w-5 h-5" />
                   Customer Information
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-2 text-sm">
-                  <Mail className="h-4 w-4 text-muted-foreground" />
-                  <span>{order.customer_email}</span>
-                </div>
-                {order.customer_phone && (
-                  <div className="flex items-center gap-2 text-sm">
-                    <Phone className="h-4 w-4 text-muted-foreground" />
-                    <span>{order.customer_phone}</span>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-gray-500" />
+                    <span className="text-gray-900">{order.customer_name}</span>
                   </div>
-                )}
+                  <div className="flex items-center gap-2">
+                    <Mail className="w-4 h-4 text-gray-500" />
+                    <span className="text-gray-600">{order.customer_email}</span>
+                  </div>
+                  {order.customer_phone && (
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-gray-500" />
+                      <span className="text-gray-600">{order.customer_phone}</span>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Order Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle>Order Summary</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Subtotal</span>
+                    <span>{formatCurrency(order.total_amount - order.delivery_fee)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Delivery Fee</span>
+                    <span>{formatCurrency(order.delivery_fee)}</span>
+                  </div>
+                  <Separator />
+                  <div className="flex justify-between font-bold text-lg">
+                    <span>Total</span>
+                    <span>{formatCurrency(order.total_amount)}</span>
+                  </div>
+                </div>
               </CardContent>
             </Card>
 
@@ -453,44 +357,23 @@ const OrderDetails = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Clock className="h-5 w-5" />
+                  <Clock className="w-5 h-5" />
                   Order Timeline
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                  <CheckCircle className="h-5 w-5 text-green-600" />
-                  <div>
-                    <p className="font-medium">Order Placed</p>
-                    <p className="text-sm text-muted-foreground">
-                      {formatDateTime(order.order_time)}
-                    </p>
+              <CardContent>
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div>
+                      <p className="font-medium">Order Placed</p>
+                      <p className="text-sm text-gray-600">
+                        {new Date(order.created_at).toLocaleString()}
+                      </p>
+                    </div>
                   </div>
+                  {/* Add more timeline items based on order status */}
                 </div>
-
-                {(order.payment_status === 'paid' || paymentTransaction) && (
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <div>
-                      <p className="font-medium">Payment Confirmed</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDateTime(order.paid_at || paymentTransaction?.paid_at || order.order_time)}
-                      </p>
-                    </div>
-                  </div>
-                )}
-                
-                {order.status?.toLowerCase() === 'confirmed' && (
-                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
-                    <CheckCircle className="h-5 w-5 text-blue-600" />
-                    <div>
-                      <p className="font-medium">Order Confirmed</p>
-                      <p className="text-sm text-muted-foreground">
-                        {formatDateTime(order.paid_at || order.order_time)}
-                      </p>
-                    </div>
-                  </div>
-                )}
               </CardContent>
             </Card>
           </div>

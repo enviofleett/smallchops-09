@@ -1,135 +1,78 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
-import { Loader2, Mail, Lock, User, ArrowLeft } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import startersLogo from '@/assets/starters-logo.png';
 
-const AdminAuth = () => {
-  const [isLogin, setIsLogin] = useState(true);
-  const [isLoading, setIsLoading] = useState(false);
+export const AdminAuth = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [error, setError] = useState('');
-  const { login, signUp } = useAuth();
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const { signIn } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    setError('');
     setIsLoading(true);
 
     try {
-      if (isLogin) {
-        const result = await login({ email, password });
-        if (result.success) {
-          toast({
-            title: "Login successful",
-            description: "Welcome back to the admin dashboard.",
-          });
-          navigate(result.redirect || '/dashboard');
-        } else {
-          setError(result.error || 'Login failed');
-        }
-      } else {
-        const result = await signUp({ email, password, name });
-        if (result.success) {
-          if (result.requiresEmailVerification) {
-            toast({
-              title: "Account created",
-              description: "Please check your email to verify your account.",
-            });
-          } else {
-            toast({
-              title: "Account created",
-              description: "Your admin account has been created successfully.",
-            });
-            navigate('/dashboard');
-          }
-        } else {
-          setError(result.error || 'Registration failed');
-        }
+      const result = await signIn(email, password);
+      if (result.success && result.user) {
+        navigate('/dashboard');
       }
-    } catch (error: any) {
-      console.error('Auth error:', error);
-      setError(error.message || 'An unexpected error occurred');
+    } catch (error) {
+      console.error('Admin login error:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSignUp = async () => {
+    setIsLoading(true);
+    try {
+      // Admin signup placeholder
+      toast({
+        title: "Admin Registration",
+        description: "Admin registration will be handled separately."
+      });
+    } catch (error) {
+      console.error('Admin signup error:', error);
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-4">
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="w-16 h-16 rounded-full mx-auto mb-4 flex items-center justify-center overflow-hidden bg-white shadow-lg">
-            <img 
-              src={startersLogo} 
-              alt="Starters" 
-              className="w-full h-full object-contain p-2"
-              loading="lazy"
-            />
-          </div>
-          <CardTitle className="text-2xl">
-            {isLogin ? 'Admin Login' : 'Create Admin Account'}
-          </CardTitle>
-          <CardDescription>
-            {isLogin 
-              ? 'Access the admin dashboard' 
-              : 'Create a new admin account'
-            }
+        <CardHeader className="space-y-1">
+          <CardTitle className="text-2xl font-bold text-center">Admin Login</CardTitle>
+          <CardDescription className="text-center">
+            Sign in to access the admin dashboard
           </CardDescription>
         </CardHeader>
-
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="name">Full Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="name"
-                    type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Enter your full name"
-                    className="pl-10"
-                    required
-                    disabled={isLoading}
-                  />
-                </div>
-              </div>
-            )}
-
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <div className="relative">
-                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <Input
                   id="email"
                   type="email"
+                  placeholder="Enter your admin email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email"
                   className="pl-10"
                   required
-                  disabled={isLoading}
                 />
               </div>
             </div>
@@ -137,64 +80,51 @@ const AdminAuth = () => {
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <div className="relative">
-                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
                 <Input
                   id="password"
-                  type="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
-                  className="pl-10"
+                  className="pl-10 pr-10"
                   required
-                  disabled={isLoading}
-                  minLength={isLogin ? undefined : 6}
                 />
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  className="absolute right-0 top-0 h-full px-3"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
               </div>
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full" 
+            <Button
+              type="submit"
+              className="w-full"
               disabled={isLoading}
             >
-              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              {isLogin ? 'Login' : 'Create Account'}
+              {isLoading ? 'Signing in...' : 'Sign In'}
             </Button>
-
-            <div className="text-center">
-              <Button
-                type="button"
-                variant="link"
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setError('');
-                  setEmail('');
-                  setPassword('');
-                  setName('');
-                }}
-                disabled={isLoading}
-              >
-                {isLogin 
-                  ? "Don't have an account? Sign up" 
-                  : "Already have an account? Login"
-                }
-              </Button>
-            </div>
-
-            <div className="flex items-center justify-center">
-              <Link 
-                to="/" 
-                className="flex items-center space-x-2 text-sm text-muted-foreground hover:text-primary"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <span>Back to Store</span>
-              </Link>
-            </div>
           </form>
+
+          <div className="mt-6 text-center">
+            <p className="text-sm text-gray-600">
+              Need admin access?{' '}
+              <button
+                type="button"
+                className="text-blue-600 hover:text-blue-500 font-medium"
+                onClick={handleSignUp}
+              >
+                Contact support
+              </button>
+            </p>
+          </div>
         </CardContent>
       </Card>
     </div>
   );
 };
-
-export default AdminAuth;

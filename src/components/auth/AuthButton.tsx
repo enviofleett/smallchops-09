@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { User, LogIn, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -19,7 +20,7 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
   showText = true 
 }) => {
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const { user, session, isAuthenticated, isLoading, logout } = useAuth();
+  const { user, session, customerAccount, isAuthenticated, isLoading, logout } = useAuth();
   const { toast } = useToast();
 
   const handleSignOut = async () => {
@@ -48,9 +49,13 @@ export const AuthButton: React.FC<AuthButtonProps> = ({
   }
 
   if (isAuthenticated && (user || session)) {
-    const displayName = user?.name || session?.user?.user_metadata?.name || session?.user?.email?.split('@')[0] || 'User';
+    // Get display name from customer account or session metadata
+    const displayName = customerAccount?.name || 
+                       session?.user?.user_metadata?.name || 
+                       session?.user?.email?.split('@')[0] || 
+                       'User';
     const displayEmail = user?.email || session?.user?.email || '';
-    const avatarUrl = user?.avatar_url || session?.user?.user_metadata?.avatar_url;
+    const avatarUrl = session?.user?.user_metadata?.avatar_url;
     
     return (
       <DropdownMenu>

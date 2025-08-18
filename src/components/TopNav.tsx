@@ -1,174 +1,135 @@
+
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Search, Bell, User, LogOut, Menu, Home, Package, Users, BarChart3, Settings } from 'lucide-react';
-import { useAuth } from '../contexts/AuthContext';
-import { useBusinessSettings } from '../hooks/useBusinessSettings';
-import { SidebarTrigger } from "@/components/ui/sidebar";
-import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  NavigationMenu,
-  NavigationMenuContent,
-  NavigationMenuItem,
-  NavigationMenuLink,
-  NavigationMenuList,
-  NavigationMenuTrigger,
-} from "@/components/ui/navigation-menu";
-const TopNav = () => {
-  const {
-    user,
-    logout
-  } = useAuth();
-  const {
-    data: settings
-  } = useBusinessSettings();
-  const [showUserMenu, setShowUserMenu] = useState(false);
-  const isMobile = useIsMobile();
-  const navigate = useNavigate();
-  const handleLogout = async () => {
-    await logout();
-    setShowUserMenu(false);
+import { Bell, User, LogOut, Settings, Menu, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+
+interface TopNavProps {
+  onMenuToggle: () => void;
+}
+
+export const TopNav = ({ onMenuToggle }: TopNavProps) => {
+  const { user, session, customerAccount, signOut } = useAuth();
+  const { toast } = useToast();
+  const [notifications] = useState([
+    { id: 1, message: "New order received", type: "info" },
+    { id: 2, message: "Payment confirmed", type: "success" },
+  ]);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      toast({
+        title: "Signed out",
+        description: "You have been signed out successfully."
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to sign out. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
-  return <header className="bg-background border-b border-border px-4 md:px-6 py-4 sticky top-0 z-40 min-h-[73px] flex items-center">
-      <div className="flex items-center justify-between gap-4 w-full">
-        {/* Mobile menu trigger */}
-        <div className="flex items-center gap-4">
-          <SidebarTrigger className="md:hidden" />
-          
-          {/* Navigation Menu - Desktop */}
-          {!isMobile && (
-            <NavigationMenu>
-              <NavigationMenuList>
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger className="bg-transparent hover:bg-accent">
-                    Dashboard
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <div className="grid gap-3 p-6 w-80">
-                      <div className="grid grid-cols-2 gap-3">
-                        <NavigationMenuLink 
-                          onClick={() => navigate('/')}
-                          className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
-                        >
-                          <Home className="h-4 w-4" />
-                          <span>Overview</span>
-                        </NavigationMenuLink>
-                        <NavigationMenuLink 
-                          onClick={() => navigate('/orders')}
-                          className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
-                        >
-                          <Package className="h-4 w-4" />
-                          <span>Orders</span>
-                        </NavigationMenuLink>
-                        <NavigationMenuLink 
-                          onClick={() => navigate('/customers')}
-                          className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
-                        >
-                          <Users className="h-4 w-4" />
-                          <span>Customers</span>
-                        </NavigationMenuLink>
-                        <NavigationMenuLink 
-                          onClick={() => navigate('/analytics')}
-                          className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
-                        >
-                          <BarChart3 className="h-4 w-4" />
-                          <span>Analytics</span>
-                        </NavigationMenuLink>
-                      </div>
-                    </div>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-                <NavigationMenuItem>
-                  <NavigationMenuTrigger className="bg-transparent hover:bg-accent">
-                    Products
-                  </NavigationMenuTrigger>
-                  <NavigationMenuContent>
-                    <div className="grid gap-3 p-6 w-80">
-                      <NavigationMenuLink 
-                        onClick={() => navigate('/products')}
-                        className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
-                      >
-                        <Package className="h-4 w-4" />
-                        <span>All Products</span>
-                      </NavigationMenuLink>
-                      <NavigationMenuLink 
-                        onClick={() => navigate('/products/categories')}
-                        className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
-                      >
-                        <Settings className="h-4 w-4" />
-                        <span>Categories</span>
-                      </NavigationMenuLink>
-                    </div>
-                  </NavigationMenuContent>
-                </NavigationMenuItem>
-              </NavigationMenuList>
-            </NavigationMenu>
-          )}
-          
-          {/* Search - responsive */}
-          <div className="flex-1 max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
-              <input 
-                type="text" 
-                placeholder={isMobile ? "Search..." : "Search orders, customers, products..."} 
-                className="w-full pl-10 pr-4 py-2 bg-muted/50 border border-input rounded-lg focus:outline-none focus:ring-2 focus:ring-ring focus:border-transparent text-sm"
-              />
-            </div>
-          </div>
+
+  // Get display name from customer account or session metadata
+  const displayName = customerAccount?.name || 
+                     session?.user?.user_metadata?.name || 
+                     session?.user?.email?.split('@')[0] || 
+                     'User';
+  
+  const displayEmail = session?.user?.email || '';
+  const avatarUrl = session?.user?.user_metadata?.avatar_url;
+
+  return (
+    <header className="bg-white border-b border-gray-200 px-4 py-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center space-x-4">
+          <Button
+            variant="ghost" 
+            size="sm"
+            onClick={onMenuToggle}
+            className="lg:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </Button>
+          <h1 className="text-xl font-semibold text-gray-900">Dashboard</h1>
         </div>
 
-        {/* Right side */}
-        <div className="flex items-center gap-2 md:gap-4">
+        <div className="flex items-center space-x-4">
           {/* Notifications */}
-          <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
-            <Bell className="h-4 w-4 md:h-5 md:w-5" />
-            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-4 w-4 md:h-5 md:w-5 flex items-center justify-center">
-              3
-            </span>
-          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="sm" className="relative">
+                <Bell className="h-5 w-5" />
+                {notifications.length > 0 && (
+                  <Badge 
+                    variant="destructive" 
+                    className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 text-xs"
+                  >
+                    {notifications.length}
+                  </Badge>
+                )}
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-80">
+              {notifications.length > 0 ? (
+                notifications.map((notification) => (
+                  <DropdownMenuItem key={notification.id} className="p-3">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium">{notification.message}</p>
+                      <p className="text-xs text-muted-foreground">Just now</p>
+                    </div>
+                  </DropdownMenuItem>
+                ))
+              ) : (
+                <DropdownMenuItem disabled>
+                  <p className="text-sm text-muted-foreground">No new notifications</p>
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* User Menu */}
-          <div className="relative">
-            <button 
-              onClick={() => setShowUserMenu(!showUserMenu)} 
-              className="flex items-center gap-2 md:gap-3 p-2 rounded-lg hover:bg-accent transition-colors"
-            >
-              <div className="w-7 h-7 md:w-8 md:h-8 bg-primary/10 rounded-full flex items-center justify-center">
-                <User className="h-3 w-3 md:h-4 md:w-4 text-primary" />
-              </div>
-              {!isMobile && (
-                <div className="text-left">
-                  <p className="text-sm font-medium text-foreground">{user?.name}</p>
-                  <p className="text-xs text-muted-foreground capitalize">{user?.role}</p>
-                </div>
-              )}
-            </button>
-
-            {showUserMenu && (
-              <div className="absolute right-0 mt-2 w-44 md:w-48 bg-popover rounded-lg shadow-lg border border-border py-2 z-50">
-                <button 
-                  onClick={() => {
-                    navigate('/settings');
-                    setShowUserMenu(false);
-                  }}
-                  className="w-full px-4 py-2 text-left text-popover-foreground hover:bg-accent flex items-center gap-2"
-                >
-                  <User className="h-4 w-4" />
+          {user && (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="flex items-center space-x-2 px-2">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={avatarUrl} />
+                    <AvatarFallback>
+                      {displayName.charAt(0).toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="hidden md:block text-left">
+                    <p className="text-sm font-medium">{displayName}</p>
+                    <p className="text-xs text-muted-foreground">{displayEmail}</p>
+                  </div>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem>
+                  <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
-                </button>
-                <hr className="my-2 border-border" />
-                <button 
-                  onClick={handleLogout} 
-                  className="w-full px-4 py-2 text-left text-destructive hover:bg-destructive/10 flex items-center gap-2"
-                >
-                  <LogOut className="h-4 w-4" />
-                  <span>Logout</span>
-                </button>
-              </div>
-            )}
-          </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <Settings className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sign out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )}
         </div>
       </div>
-    </header>;
+    </header>
+  );
 };
-export default TopNav;

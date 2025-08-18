@@ -506,27 +506,51 @@ function AdminOrderCard({
                   {order.order_type === 'delivery' ? 'Scheduled Delivery' : 'Scheduled Pickup'}
                 </p>
                 <div className="space-y-2">
-                  <div className="flex items-center gap-4 text-sm">
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-sm">
                     <span className="font-medium text-primary">
                       {format(new Date(deliverySchedule.delivery_date), 'EEEE, MMMM d, yyyy')}
                     </span>
-                    <span className="text-muted-foreground bg-muted px-2 py-1 rounded text-xs">
-                      {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
-                    </span>
-                    {deliverySchedule.is_flexible && (
-                      <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
-                        Flexible Time
-                      </Badge>
-                    )}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="text-muted-foreground bg-muted px-2 py-1 rounded text-xs">
+                        {deliverySchedule.delivery_time_start} - {deliverySchedule.delivery_time_end}
+                      </span>
+                      {deliverySchedule.is_flexible && (
+                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
+                          Flexible Time
+                        </Badge>
+                      )}
+                    </div>
                   </div>
+                  
+                  {/* Delivery Zone and Fee for delivery orders */}
+                  {order.order_type === 'delivery' && (
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-4 text-xs">
+                      {deliveryZone && (
+                        <div>
+                          <span className="text-muted-foreground">Zone:</span>
+                          <span className="ml-1 font-medium">{deliveryZone.name}</span>
+                        </div>
+                      )}
+                      {order.delivery_fee && Number(order.delivery_fee) > 0 && (
+                        <div>
+                          <span className="text-muted-foreground">Delivery Fee:</span>
+                          <span className="ml-1 font-medium text-green-600">
+                            {formatCurrency(Number(order.delivery_fee))}
+                          </span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
                   {deliverySchedule.special_instructions && (
                     <div className="text-xs p-2 bg-amber-50 border border-amber-200 rounded">
                       <strong className="text-amber-800">Special Instructions:</strong>
-                      <p className="text-amber-700 mt-1">{deliverySchedule.special_instructions}</p>
+                      <p className="text-amber-700 mt-1 break-words">{deliverySchedule.special_instructions}</p>
                     </div>
                   )}
+                  
                   <div className="text-xs text-muted-foreground">
-                    Requested: {format(new Date(deliverySchedule.requested_at), 'MMM d, h:mm a')}
+                    Schedule Requested: {format(new Date(deliverySchedule.requested_at), 'MMM d, h:mm a')}
                   </div>
                 </div>
               </div>
@@ -535,8 +559,14 @@ function AdminOrderCard({
                 <p className="text-xs text-muted-foreground mb-1">
                   {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
                 </p>
-                <div className="text-sm text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
-                  ⚠️ Schedule not yet set - Customer will receive confirmation once scheduled
+                <div className="flex items-start gap-2 text-sm text-amber-600 bg-amber-50 p-2 rounded border border-amber-200">
+                  <div className="text-amber-600 text-lg">⚠️</div>
+                  <div>
+                    <p className="font-medium">Schedule not yet set</p>
+                    <p className="text-xs text-amber-600 mt-1">
+                      Customer will receive confirmation once {order.order_type === 'delivery' ? 'delivery' : 'pickup'} is scheduled
+                    </p>
+                  </div>
                 </div>
               </div>
             )}

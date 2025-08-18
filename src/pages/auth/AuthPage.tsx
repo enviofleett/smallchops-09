@@ -1,14 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { AuthModal } from '@/components/auth/AuthModal';
-import { useAuthContext } from '@/components/auth/AuthProvider';
+import { useAuth } from '@/contexts/AuthContext';
 
 const AuthPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading } = useAuthContext();
+  const { isAuthenticated, isLoading } = useAuth();
   const redirectTo = searchParams.get('redirect') || '/';
 
   // Redirect if already authenticated

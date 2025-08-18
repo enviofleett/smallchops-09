@@ -507,7 +507,16 @@ function AdminOrderCard({
               {order.order_type === 'pickup' && order.pickup_point_id && (
                 <div>
                   <p className="text-sm text-muted-foreground font-medium mb-1">Pickup Point</p>
-                  <PickupPointDisplay pickupPointId={order.pickup_point_id} />
+                  <PickupPointDisplay 
+                    pickupPointId={order.pickup_point_id} 
+                    pickupSchedule={
+                      order.delivery_schedule ? {
+                        pickup_date: order.delivery_schedule.delivery_date,
+                        pickup_time_start: order.delivery_schedule.delivery_time_start,
+                        pickup_time_end: order.delivery_schedule.delivery_time_end
+                      } : undefined
+                    }
+                  />
                 </div>
               )}
               

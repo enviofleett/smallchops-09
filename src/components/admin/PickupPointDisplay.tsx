@@ -1,12 +1,18 @@
 import React from 'react';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
-import { MapPin, Phone, Clock } from 'lucide-react';
+import { MapPin, Phone, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface PickupPointDisplayProps {
   pickupPointId: string;
+  pickupSchedule?: {
+    pickup_date?: string;
+    pickup_time_start?: string;
+    pickup_time_end?: string;
+  };
 }
 
-export const PickupPointDisplay: React.FC<PickupPointDisplayProps> = ({ pickupPointId }) => {
+export const PickupPointDisplay: React.FC<PickupPointDisplayProps> = ({ pickupPointId, pickupSchedule }) => {
   const { data: pickupPoint, isLoading } = usePickupPoint(pickupPointId);
 
   if (isLoading) {
@@ -42,14 +48,14 @@ export const PickupPointDisplay: React.FC<PickupPointDisplayProps> = ({ pickupPo
         </div>
       )}
       
-      {pickupPoint.operating_hours && (
+      {pickupSchedule && pickupSchedule.pickup_date && (
         <div className="flex items-center gap-1">
-          <Clock className="w-3 h-3 text-muted-foreground" />
+          <Calendar className="w-3 h-3 text-muted-foreground" />
           <p className="text-xs">
-            {typeof pickupPoint.operating_hours === 'string' 
-              ? pickupPoint.operating_hours 
-              : JSON.stringify(pickupPoint.operating_hours)
-            }
+            {format(new Date(pickupSchedule.pickup_date), 'MMM d, yyyy')}
+            {pickupSchedule.pickup_time_start && pickupSchedule.pickup_time_end && (
+              ` • ${pickupSchedule.pickup_time_start} - ${pickupSchedule.pickup_time_end}`
+            )}
           </p>
         </div>
       )}

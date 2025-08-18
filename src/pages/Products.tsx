@@ -23,28 +23,32 @@ const Products = () => {
   const queryClient = useQueryClient();
 
   // Use network resilience wrapper for better error handling
+  const rawProductsQuery = useQuery<ProductWithCategory[], Error>({
+    queryKey: ['products'],
+    queryFn: getProducts,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+    refetchOnWindowFocus: false,
+  });
+
   const productsQuery = useNetworkResilience(
-    useQuery<ProductWithCategory[], Error>({
-      queryKey: ['products'],
-      queryFn: getProducts,
-      staleTime: 2 * 60 * 1000, // 2 minutes
-      refetchOnWindowFocus: false,
-    }),
+    rawProductsQuery,
     {
       fallbackData: [],
       showToast: true,
     }
   );
 
+  const rawCategoriesQuery = useQuery({
+    queryKey: ['categories', 'optimized'],
+    queryFn: getOptimizedCategories,
+    staleTime: 10 * 60 * 1000, // 10 minutes
+    refetchOnWindowFocus: false,
+  });
+
   const categoriesQuery = useNetworkResilience(
-    useQuery<Category[], Error>({
-      queryKey: ['categories', 'optimized'],
-      queryFn: getOptimizedCategories,
-      staleTime: 10 * 60 * 1000, // 10 minutes
-      refetchOnWindowFocus: false,
-    }),
+    rawCategoriesQuery,
     {
-      fallbackData: [],
+      fallbackData: [] as Category[],
       showToast: false,
     }
   );
@@ -139,7 +143,7 @@ const Products = () => {
         onCategoryChange={setCategoryFilter}
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
-        categories={categoriesQuery.data}
+        categories={categoriesQuery.data as Category[]}
         isLoadingCategories={categoriesQuery.isLoading}
       />
       
@@ -156,7 +160,7 @@ const Products = () => {
         open={isProductDialogOpen}
         onOpenChange={setIsProductDialogOpen}
         product={selectedProduct || undefined}
-        categories={categoriesQuery.data || []}
+        categories={(categoriesQuery.data as Category[]) || []}
         onSubmit={handleSubmitProduct}
         isSubmitting={isSubmitting}
       />

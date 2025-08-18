@@ -27,19 +27,21 @@ const OptimizedProductGrid: React.FC<OptimizedProductGridProps> = ({
   // Debounce search to avoid excessive API calls
   const debouncedSearch = useDebounce(searchTerm, 500);
 
+  const optimizedQuery = useOptimizedProducts({
+    categoryId: selectedCategory,
+    page,
+    limit: itemsPerPage,
+    search: debouncedSearch || undefined,
+  });
+
   const productsQuery = useNetworkResilience(
-    useOptimizedProducts({
-      categoryId: selectedCategory,
-      page,
-      limit: itemsPerPage,
-      search: debouncedSearch || undefined,
-    }),
+    optimizedQuery,
     {
       fallbackData: {
         products: [],
         pagination: {
           page: 1,
-          limit: 20,
+          limit: itemsPerPage,
           total: 0,
           totalPages: 0,
           hasNextPage: false,
@@ -77,7 +79,7 @@ const OptimizedProductGrid: React.FC<OptimizedProductGridProps> = ({
             <div className="h-10 bg-muted animate-pulse rounded w-24" />
           </div>
         )}
-        <SkeletonLoader variant="grid" count={8} />
+        <SkeletonLoader variant="product" count={8} />
       </div>
     );
   }

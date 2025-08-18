@@ -1,6 +1,7 @@
 
-import { useQuery, UseQueryOptions } from '@tanstack/react-query';
+import { UseQueryResult } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { useEffect } from 'react';
 
 interface ResilienceOptions<T> {
   fallbackData?: T;
@@ -9,24 +10,15 @@ interface ResilienceOptions<T> {
 }
 
 export const useNetworkResilience = <T>(
-  queryOptions: UseQueryOptions<T>,
+  queryResult: UseQueryResult<T>,
   resilience: ResilienceOptions<T> = {}
 ) => {
   const { toast } = useToast();
 
-  const enhancedQuery = useQuery({
-    ...queryOptions,
-    retry: (failureCount, error) => {
-      // Custom retry logic
-      if (failureCount < 3) {
-        console.warn(`Query retry ${failureCount + 1}/3:`, error);
-        return true;
-      }
-      return false;
-    },
-    retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000),
-    onError: (error: Error) => {
-      console.error('Network resilience error:', error);
+  // Handle errors with toast notifications
+  useEffect(() => {
+    if (queryResult.isError && queryResult.error) {
+      console.error('Network resilience error:', queryResult.error);
       
       if (resilience.showToast !== false) {
         toast({
@@ -36,19 +28,19 @@ export const useNetworkResilience = <T>(
         });
       }
       
-      resilience.onError?.(error);
-    },
-  });
+      resilience.onError?.(queryResult.error);
+    }
+  }, [queryResult.isError, queryResult.error, resilience, toast]);
 
   // Return fallback data if query fails and fallback is provided
-  if (enhancedQuery.isError && resilience.fallbackData) {
+  if (queryResult.isError && resilience.fallbackData) {
     return {
-      ...enhancedQuery,
+      ...queryResult,
       data: resilience.fallbackData,
       isLoading: false,
       isError: false,
     };
   }
 
-  return enhancedQuery;
+  return queryResult;
 };

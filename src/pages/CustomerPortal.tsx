@@ -128,103 +128,118 @@ export default function CustomerPortal() {
     );
   }
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <Card className="w-full max-w-md">
+          <CardHeader className="text-center">
+            <CardTitle className="flex items-center justify-center gap-2">
+              <User className="h-5 w-5" />
+              Customer Portal
+            </CardTitle>
+            <CardDescription>
+              Sign in to access your account
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Button onClick={() => setShowAuthModal(true)} className="w-full">
+              Sign In
+            </Button>
+            <div className="flex items-center justify-center space-x-2 text-sm">
+              <span className="text-muted-foreground">New customer?</span>
+              <Link to="/register" className="text-primary hover:underline font-medium">
+                Create Account
+              </Link>
+            </div>
+            <div className="text-center text-sm text-muted-foreground">
+              Sign in to manage your orders and favorites
+            </div>
+          </CardContent>
+        </Card>
+
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Header - show different content based on auth status */}
       <div className="border-b">
         <div className="container mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div>
-              <h1 className="text-2xl font-bold">
-                {isAuthenticated ? "Welcome Back!" : "Welcome to Our Store"}
-              </h1>
-              <p className="text-muted-foreground">
-                {isAuthenticated 
-                  ? (customerAccount?.name || user?.email)
-                  : "Browse our products and create an account to place orders"
-                }
-              </p>
+              <h1 className="text-2xl font-bold">Welcome Back!</h1>
+              <p className="text-muted-foreground">{customerAccount?.name || user?.email}</p>
             </div>
-            {isAuthenticated ? (
-              <Button variant="outline" onClick={handleLogout}>
-                <LogOut className="h-4 w-4 mr-2" />
-                Logout
-              </Button>
-            ) : (
-              <Link to="/auth">
-                <Button>
-                  <User className="h-4 w-4 mr-2" />
-                  Sign In
-                </Button>
-              </Link>
-            )}
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut className="h-4 w-4 mr-2" />
+              Logout
+            </Button>
           </div>
         </div>
       </div>
 
       <div className="container mx-auto px-4 py-8">
-        <Tabs defaultValue={isAuthenticated ? "dashboard" : "menu"} className="space-y-6">
-          <TabsList className={`grid w-full ${isAuthenticated ? 'grid-cols-7' : 'grid-cols-1'}`}>
-            {isAuthenticated && <TabsTrigger value="dashboard">Dashboard</TabsTrigger>}
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-7">
+            <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
             <TabsTrigger value="menu">Browse Menu</TabsTrigger>
-            {isAuthenticated && <TabsTrigger value="orders">Order History</TabsTrigger>}
-            {isAuthenticated && <TabsTrigger value="favorites">My Favorites</TabsTrigger>}
-            {isAuthenticated && <TabsTrigger value="reviews">My Reviews</TabsTrigger>}
-            {isAuthenticated && <TabsTrigger value="tracking">Track Order</TabsTrigger>}
-            {isAuthenticated && <TabsTrigger value="loyalty">Loyalty & Rewards</TabsTrigger>}
+            <TabsTrigger value="orders">Order History</TabsTrigger>
+            <TabsTrigger value="favorites">My Favorites</TabsTrigger>
+            <TabsTrigger value="reviews">My Reviews</TabsTrigger>
+            <TabsTrigger value="tracking">Track Order</TabsTrigger>
+            <TabsTrigger value="loyalty">Loyalty & Rewards</TabsTrigger>
           </TabsList>
 
-          {isAuthenticated && (
-            <TabsContent value="dashboard" className="space-y-6">
-              <div className="grid gap-4 md:grid-cols-3">
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
-                    <Package className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{recentOrders.length}</div>
-                    <p className="text-xs text-muted-foreground">
-                      {recentOrders.filter(o => o.status === 'delivered').length} completed
-                    </p>
-                  </CardContent>
-                </Card>
+          <TabsContent value="dashboard" className="space-y-6">
+            <div className="grid gap-4 md:grid-cols-3">
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Orders</CardTitle>
+                  <Package className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">{recentOrders.length}</div>
+                  <p className="text-xs text-muted-foreground">
+                    {recentOrders.filter(o => o.status === 'delivered').length} completed
+                  </p>
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
-                    <TrendingUp className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">
-                      ${recentOrders.reduce((sum, order) => 
-                        order.status === 'delivered' ? sum + Number(order.total_amount) : sum, 0
-                      ).toFixed(2)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      Recent orders total
-                    </p>
-                  </CardContent>
-                </Card>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Total Spent</CardTitle>
+                  <TrendingUp className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">
+                    ${recentOrders.reduce((sum, order) => 
+                      order.status === 'delivered' ? sum + Number(order.total_amount) : sum, 0
+                    ).toFixed(2)}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Recent orders total
+                  </p>
+                </CardContent>
+              </Card>
 
-                <Card>
-                  <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                    <CardTitle className="text-sm font-medium">Loyalty Points</CardTitle>
-                    <Star className="h-4 w-4 text-muted-foreground" />
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">1,250</div>
-                    <p className="text-xs text-muted-foreground">
-                      Silver tier member
-                    </p>
-                  </CardContent>
-                </Card>
-              </div>
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium">Loyalty Points</CardTitle>
+                  <Star className="h-4 w-4 text-muted-foreground" />
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold">1,250</div>
+                  <p className="text-xs text-muted-foreground">
+                    Silver tier member
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
 
-              {/* Payment Debug Section (Temporary) */}
-              <div className="mb-6">
-                <PaymentDebugger />
-              </div>
+            {/* Payment Debug Section (Temporary) */}
+            <div className="mb-6">
+              <PaymentDebugger />
+            </div>
 
             {/* Upcoming Deliveries Section */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
@@ -283,11 +298,9 @@ export default function CustomerPortal() {
                </CardContent>
                </Card>
              </div>
-            </TabsContent>
-          )}
+           </TabsContent>
 
-          {isAuthenticated && (
-            <TabsContent value="orders" className="space-y-6">
+          <TabsContent value="orders" className="space-y-6">
             <Card>
               <CardHeader>
                 <CardTitle>Order History</CardTitle>
@@ -345,15 +358,13 @@ export default function CustomerPortal() {
                 )}
               </CardContent>
             </Card>
-            </TabsContent>
-          )}
+          </TabsContent>
 
           <TabsContent value="menu" className="space-y-6">
             <ProductCatalog />
           </TabsContent>
 
-          {isAuthenticated && (
-            <TabsContent value="favorites" className="space-y-6">
+          <TabsContent value="favorites" className="space-y-6">
             <div className="flex items-center justify-between mb-6">
               <div>
                 <h2 className="text-2xl font-bold">My Favorites</h2>
@@ -367,26 +378,19 @@ export default function CustomerPortal() {
               </Button>
             </div>
             <FavoritesSection customerId={customerAccount?.id || null} />
-            </TabsContent>
-          )}
+          </TabsContent>
 
-          {isAuthenticated && (
-            <TabsContent value="reviews" className="space-y-6">
-              <CustomerReviewsTab />
-            </TabsContent>
-          )}
+          <TabsContent value="reviews" className="space-y-6">
+            <CustomerReviewsTab />
+          </TabsContent>
 
-          {isAuthenticated && (
-            <TabsContent value="tracking">
-              <DeliveryTracker />
-            </TabsContent>
-          )}
+          <TabsContent value="tracking">
+            <DeliveryTracker />
+          </TabsContent>
 
-          {isAuthenticated && (
-            <TabsContent value="loyalty">
-              <LoyaltyDashboard customerEmail={user?.email || ''} />
-            </TabsContent>
-          )}
+          <TabsContent value="loyalty">
+            <LoyaltyDashboard customerEmail={user?.email || ''} />
+          </TabsContent>
         </Tabs>
       </div>
     </div>

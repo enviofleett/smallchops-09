@@ -7,6 +7,18 @@ import { OrderStatus } from '@/types/orders';
 export type OrderWithItems = Tables<'orders'> & {
   order_items: Tables<'order_items'>[];
   delivery_zones?: Tables<'delivery_zones'> | null;
+  delivery_schedule?: {
+    id: string;
+    order_id: string;
+    delivery_date: string;
+    delivery_time_start: string;
+    delivery_time_end: string;
+    requested_at: string;
+    is_flexible: boolean;
+    special_instructions?: string;
+    created_at: string;
+    updated_at: string;
+  } | null;
 };
 
 interface GetOrdersParams {
@@ -64,7 +76,8 @@ export const getOrders = async ({
       .from('orders')
       .select(`*, 
         order_items (*),
-        delivery_zones (id, name, base_fee, is_active)
+        delivery_zones (id, name, base_fee, is_active),
+        order_delivery_schedule (*)
       `, { count: 'exact' });
 
     if (status !== 'all') {
@@ -88,7 +101,7 @@ export const getOrders = async ({
       
       let fallbackQuery = supabase
         .from('orders')
-        .select(`*, order_items (*)`, { count: 'exact' });
+        .select(`*, order_items (*), order_delivery_schedule (*)`, { count: 'exact' });
 
       if (status !== 'all') {
         fallbackQuery = fallbackQuery.eq('status', status);
@@ -166,7 +179,8 @@ export const updateOrder = async (
       .eq('id', orderId)
       .select(`*, 
         order_items (*),
-        delivery_zones (id, name, base_fee, is_active)
+        delivery_zones (id, name, base_fee, is_active),
+        order_delivery_schedule (*)
       `)
       .maybeSingle();
 
@@ -178,7 +192,7 @@ export const updateOrder = async (
         .from('orders')
         .update(updates)
         .eq('id', orderId)
-        .select(`*, order_items (*)`)
+        .select(`*, order_items (*), order_delivery_schedule (*)`)
         .maybeSingle();
 
       if (noZoneError) {

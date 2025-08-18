@@ -589,6 +589,8 @@ function DeliveryOrderCard({
             <div className="bg-muted/30 rounded-md p-2 sm:p-3">
               <DeliveryScheduleDisplay 
                 schedule={schedule}
+                orderType="delivery"
+                orderStatus={order.status}
               />
             </div>
           )}

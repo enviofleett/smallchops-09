@@ -1,11 +1,49 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Users, MapPin, BarChart3, Calendar } from "lucide-react";
 import { DriverManagement } from "@/components/delivery/DriverManagement";
 import { DeliveryZonesManager } from "@/components/delivery/DeliveryZonesManager";
+import { useQuery } from '@tanstack/react-query';
+import { getOrders } from '@/api/orders';
+import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 export default function DeliveryPickupPage() {
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Fetch recent delivery orders
+  const { data: ordersData } = useQuery({
+    queryKey: ['recent-delivery-orders'],
+    queryFn: () => getOrders({
+      page: 1,
+      pageSize: 10,
+    }),
+    refetchInterval: 30000, // Refresh every 30 seconds
+  });
+
+  // Get order IDs for schedule fetching
+  const orderIds = useMemo(() => 
+    ordersData?.orders?.filter(order => order.order_type === 'delivery').map(order => order.id) || [],
+    [ordersData]
+  );
+
+  // Fetch delivery schedules for orders that might be missing them
+  const { schedules } = useOrderDeliverySchedules(orderIds);
+
+  // Calculate updated metrics with live data
+  const deliveryMetrics = useMemo(() => {
+    const deliveryOrders = ordersData?.orders?.filter(order => 
+      order.order_type === 'delivery' && order.payment_status === 'paid'
+    ) || [];
+
+    return {
+      activeDrivers: 0, // This would need to come from drivers API
+      pendingDeliveries: deliveryOrders.filter(order => 
+        ['confirmed', 'preparing', 'ready'].includes(order.status)
+      ).length,
+      deliveryZones: 0, // This would need to come from zones API
+    };
+  }, [ordersData]);
+
   return <div className="w-full min-h-[calc(100vh-110px)] p-4 md:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
@@ -45,7 +83,7 @@ export default function DeliveryPickupPage() {
                   <Users className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl md:text-2xl font-bold">0</div>
+                  <div className="text-xl md:text-2xl font-bold">{deliveryMetrics.activeDrivers}</div>
                   <p className="text-xs text-muted-foreground">drivers available</p>
                 </CardContent>
               </Card>
@@ -56,7 +94,7 @@ export default function DeliveryPickupPage() {
                   <Calendar className="h-3 w-3 md:h-4 md:w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl md:text-2xl font-bold">0</div>
+                  <div className="text-xl md:text-2xl font-bold">{deliveryMetrics.pendingDeliveries}</div>
                   <p className="text-xs text-muted-foreground">orders to deliver</p>
                 </CardContent>
               </Card>
@@ -67,7 +105,7 @@ export default function DeliveryPickupPage() {
                   <MapPin className="h-3 w-3 md:w-4 md:w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
-                  <div className="text-xl md:text-2xl font-bold">0</div>
+                  <div className="text-xl md:text-2xl font-bold">{deliveryMetrics.deliveryZones}</div>
                   <p className="text-xs text-muted-foreground">zones configured</p>
                 </CardContent>
               </Card>
@@ -79,8 +117,33 @@ export default function DeliveryPickupPage() {
                 <CardTitle>Today's Delivery Performance</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-8 text-muted-foreground">
-                  No delivery data available yet. Start by adding drivers and creating delivery zones.
+                <div className="space-y-4">
+                  {ordersData?.orders?.filter(order => 
+                    order.order_type === 'delivery' && order.payment_status === 'paid'
+                  ).slice(0, 5).map((order) => {
+                    const schedule = order.delivery_schedule || schedules[order.id];
+                    return (
+                      <div key={order.id} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div>
+                          <p className="font-medium">{order.order_number}</p>
+                          <p className="text-sm text-muted-foreground">{order.customer_name}</p>
+                          {schedule && (
+                            <p className="text-xs text-blue-600">
+                              {schedule.delivery_date} • {schedule.delivery_time_start}-{schedule.delivery_time_end}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right">
+                          <div className="text-sm font-medium">₦{order.total_amount?.toLocaleString()}</div>
+                          <div className="text-xs text-muted-foreground capitalize">{order.status.replace('_', ' ')}</div>
+                        </div>
+                      </div>
+                    );
+                  }) || (
+                    <div className="text-center py-8 text-muted-foreground">
+                      No delivery data available yet. Start by adding drivers and creating delivery zones.
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>

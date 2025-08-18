@@ -97,6 +97,7 @@ const OrderDetails = () => {
       // Transform the data to match our interface
       const transformedOrder: Order = {
         ...orderData,
+        order_status: orderData.status || orderData.order_status || 'pending',
         delivery_address: typeof orderData.delivery_address === 'string' 
           ? orderData.delivery_address 
           : JSON.stringify(orderData.delivery_address),
@@ -123,8 +124,8 @@ const OrderDetails = () => {
         // Transform payment data to match our interface
         const transformedPayment: PaymentTransaction = {
           id: paymentData.id,
-          reference: paymentData.paystack_reference || paymentData.id,
-          transaction_id: paymentData.paystack_transaction_id || paymentData.id,
+          reference: paymentData.reference || paymentData.id,
+          transaction_id: paymentData.transaction_id || paymentData.id,
           amount: paymentData.amount,
           currency: paymentData.currency,
           status: paymentData.status,

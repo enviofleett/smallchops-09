@@ -424,16 +424,101 @@ class SMTPClient {
   }
 }
 
+// Debug SMTP connection function
+async function debugSMTPConnection(hostname: string, port: number) {
+  try {
+    console.log(`🔍 Testing raw TCP connection to ${hostname}:${port}...`);
+    const conn = await Deno.connect({ hostname, port });
+    console.log(`✅ TCP connection to ${hostname}:${port} successful`);
+    
+    // Read initial server greeting
+    const buffer = new Uint8Array(1024);
+    const bytesRead = await conn.read(buffer);
+    const greeting = new TextDecoder().decode(buffer.subarray(0, bytesRead || 0));
+    console.log(`📨 Server greeting: ${greeting.trim()}`);
+    
+    conn.close();
+    return greeting;
+  } catch (error) {
+    console.error(`❌ TCP connection failed to ${hostname}:${port}: ${error.message}`);
+    return null;
+  }
+}
+
+// Test function to find working SMTP host
+async function findWorkingSMTPHost(baseHostname: string) {
+  const alternatives = [
+    baseHostname, // original
+    `mail.${baseHostname.replace('smtp.', '')}`,
+    baseHostname.replace('smtp.', ''),
+    `outbound.${baseHostname.replace('smtp.', '')}`
+  ];
+
+  for (const hostname of alternatives) {
+    console.log(`🔍 Testing ${hostname}:587...`);
+    const result = await debugSMTPConnection(hostname, 587);
+    if (result && result.includes("220")) {
+      console.log(`✅ Found working SMTP server: ${hostname}`);
+      return hostname;
+    }
+    
+    // Also test port 465 for SSL
+    console.log(`🔍 Testing ${hostname}:465...`);
+    const sslResult = await debugSMTPConnection(hostname, 465);
+    if (sslResult && sslResult.includes("220")) {
+      console.log(`✅ Found working SMTP server: ${hostname}:465`);
+      return { hostname, port: 465, secure: true };
+    }
+  }
+  
+  console.log("❌ No working SMTP server found in alternatives");
+  return null;
+}
+
 async function sendSMTPEmail(emailData: EmailRequest) {
-  const smtpHost = Deno.env.get('SMTP_HOST');
-  const smtpPort = parseInt(Deno.env.get('SMTP_PORT') || '587');
+  let smtpHost = Deno.env.get('SMTP_HOST');
+  let smtpPort = parseInt(Deno.env.get('SMTP_PORT') || '587');
   const smtpUser = Deno.env.get('SMTP_USER');
   const smtpPass = Deno.env.get('SMTP_PASS');
-  const smtpSecure = Deno.env.get('SMTP_SECURE') === 'true';
+  let smtpSecure = Deno.env.get('SMTP_SECURE') === 'true';
 
   // Validate SMTP configuration
   if (!smtpHost || !smtpUser || !smtpPass) {
     throw new Error('Missing SMTP configuration. Required: SMTP_HOST, SMTP_USER, SMTP_PASS');
+  }
+
+  console.log(`=== Enhanced SMTP Debug Session ===`);
+  console.log(`Target: ${smtpHost}:${smtpPort} (${smtpSecure ? 'SSL' : 'STARTTLS'})`);
+  
+  // First, debug the connection
+  const greeting = await debugSMTPConnection(smtpHost, smtpPort);
+  if (!greeting || !greeting.includes("220")) {
+    console.log(`⚠️ Initial connection test failed, trying alternatives...`);
+    const alternative = await findWorkingSMTPHost(smtpHost);
+    if (!alternative) {
+      
+      // Provide specific troubleshooting based on error type
+      console.error("💡 SMTP Server Connection Failed - Troubleshooting Guide:");
+      console.error("   - Check if smtp.yournotify.com is the correct SMTP hostname");
+      console.error("   - Try alternative hostnames like mail.yournotify.com or yournotify.com");
+      console.error("   - Verify port 587 is correct (some providers use 465 or 25)");
+      console.error("   - Test with known working providers:");
+      console.error("     • Gmail: smtp.gmail.com:587 (use App Password)");
+      console.error("     • Outlook: smtp-mail.outlook.com:587");
+      console.error("     • SendGrid: smtp.sendgrid.net:587");
+      
+      throw new Error(`SMTP server not responding correctly. Tested ${smtpHost} and alternatives. Check if the hostname and port are correct.`);
+    }
+    
+    if (typeof alternative === 'object') {
+      smtpHost = alternative.hostname;
+      smtpPort = alternative.port;
+      smtpSecure = alternative.secure;
+    } else {
+      smtpHost = alternative;
+    }
+    
+    console.log(`🔄 Switching to working server: ${smtpHost}:${smtpPort}`);
   }
 
   console.log(`Attempting to send email via ${smtpHost}:${smtpPort} (secure: ${smtpSecure})`);

@@ -1,298 +1,505 @@
-import React from 'react';
-import { useParams, Navigate } from 'react-router-dom';
-import { Helmet } from 'react-helmet-async';
-import { Card } from '@/components/ui/card';
+
+import React, { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { supabase } from '@/integrations/supabase/client';
-import { Clock, CheckCircle, CreditCard, Package, Truck, Calendar } from 'lucide-react';
-import { useCustomerAuth } from '@/hooks/useCustomerAuth';
-import { useToast } from '@/hooks/use-toast';
-import { PublicHeader } from '@/components/layout/PublicHeader';
-import { DeliveryScheduleCard } from '@/components/orders/DeliveryScheduleCard';
-import { FullDeliveryInformation } from '@/components/customer/FullDeliveryInformation';
-import { getDeliveryScheduleByOrderId, DeliverySchedule } from '@/api/deliveryScheduleApi';
-import { usePickupPoints } from '@/hooks/usePickupPoints';
-interface OrderDetailsData {
+import { Separator } from '@/components/ui/separator';
+import { 
+  ArrowLeft, 
+  Package, 
+  MapPin, 
+  Clock, 
+  CreditCard, 
+  Phone, 
+  Mail,
+  User,
+  CheckCircle,
+  AlertCircle,
+  Truck,
+  Calendar
+} from 'lucide-react';
+import { formatCurrency } from '@/lib/utils';
+
+interface OrderItem {
+  id: string;
+  product_id: string;
+  product_name: string;
+  quantity: number;
+  unit_price: number;
+  total_price: number;
+  customizations?: any;
+}
+
+interface PaymentTransaction {
+  id: string;
+  reference: string;
+  amount: number;
+  status: string;
+  gateway_response: any;
+  created_at: string;
+  paid_at?: string;
+}
+
+interface PickupPoint {
+  id: string;
+  name: string;
+  address: string;
+  phone?: string;
+  is_active: boolean;
+}
+
+interface Order {
   id: string;
   order_number: string;
   status: string;
   payment_status: string;
-  paid_at?: string | null;
+  paid_at?: string;
   total_amount: number;
   order_time: string;
-  customer_id?: string | null;
-  customer_email?: string | null;
-  customer_phone?: string | null;
-  payment_method?: string | null;
-  payment_reference?: string | null;
-  order_type: 'delivery' | 'pickup';
+  customer_id: string;
+  customer_email: string;
+  customer_phone?: string;
+  payment_method?: string;
+  payment_reference?: string;
+  order_type: string;
   delivery_address?: any;
   pickup_point_id?: string | null;
+  special_instructions?: string | null;
+  delivery_notes?: string | null;
+  estimated_delivery_date?: string | null;
 }
 
-interface PaymentTx {
-  provider_reference?: string | null;
-  status?: string | null;
-  amount?: number | null;
-  channel?: string | null;
-  gateway_response?: string | null;
-  created_at?: string | null;
-  updated_at?: string | null;
-  paid_at?: string | null;
-}
+const OrderDetails = () => {
+  const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  
+  const [order, setOrder] = useState<Order | null>(null);
+  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
+  const [paymentTransaction, setPaymentTransaction] = useState<PaymentTransaction | null>(null);
+  const [currentPickupPoint, setCurrentPickupPoint] = useState<PickupPoint | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-const formatMoney = (value?: number | null) => {
-  const v = value || 0;
-  try {
-    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(v);
-  } catch {
-    return `₦${v.toLocaleString()}`;
-  }
-};
+  const fetchOrderDetails = async () => {
+    if (!id) return;
 
-const SectionSkeleton = () => (
-  <div className="space-y-4">
-    {[1, 2].map((i) => (
-      <Card key={i} className="p-6">
-        <Skeleton className="h-4 w-1/3 mb-3" />
-        <Skeleton className="h-4 w-2/3 mb-2" />
-        <Skeleton className="h-4 w-1/2" />
-      </Card>
-    ))}
-  </div>
-);
-
-export default function OrderDetails() {
-const { id } = useParams();
-const { isAuthenticated, customerAccount, user, isLoading } = useCustomerAuth();
-const { toast } = useToast();
-const [order, setOrder] = React.useState<OrderDetailsData | null>(null);
-const [tx, setTx] = React.useState<PaymentTx | null>(null);
-const [deliverySchedule, setDeliverySchedule] = React.useState<DeliverySchedule | null>(null);
-const [isLoadingData, setIsLoadingData] = React.useState(true);
-const [isReconciling, setIsReconciling] = React.useState(false);
-const [error, setError] = React.useState<string | null>(null);
-const { data: pickupPoints = [] } = usePickupPoints();
-
-  const canView = React.useMemo(() => {
-    if (!order) return false;
-    const email = (user?.email || customerAccount?.email || '').toLowerCase();
-    const orderEmail = (order.customer_email || '').toLowerCase();
-    return (
-      (!!customerAccount?.id && order.customer_id === customerAccount.id) ||
-      (!!email && !!orderEmail && email === orderEmail)
-    );
-  }, [order, customerAccount?.id, user?.email]);
-
-React.useEffect(() => {}, []); // placeholder to keep effect order
-
-const loadData = React.useCallback(async () => {
-  if (!id) return;
-  try {
-    setIsLoadingData(true);
-    setError(null);
-    const { data: orderData, error: orderErr } = await supabase
-      .from('orders')
-      .select(`
-            id, order_number, status, payment_status, paid_at, total_amount, order_time,
-            customer_id, customer_email, customer_phone, payment_method, payment_reference,
-            order_type, delivery_address, pickup_point_id
-          `)
-      .eq('id', id)
-      .maybeSingle();
-    if (orderErr) throw orderErr;
-    if (!orderData) throw new Error('Order not found');
-
-    setOrder(orderData as OrderDetailsData);
-
-    const { data: txData, error: txErr } = await supabase
-      .from('payment_transactions')
-      .select('provider_reference,status,amount,channel,gateway_response,created_at,updated_at,paid_at')
-      .eq('order_id', id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (txErr) {
-      console.warn('Payment transaction fetch error:', txErr);
-    }
-    setTx((txData || null) as PaymentTx | null);
-
-    // Load delivery schedule
     try {
-      const scheduleData = await getDeliveryScheduleByOrderId(id);
-      setDeliverySchedule(scheduleData);
-    } catch (scheduleErr) {
-      console.warn('Delivery schedule fetch error:', scheduleErr);
+      setIsLoading(true);
+
+      // Fetch order details
+      const { data: orderData, error: orderError } = await supabase
+        .from('orders')
+        .select(`
+          id, order_number, status, payment_status, paid_at, total_amount, order_time,
+          customer_id, customer_email, customer_phone, payment_method, payment_reference,
+          order_type, delivery_address, pickup_point_id, special_instructions, delivery_notes,
+          estimated_delivery_date
+        `)
+        .eq('id', id)
+        .single();
+
+      if (orderError) {
+        console.error('Error fetching order:', orderError);
+        toast({
+          title: "Error",
+          description: "Failed to load order details",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      setOrder(orderData);
+
+      // Fetch order items
+      const { data: itemsData, error: itemsError } = await supabase
+        .from('order_items')
+        .select('*')
+        .eq('order_id', id);
+
+      if (itemsError) {
+        console.error('Error fetching order items:', itemsError);
+      } else {
+        setOrderItems(itemsData || []);
+      }
+
+      // Fetch payment transaction if payment reference exists
+      if (orderData.payment_reference) {
+        const { data: txData, error: txError } = await supabase
+          .from('payment_transactions')
+          .select('*')
+          .eq('reference', orderData.payment_reference)
+          .single();
+
+        if (txError) {
+          console.error('Error fetching payment transaction:', txError);
+        } else {
+          setPaymentTransaction(txData);
+        }
+      }
+
+      // Fetch pickup point details if it's a pickup order
+      if (orderData.order_type === 'pickup' && orderData.pickup_point_id) {
+        const { data: pickupData, error: pickupError } = await supabase
+          .from('pickup_points')
+          .select('*')
+          .eq('id', orderData.pickup_point_id)
+          .single();
+
+        if (pickupError) {
+          console.error('Error fetching pickup point:', pickupError);
+        } else {
+          setCurrentPickupPoint(pickupData);
+        }
+      }
+
+    } catch (error) {
+      console.error('Error in fetchOrderDetails:', error);
+      toast({
+        title: "Error",
+        description: "An unexpected error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
-  } catch (e: any) {
-    console.error(e);
-    setError(e.message || 'Failed to load order details');
-  } finally {
-    setIsLoadingData(false);
+  };
+
+  useEffect(() => {
+    fetchOrderDetails();
+  }, [id]);
+
+  const getStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'confirmed':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      case 'preparing':
+        return 'bg-orange-100 text-orange-800 border-orange-200';
+      case 'ready':
+      case 'ready_for_pickup':
+        return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'out_for_delivery':
+      case 'shipped':
+        return 'bg-indigo-100 text-indigo-800 border-indigo-200';
+      case 'delivered':
+      case 'completed':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'cancelled':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const getPaymentStatusColor = (status: string) => {
+    switch (status?.toLowerCase()) {
+      case 'paid':
+      case 'confirmed':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'pending':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+      case 'failed':
+      case 'cancelled':
+        return 'bg-red-100 text-red-800 border-red-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+
+  const formatDateTime = (dateString: string) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
   }
-}, [id]);
 
-React.useEffect(() => {
-  loadData();
-}, [loadData]);
-
-// Realtime refresh when order or payment transactions update
-React.useEffect(() => {
-  if (!id) return;
-  const channel = supabase
-    .channel(`order-details-${id}`)
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'orders', filter: `id=eq.${id}` }, () => loadData())
-    .on('postgres_changes', { event: '*', schema: 'public', table: 'payment_transactions', filter: `order_id=eq.${id}` }, () => loadData())
-    .subscribe();
-  return () => { supabase.removeChannel(channel); };
-}, [id, loadData]);
-
-const refreshNow = async () => {
-  await loadData();
-};
-
-const reconcileNow = async () => {
-  const ref = tx?.provider_reference || (order as any)?.payment_reference;
-  if (!ref) {
-    toast({ title: 'No payment reference', description: 'Cannot reconcile without a payment reference.', variant: 'destructive' });
-    return;
+  if (!order) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <div className="text-center">
+          <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+          <h1 className="text-2xl font-semibold mb-2">Order Not Found</h1>
+          <p className="text-muted-foreground mb-4">
+            The order you're looking for doesn't exist or has been removed.
+          </p>
+          <Button onClick={() => navigate('/')} className="gap-2">
+            <ArrowLeft className="h-4 w-4" />
+            Back to Home
+          </Button>
+        </div>
+      </div>
+    );
   }
-  try {
-    setIsReconciling(true);
-    const fb = await supabase.functions.invoke('paystack-secure', { body: { action: 'verify', reference: ref } });
-    if (fb.error) throw fb.error;
-    toast({ title: 'Verification triggered', description: 'Refreshing payment status…' });
-    setTimeout(() => { loadData(); }, 1500);
-  } catch (e: any) {
-    toast({ title: 'Reconciliation failed', description: e.message || 'Unable to verify payment', variant: 'destructive' });
-  } finally {
-    setIsReconciling(false);
-  }
-};
 
-  if (isLoading || isLoadingData) return <SectionSkeleton />;
-  if (!isAuthenticated) return <Navigate to="/auth" replace />;
-  if (error) return <div className="container mx-auto p-6"><p className="text-destructive">{error}</p></div>;
-  if (!order) return <div className="container mx-auto p-6"><p>Order not found.</p></div>;
-  if (!canView) return <div className="container mx-auto p-6"><p>Access denied.</p></div>;
-
-  // Payment badge logic
-  const paymentStatus = (order.payment_status || '').toLowerCase();
-  const orderStatus = (order.status || '').toLowerCase();
-  let paymentBadge = { label: 'PENDING PAYMENT', cls: 'bg-yellow-100 text-yellow-800 border-yellow-200' };
-  if (paymentStatus === 'paid' || !!order.paid_at) paymentBadge = { label: 'PAID', cls: 'bg-green-100 text-green-800 border-green-200' };
-  else if (paymentStatus === 'failed') paymentBadge = { label: 'PAYMENT FAILED', cls: 'bg-red-100 text-red-800 border-red-200' };
-  else if (paymentStatus === 'pending' && orderStatus === 'confirmed') paymentBadge = { label: 'CONFIRMED', cls: 'bg-blue-100 text-blue-800 border-blue-200' };
-
-  const formatDateTime = (d?: string | null) => d ? new Date(d).toLocaleString() : undefined;
-
-  // Find the pickup point for this order if it's a pickup order
-  const currentPickupPoint = order.pickup_point_id 
-    ? pickupPoints.find(point => point.id === order.pickup_point_id) 
-    : null;
+  const subtotal = orderItems.reduce((sum, item) => sum + item.total_price, 0);
+  const tax = order.total_amount - subtotal;
 
   return (
     <div className="min-h-screen bg-background">
-      <Helmet>
-        <title>Order {order.order_number} - Payment Status & Details</title>
-        <meta name="description" content={`View payment status and details for order ${order.order_number}.`} />
-        <link rel="canonical" href={`${window.location.origin}/orders/${order.id}`} />
-      </Helmet>
-
-      <PublicHeader />
-
-      <div className="container mx-auto px-4 py-6 max-w-4xl">
+      <div className="container mx-auto py-8 px-4">
         {/* Header */}
-        <div className="mb-6 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-bold">Order {order.order_number}</h1>
-            <p className="text-muted-foreground">Placed on {formatDateTime(order.order_time)}</p>
+        <div className="flex items-center justify-between mb-8">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/')}
+              className="gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold">Order Details</h1>
+              <p className="text-muted-foreground">#{order.order_number}</p>
+            </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={refreshNow} disabled={isLoadingData}>Refresh status</Button>
+            <Badge className={`${getStatusColor(order.status)} border`}>
+              {order.status.replace('_', ' ').toUpperCase()}
+            </Badge>
+            <Badge className={`${getPaymentStatusColor(order.payment_status)} border`}>
+              {order.payment_status.toUpperCase()}
+            </Badge>
           </div>
         </div>
 
-        {/* Payment Information */}
-        <Card className="p-6 mb-6">
-          <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-            <CreditCard className="h-5 w-5" />
-            Payment Information
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <p className="text-sm text-muted-foreground">Payment Method</p>
-              <p className="font-medium">{order.payment_method || 'paystack'}</p>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Payment Status</p>
-              <Badge className={`text-xs border ${paymentBadge.cls}`}>{paymentBadge.label}</Badge>
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">Amount</p>
-              <p className="font-semibold">{formatMoney(order.total_amount)}</p>
-            </div>
-            {order.payment_reference && (
-              <div>
-                <p className="text-sm text-muted-foreground">Payment Reference</p>
-                <p className="font-mono text-sm break-all">{order.payment_reference}</p>
-              </div>
-            )}
-            {order.paid_at && (
-              <div className="md:col-span-2">
-                <p className="text-sm text-muted-foreground">Paid At</p>
-                <p className="font-medium">{formatDateTime(order.paid_at)}</p>
-              </div>
-            )}
-          </div>
-        </Card>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-2 space-y-6">
+            {/* Order Items */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Order Items
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {orderItems.map((item) => (
+                    <div key={item.id} className="flex justify-between items-start p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <h3 className="font-medium">{item.product_name}</h3>
+                        <p className="text-sm text-muted-foreground">
+                          Quantity: {item.quantity} × {formatCurrency(item.unit_price)}
+                        </p>
+                        {item.customizations && (
+                          <div className="mt-2">
+                            <p className="text-xs text-muted-foreground">Customizations:</p>
+                            <pre className="text-xs bg-muted p-2 rounded mt-1">
+                              {JSON.stringify(item.customizations, null, 2)}
+                            </pre>
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-right">
+                        <p className="font-medium">{formatCurrency(item.total_price)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Full Delivery Information Component */}
-        <FullDeliveryInformation 
-          order={order}
-          deliverySchedule={deliverySchedule}
-          pickupPoint={currentPickupPoint}
-          className="mb-6"
-        />
+            {/* Delivery/Pickup Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  {order.order_type === 'delivery' ? (
+                    <>
+                      <Truck className="h-5 w-5" />
+                      Delivery Information
+                    </>
+                  ) : (
+                    <>
+                      <MapPin className="h-5 w-5" />
+                      Pickup Information
+                    </>
+                  )}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {order.order_type === 'delivery' && order.delivery_address && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Delivery Address</p>
+                    <div className="bg-muted p-4 rounded-lg">
+                      <pre className="text-sm whitespace-pre-wrap">
+                        {typeof order.delivery_address === 'string' 
+                          ? order.delivery_address 
+                          : JSON.stringify(order.delivery_address, null, 2)
+                        }
+                      </pre>
+                    </div>
+                  </div>
+                )}
 
-        {/* Timeline */}
-        <Card className="p-6">
-          <h2 className="text-lg font-semibold mb-4">Order Timeline</h2>
-          <div className="space-y-3 text-sm">
-            <div className="flex items-center gap-2">
-              <Clock className="w-4 h-4" />
-              <span>Ordered: {formatDateTime(order.order_time)}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CreditCard className="w-4 h-4" />
-              <span>Paid: {formatDateTime(order.paid_at || tx?.paid_at || tx?.updated_at) || '—'}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <CheckCircle className="w-4 h-4" />
-              <span>Confirmed: {order.status?.toLowerCase() === 'confirmed' ? (formatDateTime(order.paid_at || order.order_time) || '—') : '—'}</span>
-            </div>
-            {['out_for_delivery','shipped','delivered','completed'].includes((order.status || '').toLowerCase()) && (
-              <div className="flex items-center gap-2">
-                <Truck className="w-4 h-4" />
-                <span>Current Status: {order.status}</span>
-              </div>
-            )}
-            {deliverySchedule && (
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                <span>Delivery Scheduled: {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG', {
-                  weekday: 'long',
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })} from {deliverySchedule.delivery_time_start} to {deliverySchedule.delivery_time_end}</span>
-              </div>
-            )}
+                {order.order_type === 'pickup' && currentPickupPoint && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Pickup Location</p>
+                    <div className="bg-muted p-4 rounded-lg">
+                      <h4 className="font-medium">{currentPickupPoint.name}</h4>
+                      <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                        <MapPin className="h-4 w-4" />
+                        {currentPickupPoint.address}
+                      </p>
+                      {currentPickupPoint.phone && (
+                        <p className="text-sm text-muted-foreground flex items-center gap-1 mt-1">
+                          <Phone className="h-4 w-4" />
+                          {currentPickupPoint.phone}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {order.estimated_delivery_date && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Estimated Delivery</p>
+                    <div className="flex items-center gap-2 text-sm">
+                      <Calendar className="h-4 w-4" />
+                      {formatDate(order.estimated_delivery_date)}
+                    </div>
+                  </div>
+                )}
+
+                {(order.special_instructions || order.delivery_notes) && (
+                  <div>
+                    <p className="text-sm text-muted-foreground mb-2">Special Instructions</p>
+                    <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
+                      <p className="text-sm">
+                        {order.special_instructions || order.delivery_notes}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
-        </Card>
+
+          {/* Sidebar */}
+          <div className="space-y-6">
+            {/* Order Summary */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CreditCard className="h-5 w-5" />
+                  Order Summary
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex justify-between text-sm">
+                  <span>Subtotal</span>
+                  <span>{formatCurrency(subtotal)}</span>
+                </div>
+                {tax > 0 && (
+                  <div className="flex justify-between text-sm">
+                    <span>Tax & Fees</span>
+                    <span>{formatCurrency(tax)}</span>
+                  </div>
+                )}
+                <Separator />
+                <div className="flex justify-between font-medium">
+                  <span>Total</span>
+                  <span>{formatCurrency(order.total_amount)}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Customer Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <User className="h-5 w-5" />
+                  Customer Information
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-2 text-sm">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>{order.customer_email}</span>
+                </div>
+                {order.customer_phone && (
+                  <div className="flex items-center gap-2 text-sm">
+                    <Phone className="h-4 w-4 text-muted-foreground" />
+                    <span>{order.customer_phone}</span>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Order Timeline */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Order Timeline
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <div>
+                    <p className="font-medium">Order Placed</p>
+                    <p className="text-sm text-muted-foreground">
+                      {formatDateTime(order.order_time)}
+                    </p>
+                  </div>
+                </div>
+
+                {(order.payment_status === 'paid' || paymentTransaction) && (
+                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <div>
+                      <p className="font-medium">Payment Confirmed</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDateTime(order.paid_at || paymentTransaction?.paid_at || order.order_time)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {order.status?.toLowerCase() === 'confirmed' && (
+                  <div className="flex items-center gap-3 p-3 bg-muted rounded-lg">
+                    <CheckCircle className="h-5 w-5 text-blue-600" />
+                    <div>
+                      <p className="font-medium">Order Confirmed</p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatDateTime(order.paid_at || order.order_time)}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </div>
     </div>
   );
-}
+};
+
+export default OrderDetails;

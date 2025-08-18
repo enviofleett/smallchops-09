@@ -32,6 +32,7 @@ import {
 } from 'lucide-react';
 import { format, isToday, parseISO } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
+import { formatAddress } from '@/utils/formatAddress';
 import { cn } from '@/lib/utils';
 
 export default function AdminDelivery() {
@@ -598,18 +599,41 @@ function DeliveryOrderCard({
             <span className="font-medium text-sm sm:text-base">₦{order.total_amount?.toLocaleString()}</span>
           </div>
           
+          {/* Delivery Address */}
           {order.delivery_address && (
             <div className="flex items-start gap-2 text-xs sm:text-sm">
               <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
               <div className="flex-1 min-w-0">
                 <p className="text-muted-foreground text-xs">Address:</p>
                 <p className="text-xs sm:text-sm break-words leading-relaxed">
-                  {typeof order.delivery_address === 'string' 
-                    ? order.delivery_address 
-                    : order.delivery_address?.street || 'Address not available'
-                  }
+                  {formatAddress(order.delivery_address)}
                 </p>
               </div>
+            </div>
+          )}
+          
+          {/* Special Instructions Fallback */}
+          {!schedule?.special_instructions && (order.special_instructions || order.items?.some((item: any) => item.special_instructions)) && (
+            <div className="flex items-start gap-2 text-xs sm:text-sm">
+              <div className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 mt-0.5 flex-shrink-0 border border-blue-600 rounded-sm flex items-center justify-center">
+                <span className="text-[8px] font-bold">!</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-muted-foreground text-xs">Special Instructions:</p>
+                <p className="text-xs sm:text-sm break-words leading-relaxed">
+                  {order.special_instructions || 
+                   order.items?.find((item: any) => item.special_instructions)?.special_instructions ||
+                   'See order details'}
+                </p>
+              </div>
+            </div>
+          )}
+          
+          {/* Delivery Fee */}
+          {order.delivery_fee && order.delivery_fee > 0 && (
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">Delivery Fee:</span>
+              <span className="text-xs sm:text-sm">₦{order.delivery_fee?.toLocaleString()}</span>
             </div>
           )}
         </div>

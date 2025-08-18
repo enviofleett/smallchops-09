@@ -46,6 +46,8 @@ interface Order {
   customer_phone?: string;
   order_items: OrderItem[];
   paid_at?: string;
+  special_instructions?: string;
+  delivery_fee?: number;
 }
 
 interface OrderDetailsModalProps {
@@ -269,6 +271,12 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                     <div className="flex justify-between text-sm text-green-600">
                       <span>Total Discount:</span>
                       <span>-{formatCurrency(totalDiscount)}</span>
+                    </div>
+                  )}
+                  {(order.delivery_fee || deliverySchedule?.delivery_fee) && (
+                    <div className="flex justify-between text-sm">
+                      <span>Delivery Fee:</span>
+                      <span>{formatCurrency(Number(order.delivery_fee || deliverySchedule?.delivery_fee || 0))}</span>
                     </div>
                   )}
                   <Separator />

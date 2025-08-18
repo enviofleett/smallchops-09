@@ -242,14 +242,25 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                     orderStatus={order.status}
                    className="mb-0" 
                  />
-               ) : (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                  <p className="text-sm text-yellow-800">
-                    No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
-                  </p>
-                </div>
-              )}
-             </div>
+                ) : (
+                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                   <p className="text-sm text-yellow-800">
+                     No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
+                   </p>
+                   <p className="text-xs text-gray-600 mt-1">
+                     Schedule will be confirmed after payment is verified.
+                   </p>
+                 </div>
+               )}
+              
+               {/* Order-level Special Instructions Fallback */}
+               {!deliverySchedule?.special_instructions && order.special_instructions && (
+                 <div className="mt-4 bg-muted/30 rounded-lg p-3">
+                   <h4 className="text-sm font-medium text-muted-foreground mb-2">Special Instructions</h4>
+                   <p className="text-sm break-words">{order.special_instructions}</p>
+                 </div>
+               )}
+              </div>
           </div>
           <div>
             <h3 className="font-semibold text-lg mb-4">Order Actions</h3>

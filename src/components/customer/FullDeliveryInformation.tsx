@@ -28,6 +28,12 @@ interface DeliverySchedule {
   is_flexible?: boolean;
 }
 
+interface OrderItem {
+  id: string;
+  product_name: string;
+  special_instructions?: string;
+}
+
 interface Order {
   id: string;
   order_number: string;
@@ -42,6 +48,9 @@ interface Order {
   pickup_point_id?: string;
   customer_phone?: string;
   paid_at?: string;
+  special_instructions?: string;
+  delivery_fee?: number;
+  order_items?: OrderItem[];
 }
 
 interface FullDeliveryInformationProps {
@@ -246,8 +255,8 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
               </div>
             )}
 
-            {/* Schedule Information */}
-            {deliverySchedule && (
+            {/* Schedule Information - with fallback to order-level data */}
+            {(deliverySchedule || order.delivery_address || pickupPoint) && (
               <>
                 <Separator />
                 <div>
@@ -256,80 +265,137 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
                     {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Schedule
                   </h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="h-4 w-4 text-muted-foreground" />
+                    {deliverySchedule ? (
+                      <>
                         <div>
-                          <p className="text-sm text-muted-foreground">
-                            {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Date
-                          </p>
-                          <p className="font-medium">
-                            {formatDate(deliverySchedule.delivery_date)}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG', {
-                              weekday: 'long',
-                              month: 'long',
-                              day: 'numeric'
-                            })}
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <Clock className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm text-muted-foreground">
-                            {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Time Window
-                          </p>
-                          <p className="font-medium">
-                            {formatTime(deliverySchedule.delivery_time_start)} - {formatTime(deliverySchedule.delivery_time_end)}
-                          </p>
-                          <p className="text-xs text-blue-600">1-hour window</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {deliverySchedule.delivery_zone && order.order_type === 'delivery' && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Delivery Zone</p>
-                        <p className="font-medium break-words">{deliverySchedule.delivery_zone}</p>
-                      </div>
-                    )}
-                    
-                    {deliverySchedule.delivery_fee && order.order_type === 'delivery' && (
-                      <div>
-                        <p className="text-sm text-muted-foreground">Delivery Fee</p>
-                        <p className="font-medium">{formatCurrency(Number(deliverySchedule.delivery_fee ?? 0))}</p>
-                      </div>
-                    )}
-                    
-                    {deliverySchedule.special_instructions && (
-                      <div className="sm:col-span-2">
-                        <div className="flex items-start gap-2">
-                          <FileText className="h-4 w-4 text-muted-foreground mt-1" />
-                          <div>
-                            <p className="text-sm text-muted-foreground">Special Instructions</p>
-                            <p className="font-medium break-words text-sm bg-muted/50 p-2 rounded">
-                              {deliverySchedule.special_instructions}
-                            </p>
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <p className="text-sm text-muted-foreground">
+                                {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Date
+                              </p>
+                              <p className="font-medium">
+                                {formatDate(deliverySchedule.delivery_date)}
+                              </p>
+                              <p className="text-xs text-muted-foreground">
+                                {new Date(deliverySchedule.delivery_date).toLocaleDateString('en-NG', {
+                                  weekday: 'long',
+                                  month: 'long',
+                                  day: 'numeric'
+                                })}
+                              </p>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    )}
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <Clock className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <p className="text-sm text-muted-foreground">
+                                {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Time Window
+                              </p>
+                              <p className="font-medium">
+                                {formatTime(deliverySchedule.delivery_time_start)} – {formatTime(deliverySchedule.delivery_time_end)}
+                              </p>
+                              <p className="text-xs text-blue-600">1-hour window</p>
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {deliverySchedule.delivery_zone && order.order_type === 'delivery' && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Delivery Zone</p>
+                            <p className="font-medium break-words">{deliverySchedule.delivery_zone}</p>
+                          </div>
+                        )}
+                        
+                        {deliverySchedule.delivery_fee && order.order_type === 'delivery' && (
+                          <div>
+                            <p className="text-sm text-muted-foreground">Delivery Fee</p>
+                            <p className="font-medium">{formatCurrency(Number(deliverySchedule.delivery_fee ?? 0))}</p>
+                          </div>
+                        )}
+                        
+                        {deliverySchedule.special_instructions && (
+                          <div className="sm:col-span-2">
+                            <div className="flex items-start gap-2">
+                              <FileText className="h-4 w-4 text-muted-foreground mt-1" />
+                              <div>
+                                <p className="text-sm text-muted-foreground">Special Instructions</p>
+                                <p className="font-medium break-words text-sm bg-muted/50 p-2 rounded">
+                                  {deliverySchedule.special_instructions}
+                                </p>
+                              </div>
+                            </div>
+                          </div>
+                        )}
 
-                    {deliverySchedule.is_flexible && (
+                        {deliverySchedule.is_flexible && (
+                          <div className="sm:col-span-2">
+                            <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
+                              <MapPin className="w-3 h-3 mr-1" />
+                              Flexible {order.order_type === 'delivery' ? 'delivery' : 'pickup'} time
+                            </Badge>
+                          </div>
+                        )}
+                      </>
+                    ) : (
                       <div className="sm:col-span-2">
-                        <Badge variant="outline" className="border-green-500 text-green-700 bg-green-50">
-                          <MapPin className="w-3 h-3 mr-1" />
-                          Flexible {order.order_type === 'delivery' ? 'delivery' : 'pickup'} time
-                        </Badge>
+                        <div className="bg-muted/30 rounded-lg p-3">
+                          <p className="text-sm text-muted-foreground">
+                            {order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} schedule will be confirmed after payment.
+                          </p>
+                        </div>
                       </div>
                     )}
                   </div>
                 </div>
               </>
+            )}
+
+            {/* Order-level Special Instructions Fallback */}
+            {!deliverySchedule?.special_instructions && order.special_instructions && (
+              <>
+                <Separator />
+                <div>
+                  <div className="flex items-start gap-2">
+                    <FileText className="h-4 w-4 text-muted-foreground mt-1" />
+                    <div>
+                      <p className="text-sm text-muted-foreground">Special Instructions</p>
+                      <p className="font-medium break-words text-sm bg-muted/50 p-2 rounded">
+                        {order.special_instructions}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Order Items Special Instructions - when no schedule or order-level instructions */}
+            {!deliverySchedule?.special_instructions && !order.special_instructions && order.order_items && (
+              (() => {
+                const itemInstructions = order.order_items
+                  .filter(item => item.special_instructions)
+                  .map(item => `${item.product_name}: ${item.special_instructions}`)
+                  .join('\n');
+                
+                return itemInstructions ? (
+                  <>
+                    <Separator />
+                    <div>
+                      <div className="flex items-start gap-2">
+                        <FileText className="h-4 w-4 text-muted-foreground mt-1" />
+                        <div>
+                          <p className="text-sm text-muted-foreground">Item Instructions</p>
+                          <p className="font-medium break-words text-sm bg-muted/50 p-2 rounded whitespace-pre-line">
+                            {itemInstructions}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                ) : null;
+              })()
             )}
 
             {/* Contact Phone */}

@@ -33,7 +33,21 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
   };
 
   const formatDate = (dateString: string) => {
-    return format(new Date(dateString), 'EEEE, MMM d, yyyy');
+    if (!dateString) return '';
+    try {
+      return format(new Date(dateString), 'dd/MM/yyyy');
+    } catch {
+      return dateString;
+    }
+  };
+
+  const formatDateLong = (dateString: string) => {
+    if (!dateString) return '';
+    try {
+      return format(new Date(dateString), 'EEEE, MMM d, yyyy');
+    } catch {
+      return dateString;
+    }
   };
 
   const getFulfillmentChannel = (type: string) => {
@@ -144,6 +158,9 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
               <p className="text-sm text-blue-800 font-semibold">
                 {formatDate(schedule.delivery_date)}
               </p>
+              <p className="text-xs text-gray-600">
+                {formatDateLong(schedule.delivery_date)}
+              </p>
             </div>
           </div>
 
@@ -155,7 +172,7 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
                 {orderType === 'delivery' ? 'Delivery' : 'Pickup'} Time Window
               </p>
               <p className="text-sm text-blue-800 font-semibold">
-                {formatTime(schedule.delivery_time_start)} - {formatTime(schedule.delivery_time_end)}
+                {formatTime(schedule.delivery_time_start)} – {formatTime(schedule.delivery_time_end)}
               </p>
               <p className="text-xs text-blue-600 mt-1">1-hour window</p>
             </div>

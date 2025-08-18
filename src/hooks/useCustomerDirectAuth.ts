@@ -64,6 +64,36 @@ export const useCustomerDirectAuth = () => {
     try {
       setIsLoading(true);
       
+      // Validate required fields
+      if (!data.name?.trim()) {
+        toast({
+          title: "Registration failed",
+          description: "Full name is required",
+          variant: "destructive"
+        });
+        return { success: false, error: "Full name is required" };
+      }
+
+      if (!data.phone?.trim()) {
+        toast({
+          title: "Registration failed", 
+          description: "Phone number is required",
+          variant: "destructive"
+        });
+        return { success: false, error: "Phone number is required" };
+      }
+
+      // Validate Nigerian phone number format
+      const phoneDigits = data.phone.replace(/\D/g, '');
+      if (phoneDigits.length !== 11 || !phoneDigits.startsWith('0')) {
+        toast({
+          title: "Registration failed",
+          description: "Please enter a valid Nigerian phone number (11 digits starting with 0)",
+          variant: "destructive"
+        });
+        return { success: false, error: "Invalid phone number format" };
+      }
+      
       // Check OTP rate limit first
       const { data: rateLimitCheck, error: rateLimitError } = await supabase.rpc('check_otp_rate_limit', {
         p_email: data.email

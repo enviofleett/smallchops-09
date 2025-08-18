@@ -39,7 +39,29 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const { login, signUp, signUpWithGoogle } = useAuth();
   const { toast } = useToast();
 
+  const validateNigerianPhone = (phone: string) => {
+    const cleaned = phone.replace(/\D/g, '');
+    return cleaned.length === 11 && cleaned.startsWith('0');
+  };
+
+  const formatNigerianPhone = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+    if (cleaned.startsWith('234')) {
+      return '0' + cleaned.slice(3);
+    }
+    if (value.startsWith('+234')) {
+      return '0' + cleaned.slice(3);
+    }
+    if (cleaned.length > 0 && !cleaned.startsWith('0')) {
+      return '0' + cleaned;
+    }
+    return cleaned;
+  };
+
   const handleInputChange = (field: string, value: string) => {
+    if (field === 'phone') {
+      value = formatNigerianPhone(value);
+    }
     setFormData(prev => ({ ...prev, [field]: value }));
     if (error) setError('');
   };
@@ -66,6 +88,31 @@ export const AuthModal: React.FC<AuthModalProps> = ({
           setError(result.error || 'Login failed');
         }
       } else {
+        // Validate required fields for registration
+        if (!formData.name.trim()) {
+          setError('Full name is required');
+          setIsLoading(false);
+          return;
+        }
+        
+        if (!formData.phone.trim()) {
+          setError('Phone number is required');
+          setIsLoading(false);
+          return;
+        }
+        
+        if (!validateNigerianPhone(formData.phone)) {
+          setError('Please enter a valid Nigerian phone number (11 digits starting with 0)');
+          setIsLoading(false);
+          return;
+        }
+        
+        if (formData.password.length < 8) {
+          setError('Password must be at least 8 characters long');
+          setIsLoading(false);
+          return;
+        }
+
         const result = await signUp({
           email: formData.email,
           password: formData.password,
@@ -173,7 +220,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
           {!isLogin && (
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number (Optional)</Label>
+              <Label htmlFor="phone">Phone Number</Label>
               <div className="relative">
                 <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
                 <Input
@@ -181,11 +228,16 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  placeholder="Enter your phone number"
+                  placeholder="0801234567"
                   className="pl-10"
+                  required={!isLogin}
                   disabled={isLoading}
+                  maxLength={11}
                 />
               </div>
+              <p className="text-xs text-muted-foreground">
+                Format: 11 digits starting with 0 (e.g., 08012345678)
+              </p>
             </div>
           )}
 
@@ -202,7 +254,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 className="pl-10 pr-10"
                 required
                 disabled={isLoading}
-                minLength={isLogin ? undefined : 6}
+                minLength={isLogin ? undefined : 8}
               />
               <Button
                 type="button"

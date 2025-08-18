@@ -161,6 +161,8 @@ export default function AuthCallback() {
   };
 
   const handlePhoneSkip = () => {
+    // Phone is now required, but we keep this for backward compatibility
+    // Users will be shown the modal again until they provide a phone number
     setShowPhoneModal(false);
     const redirectPath = handlePostLoginRedirect('customer');
     navigate(redirectPath);
@@ -181,7 +183,7 @@ export default function AuthCallback() {
     <>
       <PhoneCollectionModal
         isOpen={showPhoneModal}
-        onClose={handlePhoneSkip}
+        onClose={() => {}} // Make modal non-dismissible for required phone collection
         onSubmit={handlePhoneSubmit}
         userEmail={userEmail}
       />

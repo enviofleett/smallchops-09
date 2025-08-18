@@ -114,19 +114,11 @@ export const PhoneCollectionModal = ({
           </div>
           
           <div className="flex gap-2 pt-4">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-              className="flex-1"
-            >
-              Skip for Now
-            </Button>
+            {/* Removed Skip for Now button to make phone required */}
             <Button
               type="submit"
               disabled={isSubmitting || !validateNigerianPhone(phone)}
-              className="flex-1"
+              className="w-full"
             >
               {isSubmitting ? "Saving..." : "Complete Registration"}
             </Button>

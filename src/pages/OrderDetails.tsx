@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -21,7 +20,7 @@ import {
   Truck,
   Calendar
 } from 'lucide-react';
-import { formatCurrency } from '@/lib/utils';
+import { formatCurrency } from '@/lib/vatCalculations';
 
 interface OrderItem {
   id: string;
@@ -68,7 +67,6 @@ interface Order {
   delivery_address?: any;
   pickup_point_id?: string | null;
   special_instructions?: string | null;
-  delivery_notes?: string | null;
   estimated_delivery_date?: string | null;
 }
 
@@ -95,7 +93,7 @@ const OrderDetails = () => {
         .select(`
           id, order_number, status, payment_status, paid_at, total_amount, order_time,
           customer_id, customer_email, customer_phone, payment_method, payment_reference,
-          order_type, delivery_address, pickup_point_id, special_instructions, delivery_notes,
+          order_type, delivery_address, pickup_point_id, special_instructions,
           estimated_delivery_date
         `)
         .eq('id', id)
@@ -386,12 +384,12 @@ const OrderDetails = () => {
                   </div>
                 )}
 
-                {(order.special_instructions || order.delivery_notes) && (
+                {order.special_instructions && (
                   <div>
                     <p className="text-sm text-muted-foreground mb-2">Special Instructions</p>
                     <div className="bg-orange-50 border border-orange-200 p-4 rounded-lg">
                       <p className="text-sm">
-                        {order.special_instructions || order.delivery_notes}
+                        {order.special_instructions}
                       </p>
                     </div>
                   </div>

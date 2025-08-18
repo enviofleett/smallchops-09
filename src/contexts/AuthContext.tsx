@@ -3,17 +3,22 @@ import React, { createContext, useContext, useEffect, useState, ReactNode } from
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { useNavigate } from 'react-router-dom';
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   isLoading: boolean;
   isAuthenticated: boolean;
+  userType: string | null;
+  customerAccount: any | null;
   signUp: (email: string, password: string, name: string, phone?: string) => Promise<{ success: boolean; error?: string; user?: User }>;
   signIn: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>;
+  login: (email: string, password: string) => Promise<{ success: boolean; error?: string; user?: User }>;
   signOut: () => Promise<void>;
+  logout: () => Promise<void>;
   signInWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  signUpWithGoogle: () => Promise<{ success: boolean; error?: string }>;
+  resetPassword: (email: string) => Promise<{ success: boolean; error?: string }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -33,63 +38,83 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
+  const [customerAccount, setCustomerAccount] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
 
   useEffect(() => {
-    // Set up auth state listener FIRST
+    // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
-        // If user just signed up, create their customer account
-        if (event === 'SIGNED_UP' && session?.user) {
-          await createCustomerAccount(session.user);
+        // If user signed in, load their customer account
+        if (session?.user) {
+          await loadCustomerAccount(session.user.id);
+        } else {
+          setCustomerAccount(null);
         }
         
         setIsLoading(false);
       }
     );
 
-    // THEN check for existing session
+    // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
-      setIsLoading(false);
+      if (session?.user) {
+        loadCustomerAccount(session.user.id);
+      } else {
+        setIsLoading(false);
+      }
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-  const createCustomerAccount = async (user: User) => {
+  const loadCustomerAccount = async (userId: string) => {
     try {
-      // Check if customer account already exists
-      const { data: existingAccount } = await supabase
+      const { data, error } = await supabase
         .from('customer_accounts')
-        .select('id')
-        .eq('user_id', user.id)
+        .select('*')
+        .eq('user_id', userId)
         .single();
 
-      if (existingAccount) {
-        return; // Account already exists
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error loading customer account:', error);
+      } else if (data) {
+        setCustomerAccount(data);
       }
+    } catch (error) {
+      console.error('Error in loadCustomerAccount:', error);
+    }
+  };
 
-      // Create customer account
-      const { error } = await supabase
+  const createCustomerAccount = async (user: User, name: string, phone?: string) => {
+    try {
+      const { data, error } = await supabase
         .from('customer_accounts')
         .insert({
           user_id: user.id,
-          name: user.user_metadata?.name || user.email?.split('@')[0] || 'Customer',
-          phone: user.user_metadata?.phone || null,
-          email_verified: true, // Since they successfully signed up
-        });
+          name: name || user.email?.split('@')[0] || 'Customer',
+          phone: phone || null,
+          email_verified: true,
+        })
+        .select()
+        .single();
 
       if (error) {
         console.error('Error creating customer account:', error);
+        throw error;
       }
+
+      setCustomerAccount(data);
+      return data;
     } catch (error) {
       console.error('Error in createCustomerAccount:', error);
+      throw error;
     }
   };
 
@@ -101,7 +126,6 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         email,
         password,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
           data: {
             name,
             phone,
@@ -119,11 +143,23 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       }
 
       if (data.user) {
-        toast({
-          title: "Registration successful!",
-          description: "Welcome to Starters! You can now start ordering.",
-        });
-        return { success: true, user: data.user };
+        // Create customer account
+        try {
+          await createCustomerAccount(data.user, name, phone);
+          toast({
+            title: "Registration successful!",
+            description: "Welcome to Starters! You can now start ordering.",
+          });
+          return { success: true, user: data.user };
+        } catch (accountError) {
+          console.error('Failed to create customer account:', accountError);
+          // User was created but customer account failed - still allow them in
+          toast({
+            title: "Registration successful!",
+            description: "Welcome to Starters! You can now start ordering.",
+          });
+          return { success: true, user: data.user };
+        }
       }
 
       return { success: false, error: "Unknown error occurred" };
@@ -204,6 +240,22 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/callback`
+      });
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  };
+
   const signOut = async () => {
     try {
       // Clear any stored data
@@ -232,10 +284,16 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     session,
     isLoading,
     isAuthenticated: !!user,
+    userType: customerAccount ? 'customer' : null,
+    customerAccount,
     signUp,
     signIn,
+    login: signIn, // Alias for signIn
     signOut,
+    logout: signOut, // Alias for signOut
     signInWithGoogle,
+    signUpWithGoogle: signInWithGoogle, // Alias for signInWithGoogle
+    resetPassword,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

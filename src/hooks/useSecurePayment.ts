@@ -68,7 +68,7 @@ export const useSecurePayment = () => {
         body: {
           action: 'initialize',
           email: customerEmail,
-          amount: amount * 100, // Convert to kobo
+          amount: amount, // Send amount as-is (in naira)
           metadata: {
             order_id: orderId,
             customer_name: metadata?.customer_name,
@@ -80,28 +80,40 @@ export const useSecurePayment = () => {
 
       if (error) throw error;
 
-      if (!data.success) {
-        throw new Error(data.error || 'Payment initialization failed');
+      // Handle both success and status response formats
+      const isSuccess = data?.success === true || data?.status === true;
+      if (!isSuccess) {
+        throw new Error(data?.error || data?.message || 'Payment initialization failed (no authorization_url returned)');
+      }
+
+      // Extract authorization_url and reference from response
+      const responseData = data?.data || data;
+      const authorizationUrl = responseData?.authorization_url || 
+                              (responseData?.access_code ? `https://checkout.paystack.com/${responseData.access_code}` : null);
+      const reference = responseData?.reference;
+
+      if (!authorizationUrl) {
+        throw new Error('Payment initialization failed (no authorization_url returned)');
       }
 
       updateState({
         isLoading: false,
-        reference: data.reference,
-        authorizationUrl: data.authorization_url,
+        reference: reference,
+        authorizationUrl: authorizationUrl,
       });
 
       console.log('✅ Secure payment initialized:', {
-        reference: data.reference,
-        orderId: data.order_id
+        reference: reference,
+        orderId: responseData?.order_id || orderId
       });
 
       return {
         success: true,
-        reference: data.reference,
-        authorizationUrl: data.authorization_url,
-        accessCode: data.access_code,
-        orderId: data.order_id,
-        amount: data.amount
+        reference: reference,
+        authorizationUrl: authorizationUrl,
+        accessCode: responseData?.access_code,
+        orderId: responseData?.order_id || orderId,
+        amount: responseData?.amount || amount
       };
 
     } catch (error: any) {
@@ -156,20 +168,22 @@ export const useSecurePayment = () => {
 
         updateState({ isProcessing: false });
 
-        if (data.success) {
+        // Handle both success and status response formats
+        const isSuccess = data?.success === true || data?.status === true;
+        if (isSuccess) {
           toast.success('Payment verified successfully!');
           console.log('✅ Payment verification successful:', {
-            reference: data.reference,
-            orderId: data.order_id,
-            amount: data.amount
+            reference: data?.reference,
+            orderId: data?.order_id,
+            amount: data?.amount
           });
         } else {
           // Check if error suggests retrying
           if (data?.code === 'CONFIG_ERROR' || data?.retryable) {
-            throw new Error(`RETRYABLE: ${data?.error || 'Payment verification failed'}`);
+            throw new Error(`RETRYABLE: ${data?.error || data?.message || 'Payment verification failed'}`);
           }
           
-          toast.error(data?.error || 'Payment verification failed');
+          toast.error(data?.error || data?.message || 'Payment verification failed');
           console.log('❌ Payment verification failed:', data);
         }
 

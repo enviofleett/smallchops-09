@@ -73,19 +73,22 @@ export class PaymentsAPI {
         };
       }
 
-      if (!data?.status) {
+      // Handle both success and status response formats
+      const isSuccess = data?.status === true || data?.success === true;
+      if (!isSuccess) {
         return {
           success: false,
-          error: data?.error || 'Failed to initialize payment'
+          error: data?.error || data?.message || 'Failed to initialize payment'
         };
       }
 
+      const responseData = data.data || data;
       return {
         success: true,
         data: {
-          access_code: data.data.access_code,
-          reference: data.data.reference,
-          authorization_url: data.data.authorization_url
+          access_code: responseData.access_code,
+          reference: responseData.reference,
+          authorization_url: responseData.authorization_url
         }
       };
     } catch (error) {

@@ -55,8 +55,9 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
       };
     }
 
-    // Handle different response formats from the backend
-    if (data?.status === true || data?.success === true) {
+    // Handle different response formats from the backend (both success and status)
+    const isSuccess = data?.status === true || data?.success === true;
+    if (isSuccess) {
       const responseData = data.data || data;
       
       return {

@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const VERSION = "v2025-08-17-fixed";
+const VERSION = "v2025-08-19-diagnostics";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,10 +35,30 @@ serve(async (req) => {
       return await initializePayment(supabaseClient, requestData, req);
     } else if (action === 'verify') {
       return await verifyPayment(supabaseClient, requestData, req);
+    } else if (action === 'version' || action === 'diagnostic') {
+      // Diagnostic endpoint to verify function version
+      console.log('🔍 Version check requested');
+      return new Response(JSON.stringify({
+        status: true,
+        version: VERSION,
+        timestamp: new Date().toISOString(),
+        environment: Deno.env.get('DENO_DEPLOYMENT_ID') || 'local',
+        paystack_keys_configured: {
+          live_secret: !!Deno.env.get('PAYSTACK_SECRET_KEY_LIVE'),
+          test_secret: !!Deno.env.get('PAYSTACK_SECRET_KEY_TEST'),
+          live_public: !!Deno.env.get('PAYSTACK_PUBLIC_KEY_LIVE'),
+          test_public: !!Deno.env.get('PAYSTACK_PUBLIC_KEY_TEST')
+        },
+        validation_logic: 'NEW_NORMALIZED_EMAIL_AND_ORDER_AMOUNT'
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     } else {
       return new Response(JSON.stringify({
         status: false,
-        error: 'Invalid action specified'
+        error: 'Invalid action specified',
+        version: VERSION
       }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -128,14 +148,34 @@ async function initializePayment(supabaseClient, requestData, req = null) {
       console.log('🆕 Generated transaction reference for standalone payment:', transactionRef);
     }
 
-    // Input validation
+    // Enhanced input validation with detailed logging
+    console.log(`🔍 [${VERSION}] Validation check:`, {
+      customerEmail: !!customerEmail,
+      authoritativeAmount: !!authoritativeAmount,
+      emailValue: customerEmail,
+      amountValue: authoritativeAmount,
+      hasOrderId: !!order_id,
+      hasOrderNumber: !!order_number,
+      originalEmailField: !!email,
+      originalCustomerEmailField: !!customer_email,
+      originalAmountField: !!amount
+    });
+
     if (!customerEmail) {
+      console.error(`❌ [${VERSION}] VALIDATION FAILED: Customer email missing`, {
+        email, customer_email, resolved: customerEmail
+      });
       throw new Error('Customer email is required');
     }
     
     if (!authoritativeAmount) {
+      console.error(`❌ [${VERSION}] VALIDATION FAILED: Amount missing`, {
+        authoritativeAmount, amount, order_id, order_number
+      });
       throw new Error('Unable to determine payment amount');
     }
+
+    console.log(`✅ [${VERSION}] Validation passed successfully`);
 
     // Amount validation and conversion (single scaling point)
     const amountInKobo = Math.round(parseFloat(authoritativeAmount) * 100);

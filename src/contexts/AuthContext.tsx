@@ -280,7 +280,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUp = async ({ email, password, name, phone }: LoginCredentials & { name: string; phone?: string }) => {
     try {
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const redirectUrl = `${window.location.origin}/auth-callback`;
       const userData: Record<string, any> = { 
         name, 
         full_name: name,
@@ -331,7 +331,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         type: 'signup',
         email,
         options: {
-          emailRedirectTo: `${window.location.origin}/auth/callback`,
+          emailRedirectTo: `${window.location.origin}/auth-callback`,
         }
       });
 
@@ -354,7 +354,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const signUpWithGoogle = async () => {
     try {
-      const redirectUrl = `${window.location.origin}/auth/callback`;
+      const redirectUrl = `${window.location.origin}/auth-callback`;
       
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',

@@ -173,7 +173,30 @@ async function initializePayment(supabaseClient, requestData, req = null) {
     // Use provided callback_url or default to frontend success page
     const callbackUrl = callback_url || `${Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com'}/payment-callback`;
 
-    // Prepare Paystack payload with callback_url and object metadata
+    // Safe metadata parsing and preparation
+    let processedMetadata = {};
+    
+    if (metadata) {
+      try {
+        if (typeof metadata === 'string') {
+          // Parse JSON string safely
+          processedMetadata = JSON.parse(metadata);
+          console.log('📄 Parsed metadata from string:', processedMetadata);
+        } else if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
+          // Use object directly if it's a plain object
+          processedMetadata = metadata;
+          console.log('📄 Using object metadata:', processedMetadata);
+        } else {
+          console.warn('⚠️ Invalid metadata type, using empty object:', typeof metadata);
+          processedMetadata = {};
+        }
+      } catch (parseError) {
+        console.error('❌ Failed to parse metadata, using empty object:', parseError);
+        processedMetadata = {};
+      }
+    }
+
+    // Prepare Paystack payload with callback_url and structured metadata
     const paystackPayload = {
       email: customerEmail,
       amount: amountInKobo.toString(),
@@ -182,10 +205,10 @@ async function initializePayment(supabaseClient, requestData, req = null) {
       callback_url: callbackUrl,
       channels: channels || ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
       metadata: {
-        order_id: orderId,
-        customer_name: metadata?.customer_name,
-        order_number: metadata?.order_number,
-        ...metadata
+        order_id: orderId || processedMetadata.order_id,
+        customer_name: processedMetadata.customer_name,
+        order_number: processedMetadata.order_number,
+        ...processedMetadata
       }
     };
 

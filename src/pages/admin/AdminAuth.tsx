@@ -19,7 +19,7 @@ const AdminAuth = () => {
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
   const [error, setError] = useState('');
-  const { login, signUp } = useAuth();
+  const { login, signUpAdmin } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -41,22 +41,22 @@ const AdminAuth = () => {
           setError(result.error || 'Login failed');
         }
       } else {
-        const result = await signUp({ email, password, name });
+        const result = await signUpAdmin({ email, password, name });
         if (result.success) {
           if (result.requiresEmailVerification) {
             toast({
-              title: "Account created",
+              title: "Admin account created",
               description: "Please check your email to verify your account.",
             });
           } else {
             toast({
-              title: "Account created",
+              title: "Admin account created",
               description: "Your admin account has been created successfully.",
             });
-            navigate('/dashboard');
+            navigate(result.redirect || '/dashboard');
           }
         } else {
-          setError(result.error || 'Registration failed');
+          setError(result.error || 'Admin registration failed');
         }
       }
     } catch (error: any) {

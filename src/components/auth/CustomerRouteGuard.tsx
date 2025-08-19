@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { useCustomerAuth } from '@/hooks/useCustomerAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { storeRedirectUrl } from '@/utils/redirect';
 
 interface CustomerRouteGuardProps {
@@ -13,7 +13,7 @@ const CustomerRouteGuard = ({
   fallbackPath = '/auth?mode=customer'
 }: CustomerRouteGuardProps) => {
   const location = useLocation();
-  const { customerAccount, isAuthenticated, isLoading, error } = useCustomerAuth();
+  const { customerAccount, isAuthenticated, isLoading, userType } = useAuth();
 
   // Store the current URL for redirect after login
   useEffect(() => {
@@ -37,13 +37,8 @@ const CustomerRouteGuard = ({
     );
   }
 
-  // Check for authentication errors
-  if (error) {
-    console.warn('Customer authentication error:', error);
-  }
-
-  // Redirect to customer auth if not authenticated or no customer account
-  if (!isAuthenticated || !customerAccount) {
+  // Redirect to customer auth if not authenticated, wrong user type, or no customer account
+  if (!isAuthenticated || userType !== 'customer' || !customerAccount) {
     return <Navigate to={fallbackPath} state={{ from: location }} replace />;
   }
 

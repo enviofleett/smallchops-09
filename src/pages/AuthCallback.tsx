@@ -31,31 +31,61 @@ const AuthCallback: React.FC = () => {
         if (data.session?.user) {
           const user = data.session.user;
           console.log('Auth callback - user authenticated:', user.email);
+          setUserId(user.id);
 
-          // Check if user has phone number
-          const hasPhone = user.user_metadata?.phone || user.phone;
+          // Check if this is an admin user
+          const { data: adminProfile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
           
-          if (!hasPhone) {
-            console.log('Phone number required for user:', user.id);
-            setUserId(user.id);
-            setStatus('phone_required');
-            setShowPhoneModal(true);
+          if (adminProfile) {
+            // Admin user - redirect to dashboard
+            setStatus('success');
+            toast({
+              title: "Admin login successful!",
+              description: "Welcome to the admin dashboard.",
+            });
+            setTimeout(() => {
+              navigate('/dashboard', { replace: true });
+            }, 1500);
             return;
           }
-
-          // User is fully authenticated with phone
-          setStatus('success');
           
-          toast({
-            title: "Welcome!",
-            description: "You have been successfully authenticated.",
-          });
+          // Check for customer account
+          const { data: customerAccount } = await supabase
+            .from('customer_accounts')
+            .select('*')
+            .eq('user_id', user.id)
+            .single();
+          
+          if (customerAccount) {
+            // Customer user - check phone requirement
+            const hasPhone = user.user_metadata?.phone || customerAccount.phone;
+            
+            if (!hasPhone) {
+              console.log('Phone number required for customer:', user.id);
+              setStatus('phone_required');
+              setShowPhoneModal(true);
+              return;
+            }
 
-          // Redirect after short delay
-          setTimeout(() => {
-            const redirectTo = searchParams.get('redirect') || '/';
-            navigate(redirectTo, { replace: true });
-          }, 1500);
+            // Customer authenticated with phone
+            setStatus('success');
+            toast({
+              title: "Welcome!",
+              description: "You have been successfully authenticated.",
+            });
+            setTimeout(() => {
+              const redirectTo = searchParams.get('redirect') || '/';
+              navigate(redirectTo, { replace: true });
+            }, 1500);
+          } else {
+            // No profile found - redirect to auth
+            console.warn('No user profile found, redirecting to auth');
+            navigate('/auth', { replace: true });
+          }
         } else {
           // No active session, redirect to auth page
           console.log('No session found, redirecting to auth');

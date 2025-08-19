@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -47,12 +47,13 @@ export default function AdminOrders() {
     }),
     refetchInterval: 30000 // Refresh every 30 seconds
   });
+  
   const orders = ordersData?.orders || [];
   const totalCount = ordersData?.count || 0;
   const totalPages = Math.ceil(totalCount / 20);
 
   // Extract delivery schedules from orders (now included in admin function)
-  const deliverySchedules = React.useMemo(() => {
+  const deliverySchedules = useMemo(() => {
     const scheduleMap: Record<string, any> = {};
     orders.forEach((order: any) => {
       if (order.delivery_schedule) {
@@ -63,7 +64,7 @@ export default function AdminOrders() {
   }, [orders]);
 
   // Filter orders by delivery schedule
-  const filteredOrders = React.useMemo(() => {
+  const filteredOrders = useMemo(() => {
     if (deliveryFilter === 'all') return orders;
     
     const today = new Date();
@@ -92,28 +93,32 @@ export default function AdminOrders() {
   }, [orders, deliverySchedules, deliveryFilter]);
 
   // Get order counts by status for tab badges
-  const orderCounts = {
+  const orderCounts = useMemo(() => ({
     all: totalCount,
     pending: orders.filter(o => o.status === 'pending').length,
     confirmed: orders.filter(o => o.status === 'confirmed').length,
     preparing: orders.filter(o => o.status === 'preparing').length,
     out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
     delivered: orders.filter(o => o.status === 'delivered').length
-  };
+  }), [orders, totalCount]);
+
   const handleOrderClick = (order: OrderWithItems) => {
     setSelectedOrder(order);
     setIsDialogOpen(true);
   };
+
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
     setCurrentPage(1);
     refetch();
   };
+
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     setStatusFilter(value as 'all' | OrderStatus);
     setCurrentPage(1);
   };
+
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'delivered':
@@ -132,7 +137,9 @@ export default function AdminOrders() {
         return 'bg-gray-100 text-gray-800';
     }
   };
-  return <>
+
+  return (
+    <>
       <Helmet>
         <title>Order Management - Admin Dashboard</title>
         <meta name="description" content="Manage all orders, track deliveries, and monitor order status in real-time." />
@@ -141,8 +148,6 @@ export default function AdminOrders() {
       <div className="space-y-6">
         {/* System Status Check */}
         <SystemStatusChecker />
-        {/* Performance Monitor */}
-        
         
         {/* Header - Mobile Responsive */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -301,21 +306,28 @@ export default function AdminOrders() {
           </TabsList>
 
           <TabsContent value={activeTab} className="space-y-4">
-            {isLoading ? <div className="space-y-4">
-                {[...Array(5)].map((_, i) => <Card key={i} className="p-6">
+            {isLoading ? (
+              <div className="space-y-4">
+                {[...Array(5)].map((_, i) => (
+                  <Card key={i} className="p-6">
                     <div className="animate-pulse space-y-3">
                       <div className="h-4 bg-muted rounded w-1/4"></div>
                       <div className="h-4 bg-muted rounded w-1/2"></div>
                       <div className="h-4 bg-muted rounded w-1/3"></div>
                     </div>
-                  </Card>)}
-              </div> : error ? <Card className="p-6">
+                  </Card>
+                ))}
+              </div>
+            ) : error ? (
+              <Card className="p-6">
                 <div className="text-center">
                   <AlertCircle className="w-8 h-8 mx-auto text-red-500 mb-2" />
                   <p className="text-red-600 font-medium">Error loading orders</p>
                   <p className="text-sm text-muted-foreground">Please try again later</p>
                 </div>
-              </Card> : filteredOrders.length === 0 ? <Card className="p-6">
+              </Card>
+            ) : filteredOrders.length === 0 ? (
+              <Card className="p-6">
                 <div className="text-center">
                   <Package className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
                   <p className="font-medium">No orders found</p>
@@ -323,44 +335,68 @@ export default function AdminOrders() {
                     {searchQuery || deliveryFilter !== 'all' ? 'Try adjusting your search criteria or filters' : 'No orders match the current filter'}
                   </p>
                 </div>
-              </Card> : <>
+              </Card>
+            ) : (
+              <>
                 {/* Orders List */}
                 <div className="space-y-4">
-                  {filteredOrders.map(order => <div key={order.id} onClick={() => handleOrderClick(order)} className="cursor-pointer transition-transform hover:scale-[1.01]">
+                  {filteredOrders.map(order => (
+                    <div key={order.id} onClick={() => handleOrderClick(order)} className="cursor-pointer transition-transform hover:scale-[1.01]">
                       <AdminOrderCard order={order} deliverySchedule={deliverySchedules[order.id]} />
-                    </div>)}
+                    </div>
+                  ))}
                 </div>
 
                 {/* Pagination */}
-                {totalPages > 1 && <div className="flex items-center justify-between">
+                {totalPages > 1 && (
+                  <div className="flex items-center justify-between">
                     <p className="text-sm text-muted-foreground">
                       Showing {(currentPage - 1) * 20 + 1} to{' '}
                       {Math.min(currentPage * 20, totalCount)} of {totalCount} orders
                     </p>
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1}>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setCurrentPage(p => Math.max(1, p - 1))} 
+                        disabled={currentPage === 1}
+                      >
                         Previous
                       </Button>
                       <span className="px-3 py-1 text-sm">
                         Page {currentPage} of {totalPages}
                       </span>
-                      <Button variant="outline" size="sm" onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages}>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} 
+                        disabled={currentPage === totalPages}
+                      >
                         Next
                       </Button>
                     </div>
-                  </div>}
-              </>}
+                  </div>
+                )}
+              </>
+            )}
           </TabsContent>
         </Tabs>
 
         {/* Order Details Dialog */}
-        {selectedOrder && <OrderDetailsDialog order={selectedOrder} isOpen={isDialogOpen} onClose={() => {
-        setIsDialogOpen(false);
-        setSelectedOrder(null);
-        refetch(); // Refresh orders after dialog closes
-      }} />}
+        {selectedOrder && (
+          <OrderDetailsDialog 
+            order={selectedOrder} 
+            isOpen={isDialogOpen} 
+            onClose={() => {
+              setIsDialogOpen(false);
+              setSelectedOrder(null);
+              refetch(); // Refresh orders after dialog closes
+            }} 
+          />
+        )}
       </div>
-    </>;
+    </>
+  );
 }
 
 // Admin-specific order card component
@@ -386,17 +422,21 @@ function AdminOrderCard({
     },
     enabled: !!order.delivery_zone_id
   });
+
   const {
     data: detailedOrderData,
     isLoading: isLoadingDetails
   } = useDetailedOrderData(order.id);
+
   const [showProductDetails, setShowProductDetails] = useState(false);
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', {
       style: 'currency',
       currency: 'NGN'
     }).format(amount);
   };
+
   const getStatusBadgeColor = (status: string) => {
     switch (status) {
       case 'delivered':
@@ -415,7 +455,9 @@ function AdminOrderCard({
         return 'bg-gray-100 text-gray-800';
     }
   };
-  return <Card className="hover:shadow-md transition-shadow">
+
+  return (
+    <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
@@ -448,10 +490,15 @@ function AdminOrderCard({
             <p className="text-sm text-muted-foreground">Items & Payment</p>
             <div className="flex items-center gap-2">
               <span className="font-medium">{order.order_items?.length || 0} items</span>
-              <Button variant="ghost" size="sm" onClick={e => {
-              e.stopPropagation();
-              setShowProductDetails(!showProductDetails);
-            }} className="h-6 px-2 text-xs">
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                onClick={e => {
+                  e.stopPropagation();
+                  setShowProductDetails(!showProductDetails);
+                }} 
+                className="h-6 px-2 text-xs"
+              >
                 <ChevronDown className={`w-3 h-3 transition-transform ${showProductDetails ? 'rotate-180' : ''}`} />
                 Products
               </Button>
@@ -463,15 +510,25 @@ function AdminOrderCard({
         </div>
 
         {/* Product Details Expansion */}
-        {showProductDetails && <div className="mt-4 border-t pt-4">
-            {isLoadingDetails ? <div className="space-y-2">
+        {showProductDetails && (
+          <div className="mt-4 border-t pt-4">
+            {isLoadingDetails ? (
+              <div className="space-y-2">
                 <div className="h-4 bg-muted animate-pulse rounded" />
                 <div className="h-4 bg-muted animate-pulse rounded w-3/4" />
-              </div> : detailedOrderData?.items ? <div className="space-y-2">
+              </div>
+            ) : detailedOrderData?.items ? (
+              <div className="space-y-2">
                 <h4 className="font-medium text-sm mb-2">Product Details</h4>
-                {detailedOrderData.items.map((item: any) => <ProductDetailCard key={item.id} item={item} showReorderButton={false} />)}
-              </div> : <p className="text-sm text-muted-foreground">Product details not available</p>}
-          </div>}
+                {detailedOrderData.items.map((item: any) => (
+                  <ProductDetailCard key={item.id} item={item} showReorderButton={false} />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">Product details not available</p>
+            )}
+          </div>
+        )}
 
         {/* Enhanced Delivery Information Display using DeliveryScheduleDisplay */}
         {order.payment_status === 'paid' && (
@@ -568,5 +625,6 @@ function AdminOrderCard({
           </div>
         )}
       </CardContent>
-    </Card>;
+    </Card>
+  );
 }

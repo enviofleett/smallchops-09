@@ -332,6 +332,7 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           delivery_date: formData.delivery_date,
           delivery_time_start: formData.delivery_time_slot?.start_time,
           delivery_time_end: formData.delivery_time_slot?.end_time,
+          is_flexible: false,
           special_instructions: formData.special_instructions || null
         },
         payment_method: 'paystack',
@@ -468,6 +469,51 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         };
         
         console.log('✅ Processed payment data:', processedPaymentData);
+        
+        // Add delivery schedule fallback check
+        if (parsedData.order_id && sanitizedData.delivery_schedule) {
+          console.log('🔍 Verifying delivery schedule was persisted...');
+          try {
+            const { getDeliveryScheduleByOrderId, createDeliverySchedule } = await import('@/api/deliveryScheduleApi');
+            
+            const existingSchedule = await getDeliveryScheduleByOrderId(parsedData.order_id);
+            
+            if (!existingSchedule) {
+              console.log('⚠️ Delivery schedule not found, attempting fallback insert...');
+              
+              try {
+                const fallbackSchedule = await createDeliverySchedule({
+                  order_id: parsedData.order_id,
+                  delivery_date: sanitizedData.delivery_schedule.delivery_date,
+                  delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
+                  delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
+                  is_flexible: sanitizedData.delivery_schedule.is_flexible || false,
+                  special_instructions: sanitizedData.delivery_schedule.special_instructions || null
+                });
+                
+                console.log('✅ Fallback delivery schedule inserted:', fallbackSchedule.id);
+                toast({
+                  title: "Schedule Saved",
+                  description: "Your delivery schedule has been confirmed.",
+                });
+              } catch (fallbackError) {
+                console.error('❌ Fallback schedule insert failed:', fallbackError);
+                toast({
+                  title: "Schedule Error", 
+                  description: "We couldn't save your delivery window. Please try again.",
+                  variant: "destructive",
+                });
+                setIsSubmitting(false);
+                return; // Don't proceed to payment
+              }
+            } else {
+              console.log('✅ Delivery schedule already exists:', existingSchedule.id);
+            }
+          } catch (scheduleCheckError) {
+            console.error('❌ Schedule verification failed:', scheduleCheckError);
+            // Continue anyway since server should have handled it
+          }
+        }
         
         // Mark checkout in progress to persist cart
         markCheckoutInProgress(processedPaymentData.reference);

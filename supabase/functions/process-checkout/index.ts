@@ -114,7 +114,8 @@ serve(async (req) => {
       delivery_zone_id,
       payment_method,
       guest_session_id,
-      payment_reference
+      payment_reference,
+      delivery_schedule
     } = requestBody;
 
     // 🚨 CRITICAL: Block frontend-generated payment references
@@ -158,6 +159,47 @@ serve(async (req) => {
 
     if (fulfillment_type === 'pickup' && !pickup_point_id) {
       throw new Error('pickup_point_id is required for pickup orders');
+    }
+
+    // Validate delivery schedule for all fulfillment types
+    if (delivery_schedule) {
+      console.log('📅 Validating delivery schedule:', delivery_schedule);
+      
+      if (!delivery_schedule.delivery_date || !delivery_schedule.delivery_time_start || !delivery_schedule.delivery_time_end) {
+        throw new Error('Delivery schedule must include delivery_date, delivery_time_start, and delivery_time_end');
+      }
+
+      // Validate date format (YYYY-MM-DD)
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(delivery_schedule.delivery_date)) {
+        throw new Error('delivery_date must be in YYYY-MM-DD format');
+      }
+
+      // Validate time format (HH:mm)
+      const timeRegex = /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/;
+      if (!timeRegex.test(delivery_schedule.delivery_time_start) || !timeRegex.test(delivery_schedule.delivery_time_end)) {
+        throw new Error('delivery_time_start and delivery_time_end must be in HH:mm format');
+      }
+
+      // Validate that start time is before end time
+      const startTime = delivery_schedule.delivery_time_start;
+      const endTime = delivery_schedule.delivery_time_end;
+      if (startTime >= endTime) {
+        throw new Error('delivery_time_start must be before delivery_time_end');
+      }
+
+      // Check that delivery date is not in the past
+      const deliveryDate = new Date(delivery_schedule.delivery_date);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0); // Set to start of day for comparison
+      
+      if (deliveryDate < today) {
+        throw new Error('delivery_date cannot be in the past');
+      }
+
+      console.log('✅ Delivery schedule validation passed');
+    } else if (fulfillment_type === 'delivery') {
+      throw new Error('delivery_schedule is required for delivery orders');
     }
 
     console.log('✅ Validation passed, creating order...');
@@ -346,6 +388,111 @@ serve(async (req) => {
 
     if (!orderDetails) {
       throw new Error('Failed to retrieve created order');
+    }
+
+    // Insert delivery schedule if provided
+    let scheduleId: string | null = null;
+    if (delivery_schedule) {
+      try {
+        console.log('📅 Inserting delivery schedule for order:', orderId);
+        
+        const scheduleData = {
+          order_id: orderId,
+          delivery_date: delivery_schedule.delivery_date,
+          delivery_time_start: delivery_schedule.delivery_time_start,
+          delivery_time_end: delivery_schedule.delivery_time_end,
+          is_flexible: delivery_schedule.is_flexible || false,
+          special_instructions: delivery_schedule.special_instructions || null,
+          requested_at: new Date().toISOString()
+        };
+
+        const { data: scheduleRecord, error: scheduleError } = await supabaseClient
+          .from('order_delivery_schedule')
+          .insert(scheduleData)
+          .select('id')
+          .single();
+
+        if (scheduleError) {
+          console.error('❌ Failed to insert delivery schedule:', scheduleError);
+          
+          // Log to payment_processing_logs
+          await supabaseClient
+            .from('payment_processing_logs')
+            .insert({
+              order_id: orderId,
+              payment_reference: authoritativePaymentReference,
+              processing_stage: 'schedule_insert_failed',
+              error_message: scheduleError.message,
+              metadata: {
+                schedule_data: scheduleData,
+                error_code: scheduleError.code
+              }
+            });
+
+          // Log to audit_logs
+          await supabaseClient
+            .from('audit_logs')
+            .insert({
+              action: 'delivery_schedule_insert_failed',
+              category: 'Order Management',
+              message: `Failed to insert delivery schedule for order ${orderDetails.order_number}`,
+              entity_id: orderId,
+              old_values: null,
+              new_values: scheduleData,
+              user_id: null
+            });
+
+          throw new Error('Failed to save delivery schedule: ' + scheduleError.message);
+        }
+
+        scheduleId = scheduleRecord.id;
+        console.log('✅ Delivery schedule inserted:', scheduleId);
+
+        // Log success
+        await supabaseClient
+          .from('audit_logs')
+          .insert({
+            action: 'delivery_schedule_inserted',
+            category: 'Order Management',
+            message: `Delivery schedule created for order ${orderDetails.order_number}: ${delivery_schedule.delivery_date} ${delivery_schedule.delivery_time_start}-${delivery_schedule.delivery_time_end}`,
+            entity_id: orderId,
+            old_values: null,
+            new_values: scheduleData,
+            user_id: null
+          });
+
+        // Insert success metric
+        await supabaseClient
+          .from('api_metrics')
+          .insert({
+            endpoint: 'process-checkout',
+            metric_type: 'schedule_persisted',
+            metric_value: 1,
+            dimensions: {
+              fulfillment_type: fulfillment_type,
+              has_special_instructions: !!delivery_schedule.special_instructions
+            }
+          });
+
+      } catch (scheduleError: any) {
+        console.error('❌ Delivery schedule insertion failed:', scheduleError);
+        
+        // Insert failure metric
+        await supabaseClient
+          .from('api_metrics')
+          .insert({
+            endpoint: 'process-checkout',
+            metric_type: 'schedule_persist_failed',
+            metric_value: 1,
+            dimensions: {
+              fulfillment_type: fulfillment_type,
+              error_type: scheduleError.name || 'unknown'
+            }
+          });
+
+        // Re-throw to prevent order from proceeding to payment without schedule
+        throw scheduleError;
+      }
     }
 
     // Initialize payment with Paystack (with retry mechanism)
@@ -623,6 +770,14 @@ serve(async (req) => {
         access_code: finalAccessCode,
         reference: authoritativePaymentReference // Always use server txn_ reference
       },
+      schedule: scheduleId ? {
+        schedule_id: scheduleId,
+        delivery_date: delivery_schedule?.delivery_date,
+        delivery_time_start: delivery_schedule?.delivery_time_start,
+        delivery_time_end: delivery_schedule?.delivery_time_end,
+        is_flexible: delivery_schedule?.is_flexible || false,
+        special_instructions: delivery_schedule?.special_instructions
+      } : null,
       message: 'Order created and payment initialized successfully'
     };
 

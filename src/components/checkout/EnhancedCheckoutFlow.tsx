@@ -286,13 +286,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       }
 
       // Check if process-checkout provided a payment_url to open
-      if (data?.payment_url) {
-        console.log('🔗 Opening process-checkout payment URL in new tab:', data.payment_url);
-        window.open(data.payment_url, '_blank');
+      if (data?.payment_url || data?.authorization_url) {
+        const paymentUrl = data.payment_url || data.authorization_url;
+        console.log('🔗 Opening process-checkout payment URL in new tab:', paymentUrl);
+        window.open(paymentUrl, '_blank');
         toast({
           title: "Payment opened",
           description: "Complete payment in the new tab, then return here."
         });
+        return; // Exit early if primary payment flow worked
       }
 
       // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
@@ -327,7 +329,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         orderId: parsedData?.order_id,
         orderNumber: parsedData?.order_number || data?.order_number,
         amount: total,
-        email: sanitizedData.customer_email
+        email: sanitizedData.customer_email,
+        successUrl: `${window.location.origin}/payment-callback`,
+        cancelUrl: window.location.href
       });
       setCheckoutStep('payment');
       setIsSubmitting(false);
@@ -715,6 +719,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           amount={paymentData.amount}
           email={paymentData.email}
           orderNumber={paymentData.orderNumber}
+          successUrl={paymentData.successUrl}
+          cancelUrl={paymentData.cancelUrl}
           onSuccess={handlePaymentSuccess}
           onError={(error) => handlePaymentFailure({ message: error })}
           onClose={() => setCheckoutStep('details')}

@@ -132,10 +132,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const items = cart.items || [];
   const { guestSession } = useGuestSession();
   const guestSessionId = guestSession?.sessionId;
-  const { user, session, isAuthenticated } = useCustomerAuth();
+  const { user, session, isAuthenticated, isLoading } = useCustomerAuth();
   const { profile } = useCustomerProfile();
   
-  const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>('auth');
+  // Initialize checkout step based on authentication status
+  const getInitialCheckoutStep = () => {
+    if (isAuthenticated) return 'details';
+    return 'auth';
+  };
+  
+  const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>(getInitialCheckoutStep());
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: '',
     customer_name: '',
@@ -209,6 +215,17 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
     return () => window.removeEventListener('message', handleMessage);
   }, [handleClose]);
 
+  // Manage checkout step based on authentication status
+  useEffect(() => {
+    if (!isLoading) {
+      if (isAuthenticated) {
+        setCheckoutStep('details');
+      } else {
+        setCheckoutStep('auth');
+      }
+    }
+  }, [isAuthenticated, isLoading]);
+
   // Auto-fill form data from user profile
   useEffect(() => {
     if (isAuthenticated && profile) {
@@ -218,7 +235,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         customer_name: (profile as any).name || '',
         customer_phone: (profile as any).phone || ''
       }));
-      setCheckoutStep('details');
     }
   }, [isAuthenticated, profile]);
 
@@ -844,9 +860,20 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
-              {checkoutStep === 'auth' && renderAuthStep()}
-              {checkoutStep === 'details' && renderDetailsStep()}
-              {checkoutStep === 'payment' && renderPaymentStep()}
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="space-y-4 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-muted-foreground">Checking account...</p>
+                  </div>
+                </div>
+              ) : (
+                <>
+                  {checkoutStep === 'auth' && renderAuthStep()}
+                  {checkoutStep === 'details' && renderDetailsStep()}
+                  {checkoutStep === 'payment' && renderPaymentStep()}
+                </>
+              )}
             </div>
 
             {/* Sticky Bottom Action */}

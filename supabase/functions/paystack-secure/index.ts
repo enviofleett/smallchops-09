@@ -61,102 +61,60 @@ serve(async (req) => {
 
 async function initializePayment(supabaseClient, requestData) {
   try {
-    const { email, amount, reference, metadata, channels, order_id, order_number } = requestData;
-
-    console.log('🔍 Fetching Paystack configuration...');
-    
-    // Get authoritative amount from order if order_id/order_number provided
-    let authoritativeAmount = amount;
-    let orderId = order_id;
-    
-    if (order_id || order_number) {
-      const serviceClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-        { auth: { persistSession: false } }
-      );
-
-      let orderQuery = serviceClient.from('orders').select('id, total_amount, payment_reference');
-      
-      if (order_id) {
-        orderQuery = orderQuery.eq('id', order_id);
-      } else if (order_number) {
-        orderQuery = orderQuery.eq('order_number', order_number);
-      }
-      
-      const { data: order, error: orderError } = await orderQuery.single();
-      
-      if (orderError || !order) {
-        console.error('❌ Order not found:', { order_id, order_number, error: orderError });
-        throw new Error('Order not found');
-      }
-      
-      authoritativeAmount = order.total_amount;
-      orderId = order.id;
-      
-      // Security check: log if client amount differs from DB amount
-      if (amount && Math.abs(parseFloat(amount) - authoritativeAmount) > 0.01) {
-        console.error('🚨 SECURITY ALERT: Amount mismatch detected!', {
-          client_amount: amount,
-          db_amount: authoritativeAmount,
-          order_id: orderId,
-          email
-        });
-        
-        // Log security incident but don't fail - use authoritative amount
-        try {
-          await serviceClient.from('security_incidents').insert({
-            type: 'payment_amount_mismatch',
-            description: `Client attempted to pay different amount than order total`,
-            severity: 'high',
-            reference: order.payment_reference || reference,
-            expected_amount: authoritativeAmount,
-            received_amount: parseFloat(amount),
-            created_at: new Date().toISOString()
-          });
-        } catch (e) {
-          console.error('Failed to log security incident:', e);
-        }
-      }
-      
-      console.log('💰 Using authoritative amount from DB:', authoritativeAmount, 'for order:', orderId);
-    }
+    const { email, amount, reference, metadata, channels } = requestData;
 
     // Input validation
-    if (!email || !authoritativeAmount) {
+    if (!email || !amount) {
       throw new Error('Email and amount are required');
     }
 
-    // FIX: Use server-generated reference consistently  
-    let transactionRef = `txn_${Date.now()}_${crypto.randomUUID()}`;
-    console.log('✅ Server-generated reference:', transactionRef);
+    // FIX: Use provided reference if available, generate only if missing
+    let transactionRef = reference;
+    if (!transactionRef) {
+      transactionRef = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('🆕 Generated new reference:', transactionRef);
+    } else {
+      console.log('✅ Using provided reference:', transactionRef);
+      
+      // Validate reference format
+      if (!transactionRef.startsWith('txn_') && !transactionRef.startsWith('pay_')) {
+        console.log('⚠️ Invalid reference format, generating new one');
+        transactionRef = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      }
+      
+      // Convert pay_ to txn_ for consistency
+      if (transactionRef.startsWith('pay_')) {
+        const oldRef = transactionRef;
+        transactionRef = transactionRef.replace('pay_', 'txn_');
+        console.log(`🔄 Converted reference: ${oldRef} -> ${transactionRef}`);
+      }
+    }
 
-    // Amount validation and conversion (single scaling point)
-    const amountInKobo = Math.round(parseFloat(authoritativeAmount) * 100);
+    // Amount validation and conversion
+    const amountInKobo = Math.round(parseFloat(amount) * 100);
     if (isNaN(amountInKobo) || amountInKobo < 100) {
       throw new Error('Amount must be a number equal to or greater than ₦1.00');
     }
 
-    console.log('💰 Amount processing:', {
-      authoritative_amount_naira: authoritativeAmount,
+    console.log('💰 Amount conversion details:', {
+      input_amount: amount,
       amount_in_kobo: amountInKobo,
-      client_provided_amount: amount,
-      using_authoritative: true
+      amount_in_naira: amountInKobo / 100
     })
 
     console.log(`💳 Initializing payment: ${transactionRef} for ${email}, amount: ₦${amountInKobo/100}`);
 
-    // Get Paystack configuration
-    const { getPaystackConfig } = await import('../_shared/paystack-config.ts');
-    const config = getPaystackConfig();
+    // FIX: Get secret key from environment variables instead of database
+    const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY') || 
+                     Deno.env.get('PAYSTACK_SECRET_KEY_TEST') || 
+                     Deno.env.get('PAYSTACK_SECRET_KEY_LIVE');
     
-    if (!config.secretKey) {
-      console.error('❌ No Paystack secret key found');
+    if (!secretKey) {
+      console.error('❌ No Paystack secret key found in environment');
       throw new Error('Paystack secret key not configured');
     }
 
-    console.log('⚙️ Config result:', { config: 'found', error: null });
-    console.log('🔑 Using secret key type:', config.isTestMode ? 'test' : 'live');
+    console.log('🔑 Using Paystack secret key:', secretKey.substring(0, 10) + '...');
 
     // Use provided callback_url or default to frontend success page
     const callbackUrl = requestData.callback_url || `${Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com'}/checkout/success`;
@@ -167,13 +125,9 @@ async function initializePayment(supabaseClient, requestData) {
       amount: amountInKobo.toString(),
       currency: 'NGN',
       reference: transactionRef,
+      callback_url: callbackUrl, // FIX: Added callback URL
       channels: channels || ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
-      metadata: JSON.stringify({
-        order_id: orderId,
-        customer_name: metadata?.customer_name,
-        order_number: metadata?.order_number,
-        ...metadata
-      })
+      metadata: metadata || {} // FIX: Keep as object, don't stringify
     };
 
     console.log('🚀 Sending to Paystack:', JSON.stringify(paystackPayload, null, 2));
@@ -182,7 +136,7 @@ async function initializePayment(supabaseClient, requestData) {
     const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.secretKey}`,
+        'Authorization': `Bearer ${secretKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify(paystackPayload)
@@ -232,9 +186,9 @@ async function initializePayment(supabaseClient, requestData) {
       const { error: transactionError } = await serviceClient
         .from('payment_transactions')
         .upsert({
-          provider_reference: transactionRef, // Use correct column name
-          order_id: orderId,
-          amount: authoritativeAmount, // Store in naira
+          reference: transactionRef,
+          provider_reference: paystackData.data.reference,
+          amount: amountInKobo / 100, // Convert back to naira
           status: 'pending',
           provider: 'paystack',
           customer_email: email,
@@ -243,7 +197,7 @@ async function initializePayment(supabaseClient, requestData) {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         }, {
-          onConflict: 'provider_reference'
+          onConflict: 'reference'
         })
       
       if (transactionError) {
@@ -290,11 +244,12 @@ async function verifyPayment(supabaseClient, requestData) {
 
     console.log('🔍 Verifying payment:', reference);
 
-    // Get Paystack configuration
-    const { getPaystackConfig } = await import('../_shared/paystack-config.ts');
-    const config = getPaystackConfig();
+    // FIX: Get secret key from environment variables
+    const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY') || 
+                     Deno.env.get('PAYSTACK_SECRET_KEY_TEST') || 
+                     Deno.env.get('PAYSTACK_SECRET_KEY_LIVE');
     
-    if (!config.secretKey) {
+    if (!secretKey) {
       throw new Error('Paystack secret key not configured');
     }
 
@@ -302,7 +257,7 @@ async function verifyPayment(supabaseClient, requestData) {
     const paystackResponse = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${config.secretKey}`,
+        'Authorization': `Bearer ${secretKey}`,
         'Content-Type': 'application/json'
       }
     });
@@ -339,7 +294,7 @@ async function verifyPayment(supabaseClient, requestData) {
             verified_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           })
-          .eq('provider_reference', reference)
+          .eq('reference', reference)
 
         if (transactionUpdateError) {
           console.error('⚠️ Failed to update payment transaction:', transactionUpdateError)

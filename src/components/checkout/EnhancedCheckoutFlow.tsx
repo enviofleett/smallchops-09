@@ -260,55 +260,51 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
       console.log('📦 Submitting checkout data:', sanitizedData);
 
-      // Call process-checkout to create order
+      // Call Supabase edge function
       const { data, error } = await supabase.functions.invoke('process-checkout', {
         body: sanitizedData
       });
 
       if (error) throw error;
 
-      console.log('🔄 Order created successfully:', data);
+      console.log('🔄 Raw server response:', data);
 
-      // Now initialize payment using secure payment processor with order ID
-      if (data?.order_id) {
-        console.log('💳 Initializing secure payment for order:', data.order_id);
-        
-        const { data: paymentData, error: paymentError } = await supabase.functions.invoke('paystack-secure', {
-          body: {
-            action: 'initialize',
-            order_id: data.order_id,
-            customer_email: sanitizedData.customer_email,
-            metadata: {
-              order_id: data.order_id,
-              customer_name: sanitizedData.customer_name,
-              order_number: data.order_number
-            },
-            callback_url: `${window.location.origin}/payment-callback`
-          }
+      // Try to parse response, fall back to minimal order data if payment_url missing
+      let parsedData;
+      try {
+        parsedData = normalizePaymentResponse(data);
+        console.log('✅ Parsed server response successfully:', parsedData);
+      } catch (error) {
+        console.warn('⚠️ Could not parse payment_url from response, proceeding to secure payment handler:', error);
+        // Fall back to minimal order data without payment_url
+        parsedData = {
+          order_id: data?.order_id,
+          order_number: data?.order_number,
+          amount: total,
+          customer_email: sanitizedData.customer_email,
+          success: true
+        };
+      }
+
+      // Check if process-checkout provided a payment_url to open
+      if (data?.payment_url || data?.authorization_url) {
+        const paymentUrl = data.payment_url || data.authorization_url;
+        console.log('🔗 Opening process-checkout payment URL in new tab:', paymentUrl);
+        window.open(paymentUrl, '_blank');
+        toast({
+          title: "Payment opened",
+          description: "Complete payment in the new tab, then return here."
         });
-
-        if (paymentError) throw paymentError;
-
-        console.log('✅ Payment initialized successfully:', paymentData);
-
-        if (paymentData?.data?.authorization_url) {
-          console.log('🔗 Opening payment URL:', paymentData.data.authorization_url);
-          window.open(paymentData.data.authorization_url, '_blank');
-          toast({
-            title: "Payment opened",
-            description: "Complete payment in the new tab, then return here."
-          });
-          return;
-        }
+        return; // Exit early if primary payment flow worked
       }
 
       // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
-      if (data?.order_id && sanitizedData.delivery_schedule) {
+      if (parsedData?.order_id && sanitizedData.delivery_schedule) {
         console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
         try {
           const { upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
           await upsertDeliverySchedule({
-            order_id: data.order_id,
+            order_id: parsedData.order_id,
             delivery_date: sanitizedData.delivery_schedule.delivery_date,
             delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
             delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
@@ -329,10 +325,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         }
       }
       
-      // Fallback: Set payment data for PaystackPaymentHandler 
+      // Set payment data for PaystackPaymentHandler to initialize securely
       setPaymentData({
-        orderId: data?.order_id,
-        orderNumber: data?.order_number,
+        orderId: parsedData?.order_id,
+        orderNumber: parsedData?.order_number || data?.order_number,
         amount: total,
         email: sanitizedData.customer_email,
         successUrl: `${window.location.origin}/payment-callback`,
@@ -737,20 +733,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className={cn(
-        "max-h-[95vh] overflow-hidden p-0",
-        // Mobile: full screen sheet
-        "w-[100vw] h-[100vh] max-w-none rounded-none sm:rounded-lg",
-        // Desktop: responsive dialog
-        "sm:w-[95vw] sm:h-auto sm:max-w-4xl",
-        "lg:max-w-6xl xl:max-w-7xl"
-      )}>
-        <DialogHeader className="p-4 pb-2 border-b shrink-0">
+      <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] overflow-hidden p-0">
+        <DialogHeader className="p-4 pb-2 border-b">
           <DialogTitle className="flex items-center justify-between text-lg">
-            <span className="flex items-center gap-2">
-              <ShoppingBag className="w-5 h-5" />
-              Checkout
-            </span>
+            <span>Checkout</span>
             <DialogClose asChild>
               <Button variant="ghost" size="sm" className="h-8 w-8">
                 <X className="w-4 h-4" />
@@ -759,32 +745,17 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           </DialogTitle>
         </DialogHeader>
 
-        <div className={cn(
-          "enhanced-checkout-flow flex-1 min-h-0",
-          // Mobile: single column stack
-          "flex flex-col",
-          // Desktop: two column grid
-          "lg:grid lg:grid-cols-3"
-        )}>
+        <div className="enhanced-checkout-flow flex flex-col lg:grid lg:grid-cols-3 gap-4 lg:gap-6 overflow-hidden h-full">
           {/* Main Content Area */}
-          <div className={cn(
-            "lg:col-span-2 overflow-y-auto",
-            "p-4 space-y-4 sm:space-y-6",
-            "flex-1 min-h-0"
-          )}>
+          <div className="lg:col-span-2 overflow-y-auto px-4 pb-4 lg:pr-2 max-h-[calc(95vh-80px)] lg:max-h-[calc(95vh-120px)]">
             {checkoutStep === 'auth' && renderAuthStep()}
             {checkoutStep === 'details' && renderDetailsStep()}
             {checkoutStep === 'payment' && renderPaymentStep()}
           </div>
 
-          {/* Order Summary - Mobile: Sticky footer, Desktop: Sidebar */}
-          <div className={cn(
-            "lg:col-span-1 border-t lg:border-t-0 lg:border-l",
-            "bg-muted/20 shrink-0",
-            // Mobile: show condensed summary
-            "lg:block"
-          )}>
-            <div className="p-4 lg:sticky lg:top-0 lg:max-h-[calc(95vh-120px)] lg:overflow-y-auto">
+          {/* Order Summary Sidebar */}
+          <div className="lg:col-span-1 border-t lg:border-t-0 lg:border-l bg-muted/20">
+            <div className="lg:sticky lg:top-0 p-4 lg:max-h-[calc(95vh-120px)] lg:overflow-y-auto">
               <OrderSummaryCard
                 items={items}
                 subtotal={subtotal}
@@ -793,29 +764,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
               />
             </div>
           </div>
-
-          {/* Mobile Sticky CTA Footer */}
-          {checkoutStep === 'details' && (
-            <div className="lg:hidden sticky bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg">
-              <Button
-                onClick={handleFormSubmit}
-                disabled={!canProceedToDetails || isSubmitting}
-                className="w-full h-12 text-base font-semibold"
-                size="lg"
-              >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    Pay ₦{total.toLocaleString()}
-                  </>
-                )}
-              </Button>
-            </div>
-          )}
         </div>
       </DialogContent>
     </Dialog>

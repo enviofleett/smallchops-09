@@ -61,21 +61,27 @@ serve(async (req) => {
 
 async function initializePayment(supabaseClient, requestData) {
   try {
-    const { email, amount, reference, metadata, channels, order_id, order_number } = requestData;
+    const { email, customer_email, amount, reference, metadata, channels, order_id, order_number } = requestData;
+
+    // Normalize email input - accept both email and customer_email
+    const customerEmail = email || customer_email;
+    console.log('📧 Email normalization:', { email, customer_email, resolved: customerEmail });
 
     console.log('🔍 Fetching Paystack configuration...');
     
-    // Get authoritative amount from order if order_id/order_number provided
+    // Get authoritative amount and transaction reference from order
     let authoritativeAmount = amount;
     let orderId = order_id;
+    let transactionRef;
+    
+    // Create service client for database operations
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    );
     
     if (order_id || order_number) {
-      const serviceClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-        { auth: { persistSession: false } }
-      );
-
       let orderQuery = serviceClient.from('orders').select('id, total_amount, payment_reference');
       
       if (order_id) {
@@ -94,13 +100,34 @@ async function initializePayment(supabaseClient, requestData) {
       authoritativeAmount = order.total_amount;
       orderId = order.id;
       
+      // Use existing transaction reference if valid, otherwise generate new one
+      if (order.payment_reference && order.payment_reference.startsWith('txn_')) {
+        transactionRef = order.payment_reference;
+        console.log('🔄 Using existing transaction reference:', transactionRef);
+      } else {
+        transactionRef = `txn_${Date.now()}_${crypto.randomUUID()}`;
+        console.log('🆕 Generated new transaction reference:', transactionRef);
+        
+        // Update order with new payment reference
+        const { error: updateError } = await serviceClient.rpc('update_order_with_payment_reference', {
+          order_uuid: orderId,
+          new_payment_reference: transactionRef
+        });
+        
+        if (updateError) {
+          console.error('⚠️ Failed to update order payment reference:', updateError);
+        } else {
+          console.log('✅ Order payment reference updated successfully');
+        }
+      }
+      
       // Security check: log if client amount differs from DB amount
       if (amount && Math.abs(parseFloat(amount) - authoritativeAmount) > 0.01) {
         console.error('🚨 SECURITY ALERT: Amount mismatch detected!', {
           client_amount: amount,
           db_amount: authoritativeAmount,
           order_id: orderId,
-          email
+          email: customerEmail
         });
         
         // Log security incident but don't fail - use authoritative amount
@@ -109,7 +136,7 @@ async function initializePayment(supabaseClient, requestData) {
             type: 'payment_amount_mismatch',
             description: `Client attempted to pay different amount than order total`,
             severity: 'high',
-            reference: order.payment_reference || reference,
+            reference: transactionRef,
             expected_amount: authoritativeAmount,
             received_amount: parseFloat(amount),
             created_at: new Date().toISOString()
@@ -120,16 +147,20 @@ async function initializePayment(supabaseClient, requestData) {
       }
       
       console.log('💰 Using authoritative amount from DB:', authoritativeAmount, 'for order:', orderId);
+    } else {
+      // Generate transaction reference for non-order payments
+      transactionRef = `txn_${Date.now()}_${crypto.randomUUID()}`;
+      console.log('🆕 Generated transaction reference for standalone payment:', transactionRef);
     }
 
     // Input validation
-    if (!email || !authoritativeAmount) {
-      throw new Error('Email and amount are required');
+    if (!customerEmail) {
+      throw new Error('Customer email is required');
     }
-
-    // FIX: Use server-generated reference consistently  
-    let transactionRef = `txn_${Date.now()}_${crypto.randomUUID()}`;
-    console.log('✅ Server-generated reference:', transactionRef);
+    
+    if (!authoritativeAmount) {
+      throw new Error('Unable to determine amount from order');
+    }
 
     // Amount validation and conversion (single scaling point)
     const amountInKobo = Math.round(parseFloat(authoritativeAmount) * 100);
@@ -141,10 +172,11 @@ async function initializePayment(supabaseClient, requestData) {
       authoritative_amount_naira: authoritativeAmount,
       amount_in_kobo: amountInKobo,
       client_provided_amount: amount,
-      using_authoritative: true
+      using_authoritative: true,
+      transaction_reference: transactionRef
     })
 
-    console.log(`💳 Initializing payment: ${transactionRef} for ${email}, amount: ₦${amountInKobo/100}`);
+    console.log(`💳 Initializing payment: ${transactionRef} for ${customerEmail}, amount: ₦${amountInKobo/100}`);
 
     // Get Paystack configuration
     const { getPaystackConfig } = await import('../_shared/paystack-config.ts');
@@ -163,7 +195,7 @@ async function initializePayment(supabaseClient, requestData) {
 
     // Prepare Paystack payload
     const paystackPayload = {
-      email,
+      email: customerEmail,
       amount: amountInKobo.toString(),
       currency: 'NGN',
       reference: transactionRef,
@@ -223,21 +255,15 @@ async function initializePayment(supabaseClient, requestData) {
 
     // Create payment transaction record using service role client
     try {
-      const serviceClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-        { auth: { persistSession: false } }
-      )
-
       const { error: transactionError } = await serviceClient
         .from('payment_transactions')
         .upsert({
-          provider_reference: transactionRef, // Use correct column name
+          provider_reference: transactionRef, // Use our transaction reference
           order_id: orderId,
           amount: authoritativeAmount, // Store in naira
           status: 'pending',
           provider: 'paystack',
-          customer_email: email,
+          customer_email: customerEmail, // Use normalized email
           authorization_url: paystackData.data.authorization_url,
           access_code: paystackData.data.access_code,
           created_at: new Date().toISOString(),
@@ -261,7 +287,7 @@ async function initializePayment(supabaseClient, requestData) {
       data: {
         authorization_url: paystackData.data.authorization_url,
         access_code: paystackData.data.access_code,
-        reference: paystackData.data.reference
+        reference: transactionRef // Return our consistent transaction reference
       }
     }), {
       status: 200,

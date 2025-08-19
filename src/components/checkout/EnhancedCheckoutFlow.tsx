@@ -169,6 +169,46 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   // Initialize order processing
   const { markCheckoutInProgress } = useOrderProcessing();
 
+  const handleClose = () => {
+    if (checkoutStep === 'payment' && paymentData) {
+      // Don't close during payment process
+      toast({
+        title: "Payment in Progress",
+        description: "Please complete your payment before closing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    onClose();
+  };
+
+  // Listen for payment completion messages from popup window
+  useEffect(() => {
+    const handleMessage = (event: MessageEvent) => {
+      // Verify origin for security
+      if (event.origin !== window.location.origin) return;
+      
+      if (event.data.type === 'PAYMENT_SUCCESS') {
+        console.log('Payment successful, closing checkout dialog');
+        handleClose();
+        toast({
+          title: "Payment Successful!",
+          description: "Your order has been confirmed.",
+        });
+      } else if (event.data.type === 'PAYMENT_FAILED') {
+        console.log('Payment failed:', event.data.error);
+        toast({
+          title: "Payment Failed",
+          description: "Please try again or contact support.",
+          variant: "destructive",
+        });
+      }
+    };
+
+    window.addEventListener('message', handleMessage);
+    return () => window.removeEventListener('message', handleMessage);
+  }, [handleClose]);
+
   // Auto-fill form data from user profile
   useEffect(() => {
     if (isAuthenticated && profile) {
@@ -395,18 +435,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
     navigate('/orders');
   }, [formData, checkoutStep, deliveryFee, savePrePaymentState, markCheckoutInProgress, markPaymentCompleted, clearCart, clearRecoveryState, onClose, navigate]);
 
-  const handleClose = () => {
-    if (checkoutStep === 'payment' && paymentData) {
-      // Don't close during payment process
-      toast({
-        title: "Payment in Progress",
-        description: "Please complete your payment before closing.",
-        variant: "destructive",
-      });
-      return;
-    }
-    onClose();
-  };
 
   // Validation
   const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);

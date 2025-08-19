@@ -98,25 +98,32 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
   // Mobile: Collapsible version
   if (collapsibleOnMobile) {
     return (
-      <div className={cn("md:hidden mb-6", className)}>
-        <Accordion type="single" collapsible>
-          <AccordionItem value="order-summary" className="border border-border rounded-lg shadow-sm">
-            <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 transition-colors">
+      <div className={cn("lg:hidden", className)}>
+        <Accordion type="single" collapsible defaultValue="order-summary">
+          <AccordionItem value="order-summary" className="border border-border rounded-lg shadow-sm bg-card">
+            <AccordionTrigger className="px-4 py-4 hover:no-underline hover:bg-muted/50 transition-colors [&>svg]:h-4 [&>svg]:w-4">
               <div className="flex items-center justify-between w-full">
-                <div className="flex items-center gap-2">
-                  <ShoppingCart className="h-4 w-4 text-primary" />
-                  <span className="font-medium">Order Summary</span>
-                  <span className="text-sm text-muted-foreground">
-                    ({items.length} {items.length === 1 ? 'item' : 'items'})
-                  </span>
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <ShoppingCart className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="text-left">
+                    <p className="font-semibold text-base">Order Summary</p>
+                    <p className="text-sm text-muted-foreground">
+                      {items.length} {items.length === 1 ? 'item' : 'items'}
+                    </p>
+                  </div>
                 </div>
                 <div className="text-right">
-                  <p className="font-semibold text-primary">₦{total.toLocaleString()}</p>
+                  <p className="font-bold text-lg text-primary">₦{total.toLocaleString()}</p>
+                  <p className="text-xs text-muted-foreground">Total</p>
                 </div>
               </div>
             </AccordionTrigger>
-            <AccordionContent className="px-4 pb-4 pt-2">
-              {orderContent}
+            <AccordionContent className="px-4 pb-4 pt-0">
+              <div className="pt-2 border-t">
+                {orderContent}
+              </div>
             </AccordionContent>
           </AccordionItem>
         </Accordion>
@@ -127,20 +134,24 @@ export const OrderSummaryCard: React.FC<OrderSummaryCardProps> = ({
   // Desktop: Regular card
   return (
     <Card className={cn(
-      "hidden md:block",
-      sticky && "sticky top-4",
+      "hidden lg:block shadow-sm",
+      sticky && "sticky top-6",
       className
     )}>
-      <CardHeader className="pb-3">
-        <CardTitle className="flex items-center gap-2 text-lg">
-          <ShoppingCart className="h-5 w-5" />
-          Order Summary
-          <span className="text-sm font-normal text-muted-foreground">
-            ({items.length} items)
-          </span>
+      <CardHeader className="pb-4">
+        <CardTitle className="flex items-center gap-3 text-lg">
+          <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+            <ShoppingCart className="h-4 w-4 text-primary" />
+          </div>
+          <div>
+            <p className="font-semibold">Order Summary</p>
+            <p className="text-sm font-normal text-muted-foreground">
+              {items.length} {items.length === 1 ? 'item' : 'items'}
+            </p>
+          </div>
         </CardTitle>
       </CardHeader>
-      <CardContent>
+      <CardContent className="pt-0">
         {orderContent}
       </CardContent>
     </Card>

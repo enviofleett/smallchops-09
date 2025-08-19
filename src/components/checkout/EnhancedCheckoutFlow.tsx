@@ -738,18 +738,18 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className={cn(
-        "w-full max-w-none h-full overflow-hidden p-0",
-        "sm:max-w-xl sm:h-[90vh] sm:rounded-lg",
-        "lg:max-w-5xl lg:h-[95vh]",
-        "flex flex-col"
+        "max-h-[95vh] overflow-hidden p-0",
+        // Mobile: full screen sheet
+        "w-[100vw] h-[100vh] max-w-none rounded-none sm:rounded-lg",
+        // Desktop: responsive dialog
+        "sm:w-[95vw] sm:h-auto sm:max-w-4xl",
+        "lg:max-w-6xl xl:max-w-7xl"
       )}>
-        <DialogHeader className="shrink-0 px-4 sm:px-6 py-4 border-b">
-          <DialogTitle className="flex items-center justify-between text-lg font-semibold">
+        <DialogHeader className="p-4 pb-2 border-b shrink-0">
+          <DialogTitle className="flex items-center justify-between text-lg">
             <span className="flex items-center gap-2">
               <ShoppingBag className="w-5 h-5" />
-              {checkoutStep === 'auth' && 'Checkout'}
-              {checkoutStep === 'details' && 'Order Details'}
-              {checkoutStep === 'payment' && 'Payment'}
+              Checkout
             </span>
             <DialogClose asChild>
               <Button variant="ghost" size="sm" className="h-8 w-8">
@@ -759,105 +759,64 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 flex overflow-hidden">
-          {/* Main Content */}
-          <div className="flex-1 overflow-y-auto">
-            <div className="p-4 sm:p-6 lg:pr-0 space-y-6">
-              {/* Mobile Order Summary - Collapsible */}
-              {checkoutStep !== 'auth' && (
-                <OrderSummaryCard
-                  items={items}
-                  subtotal={subtotal}
-                  deliveryFee={deliveryFee}
-                  total={total}
-                  collapsibleOnMobile
-                  className="lg:hidden"
-                />
-              )}
+        <div className={cn(
+          "enhanced-checkout-flow flex-1 min-h-0",
+          // Mobile: single column stack
+          "flex flex-col",
+          // Desktop: two column grid
+          "lg:grid lg:grid-cols-3"
+        )}>
+          {/* Main Content Area */}
+          <div className={cn(
+            "lg:col-span-2 overflow-y-auto",
+            "p-4 space-y-4 sm:space-y-6",
+            "flex-1 min-h-0"
+          )}>
+            {checkoutStep === 'auth' && renderAuthStep()}
+            {checkoutStep === 'details' && renderDetailsStep()}
+            {checkoutStep === 'payment' && renderPaymentStep()}
+          </div>
 
-              {checkoutStep === 'auth' && renderAuthStep()}
-              {checkoutStep === 'details' && renderDetailsStep()}
-              {checkoutStep === 'payment' && renderPaymentStep()}
+          {/* Order Summary - Mobile: Sticky footer, Desktop: Sidebar */}
+          <div className={cn(
+            "lg:col-span-1 border-t lg:border-t-0 lg:border-l",
+            "bg-muted/20 shrink-0",
+            // Mobile: show condensed summary
+            "lg:block"
+          )}>
+            <div className="p-4 lg:sticky lg:top-0 lg:max-h-[calc(95vh-120px)] lg:overflow-y-auto">
+              <OrderSummaryCard
+                items={items}
+                subtotal={subtotal}
+                deliveryFee={deliveryFee}
+                total={total}
+              />
             </div>
           </div>
 
-          {/* Desktop Order Summary - Sticky Sidebar */}
-          {checkoutStep !== 'auth' && (
-            <div className="hidden lg:block w-80 xl:w-96 border-l bg-muted/30">
-              <div className="p-6 h-full overflow-y-auto">
-                <OrderSummaryCard
-                  items={items}
-                  subtotal={subtotal}
-                  deliveryFee={deliveryFee}
-                  total={total}
-                  sticky
-                />
-              </div>
+          {/* Mobile Sticky CTA Footer */}
+          {checkoutStep === 'details' && (
+            <div className="lg:hidden sticky bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg">
+              <Button
+                onClick={handleFormSubmit}
+                disabled={!canProceedToDetails || isSubmitting}
+                className="w-full h-12 text-base font-semibold"
+                size="lg"
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Pay ₦{total.toLocaleString()}
+                  </>
+                )}
+              </Button>
             </div>
           )}
         </div>
-
-        {/* Mobile Sticky Footer */}
-        {checkoutStep === 'details' && (
-          <div className="lg:hidden flex-shrink-0 border-t bg-background p-4 space-y-3">
-            <div className="flex gap-3">
-              <Button 
-                variant="outline" 
-                className="flex-1 h-12 text-sm font-medium"
-                onClick={() => {
-                  // Scroll to mobile summary
-                  const summaryElement = document.querySelector('[data-radix-collection-item]');
-                  if (summaryElement) {
-                    summaryElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }}
-              >
-                View Summary
-              </Button>
-              <div className="flex-[2] min-w-0">
-                <Button 
-                  onClick={handleFormSubmit}
-                  disabled={!canProceedToDetails || isSubmitting}
-                  className="w-full h-12 text-sm font-semibold"
-                >
-                  {isSubmitting ? (
-                    <>
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                      Processing...
-                    </>
-                  ) : (
-                    `Pay ₦${total.toLocaleString()}`
-                  )}
-                </Button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Mobile Payment Step Footer */}
-        {checkoutStep === 'payment' && (
-          <div className="lg:hidden flex-shrink-0 border-t bg-background p-4">
-            <div className="flex gap-3">
-              <Button 
-                variant="outline" 
-                className="flex-1 h-12 text-sm font-medium"
-                onClick={() => {
-                  const summaryElement = document.querySelector('[data-radix-collection-item]');
-                  if (summaryElement) {
-                    summaryElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                  }
-                }}
-              >
-                Summary
-              </Button>
-              <div className="flex-[2] min-w-0 flex items-center justify-center">
-                <span className="text-lg font-bold text-primary">
-                  Total: ₦{total.toLocaleString()}
-                </span>
-              </div>
-            </div>
-          </div>
-        )}
       </DialogContent>
     </Dialog>
   );

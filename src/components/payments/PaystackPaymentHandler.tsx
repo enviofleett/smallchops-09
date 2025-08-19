@@ -74,9 +74,9 @@ export const PaystackPaymentHandler = ({
     }
 
     try {
-      openSecurePayment(authorizationUrl);
+      window.location.href = authorizationUrl;
       // Note: onSuccess will be called by the payment callback handler after verification
-      toast.info('Payment window opened. Complete payment to continue.');
+      toast.info('Redirecting to secure Paystack checkout...');
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Payment failed');
     }

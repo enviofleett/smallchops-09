@@ -737,9 +737,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden p-0 md:max-h-[90vh]">
+      <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden overscroll-contain p-0">
         {/* Mobile Header */}
-        <div className="flex md:hidden items-center justify-between p-4 border-b bg-background">
+        <div className="flex md:hidden items-center justify-between p-4 border-b bg-background flex-shrink-0">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
@@ -758,7 +758,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         </div>
 
         {/* Mobile Order Summary */}
-        <div className="md:hidden">
+        <div className="md:hidden flex-shrink-0">
           <OrderSummaryCard
             items={items}
             subtotal={subtotal}
@@ -768,36 +768,38 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 h-full">
+        <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0 overflow-hidden">
           {/* Desktop Left Panel - Order Details */}
-          <div className="hidden lg:block lg:col-span-1 bg-muted/30 p-6 border-r">
-            <div className="flex items-center gap-3 mb-6">
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onClose}
-                className="h-8 w-8 p-0"
-              >
-                <X className="h-4 w-4" />
-              </Button>
-              <h2 className="text-lg font-semibold">Order Details</h2>
+          <div className="hidden lg:block lg:col-span-1 bg-muted/30 border-r overflow-y-auto">
+            <div className="p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={onClose}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+                <h2 className="text-lg font-semibold">Order Details</h2>
+              </div>
+              
+              <OrderSummaryCard
+                items={items}
+                subtotal={subtotal}
+                deliveryFee={deliveryFee}
+                total={total}
+                collapsibleOnMobile={false}
+                className="shadow-none border-0 bg-transparent"
+              />
             </div>
-            
-            <OrderSummaryCard
-              items={items}
-              subtotal={subtotal}
-              deliveryFee={deliveryFee}
-              total={total}
-              collapsibleOnMobile={false}
-              className="shadow-none border-0 bg-transparent"
-            />
           </div>
 
           {/* Main Content Panel */}
-          <div className="lg:col-span-2 flex flex-col h-full min-h-0">
+          <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
             {/* Desktop Header */}
-            <div className="hidden md:block">
-              <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+            <div className="hidden md:block flex-shrink-0">
+              <DialogHeader className="px-6 py-4 border-b">
                 <div className="flex items-center justify-between">
                   <DialogTitle className="text-xl">
                     {checkoutStep === 'auth' && 'Complete Your Order'}
@@ -813,7 +815,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
               </DialogHeader>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 min-h-0">
+            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
               {checkoutStep === 'auth' && renderAuthStep()}
               {checkoutStep === 'details' && renderDetailsStep()}
               {checkoutStep === 'payment' && renderPaymentStep()}

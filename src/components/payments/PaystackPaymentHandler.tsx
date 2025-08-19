@@ -104,7 +104,7 @@ export const PaystackPaymentHandler = ({
         <CardTitle className="flex items-center justify-center gap-2">
           <span>Secure Payment</span>
           <Badge variant="outline" className="text-xs">
-            ₦{amount.toLocaleString()}
+            ₦{amount?.toLocaleString() || '0'}
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -136,7 +136,7 @@ export const PaystackPaymentHandler = ({
                 Processing Payment...
               </div>
             ) : (
-              `Pay ₦${amount.toLocaleString()}`
+              `Pay ₦${amount?.toLocaleString() || '0'}`
             )}
           </Button>
 

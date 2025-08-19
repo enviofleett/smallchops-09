@@ -719,27 +719,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         )}
       </div>
 
-      {/* Desktop payment button */}
-      <div className="hidden lg:flex gap-3">
-        <Button
-          onClick={handleFormSubmit}
-          disabled={!canProceedToDetails || isSubmitting}
-          className="flex-1 h-12"
-          size="lg"
-        >
-          {isSubmitting ? (
-            <>
-              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-              Processing...
-            </>
-          ) : (
-            <>
-              Proceed to Payment • ₦{total.toLocaleString()}
-            </>
-          )}
-        </Button>
-      </div>
-
       {lastPaymentError && (
         <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
           <div className="flex items-start gap-2">

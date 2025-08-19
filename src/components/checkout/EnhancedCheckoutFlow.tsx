@@ -311,6 +311,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         } : null,
         payment_method: formData.payment_method,
         guest_session_id: guestSessionId,
+        terms_accepted: termsRequired ? termsAccepted : undefined,
         timestamp: new Date().toISOString()
       };
 
@@ -456,6 +457,40 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isValidPhone = (phone: string) => /^[\d\s\-\+\(\)]{10,}$/.test(phone);
 
+  // Terms and conditions state
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [termsRequired, setTermsRequired] = useState(false);
+  const [termsContent, setTermsContent] = useState('');
+  const [showTermsDialog, setShowTermsDialog] = useState(false);
+
+  // Load terms settings on mount
+  useEffect(() => {
+    const loadTermsSettings = async () => {
+      try {
+        const { data: requireTermsData } = await supabase
+          .from('content_management')
+          .select('content')
+          .eq('key', 'legal_require_terms_acceptance')
+          .single();
+
+        const { data: termsContentData } = await supabase
+          .from('content_management')
+          .select('content, is_published')
+          .eq('key', 'legal_terms')
+          .single();
+
+        if (requireTermsData?.content === 'true' && termsContentData?.is_published) {
+          setTermsRequired(true);
+          setTermsContent(termsContentData.content || '');
+        }
+      } catch (error) {
+        console.log('Terms settings not configured or error loading:', error);
+      }
+    };
+
+    loadTermsSettings();
+  }, []);
+
   const canProceedToDetails = useMemo(() => {
     if (checkoutStep !== 'details') return false;
     
@@ -464,17 +499,23 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       isValidEmail(formData.customer_email) &&
       isValidPhone(formData.customer_phone);
 
+    // Terms validation - only required if admin enabled it
+    const termsValidation = !termsRequired || termsAccepted;
+
     if (formData.fulfillment_type === 'delivery') {
-      return baseValidation &&
+      // Make city and postal code optional, delivery schedule mandatory
+      const deliveryValidation = baseValidation &&
         formData.delivery_address.address_line_1.trim() &&
-        formData.delivery_address.city.trim() &&
         formData.delivery_address.state.trim() &&
-        formData.delivery_address.postal_code.trim() &&
-        deliveryZone;
+        deliveryZone &&
+        formData.delivery_date && 
+        formData.delivery_time_slot;
+      
+      return deliveryValidation && termsValidation;
     } else {
-      return baseValidation && pickupPoint;
+      return baseValidation && pickupPoint && termsValidation;
     }
-  }, [formData, deliveryZone, pickupPoint, checkoutStep]);
+  }, [formData, deliveryZone, pickupPoint, checkoutStep, termsRequired, termsAccepted]);
 
   const renderAuthStep = () => (
     <div className="space-y-6">
@@ -621,13 +662,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
               </div>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="city">City *</Label>
+                  <Label htmlFor="city">City</Label>
                   <Input
                     id="city"
                     value={formData.delivery_address.city}
                     onChange={(e) => handleFormChange('delivery_address.city', e.target.value)}
                     placeholder="City"
-                    required
                   />
                 </div>
                 <div>
@@ -641,13 +681,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                   />
                 </div>
                 <div className="sm:col-span-2 lg:col-span-1">
-                  <Label htmlFor="postal_code">Postal Code *</Label>
+                  <Label htmlFor="postal_code">Postal Code</Label>
                   <Input
                     id="postal_code"
                     value={formData.delivery_address.postal_code}
                     onChange={(e) => handleFormChange('delivery_address.postal_code', e.target.value)}
                     placeholder="Postal code"
-                    required
                   />
                 </div>
               </div>
@@ -700,7 +739,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Clock className="w-4 h-4" />
-                Delivery Schedule
+                Delivery Schedule *
               </CardTitle>
             </CardHeader>
             <CardContent>
@@ -858,6 +897,29 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             {/* Sticky Bottom Action */}
             {checkoutStep === 'details' && (
               <div className="flex-shrink-0 p-4 md:p-6 border-t bg-background/80 backdrop-blur-sm">
+                {/* Terms and Conditions */}
+                {termsRequired && (
+                  <div className="mb-4 flex items-start gap-2">
+                    <input
+                      type="checkbox"
+                      id="terms-checkbox"
+                      checked={termsAccepted}
+                      onChange={(e) => setTermsAccepted(e.target.checked)}
+                      className="mt-1 h-4 w-4 accent-primary"
+                    />
+                    <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer">
+                      I agree to the{' '}
+                      <button
+                        type="button"
+                        onClick={() => setShowTermsDialog(true)}
+                        className="text-primary hover:underline font-medium"
+                      >
+                        Terms and Conditions
+                      </button>
+                    </Label>
+                  </div>
+                )}
+
                 <Button
                   onClick={handleFormSubmit}
                   disabled={!canProceedToDetails || isSubmitting}
@@ -879,6 +941,41 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             )}
           </div>
         </div>
+
+        {/* Terms and Conditions Dialog */}
+        <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <FileText className="w-5 h-5" />
+                Terms and Conditions
+              </DialogTitle>
+            </DialogHeader>
+            <div className="prose prose-sm max-w-none">
+              {termsContent ? (
+                <div dangerouslySetInnerHTML={{ __html: termsContent }} />
+              ) : (
+                <p>Terms and conditions content is being loaded...</p>
+              )}
+            </div>
+            <div className="flex justify-end gap-2 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowTermsDialog(false)}
+              >
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  setTermsAccepted(true);
+                  setShowTermsDialog(false);
+                }}
+              >
+                I Agree
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </DialogContent>
     </Dialog>
   );

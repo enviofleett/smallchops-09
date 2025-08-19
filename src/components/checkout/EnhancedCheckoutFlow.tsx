@@ -268,71 +268,71 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
       console.log('🔄 Raw server response:', data);
 
-      // Parse and validate response
-      const parsedData = normalizePaymentResponse(data);
-      console.log('🔍 Parsed server response:', parsedData);
-
-      if (parsedData && (parsedData as any).success) {
-        // Process and normalize payment data
-        const processedPaymentData = normalizePaymentData(parsedData);
-        
-        console.log('✅ Processed payment data:', processedPaymentData);
-        
-        // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
-        if (parsedData.order_id && sanitizedData.delivery_schedule) {
-          console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
-          try {
-            const { upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
-            await upsertDeliverySchedule({
-              order_id: parsedData.order_id,
-              delivery_date: sanitizedData.delivery_schedule.delivery_date,
-              delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
-              delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
-              is_flexible: sanitizedData.delivery_schedule.is_flexible || false,
-              special_instructions: sanitizedData.delivery_schedule.special_instructions || null
-            });
-            console.log('✅ [GUARDRAIL] Schedule upserted successfully');
-            toast({
-              title: "Schedule saved",
-              description: "Your delivery schedule has been confirmed."
-            });
-          } catch (error) {
-            console.error('🛡️ [GUARDRAIL] Fallback failed:', error);
-            toast({
-              title: "Processing delivery schedule",
-              description: "We'll finalize your delivery window after payment."
-            });
-          }
-        }
-        
-        // Save payment state and mark checkout in progress
-        savePrePaymentState(formData, checkoutStep, deliveryFee, (processedPaymentData as any).reference);
-        markCheckoutInProgress((processedPaymentData as any).reference);
-        
-        setPaymentData(processedPaymentData);
-        setCheckoutStep('payment');
-        setIsSubmitting(false);
-        
-        logPaymentAttempt(sanitizedData, 'success');
-        
-      } else {
-        console.error('❌ Server responded with success: false');
-        
-        // Validate and generate user-friendly error message
-        const validationResult = validatePaymentInitializationData(parsedData || {});
-        const userFriendlyError = generateUserFriendlyErrorMessage(validationResult);
-        
-        console.error('Error details:', {
-          validation: validationResult,
-          userMessage: userFriendlyError,
-          rawData: parsedData
-        });
-        
-        setLastPaymentError(userFriendlyError);
-        handlePaymentFailure({ type: 'checkout_failure', responseData: parsedData });
-        
-        throw new Error(userFriendlyError);
+      // Try to parse response, fall back to minimal order data if payment_url missing
+      let parsedData;
+      try {
+        parsedData = normalizePaymentResponse(data);
+        console.log('✅ Parsed server response successfully:', parsedData);
+      } catch (error) {
+        console.warn('⚠️ Could not parse payment_url from response, proceeding to secure payment handler:', error);
+        // Fall back to minimal order data without payment_url
+        parsedData = {
+          order_id: data?.order_id,
+          order_number: data?.order_number,
+          amount: total,
+          customer_email: sanitizedData.customer_email,
+          success: true
+        };
       }
+
+      // Check if process-checkout provided a payment_url to open
+      if (data?.payment_url) {
+        console.log('🔗 Opening process-checkout payment URL in new tab:', data.payment_url);
+        window.open(data.payment_url, '_blank');
+        toast({
+          title: "Payment opened",
+          description: "Complete payment in the new tab, then return here."
+        });
+      }
+
+      // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
+      if (parsedData?.order_id && sanitizedData.delivery_schedule) {
+        console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
+        try {
+          const { upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
+          await upsertDeliverySchedule({
+            order_id: parsedData.order_id,
+            delivery_date: sanitizedData.delivery_schedule.delivery_date,
+            delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
+            delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
+            is_flexible: sanitizedData.delivery_schedule.is_flexible || false,
+            special_instructions: sanitizedData.delivery_schedule.special_instructions || null
+          });
+          console.log('✅ [GUARDRAIL] Schedule upserted successfully');
+          toast({
+            title: "Schedule saved",
+            description: "Your delivery schedule has been confirmed."
+          });
+        } catch (error) {
+          console.error('🛡️ [GUARDRAIL] Fallback failed:', error);
+          toast({
+            title: "Processing delivery schedule",
+            description: "We'll finalize your delivery window after payment."
+          });
+        }
+      }
+      
+      // Set payment data for PaystackPaymentHandler to initialize securely
+      setPaymentData({
+        orderId: parsedData?.order_id,
+        orderNumber: parsedData?.order_number || data?.order_number,
+        amount: total,
+        email: sanitizedData.customer_email
+      });
+      setCheckoutStep('payment');
+      setIsSubmitting(false);
+      
+      logPaymentAttempt(sanitizedData, 'success');
       
     } catch (error: any) {
       console.error('🚨 Checkout submission error:', error);
@@ -368,7 +368,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
     }
   };
 
-  const handlePaymentSuccess = useCallback(() => {
+  const handlePaymentSuccess = useCallback((reference: string) => {
+    console.log('🎉 Payment success callback triggered with reference:', reference);
+    
+    // Save states and mark checkout progress when we get valid reference
+    if (reference && reference.startsWith('txn_')) {
+      savePrePaymentState(formData, checkoutStep, deliveryFee, reference);
+      markCheckoutInProgress(reference);
+    }
+    
     markPaymentCompleted();
     clearCart();
     clearRecoveryState();
@@ -380,7 +388,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
     });
     
     navigate('/orders');
-  }, [markPaymentCompleted, clearCart, clearRecoveryState, onClose, navigate]);
+  }, [formData, checkoutStep, deliveryFee, savePrePaymentState, markCheckoutInProgress, markPaymentCompleted, clearCart, clearRecoveryState, onClose, navigate]);
 
   const handleClose = () => {
     if (checkoutStep === 'payment' && paymentData) {
@@ -703,13 +711,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
       {paymentData && (
         <PaystackPaymentHandler
-          orderId={(paymentData as any).order_id}
-          amount={total}
-          email={formData.customer_email}
-          orderNumber={(paymentData as any).order_number || 'UNKNOWN'}
+          orderId={paymentData.orderId}
+          amount={paymentData.amount}
+          email={paymentData.email}
+          orderNumber={paymentData.orderNumber}
           onSuccess={handlePaymentSuccess}
-          onError={handlePaymentFailure}
-          onClose={() => {}}
+          onError={(error) => handlePaymentFailure({ message: error })}
+          onClose={() => setCheckoutStep('details')}
         />
       )}
     </div>

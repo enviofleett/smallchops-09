@@ -101,7 +101,7 @@ async function initializePayment(supabaseClient, requestData, req = null) {
     
     if (order_id || order_number) {
       console.log('🔍 Fetching order details...');
-      let orderQuery = serviceClient.from('orders').select('id, total_amount, payment_reference, order_number');
+      let orderQuery = serviceClient.from('orders').select('id, total_amount, payment_reference, order_number, customer_email');
       
       if (order_id) {
         orderQuery = orderQuery.eq('id', order_id);
@@ -116,8 +116,22 @@ async function initializePayment(supabaseClient, requestData, req = null) {
         throw new Error('Order not found');
       }
       
+      console.log(`📋 [${VERSION}] Order found:`, {
+        id: order.id,
+        amount: order.total_amount,
+        existing_reference: order.payment_reference,
+        order_number: order.order_number,
+        customer_email: order.customer_email
+      });
+      
       authoritativeAmount = order.total_amount;
       orderId = order.id;
+      
+      // Use customer email from order if not provided by client (critical fallback)
+      if (!customerEmail && order.customer_email) {
+        customerEmail = order.customer_email;
+        console.log(`📧 [${VERSION}] Using customer email from order:`, customerEmail);
+      }
       
       // Use existing transaction reference if valid, otherwise generate new one
       if (order.payment_reference && order.payment_reference.startsWith('txn_')) {

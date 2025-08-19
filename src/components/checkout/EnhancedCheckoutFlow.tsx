@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCustomerProfile } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
-import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText } from "lucide-react";
+import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText, ChevronLeft } from "lucide-react";
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
@@ -456,18 +456,19 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const renderDetailsStep = () => (
     <div className="space-y-6">
       <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold">Order Details</h3>
-          {!isAuthenticated && (
+        {!isAuthenticated && (
+          <div className="flex items-center justify-between md:hidden mb-4">
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setCheckoutStep('auth')}
+              className="flex items-center gap-2"
             >
+              <ChevronLeft className="w-4 h-4" />
               Back
             </Button>
-          )}
-        </div>
+          </div>
+        )}
 
         {/* Customer Information */}
         <Card>
@@ -736,87 +737,111 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-hidden p-0">
-        <div className="enhanced-checkout-flow flex flex-col overflow-hidden h-full">
-          {/* Header with back navigation */}
-          <div className="flex items-center justify-between p-4 border-b bg-background">
-            <div className="flex items-center gap-3">
-              {checkoutStep !== 'auth' && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => {
-                    if (checkoutStep === 'payment') setCheckoutStep('details');
-                    else if (checkoutStep === 'details') {
-                      if (isAuthenticated) onClose();
-                      else setCheckoutStep('auth');
-                    }
-                  }}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="w-4 h-4" />
-                </Button>
-              )}
-              <h2 className="text-lg font-semibold">
-                {checkoutStep === 'details' && 'Order Details'}
-                {checkoutStep === 'payment' && 'Complete Payment'}
-                {checkoutStep === 'auth' && 'Checkout'}
-              </h2>
-            </div>
-            <DialogClose asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                <X className="w-4 h-4" />
-              </Button>
-            </DialogClose>
+      <DialogContent className="max-w-5xl max-h-[95vh] overflow-hidden p-0 md:max-h-[90vh]">
+        {/* Mobile Header */}
+        <div className="flex md:hidden items-center justify-between p-4 border-b bg-background">
+          <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClose}
+              className="h-8 w-8 p-0"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+            <h2 className="text-lg font-semibold">
+              {checkoutStep === 'auth' && 'Complete Order'}
+              {checkoutStep === 'details' && 'Checkout'}
+              {checkoutStep === 'payment' && 'Payment'}
+            </h2>
           </div>
+        </div>
 
-          <div className="flex flex-col lg:grid lg:grid-cols-3 gap-0 overflow-hidden h-full">
-            {/* Main Content Area */}
-            <div className="lg:col-span-2 overflow-y-auto">
-              <div className="p-4 pb-20 lg:pb-4 space-y-6">
-                {checkoutStep === 'auth' && renderAuthStep()}
-                {checkoutStep === 'details' && renderDetailsStep()}
-                {checkoutStep === 'payment' && renderPaymentStep()}
-              </div>
-            </div>
+        {/* Mobile Order Summary */}
+        <div className="md:hidden">
+          <OrderSummaryCard
+            items={items}
+            subtotal={subtotal}
+            deliveryFee={deliveryFee}
+            total={total}
+            collapsibleOnMobile={true}
+          />
+        </div>
 
-            {/* Order Summary Sidebar */}
-            <div className="lg:col-span-1 border-t lg:border-t-0 lg:border-l bg-muted/20">
-              <div className="lg:sticky lg:top-0 p-4 lg:max-h-[calc(95vh-80px)] lg:overflow-y-auto">
-                <h3 className="font-semibold mb-4">Order Details</h3>
-                <OrderSummaryCard
-                  items={items}
-                  subtotal={subtotal}
-                  deliveryFee={deliveryFee}
-                  total={total}
-                  collapsibleOnMobile={false}
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Sticky bottom action bar for mobile */}
-          {checkoutStep === 'details' && (
-            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-50">
+        <div className="grid grid-cols-1 lg:grid-cols-3 h-full">
+          {/* Desktop Left Panel - Order Details */}
+          <div className="hidden lg:block lg:col-span-1 bg-muted/30 p-6 border-r">
+            <div className="flex items-center gap-3 mb-6">
               <Button
-                onClick={handleFormSubmit}
-                disabled={!canProceedToDetails || isSubmitting}
-                className="w-full h-12"
-                size="lg"
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="h-8 w-8 p-0"
               >
-                {isSubmitting ? (
-                  <>
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    Processing...
-                  </>
-                ) : (
-                  <>
-                    Proceed to Payment • ₦{total.toLocaleString()}
-                  </>
-                )}
+                <X className="h-4 w-4" />
               </Button>
+              <h2 className="text-lg font-semibold">Order Details</h2>
             </div>
-          )}
+            
+            <OrderSummaryCard
+              items={items}
+              subtotal={subtotal}
+              deliveryFee={deliveryFee}
+              total={total}
+              collapsibleOnMobile={false}
+              className="shadow-none border-0 bg-transparent"
+            />
+          </div>
+
+          {/* Main Content Panel */}
+          <div className="lg:col-span-2 flex flex-col h-full min-h-0">
+            {/* Desktop Header */}
+            <div className="hidden md:block">
+              <DialogHeader className="px-6 py-4 border-b flex-shrink-0">
+                <div className="flex items-center justify-between">
+                  <DialogTitle className="text-xl">
+                    {checkoutStep === 'auth' && 'Complete Your Order'}
+                    {checkoutStep === 'details' && 'Delivery Details'}
+                    {checkoutStep === 'payment' && 'Payment'}
+                  </DialogTitle>
+                  <DialogClose asChild>
+                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </DialogClose>
+                </div>
+              </DialogHeader>
+            </div>
+
+            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 min-h-0">
+              {checkoutStep === 'auth' && renderAuthStep()}
+              {checkoutStep === 'details' && renderDetailsStep()}
+              {checkoutStep === 'payment' && renderPaymentStep()}
+            </div>
+
+            {/* Sticky Bottom Action */}
+            {checkoutStep === 'details' && (
+              <div className="flex-shrink-0 p-4 md:p-6 border-t bg-background/80 backdrop-blur-sm">
+                <Button
+                  onClick={handleFormSubmit}
+                  disabled={!canProceedToDetails || isSubmitting}
+                  className="w-full h-12 md:h-14 text-base md:text-lg font-medium"
+                  size="lg"
+                >
+                  {isSubmitting ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : null}
+                  Proceed to Payment • ₦{total.toLocaleString()}
+                </Button>
+                
+                {lastPaymentError && (
+                  <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                    <p className="text-sm text-destructive">{lastPaymentError}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </DialogContent>
     </Dialog>

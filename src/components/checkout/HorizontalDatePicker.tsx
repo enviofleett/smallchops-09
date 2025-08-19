@@ -1,6 +1,6 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, CalendarIcon } from 'lucide-react';
 import { format, addDays, isSameDay, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DeliverySlot } from '@/utils/deliveryScheduling';
@@ -46,7 +46,10 @@ export const HorizontalDatePicker: React.FC<HorizontalDatePickerProps> = ({
   return (
     <div className={cn("space-y-4", className)}>
       <div className="flex items-center justify-between">
-        <h3 className="font-medium text-foreground">Select delivery date</h3>
+        <h3 className="font-medium text-foreground flex items-center gap-2">
+          <CalendarIcon className="w-4 h-4" />
+          Select delivery date
+        </h3>
         <div className="flex gap-1">
           <Button
             variant="outline"
@@ -69,7 +72,7 @@ export const HorizontalDatePicker: React.FC<HorizontalDatePickerProps> = ({
         </div>
       </div>
 
-      <div className="flex gap-2 overflow-hidden">
+      <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
         {visibleSlots.map((slot) => {
           const date = parseISO(slot.date);
           const isSelected = selectedDate && isSameDay(date, parseISO(selectedDate));
@@ -81,23 +84,24 @@ export const HorizontalDatePicker: React.FC<HorizontalDatePickerProps> = ({
               variant={isSelected ? "default" : "outline"}
               onClick={() => onDateSelect(slot.date)}
               className={cn(
-                "flex-1 min-w-0 h-16 flex flex-col items-center justify-center gap-1 px-2",
-                "border-2 transition-all duration-200 hover:scale-105",
-                isSelected && "bg-primary text-primary-foreground border-primary",
-                !isSelected && "hover:bg-muted/50"
+                "flex-shrink-0 min-w-[80px] h-16 sm:h-18 flex flex-col items-center justify-center gap-1 px-3",
+                "border-2 transition-all duration-200 hover:scale-105 active:scale-95",
+                "text-center touch-manipulation",
+                isSelected && "bg-primary text-primary-foreground border-primary shadow-md",
+                !isSelected && "hover:bg-muted/50 hover:border-primary/20"
               )}
             >
-              <span className="text-xs font-medium">
+              <span className="text-xs font-medium opacity-80">
                 {format(date, 'EEE')}
               </span>
               <span className={cn(
-                "text-sm font-bold",
+                "text-lg font-bold",
                 isToday && !isSelected && "text-primary"
               )}>
                 {format(date, 'd')}
               </span>
               {isToday && (
-                <span className="text-xs text-primary">Today</span>
+                <span className="text-xs opacity-80">Today</span>
               )}
             </Button>
           );

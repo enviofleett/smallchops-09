@@ -169,13 +169,15 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
                       disabled={!timeSlot.available}
                       onClick={() => handleTimeSlotSelect(timeSlot)}
                       className={cn(
-                        "h-12 px-3 flex items-center justify-center",
+                        "h-14 px-3 flex items-center justify-center",
                         "border-2 transition-all duration-200 hover:scale-105 active:scale-95",
+                        "text-center touch-manipulation rounded-lg",
                         !timeSlot.available && "opacity-50 cursor-not-allowed",
-                        isSelected && "bg-primary text-primary-foreground border-primary"
+                        isSelected && "bg-primary text-primary-foreground border-primary shadow-md",
+                        !isSelected && "hover:bg-muted/50 hover:border-primary/20"
                       )}
                     >
-                      <span className="font-medium text-sm">
+                      <span className="font-medium text-sm leading-tight">
                         {timeSlot.start_time} - {timeSlot.end_time}
                       </span>
                     </Button>

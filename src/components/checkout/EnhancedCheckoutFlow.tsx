@@ -470,48 +470,47 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         
         console.log('✅ Processed payment data:', processedPaymentData);
         
-        // Add delivery schedule fallback check
+        // Add delivery schedule verification (non-blocking)
         if (parsedData.order_id && sanitizedData.delivery_schedule) {
-          console.log('🔍 Verifying delivery schedule was persisted...');
-          try {
-            const { getDeliveryScheduleByOrderId, createDeliverySchedule } = await import('@/api/deliveryScheduleApi');
-            
-            const existingSchedule = await getDeliveryScheduleByOrderId(parsedData.order_id);
-            
-            if (!existingSchedule) {
-              console.log('⚠️ Delivery schedule not found, attempting fallback insert...');
-              
-              try {
-                const fallbackSchedule = await createDeliverySchedule({
-                  order_id: parsedData.order_id,
-                  delivery_date: sanitizedData.delivery_schedule.delivery_date,
-                  delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
-                  delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
-                  is_flexible: sanitizedData.delivery_schedule.is_flexible || false,
-                  special_instructions: sanitizedData.delivery_schedule.special_instructions || null
-                });
-                
-                console.log('✅ Fallback delivery schedule inserted:', fallbackSchedule.id);
-                toast({
-                  title: "Schedule Saved",
-                  description: "Your delivery schedule has been confirmed.",
-                });
-              } catch (fallbackError) {
-                console.error('❌ Fallback schedule insert failed:', fallbackError);
-                toast({
-                  title: "Schedule Error", 
-                  description: "We couldn't save your delivery window. Please try again.",
-                  variant: "destructive",
-                });
-                setIsSubmitting(false);
-                return; // Don't proceed to payment
+          // If server already returned schedule info, skip client checks
+          if (parsedData.schedule?.schedule_id) {
+            console.log('✅ Server confirmed schedule:', parsedData.schedule.schedule_id);
+          } else {
+            console.log('🔍 Verifying delivery schedule was persisted (client-side, non-blocking)...');
+            try {
+              const { getDeliveryScheduleByOrderId, createDeliverySchedule } = await import('@/api/deliveryScheduleApi');
+              const existingSchedule = await getDeliveryScheduleByOrderId(parsedData.order_id);
+              if (!existingSchedule) {
+                console.log('⚠️ No schedule found via SELECT, attempting client insert as guardrail...');
+                try {
+                  const fallbackSchedule = await createDeliverySchedule({
+                    order_id: parsedData.order_id,
+                    delivery_date: sanitizedData.delivery_schedule.delivery_date,
+                    delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
+                    delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
+                    is_flexible: sanitizedData.delivery_schedule.is_flexible || false,
+                    special_instructions: sanitizedData.delivery_schedule.special_instructions || null
+                  });
+                  console.log('✅ Client fallback schedule inserted:', fallbackSchedule.id);
+                  toast({
+                    title: "Schedule Saved",
+                    description: "Your delivery schedule has been confirmed.",
+                  });
+                } catch (fallbackError) {
+                  console.warn('⚠️ Client fallback insert failed, proceeding since server is authoritative:', fallbackError);
+                  toast({
+                    title: "Schedule queued",
+                    description: "We’ll finalize your delivery window after payment.",
+                  });
+                  // Do NOT block payment
+                }
+              } else {
+                console.log('✅ Delivery schedule exists:', existingSchedule.id);
               }
-            } else {
-              console.log('✅ Delivery schedule already exists:', existingSchedule.id);
+            } catch (scheduleCheckError) {
+              console.warn('⚠️ Schedule verification skipped (likely RLS), proceeding:', scheduleCheckError);
+              // Non-blocking
             }
-          } catch (scheduleCheckError) {
-            console.error('❌ Schedule verification failed:', scheduleCheckError);
-            // Continue anyway since server should have handled it
           }
         }
         

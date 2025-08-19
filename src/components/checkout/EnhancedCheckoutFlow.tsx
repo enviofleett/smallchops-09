@@ -129,7 +129,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const navigate = useNavigate();
   const { cart, clearCart, getCartTotal } = useCart();
   const items = cart.items || [];
-  const { sessionId: guestSessionId } = useGuestSession();
+  const { guestSession } = useGuestSession();
+  const guestSessionId = guestSession?.sessionId;
   const { user, isAuthenticated } = useCustomerAuth();
   const { profile } = useCustomerProfile();
   
@@ -158,27 +159,30 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   // Initialize checkout state recovery
   const { 
-    markCheckoutInProgress, 
+    savePrePaymentState, 
     markPaymentCompleted, 
     clearState: clearRecoveryState,
-    hasInProgressCheckout 
+    hasRecoverableState 
   } = useCheckoutStateRecovery();
+
+  // Initialize order processing
+  const { markCheckoutInProgress } = useOrderProcessing();
 
   // Auto-fill form data from user profile
   useEffect(() => {
     if (isAuthenticated && profile) {
       setFormData(prev => ({
         ...prev,
-        customer_email: profile.email || '',
-        customer_name: profile.name || '',
-        customer_phone: profile.phone || ''
+        customer_email: (profile as any).email || '',
+        customer_name: (profile as any).name || '',
+        customer_phone: (profile as any).phone || ''
       }));
       setCheckoutStep('details');
     }
   }, [isAuthenticated, profile]);
 
-  // Calculate delivery fee
-  const deliveryFee = getDeliveryFee(deliveryZone?.base_fee || 0);
+  // Calculate delivery fee (simple calculation since no getDeliveryFee from useCart)
+  const deliveryFee = deliveryZone?.base_fee || 0;
   
   // Calculate totals
   const subtotal = getCartTotal();
@@ -187,13 +191,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const handleFormChange = (field: string, value: any) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
-      setFormData(prev => ({
-        ...prev,
-        [parent]: {
-          ...prev[parent as keyof CheckoutData],
-          [child]: value
-        }
-      }));
+      setFormData(prev => {
+        const parentData = prev[parent as keyof CheckoutData] as any;
+        return {
+          ...prev,
+          [parent]: {
+            ...parentData,
+            [child]: value
+          }
+        };
+      });
     } else {
       setFormData(prev => ({
         ...prev,
@@ -214,14 +221,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
     });
   }, []);
 
-  const { processOrder } = useOrderProcessing({
-    onSuccess: (result) => {
-      console.log('✅ Order processed successfully:', result);
-      setPaymentData(result);
-      setCheckoutStep('payment');
-    },
-    onError: handlePaymentFailure
-  });
+  // Remove the processOrder hook usage since it doesn't exist
 
   const handleFormSubmit = async () => {
     try {
@@ -237,7 +237,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : null,
         pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : null,
         order_items: items.map(item => ({
-          product_id: item.productId,
+          product_id: item.product_id,
           quantity: item.quantity,
           unit_price: item.price,
           total_price: item.price * item.quantity
@@ -272,7 +272,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       const parsedData = normalizePaymentResponse(data);
       console.log('🔍 Parsed server response:', parsedData);
 
-      if (parsedData && parsedData.success) {
+      if (parsedData && (parsedData as any).success) {
         // Process and normalize payment data
         const processedPaymentData = normalizePaymentData(parsedData);
         
@@ -305,8 +305,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           }
         }
         
-        // Mark checkout in progress to persist cart
-        markCheckoutInProgress(processedPaymentData.reference);
+        // Save payment state and mark checkout in progress
+        savePrePaymentState(formData, checkoutStep, deliveryFee, (processedPaymentData as any).reference);
+        markCheckoutInProgress((processedPaymentData as any).reference);
         
         setPaymentData(processedPaymentData);
         setCheckoutStep('payment');
@@ -428,12 +429,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       </div>
       
       <GuestOrLoginChoice
-        onGuestCheckout={() => setCheckoutStep('details')}
+        onContinueAsGuest={() => setCheckoutStep('details')}
         onLogin={() => {
           storeRedirectUrl('/checkout');
           onClose();
           navigate('/auth');
         }}
+        totalAmount={total}
       />
     </div>
   );
@@ -601,8 +603,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
               </div>
               
               <DeliveryZoneDropdown
-                onZoneSelect={setDeliveryZone}
-                selectedZone={deliveryZone}
+                selectedZoneId={deliveryZone?.id}
+                onZoneSelect={(zoneId, fee) => {
+                  const zone = { id: zoneId, base_fee: fee };
+                  setDeliveryZone(zone);
+                }}
+                orderSubtotal={subtotal}
               />
             </CardContent>
           </Card>
@@ -619,11 +625,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </CardHeader>
             <CardContent>
               <PickupPointSelector
-                onPointSelect={(point) => {
+                selectedPointId={pickupPoint?.id}
+                onSelect={(point) => {
                   setPickupPoint(point);
-                  handleFormChange('pickup_point_id', point.id);
+                  handleFormChange('pickup_point_id', point?.id);
                 }}
-                selectedPoint={pickupPoint}
               />
             </CardContent>
           </Card>
@@ -640,14 +646,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </CardHeader>
             <CardContent>
               <DeliveryScheduler
-                onScheduleChange={(schedule) => {
-                  handleFormChange('delivery_date', schedule.date);
-                  handleFormChange('delivery_time_slot', schedule.timeSlot);
-                  handleFormChange('special_instructions', schedule.specialInstructions);
+                onScheduleChange={(date, timeSlot) => {
+                  handleFormChange('delivery_date', date);
+                  handleFormChange('delivery_time_slot', timeSlot);
                 }}
                 selectedDate={formData.delivery_date}
                 selectedTimeSlot={formData.delivery_time_slot}
-                specialInstructions={formData.special_instructions}
               />
             </CardContent>
           </Card>
@@ -699,14 +703,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
       {paymentData && (
         <PaystackPaymentHandler
-          paymentData={paymentData}
+          orderId={(paymentData as any).order_id}
+          amount={total}
+          email={formData.customer_email}
+          orderNumber={(paymentData as any).order_number || 'UNKNOWN'}
           onSuccess={handlePaymentSuccess}
           onError={handlePaymentFailure}
-          customerData={{
-            email: formData.customer_email,
-            name: formData.customer_name,
-            phone: formData.customer_phone
-          }}
+          onClose={() => {}}
         />
       )}
     </div>
@@ -740,8 +743,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                 subtotal={subtotal}
                 deliveryFee={deliveryFee}
                 total={total}
-                deliveryZone={deliveryZone}
-                fulfillmentType={formData.fulfillment_type}
               />
             </div>
           </div>

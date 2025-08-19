@@ -31,21 +31,25 @@ export const AdminDashboardWithResilience = () => {
         )
       ]);
 
-      // Extract data safely
-      const orders = ordersResult.status === 'fulfilled' ? ordersResult.value.data || [] : [];
-      const customers = customersResult.status === 'fulfilled' ? customersResult.value.data || [] : [];
+      // Extract data safely with proper typing
+      const orders: any[] = ordersResult.status === 'fulfilled' ? (ordersResult.value.data || []) : [];
+      const customers: any[] = customersResult.status === 'fulfilled' ? (customersResult.value.data || []) : [];
 
-      // Calculate stats with fallbacks
-      const totalRevenue = orders.reduce((sum: number, order: any) => {
+      // Calculate stats with fallbacks and proper typing
+      const totalRevenue: number = orders.reduce((sum: number, order: any) => {
         const amount = parseFloat(order?.total_amount || '0');
         return sum + (isNaN(amount) ? 0 : amount);
       }, 0);
 
+      const totalCustomers: number = customers.length;
+      const recentOrders: any[] = orders.slice(0, 5);
+      const totalOrders: number = orders.length;
+
       return {
-        totalOrders: orders.length,
-        totalRevenue: totalRevenue,
-        totalCustomers: Array.isArray(customers) ? customers.length : 0,
-        recentOrders: Array.isArray(orders) ? orders.slice(0, 5) : []
+        totalOrders,
+        totalRevenue,
+        totalCustomers,
+        recentOrders
       };
     },
     staleTime: 2 * 60 * 1000, // 2 minutes

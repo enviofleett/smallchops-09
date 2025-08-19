@@ -28,9 +28,10 @@ import {
   CalendarIcon,
   CheckSquare,
   Square,
-  AlertTriangle
+  AlertTriangle,
+  RefreshCw
 } from 'lucide-react';
-import { format, isToday, parseISO } from 'date-fns';
+import { format, isToday, parseISO, isAfter, isBefore, addMinutes } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { formatAddress } from '@/utils/formatAddress';
 import { cn } from '@/lib/utils';
@@ -57,7 +58,7 @@ export default function AdminDelivery() {
       startDate: selectedDateString,
       endDate: selectedDateString,
     }),
-    refetchInterval: isSelectedDateToday ? 30000 : undefined, // Only poll for today
+    // Removed automatic polling - use manual refresh instead
   });
 
   // Filter for paid delivery orders only (all statuses for metrics)
@@ -98,22 +99,34 @@ export default function AdminDelivery() {
     if (deliveryWindowFilter === 'all') return readyOrders;
     if (deliveryWindowFilter === 'due-now') {
       const now = new Date();
-      const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       
       return readyOrders.filter(order => {
         const schedule = deliverySchedules[order.id];
-        if (!schedule) return false;
-        return currentTime >= schedule.delivery_time_start && currentTime <= schedule.delivery_time_end;
+        if (!schedule?.delivery_time_start || !schedule?.delivery_time_end) return false;
+        
+        try {
+          // Create timezone-safe date comparisons
+          const today = format(selectedDate, 'yyyy-MM-dd');
+          const startTime = parseISO(`${today}T${schedule.delivery_time_start}:00`);
+          const endTime = parseISO(`${today}T${schedule.delivery_time_end}:00`);
+          
+          // Add some buffer for "due now" (within 30 minutes)
+          const bufferStart = addMinutes(startTime, -30);
+          
+          return (isAfter(now, bufferStart) && isBefore(now, endTime)) || isAfter(now, startTime);
+        } catch {
+          return false;
+        }
       });
     }
     
     const [startHour] = deliveryWindowFilter.split('-');
     return readyOrders.filter(order => {
       const schedule = deliverySchedules[order.id];
-      if (!schedule) return false;
+      if (!schedule?.delivery_time_start) return false;
       return schedule.delivery_time_start.startsWith(startHour);
     });
-  }, [readyOrders, deliveryWindowFilter, deliverySchedules]);
+  }, [readyOrders, deliveryWindowFilter, deliverySchedules, selectedDate]);
 
   // Reset selection when window filter changes
   React.useEffect(() => {
@@ -206,13 +219,14 @@ export default function AdminDelivery() {
         )}
 
         {/* Server Cap Warning */}
-        {deliveryOrdersData?.count === 1000 && (
+        {(deliveryOrdersData?.count === 1000 || 
+          deliveryOrdersData?.orders?.length === 1000) && (
           <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 sm:p-4 mx-2 sm:mx-0">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-orange-600 font-medium">
-                  Maximum data limit reached (1000 orders)
+                  Maximum data limit reached ({deliveryOrdersData?.orders?.length || 1000} orders)
                 </p>
                 <p className="text-xs text-orange-600/80 mt-1 break-words">
                   Some orders may not be displayed. Consider narrowing your date range.
@@ -346,12 +360,22 @@ export default function AdminDelivery() {
             {/* Header */}
             <div className="border-b pb-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="text-lg sm:text-xl font-semibold truncate">Ready Delivery Orders</h2>
-                  <p className="text-sm text-muted-foreground">
-                    Showing only orders with status READY
-                  </p>
-                </div>
+            <div className="min-w-0">
+              <h2 className="text-lg sm:text-xl font-semibold truncate">Ready Delivery Orders</h2>
+              <p className="text-sm text-muted-foreground">
+                Showing only orders with status READY
+              </p>
+            </div>
+            <Button
+              onClick={() => refetchOrders()}
+              variant="outline"
+              size="sm"
+              disabled={ordersLoading}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className={cn("w-4 h-4", ordersLoading && "animate-spin")} />
+              Refresh
+            </Button>
                 <div className="flex items-center gap-2 flex-wrap">
                   <Badge variant="outline" className="text-xs">
                     Ready: {readyOrders.length}
@@ -388,7 +412,8 @@ export default function AdminDelivery() {
                     <Checkbox
                       checked={selectedOrders.length === readyFilteredOrders.length}
                       onCheckedChange={(checked) => {
-                        if (checked) {
+                        const isChecked = checked === true;
+                        if (isChecked) {
                           setSelectedOrders(readyFilteredOrders);
                         } else {
                           setSelectedOrders([]);
@@ -521,9 +546,9 @@ function DeliveryOrderItem({ order }: { order: any }) {
         order.status === 'confirmed' ? 'default' :
         order.status === 'preparing' ? 'secondary' :
         order.status === 'ready' ? 'outline' :
-        order.status === 'out_for_delivery' ? 'default' : 'secondary'
+        order.status === 'out_for_delivery' ? 'default' : 'outline'
       }>
-        {order.status.replace('_', ' ')}
+        {order.status?.replace(/_/g, ' ') || 'Unknown'}
       </Badge>
     </div>
   );
@@ -549,7 +574,7 @@ function DeliveryOrderCard({
           <div className="flex items-start gap-3 min-w-0 flex-1">
             <Checkbox
               checked={isSelected}
-              onCheckedChange={onSelect}
+              onCheckedChange={(checked) => onSelect(checked === true)}
               className="flex-shrink-0 mt-1"
             />
             <div className="min-w-0 flex-1">

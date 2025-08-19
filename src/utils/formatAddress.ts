@@ -15,15 +15,18 @@ export const formatAddress = (address: any): string => {
   
   // If it's already a string, return it
   if (typeof address === 'string') {
+    const trimmed = address.trim();
+    if (!trimmed) return 'N/A';
+    
     // Try to parse if it looks like JSON
-    if (address.startsWith('{') && address.endsWith('}')) {
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
-        address = JSON.parse(address);
+        address = JSON.parse(trimmed);
       } catch {
-        return address;
+        return trimmed;
       }
     } else {
-      return address;
+      return trimmed;
     }
   }
   
@@ -71,15 +74,18 @@ export const formatAddressMultiline = (address: any): string => {
   
   // If it's already a string, return it
   if (typeof address === 'string') {
+    const trimmed = address.trim();
+    if (!trimmed) return 'N/A';
+    
     // Try to parse if it looks like JSON
-    if (address.startsWith('{') && address.endsWith('}')) {
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
       try {
-        address = JSON.parse(address);
+        address = JSON.parse(trimmed);
       } catch {
-        return address;
+        return trimmed;
       }
     } else {
-      return address;
+      return trimmed;
     }
   }
   

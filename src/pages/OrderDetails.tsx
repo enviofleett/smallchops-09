@@ -188,7 +188,7 @@ const loadData = React.useCallback(async () => {
       .select(`
         id, order_number, status, payment_status, paid_at, total_amount, order_time,
         customer_id, customer_email, customer_phone, customer_name, payment_method, payment_reference,
-        order_type, delivery_address, pickup_point_id, special_instructions, delivery_notes, estimated_delivery_date
+        order_type, delivery_address, pickup_point_id, special_instructions, estimated_delivery_date
       `)
       .eq('id', id)
       .maybeSingle();

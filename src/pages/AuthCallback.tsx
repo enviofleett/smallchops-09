@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -8,91 +7,172 @@ import { PublicFooter } from '@/components/layout/PublicFooter';
 import { PhoneCollectionModal } from '@/components/auth/PhoneCollectionModal';
 import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
 
+type AuthStatus = 'loading' | 'success' | 'error' | 'phone_required';
+
+interface UserData {
+  id: string;
+  email?: string;
+  phone?: string;
+}
+
 const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'phone_required'>('loading');
+  const [status, setStatus] = useState<AuthStatus>('loading');
   const [error, setError] = useState<string>('');
   const [showPhoneModal, setShowPhoneModal] = useState(false);
-  const [userId, setUserId] = useState<string>('');
+  const [userData, setUserData] = useState<UserData>({ id: '' });
+  const [isPhoneSubmitting, setIsPhoneSubmitting] = useState(false);
+  const redirectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const hasProcessedAuth = useRef(false);
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimeoutRef.current) {
+        clearTimeout(redirectTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const redirectToDestination = useCallback((delay: number = 1500) => {
+    if (redirectTimeoutRef.current) {
+      clearTimeout(redirectTimeoutRef.current);
+    }
+    
+    redirectTimeoutRef.current = setTimeout(() => {
+      const redirectTo = searchParams.get('redirect') || '/dashboard';
+      navigate(redirectTo, { replace: true });
+    }, delay);
+  }, [navigate, searchParams]);
+
+  const handleAuthError = useCallback((errorMessage: string, logError?: any) => {
+    if (logError) {
+      console.error('Auth callback error:', logError);
+    }
+    setError(errorMessage);
+    setStatus('error');
+  }, []);
+
+  const validatePhoneNumber = (phone: string): boolean => {
+    // Basic phone validation - adjust regex as needed
+    const phoneRegex = /^\+?[\d\s\-\(\)]{10,}$/;
+    return phoneRegex.test(phone.trim());
+  };
 
   useEffect(() => {
+    // Prevent multiple executions
+    if (hasProcessedAuth.current) return;
+    hasProcessedAuth.current = true;
+
     const handleAuthCallback = async () => {
       try {
-        const { data, error } = await supabase.auth.getSession();
+        setStatus('loading');
         
-        if (error) {
-          console.error('Auth callback error:', error);
-          setError(error.message);
-          setStatus('error');
+        // Get current session
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          handleAuthError(sessionError.message, sessionError);
           return;
         }
 
-        if (data.session?.user) {
-          const user = data.session.user;
-          console.log('Auth callback - user authenticated:', user.email);
-
-          // Check if user has phone number
-          const hasPhone = user.user_metadata?.phone || user.phone;
-          
-          if (!hasPhone) {
-            console.log('Phone number required for user:', user.id);
-            setUserId(user.id);
-            setStatus('phone_required');
-            setShowPhoneModal(true);
-            return;
-          }
-
-          // User is fully authenticated with phone
-          setStatus('success');
-          
-          toast({
-            title: "Welcome!",
-            description: "You have been successfully authenticated.",
-          });
-
-          // Redirect after short delay
-          setTimeout(() => {
-            const redirectTo = searchParams.get('redirect') || '/';
-            navigate(redirectTo, { replace: true });
-          }, 1500);
-        } else {
-          // No active session, redirect to auth page
-          console.log('No session found, redirecting to auth');
+        if (!sessionData.session?.user) {
+          console.log('No active session found, redirecting to auth');
           navigate('/auth', { replace: true });
+          return;
         }
+
+        const user = sessionData.session.user;
+        console.log('Auth callback - user authenticated:', user.email);
+
+        // Store user data
+        const currentUserData: UserData = {
+          id: user.id,
+          email: user.email,
+          phone: user.user_metadata?.phone || user.phone
+        };
+        setUserData(currentUserData);
+
+        // Check if phone number is required and missing
+        if (!currentUserData.phone) {
+          console.log('Phone number required for user:', user.id);
+          setStatus('phone_required');
+          setShowPhoneModal(true);
+          return;
+        }
+
+        // User is fully authenticated
+        setStatus('success');
+        
+        toast({
+          title: "Welcome back!",
+          description: "You have been successfully authenticated.",
+        });
+
+        redirectToDestination();
+
       } catch (err) {
-        console.error('Unexpected error in auth callback:', err);
-        setError('An unexpected error occurred during authentication');
-        setStatus('error');
+        handleAuthError(
+          'An unexpected error occurred during authentication',
+          err
+        );
       }
     };
 
     handleAuthCallback();
-  }, [navigate, searchParams, toast]);
+  }, [navigate, searchParams, toast, handleAuthError, redirectToDestination]);
 
   const handlePhoneSubmit = async (phoneNumber: string) => {
+    if (!phoneNumber.trim()) {
+      toast({
+        title: "Invalid phone number",
+        description: "Please enter a valid phone number",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!validatePhoneNumber(phoneNumber)) {
+      toast({
+        title: "Invalid phone format",
+        description: "Please enter a valid phone number with country code",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsPhoneSubmitting(true);
+
     try {
       // Update user metadata with phone number
       const { error: updateError } = await supabase.auth.updateUser({
-        data: { phone: phoneNumber }
+        data: { phone: phoneNumber.trim() }
       });
 
       if (updateError) {
         throw updateError;
       }
 
-      // Also update the customer_accounts table
-      const { error: customerError } = await supabase
-        .from('customer_accounts')
-        .update({ phone: phoneNumber })
-        .eq('user_id', userId);
+      // Also update the customer_accounts table if it exists
+      try {
+        const { error: customerError } = await supabase
+          .from('customer_accounts')
+          .update({ phone: phoneNumber.trim() })
+          .eq('user_id', userData.id);
 
-      if (customerError) {
-        console.warn('Failed to update customer phone:', customerError);
+        if (customerError) {
+          console.warn('Failed to update customer phone (table may not exist):', customerError);
+          // Don't throw here as this might be expected
+        }
+      } catch (customerUpdateError) {
+        console.warn('Customer accounts table update failed:', customerUpdateError);
+        // Continue without failing the entire flow
       }
 
+      // Update local state
+      setUserData(prev => ({ ...prev, phone: phoneNumber.trim() }));
       setShowPhoneModal(false);
       setStatus('success');
       
@@ -101,18 +181,31 @@ const AuthCallback: React.FC = () => {
         description: "Your account setup is now complete.",
       });
 
-      setTimeout(() => {
-        const redirectTo = searchParams.get('redirect') || '/';
-        navigate(redirectTo, { replace: true });
-      }, 1500);
+      redirectToDestination();
+
     } catch (error: any) {
       console.error('Phone update error:', error);
       toast({
         title: "Phone update failed",
-        description: error.message || "Failed to update phone number",
+        description: error.message || "Failed to update phone number. Please try again.",
         variant: "destructive"
       });
+    } finally {
+      setIsPhoneSubmitting(false);
     }
+  };
+
+  const handlePhoneModalClose = () => {
+    // Only allow closing if there's an error or if we want to allow skipping
+    // For now, making it non-dismissible as intended
+    console.log('Phone modal close attempted - modal is non-dismissible');
+  };
+
+  const handleRetryAuth = () => {
+    hasProcessedAuth.current = false;
+    setStatus('loading');
+    setError('');
+    window.location.reload(); // Force a fresh auth attempt
   };
 
   const renderStatus = () => {
@@ -150,17 +243,32 @@ const AuthCallback: React.FC = () => {
             <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
             <h2 className="text-xl font-semibold mb-2">Authentication failed</h2>
             <p className="text-muted-foreground mb-4">{error}</p>
-            <button
-              onClick={() => navigate('/auth')}
-              className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90"
-            >
-              Try again
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={handleRetryAuth}
+                className="bg-primary text-primary-foreground px-4 py-2 rounded-md hover:bg-primary/90 transition-colors"
+              >
+                Retry Authentication
+              </button>
+              <br />
+              <button
+                onClick={() => navigate('/auth', { replace: true })}
+                className="bg-secondary text-secondary-foreground px-4 py-2 rounded-md hover:bg-secondary/90 transition-colors"
+              >
+                Back to Sign In
+              </button>
+            </div>
           </div>
         );
 
       default:
-        return null;
+        return (
+          <div className="text-center">
+            <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2">Unknown status</h2>
+            <p className="text-muted-foreground">Please refresh the page or try again.</p>
+          </div>
+        );
     }
   };
 
@@ -177,8 +285,9 @@ const AuthCallback: React.FC = () => {
       <PhoneCollectionModal
         isOpen={showPhoneModal}
         onSubmit={handlePhoneSubmit}
-        onClose={() => {}} // Non-dismissible
-        userEmail={userId} // Pass user ID for context
+        onClose={handlePhoneModalClose}
+        userEmail={userData.email || 'Unknown User'} // Fixed: pass email instead of userId
+        isLoading={isPhoneSubmitting}
       />
       
       <PublicFooter />

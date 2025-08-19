@@ -470,18 +470,18 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
         
         console.log('✅ Processed payment data:', processedPaymentData);
         
-        // Add delivery schedule verification (non-blocking)
+        // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
         if (parsedData.order_id && sanitizedData.delivery_schedule) {
           // If server already returned schedule info, skip client checks
           if (parsedData.schedule?.schedule_id) {
-            console.log('✅ Server confirmed schedule:', parsedData.schedule.schedule_id);
+            console.log('✅ [GUARDRAIL] Server confirmed schedule:', parsedData.schedule.schedule_id);
           } else {
-            console.log('🔍 Verifying delivery schedule was persisted (client-side, non-blocking)...');
+            console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
             try {
               const { getDeliveryScheduleByOrderId, createDeliverySchedule } = await import('@/api/deliveryScheduleApi');
               const existingSchedule = await getDeliveryScheduleByOrderId(parsedData.order_id);
               if (!existingSchedule) {
-                console.log('⚠️ No schedule found via SELECT, attempting client insert as guardrail...');
+                console.log('⚠️ [GUARDRAIL] No schedule found via SELECT, attempting non-blocking client insert...');
                 try {
                   const fallbackSchedule = await createDeliverySchedule({
                     order_id: parsedData.order_id,

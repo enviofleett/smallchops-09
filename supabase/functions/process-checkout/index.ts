@@ -390,11 +390,11 @@ serve(async (req) => {
       throw new Error('Failed to retrieve created order');
     }
 
-    // Insert delivery schedule if provided
+    // AUTHORITATIVE DELIVERY SCHEDULE PERSISTENCE
     let scheduleId: string | null = null;
     if (delivery_schedule) {
       try {
-        console.log('📅 Inserting delivery schedule for order:', orderId);
+        console.log('📅 [AUTHORITATIVE] Inserting delivery schedule for order:', orderId);
         
         const scheduleData = {
           order_id: orderId,
@@ -413,85 +413,69 @@ serve(async (req) => {
           .single();
 
         if (scheduleError) {
-          console.error('❌ Failed to insert delivery schedule:', scheduleError);
+          console.error('❌ [CRITICAL] Delivery schedule insert failed - blocking payment:', scheduleError);
           
-          // Log to payment_processing_logs
+          // Log failure for monitoring
           await supabaseClient
             .from('payment_processing_logs')
             .insert({
               order_id: orderId,
               payment_reference: authoritativePaymentReference,
-              processing_stage: 'schedule_insert_failed',
+              processing_stage: 'schedule_insert_failed_blocking',
               error_message: scheduleError.message,
               metadata: {
                 schedule_data: scheduleData,
-                error_code: scheduleError.code
+                error_code: scheduleError.code,
+                failure_reason: 'delivery_schedule_required_for_delivery_orders'
               }
             });
 
-          // Log to audit_logs
-          await supabaseClient
-            .from('audit_logs')
-            .insert({
-              action: 'delivery_schedule_insert_failed',
-              category: 'Order Management',
-              message: `Failed to insert delivery schedule for order ${orderDetails.order_number}`,
-              entity_id: orderId,
-              old_values: null,
-              new_values: scheduleData,
-              user_id: null
+          // For delivery orders, schedule is REQUIRED - block payment initialization
+          if (fulfillment_type === 'delivery') {
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Failed to create delivery schedule. Delivery orders require valid scheduling.',
+              code: 'DELIVERY_SCHEDULE_REQUIRED',
+              details: scheduleError.message
+            }), { 
+              status: 422, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
             });
-
-          throw new Error('Failed to save delivery schedule: ' + scheduleError.message);
+          }
+          
+          // For pickup orders, log but continue
+          console.log('⚠️ Schedule insert failed for pickup order - continuing without schedule');
+        } else {
+          scheduleId = scheduleRecord.id;
+          console.log('✅ [AUTHORITATIVE] Delivery schedule persisted successfully:', scheduleId);
+          
+          // Log successful persistence
+          await supabaseClient
+            .from('payment_processing_logs')
+            .insert({
+              order_id: orderId,
+              payment_reference: authoritativePaymentReference,
+              processing_stage: 'schedule_persisted_successfully',
+              metadata: {
+                schedule_id: scheduleId,
+                schedule_data: scheduleData
+              }
+            });
         }
-
-        scheduleId = scheduleRecord.id;
-        console.log('✅ Delivery schedule inserted:', scheduleId);
-
-        // Log success
-        await supabaseClient
-          .from('audit_logs')
-          .insert({
-            action: 'delivery_schedule_inserted',
-            category: 'Order Management',
-            message: `Delivery schedule created for order ${orderDetails.order_number}: ${delivery_schedule.delivery_date} ${delivery_schedule.delivery_time_start}-${delivery_schedule.delivery_time_end}`,
-            entity_id: orderId,
-            old_values: null,
-            new_values: scheduleData,
-            user_id: null
-          });
-
-        // Insert success metric
-        await supabaseClient
-          .from('api_metrics')
-          .insert({
-            endpoint: 'process-checkout',
-            metric_type: 'schedule_persisted',
-            metric_value: 1,
-            dimensions: {
-              fulfillment_type: fulfillment_type,
-              has_special_instructions: !!delivery_schedule.special_instructions
-            }
-          });
-
-      } catch (scheduleError: any) {
-        console.error('❌ Delivery schedule insertion failed:', scheduleError);
+      } catch (scheduleException) {
+        console.error('❌ [CRITICAL] Exception during schedule persistence:', scheduleException);
         
-        // Insert failure metric
-        await supabaseClient
-          .from('api_metrics')
-          .insert({
-            endpoint: 'process-checkout',
-            metric_type: 'schedule_persist_failed',
-            metric_value: 1,
-            dimensions: {
-              fulfillment_type: fulfillment_type,
-              error_type: scheduleError.name || 'unknown'
-            }
+        // For delivery orders, this is a blocking error
+        if (fulfillment_type === 'delivery') {
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'System error creating delivery schedule. Please try again.',
+            code: 'SCHEDULE_SYSTEM_ERROR'
+          }), { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           });
-
-        // Re-throw to prevent order from proceeding to payment without schedule
-        throw scheduleError;
+        }
       }
     }
 

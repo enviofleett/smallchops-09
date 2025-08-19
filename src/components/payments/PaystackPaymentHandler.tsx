@@ -74,18 +74,22 @@ export const PaystackPaymentHandler = ({
 
     try {
       openSecurePayment(authorizationUrl);
-      onSuccess(currentReference);
+      // Note: onSuccess will be called by the payment callback handler after verification
+      toast.info('Payment window opened. Complete payment to continue.');
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Payment failed');
     }
   };
 
   const handleFallback = () => {
-    if (currentReference) {
-      const fallbackUrl = `https://paystack.com/pay/${currentReference}`;
-      window.open(fallbackUrl, '_blank');
-      toast.info('Payment opened in new tab');
+    if (!authorizationUrl) {
+      onError('Payment not ready. Please try again.');
+      return;
     }
+    
+    // Use the same secure authorizationUrl for alternative payment
+    window.open(authorizationUrl, '_blank');
+    toast.info('Payment opened in new tab');
   };
 
   const handleRetry = () => {

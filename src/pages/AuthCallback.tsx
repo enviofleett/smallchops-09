@@ -53,12 +53,50 @@ const AuthCallback: React.FC = () => {
             return;
           }
           
-          // Check for customer account
-          const { data: customerAccount } = await supabase
-            .from('customer_accounts')
-            .select('*')
-            .eq('user_id', user.id)
-            .single();
+          // Check for customer account with retry
+          let customerAccount = null;
+          let retryCount = 0;
+          const maxRetries = 3;
+          
+          while (!customerAccount && retryCount < maxRetries) {
+            const { data } = await supabase
+              .from('customer_accounts')
+              .select('*')
+              .eq('user_id', user.id)
+              .maybeSingle();
+            
+            customerAccount = data;
+            if (!customerAccount) {
+              retryCount++;
+              if (retryCount < maxRetries) {
+                console.log(`Customer account not found, retry ${retryCount}/${maxRetries}`);
+                await new Promise(resolve => setTimeout(resolve, 1000));
+              }
+            }
+          }
+          
+          // If still no customer account, try to create one
+          if (!customerAccount) {
+            console.log('Creating customer account for user:', user.id);
+            const { data: newAccount, error: createError } = await supabase
+              .from('customer_accounts')
+              .insert({
+                user_id: user.id,
+                name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Customer',
+                email: user.email,
+                phone: user.user_metadata?.phone,
+                email_verified: !!user.email_confirmed_at,
+                phone_verified: false,
+                profile_completion_percentage: user.user_metadata?.phone ? 80 : 60
+              })
+              .select()
+              .single();
+            
+            if (!createError && newAccount) {
+              customerAccount = newAccount;
+              console.log('Customer account created successfully:', customerAccount.id);
+            }
+          }
           
           if (customerAccount) {
             // Customer user - check phone requirement

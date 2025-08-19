@@ -132,7 +132,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const items = cart.items || [];
   const { guestSession } = useGuestSession();
   const guestSessionId = guestSession?.sessionId;
-  const { user, isAuthenticated } = useCustomerAuth();
+  const { user, session, isAuthenticated } = useCustomerAuth();
   const { profile } = useCustomerProfile();
   
   const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>('auth');

@@ -34,25 +34,26 @@ export const useCustomerAuth = () => {
   useEffect(() => {
     let mounted = true;
     let subscription: any;
-    let accountFetchTimeout: NodeJS.Timeout;
 
-    // Fast customer account loader with timeout
-    const loadCustomerAccount = async (userId: string, timeoutMs: number = 3000) => {
-      return Promise.race([
-        supabase
+    const loadCustomerAccount = async (userId: string) => {
+      try {
+        const { data, error } = await supabase
           .from('customer_accounts')
           .select('*')
           .eq('user_id', userId)
-          .maybeSingle(),
-        new Promise<{ data: null; error: Error }>((_, reject) => 
-          setTimeout(() => reject(new Error('Account fetch timeout')), timeoutMs)
-        )
-      ]).then(({ data, error }) => {
-        if (error && !error.message.includes('timeout')) {
-          console.warn('Error fetching customer account:', error);
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error fetching customer account:', error);
+          return null;
         }
+        
+        console.log('🔍 Customer account data:', data);
         return data;
-      }).catch(() => null);
+      } catch (error) {
+        console.error('Customer account fetch error:', error);
+        return null;
+      }
     };
 
     const initializeAuth = async () => {
@@ -62,26 +63,31 @@ export const useCustomerAuth = () => {
           if (!mounted) return;
           
           if (session?.user) {
-            // Immediately mark as authenticated to unblock UI
-            setAuthState(prev => ({ 
-              ...prev, 
-              user: session.user, 
-              session, 
-              isLoading: false, // Unblock UI immediately
-              isAuthenticated: true,
-              error: null
-            }));
-
-            // Load customer account in background
-            const customerAccount = await loadCustomerAccount(session.user.id, 2000);
-            
-            if (mounted) {
-              setAuthState(prev => ({
-                ...prev,
-                customerAccount,
+            // Use setTimeout to prevent potential Supabase deadlocks
+            setTimeout(async () => {
+              if (!mounted) return;
+              
+              setAuthState(prev => ({ 
+                ...prev, 
+                user: session.user, 
+                session, 
+                isLoading: true,
                 error: null
               }));
-            }
+
+              // Load customer account
+              const customerAccount = await loadCustomerAccount(session.user.id);
+              
+              if (mounted) {
+                setAuthState(prev => ({
+                  ...prev,
+                  customerAccount,
+                  isLoading: false,
+                  isAuthenticated: true, // Session exists = authenticated
+                  error: null
+                }));
+              }
+            }, 0);
           } else {
             setAuthState({
               user: null,
@@ -96,58 +102,41 @@ export const useCustomerAuth = () => {
 
         subscription = data.subscription;
 
-        // Fast initial session check with timeout
-        const sessionPromise = Promise.race([
-          supabase.auth.getSession(),
-          new Promise<{ data: { session: null } }>((resolve) => 
-            setTimeout(() => resolve({ data: { session: null } }), 1000)
-          )
-        ]);
-
-        const { data: { session: initialSession } } = await sessionPromise;
+        // Check for existing session
+        const { data: { session: initialSession } } = await supabase.auth.getSession();
         
         if (!mounted) return;
 
         if (initialSession?.user) {
-          // Immediate UI unblock for authenticated users
           setAuthState(prev => ({ 
             ...prev, 
             user: initialSession.user, 
             session: initialSession, 
-            isLoading: false, // Unblock UI immediately
-            isAuthenticated: true,
-            error: null
+            isLoading: true 
           }));
 
-          // Background customer account fetch
-          accountFetchTimeout = setTimeout(async () => {
-            if (!mounted) return;
-            const customerAccount = await loadCustomerAccount(initialSession.user.id, 1500);
-            
-            if (mounted) {
-              setAuthState(prev => ({
-                ...prev,
-                customerAccount,
-                error: null
-              }));
-            }
-          }, 0);
+          const customerAccount = await loadCustomerAccount(initialSession.user.id);
+          
+          if (mounted) {
+            setAuthState(prev => ({
+              ...prev,
+              customerAccount,
+              isLoading: false,
+              isAuthenticated: true, // Session exists = authenticated
+              error: null
+            }));
+          }
         } else {
-          // Fast-path for guest users
-          setAuthState(prev => ({ 
-            ...prev, 
-            isLoading: false,
-            isAuthenticated: false 
-          }));
+          if (mounted) {
+            setAuthState(prev => ({ ...prev, isLoading: false }));
+          }
         }
       } catch (error) {
-        console.warn('Customer auth initialization error:', error);
+        console.error('Customer auth initialization error:', error);
         if (mounted) {
-          // Don't block UI on auth errors
           setAuthState(prev => ({ 
             ...prev, 
             isLoading: false,
-            isAuthenticated: false,
             error: error instanceof Error ? error.message : 'Authentication initialization failed'
           }));
         }
@@ -159,7 +148,6 @@ export const useCustomerAuth = () => {
     return () => {
       mounted = false;
       subscription?.unsubscribe();
-      if (accountFetchTimeout) clearTimeout(accountFetchTimeout);
     };
   }, []);
 

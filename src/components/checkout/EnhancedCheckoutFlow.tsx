@@ -25,7 +25,6 @@ import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
 import { safeErrorMessage, normalizePaymentResponse } from '@/utils/errorHandling';
 import { validatePaymentFlow, formatDiagnosticResults } from '@/utils/paymentDiagnostics';
 import { cn } from "@/lib/utils";
-import { edgeFunctionWarmer } from '@/utils/edgeFunctionWarmer';
 
 import {
   Dialog,
@@ -136,13 +135,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const { user, session, isAuthenticated, isLoading } = useCustomerAuth();
   const { profile } = useCustomerProfile();
   
-  // Fast-path initial step determination
-  const getInitialCheckoutStep = (): 'auth' | 'details' | 'payment' => {
-    // Default to details - auth check will redirect if needed
-    return 'details';
+  // Initialize checkout step based on authentication status
+  const getInitialCheckoutStep = () => {
+    if (isAuthenticated) return 'details';
+    return 'auth';
   };
   
-  const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>(() => getInitialCheckoutStep());
+  const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>(getInitialCheckoutStep());
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: '',
     customer_name: '',
@@ -175,13 +174,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   // Initialize order processing
   const { markCheckoutInProgress } = useOrderProcessing();
-
-  // Warm up edge functions on mount for faster checkout
-  useEffect(() => {
-    if (isOpen) {
-      edgeFunctionWarmer.warmCheckoutFunctions();
-    }
-  }, [isOpen]);
 
   const handleClose = () => {
     if (checkoutStep === 'payment' && paymentData) {
@@ -223,16 +215,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
     return () => window.removeEventListener('message', handleMessage);
   }, [handleClose]);
 
-  // Non-blocking auth step management
+  // Manage checkout step based on authentication status
   useEffect(() => {
-    // Only redirect to auth if explicitly not authenticated
-    if (!isLoading && !isAuthenticated && !guestSessionId) {
-      setCheckoutStep('auth');
-    } else if (isAuthenticated) {
-      setCheckoutStep('details');
+    if (!isLoading) {
+      if (isAuthenticated) {
+        setCheckoutStep('details');
+      } else {
+        setCheckoutStep('auth');
+      }
     }
-    // Default to details step for guest users to avoid blocking
-  }, [isAuthenticated, isLoading, guestSessionId]);
+  }, [isAuthenticated, isLoading]);
 
   // Auto-fill form data from user profile
   useEffect(() => {
@@ -886,22 +878,20 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
-              {/* Non-blocking loading indicator */}
-              {isLoading && (
-                <div className="fixed top-4 right-4 z-50">
-                  <div className="bg-background/95 backdrop-blur-sm border rounded-lg px-3 py-2 shadow-lg">
-                    <div className="flex items-center gap-2 text-sm">
-                      <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
-                      <span className="text-muted-foreground">Loading...</span>
-                    </div>
+              {isLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="space-y-4 text-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                    <p className="text-muted-foreground">Checking account...</p>
                   </div>
                 </div>
+              ) : (
+                <>
+                  {checkoutStep === 'auth' && renderAuthStep()}
+                  {checkoutStep === 'details' && renderDetailsStep()}
+                  {checkoutStep === 'payment' && renderPaymentStep()}
+                </>
               )}
-              
-              {/* Always render content - no blocking */}
-              {checkoutStep === 'auth' && renderAuthStep()}
-              {checkoutStep === 'details' && renderDetailsStep()}
-              {checkoutStep === 'payment' && renderPaymentStep()}
             </div>
 
             {/* Sticky Bottom Action */}

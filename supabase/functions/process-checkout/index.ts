@@ -47,32 +47,6 @@ serve(async (req) => {
     );
 
     const requestBody = await req.json();
-    
-    // STRUCTURED REQUEST LOGGING for recovery (Step 1 of plan)
-    try {
-      const sanitizedPayload = {
-        delivery_schedule: requestBody?.delivery_schedule || null,
-        fulfillment_type: requestBody?.fulfillment_type,
-        order_number: requestBody?.order_number || null,
-        customer_email: requestBody?.customer_email ? String(requestBody.customer_email).replace(/(^.).+(@.*$)/, '$1***$2') : undefined,
-        timestamp: new Date().toISOString()
-      };
-      
-      await supabaseClient
-        .from('api_request_logs')
-        .insert({
-          endpoint: 'process-checkout',
-          method: req.method,
-          ip_address: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip'),
-          user_agent: req.headers.get('user-agent'),
-          request_payload: sanitizedPayload
-        });
-      
-      console.log('📝 API request logged for recovery purposes');
-    } catch (logError) {
-      console.warn('⚠️ Non-blocking: Failed to log API request:', logError);
-    }
-    
     const sanitized = {
       ...requestBody,
       customer_email: requestBody?.customer_email ? String(requestBody.customer_email).replace(/(^.).+(@.*$)/, '$1***$2') : undefined,
@@ -438,28 +412,28 @@ serve(async (req) => {
           .select('id')
           .single();
 
-          if (scheduleError) {
-            console.error('❌ [CRITICAL] Delivery schedule upsert failed - blocking payment:', scheduleError);
-            
-            // Log failure for monitoring
-            await supabaseClient
-              .from('payment_processing_logs')
-              .insert({
-                order_id: orderId,
-                payment_reference: authoritativePaymentReference,
-                processing_stage: 'schedule_upsert_failed_blocking',
-                error_message: scheduleError.message,
-                metadata: {
-                  schedule_data: scheduleData,
-                  error_code: scheduleError.code,
-                  failure_reason: 'delivery_schedule_required_for_delivery_orders'
-                }
-              });
+        if (scheduleError) {
+          console.error('❌ [CRITICAL] Delivery schedule upsert failed - blocking payment:', scheduleError);
+          
+          // Log failure for monitoring
+          await supabaseClient
+            .from('payment_processing_logs')
+            .insert({
+              order_id: orderId,
+              payment_reference: authoritativePaymentReference,
+              processing_stage: 'schedule_upsert_failed_blocking',
+              error_message: scheduleError.message,
+              metadata: {
+                schedule_data: scheduleData,
+                error_code: scheduleError.code,
+                failure_reason: 'delivery_schedule_required_for_delivery_orders'
+              }
+            });
 
-            // For delivery orders, schedule is REQUIRED - block payment initialization
-            if (fulfillment_type === 'delivery') {
-              return new Response(JSON.stringify({
-                success: false,
+          // For delivery orders, schedule is REQUIRED - block payment initialization
+          if (fulfillment_type === 'delivery') {
+            return new Response(JSON.stringify({
+              success: false,
               error: 'Failed to create delivery schedule. Delivery orders require valid scheduling.',
               code: 'DELIVERY_SCHEDULE_REQUIRED',
               details: scheduleError.message

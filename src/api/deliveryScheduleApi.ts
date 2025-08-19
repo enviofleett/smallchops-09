@@ -33,6 +33,17 @@ export const createDeliverySchedule = async (scheduleData: CreateDeliverySchedul
   return data;
 };
 
+export const upsertDeliverySchedule = async (scheduleData: CreateDeliverySchedule): Promise<DeliverySchedule> => {
+  const { data, error } = await supabase
+    .from('order_delivery_schedule')
+    .upsert(scheduleData, { onConflict: 'order_id' })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+};
+
 export const getDeliveryScheduleByOrderId = async (orderId: string): Promise<DeliverySchedule | null> => {
   const { data, error } = await supabase
     .from('order_delivery_schedule')

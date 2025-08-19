@@ -475,15 +475,68 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
           // If server already returned schedule info, skip client checks
           if (parsedData.schedule?.schedule_id) {
             console.log('✅ [GUARDRAIL] Server confirmed schedule:', parsedData.schedule.schedule_id);
+            toast({
+              title: "Schedule saved",
+              description: "Your delivery schedule has been confirmed."
+            });
           } else {
             console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
+            // Simple fallback - just attempt upsert once
             try {
-              const { getDeliveryScheduleByOrderId, createDeliverySchedule } = await import('@/api/deliveryScheduleApi');
-              const existingSchedule = await getDeliveryScheduleByOrderId(parsedData.order_id);
-              if (!existingSchedule) {
-                console.log('⚠️ [GUARDRAIL] No schedule found via SELECT, attempting non-blocking client insert...');
+              const { upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
+              await upsertDeliverySchedule({
+                order_id: parsedData.order_id,
+                delivery_date: sanitizedData.delivery_schedule.delivery_date,
+                delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
+                delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
+                is_flexible: sanitizedData.delivery_schedule.is_flexible || false,
+                special_instructions: sanitizedData.delivery_schedule.special_instructions || null
+              });
+              console.log('✅ [GUARDRAIL] Schedule upserted successfully');
+              toast({
+                title: "Schedule saved",
+                description: "Your delivery schedule has been confirmed."
+              });
+            } catch (error) {
+              console.error('🛡️ [GUARDRAIL] Fallback failed:', error);
+              toast({
+                title: "Processing delivery schedule",
+                description: "We'll finalize your delivery window after payment."
+              });
+            }
+          }
+        }
+              // Import both functions needed for guardrail fallback
+              const { getDeliveryScheduleByOrderId, upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
+              const { useQueryClient } = await import('@tanstack/react-query');
+              const queryClient = useQueryClient();
+              
+              const executeGuardrailFallback = async (retryCount = 0) => {
+                const maxRetries = 1;
+                const delays = [500, 1000]; // 500ms, then 1000ms
+                
                 try {
-                  const fallbackSchedule = await createDeliverySchedule({
+                  // Wait before checking/upserting
+                  if (retryCount > 0) {
+                    console.log(`🛡️ [GUARDRAIL] retrying (${retryCount}/${maxRetries})`);
+                  }
+                  await new Promise(resolve => setTimeout(resolve, delays[retryCount] || 500));
+                  
+                  // First check if schedule exists
+                  const existingSchedule = await getDeliveryScheduleByOrderId(parsedData.order_id);
+                  if (existingSchedule) {
+                    console.log('🛡️ [GUARDRAIL] select-success - schedule found');
+                    toast({
+                      title: "Schedule saved",
+                      description: "Your delivery schedule has been confirmed.",
+                    });
+                    return;
+                  }
+                  
+                  console.log('🛡️ [GUARDRAIL] select-miss - attempting upsert');
+                  
+                  // Attempt upsert
+                  const fallbackSchedule = await upsertDeliverySchedule({
                     order_id: parsedData.order_id,
                     delivery_date: sanitizedData.delivery_schedule.delivery_date,
                     delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
@@ -491,8 +544,38 @@ const EnhancedCheckoutFlowComponent: React.FC<EnhancedCheckoutFlowProps> = React
                     is_flexible: sanitizedData.delivery_schedule.is_flexible || false,
                     special_instructions: sanitizedData.delivery_schedule.special_instructions || null
                   });
-                  console.log('✅ Client fallback schedule inserted:', fallbackSchedule.id);
+                  
+                  console.log('🛡️ [GUARDRAIL] upsert-success:', fallbackSchedule.id);
+                  
+                  // Invalidate caches
+                  queryClient.invalidateQueries({ queryKey: ['delivery-schedules'] });
+                  queryClient.invalidateQueries({ queryKey: ['customer-delivery-schedules'] });
+                  queryClient.invalidateQueries({ queryKey: ['detailed-order', parsedData.order_id] });
+                  
                   toast({
+                    title: "Schedule saved",
+                    description: "Your delivery schedule has been confirmed.",
+                  });
+                  
+                } catch (error) {
+                  console.error(`🛡️ [GUARDRAIL] upsert-failed (attempt ${retryCount + 1}):`, error);
+                  
+                  if (retryCount < maxRetries) {
+                    return executeGuardrailFallback(retryCount + 1);
+                  } else {
+                    console.error('🛡️ [GUARDRAIL] final-failure - max retries exceeded');
+                    toast({
+                      title: "Processing delivery schedule",
+                      description: "We'll finalize your delivery window after payment.",
+                    });
+                  }
+                }
+              };
+              
+              // Execute guardrail fallback (non-blocking)
+              executeGuardrailFallback().catch(error => {
+                console.error('🛡️ [GUARDRAIL] unexpected-error:', error);
+              });
                     title: "Schedule Saved",
                     description: "Your delivery schedule has been confirmed.",
                   });

@@ -408,12 +408,12 @@ serve(async (req) => {
 
         const { data: scheduleRecord, error: scheduleError } = await supabaseClient
           .from('order_delivery_schedule')
-          .insert(scheduleData)
+          .upsert(scheduleData, { onConflict: 'order_id' })
           .select('id')
           .single();
 
         if (scheduleError) {
-          console.error('❌ [CRITICAL] Delivery schedule insert failed - blocking payment:', scheduleError);
+          console.error('❌ [CRITICAL] Delivery schedule upsert failed - blocking payment:', scheduleError);
           
           // Log failure for monitoring
           await supabaseClient
@@ -421,7 +421,7 @@ serve(async (req) => {
             .insert({
               order_id: orderId,
               payment_reference: authoritativePaymentReference,
-              processing_stage: 'schedule_insert_failed_blocking',
+              processing_stage: 'schedule_upsert_failed_blocking',
               error_message: scheduleError.message,
               metadata: {
                 schedule_data: scheduleData,
@@ -447,7 +447,7 @@ serve(async (req) => {
           console.log('⚠️ Schedule insert failed for pickup order - continuing without schedule');
         } else {
           scheduleId = scheduleRecord.id;
-          console.log('✅ [AUTHORITATIVE] Delivery schedule persisted successfully:', scheduleId);
+          console.log('✅ [AUTHORITATIVE] Delivery schedule upserted successfully:', scheduleId);
           
           // Log successful persistence
           await supabaseClient
@@ -458,6 +458,7 @@ serve(async (req) => {
               processing_stage: 'schedule_persisted_successfully',
               metadata: {
                 schedule_id: scheduleId,
+                order_id: orderId,
                 schedule_data: scheduleData
               }
             });

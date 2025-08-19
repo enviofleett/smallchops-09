@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useSecurePayment } from '@/hooks/useSecurePayment';
+import './payment-styles.css';
 
 interface PaystackPaymentHandlerProps {
   orderId: string;
@@ -98,7 +99,7 @@ export const PaystackPaymentHandler = ({
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="paystack-payment-handler w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <CardTitle className="flex items-center justify-center gap-2">
           <span>Secure Payment</span>

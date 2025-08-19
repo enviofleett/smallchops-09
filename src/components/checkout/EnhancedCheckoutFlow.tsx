@@ -18,6 +18,7 @@ import { OrderSummaryCard } from "./OrderSummaryCard";
 import { PaystackPaymentHandler } from "@/components/payments/PaystackPaymentHandler";
 import { storeRedirectUrl } from "@/utils/redirect";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
+import '@/components/payments/payment-styles.css';
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
 import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
 import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
@@ -743,7 +744,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           </DialogTitle>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
+        <div className="enhanced-checkout-flow grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
           <div className="lg:col-span-2 overflow-y-auto pr-2 max-h-[calc(90vh-120px)]">
             {checkoutStep === 'auth' && renderAuthStep()}
             {checkoutStep === 'details' && renderDetailsStep()}

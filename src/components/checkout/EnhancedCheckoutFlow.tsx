@@ -660,23 +660,27 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </CardHeader>
             <CardContent>
               <DeliveryScheduler
+                variant="horizontal"
                 onScheduleChange={(date, timeSlot) => {
                   handleFormChange('delivery_date', date);
                   handleFormChange('delivery_time_slot', timeSlot);
                 }}
                 selectedDate={formData.delivery_date}
                 selectedTimeSlot={formData.delivery_time_slot}
+                showHeader={false}
               />
             </CardContent>
           </Card>
         )}
       </div>
 
-      <div className="flex gap-3">
+      {/* Desktop payment button */}
+      <div className="hidden lg:flex gap-3">
         <Button
           onClick={handleFormSubmit}
           disabled={!canProceedToDetails || isSubmitting}
-          className="flex-1"
+          className="flex-1 h-12"
+          size="lg"
         >
           {isSubmitting ? (
             <>
@@ -685,8 +689,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </>
           ) : (
             <>
-              <ShoppingBag className="w-4 h-4 mr-2" />
-              Proceed to Payment
+              Proceed to Payment • ₦{total.toLocaleString()}
             </>
           )}
         </Button>
@@ -733,37 +736,87 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] overflow-hidden p-0">
-        <DialogHeader className="p-4 pb-2 border-b">
-          <DialogTitle className="flex items-center justify-between text-lg">
-            <span>Checkout</span>
+      <DialogContent className="max-w-6xl w-[95vw] max-h-[95vh] overflow-hidden p-0">
+        <div className="enhanced-checkout-flow flex flex-col overflow-hidden h-full">
+          {/* Header with back navigation */}
+          <div className="flex items-center justify-between p-4 border-b bg-background">
+            <div className="flex items-center gap-3">
+              {checkoutStep !== 'auth' && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    if (checkoutStep === 'payment') setCheckoutStep('details');
+                    else if (checkoutStep === 'details') {
+                      if (isAuthenticated) onClose();
+                      else setCheckoutStep('auth');
+                    }
+                  }}
+                  className="h-8 w-8 p-0"
+                >
+                  <X className="w-4 h-4" />
+                </Button>
+              )}
+              <h2 className="text-lg font-semibold">
+                {checkoutStep === 'details' && 'Order Details'}
+                {checkoutStep === 'payment' && 'Complete Payment'}
+                {checkoutStep === 'auth' && 'Checkout'}
+              </h2>
+            </div>
             <DialogClose asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8">
+              <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
                 <X className="w-4 h-4" />
               </Button>
             </DialogClose>
-          </DialogTitle>
-        </DialogHeader>
-
-        <div className="enhanced-checkout-flow flex flex-col lg:grid lg:grid-cols-3 gap-4 lg:gap-6 overflow-hidden h-full">
-          {/* Main Content Area */}
-          <div className="lg:col-span-2 overflow-y-auto px-4 pb-4 lg:pr-2 max-h-[calc(95vh-80px)] lg:max-h-[calc(95vh-120px)]">
-            {checkoutStep === 'auth' && renderAuthStep()}
-            {checkoutStep === 'details' && renderDetailsStep()}
-            {checkoutStep === 'payment' && renderPaymentStep()}
           </div>
 
-          {/* Order Summary Sidebar */}
-          <div className="lg:col-span-1 border-t lg:border-t-0 lg:border-l bg-muted/20">
-            <div className="lg:sticky lg:top-0 p-4 lg:max-h-[calc(95vh-120px)] lg:overflow-y-auto">
-              <OrderSummaryCard
-                items={items}
-                subtotal={subtotal}
-                deliveryFee={deliveryFee}
-                total={total}
-              />
+          <div className="flex flex-col lg:grid lg:grid-cols-3 gap-0 overflow-hidden h-full">
+            {/* Main Content Area */}
+            <div className="lg:col-span-2 overflow-y-auto">
+              <div className="p-4 pb-20 lg:pb-4 space-y-6">
+                {checkoutStep === 'auth' && renderAuthStep()}
+                {checkoutStep === 'details' && renderDetailsStep()}
+                {checkoutStep === 'payment' && renderPaymentStep()}
+              </div>
+            </div>
+
+            {/* Order Summary Sidebar */}
+            <div className="lg:col-span-1 border-t lg:border-t-0 lg:border-l bg-muted/20">
+              <div className="lg:sticky lg:top-0 p-4 lg:max-h-[calc(95vh-80px)] lg:overflow-y-auto">
+                <h3 className="font-semibold mb-4">Order Details</h3>
+                <OrderSummaryCard
+                  items={items}
+                  subtotal={subtotal}
+                  deliveryFee={deliveryFee}
+                  total={total}
+                  collapsibleOnMobile={false}
+                />
+              </div>
             </div>
           </div>
+
+          {/* Sticky bottom action bar for mobile */}
+          {checkoutStep === 'details' && (
+            <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-background border-t p-4 z-50">
+              <Button
+                onClick={handleFormSubmit}
+                disabled={!canProceedToDetails || isSubmitting}
+                className="w-full h-12"
+                size="lg"
+              >
+                {isSubmitting ? (
+                  <>
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    Processing...
+                  </>
+                ) : (
+                  <>
+                    Proceed to Payment • ₦{total.toLocaleString()}
+                  </>
+                )}
+              </Button>
+            </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

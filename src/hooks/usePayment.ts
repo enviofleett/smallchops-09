@@ -51,10 +51,11 @@ export const usePayment = () => {
 
       const { data: response, error } = await supabase.functions.invoke('secure-payment-processor', {
         body: {
+          action: 'initialize',
           order_id: orderId,
           customer_email: customerEmail || '',
-          amount, // Ignored by backend, but kept for compatibility
-          redirect_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`
+          // Amount intentionally not passed - backend derives from DB
+          callback_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`
         }
       });
 
@@ -173,9 +174,12 @@ export const usePayment = () => {
     try {
       console.log('🔍 Verifying payment with secure verify-payment RPC:', reference);
       
-      // Use the dedicated verify-payment function instead of paystack-secure
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
-        body: { reference }
+      // Use secure-payment-processor for verification
+      const { data, error } = await supabase.functions.invoke('secure-payment-processor', {
+        body: { 
+          action: 'verify',
+          reference 
+        }
       });
 
       if (error) throw new Error(error.message);

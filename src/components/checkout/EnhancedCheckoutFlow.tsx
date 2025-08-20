@@ -326,53 +326,30 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
       console.log('🔄 Raw server response:', data);
 
-      // Try to parse response, prioritizing backend-returned amounts
-      let parsedData;
-      try {
-        parsedData = normalizePaymentResponse(data);
-        console.log('✅ Parsed server response successfully:', parsedData);
-      } catch (error) {
-        console.warn('⚠️ Could not parse payment_url from response, proceeding to secure payment handler:', error);
-        // Fall back to minimal order data without payment_url
-        parsedData = {
-          order_id: data?.order_id,
-          order_number: data?.order_number,
-          amount: data?.amount || total, // Prioritize backend amount
-          customer_email: sanitizedData.customer_email,
-          success: true
-        };
-      }
-
-      // 🔧 CRITICAL: Use backend-returned amount if available
-      const authoritativeAmount = data?.amount || parsedData?.amount || total;
+      // Use backend-returned order data
+      const orderData = {
+        order_id: data?.order_id,
+        order_number: data?.order_number,
+        authoritative_amount: data?.amount || total, // Backend amount is authoritative
+        customer_email: sanitizedData.customer_email,
+        success: true
+      };
       
-      console.log('💰 Amount prioritization:', {
+      console.log('💰 Order created successfully:', {
         client_calculated: total,
         backend_returned: data?.amount,
-        authoritative_amount: authoritativeAmount,
+        authoritative_amount: orderData.authoritative_amount,
         items_subtotal: data?.items_subtotal,
         delivery_fee: data?.delivery_fee
       });
 
-      // Check if process-checkout provided a payment_url to open
-      if (data?.payment_url || data?.authorization_url) {
-        const paymentUrl = data.payment_url || data.authorization_url;
-        console.log('🔗 Opening process-checkout payment URL in new tab:', paymentUrl);
-        window.open(paymentUrl, '_blank');
-        toast({
-          title: "Payment opened",
-          description: "Complete payment in the new tab, then return here."
-        });
-        return; // Exit early if primary payment flow worked
-      }
-
       // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
-      if (parsedData?.order_id && sanitizedData.delivery_schedule) {
+      if (orderData?.order_id && sanitizedData.delivery_schedule) {
         console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
         try {
           const { upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
           await upsertDeliverySchedule({
-            order_id: parsedData.order_id,
+            order_id: orderData.order_id,
             delivery_date: sanitizedData.delivery_schedule.delivery_date,
             delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
             delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
@@ -395,9 +372,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       
       // Set payment data for PaystackPaymentHandler to initialize securely
       setPaymentData({
-        orderId: parsedData?.order_id,
-        orderNumber: parsedData?.order_number || data?.order_number,
-        amount: authoritativeAmount, // Use authoritative amount from backend
+        orderId: orderData.order_id,
+        orderNumber: orderData.order_number,
+        amount: orderData.authoritative_amount, // Use authoritative amount from backend
         email: sanitizedData.customer_email,
         successUrl: `${window.location.origin}/payment-callback`,
         cancelUrl: window.location.href

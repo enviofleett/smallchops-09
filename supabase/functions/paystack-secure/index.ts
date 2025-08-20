@@ -63,78 +63,111 @@ async function initializePayment(supabaseClient, requestData) {
   try {
     const { email, amount, reference, metadata, channels } = requestData;
 
+    console.log('🔐 SECURE INIT: Backend authoritative amounts enabled', {
+      provided_email: email,
+      client_amount: amount,
+      metadata_order_id: metadata?.order_id,
+      client_reference: reference
+    });
+
     // Input validation
-    if (!email || !amount) {
-      throw new Error('Email and amount are required');
+    if (!email) {
+      throw new Error('Email is required');
     }
 
-    // 🔒 Authoritative amount and idempotent reference handling
-    // Always try to resolve order context and reuse existing pending init
+    // Service client with elevated permissions for DB operations
     const serviceClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { persistSession: false } }
     );
 
-    let authoritativeAmount = amount;
+    let authoritativeAmount: number;
     let transactionRef = reference as string | undefined;
+    let orderFound = false;
 
+    // 🔒 BACKEND AS SOURCE OF TRUTH: Always derive amount from DB when order_id is present
     if (metadata?.order_id) {
       try {
-        console.log('🔍 Resolving order context for idempotency:', metadata.order_id);
-        const { data: orderData } = await serviceClient
+        console.log('🔍 Fetching authoritative order data:', metadata.order_id);
+        const { data: orderData, error: orderError } = await serviceClient
           .from('orders')
           .select('id, payment_reference, total_amount, delivery_fee, status')
           .eq('id', metadata.order_id)
           .single();
 
+        if (orderError) {
+          console.error('❌ Failed to fetch order:', orderError);
+          throw new Error(`Order not found: ${metadata.order_id}`);
+        }
+
         if (orderData) {
-          // Compute authoritative amount from DB
-          const computedAmount = (orderData.total_amount || 0) + (orderData.delivery_fee || 0);
-          authoritativeAmount = computedAmount;
-          console.log('💰 Authoritative amount (DB):', {
-            provided_amount: amount,
-            computed_amount: computedAmount
+          orderFound = true;
+          // AUTHORITATIVE AMOUNT: DB total_amount (excludes delivery) + delivery_fee
+          const dbTotalAmount = orderData.total_amount || 0;
+          const dbDeliveryFee = orderData.delivery_fee || 0;
+          authoritativeAmount = dbTotalAmount + dbDeliveryFee;
+
+          console.log('💰 AUTHORITATIVE AMOUNT (Backend-derived):', {
+            client_provided: amount,
+            db_total_amount: dbTotalAmount,
+            db_delivery_fee: dbDeliveryFee,
+            authoritative_amount: authoritativeAmount,
+            amount_source: 'database'
           });
 
-          // Determine canonical reference: prefer order.payment_reference
+          // Reference handling: prefer existing order.payment_reference
           if (orderData.payment_reference && typeof orderData.payment_reference === 'string') {
             transactionRef = orderData.payment_reference;
-            console.log('✅ Reusing order payment_reference as transactionRef:', transactionRef);
+            console.log('✅ Reusing existing order payment_reference:', transactionRef);
           }
 
-          // If no reference on order, normalize incoming or generate new
+          // Generate new reference if none exists
           if (!transactionRef) {
             transactionRef = `txn_${Date.now()}_${crypto.randomUUID()}`;
             console.log('🆕 Generated new server reference:', transactionRef);
-          } else if (!transactionRef.startsWith('txn_')) {
+          }
+
+          // Normalize reference format to txn_
+          if (!transactionRef.startsWith('txn_')) {
             const oldRef = transactionRef;
-            transactionRef = transactionRef.startsWith('pay_')
-              ? `txn_${transactionRef.slice(4)}`
-              : `txn_${Date.now()}_${crypto.randomUUID()}`;
+            if (transactionRef.startsWith('pay_')) {
+              transactionRef = `txn_${transactionRef.slice(4)}`;
+            } else {
+              transactionRef = `txn_${Date.now()}_${crypto.randomUUID()}`;
+            }
             console.log(`🔄 Normalized reference: ${oldRef} -> ${transactionRef}`);
           }
 
-          // Persist canonical reference on the order if missing/different
+          // Update order with canonical reference if changed
           if (orderData.payment_reference !== transactionRef) {
             await serviceClient
               .from('orders')
-              .update({ payment_reference: transactionRef, updated_at: new Date().toISOString() })
+              .update({ 
+                payment_reference: transactionRef, 
+                updated_at: new Date().toISOString() 
+              })
               .eq('id', orderData.id);
+            console.log('📝 Updated order with canonical reference');
           }
 
-          // Idempotency: if a pending init already exists for this order, reuse it
+          // 🔄 IDEMPOTENCY: Check for existing pending payment initialization
           const { data: existingTx } = await serviceClient
             .from('payment_transactions')
-            .select('reference, provider_reference, authorization_url, access_code, status, created_at')
-            .or(`order_id.eq.${orderData.id},reference.eq.${transactionRef}`)
+            .select('reference, provider_reference, authorization_url, access_code, status, amount')
+            .eq('order_id', orderData.id)
             .in('status', ['pending', 'initialized'])
             .order('created_at', { ascending: false })
             .limit(1)
             .maybeSingle();
 
-          if (existingTx?.authorization_url) {
-            console.log('♻️ Idempotent reuse of existing pending initialization');
+          if (existingTx?.authorization_url && existingTx?.access_code) {
+            console.log('♻️ IDEMPOTENT REUSE: Found existing valid payment initialization', {
+              existing_reference: existingTx.reference,
+              existing_amount: existingTx.amount,
+              authorization_url: existingTx.authorization_url.substring(0, 50) + '...'
+            });
+
             return new Response(JSON.stringify({
               status: true,
               data: {
@@ -142,7 +175,9 @@ async function initializePayment(supabaseClient, requestData) {
                 access_code: existingTx.access_code,
                 reference: existingTx.provider_reference || existingTx.reference || transactionRef
               },
-              reused: true
+              reused: true,
+              amount_source: 'database',
+              authoritative_amount: authoritativeAmount
             }), {
               status: 200,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -150,35 +185,37 @@ async function initializePayment(supabaseClient, requestData) {
           }
         }
       } catch (e) {
-        console.warn('⚠️ Order context resolution failed, continuing with provided data:', e);
+        console.error('❌ Order context resolution failed:', e);
+        throw new Error(`Failed to resolve order: ${e.message}`);
       }
     }
 
-    // Final fallback for reference if still not set
+    // Fallback: if no order context, use client amount (with warning)
+    if (!orderFound) {
+      authoritativeAmount = amount;
+      console.warn('⚠️ NO ORDER CONTEXT: Using client-provided amount (less secure)', {
+        client_amount: amount,
+        amount_source: 'client'
+      });
+    }
+
+    // Final reference fallback
     if (!transactionRef) {
       transactionRef = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log('🆕 Generated new reference (no order context):', transactionRef);
-    } else {
-      console.log('✅ Using reference:', transactionRef);
-      if (transactionRef.startsWith('pay_')) {
-        const oldRef = transactionRef;
-        transactionRef = transactionRef.replace('pay_', 'txn_');
-        console.log(`🔄 Converted reference: ${oldRef} -> ${transactionRef}`);
-      }
+      console.log('🆕 Generated fallback reference:', transactionRef);
     }
 
-    // Amount validation and conversion using authoritative amount
+    // Amount validation and conversion to kobo
     const amountInKobo = Math.round(parseFloat(authoritativeAmount) * 100);
     if (isNaN(amountInKobo) || amountInKobo < 100) {
       throw new Error('Amount must be a number equal to or greater than ₦1.00');
     }
 
-    console.log('💰 Authoritative amount conversion details:', {
-      original_amount: amount,
-      authoritative_amount: authoritativeAmount,
+    console.log('💰 FINAL AMOUNT DETAILS:', {
+      authoritative_amount_naira: authoritativeAmount,
       amount_in_kobo: amountInKobo,
-      amount_in_naira: amountInKobo / 100,
-      metadata: metadata
+      reference: transactionRef,
+      order_found: orderFound
     })
 
     console.log(`💳 Initializing payment: ${transactionRef} for ${email}, amount: ₦${amountInKobo/100}`);
@@ -198,15 +235,22 @@ async function initializePayment(supabaseClient, requestData) {
     // Use provided callback_url or default to frontend success page
     const callbackUrl = requestData.callback_url || `${Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com'}/checkout/success`;
 
-    // Prepare Paystack payload
+    // Prepare Paystack payload with normalized metadata
+    const normalizedMetadata = {
+      ...(metadata && typeof metadata === 'object' ? metadata : {}),
+      amount_source: orderFound ? 'database' : 'client',
+      authoritative_amount: authoritativeAmount,
+      generated_by: 'paystack-secure-v3'
+    };
+
     const paystackPayload = {
       email,
       amount: amountInKobo.toString(),
       currency: 'NGN',
       reference: transactionRef,
-      callback_url: callbackUrl, // FIX: Added callback URL
+      callback_url: callbackUrl,
       channels: channels || ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
-      metadata: metadata || {} // FIX: Keep as object, don't stringify
+      metadata: normalizedMetadata
     };
 
     console.log('🚀 Sending to Paystack:', JSON.stringify(paystackPayload, null, 2));
@@ -256,19 +300,13 @@ async function initializePayment(supabaseClient, requestData) {
 
     // Create payment transaction record using service role client
     try {
-      const serviceClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-        { auth: { persistSession: false } }
-      )
-
       const { error: transactionError } = await serviceClient
         .from('payment_transactions')
         .upsert({
           order_id: metadata?.order_id || null,
           reference: transactionRef,
           provider_reference: paystackData.data.reference,
-          amount: amountInKobo / 100, // Convert back to naira
+          amount: authoritativeAmount, // Use authoritative amount in Naira
           status: 'pending',
           provider: 'paystack',
           customer_email: email,
@@ -283,7 +321,7 @@ async function initializePayment(supabaseClient, requestData) {
       if (transactionError) {
         console.error('⚠️ Failed to create payment transaction record:', transactionError)
       } else {
-        console.log('✅ Payment transaction record created successfully')
+        console.log('✅ Payment transaction record created with authoritative amount')
       }
     } catch (dbError) {
       console.error('⚠️ Database error creating transaction record:', dbError)

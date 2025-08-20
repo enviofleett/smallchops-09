@@ -3,34 +3,10 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const VERSION = "v2025-08-17-hotfix-complete-payment-data";
 
-// Production-ready CORS configuration - restrict to production domains
-function getCorsHeaders(origin: string | null): Record<string, string> {
-  const allowedOrigins = [
-    'https://startersmallchops.com',
-    'https://www.startersmallchops.com'
-  ];
-  
-  // Allow Lovable preview domains for development
-  if (origin && (origin.includes('lovableproject.com') || origin.includes('lovable.app'))) {
-    allowedOrigins.push(origin);
-  }
-
-  const isAllowed = origin && allowedOrigins.includes(origin);
-
-  return {
-    'Access-Control-Allow-Origin': isAllowed ? origin : allowedOrigins[0],
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
-    'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS, PATCH',
-    'Access-Control-Max-Age': '86400',
-    'Access-Control-Allow-Credentials': 'true',
-    'Vary': 'Origin'
-  };
-}
+import { getCorsHeaders } from '../_shared/cors.ts';
 
 serve(async (req) => {
-  // Get origin for CORS
-  const origin = req.headers.get('origin');
-  const corsHeaders = getCorsHeaders(origin);
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -508,11 +484,11 @@ serve(async (req) => {
       try {
         console.log(`🔄 Payment initialization attempt ${attempt}/${maxRetries}`);
         
-        const { data: response, error: paymentError } = await supabaseClient.functions.invoke('paystack-secure', {
+        const { data: response, error: paymentError } = await supabaseClient.functions.invoke('secure-payment-processor', {
           body: {
             action: 'initialize',
             email: customer_email,
-            amount: authoritativeAmount, // Use authoritative amount from database
+            amount: Math.round(authoritativeAmount * 100), // Convert to kobo for Paystack
             reference: authoritativePaymentReference,
             callback_url: `https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/payment-callback?reference=${authoritativePaymentReference}&order_id=${orderId}`,
             metadata: {

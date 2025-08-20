@@ -1,268 +1,229 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { getCorsHeaders, handleCorsPreflight } from '../_shared/cors.ts'
-import { getPaystackConfig } from '../_shared/paystack-config.ts'
+import { getCorsHeaders } from '../_shared/cors.ts'
 
 interface PaymentRequest {
-  action: string
   order_id: string
+  amount: number
   customer_email: string
+  redirect_url?: string
+  metadata?: any
+}
+
+interface PaystackInitResponse {
+  status: boolean
+  message: string
+  data: {
+    authorization_url: string
+    access_code: string
+    reference: string
+  }
 }
 
 serve(async (req) => {
-  const cors = getCorsHeaders(req)
-  const pre = handleCorsPreflight(req)
-  if (pre) return new Response(null, { status: 204, headers: cors })
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'))
+  
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
 
   try {
-    if (req.method !== "POST") {
-      return new Response("Method Not Allowed", { status: 405, headers: { ...cors, 'Content-Type': 'application/json' } })
-    }
-
-    const { action, order_id, customer_email } = await req.json() as PaymentRequest
-
-    if (action !== "initialize") {
-      return new Response(JSON.stringify({ success: false, error: "Unsupported action" }), { 
-        status: 400, 
-        headers: { ...cors, 'Content-Type': 'application/json' } 
-      })
-    }
-
-    if (!order_id || !customer_email) {
-      return new Response(JSON.stringify({ success: false, error: "order_id and customer_email required" }), { 
-        status: 400, 
-        headers: { ...cors, 'Content-Type': 'application/json' } 
-      })
-    }
-
-    // Generate correlation ID for tracking
-    const correlationId = `${order_id}_${crypto.randomUUID().slice(0, 8)}`
-    console.log('🔐 [SECURE-PAYMENT-PROCESSOR] Processing payment for order:', {
-      correlation_id: correlationId,
-      order_id,
-      customer_email
-    })
-
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const config = getPaystackConfig(req)
-    console.log(`🔑 Using ${config.mode} environment`)
+    // Import environment-specific configuration
+    const { getPaystackConfig } = await import('../_shared/paystack-config.ts')
+    const paystackConfig = getPaystackConfig(req)
+    
+    console.log(`🔑 Using ${paystackConfig.environment} environment with key: ${paystackConfig.secretKey.substring(0, 10)}...`)
 
-    // 1. UNIFORM AMOUNT DERIVATION: Get order details and calculate authoritative amount
+    const { order_id, amount, customer_email, redirect_url, metadata } = await req.json() as PaymentRequest
+
+    if (!order_id || !amount || !customer_email) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Missing required fields: order_id, amount, customer_email',
+          code: 'MISSING_REQUIRED_FIELDS'
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
+
+    // 🚨 SECURITY: Generate secure backend reference only
+    const secureReference = `txn_${Date.now()}_${order_id}`
+
+    console.log('🔐 Generating secure payment for order:', {
+      order_id,
+      reference: secureReference,
+      amount,
+      customer_email
+    })
+
+    // Verify order exists
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
-      .select('id, total_amount, delivery_fee, status, payment_reference, order_number')
+      .select('id, total_amount, status')
       .eq('id', order_id)
       .single()
 
     if (orderError || !order) {
-      return new Response(JSON.stringify({ success: false, error: `Order not found: ${orderError?.message}` }), { 
-        status: 404, 
-        headers: { ...cors, 'Content-Type': 'application/json' } 
-      })
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Order not found',
+          code: 'ORDER_NOT_FOUND'
+        }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
 
-    // Calculate authoritative amount: total_amount + delivery_fee (backend source of truth)
-    const baseAmount = parseFloat(order.total_amount) || 0;
-    const deliveryFee = parseFloat(order.delivery_fee) || 0;
-    const authoritativeAmount = baseAmount + deliveryFee;
-    const amountInKobo = Math.round(authoritativeAmount * 100); // Strict integer conversion
-    
-    console.log('[SECURE-PAYMENT-PROCESSOR] Amount calculation:', {
-      correlation_id: correlationId,
-      order_id,
-      base_amount: baseAmount,
-      delivery_fee: deliveryFee,
-      authoritative_amount: authoritativeAmount,
-      amount_in_kobo: amountInKobo,
-      existing_reference: order.payment_reference,
-      mode: config.mode
-    });
+    // Verify amount matches order
+    if (Math.abs(order.total_amount - amount) > 0.01) {
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Amount mismatch with order',
+          code: 'AMOUNT_MISMATCH',
+          expected: order.total_amount,
+          provided: amount
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
 
-    // 2. ENFORCE IDEMPOTENCY: Check for existing payment initialization
-    let reference = order.payment_reference;
-    
-    if (reference) {
-      const { data: existingPayment } = await supabaseClient
-        .from('payment_transactions')
-        .select('authorization_url, access_code, status')
-        .eq('provider_reference', reference)
-        .in('status', ['pending', 'initialized'])
-        .single()
-
-      if (existingPayment?.authorization_url) {
-        console.log('[SECURE-PAYMENT-PROCESSOR] Reusing existing payment:', {
-          correlation_id: correlationId,
-          reference,
-          reused: true
-        })
-        
-        return new Response(
-          JSON.stringify({
-            success: true,
-            authorization_url: existingPayment.authorization_url,
-            access_code: existingPayment.access_code,
-            reference,
-            amount: authoritativeAmount,
-            mode: config.mode,
-            reused: true
-          }),
-          { headers: { ...cors, 'Content-Type': 'application/json' } }
-        )
+    // Initialize payment with Paystack
+    const paystackPayload = {
+      email: customer_email,
+      amount: Math.round(amount * 100), // Convert to kobo
+      reference: secureReference,
+      callback_url: redirect_url || `${Deno.env.get('FRONTEND_URL')}/payment-callback`,
+      metadata: {
+        order_id,
+        generated_by: 'secure-backend',
+        timestamp: new Date().toISOString(),
+        ...metadata
       }
     }
 
-    // 3. Generate new reference if needed
-    if (!reference) {
-      reference = `txn_${Date.now()}_${crypto.randomUUID()}`
-      
-      // Update order with new reference
-      await supabaseClient
-        .from('orders')
-        .update({ payment_reference: reference })
-        .eq('id', order_id)
-    }
-
-    // 4. Initialize with Paystack (strict integer amount)
-    const paystackPayload = {
-      amount: amountInKobo, // Send as integer, not string
-      email: customer_email,
-      reference,
-      metadata: {
-        order_id,
-        order_number: order.order_number,
-        correlation_id: correlationId
-      },
-      callback_url: Deno.env.get('SITE_URL') ? `${Deno.env.get('SITE_URL')}/payment/callback` : undefined
-    }
-
-    console.log('[SECURE-PAYMENT-PROCESSOR] Sending to Paystack:', {
-      correlation_id: correlationId,
-      amount_in_kobo: amountInKobo,
-      reference,
-      mode: config.mode
-    })
-
-    const paystackResponse = await fetch(`${config.baseUrl}/transaction/initialize`, {
+    const paystackResponse = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${config.secretKey}`,
+        'Authorization': `Bearer ${paystackConfig.secretKey}`,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify(paystackPayload),
+      body: JSON.stringify(paystackPayload)
     })
 
-    const paystackData = await paystackResponse.json()
+    const paystackData: PaystackInitResponse = await paystackResponse.json()
 
-    if (!paystackData.status) {
-      console.error('[SECURE-PAYMENT-PROCESSOR] Paystack initialization failed:', paystackData)
-      return new Response(JSON.stringify({ success: false, error: `Paystack initialization failed: ${paystackData.message}` }), { 
-        status: 502, 
-        headers: { ...cors, 'Content-Type': 'application/json' } 
-      })
+    if (!paystackResponse.ok || !paystackData.status) {
+      console.error('Paystack initialization failed:', paystackData)
+      
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Failed to initialize payment with Paystack',
+          code: 'PAYSTACK_INIT_FAILED',
+          details: paystackData.message
+        }),
+        { 
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
     }
 
-    // 5. Store payment transaction (amount in NAIRA, not kobo)
-    const { error: insertError } = await supabaseClient
-      .from('payment_transactions')
-      .upsert({
-        order_id,
-        provider_reference: reference,
-        amount: authoritativeAmount, // Store in Naira
-        currency: 'NGN',
-        status: 'pending',
-        payment_method: 'paystack',
-        customer_email,
-        authorization_url: paystackData.data.authorization_url,
-        access_code: paystackData.data.access_code,
-        provider_response: JSON.stringify({
-          ...paystackData.data,
-          correlation_id: correlationId,
-          mode: config.mode
-        })
-      }, {
-        onConflict: 'provider_reference',
-        ignoreDuplicates: false
+    // Update order with secure reference
+    const { error: updateError } = await supabaseClient
+      .from('orders')
+      .update({
+        payment_reference: secureReference,
+        paystack_reference: secureReference,
+        status: 'payment_initiated',
+        updated_at: new Date().toISOString()
       })
+      .eq('id', order_id)
 
-    if (insertError) {
-      console.error('[SECURE-PAYMENT-PROCESSOR] Failed to store transaction:', {
-        correlation_id: correlationId,
-        error: insertError
-      })
+    if (updateError) {
+      console.error('Failed to update order with reference:', updateError)
+      throw new Error('Failed to update order')
     }
 
-    console.log('[SECURE-PAYMENT-PROCESSOR] Payment initialized successfully:', {
-      correlation_id: correlationId,
-      reference,
-      authorization_url: paystackData.data.authorization_url,
-      mode: config.mode
+    console.log('✅ Secure payment initialized:', {
+      order_id,
+      reference: secureReference,
+      authorization_url: paystackData.data.authorization_url
     })
-
-    // 6. Unified response contract (PATCH)
-    const payload = {
-      success: true,
-      authorization_url: paystackData.data.authorization_url,
-      access_code: paystackData.data.access_code,
-      reference,
-      amount: authoritativeAmount, // NAIRA, authoritative
-      mode: config.mode,
-      reused: false
-    }
 
     return new Response(
-      JSON.stringify(payload),
-      { headers: { ...cors, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        success: true,
+        reference: secureReference,
+        authorization_url: paystackData.data.authorization_url,
+        access_code: paystackData.data.access_code,
+        order_id,
+        amount
+      }),
+      { 
+        status: 200, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
     )
 
   } catch (error) {
-    console.error('[SECURE-PAYMENT-PROCESSOR] Error:', error)
+    console.error('Secure payment processor error:', error)
     
     return new Response(
       JSON.stringify({
         success: false,
-        error: 'INTERNAL_ERROR',
+        error: 'Internal server error',
+        code: 'INTERNAL_ERROR',
         message: error.message
       }),
       { 
         status: 500, 
-        headers: { ...cors, 'Content-Type': 'application/json' } 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
       }
     )
   }
 })
 
 /*
-🔐 SECURE PAYMENT PROCESSOR - HARDENED
+🔐 SECURE PAYMENT PROCESSOR
 - ✅ Only backend generates payment references (txn_ format)
 - ✅ Validates order exists and amount matches
-- ✅ Request-aware Paystack config (LIVE/TEST)
 - ✅ Integrates with Paystack securely
 - ✅ Updates order with secure reference
 - ✅ Comprehensive error handling and logging
-- ✅ Proper CORS with allowlist
-- ✅ Integer amount conversion (no float drift)
 
 🔧 USAGE:
 POST /functions/v1/secure-payment-processor
 {
-  "action": "initialize",
   "order_id": "uuid",
-  "customer_email": "user@example.com"
+  "amount": 649.90,
+  "customer_email": "user@example.com",
+  "redirect_url": "https://yoursite.com/callback"
 }
 
 📊 RESPONSE:
 {
   "success": true,
+  "reference": "txn_1734567890123_order-uuid",
   "authorization_url": "https://checkout.paystack.com/...",
   "access_code": "...",
-  "reference": "txn_1734567890123_order-uuid",
-  "amount": 649.90,
-  "mode": "TEST|LIVE",
-  "reused": false
+  "order_id": "uuid",
+  "amount": 649.90
 }
 */

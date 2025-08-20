@@ -1,168 +1,235 @@
-
 import { useState } from 'react';
+import { paystackService, assertServerReference, validateReferenceForVerification } from '@/lib/paystack';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
-interface PaymentInitResponse {
-  success: boolean;
-  authorization_url?: string;
-  access_code?: string;
-  reference?: string;
-  amount?: number;
-  mode?: string;
-  error?: string;
-}
+import { PaymentErrorHandler } from '@/lib/payment-error-handler';
+import { useErrorHandler } from '@/hooks/useErrorHandler';
+import { safeErrorMessage, handlePaymentError } from '@/utils/errorHandling';
 
 export interface PaymentResult {
   success: boolean;
-  url?: string;
   sessionId?: string;
+  url?: string;
   error?: string;
 }
 
 export interface PaymentVerification {
   success: boolean;
+  paymentStatus?: string;
+  orderStatus?: string;
+  orderNumber?: string;
+  orderId?: string;
+  amount?: number;
   amountNaira?: number;
-  status?: string;
+  paidAt?: string;
+  channel?: string;
   reference?: string;
+  message?: string;
 }
 
 export type PaymentProvider = 'paystack';
 
 export const usePayment = () => {
-  const [isLoading, setIsLoading] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const { handleError } = useErrorHandler();
 
-  // PATCH: expect success + use returned URL/reference
-  const initializePayment = async ({ 
-    orderId, 
-    customerEmail 
-  }: { 
-    orderId: string; 
-    customerEmail: string; 
-  }) => {
-    setIsLoading(true);
-    
+  const initiatePayment = async (
+    orderId: string,
+    amount: number,
+    customerEmail?: string,
+    provider: PaymentProvider = 'paystack'
+  ): Promise<PaymentResult> => {
+    setLoading(true);
     try {
-      console.log('🔄 [FRONTEND] Initializing payment:', { orderId, customerEmail });
+      const response = await paystackService.initializeTransaction({
+        email: customerEmail || '',
+        amount: paystackService.formatAmount(amount),
+        callback_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`,
+        metadata: { order_id: orderId, orderId }
+      });
 
-      const { data: response, error } = await supabase.functions.invoke('secure-payment-processor', {
-        body: {
-          action: 'initialize',
-          order_id: orderId,
-          customer_email: customerEmail || '',
-          // Amount explicitly NOT passed - backend calculates from order table
-          callback_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`
+      // Validate server reference format (should be txn_)
+      let validServerRef = true;
+      try {
+        assertServerReference(response.reference);
+        console.log('✅ Server returned valid txn_ reference:', response.reference);
+      } catch (e) {
+        validServerRef = false;
+        console.warn('⚠️ Server returned invalid reference format:', response.reference, e);
+      }
+
+      // DO NOT update orders table from client
+      // The server-side verification will handle all database updates
+      // Legacy frontend writes removed to prevent RLS 403 errors
+
+      // Store last reference and order details for callback fallback
+      try {
+        if (response.reference) {
+          sessionStorage.setItem('paystack_last_reference', response.reference);
+          localStorage.setItem('paystack_last_reference', response.reference);
         }
-      });
-
-      console.log('🔄 [FRONTEND] Payment processor response:', {
-        success: !!response?.success,
-        hasAuthUrl: !!response?.authorization_url,
-        reference: response?.reference,
-        amount: response?.amount,
-        mode: response?.mode,
-        error: error?.message
-      });
-
-      if (error) {
-        console.error('❌ [FRONTEND] Payment initialization error:', error);
-        throw new Error(error.message);
+        const details = JSON.stringify({ orderId, reference: response.reference });
+        sessionStorage.setItem('orderDetails', details);
+        localStorage.setItem('orderDetails', details);
+      } catch (e) {
+        console.warn('Failed to store payment reference locally:', e);
       }
 
-      // PATCH: Check for success flag and required fields
-      if (!response?.success || !response?.authorization_url) {
-        console.error('❌ [FRONTEND] Invalid payment response:', response);
-        throw new Error(response?.error || 'Payment initialization failed - missing required fields');
-      }
-
-      console.log('✅ [FRONTEND] Payment initialized successfully:', {
-        reference: response.reference,
-        amount: response.amount,
-        mode: response.mode
-      });
-
-      return { 
-        url: response.authorization_url, 
-        reference: response.reference, 
-        amount: response.amount,
-        mode: response.mode
-      };
-    } catch (error) {
-      console.error('❌ [FRONTEND] Payment initialization failed:', error);
-      const message = error instanceof Error ? error.message : 'Payment initialization failed';
-      toast.error(`Payment Error: ${message}`);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const verifyPayment = async (reference: string) => {
-    setIsLoading(true);
-    
-    try {
-      console.log('🔍 [FRONTEND] Verifying payment:', { reference });
-
-      const { data, error } = await supabase.functions.invoke('verify-payment', {
-        body: { reference }
-      });
-
-      if (error) {
-        console.error('❌ [FRONTEND] Payment verification error:', error);
-        throw new Error(error.message);
-      }
-
-      console.log('✅ [FRONTEND] Payment verification response:', data);
-      return data;
-    } catch (error) {
-      console.error('❌ [FRONTEND] Payment verification failed:', error);
-      const message = error instanceof Error ? error.message : 'Payment verification failed';
-      toast.error(`Verification Error: ${message}`);
-      throw error;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // Legacy aliases for backward compatibility
-  const initiatePayment = async (orderId: string, amount: number, email?: string): Promise<PaymentResult> => {
-    try {
-      const result = await initializePayment({ orderId, customerEmail: email || '' });
       return {
         success: true,
-        url: result.url,
-        sessionId: result.reference
+        url: response.authorization_url,
+        sessionId: validServerRef ? response.reference : undefined
       };
     } catch (error) {
+      console.error('Payment initiation error:', error);
+      handleError(error, 'payment initiation');
+      const errorMessage = safeErrorMessage(error);
+
       return {
         success: false,
-        error: error instanceof Error ? error.message : 'Payment failed'
+        error: errorMessage
       };
+    } finally {
+      setLoading(false);
     }
   };
 
-  const processPayment = async (orderId: string, amount: number, email: string, openInNewTab = false, provider: PaymentProvider = 'paystack') => {
+  const processPayment = async (
+    orderId: string,
+    amount: number,
+    customerEmail?: string,
+    openInNewTab = true,
+    provider: PaymentProvider = 'paystack'
+  ): Promise<boolean> => {
+    setProcessing(true);
     try {
-      const result = await initializePayment({ orderId, customerEmail: email });
-      if (openInNewTab) {
-        window.open(result.url, '_blank');
+      const result = await initiatePayment(orderId, amount, customerEmail, provider);
+
+      if (result.success && result.url) {
+        if (openInNewTab) {
+          // Open checkout in a new tab
+          window.open(result.url, '_blank');
+        } else {
+          // Redirect in the same window
+          window.location.href = result.url;
+        }
+        return true;
       } else {
-        window.location.href = result.url;
+        const errorMessage = safeErrorMessage(result.error || 'Failed to process payment');
+        toast.error('Payment Failed', {
+          description: errorMessage,
+          duration: 5000,
+        });
+        return false;
       }
-      return true;
     } catch (error) {
-      console.error('Process payment error:', error);
+      console.error('Payment processing error:', error);
+      const errorMessage = safeErrorMessage(error);
+
+      toast.error('Payment Error', {
+        description: errorMessage,
+        duration: 5000,
+      });
       return false;
+    } finally {
+      setProcessing(false);
     }
+  };
+
+  const verifyPayment = async (
+    reference: string,
+    provider: PaymentProvider = 'paystack'
+  ): Promise<PaymentVerification> => {
+    // Validate reference format (warn but support both txn_ and legacy formats during transition)
+    if (!validateReferenceForVerification(reference)) {
+      console.warn('⚠️ Unexpected reference format for verification:', reference);
+      // Don't throw error during transition period - let backend handle it
+    }
+    try {
+      const { data, error } = await supabase.functions.invoke('paystack-secure', {
+        body: { action: 'verify', reference }
+      });
+
+      if (error) throw new Error(error.message);
+
+      const success = data?.status === true || data?.success === true;
+      if (!success) {
+        return { success: false };
+      }
+
+      const d: any = data?.data || data;
+      const order = d?.order || data?.order;
+
+      const ref = d?.reference || d?.provider_reference || d?.payment_reference;
+      const rawAmount = typeof d?.total_amount === 'number' ? d.total_amount : (typeof d?.amount === 'number' ? d.amount : undefined);
+      const amountNaira = typeof rawAmount === 'number' ? (rawAmount > 10000 ? rawAmount / 100 : rawAmount) : undefined;
+
+      return {
+        success: true,
+        paymentStatus: d?.payment_status || d?.status || (success ? 'paid' : undefined),
+        orderStatus: order?.status || d?.order_status,
+        orderNumber: order?.order_number || d?.order_number,
+        orderId: d?.order_id || order?.id,
+        amount: rawAmount,
+        amountNaira,
+        paidAt: d?.paid_at,
+        channel: d?.channel,
+        reference: ref,
+        message: d?.gateway_response || d?.message,
+      };
+    } catch (error) {
+      console.error('Payment verification error:', error);
+      const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
+
+      toast.error(errorInfo.title, {
+        description: errorInfo.message,
+        duration: 5000,
+      });
+      throw error;
+    }
+  };
+
+  const handlePaymentSuccess = async (sessionId: string, provider: PaymentProvider = 'paystack') => {
+    try {
+      const verification = await verifyPayment(sessionId, provider);
+
+      if (verification?.success) {
+        toast.success('Payment successful!');
+        return verification;
+      } else {
+        toast.error('Payment was not completed successfully');
+        return null;
+      }
+    } catch (error) {
+      console.error('Error handling payment success:', error);
+      const errorInfo = PaymentErrorHandler.formatErrorForUser(error);
+
+      toast.error(errorInfo.title, {
+        description: errorInfo.message,
+        duration: 5000,
+      });
+      return null;
+    }
+  };
+
+  const handlePaymentError = (error?: string) => {
+    console.error('Payment error:', error);
+    const errorInfo = PaymentErrorHandler.formatErrorForUser(new Error(error || 'Payment was cancelled or failed'));
+
+    toast.error(errorInfo.title, {
+      description: errorInfo.message,
+      duration: 5000,
+    });
   };
 
   return {
-    initializePayment,
-    verifyPayment,
-    isLoading,
-    // Legacy aliases
+    loading,
+    processing,
     initiatePayment,
     processPayment,
-    loading: isLoading
+    verifyPayment,
+    handlePaymentSuccess,
+    handlePaymentError
   };
 };

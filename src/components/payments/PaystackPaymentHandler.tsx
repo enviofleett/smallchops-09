@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
-import { usePayment } from '@/hooks/usePayment';
+import { useSecurePayment } from '@/hooks/useSecurePayment';
 import './payment-styles.css';
 
 interface PaystackPaymentHandlerProps {
@@ -35,38 +35,37 @@ export const PaystackPaymentHandler = ({
   const [currentReference, setCurrentReference] = useState<string>('');
   
   const {
-    initiatePayment,
-    verifyPayment,
-    loading
-  } = usePayment();
+    initializeSecurePayment,
+    openSecurePayment,
+    isLoading,
+    isProcessing,
+    error,
+    reference,
+    authorizationUrl,
+    resetState
+  } = useSecurePayment();
 
-  const [authorizationUrl, setAuthorizationUrl] = useState<string>('');
-  const [reference, setReference] = useState<string>('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [initError, setInitError] = useState<string>('');
-
-  // Initialize payment on mount using unified secure-payment-processor
+  // Initialize secure payment on mount
   useEffect(() => {
     const initPayment = async () => {
-      try {
-        setInitError('');
-        const result = await initiatePayment(orderId, amount, email);
-
-        if (result.success && result.url && result.sessionId) {
-          setAuthorizationUrl(result.url);
-          setReference(result.sessionId);
-          setCurrentReference(result.sessionId);
-        } else {
-          setInitError(result.error || 'Failed to initialize payment');
+      const result = await initializeSecurePayment({
+        orderId,
+        amount,
+        customerEmail: email,
+        redirectUrl: successUrl || `${window.location.origin}/payment-callback`,
+        metadata: {
+          orderNumber,
+          cancelUrl
         }
-      } catch (error) {
-        console.error('Payment initialization failed:', error);
-        setInitError(error instanceof Error ? error.message : 'Payment initialization failed');
+      });
+
+      if (result.success && result.reference) {
+        setCurrentReference(result.reference);
       }
     };
 
     initPayment();
-  }, [orderId, amount, email, initiatePayment]);
+  }, [orderId, amount, email, orderNumber, successUrl, cancelUrl, initializeSecurePayment]);
 
   const handlePayment = async () => {
     if (!authorizationUrl) {
@@ -75,9 +74,9 @@ export const PaystackPaymentHandler = ({
     }
 
     try {
-      window.location.href = authorizationUrl;
+      openSecurePayment(authorizationUrl);
       // Note: onSuccess will be called by the payment callback handler after verification
-      toast.info('Redirecting to secure Paystack checkout...');
+      toast.info('Payment window opened. Complete payment to continue.');
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Payment failed');
     }
@@ -95,10 +94,7 @@ export const PaystackPaymentHandler = ({
   };
 
   const handleRetry = () => {
-    setAuthorizationUrl('');
-    setReference('');
-    setCurrentReference('');
-    setIsProcessing(false);
+    resetState();
     window.location.reload();
   };
 
@@ -113,11 +109,11 @@ export const PaystackPaymentHandler = ({
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        {initError && (
+        {error && (
           <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              {initError}
+              {error}
             </AlertDescription>
           </Alert>
         )}
@@ -125,11 +121,11 @@ export const PaystackPaymentHandler = ({
         <div className="space-y-3">
           <Button
             onClick={handlePayment}
-            disabled={loading || isProcessing || !authorizationUrl}
+            disabled={isLoading || isProcessing || !authorizationUrl}
             className="w-full"
             size="lg"
           >
-            {loading ? (
+            {isLoading ? (
               <div className="flex items-center gap-2">
                 <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
                 Initializing Secure Payment...
@@ -144,17 +140,17 @@ export const PaystackPaymentHandler = ({
             )}
           </Button>
 
-          {loading && (
+          {isLoading && (
             <div className="text-center text-sm text-muted-foreground">
               Generating secure payment reference...
             </div>
           )}
 
-          {(loading || isProcessing) && (
+          {(isLoading || isProcessing) && (
             <div className="space-y-2">
-              <Progress value={loading ? 50 : 85} className="w-full" />
+              <Progress value={isLoading ? 50 : 85} className="w-full" />
               <p className="text-xs text-center text-muted-foreground">
-                {loading ? 'Securing payment...' : 'Redirecting to payment gateway...'}
+                {isLoading ? 'Securing payment...' : 'Redirecting to payment gateway...'}
               </p>
             </div>
           )}
@@ -171,7 +167,7 @@ export const PaystackPaymentHandler = ({
               Alternative
             </Button>
             
-            {initError && (
+            {error && (
               <Button
                 variant="outline"
                 size="sm"

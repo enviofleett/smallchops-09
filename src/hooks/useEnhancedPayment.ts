@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { usePayment, type PaymentResult, type PaymentVerification } from './usePayment';
+import { usePayment, PaymentResult, PaymentVerification } from './usePayment';
 
 interface EnhancedPaymentState {
   isProcessing: boolean;

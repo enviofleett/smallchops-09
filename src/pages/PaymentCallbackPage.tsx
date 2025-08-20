@@ -60,15 +60,6 @@ export const PaymentCallbackPage: React.FC = () => {
             reference: (result as any).reference
           });
           
-          // Notify parent window (if opened from checkout dialog)
-          if (window.opener && !window.opener.closed) {
-            window.opener.postMessage({ 
-              type: 'PAYMENT_SUCCESS', 
-              orderId: (result as any).order_id,
-              reference: reference
-            }, window.location.origin);
-          }
-
           // Use payment completion coordinator for cart clearing with 15-second delay
           paymentCompletionCoordinator.coordinatePaymentCompletion(
             {
@@ -89,27 +80,11 @@ export const PaymentCallbackPage: React.FC = () => {
           console.error('❌ Payment verification failed:', (result as any).error);
           setVerificationStatus('failed');
           setErrorMessage((result as any).error || 'Payment verification failed');
-          
-          // Notify parent window of failure (if opened from checkout dialog)
-          if (window.opener && !window.opener.closed) {
-            window.opener.postMessage({ 
-              type: 'PAYMENT_FAILED', 
-              error: (result as any).error || 'Payment verification failed'
-            }, window.location.origin);
-          }
         }
       } catch (error) {
         console.error('❌ Payment verification error:', error);
         setVerificationStatus('failed');
         setErrorMessage(error instanceof Error ? error.message : 'Verification failed');
-        
-        // Notify parent window of failure (if opened from checkout dialog)
-        if (window.opener && !window.opener.closed) {
-          window.opener.postMessage({ 
-            type: 'PAYMENT_FAILED', 
-            error: error instanceof Error ? error.message : 'Verification failed'
-          }, window.location.origin);
-        }
       }
     };
 

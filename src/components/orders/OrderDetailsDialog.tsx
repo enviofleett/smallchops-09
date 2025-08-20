@@ -47,48 +47,14 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
     refetchOnWindowFocus: false,
   });
 
-  // Fetch delivery schedule for this order with recovery mechanism
-  const { data: deliverySchedule, isLoading: isLoadingSchedule, refetch: refetchSchedule } = useQuery({
+  // Fetch delivery schedule for this order
+  const { data: deliverySchedule, isLoading: isLoadingSchedule } = useQuery({
     queryKey: ['deliverySchedule', order.id],
     queryFn: async () => {
       return await getDeliveryScheduleByOrderId(order.id);
     },
     enabled: !!order.id
   });
-
-  // Auto-recovery mutation for missing schedules
-  const recoveryMutation = useMutation({
-    mutationFn: async (orderId: string) => {
-      console.log(`🔄 Attempting to recover delivery schedule for order: ${orderId}`);
-      const { data, error } = await supabase.functions.invoke('recover-order-schedule', {
-        body: { order_id: orderId }
-      });
-      if (error) throw error;
-      return data;
-    },
-    onSuccess: (data) => {
-      if (data.recovered) {
-        console.log('✅ Schedule recovered successfully');
-        toast({ 
-          title: 'Schedule Recovered', 
-          description: 'Missing delivery schedule has been recovered from order logs.' 
-        });
-        // Refetch the schedule
-        refetchSchedule();
-      }
-    },
-    onError: (error) => {
-      console.error('❌ Schedule recovery failed:', error);
-    },
-  });
-
-  // Attempt auto-recovery when no schedule is found
-  useEffect(() => {
-    if (!isLoadingSchedule && !deliverySchedule && order.id && !recoveryMutation.isPending) {
-      console.log(`⚠️ No delivery schedule found for order ${order.id}, attempting recovery...`);
-      recoveryMutation.mutate(order.id);
-    }
-  }, [deliverySchedule, isLoadingSchedule, order.id, recoveryMutation]);
 
   // Fetch pickup point for pickup orders
   const { data: pickupPoint } = usePickupPoint(
@@ -264,46 +230,28 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                  )}
                  {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
                </h3>
-                {isLoadingSchedule || recoveryMutation.isPending ? (
-                  <div className="bg-gray-100 rounded-lg p-4 animate-pulse">
-                    <div className="h-4 bg-gray-300 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-300 rounded w-2/3"></div>
-                    {recoveryMutation.isPending && (
-                      <p className="text-xs text-blue-600 mt-2">🔄 Attempting to recover schedule...</p>
-                    )}
-                  </div>
-                ) : deliverySchedule ? (
-                   <DeliveryScheduleDisplay 
-                     schedule={deliverySchedule}
-                     orderType={order.order_type as 'delivery' | 'pickup'}
-                     orderStatus={order.status}
-                    className="mb-0" 
-                  />
-                 ) : (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-sm text-yellow-800">
-                      No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
-                    </p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {recoveryMutation.isError ? 
-                        'Recovery failed. Schedule will be confirmed after payment is verified.' :
-                        'Schedule will be confirmed after payment is verified.'
-                      }
-                    </p>
-                    {recoveryMutation.isError && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2"
-                        onClick={() => recoveryMutation.mutate(order.id)}
-                        disabled={recoveryMutation.isPending}
-                      >
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Retry Recovery
-                      </Button>
-                    )}
-                  </div>
-                )}
+               {isLoadingSchedule ? (
+                 <div className="bg-gray-100 rounded-lg p-4 animate-pulse">
+                   <div className="h-4 bg-gray-300 rounded mb-2"></div>
+                   <div className="h-3 bg-gray-300 rounded w-2/3"></div>
+                 </div>
+               ) : deliverySchedule ? (
+                  <DeliveryScheduleDisplay 
+                    schedule={deliverySchedule}
+                    orderType={order.order_type as 'delivery' | 'pickup'}
+                    orderStatus={order.status}
+                   className="mb-0" 
+                 />
+                ) : (
+                 <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+                   <p className="text-sm text-yellow-800">
+                     No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
+                   </p>
+                   <p className="text-xs text-gray-600 mt-1">
+                     Schedule will be confirmed after payment is verified.
+                   </p>
+                 </div>
+               )}
               
                {/* Order-level Special Instructions Fallback */}
                {!deliverySchedule?.special_instructions && order.special_instructions && (

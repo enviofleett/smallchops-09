@@ -42,26 +42,46 @@ export const usePayment = () => {
   ): Promise<PaymentResult> => {
     setLoading(true);
     try {
-      const response = await paystackService.initializeTransaction({
-        email: customerEmail || '',
-        amount: paystackService.formatAmount(amount),
-        callback_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`,
-        metadata: { order_id: orderId, orderId }
+      // 4. FRONTEND HARDENING: Use supabase.functions.invoke consistently
+      console.log('🚀 [FRONTEND] Initiating payment via secure-payment-processor:', {
+        orderId,
+        customerEmail,
+        amount // Note: This amount will be ignored by backend - DB is source of truth
       });
+
+      const { data: response, error } = await supabase.functions.invoke('secure-payment-processor', {
+        body: {
+          order_id: orderId,
+          customer_email: customerEmail || '',
+          amount, // Ignored by backend, but kept for compatibility
+          redirect_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`
+        }
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Payment initialization failed');
+      }
+
+      if (!response?.success) {
+        throw new Error(response?.error || 'Payment initialization failed');
+      }
 
       // Validate server reference format (should be txn_)
       let validServerRef = true;
       try {
         assertServerReference(response.reference);
-        console.log('✅ Server returned valid txn_ reference:', response.reference);
+        console.log('✅ [FRONTEND] Server returned valid txn_ reference:', response.reference);
       } catch (e) {
         validServerRef = false;
-        console.warn('⚠️ Server returned invalid reference format:', response.reference, e);
+        console.warn('⚠️ [FRONTEND] Server returned invalid reference format:', response.reference, e);
       }
 
-      // DO NOT update orders table from client
-      // The server-side verification will handle all database updates
-      // Legacy frontend writes removed to prevent RLS 403 errors
+      console.log('✅ [FRONTEND] Payment initialization successful:', {
+        orderId,
+        reference: response.reference,
+        amount: response.amount, // This is the authoritative amount from DB
+        reused: response.reused || false
+      });
 
       // Store last reference and order details for callback fallback
       try {
@@ -69,11 +89,15 @@ export const usePayment = () => {
           sessionStorage.setItem('paystack_last_reference', response.reference);
           localStorage.setItem('paystack_last_reference', response.reference);
         }
-        const details = JSON.stringify({ orderId, reference: response.reference });
+        const details = JSON.stringify({ 
+          orderId, 
+          reference: response.reference,
+          authoritativeAmount: response.amount 
+        });
         sessionStorage.setItem('orderDetails', details);
         localStorage.setItem('orderDetails', details);
       } catch (e) {
-        console.warn('Failed to store payment reference locally:', e);
+        console.warn('[FRONTEND] Failed to store payment reference locally:', e);
       }
 
       return {

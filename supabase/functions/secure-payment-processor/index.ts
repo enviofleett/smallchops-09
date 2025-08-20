@@ -61,10 +61,10 @@ serve(async (req) => {
       customer_email
     })
 
-    // Verify order exists and get authoritative amount
+    // 1. UNIFORM AMOUNT DERIVATION: Get order details and calculate authoritative amount
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
-      .select('id, total_amount, status, payment_reference')
+      .select('id, total_amount, delivery_fee, status, payment_reference, order_number')
       .eq('id', order_id)
       .single()
 
@@ -82,20 +82,67 @@ serve(async (req) => {
       )
     }
 
-    // Use authoritative amount from database (ignore client amount)
-    const authoritativeAmount = order.total_amount
-    console.log('💰 Using authoritative amount from DB:', authoritativeAmount)
+    // Calculate authoritative amount: total_amount + delivery_fee (if exists)
+    const baseAmount = parseFloat(order.total_amount) || 0;
+    const deliveryFee = parseFloat(order.delivery_fee) || 0;
+    const authoritativeAmount = baseAmount + deliveryFee;
+    
+    console.log('💰 [PAYMENT-PROCESSOR] Calculating authoritative amount:', {
+      order_id,
+      base_amount: baseAmount,
+      delivery_fee: deliveryFee,
+      total_authoritative: authoritativeAmount,
+      order_number: order.order_number
+    });
 
-    // Use existing reference or generate new one
-    const secureReference = order.payment_reference || `txn_${Date.now()}_${order_id}`
+    // 2. ENFORCE IDEMPOTENCY: Check for existing payment initialization
+    let secureReference = order.payment_reference;
+    let shouldInitializeWithPaystack = true;
 
-    // Log amount handling for debugging
-    console.log('🔍 Amount processing:', {
+    if (secureReference) {
+      // Check if we have an existing valid payment transaction
+      const { data: existingPayment } = await supabaseClient
+        .from('payment_transactions')
+        .select('status, authorization_url, access_code, provider_reference')
+        .eq('order_id', order_id)
+        .in('status', ['pending', 'initialized'])
+        .single();
+
+      if (existingPayment && existingPayment.authorization_url) {
+        console.log('🔄 [PAYMENT-PROCESSOR] Reusing existing payment initialization:', {
+          order_id,
+          reference: secureReference,
+          status: existingPayment.status
+        });
+
+        return new Response(
+          JSON.stringify({
+            success: true,
+            reference: secureReference,
+            authorization_url: existingPayment.authorization_url,
+            access_code: existingPayment.access_code,
+            order_id,
+            amount: authoritativeAmount,
+            reused: true
+          }),
+          { 
+            status: 200, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      }
+    } else {
+      // Generate new secure reference
+      secureReference = `txn_${Date.now()}_${order_id}`;
+    }
+
+    console.log('🚀 [PAYMENT-PROCESSOR] Initializing new payment with Paystack:', {
+      order_id,
+      reference: secureReference,
       authoritative_amount_naira: authoritativeAmount,
       authoritative_amount_kobo: Math.round(authoritativeAmount * 100),
-      provided_amount: amount,
-      using_db_amount: true
-    })
+      customer_email
+    });
 
     // Initialize payment with Paystack using authoritative amount
     const paystackPayload = {
@@ -105,9 +152,12 @@ serve(async (req) => {
       callback_url: redirect_url || `${Deno.env.get('FRONTEND_URL')}/payment-callback`,
       metadata: {
         order_id,
+        order_number: order.order_number,
         generated_by: 'secure-backend',
         timestamp: new Date().toISOString(),
         authoritative_amount: authoritativeAmount,
+        base_amount: baseAmount,
+        delivery_fee: deliveryFee,
         ...metadata
       }
     }
@@ -187,11 +237,14 @@ serve(async (req) => {
       // Non-blocking - payment initialization should still succeed
     }
 
-    console.log('✅ Secure payment initialized:', {
+    console.log('✅ [PAYMENT-PROCESSOR] Payment initialization completed:', {
       order_id,
+      order_number: order.order_number,
       reference: secureReference,
-      authorization_url: paystackData.data.authorization_url
-    })
+      amount: authoritativeAmount,
+      authorization_url: paystackData.data.authorization_url,
+      reused: false
+    });
 
     return new Response(
       JSON.stringify({

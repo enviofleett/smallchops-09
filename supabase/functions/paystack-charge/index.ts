@@ -1,12 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getCorsHeaders, handleCorsPreflight } from "../_shared/cors.ts";
+import { getPaystackConfig } from "../_shared/paystack-config.ts";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Input validation schemas
 const validateChargeInput = (body: any) => {
   const errors: string[] = [];
   
@@ -48,9 +44,9 @@ const sanitizeError = (error: any): string => {
 };
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  const cors = getCorsHeaders(req);
+  const pre = handleCorsPreflight(req);
+  if (pre) return new Response(null, { status: 204, headers: cors });
 
   let supabaseClient;
   let user;
@@ -70,7 +66,7 @@ serve(async (req) => {
         status: false,
         error: 'Authentication required'
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...cors, 'Content-Type': 'application/json' },
         status: 401,
       });
     }
@@ -83,7 +79,7 @@ serve(async (req) => {
         status: false,
         error: 'Invalid authentication token'
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...cors, 'Content-Type': 'application/json' },
         status: 401,
       });
     }
@@ -104,31 +100,15 @@ serve(async (req) => {
         error: 'Validation failed',
         details: validationErrors
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...cors, 'Content-Type': 'application/json' },
         status: 400,
       });
     }
 
     const { authorization_code, amount, email, reference, metadata = {}, orderId } = body;
 
-    // Get Paystack configuration
-    const { data: config, error: configError } = await supabaseClient
-      .from('payment_integrations')
-      .select('secret_key, test_mode')
-      .eq('provider', 'paystack')
-      .eq('connection_status', 'connected')
-      .single();
-
-    if (configError || !config) {
-      console.error('Paystack configuration error:', configError);
-      return new Response(JSON.stringify({
-        status: false,
-        error: 'Payment system temporarily unavailable'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 503,
-      });
-    }
+    // PATCH: Use request-aware config instead of direct env var
+    const config = getPaystackConfig(req);
 
     // Generate reference if not provided
     const transactionRef = reference || `charge_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -156,16 +136,16 @@ serve(async (req) => {
         status: false,
         error: 'Failed to initialize payment'
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...cors, 'Content-Type': 'application/json' },
         status: 500,
       });
     }
 
-    // Charge authorization with Paystack
-    const paystackResponse = await fetch('https://api.paystack.co/transaction/charge_authorization', {
+    // Charge authorization with Paystack using config
+    const paystackResponse = await fetch(`${config.baseUrl}/transaction/charge_authorization`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${config.secret_key}`,
+        'Authorization': `Bearer ${config.secretKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -194,7 +174,7 @@ serve(async (req) => {
         status: false,
         error: sanitizeError(paystackData)
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...cors, 'Content-Type': 'application/json' },
         status: 400,
       });
     }
@@ -236,7 +216,7 @@ serve(async (req) => {
         gateway_response: paystackData.data.gateway_response
       }
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...cors, 'Content-Type': 'application/json' },
       status: 200,
     });
 
@@ -264,7 +244,7 @@ serve(async (req) => {
       status: false,
       error: sanitizeError(error)
     }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...cors, 'Content-Type': 'application/json' },
       status: 500,
     });
   }

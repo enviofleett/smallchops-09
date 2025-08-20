@@ -1,10 +1,25 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0';
 
-// CORS headers for web app compatibility
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+// Enhanced CORS headers with origin validation
+const getAllowedOrigins = () => {
+  const envType = Deno.env.get('DENO_ENV') || 'development';
+  if (envType === 'production') {
+    return ['https://oknnklksdiqaifhxaccs.supabase.co', 'https://lovable.dev']; // Add your production domains
+  }
+  return ['*']; // Allow all in development
+};
+
+const getCorsHeaders = (origin?: string | null) => {
+  const allowedOrigins = getAllowedOrigins();
+  const allowOrigin = allowedOrigins.includes('*') || (origin && allowedOrigins.includes(origin)) ? (origin || '*') : 'null';
+  
+  return {
+    'Access-Control-Allow-Origin': allowOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-csrf-token',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Credentials': 'true',
+  };
 };
 
 // Interface for OTP verification request matching existing API format
@@ -14,9 +29,24 @@ interface AuthVerifyOTPRequest {
 }
 
 serve(async (req: Request) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  // Enhanced security: Validate origin in production
+  const envType = Deno.env.get('DENO_ENV') || 'development';
+  if (envType === 'production' && origin) {
+    const allowedOrigins = getAllowedOrigins();
+    if (!allowedOrigins.includes('*') && !allowedOrigins.includes(origin)) {
+      return new Response(
+        JSON.stringify({ success: false, error: "Origin not allowed" }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
   }
 
   try {

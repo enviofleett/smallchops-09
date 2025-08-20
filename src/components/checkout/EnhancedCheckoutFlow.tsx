@@ -478,12 +478,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="customer_name">Full Name *</Label>
                 <Input
                   id="customer_name"
-                  type="text"
                   value={formData.customer_name}
                   onChange={(e) => handleFormChange('customer_name', e.target.value)}
                   placeholder="Enter your full name"
@@ -574,7 +573,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                   placeholder="Apartment, suite, etc."
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
                   <Label htmlFor="city">City *</Label>
                   <Input
@@ -595,7 +594,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                     required
                   />
                 </div>
-                <div className="sm:col-span-2 lg:col-span-1">
+                <div>
                   <Label htmlFor="postal_code">Postal Code *</Label>
                   <Input
                     id="postal_code"
@@ -733,29 +732,27 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-7xl w-[95vw] max-h-[95vh] overflow-hidden p-0">
-        <DialogHeader className="p-4 pb-2 border-b">
-          <DialogTitle className="flex items-center justify-between text-lg">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
             <span>Checkout</span>
             <DialogClose asChild>
-              <Button variant="ghost" size="sm" className="h-8 w-8">
+              <Button variant="ghost" size="sm">
                 <X className="w-4 h-4" />
               </Button>
             </DialogClose>
           </DialogTitle>
         </DialogHeader>
 
-        <div className="enhanced-checkout-flow flex flex-col lg:grid lg:grid-cols-3 gap-4 lg:gap-6 overflow-hidden h-full">
-          {/* Main Content Area */}
-          <div className="lg:col-span-2 overflow-y-auto px-4 pb-4 lg:pr-2 max-h-[calc(95vh-80px)] lg:max-h-[calc(95vh-120px)]">
+        <div className="enhanced-checkout-flow grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
+          <div className="lg:col-span-2 overflow-y-auto pr-2 max-h-[calc(90vh-120px)]">
             {checkoutStep === 'auth' && renderAuthStep()}
             {checkoutStep === 'details' && renderDetailsStep()}
             {checkoutStep === 'payment' && renderPaymentStep()}
           </div>
 
-          {/* Order Summary Sidebar */}
-          <div className="lg:col-span-1 border-t lg:border-t-0 lg:border-l bg-muted/20">
-            <div className="lg:sticky lg:top-0 p-4 lg:max-h-[calc(95vh-120px)] lg:overflow-y-auto">
+          <div className="lg:col-span-1">
+            <div className="sticky top-0">
               <OrderSummaryCard
                 items={items}
                 subtotal={subtotal}

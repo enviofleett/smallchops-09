@@ -88,7 +88,7 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
         reference: backendReference, // Use backend-provided reference
         order_reference: backendReference, // Same reference for consistency
         email: params.customerInfo.email,
-        amount: params.totalAmount, // Send in naira - backend will convert to kobo
+        amount: params.totalAmount * 100, // Convert to kobo
         metadata: {
           order_id: order.id,
           customer_name: params.customerInfo.name,

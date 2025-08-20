@@ -106,8 +106,8 @@ export class PaymentsAPI {
   static async verifyPayment(reference: string): Promise<VerifyPaymentResponse> {
     try {
       // Prefer secure verifier that performs atomic updates
-      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference }
+      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('verify-payment', {
+        body: { reference }
       });
 
       const normalize = (res: any): VerifyPaymentResponse => {

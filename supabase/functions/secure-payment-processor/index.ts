@@ -41,11 +41,11 @@ serve(async (req) => {
 
     const { order_id, amount, customer_email, redirect_url, metadata } = await req.json() as PaymentRequest
 
-    if (!order_id || !amount || !customer_email) {
+    if (!order_id || !customer_email) {
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Missing required fields: order_id, amount, customer_email',
+          error: 'Missing required fields: order_id, customer_email',
           code: 'MISSING_REQUIRED_FIELDS'
         }),
         { 
@@ -55,20 +55,16 @@ serve(async (req) => {
       )
     }
 
-    // 🚨 SECURITY: Generate secure backend reference only
-    const secureReference = `txn_${Date.now()}_${order_id}`
-
-    console.log('🔐 Generating secure payment for order:', {
+    console.log('🔐 Processing secure payment for order:', {
       order_id,
-      reference: secureReference,
-      amount,
+      provided_amount: amount,
       customer_email
     })
 
-    // Verify order exists
+    // Verify order exists and get authoritative amount
     const { data: order, error: orderError } = await supabaseClient
       .from('orders')
-      .select('id, total_amount, status')
+      .select('id, total_amount, status, payment_reference')
       .eq('id', order_id)
       .single()
 
@@ -86,33 +82,32 @@ serve(async (req) => {
       )
     }
 
-    // Verify amount matches order
-    if (Math.abs(order.total_amount - amount) > 0.01) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: 'Amount mismatch with order',
-          code: 'AMOUNT_MISMATCH',
-          expected: order.total_amount,
-          provided: amount
-        }),
-        { 
-          status: 400, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
+    // Use authoritative amount from database (ignore client amount)
+    const authoritativeAmount = order.total_amount
+    console.log('💰 Using authoritative amount from DB:', authoritativeAmount)
 
-    // Initialize payment with Paystack
+    // Use existing reference or generate new one
+    const secureReference = order.payment_reference || `txn_${Date.now()}_${order_id}`
+
+    // Log amount handling for debugging
+    console.log('🔍 Amount processing:', {
+      authoritative_amount_naira: authoritativeAmount,
+      authoritative_amount_kobo: Math.round(authoritativeAmount * 100),
+      provided_amount: amount,
+      using_db_amount: true
+    })
+
+    // Initialize payment with Paystack using authoritative amount
     const paystackPayload = {
       email: customer_email,
-      amount: Math.round(amount * 100), // Convert to kobo
+      amount: Math.round(authoritativeAmount * 100), // Convert DB amount to kobo
       reference: secureReference,
       callback_url: redirect_url || `${Deno.env.get('FRONTEND_URL')}/payment-callback`,
       metadata: {
         order_id,
         generated_by: 'secure-backend',
         timestamp: new Date().toISOString(),
+        authoritative_amount: authoritativeAmount,
         ...metadata
       }
     }
@@ -161,6 +156,37 @@ serve(async (req) => {
       throw new Error('Failed to update order')
     }
 
+    // Create payment transaction record using service role
+    try {
+      const { error: transactionError } = await supabaseClient
+        .from('payment_transactions')
+        .upsert({
+          reference: secureReference,
+          provider_reference: secureReference,
+          order_id: order_id,
+          amount: authoritativeAmount,
+          status: 'pending',
+          provider: 'paystack',
+          customer_email: customer_email,
+          authorization_url: paystackData.data.authorization_url,
+          access_code: paystackData.data.access_code,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        }, {
+          onConflict: 'reference'
+        })
+
+      if (transactionError) {
+        console.error('⚠️ Failed to create payment transaction record:', transactionError)
+        // Log but don't fail the payment
+      } else {
+        console.log('✅ Payment transaction record created')
+      }
+    } catch (dbError) {
+      console.error('⚠️ Database error creating transaction record:', dbError)
+      // Non-blocking - payment initialization should still succeed
+    }
+
     console.log('✅ Secure payment initialized:', {
       order_id,
       reference: secureReference,
@@ -174,7 +200,7 @@ serve(async (req) => {
         authorization_url: paystackData.data.authorization_url,
         access_code: paystackData.data.access_code,
         order_id,
-        amount
+        amount: authoritativeAmount // Return the authoritative amount
       }),
       { 
         status: 200, 

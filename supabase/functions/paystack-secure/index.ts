@@ -96,6 +96,12 @@ async function initializePayment(supabaseClient, requestData) {
       throw new Error('Amount must be a number equal to or greater than ₦1.00');
     }
 
+    console.log('💰 Amount conversion details:', {
+      input_amount: amount,
+      amount_in_kobo: amountInKobo,
+      amount_in_naira: amountInKobo / 100
+    })
+
     console.log(`💳 Initializing payment: ${transactionRef} for ${email}, amount: ₦${amountInKobo/100}`);
 
     // FIX: Get secret key from environment variables instead of database
@@ -169,27 +175,39 @@ async function initializePayment(supabaseClient, requestData) {
 
     console.log('✅ Paystack payment initialized successfully:', paystackData.data.reference);
 
-    // FIX: Try to store payment transaction (non-blocking)
+    // Create payment transaction record using service role client
     try {
-      await supabaseClient
+      const serviceClient = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        { auth: { persistSession: false } }
+      )
+
+      const { error: transactionError } = await serviceClient
         .from('payment_transactions')
         .upsert({
           reference: transactionRef,
+          provider_reference: paystackData.data.reference,
           amount: amountInKobo / 100, // Convert back to naira
           status: 'pending',
           provider: 'paystack',
-          provider_reference: paystackData.data.reference,
+          customer_email: email,
           authorization_url: paystackData.data.authorization_url,
           access_code: paystackData.data.access_code,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }, {
           onConflict: 'reference'
-        });
+        })
       
-      console.log('✅ Payment transaction record created');
+      if (transactionError) {
+        console.error('⚠️ Failed to create payment transaction record:', transactionError)
+      } else {
+        console.log('✅ Payment transaction record created successfully')
+      }
     } catch (dbError) {
-      console.error('⚠️ Failed to create payment transaction record (non-blocking):', dbError.message);
-      // Don't fail the payment initialization
+      console.error('⚠️ Database error creating transaction record:', dbError)
+      // Non-blocking - payment initialization should still succeed
     }
 
     return new Response(JSON.stringify({
@@ -259,27 +277,46 @@ async function verifyPayment(supabaseClient, requestData) {
 
     console.log('✅ Paystack payment verified successfully:', reference);
 
-    // FIX: Update database records after successful verification
+    // Update database records after successful verification using service role
     if (paystackData.data.status === 'success') {
       try {
+        const serviceClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          { auth: { persistSession: false } }
+        )
+
         // Update payment transaction
-        await supabaseClient
+        const { error: transactionUpdateError } = await serviceClient
           .from('payment_transactions')
           .update({ 
             status: 'completed',
-            verified_at: new Date().toISOString()
+            verified_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           })
-          .eq('reference', reference);
+          .eq('reference', reference)
+
+        if (transactionUpdateError) {
+          console.error('⚠️ Failed to update payment transaction:', transactionUpdateError)
+        }
 
         // Update order status
-        await supabaseClient
+        const { error: orderUpdateError } = await serviceClient
           .from('orders')
-          .update({ status: 'completed' })
-          .eq('payment_reference', reference);
+          .update({ 
+            status: 'confirmed',
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('payment_reference', reference)
 
-        console.log('✅ Database records updated after verification');
+        if (orderUpdateError) {
+          console.error('⚠️ Failed to update order status:', orderUpdateError)
+        } else {
+          console.log('✅ Database records updated after verification')
+        }
       } catch (dbError) {
-        console.error('⚠️ Failed to update database after verification:', dbError.message);
+        console.error('⚠️ Failed to update database after verification:', dbError)
         // Don't fail the verification response
       }
     }

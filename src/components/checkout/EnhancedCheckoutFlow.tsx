@@ -755,7 +755,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
           {/* Order Summary Sidebar */}
           <div className="lg:col-span-1 border-t lg:border-t-0 lg:border-l bg-muted/20">
-            <div className="sticky top-0 p-4">
+            <div className="lg:sticky lg:top-0 p-4 lg:max-h-[calc(95vh-120px)] lg:overflow-y-auto">
               <OrderSummaryCard
                 items={items}
                 subtotal={subtotal}

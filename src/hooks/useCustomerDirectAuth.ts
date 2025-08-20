@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -312,7 +311,7 @@ export const useCustomerDirectAuth = () => {
       const oauthOptions: any = {
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth-callback`
+          redirectTo: `${window.location.origin}/auth/callback`
         }
       };
       

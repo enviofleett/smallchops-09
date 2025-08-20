@@ -68,6 +68,44 @@ async function initializePayment(supabaseClient, requestData) {
       throw new Error('Email and amount are required');
     }
 
+    // 🔧 SAFETY NET: Recompute authoritative amount if order_id provided
+    let authoritativeAmount = amount;
+    if (metadata?.order_id) {
+      try {
+        console.log('🔍 Verifying amount for order:', metadata.order_id);
+        
+        const serviceClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          { auth: { persistSession: false } }
+        );
+
+        const { data: orderData } = await serviceClient
+          .from('orders')
+          .select('total_amount, delivery_fee')
+          .eq('id', metadata.order_id)
+          .single();
+
+        if (orderData) {
+          const computedAmount = (orderData.total_amount || 0) + (orderData.delivery_fee || 0);
+          
+          console.log('💰 Amount verification:', {
+            provided_amount: amount,
+            computed_amount: computedAmount,
+            discrepancy: Math.abs(computedAmount - amount)
+          });
+
+          // Use computed amount if there's a significant discrepancy
+          if (Math.abs(computedAmount - amount) > 0.01) {
+            console.log('⚠️ Amount discrepancy detected, using computed amount');
+            authoritativeAmount = computedAmount;
+          }
+        }
+      } catch (error) {
+        console.error('⚠️ Amount verification failed, using provided amount:', error);
+      }
+    }
+
     // FIX: Use provided reference if available, generate only if missing
     let transactionRef = reference;
     if (!transactionRef) {
@@ -90,16 +128,18 @@ async function initializePayment(supabaseClient, requestData) {
       }
     }
 
-    // Amount validation and conversion
-    const amountInKobo = Math.round(parseFloat(amount) * 100);
+    // Amount validation and conversion using authoritative amount
+    const amountInKobo = Math.round(parseFloat(authoritativeAmount) * 100);
     if (isNaN(amountInKobo) || amountInKobo < 100) {
       throw new Error('Amount must be a number equal to or greater than ₦1.00');
     }
 
-    console.log('💰 Amount conversion details:', {
-      input_amount: amount,
+    console.log('💰 Authoritative amount conversion details:', {
+      original_amount: amount,
+      authoritative_amount: authoritativeAmount,
       amount_in_kobo: amountInKobo,
-      amount_in_naira: amountInKobo / 100
+      amount_in_naira: amountInKobo / 100,
+      metadata: metadata
     })
 
     console.log(`💳 Initializing payment: ${transactionRef} for ${email}, amount: ₦${amountInKobo/100}`);

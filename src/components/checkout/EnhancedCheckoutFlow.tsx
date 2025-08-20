@@ -326,7 +326,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
       console.log('🔄 Raw server response:', data);
 
-      // Try to parse response, fall back to minimal order data if payment_url missing
+      // Try to parse response, prioritizing backend-returned amounts
       let parsedData;
       try {
         parsedData = normalizePaymentResponse(data);
@@ -337,11 +337,22 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         parsedData = {
           order_id: data?.order_id,
           order_number: data?.order_number,
-          amount: total,
+          amount: data?.amount || total, // Prioritize backend amount
           customer_email: sanitizedData.customer_email,
           success: true
         };
       }
+
+      // 🔧 CRITICAL: Use backend-returned amount if available
+      const authoritativeAmount = data?.amount || parsedData?.amount || total;
+      
+      console.log('💰 Amount prioritization:', {
+        client_calculated: total,
+        backend_returned: data?.amount,
+        authoritative_amount: authoritativeAmount,
+        items_subtotal: data?.items_subtotal,
+        delivery_fee: data?.delivery_fee
+      });
 
       // Check if process-checkout provided a payment_url to open
       if (data?.payment_url || data?.authorization_url) {
@@ -386,7 +397,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       setPaymentData({
         orderId: parsedData?.order_id,
         orderNumber: parsedData?.order_number || data?.order_number,
-        amount: total,
+        amount: authoritativeAmount, // Use authoritative amount from backend
         email: sanitizedData.customer_email,
         successUrl: `${window.location.origin}/payment-callback`,
         cancelUrl: window.location.href

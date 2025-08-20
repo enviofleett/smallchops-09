@@ -181,7 +181,8 @@ const App = () => {
               
               {/* Authentication routes */}
               <Route path="/auth" element={<ErrorBoundaryWrapper context="Auth Page"><AuthPage /></ErrorBoundaryWrapper>} />
-              <Route path="/auth-callback" element={<AuthCallback />} />
+              <Route path="/auth/callback" element={<AuthCallback />} />
+              <Route path="/auth-callback" element={<AuthCallback />} /> {/* Legacy support */}
               <Route path="/auth/verify" element={<EmailVerificationPage />} />
               <Route path="/auth/reset" element={<PasswordResetPage />} />
               

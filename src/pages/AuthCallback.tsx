@@ -109,9 +109,18 @@ const AuthCallback: React.FC = () => {
               return;
             }
 
+            // Only process welcome email for email-verified users
+            if (!user.email_confirmed_at) {
+              console.log('Email not confirmed, skipping welcome email for:', user.email);
+              // Don't allow access until email is confirmed
+              setStatus('error');
+              setError('Please verify your email address before accessing the platform.');
+              return;
+            }
+
             // Check if welcome email has been sent
             const welcomeSent = user.user_metadata?.welcome_sent;
-            console.log('Welcome email status for user:', user.email, 'welcome_sent:', welcomeSent);
+            console.log('Welcome email status for verified user:', user.email, 'welcome_sent:', welcomeSent, 'email_confirmed_at:', user.email_confirmed_at);
             
             if (!welcomeSent) {
               console.log('Triggering welcome email for verified user:', user.email);

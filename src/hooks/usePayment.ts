@@ -13,6 +13,22 @@ interface PaymentInitResponse {
   error?: string;
 }
 
+export interface PaymentResult {
+  success: boolean;
+  url?: string;
+  sessionId?: string;
+  error?: string;
+}
+
+export interface PaymentVerification {
+  success: boolean;
+  amountNaira?: number;
+  status?: string;
+  reference?: string;
+}
+
+export type PaymentProvider = 'paystack';
+
 export const usePayment = () => {
   const [isLoading, setIsLoading] = useState(false);
 
@@ -108,9 +124,45 @@ export const usePayment = () => {
     }
   };
 
+  // Legacy aliases for backward compatibility
+  const initiatePayment = async (orderId: string, amount: number, email?: string): Promise<PaymentResult> => {
+    try {
+      const result = await initializePayment({ orderId, customerEmail: email || '' });
+      return {
+        success: true,
+        url: result.url,
+        sessionId: result.reference
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Payment failed'
+      };
+    }
+  };
+
+  const processPayment = async (orderId: string, amount: number, email: string, openInNewTab = false, provider: PaymentProvider = 'paystack') => {
+    try {
+      const result = await initializePayment({ orderId, customerEmail: email });
+      if (openInNewTab) {
+        window.open(result.url, '_blank');
+      } else {
+        window.location.href = result.url;
+      }
+      return true;
+    } catch (error) {
+      console.error('Process payment error:', error);
+      return false;
+    }
+  };
+
   return {
     initializePayment,
     verifyPayment,
-    isLoading
+    isLoading,
+    // Legacy aliases
+    initiatePayment,
+    processPayment,
+    loading: isLoading
   };
 };

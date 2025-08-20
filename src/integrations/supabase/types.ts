@@ -7782,6 +7782,33 @@ export type Database = {
           },
         ]
       }
+      user_profiles: {
+        Row: {
+          created_at: string | null
+          full_name: string | null
+          id: string | null
+          is_verified: boolean | null
+          phone_number: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_verified?: boolean | null
+          phone_number?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_verified?: boolean | null
+          phone_number?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       activate_admin_user: {
@@ -8665,6 +8692,17 @@ export type Database = {
         }
         Returns: string
       }
+      log_registration_security_event: {
+        Args: {
+          p_email: string
+          p_event_type: string
+          p_ip_address?: unknown
+          p_metadata?: Json
+          p_success?: boolean
+          p_user_agent?: string
+        }
+        Returns: string
+      }
       log_security_event: {
         Args:
           | {
@@ -8988,6 +9026,10 @@ export type Database = {
       }
       validate_paystack_webhook_ip: {
         Args: { request_ip: unknown }
+        Returns: boolean
+      }
+      validate_phone_number: {
+        Args: { phone_text: string }
         Returns: boolean
       }
       validate_promotion_usage: {

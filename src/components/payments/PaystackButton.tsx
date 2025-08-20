@@ -1,8 +1,8 @@
 import React, { useState, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
-import { paystackService, assertServerReference } from '@/lib/paystack';
 import { toast } from 'sonner';
+import { paymentProtection, initializePaystackScript, handlePaymentError } from '@/utils/clientSidePaymentProtection';
 
 // Extend window object for Paystack
 declare global {
@@ -54,137 +54,144 @@ export const PaystackButton: React.FC<PaystackButtonProps> = ({
       return;
     }
 
+    const orderData = { orderId, amount, email };
+
+    // Check protection mechanisms
+    if (!paymentProtection.canAttemptPayment(orderData)) {
+      toast.error('Please wait before attempting another payment');
+      return;
+    }
+
+    // Check cache first (prevents duplicate Edge Function calls)
+    const cachedPayment = paymentProtection.getCachedPayment(orderData);
+    if (cachedPayment) {
+      console.log('✅ Using cached payment data');
+      openPaystackPopup(cachedPayment.public_key, cachedPayment.reference);
+      return;
+    }
+
+    paymentProtection.startPaymentProcessing(orderData);
     setLoading(true);
     
     try {
-      // Build callback URL with proper encoding - will be updated with reference after initialization
-      let callbackUrl = `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`;
+      // Load Paystack script
+      await initializePaystackScript();
+
+      // Generate client-side reference (for immediate popup, verified server-side later)
+      const clientRef = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Initialize transaction with backend - this will create payment_transaction record
-      const response = await paystackService.initializeTransaction({
+      // Get Paystack public key (cached or from server)
+      let publicKey = localStorage.getItem('paystack_public_key');
+      if (!publicKey) {
+        // Only make server call if absolutely necessary
+        const response = await fetch('/api/paystack-config', { 
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        
+        if (response.ok) {
+          const config = await response.json();
+          publicKey = config.public_key;
+          // Cache for 1 hour
+          localStorage.setItem('paystack_public_key', publicKey);
+          setTimeout(() => localStorage.removeItem('paystack_public_key'), 60 * 60 * 1000);
+        } else {
+          throw new Error('Unable to load payment configuration');
+        }
+      }
+
+      if (!publicKey) {
+        throw new Error('Payment configuration not available');
+      }
+
+      // Cache the payment data
+      paymentProtection.cachePaymentData(orderData, { public_key: publicKey, reference: clientRef });
+
+      // Open Paystack popup immediately (no server delay)
+      openPaystackPopup(publicKey, clientRef);
+
+    } catch (error) {
+      paymentProtection.stopPaymentProcessing(orderData);
+      setLoading(false);
+      console.error('Payment initialization error:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Payment initialization failed';
+      handlePaymentError(new Error(errorMessage), orderData);
+      onError(errorMessage);
+      toast.error(errorMessage);
+    }
+  }, [email, amount, orderId, customerName, customerPhone, metadata, channels, onSuccess, onError, onClose]);
+
+  const openPaystackPopup = (publicKey: string, reference: string) => {
+    try {
+      const handler = window.PaystackPop.setup({
+        key: publicKey,
         email,
-        amount: paystackService.formatAmount(amount),
-        callback_url: callbackUrl,
+        amount: amount * 100, // Convert to kobo
+        ref: reference,
         channels,
+        currency: 'NGN',
         metadata: {
           order_id: orderId,
           customer_name: customerName,
           customer_phone: customerPhone,
           order_number: metadata.order_number || `ORDER-${Date.now()}`,
           ...metadata
+        },
+        onClose: () => {
+          const orderData = { orderId, amount, email };
+          paymentProtection.stopPaymentProcessing(orderData);
+          setLoading(false);
+          onClose?.();
+        },
+        callback: (response: any) => {
+          const orderData = { orderId, amount, email };
+          paymentProtection.stopPaymentProcessing(orderData);
+          setLoading(false);
+          
+          if (response.status === 'success') {
+            const ref = response.reference;
+            paymentProtection.recordPaymentSuccess();
+            
+            // Store reference for verification
+            try { 
+              sessionStorage.setItem('paystack_last_reference', ref);
+              localStorage.setItem('paystack_last_reference', ref);
+              const details = JSON.stringify({ orderId, reference: ref });
+              sessionStorage.setItem('orderDetails', details);
+              localStorage.setItem('orderDetails', details);
+            } catch {}
+            
+            // Navigate to callback page for server-side verification only
+            window.location.href = `/payment/callback?reference=${encodeURIComponent(ref)}&status=success&order_id=${encodeURIComponent(orderId)}`;
+          } else {
+            paymentProtection.recordPaymentFailure();
+            onError('Payment was not completed');
+          }
         }
       });
-
-      if (response.authorization_url) {
-        // Open Paystack popup or redirect
-        const config = await paystackService.getConfig();
-        
-        // Use the server-returned reference as the single source of truth
-        const serverRef = response.reference;
-        
-        // Update callback URL to include the payment reference for more reliable recovery
-        callbackUrl = `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}&reference=${encodeURIComponent(serverRef)}`;
-
-        // Store reference immediately for callback recovery across tabs
-        try {
-          sessionStorage.setItem('paystack_last_reference', serverRef);
-          localStorage.setItem('paystack_last_reference', serverRef);
-          const details = JSON.stringify({ orderId, reference: serverRef });
-          sessionStorage.setItem('orderDetails', details);
-          localStorage.setItem('orderDetails', details);
-        } catch {}
-
-        try {
-          assertServerReference(serverRef);
-        } catch (e) {
-          setLoading(false);
-          console.warn('Invalid server reference, redirecting to authorization URL:', serverRef, e);
-          // Fallback to redirect (break out of preview iframe if needed)
-          const url = response.authorization_url;
-          try {
-            if (window.top && window.top !== window.self) {
-              (window.top as Window).location.href = url;
-            } else {
-              window.location.href = url;
-            }
-          } catch {
-            window.open(url, '_blank', 'noopener,noreferrer');
-          }
-          return;
-        }
-        if (config?.public_key) {
-          // Use Paystack inline popup
-          const handler = window.PaystackPop.setup({
-            key: config.public_key,
-            email,
-            amount: paystackService.formatAmount(amount),
-            ref: serverRef,
-            channels,
-            currency: 'NGN',
-            metadata: {
-              orderId,
-              customerName,
-              customerPhone,
-              ...metadata
-            },
-            onClose: () => {
-              setLoading(false);
-              onClose?.();
-            },
-            callback: (response: any) => {
-              setLoading(false);
-              if (response.status === 'success') {
-                const ref = response.reference || serverRef;
-                try { 
-                  sessionStorage.setItem('paystack_last_reference', ref);
-                  localStorage.setItem('paystack_last_reference', ref);
-                  const details = JSON.stringify({ orderId, reference: ref });
-                  sessionStorage.setItem('orderDetails', details);
-                  localStorage.setItem('orderDetails', details);
-                } catch {}
-                
-                // Navigate to callback page for unified verification (instead of inline)
-                window.location.href = `/payment/callback?reference=${encodeURIComponent(ref)}&status=success&order_id=${encodeURIComponent(orderId)}`;
-              } else {
-                onError('Payment was not completed');
-              }
-            }
-          });
-          
-          handler.openIframe();
-        } else {
-          // Fallback to redirect (break out of preview iframe if needed)
-          const url = response.authorization_url;
-          try {
-            if (window.top && window.top !== window.self) {
-              (window.top as Window).location.href = url;
-            } else {
-              window.location.href = url;
-            }
-          } catch {
-            window.open(url, '_blank', 'noopener,noreferrer');
-          }
-        }
-      } else {
-        throw new Error('Failed to initialize payment');
-      }
+      
+      handler.openIframe();
     } catch (error) {
+      const orderData = { orderId, amount, email };
+      paymentProtection.stopPaymentProcessing(orderData);
       setLoading(false);
-      console.error('Payment initialization error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Payment initialization failed';
-      onError(errorMessage);
-      toast.error(errorMessage);
+      handlePaymentError(error as Error, orderData);
+      onError('Failed to open payment window');
     }
-  }, [email, amount, orderId, customerName, customerPhone, metadata, channels, onSuccess, onError, onClose]);
+  };
+
+  // Create debounced payment function
+  const debouncedPayment = paymentProtection.createDebouncedPayment(initializePayment, 2000);
 
   return (
     <Button
-      onClick={initializePayment}
+      onClick={debouncedPayment}
       disabled={disabled || loading}
       className={className}
+      data-payment-button="true"
     >
       {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-      {children || `Pay ${paystackService.formatCurrency(amount)}`}
+      {children || `Pay ₦${amount.toLocaleString()}`}
     </Button>
   );
 };

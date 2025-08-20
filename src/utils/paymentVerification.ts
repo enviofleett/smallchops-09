@@ -30,9 +30,8 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
   }
   
   try {
-    const { data, error } = await supabase.functions.invoke('paystack-secure', {
+    const { data, error } = await supabase.functions.invoke('verify-payment-minimal', {
       body: {
-        action: 'verify',
         reference: reference
       }
     });

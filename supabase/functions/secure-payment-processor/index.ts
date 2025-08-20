@@ -93,9 +93,11 @@ async function initializePayment(payload: any, corsHeaders: any) {
   const authoritativeAmount = baseAmount + deliveryFee;
   const amountInKobo = Math.round(authoritativeAmount * 100); // Strict integer conversion
   
-  console.log('[SECURE-PAYMENT-PROCESSOR] Initialize payment:', {
+  console.log('[SECURE-PAYMENT-PROCESSOR] Amount calculation:', {
     correlation_id: correlationId,
     order_id,
+    base_amount: baseAmount,
+    delivery_fee: deliveryFee,
     authoritative_amount: authoritativeAmount,
     amount_in_kobo: amountInKobo,
     existing_reference: order.payment_reference

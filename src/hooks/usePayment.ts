@@ -54,9 +54,17 @@ export const usePayment = () => {
           action: 'initialize',
           order_id: orderId,
           customer_email: customerEmail || '',
-          // Amount intentionally not passed - backend derives from DB
+          // Amount explicitly NOT passed - backend calculates from order table
           callback_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`
         }
+      });
+
+      console.log('🔄 [FRONTEND] Payment processor response:', {
+        success: !!response,
+        hasAuthUrl: !!response?.authorization_url,
+        reference: response?.reference,
+        amount: response?.amount,
+        error: error?.message
       });
 
       if (error) {

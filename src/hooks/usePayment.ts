@@ -42,47 +42,26 @@ export const usePayment = () => {
   ): Promise<PaymentResult> => {
     setLoading(true);
     try {
-      // 4. FRONTEND HARDENING: Use supabase.functions.invoke consistently
-      console.log('🚀 [FRONTEND] Initiating payment via secure-payment-processor:', {
-        orderId,
-        customerEmail,
-        amount // Note: This amount will be ignored by backend - DB is source of truth
+      const response = await paystackService.initializeTransaction({
+        email: customerEmail || '',
+        amount: paystackService.formatAmount(amount),
+        callback_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`,
+        metadata: { order_id: orderId, orderId }
       });
-
-      const { data: response, error } = await supabase.functions.invoke('secure-payment-processor', {
-        body: {
-          action: 'initialize',
-          order_id: orderId,
-          customer_email: customerEmail || '',
-          // Amount intentionally not passed - backend derives from DB
-          callback_url: `${window.location.origin}/payment/callback?order_id=${encodeURIComponent(orderId)}`
-        }
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Payment initialization failed');
-      }
-
-      if (!response?.success) {
-        throw new Error(response?.error || 'Payment initialization failed');
-      }
 
       // Validate server reference format (should be txn_)
       let validServerRef = true;
       try {
         assertServerReference(response.reference);
-        console.log('✅ [FRONTEND] Server returned valid txn_ reference:', response.reference);
+        console.log('✅ Server returned valid txn_ reference:', response.reference);
       } catch (e) {
         validServerRef = false;
-        console.warn('⚠️ [FRONTEND] Server returned invalid reference format:', response.reference, e);
+        console.warn('⚠️ Server returned invalid reference format:', response.reference, e);
       }
 
-      console.log('✅ [FRONTEND] Payment initialization successful:', {
-        orderId,
-        reference: response.reference,
-        amount: response.amount, // This is the authoritative amount from DB
-        reused: response.reused || false
-      });
+      // DO NOT update orders table from client
+      // The server-side verification will handle all database updates
+      // Legacy frontend writes removed to prevent RLS 403 errors
 
       // Store last reference and order details for callback fallback
       try {
@@ -90,15 +69,11 @@ export const usePayment = () => {
           sessionStorage.setItem('paystack_last_reference', response.reference);
           localStorage.setItem('paystack_last_reference', response.reference);
         }
-        const details = JSON.stringify({ 
-          orderId, 
-          reference: response.reference,
-          authoritativeAmount: response.amount 
-        });
+        const details = JSON.stringify({ orderId, reference: response.reference });
         sessionStorage.setItem('orderDetails', details);
         localStorage.setItem('orderDetails', details);
       } catch (e) {
-        console.warn('[FRONTEND] Failed to store payment reference locally:', e);
+        console.warn('Failed to store payment reference locally:', e);
       }
 
       return {
@@ -169,48 +144,39 @@ export const usePayment = () => {
     // Validate reference format (warn but support both txn_ and legacy formats during transition)
     if (!validateReferenceForVerification(reference)) {
       console.warn('⚠️ Unexpected reference format for verification:', reference);
+      // Don't throw error during transition period - let backend handle it
     }
-    
     try {
-      console.log('🔍 Verifying payment with secure verify-payment RPC:', reference);
-      
-      // Use secure-payment-processor for verification
-      const { data, error } = await supabase.functions.invoke('secure-payment-processor', {
-        body: { 
-          action: 'verify',
-          reference 
-        }
+      const { data, error } = await supabase.functions.invoke('paystack-secure', {
+        body: { action: 'verify', reference }
       });
 
       if (error) throw new Error(error.message);
 
-      const success = data?.success === true;
+      const success = data?.status === true || data?.success === true;
       if (!success) {
-        console.warn('❌ Payment verification failed:', data);
-        return { 
-          success: false, 
-          message: data?.error || 'Payment verification failed'
-        };
+        return { success: false };
       }
 
-      console.log('✅ Payment verification successful:', {
-        reference: data.reference,
-        order_id: data.order_id,
-        amount: data.amount
-      });
+      const d: any = data?.data || data;
+      const order = d?.order || data?.order;
+
+      const ref = d?.reference || d?.provider_reference || d?.payment_reference;
+      const rawAmount = typeof d?.total_amount === 'number' ? d.total_amount : (typeof d?.amount === 'number' ? d.amount : undefined);
+      const amountNaira = typeof rawAmount === 'number' ? (rawAmount > 10000 ? rawAmount / 100 : rawAmount) : undefined;
 
       return {
         success: true,
-        paymentStatus: data.payment_status || 'paid',
-        orderStatus: data.order_status,
-        orderNumber: data.order_number,
-        orderId: data.order_id,
-        amount: data.amount,
-        amountNaira: data.amount,
-        paidAt: data.paid_at,
-        channel: data.channel,
-        reference: data.reference,
-        message: data.gateway_response || 'Payment verified successfully',
+        paymentStatus: d?.payment_status || d?.status || (success ? 'paid' : undefined),
+        orderStatus: order?.status || d?.order_status,
+        orderNumber: order?.order_number || d?.order_number,
+        orderId: d?.order_id || order?.id,
+        amount: rawAmount,
+        amountNaira,
+        paidAt: d?.paid_at,
+        channel: d?.channel,
+        reference: ref,
+        message: d?.gateway_response || d?.message,
       };
     } catch (error) {
       console.error('Payment verification error:', error);

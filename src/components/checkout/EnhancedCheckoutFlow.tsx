@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCustomerProfile } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
-import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText, ChevronLeft } from "lucide-react";
+import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText } from "lucide-react";
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
@@ -18,7 +18,6 @@ import { OrderSummaryCard } from "./OrderSummaryCard";
 import { PaystackPaymentHandler } from "@/components/payments/PaystackPaymentHandler";
 import { storeRedirectUrl } from "@/utils/redirect";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
-import '@/components/payments/payment-styles.css';
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
 import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
 import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
@@ -132,16 +131,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const items = cart.items || [];
   const { guestSession } = useGuestSession();
   const guestSessionId = guestSession?.sessionId;
-  const { user, session, isAuthenticated, isLoading } = useCustomerAuth();
+  const { user, isAuthenticated } = useCustomerAuth();
   const { profile } = useCustomerProfile();
   
-  // Initialize checkout step based on authentication status
-  const getInitialCheckoutStep = () => {
-    if (isAuthenticated) return 'details';
-    return 'auth';
-  };
-  
-  const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>(getInitialCheckoutStep());
+  const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>('auth');
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: '',
     customer_name: '',
@@ -175,57 +168,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   // Initialize order processing
   const { markCheckoutInProgress } = useOrderProcessing();
 
-  const handleClose = () => {
-    if (checkoutStep === 'payment' && paymentData) {
-      // Don't close during payment process
-      toast({
-        title: "Payment in Progress",
-        description: "Please complete your payment before closing.",
-        variant: "destructive",
-      });
-      return;
-    }
-    onClose();
-  };
-
-  // Listen for payment completion messages from popup window
-  useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Verify origin for security
-      if (event.origin !== window.location.origin) return;
-      
-      if (event.data.type === 'PAYMENT_SUCCESS') {
-        console.log('Payment successful, closing checkout dialog');
-        handleClose();
-        toast({
-          title: "Payment Successful!",
-          description: "Your order has been confirmed.",
-        });
-      } else if (event.data.type === 'PAYMENT_FAILED') {
-        console.log('Payment failed:', event.data.error);
-        toast({
-          title: "Payment Failed",
-          description: "Please try again or contact support.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [handleClose]);
-
-  // Manage checkout step based on authentication status
-  useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated) {
-        setCheckoutStep('details');
-      } else {
-        setCheckoutStep('auth');
-      }
-    }
-  }, [isAuthenticated, isLoading]);
-
   // Auto-fill form data from user profile
   useEffect(() => {
     if (isAuthenticated && profile) {
@@ -235,6 +177,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         customer_name: (profile as any).name || '',
         customer_phone: (profile as any).phone || ''
       }));
+      setCheckoutStep('details');
     }
   }, [isAuthenticated, profile]);
 
@@ -311,7 +254,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         } : null,
         payment_method: formData.payment_method,
         guest_session_id: guestSessionId,
-        terms_accepted: termsRequired ? termsAccepted : undefined,
         timestamp: new Date().toISOString()
       };
 
@@ -326,30 +268,40 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
       console.log('🔄 Raw server response:', data);
 
-      // Use backend-returned order data
-      const orderData = {
-        order_id: data?.order_id,
-        order_number: data?.order_number,
-        authoritative_amount: data?.amount || total, // Backend amount is authoritative
-        customer_email: sanitizedData.customer_email,
-        success: true
-      };
-      
-      console.log('💰 Order created successfully:', {
-        client_calculated: total,
-        backend_returned: data?.amount,
-        authoritative_amount: orderData.authoritative_amount,
-        items_subtotal: data?.items_subtotal,
-        delivery_fee: data?.delivery_fee
-      });
+      // Try to parse response, fall back to minimal order data if payment_url missing
+      let parsedData;
+      try {
+        parsedData = normalizePaymentResponse(data);
+        console.log('✅ Parsed server response successfully:', parsedData);
+      } catch (error) {
+        console.warn('⚠️ Could not parse payment_url from response, proceeding to secure payment handler:', error);
+        // Fall back to minimal order data without payment_url
+        parsedData = {
+          order_id: data?.order_id,
+          order_number: data?.order_number,
+          amount: total,
+          customer_email: sanitizedData.customer_email,
+          success: true
+        };
+      }
+
+      // Check if process-checkout provided a payment_url to open
+      if (data?.payment_url) {
+        console.log('🔗 Opening process-checkout payment URL in new tab:', data.payment_url);
+        window.open(data.payment_url, '_blank');
+        toast({
+          title: "Payment opened",
+          description: "Complete payment in the new tab, then return here."
+        });
+      }
 
       // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
-      if (orderData?.order_id && sanitizedData.delivery_schedule) {
+      if (parsedData?.order_id && sanitizedData.delivery_schedule) {
         console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
         try {
           const { upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
           await upsertDeliverySchedule({
-            order_id: orderData.order_id,
+            order_id: parsedData.order_id,
             delivery_date: sanitizedData.delivery_schedule.delivery_date,
             delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
             delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
@@ -372,12 +324,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       
       // Set payment data for PaystackPaymentHandler to initialize securely
       setPaymentData({
-        orderId: orderData.order_id,
-        orderNumber: orderData.order_number,
-        amount: orderData.authoritative_amount, // Use authoritative amount from backend
-        email: sanitizedData.customer_email,
-        successUrl: `${window.location.origin}/payment-callback`,
-        cancelUrl: window.location.href
+        orderId: parsedData?.order_id,
+        orderNumber: parsedData?.order_number || data?.order_number,
+        amount: total,
+        email: sanitizedData.customer_email
       });
       setCheckoutStep('payment');
       setIsSubmitting(false);
@@ -440,44 +390,22 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
     navigate('/orders');
   }, [formData, checkoutStep, deliveryFee, savePrePaymentState, markCheckoutInProgress, markPaymentCompleted, clearCart, clearRecoveryState, onClose, navigate]);
 
+  const handleClose = () => {
+    if (checkoutStep === 'payment' && paymentData) {
+      // Don't close during payment process
+      toast({
+        title: "Payment in Progress",
+        description: "Please complete your payment before closing.",
+        variant: "destructive",
+      });
+      return;
+    }
+    onClose();
+  };
 
   // Validation
   const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
   const isValidPhone = (phone: string) => /^[\d\s\-\+\(\)]{10,}$/.test(phone);
-
-  // Terms and conditions state
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [termsRequired, setTermsRequired] = useState(false);
-  const [termsContent, setTermsContent] = useState('');
-  const [showTermsDialog, setShowTermsDialog] = useState(false);
-
-  // Load terms settings on mount
-  useEffect(() => {
-    const loadTermsSettings = async () => {
-      try {
-        const { data: requireTermsData } = await supabase
-          .from('content_management')
-          .select('content')
-          .eq('key', 'legal_require_terms_acceptance')
-          .single();
-
-        const { data: termsContentData } = await supabase
-          .from('content_management')
-          .select('content, is_published')
-          .eq('key', 'legal_terms')
-          .single();
-
-        if (requireTermsData?.content === 'true' && termsContentData?.is_published) {
-          setTermsRequired(true);
-          setTermsContent(termsContentData.content || '');
-        }
-      } catch (error) {
-        console.log('Terms settings not configured or error loading:', error);
-      }
-    };
-
-    loadTermsSettings();
-  }, []);
 
   const canProceedToDetails = useMemo(() => {
     if (checkoutStep !== 'details') return false;
@@ -487,23 +415,17 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       isValidEmail(formData.customer_email) &&
       isValidPhone(formData.customer_phone);
 
-    // Terms validation - only required if admin enabled it
-    const termsValidation = !termsRequired || termsAccepted;
-
     if (formData.fulfillment_type === 'delivery') {
-      // Make city and postal code optional, delivery schedule mandatory
-      const deliveryValidation = baseValidation &&
+      return baseValidation &&
         formData.delivery_address.address_line_1.trim() &&
+        formData.delivery_address.city.trim() &&
         formData.delivery_address.state.trim() &&
-        deliveryZone &&
-        formData.delivery_date && 
-        formData.delivery_time_slot;
-      
-      return deliveryValidation && termsValidation;
+        formData.delivery_address.postal_code.trim() &&
+        deliveryZone;
     } else {
-      return baseValidation && pickupPoint && termsValidation;
+      return baseValidation && pickupPoint;
     }
-  }, [formData, deliveryZone, pickupPoint, checkoutStep, termsRequired, termsAccepted]);
+  }, [formData, deliveryZone, pickupPoint, checkoutStep]);
 
   const renderAuthStep = () => (
     <div className="space-y-6">
@@ -529,19 +451,18 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const renderDetailsStep = () => (
     <div className="space-y-6">
       <div className="space-y-4">
-        {!isAuthenticated && (
-          <div className="flex items-center justify-between md:hidden mb-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-lg font-semibold">Order Details</h3>
+          {!isAuthenticated && (
             <Button
               variant="ghost"
               size="sm"
               onClick={() => setCheckoutStep('auth')}
-              className="flex items-center gap-2"
             >
-              <ChevronLeft className="w-4 h-4" />
               Back
             </Button>
-          </div>
-        )}
+          )}
+        </div>
 
         {/* Customer Information */}
         <Card>
@@ -552,12 +473,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="customer_name">Full Name *</Label>
                 <Input
                   id="customer_name"
-                  type="text"
                   value={formData.customer_name}
                   onChange={(e) => handleFormChange('customer_name', e.target.value)}
                   placeholder="Enter your full name"
@@ -648,14 +568,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                   placeholder="Apartment, suite, etc."
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="city">City</Label>
+                  <Label htmlFor="city">City *</Label>
                   <Input
                     id="city"
                     value={formData.delivery_address.city}
                     onChange={(e) => handleFormChange('delivery_address.city', e.target.value)}
                     placeholder="City"
+                    required
                   />
                 </div>
                 <div>
@@ -668,13 +589,14 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                     required
                   />
                 </div>
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <Label htmlFor="postal_code">Postal Code</Label>
+                <div>
+                  <Label htmlFor="postal_code">Postal Code *</Label>
                   <Input
                     id="postal_code"
                     value={formData.delivery_address.postal_code}
                     onChange={(e) => handleFormChange('delivery_address.postal_code', e.target.value)}
                     placeholder="Postal code"
+                    required
                   />
                 </div>
               </div>
@@ -727,23 +649,41 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             <CardHeader className="pb-3">
               <CardTitle className="text-base flex items-center gap-2">
                 <Clock className="w-4 h-4" />
-                Delivery Schedule *
+                Delivery Schedule
               </CardTitle>
             </CardHeader>
             <CardContent>
               <DeliveryScheduler
-                variant="horizontal"
                 onScheduleChange={(date, timeSlot) => {
                   handleFormChange('delivery_date', date);
                   handleFormChange('delivery_time_slot', timeSlot);
                 }}
                 selectedDate={formData.delivery_date}
                 selectedTimeSlot={formData.delivery_time_slot}
-                showHeader={false}
               />
             </CardContent>
           </Card>
         )}
+      </div>
+
+      <div className="flex gap-3">
+        <Button
+          onClick={handleFormSubmit}
+          disabled={!canProceedToDetails || isSubmitting}
+          className="flex-1"
+        >
+          {isSubmitting ? (
+            <>
+              <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <ShoppingBag className="w-4 h-4 mr-2" />
+              Proceed to Payment
+            </>
+          )}
+        </Button>
       </div>
 
       {lastPaymentError && (
@@ -775,8 +715,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           amount={paymentData.amount}
           email={paymentData.email}
           orderNumber={paymentData.orderNumber}
-          successUrl={paymentData.successUrl}
-          cancelUrl={paymentData.cancelUrl}
           onSuccess={handlePaymentSuccess}
           onError={(error) => handlePaymentFailure({ message: error })}
           onClose={() => setCheckoutStep('details')}
@@ -787,183 +725,36 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   return (
     <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden overscroll-contain p-0">
-        {/* Mobile Header */}
-        <div className="flex md:hidden items-center justify-between p-4 border-b bg-background flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <h2 className="text-lg font-semibold">
-              {checkoutStep === 'auth' && 'Complete Order'}
-              {checkoutStep === 'details' && 'Checkout'}
-              {checkoutStep === 'payment' && 'Payment'}
-            </h2>
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden">
+        <DialogHeader>
+          <DialogTitle className="flex items-center justify-between">
+            <span>Checkout</span>
+            <DialogClose asChild>
+              <Button variant="ghost" size="sm">
+                <X className="w-4 h-4" />
+              </Button>
+            </DialogClose>
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
+          <div className="lg:col-span-2 overflow-y-auto pr-2 max-h-[calc(90vh-120px)]">
+            {checkoutStep === 'auth' && renderAuthStep()}
+            {checkoutStep === 'details' && renderDetailsStep()}
+            {checkoutStep === 'payment' && renderPaymentStep()}
           </div>
-        </div>
 
-        {/* Mobile Order Summary */}
-        <div className="md:hidden flex-shrink-0">
-          <OrderSummaryCard
-            items={items}
-            subtotal={subtotal}
-            deliveryFee={deliveryFee}
-            total={total}
-            collapsibleOnMobile={true}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0 overflow-hidden">
-          {/* Desktop Left Panel - Order Details */}
-          <div className="hidden lg:block lg:col-span-1 bg-muted/30 border-r overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onClose}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-                <h2 className="text-lg font-semibold">Order Details</h2>
-              </div>
-              
+          <div className="lg:col-span-1">
+            <div className="sticky top-0">
               <OrderSummaryCard
                 items={items}
                 subtotal={subtotal}
                 deliveryFee={deliveryFee}
                 total={total}
-                collapsibleOnMobile={false}
-                className="shadow-none border-0 bg-transparent"
               />
             </div>
           </div>
-
-          {/* Main Content Panel */}
-          <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
-            {/* Desktop Header */}
-            <div className="hidden md:block flex-shrink-0">
-              <DialogHeader className="px-6 py-4 border-b">
-                <div className="flex items-center justify-between">
-                  <DialogTitle className="text-xl">
-                    {checkoutStep === 'auth' && 'Complete Your Order'}
-                    {checkoutStep === 'details' && 'Delivery Details'}
-                    {checkoutStep === 'payment' && 'Payment'}
-                  </DialogTitle>
-                  <DialogClose asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </DialogClose>
-                </div>
-              </DialogHeader>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="space-y-4 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="text-muted-foreground">Checking account...</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {checkoutStep === 'auth' && renderAuthStep()}
-                  {checkoutStep === 'details' && renderDetailsStep()}
-                  {checkoutStep === 'payment' && renderPaymentStep()}
-                </>
-              )}
-            </div>
-
-            {/* Sticky Bottom Action */}
-            {checkoutStep === 'details' && (
-              <div className="flex-shrink-0 p-4 md:p-6 border-t bg-background/80 backdrop-blur-sm">
-                {/* Terms and Conditions */}
-                {termsRequired && (
-                  <div className="mb-4 flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      id="terms-checkbox"
-                      checked={termsAccepted}
-                      onChange={(e) => setTermsAccepted(e.target.checked)}
-                      className="mt-1 h-4 w-4 accent-primary"
-                    />
-                    <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer">
-                      I agree to the{' '}
-                      <button
-                        type="button"
-                        onClick={() => setShowTermsDialog(true)}
-                        className="text-primary hover:underline font-medium"
-                      >
-                        Terms and Conditions
-                      </button>
-                    </Label>
-                  </div>
-                )}
-
-                <Button
-                  onClick={handleFormSubmit}
-                  disabled={!canProceedToDetails || isSubmitting}
-                  className="w-full h-12 md:h-14 text-base md:text-lg font-medium"
-                  size="lg"
-                >
-                  {isSubmitting ? (
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  Proceed to Payment • ₦{total.toLocaleString()}
-                </Button>
-                
-                {lastPaymentError && (
-                  <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                    <p className="text-sm text-destructive">{lastPaymentError}</p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
         </div>
-
-        {/* Terms and Conditions Dialog */}
-        <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Terms and Conditions
-              </DialogTitle>
-            </DialogHeader>
-            <div className="prose prose-sm max-w-none">
-              {termsContent ? (
-                <div dangerouslySetInnerHTML={{ __html: termsContent }} />
-              ) : (
-                <p>Terms and conditions content is being loaded...</p>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => setShowTermsDialog(false)}
-              >
-                Close
-              </Button>
-              <Button
-                onClick={() => {
-                  setTermsAccepted(true);
-                  setShowTermsDialog(false);
-                }}
-              >
-                I Agree
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
       </DialogContent>
     </Dialog>
   );

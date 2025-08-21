@@ -42,20 +42,18 @@ serve(async (req) => {
       console.log('Webhook secret not configured - proceeding with IP validation only');
     }
 
-    // 🔒 CORRECT WEBHOOK SIGNATURE VERIFICATION using HMAC-SHA512
+    // Verify webhook signature only if both signature and secret are available
     let signatureValid = false;
     
     if (signature && webhookSecret) {
       try {
-        console.log('🔐 Verifying webhook signature with HMAC-SHA512');
-        
         const encoder = new TextEncoder();
         const key = await crypto.subtle.importKey(
           "raw",
           encoder.encode(webhookSecret),
           { name: "HMAC", hash: "SHA-512" },
           false,
-          ["sign", "verify"]
+          ["sign"]
         );
 
         const signatureBytes = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
@@ -63,29 +61,21 @@ serve(async (req) => {
           .map(b => b.toString(16).padStart(2, '0'))
           .join('');
 
-        // Clean up signature format - remove 'sha512=' prefix if present
+        // Remove 'sha512=' prefix if present in signature
         const cleanSignature = signature.startsWith('sha512=') ? signature.slice(7) : signature;
         
-        // Use timing-safe comparison
-        signatureValid = expectedSignature.length === cleanSignature.length && 
-                        expectedSignature === cleanSignature;
+        signatureValid = expectedSignature === cleanSignature;
         
         if (!signatureValid) {
-          console.warn('🚨 Webhook signature verification FAILED:', {
-            expected_length: expectedSignature.length,
-            received_length: cleanSignature.length,
-            expected_prefix: expectedSignature.substring(0, 10),
-            received_prefix: cleanSignature.substring(0, 10)
-          });
+          console.warn('Signature verification failed - processing with IP validation');
         } else {
-          console.log('✅ Webhook signature verified successfully with HMAC-SHA512');
+          console.log('Webhook signature verified successfully');
         }
       } catch (error) {
-        console.error('❌ Signature verification error:', error);
-        signatureValid = false;
+        console.warn('Signature verification error - processing with IP validation:', error);
       }
     } else {
-      console.log('⚠️ Webhook signature verification skipped - no signature or secret available');
+      console.log('Webhook signature verification skipped - no signature or secret available');
     }
 
     // Enhanced security: Validate IP address when signature verification is not available or fails
@@ -224,46 +214,28 @@ serve(async (req) => {
 
 async function handleChargeSuccess(supabaseClient: any, data: any) {
   try {
-    const paystackAmount = data.amount;
-    const paidInNaira = paystackAmount / 100;
-
-    console.log(`🔔 [WEBHOOK] Processing charge.success:`, {
-      reference: data.reference,
-      paid_kobo: paystackAmount,
-      paid_naira: paidInNaira,
-      paystack_status: data.status
+    // Use transaction for data consistency
+    const { error: transactionError } = await supabaseClient.rpc('handle_successful_payment', {
+      p_reference: data.reference,
+      p_paid_at: new Date(data.paid_at),
+      p_gateway_response: data.gateway_response,
+      p_fees: data.fees / 100,
+      p_channel: data.channel,
+      p_authorization_code: data.authorization?.authorization_code,
+      p_card_type: data.authorization?.card_type,
+      p_last4: data.authorization?.last4,
+      p_exp_month: data.authorization?.exp_month,
+      p_exp_year: data.authorization?.exp_year,
+      p_bank: data.authorization?.bank
     });
 
-    // 3. UNIFY VERIFICATION LOGIC: Use the same RPC as verify-payment
-    const { data: verificationResult, error: verificationError } = await supabaseClient
-      .rpc('verify_and_update_payment_status', {
-        payment_ref: data.reference,
-        new_status: 'confirmed',
-        payment_amount: paidInNaira,
-        payment_gateway_response: {
-          gateway_response: data.gateway_response,
-          fees: data.fees,
-          channel: data.channel,
-          authorization: data.authorization,
-          paid_at: data.paid_at,
-          processor: 'webhook'
-        }
-      });
-
-    if (verificationError) {
-      console.error(`❌ [WEBHOOK] Verification failed for ${data.reference}:`, verificationError);
-      throw new Error(`Payment verification failed: ${verificationError.message}`);
+    if (transactionError) {
+      throw new Error(`Database transaction failed: ${transactionError.message}`);
     }
 
-    console.log(`✅ [WEBHOOK] Payment verified and order updated:`, {
-      reference: data.reference,
-      order_id: verificationResult?.[0]?.order_id,
-      order_number: verificationResult?.[0]?.order_number,
-      amount: verificationResult?.[0]?.amount
-    });
-
+    console.log(`Successfully processed charge success for reference: ${data.reference}`);
   } catch (error) {
-    console.error('❌ [WEBHOOK] Error handling charge success:', error);
+    console.error('Error handling charge success:', error);
     throw error;
   }
 }

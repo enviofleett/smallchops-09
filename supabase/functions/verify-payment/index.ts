@@ -191,93 +191,15 @@ serve(async (req) => {
       )
     }
 
-    console.log('[VERIFY-PAYMENT-V2] Payment confirmed, performing amount validation before update')
+    console.log('[VERIFY-PAYMENT-V2] Payment confirmed, using secure RPC to update order')
 
-    // 🔒 AMOUNT VALIDATION: Get expected amount from order to verify against paid amount
-    const paidAmountNaira = transaction.amount / 100; // Convert from kobo to Naira
-    let expectedAmount: number | null = null;
-    let amountMismatch = false;
-
-    try {
-      const { data: orderData } = await supabaseClient
-        .from('orders')
-        .select('total_amount, delivery_fee')
-        .eq('payment_reference', reference)
-        .single();
-
-      if (orderData) {
-        expectedAmount = (orderData.total_amount || 0) + (orderData.delivery_fee || 0);
-        const amountDifference = Math.abs(paidAmountNaira - expectedAmount);
-        amountMismatch = amountDifference > 0.01; // Allow 1 kobo tolerance for rounding
-
-        console.log('[VERIFY-PAYMENT-V2] Amount validation:', {
-          paid_amount: paidAmountNaira,
-          expected_amount: expectedAmount,
-          difference: amountDifference,
-          is_mismatch: amountMismatch
-        });
-
-        if (amountMismatch) {
-          // 🚨 SECURITY INCIDENT: Amount mismatch detected
-          await supabaseClient.from('security_incidents').insert({
-            type: 'payment_amount_mismatch',
-            description: `Payment amount mismatch detected: paid ₦${paidAmountNaira}, expected ₦${expectedAmount}`,
-            severity: 'critical',
-            reference: reference,
-            expected_amount: expectedAmount,
-            received_amount: paidAmountNaira,
-            created_at: new Date().toISOString()
-          });
-
-          console.error('[VERIFY-PAYMENT-V2] 🚨 CRITICAL SECURITY ALERT: Payment amount mismatch', {
-            reference,
-            paid_amount: paidAmountNaira,
-            expected_amount: expectedAmount
-          });
-
-          // Update payment transaction with mismatch status
-          await supabaseClient
-            .from('payment_transactions')
-            .upsert({
-              provider_reference: reference,
-              amount: paidAmountNaira,
-              status: 'mismatch',
-              gateway_response: `Amount mismatch: paid ₦${paidAmountNaira}, expected ₦${expectedAmount}`,
-              metadata: transaction,
-              processed_at: new Date().toISOString()
-            }, {
-              onConflict: 'provider_reference'
-            });
-
-          return new Response(
-            JSON.stringify({
-              success: false,
-              payment_status: 'mismatch',
-              error: 'Payment amount does not match order total',
-              code: 'AMOUNT_MISMATCH',
-              reference,
-              paid_amount: paidAmountNaira,
-              expected_amount: expectedAmount
-            }),
-            { 
-              status: 400, 
-              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-            }
-          );
-        }
-      }
-    } catch (amountCheckError) {
-      console.warn('[VERIFY-PAYMENT-V2] Amount validation failed (non-critical):', amountCheckError);
-      // Continue with verification if amount check fails
-    }
-
-    // Use the secure RPC to update order status
+    // Use the secure RPC instead of direct table updates
     const { data: rpcResult, error: rpcError } = await supabaseClient.rpc(
       'verify_and_update_payment_status',
       {
         payment_ref: reference,
         new_status: 'confirmed',
-        payment_amount: paidAmountNaira,
+        payment_amount: transaction.amount / 100, // Convert from kobo to Naira
         payment_gateway_response: transaction
       }
     );

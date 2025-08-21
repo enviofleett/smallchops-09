@@ -5,7 +5,6 @@ import { supabase } from '../integrations/supabase/client';
 import { User, AuthState, LoginCredentials } from '../types/auth';
 import logger from '../lib/logger';
 import { useToast } from '@/hooks/use-toast';
-import { handlePostLoginRedirect } from '@/utils/redirect';
 
 interface CustomerAccount {
   id: string;
@@ -19,7 +18,6 @@ interface CustomerAccount {
 interface AuthContextType extends AuthState {
   login: (credentials: LoginCredentials) => Promise<{ success: boolean; redirect?: string; error?: string }>;
   signUp: (credentials: LoginCredentials & { name: string; phone?: string }) => Promise<{ success: boolean; requiresEmailVerification?: boolean; error?: string }>;
-  signUpAdmin: (credentials: { email: string; password: string; name: string }) => Promise<{ success: boolean; requiresEmailVerification?: boolean; redirect?: string; error?: string }>;
   signUpWithGoogle: () => Promise<void>;
   logout: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
@@ -402,48 +400,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
-  const signUpAdmin = async (credentials: { email: string; password: string; name: string }) => {
-    try {
-      const { email, password, name } = credentials;
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo: `${window.location.origin}/auth-callback`,
-          data: {
-            user_type: 'admin',
-            role: 'admin',
-            name,
-            full_name: name,
-          },
-        },
-      });
-
-      if (error) {
-        console.error('Admin sign up error:', error);
-        toast({
-          title: "Admin registration failed",
-          description: error.message,
-          variant: "destructive",
-        });
-        return { success: false, error: error.message };
-      }
-
-      if (data.user && !data.user.email_confirmed_at) {
-        toast({
-          title: "Admin registration successful!",
-          description: "Please check your email to verify your account.",
-        });
-        return { success: true, requiresEmailVerification: true };
-      }
-
-      return { success: true, redirect: handlePostLoginRedirect('admin') };
-    } catch (error: any) {
-      console.error('Admin sign up error:', error);
-      return { success: false, error: error.message };
-    }
-  };
-
   const value = {
     session,
     user,
@@ -453,7 +409,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     isLoading,
     login,
     signUp,
-    signUpAdmin,
     signUpWithGoogle,
     logout,
     resetPassword,

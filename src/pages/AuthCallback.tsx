@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,155 +32,31 @@ const AuthCallback: React.FC = () => {
         if (data.session?.user) {
           const user = data.session.user;
           console.log('Auth callback - user authenticated:', user.email);
-          setUserId(user.id);
 
-          // Check if this is an admin user
-          const { data: adminProfile } = await supabase
-            .from('profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
+          // Check if user has phone number
+          const hasPhone = user.user_metadata?.phone || user.phone;
           
-          if (adminProfile) {
-            // Admin user - redirect to dashboard
-            setStatus('success');
-            toast({
-              title: "Admin login successful!",
-              description: "Welcome to the admin dashboard.",
-            });
-            setTimeout(() => {
-              navigate('/dashboard', { replace: true });
-            }, 1500);
+          if (!hasPhone) {
+            console.log('Phone number required for user:', user.id);
+            setUserId(user.id);
+            setStatus('phone_required');
+            setShowPhoneModal(true);
             return;
           }
+
+          // User is fully authenticated with phone
+          setStatus('success');
           
-          // Check for customer account with retry
-          let customerAccount = null;
-          let retryCount = 0;
-          const maxRetries = 3;
-          
-          while (!customerAccount && retryCount < maxRetries) {
-            const { data } = await supabase
-              .from('customer_accounts')
-              .select('*')
-              .eq('user_id', user.id)
-              .maybeSingle();
-            
-            customerAccount = data;
-            if (!customerAccount) {
-              retryCount++;
-              if (retryCount < maxRetries) {
-                console.log(`Customer account not found, retry ${retryCount}/${maxRetries}`);
-                await new Promise(resolve => setTimeout(resolve, 1000));
-              }
-            }
-          }
-          
-          // If still no customer account, try to create one
-          if (!customerAccount) {
-            console.log('Creating customer account for user:', user.id);
-            const { data: newAccount, error: createError } = await supabase
-              .from('customer_accounts')
-              .insert({
-                user_id: user.id,
-                name: user.user_metadata?.name || user.user_metadata?.full_name || user.email?.split('@')[0] || 'Customer',
-                email: user.email,
-                phone: user.user_metadata?.phone,
-                email_verified: !!user.email_confirmed_at,
-                phone_verified: false,
-                profile_completion_percentage: user.user_metadata?.phone ? 80 : 60
-              })
-              .select()
-              .single();
-            
-            if (!createError && newAccount) {
-              customerAccount = newAccount;
-              console.log('Customer account created successfully:', customerAccount.id);
-            }
-          }
-          
-          if (customerAccount) {
-            // Customer user - check phone requirement
-            const hasPhone = user.user_metadata?.phone || customerAccount.phone;
-            
-            if (!hasPhone) {
-              console.log('Phone number required for customer:', user.id);
-              setStatus('phone_required');
-              setShowPhoneModal(true);
-              return;
-            }
+          toast({
+            title: "Welcome!",
+            description: "You have been successfully authenticated.",
+          });
 
-            // Only process welcome email for email-verified users
-            if (!user.email_confirmed_at) {
-              console.log('Email not confirmed, skipping welcome email for:', user.email);
-              // Don't allow access until email is confirmed
-              setStatus('error');
-              setError('Please verify your email address before accessing the platform.');
-              return;
-            }
-
-            // Check if welcome email has been sent
-            const welcomeSent = user.user_metadata?.welcome_sent;
-            console.log('Welcome email status for verified user:', user.email, 'welcome_sent:', welcomeSent, 'email_confirmed_at:', user.email_confirmed_at);
-            
-            if (!welcomeSent) {
-              console.log('Triggering welcome email for verified user:', user.email);
-              try {
-                // Trigger welcome email processor
-                const welcomeResponse = await supabase.functions.invoke('customer-welcome-processor', {
-                  body: {
-                    customer_email: user.email,
-                    customer_name: customerAccount.name || user.user_metadata?.name || user.user_metadata?.full_name || 'Customer',
-                    trigger_type: 'auth_link'
-                  }
-                });
-
-                if (welcomeResponse.error) {
-                  console.error('Welcome email failed:', welcomeResponse.error);
-                } else {
-                  console.log('Welcome email triggered successfully for:', user.email);
-                  
-                  // Mark welcome email as sent in user metadata
-                  await supabase.auth.updateUser({
-                    data: { welcome_sent: true }
-                  });
-                  console.log('User metadata updated with welcome_sent=true');
-                }
-
-                // Also update customer_accounts email_verified status (non-blocking)
-                try {
-                  await supabase
-                    .from('customer_accounts')
-                    .update({ email_verified: true })
-                    .eq('user_id', user.id);
-                  console.log('Customer account email_verified updated');
-                } catch (updateError) {
-                  console.warn('Non-blocking: Failed to update customer email_verified:', updateError);
-                }
-
-              } catch (welcomeError) {
-                console.error('Non-blocking welcome email error:', welcomeError);
-                // Don't block authentication flow for welcome email failures
-              }
-            } else {
-              console.log('Welcome email already sent for user:', user.email);
-            }
-
-            // Customer authenticated with phone
-            setStatus('success');
-            toast({
-              title: "Welcome!",
-              description: "You have been successfully authenticated.",
-            });
-            setTimeout(() => {
-              const redirectTo = searchParams.get('redirect') || '/';
-              navigate(redirectTo, { replace: true });
-            }, 1500);
-          } else {
-            // No profile found - redirect to auth
-            console.warn('No user profile found, redirecting to auth');
-            navigate('/auth', { replace: true });
-          }
+          // Redirect after short delay
+          setTimeout(() => {
+            const redirectTo = searchParams.get('redirect') || '/';
+            navigate(redirectTo, { replace: true });
+          }, 1500);
         } else {
           // No active session, redirect to auth page
           console.log('No session found, redirecting to auth');

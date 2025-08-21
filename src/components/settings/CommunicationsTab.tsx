@@ -17,7 +17,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Mail, Settings, FileText, TestTube, Activity, BarChart3, AlertCircle, CheckCircle, Clock, Send, TrendingUp, User, Zap } from 'lucide-react';
 import { DeliverySchedulingTab } from './DeliverySchedulingTab';
-import { LegalTermsManager } from './LegalTermsManager';
 interface EmailStats {
   totalSent: number;
   deliveredToday: number;
@@ -178,7 +177,7 @@ export const CommunicationsTab = () => {
         </div>}
 
       <Tabs defaultValue="settings" className="space-y-4">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             SMTP Settings
@@ -202,10 +201,6 @@ export const CommunicationsTab = () => {
           <TabsTrigger value="delivery-scheduling" className="flex items-center gap-2">
             <Clock className="h-4 w-4" />
             Delivery Scheduling
-          </TabsTrigger>
-          <TabsTrigger value="legal-terms" className="flex items-center gap-2">
-            <FileText className="h-4 w-4" />
-            Legal & Terms
           </TabsTrigger>
         </TabsList>
 
@@ -353,10 +348,6 @@ export const CommunicationsTab = () => {
 
         <TabsContent value="delivery-scheduling" className="space-y-4">
           <DeliverySchedulingTab />
-        </TabsContent>
-
-        <TabsContent value="legal-terms" className="space-y-4">
-          <LegalTermsManager />
         </TabsContent>
       </Tabs>
     </div>;

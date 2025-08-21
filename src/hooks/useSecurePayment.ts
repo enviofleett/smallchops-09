@@ -245,6 +245,11 @@ export const useSecurePayment = () => {
 
     console.log('🚀 Opening secure payment URL');
     
+    // Clear any existing payment references from storage
+    localStorage.removeItem('pending_payment_reference');
+    localStorage.removeItem('paystack_reference');
+    sessionStorage.removeItem('checkout_reference');
+    
     // Open Paystack in new tab for better UX
     const paymentWindow = window.open(authorizationUrl, '_blank');
     

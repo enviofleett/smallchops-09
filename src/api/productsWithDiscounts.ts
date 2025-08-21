@@ -26,24 +26,25 @@ export async function getProductsWithDiscounts(categoryId?: string): Promise<Pro
     const productsPromise = query.order("name");
     const promotionsPromise = getPromotions();
     
-    // Parallel execution with timeout fallback
-    const [
-      { data: products, error: productsError },
-      promotions
-    ] = await Promise.all([
+    // Parallel execution with improved timeout handling
+    const [productsResult, promotions] = await Promise.allSettled([
       Promise.race([
         productsPromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Products query timeout')), 4000)
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error('Products query timeout')), 5000)
         )
       ]) as Promise<any>,
-      Promise.race([
-        promotionsPromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Promotions query timeout')), 2000)
-        )
-      ]) as Promise<any>
+      promotionsPromise // getPromotions now has its own timeout handling
     ]);
+
+    // Handle products result
+    const { data: products, error: productsError } =
+      productsResult.status === 'fulfilled' ? productsResult.value : { data: null, error: productsResult.reason };
+
+    // Handle promotions result - getPromotions now handles its own errors/cache
+    const activePromotions = promotions.status === 'fulfilled' && Array.isArray(promotions.value)
+      ? promotions.value.filter(p => p.status === 'active')
+      : [];
     
     if (productsError) {
       console.error('Products query error:', productsError);

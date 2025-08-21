@@ -200,14 +200,41 @@ const PaymentSystemHealthDashboard: React.FC = () => {
             Monitor and test critical payment system components
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button 
-            onClick={runFullHealthCheck} 
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            onClick={runFullHealthCheck}
             disabled={loading}
             className="flex items-center gap-2"
           >
-            {loading ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
-            Run Full Health Check
+            {loading && runningTest === null ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+            Full Health Check
+          </Button>
+          <Button
+            onClick={runEndToEndTest}
+            disabled={loading}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            {runningTest === 'End-to-End Payment Flow' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <CreditCard className="h-4 w-4" />}
+            End-to-End Test
+          </Button>
+          <Button
+            onClick={runWebhookTest}
+            disabled={loading}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            {runningTest === 'Webhook Functionality' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Server className="h-4 w-4" />}
+            Webhook Test
+          </Button>
+          <Button
+            onClick={runMonitoringCheck}
+            disabled={loading}
+            variant="outline"
+            className="flex items-center gap-2"
+          >
+            {runningTest === 'System Monitoring' ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Shield className="h-4 w-4" />}
+            Monitor Logs
           </Button>
         </div>
       </div>

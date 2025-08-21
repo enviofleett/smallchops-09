@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supabase Environment Variables Setup</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 900px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px 0; }
+        .success { background: #f0f8f0; border-left: 4px solid #10b981; padding: 15px; margin: 10px 0; }
+        .error { background: #fdf2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 10px 0; }
+        .info { background: #f0f4ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 10px 0; }
+        .warning { background: #fff8f0; border-left: 4px solid #f59e0b; padding: 15px; margin: 10px 0; }
+        button { padding: 12px 24px; margin: 8px; cursor: pointer; border: none; border-radius: 5px; font-size: 14px; background: #3b82f6; color: white; }
+        .btn-copy { background: #10b981; font-size: 12px; padding: 8px 16px; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 12px; position: relative; }
+        .copy-button { position: absolute; top: 10px; right: 10px; }
+        .env-var { margin: 10px 0; padding: 10px; border: 1px solid #ddd; border-radius: 5px; background: #f9f9f9; }
+        .steps { counter-reset: step-counter; }
+        .step { counter-increment: step-counter; margin: 20px 0; padding: 15px; border-left: 4px solid #3b82f6; }
+        .step::before { content: "Step " counter(step-counter) ": "; font-weight: bold; color: #3b82f6; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 12px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+        .status-check { padding: 8px 12px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .status-required { background: #fef2f2; color: #dc2626; }
+        .status-optional { background: #f0f9ff; color: #2563eb; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>⚙️ Supabase Environment Variables Setup</h1>
+            <p>Complete guide to configure all required environment variables for the payment system.</p>
+        </div>
+
+        <div class="card">
+            <h2>📋 Required Environment Variables</h2>
+            
+            <table>
+                <thead>
+                    <tr>
+                        <th>Variable Name</th>
+                        <th>Value</th>
+                        <th>Purpose</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td><code>PAYSTACK_SECRET_KEY_TEST</code></td>
+                        <td><code>sk_test_0311ba51e34c9ab686b86850bd70294634d3e41f</code></td>
+                        <td>Primary test key for payment functions</td>
+                        <td><span class="status-check status-required">REQUIRED</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>PAYSTACK_SECRET_KEY</code></td>
+                        <td><code>sk_test_0311ba51e34c9ab686b86850bd70294634d3e41f</code></td>
+                        <td>Fallback key for payment functions</td>
+                        <td><span class="status-check status-required">REQUIRED</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>SUPABASE_URL</code></td>
+                        <td><code>https://oknnklksdiqaifhxaccs.supabase.co</code></td>
+                        <td>Supabase project URL</td>
+                        <td><span class="status-check status-required">REQUIRED</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>SUPABASE_SERVICE_ROLE_KEY</code></td>
+                        <td><code>[Get from Supabase Dashboard]</code></td>
+                        <td>Admin access for database operations</td>
+                        <td><span class="status-check status-required">REQUIRED</span></td>
+                    </tr>
+                    <tr>
+                        <td><code>FORCE_TEST_MODE</code></td>
+                        <td><code>true</code></td>
+                        <td>Force test environment</td>
+                        <td><span class="status-check status-optional">OPTIONAL</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>🚀 Step-by-Step Setup</h2>
+            
+            <div class="steps">
+                <div class="step">
+                    <h3>Access Supabase Dashboard</h3>
+                    <p>Go to <a href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs" target="_blank">Supabase Project Dashboard</a></p>
+                    <p>Sign in with your Supabase account credentials.</p>
+                </div>
+
+                <div class="step">
+                    <h3>Get Service Role Key</h3>
+                    <p>In the dashboard:</p>
+                    <ol>
+                        <li>Click <strong>"Settings"</strong> in the sidebar</li>
+                        <li>Click <strong>"API"</strong></li>
+                        <li>Find <strong>"service_role"</strong> key</li>
+                        <li>Copy the key (starts with <code>eyJ...</code>)</li>
+                    </ol>
+                </div>
+
+                <div class="step">
+                    <h3>Navigate to Environment Variables</h3>
+                    <p>In the dashboard:</p>
+                    <ol>
+                        <li>Click <strong>"Settings"</strong> in the sidebar</li>
+                        <li>Click <strong>"Environment Variables"</strong></li>
+                        <li>You'll see a form to add new variables</li>
+                    </ol>
+                </div>
+
+                <div class="step">
+                    <h3>Add Required Variables</h3>
+                    <p>Add each variable one by one:</p>
+                    
+                    <div class="env-var">
+                        <strong>Variable 1:</strong>
+                        <pre>Name: PAYSTACK_SECRET_KEY_TEST
+Value: sk_test_0311ba51e34c9ab686b86850bd70294634d3e41f</pre>
+                        <button class="btn-copy" onclick="copyToClipboard('PAYSTACK_SECRET_KEY_TEST=sk_test_0311ba51e34c9ab686b86850bd70294634d3e41f')">Copy</button>
+                    </div>
+
+                    <div class="env-var">
+                        <strong>Variable 2:</strong>
+                        <pre>Name: PAYSTACK_SECRET_KEY
+Value: sk_test_0311ba51e34c9ab686b86850bd70294634d3e41f</pre>
+                        <button class="btn-copy" onclick="copyToClipboard('PAYSTACK_SECRET_KEY=sk_test_0311ba51e34c9ab686b86850bd70294634d3e41f')">Copy</button>
+                    </div>
+
+                    <div class="env-var">
+                        <strong>Variable 3:</strong>
+                        <pre>Name: SUPABASE_URL
+Value: https://oknnklksdiqaifhxaccs.supabase.co</pre>
+                        <button class="btn-copy" onclick="copyToClipboard('SUPABASE_URL=https://oknnklksdiqaifhxaccs.supabase.co')">Copy</button>
+                    </div>
+
+                    <div class="env-var">
+                        <strong>Variable 4:</strong>
+                        <pre>Name: SUPABASE_SERVICE_ROLE_KEY
+Value: [Paste your service role key here]</pre>
+                        <div class="warning">
+                            <p><strong>Note:</strong> Replace with the actual service role key from Step 2.</p>
+                        </div>
+                    </div>
+
+                    <div class="env-var">
+                        <strong>Variable 5 (Optional):</strong>
+                        <pre>Name: FORCE_TEST_MODE
+Value: true</pre>
+                        <button class="btn-copy" onclick="copyToClipboard('FORCE_TEST_MODE=true')">Copy</button>
+                    </div>
+                </div>
+
+                <div class="step">
+                    <h3>Save and Deploy</h3>
+                    <p>After adding all variables:</p>
+                    <ol>
+                        <li>Click <strong>"Save"</strong> or <strong>"Update"</strong></li>
+                        <li>Wait for the environment to reload</li>
+                        <li>Redeploy your Edge Functions if needed</li>
+                    </ol>
+                </div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🔧 Quick Copy Commands</h2>
+            <p>If you prefer command-line setup (requires Supabase CLI):</p>
+            
+            <div class="warning">
+                <h4>⚠️ Prerequisites</h4>
+                <p>You need Supabase CLI installed and logged in to use these commands.</p>
+            </div>
+
+            <pre><button class="copy-button btn-copy" onclick="copyToClipboard(document.getElementById('cli-commands').textContent)">Copy All</button><code id="cli-commands"># Set environment variables via CLI
+supabase secrets set PAYSTACK_SECRET_KEY_TEST=sk_test_0311ba51e34c9ab686b86850bd70294634d3e41f
+supabase secrets set PAYSTACK_SECRET_KEY=sk_test_0311ba51e34c9ab686b86850bd70294634d3e41f
+supabase secrets set SUPABASE_URL=https://oknnklksdiqaifhxaccs.supabase.co
+supabase secrets set FORCE_TEST_MODE=true
+
+# Note: SUPABASE_SERVICE_ROLE_KEY should be set in the dashboard for security</code></pre>
+        </div>
+
+        <div class="card">
+            <h2>✅ Verification</h2>
+            <p>After setting up environment variables, verify they're working:</p>
+            
+            <button onclick="window.open('/test-direct-functions.html', '_blank')">🔍 Test Function Access</button>
+            <button onclick="window.open('/verify-paystack-credentials.html', '_blank')">🔑 Verify Credentials</button>
+            
+            <div class="info">
+                <h4>📊 Expected Results After Setup</h4>
+                <ul>
+                    <li>✅ Functions return status 200 (not 404)</li>
+                    <li>✅ Credential health checks pass</li>
+                    <li>✅ Payment initialization works</li>
+                    <li>✅ No "Transaction reference not found" errors</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🚨 Troubleshooting</h2>
+            
+            <div class="error">
+                <h4>❌ Still Getting 404 Errors</h4>
+                <p><strong>Cause:</strong> Functions not deployed or env vars not set</p>
+                <p><strong>Solution:</strong> Redeploy functions after setting environment variables</p>
+            </div>
+
+            <div class="error">
+                <h4>❌ Getting 500 Errors</h4>
+                <p><strong>Cause:</strong> Missing or incorrect environment variables</p>
+                <p><strong>Solution:</strong> Double-check all variable names and values</p>
+            </div>
+
+            <div class="warning">
+                <h4>⚠️ Functions Timeout</h4>
+                <p><strong>Cause:</strong> Database connection issues</p>
+                <p><strong>Solution:</strong> Verify SUPABASE_SERVICE_ROLE_KEY is correct</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function copyToClipboard(text) {
+            navigator.clipboard.writeText(text).then(() => {
+                // Show feedback
+                const button = event.target;
+                const originalText = button.textContent;
+                button.textContent = 'Copied!';
+                button.style.background = '#10b981';
+                
+                setTimeout(() => {
+                    button.textContent = originalText;
+                    button.style.background = '#10b981';
+                }, 2000);
+            }).catch(err => {
+                console.error('Failed to copy: ', err);
+                alert('Failed to copy to clipboard. Please copy manually.');
+            });
+        }
+
+        // Show current status
+        window.addEventListener('load', () => {
+            console.log('🔧 Environment Variables Setup Guide Loaded');
+            console.log('📋 Required Variables:', {
+                'PAYSTACK_SECRET_KEY_TEST': 'sk_test_0311ba51e34c9ab686b86850bd70294634d3e41f',
+                'PAYSTACK_SECRET_KEY': 'sk_test_0311ba51e34c9ab686b86850bd70294634d3e41f',
+                'SUPABASE_URL': 'https://oknnklksdiqaifhxaccs.supabase.co'
+            });
+        });
+    </script>
+</body>
+</html>

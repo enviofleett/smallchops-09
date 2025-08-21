@@ -93,58 +93,113 @@ serve(async (req) => {
         throw new Error('Invalid customer ID format');
       }
       customerId = processedRequest.customer.id;
-      console.log('👤 Using existing customer:', customerId);
+      console.log('👤 Using existing customer ID:', customerId);
     } else {
-      // First, try to find existing customer by email
+      // Step 1: Try to find existing customer by email using maybeSingle for safer querying
+      console.log('🔍 Searching for existing customer with email:', sanitizedEmail);
       const { data: existingCustomer, error: findError } = await supabaseAdmin
         .from('customer_accounts')
         .select('id, name, phone')
         .eq('email', sanitizedEmail)
-        .single();
+        .maybeSingle();
+
+      // Log find errors for debugging but don't fail the request
+      if (findError) {
+        console.warn('⚠️ Customer lookup error (non-blocking):', findError);
+      }
 
       if (existingCustomer) {
-        // Customer exists, use existing ID
+        // Path A: Customer exists, use existing ID
         customerId = existingCustomer.id;
-        console.log('👤 Found existing customer:', {
+        console.log('✅ Found existing customer:', {
           id: customerId,
           email: sanitizedEmail,
-          name: existingCustomer.name
+          name: existingCustomer.name,
+          phone: existingCustomer.phone
         });
 
-        // Optionally update customer info if provided data is more complete
-        if (processedRequest.customer.name?.trim() && 
-            processedRequest.customer.name.trim() !== existingCustomer.name) {
-          console.log('📝 Updating customer name from:', existingCustomer.name, 'to:', processedRequest.customer.name.trim());
-          await supabaseAdmin
-            .from('customer_accounts')
-            .update({ 
-              name: processedRequest.customer.name.trim(),
-              phone: processedRequest.customer.phone?.trim() || existingCustomer.phone
-            })
-            .eq('id', customerId);
+        // Optionally enrich existing customer data if provided data is more complete
+        const shouldUpdateName = processedRequest.customer.name?.trim() && 
+          processedRequest.customer.name.trim() !== existingCustomer.name;
+        const shouldUpdatePhone = processedRequest.customer.phone?.trim() && 
+          processedRequest.customer.phone.trim() !== existingCustomer.phone;
+
+        if (shouldUpdateName || shouldUpdatePhone) {
+          const updates = {};
+          if (shouldUpdateName) {
+            updates.name = processedRequest.customer.name.trim();
+            console.log('📝 Will update customer name from:', existingCustomer.name, 'to:', updates.name);
+          }
+          if (shouldUpdatePhone) {
+            updates.phone = processedRequest.customer.phone.trim();
+            console.log('📝 Will update customer phone from:', existingCustomer.phone, 'to:', updates.phone);
+          }
+
+          try {
+            await supabaseAdmin
+              .from('customer_accounts')
+              .update(updates)
+              .eq('id', customerId);
+            console.log('✅ Customer data enrichment successful');
+          } catch (updateError) {
+            console.warn('⚠️ Customer data enrichment failed (non-blocking):', updateError);
+            // Don't fail the checkout for this
+          }
         }
       } else {
-        // Customer doesn't exist, create new one
-        const { data: newCustomer, error: customerError } = await supabaseAdmin
-          .from('customer_accounts')
-          .insert({
-            name: processedRequest.customer.name.trim(),
-            email: sanitizedEmail,
-            phone: processedRequest.customer.phone?.trim() || null,
-            email_verified: false,
-            phone_verified: false,
-            profile_completion_percentage: 60
-          })
-          .select('id')
-          .single();
+        // Path B: Customer doesn't exist, create new one with race-safe logic
+        console.log('🆕 Creating new customer account for:', sanitizedEmail);
+        try {
+          const { data: newCustomer, error: customerError } = await supabaseAdmin
+            .from('customer_accounts')
+            .insert({
+              name: processedRequest.customer.name.trim(),
+              email: sanitizedEmail,
+              phone: processedRequest.customer.phone?.trim() || null,
+              email_verified: false,
+              phone_verified: false,
+              profile_completion_percentage: 60
+            })
+            .select('id')
+            .single();
 
-        if (customerError) {
-          console.error('❌ Customer creation failed:', customerError);
-          throw new Error('Failed to create customer account');
+          if (customerError) {
+            console.error('❌ Customer creation failed:', customerError);
+            throw customerError; // Will be caught by the outer try-catch
+          }
+
+          customerId = newCustomer.id;
+          console.log('✅ Created new customer:', customerId);
+
+        } catch (creationError) {
+          // Path C: Handle race condition - another process created the same customer
+          if (creationError.code === '23505' && creationError.message?.includes('customer_accounts_email_key')) {
+            console.log('🔄 Race condition detected - customer was created by another process, fetching existing customer...');
+            
+            // Another process created the customer, fetch the existing one
+            const { data: raceCustomer, error: raceError } = await supabaseAdmin
+              .from('customer_accounts')
+              .select('id, name, phone')
+              .eq('email', sanitizedEmail)
+              .single();
+
+            if (raceError || !raceCustomer) {
+              console.error('❌ Failed to fetch customer after race condition:', raceError);
+              throw new Error('Failed to resolve customer account after creation conflict');
+            }
+
+            customerId = raceCustomer.id;
+            console.log('✅ Resolved race condition - using existing customer:', {
+              id: customerId,
+              email: sanitizedEmail,
+              name: raceCustomer.name
+            });
+          } else {
+            // Unexpected error
+            console.error('❌ Unexpected customer creation error:', creationError);
+            throw new Error('Failed to create customer account');
+          }
         }
-
-        customerId = newCustomer.id;
-        console.log('👤 Created new customer:', customerId);
       }
     }
 

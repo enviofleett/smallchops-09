@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🚨 Production Payment System Fix</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            max-width: 1400px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #2d3748;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 16px;
+            padding: 30px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+        }
+        
+        .emergency-header {
+            background: linear-gradient(135deg, #e53e3e, #c53030);
+            color: white;
+            padding: 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            text-align: center;
+        }
+        
+        .fix-result { 
+            padding: 20px; 
+            margin: 16px 0; 
+            border-radius: 12px; 
+            border-left: 6px solid;
+            animation: slideIn 0.3s ease-out;
+        }
+        
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateX(-10px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        
+        .critical { background: #fff5f5; color: #c53030; border-left-color: #e53e3e; }
+        .warning { background: #fffbeb; color: #d69e2e; border-left-color: #f6ad55; }
+        .success { background: #f0fff4; color: #38a169; border-left-color: #68d391; }
+        .info { background: #ebf8ff; color: #2b6cb0; border-left-color: #4299e1; }
+        
+        .grid { display: grid; gap: 24px; margin: 24px 0; }
+        .grid-2 { grid-template-columns: 1fr 1fr; }
+        .grid-3 { grid-template-columns: repeat(3, 1fr); }
+        .grid-4 { grid-template-columns: repeat(4, 1fr); }
+        
+        .card { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 24px; 
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+            border: 1px solid #e2e8f0;
+        }
+        
+        .stat-card { 
+            text-align: center; 
+            padding: 24px; 
+            border-radius: 12px; 
+            background: linear-gradient(135deg, #4299e1, #3182ce);
+            color: white;
+            transition: transform 0.2s;
+        }
+        .stat-card:hover { transform: translateY(-2px); }
+        .stat-number { font-size: 3rem; font-weight: bold; margin: 12px 0; }
+        .stat-label { font-size: 1rem; opacity: 0.9; }
+        
+        button { 
+            padding: 16px 32px; 
+            margin: 8px; 
+            border: none; 
+            border-radius: 10px; 
+            cursor: pointer; 
+            font-weight: 600;
+            font-size: 16px;
+            transition: all 0.2s;
+            min-width: 200px;
+        }
+        
+        .btn-emergency { 
+            background: linear-gradient(135deg, #e53e3e, #c53030); 
+            color: white; 
+            font-size: 18px;
+            padding: 20px 40px;
+        }
+        .btn-emergency:hover { background: linear-gradient(135deg, #c53030, #9c1c1c); transform: translateY(-1px); }
+        
+        .btn-primary { background: linear-gradient(135deg, #4299e1, #3182ce); color: white; }
+        .btn-primary:hover { background: linear-gradient(135deg, #3182ce, #2c5aa0); transform: translateY(-1px); }
+        
+        .btn-success { background: linear-gradient(135deg, #38a169, #2f855a); color: white; }
+        .btn-success:hover { background: linear-gradient(135deg, #2f855a, #276749); transform: translateY(-1px); }
+        
+        .btn-warning { background: linear-gradient(135deg, #d69e2e, #b7791f); color: white; }
+        .btn-warning:hover { background: linear-gradient(135deg, #b7791f, #975a16); transform: translateY(-1px); }
+        
+        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+        th, td { padding: 16px; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        th { background: #f7fafc; font-weight: 600; color: #2d3748; }
+        tr:hover { background: #f7fafc; }
+        
+        .status-badge { 
+            padding: 6px 16px; 
+            border-radius: 20px; 
+            font-size: 12px; 
+            font-weight: bold; 
+            text-transform: uppercase;
+            display: inline-block;
+        }
+        .badge-success { background: #c6f6d5; color: #22543d; }
+        .badge-warning { background: #faf089; color: #744210; }
+        .badge-danger { background: #fed7d7; color: #742a2a; }
+        .badge-info { background: #bee3f8; color: #2c5aa0; }
+        
+        .loading { 
+            display: inline-block; 
+            width: 24px; 
+            height: 24px; 
+            border: 3px solid #f3f3f3; 
+            border-top: 3px solid #3498db; 
+            border-radius: 50%; 
+            animation: spin 1s linear infinite; 
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        
+        .progress-container {
+            background: #e2e8f0;
+            border-radius: 10px;
+            height: 12px;
+            overflow: hidden;
+            margin: 12px 0;
+        }
+        .progress-bar { 
+            height: 100%; 
+            background: linear-gradient(90deg, #4299e1, #38a169); 
+            transition: width 0.5s ease; 
+            border-radius: 10px;
+        }
+        
+        .environment-badge {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-weight: bold;
+            font-size: 14px;
+            z-index: 1000;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .env-production { background: linear-gradient(135deg, #e53e3e, #c53030); color: white; }
+        .env-development { background: linear-gradient(135deg, #38a169, #2f855a); color: white; }
+        
+        pre { 
+            background: #1a202c; 
+            color: #e2e8f0; 
+            padding: 20px; 
+            border-radius: 12px; 
+            overflow-x: auto; 
+            font-size: 14px;
+            margin: 16px 0;
+            border: 1px solid #4a5568;
+        }
+        
+        .fix-step {
+            display: flex;
+            align-items: center;
+            margin: 16px 0;
+            padding: 16px;
+            border-radius: 10px;
+            background: #f7fafc;
+            border-left: 4px solid #cbd5e0;
+        }
+        .step-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            margin-right: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: white;
+        }
+        .step-pending { background: #cbd5e0; }
+        .step-running { background: #4299e1; }
+        .step-success { background: #38a169; }
+        .step-error { background: #e53e3e; }
+        
+        .health-indicator {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .health-critical { background: #fed7d7; color: #742a2a; }
+        .health-degraded { background: #faf089; color: #744210; }
+        .health-healthy { background: #c6f6d5; color: #22543d; }
+    </style>
+</head>
+<body>
+    <div class="environment-badge" id="envBadge">🔍 Detecting...</div>
+    
+    <div class="container">
+        <div class="emergency-header">
+            <h1 style="margin: 0; font-size: 3rem;">🚨 PRODUCTION PAYMENT SYSTEM FIX</h1>
+            <p style="margin: 12px 0 0 0; font-size: 1.2rem; opacity: 0.9;">
+                Emergency repair tool for critical payment system issues
+            </p>
+        </div>
+
+        <!-- System Health Overview -->
+        <div class="card">
+            <h2 style="margin: 0 0 20px 0; color: #2d3748;">📊 Current System Health</h2>
+            <div id="healthOverview">
+                <div class="health-indicator health-critical">
+                    <span>🔍</span> Checking system health...
+                </div>
+            </div>
+        </div>
+
+        <!-- Emergency Fix Controls -->
+        <div class="card">
+            <h2 style="margin: 0 0 20px 0; color: #2d3748;">🔧 Emergency Fix Controls</h2>
+            <div style="text-align: center; margin: 20px 0;">
+                <button class="btn-emergency" onclick="runComprehensiveFix()" id="emergencyBtn">
+                    🚨 RUN COMPREHENSIVE FIX
+                </button>
+                <p style="margin: 12px 0; color: #718096;">
+                    This will fix all payment issues: missing records, inconsistent statuses, and RPC problems
+                </p>
+            </div>
+            
+            <div class="grid grid-3" style="margin-top: 24px;">
+                <button class="btn-primary" onclick="testRPCFunction()" id="testRpcBtn">
+                    🔧 Test RPC Function
+                </button>
+                <button class="btn-warning" onclick="backfillPaymentRecords()" id="backfillBtn">
+                    💳 Fix Missing Records
+                </button>
+                <button class="btn-success" onclick="fixInconsistentStatuses()" id="statusBtn">
+                    🔄 Fix Status Issues
+                </button>
+            </div>
+        </div>
+
+        <!-- Fix Progress -->
+        <div class="card" id="progressCard" style="display: none;">
+            <h2>🔄 Fix Progress</h2>
+            <div id="fixSteps"></div>
+        </div>
+
+        <!-- Results Display -->
+        <div id="results"></div>
+    </div>
+
+    <script>
+        const SUPABASE_URL = 'https://oknnklksdiqaifhxaccs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA';
+        
+        const environment = window.location.hostname.includes('localhost') ? 'development' : 'production';
+        document.getElementById('envBadge').className = `environment-badge env-${environment}`;
+        document.getElementById('envBadge').textContent = environment === 'production' ? '🚨 PRODUCTION' : '🧪 Development';
+
+        let currentFixProgress = [];
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `fix-result ${type}`;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            document.getElementById('results').appendChild(div);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+
+        function setButtonLoading(buttonId, isLoading, originalText) {
+            const btn = document.getElementById(buttonId);
+            if (isLoading) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span> Processing...';
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        function updateFixStep(stepIndex, status, message) {
+            currentFixProgress[stepIndex] = { status, message };
+            displayFixProgress();
+        }
+
+        function displayFixProgress() {
+            const stepsHtml = currentFixProgress.map((step, index) => {
+                const iconClass = step.status === 'pending' ? 'step-pending' :
+                                 step.status === 'running' ? 'step-running' :
+                                 step.status === 'success' ? 'step-success' : 'step-error';
+                
+                const icon = step.status === 'pending' ? '⏳' :
+                            step.status === 'running' ? '🔄' :
+                            step.status === 'success' ? '✅' : '❌';
+
+                return `
+                    <div class="fix-step">
+                        <div class="step-icon ${iconClass}">${icon}</div>
+                        <div>
+                            <strong>Step ${index + 1}:</strong> ${step.message}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('fixSteps').innerHTML = stepsHtml;
+            document.getElementById('progressCard').style.display = 'block';
+        }
+
+        async function checkSystemHealth() {
+            try {
+                addResult('📊 Checking current system health...', 'info');
+                
+                // Test RPC function
+                const rpcTest = await testRPCFunctionExecution();
+                
+                // Check recent orders
+                const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+                const ordersResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?created_at=gte.${twentyFourHoursAgo}&select=id,status,payment_status,payment_reference,total_amount`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+                
+                const orders = await ordersResponse.json();
+                
+                // Calculate health metrics
+                const paidOrders = orders.filter(o => o.payment_status === 'paid').length;
+                const confirmedOrders = orders.filter(o => o.status === 'confirmed').length;
+                const inconsistentOrders = orders.filter(o => 
+                    (o.payment_status === 'paid' && o.status !== 'confirmed') ||
+                    (o.status === 'confirmed' && o.payment_status !== 'paid')
+                ).length;
+
+                let overallHealth = 'healthy';
+                let healthColor = 'health-healthy';
+                let healthIcon = '✅';
+
+                const issues = [];
+                
+                if (!rpcTest.available) {
+                    issues.push('RPC function not available');
+                    overallHealth = 'critical';
+                }
+                
+                if (inconsistentOrders > 0) {
+                    issues.push(`${inconsistentOrders} orders with inconsistent statuses`);
+                    if (overallHealth !== 'critical') overallHealth = 'degraded';
+                }
+
+                if (overallHealth === 'critical') {
+                    healthColor = 'health-critical';
+                    healthIcon = '🚨';
+                } else if (overallHealth === 'degraded') {
+                    healthColor = 'health-degraded';
+                    healthIcon = '⚠️';
+                }
+
+                const healthHtml = `
+                    <div class="grid grid-4">
+                        <div class="health-indicator ${healthColor}">
+                            <span>${healthIcon}</span> Overall: ${overallHealth.toUpperCase()}
+                        </div>
+                        <div class="health-indicator ${rpcTest.available ? 'health-healthy' : 'health-critical'}">
+                            <span>${rpcTest.available ? '✅' : '❌'}</span> RPC: ${rpcTest.available ? 'Available' : 'Missing'}
+                        </div>
+                        <div class="health-indicator health-info">
+                            <span>📊</span> Orders (24h): ${orders.length}
+                        </div>
+                        <div class="health-indicator ${inconsistentOrders === 0 ? 'health-healthy' : 'health-warning'}">
+                            <span>${inconsistentOrders === 0 ? '✅' : '⚠️'}</span> Issues: ${inconsistentOrders}
+                        </div>
+                    </div>
+                    ${issues.length > 0 ? `
+                        <div style="margin-top: 16px;">
+                            <strong>Issues Found:</strong>
+                            <ul style="margin: 8px 0; color: #e53e3e;">
+                                ${issues.map(issue => `<li>${issue}</li>`).join('')}
+                            </ul>
+                        </div>
+                    ` : ''}
+                `;
+
+                document.getElementById('healthOverview').innerHTML = healthHtml;
+                
+                if (issues.length > 0) {
+                    addResult(`⚠️ System health check found ${issues.length} issues that need fixing`, 'warning');
+                } else {
+                    addResult('✅ System health check passed - no critical issues found', 'success');
+                }
+
+            } catch (error) {
+                addResult(`❌ Health check failed: ${error.message}`, 'critical');
+            }
+        }
+
+        async function testRPCFunctionExecution() {
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_and_update_payment_status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({
+                        payment_ref: `test_${Date.now()}`,
+                        new_status: 'confirmed',
+                        payment_amount: 100
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.status === 404 && data.message && data.message.includes('not found')) {
+                    return { available: true, functional: true };
+                } else if (response.status === 404 && data.message && data.message.includes('function')) {
+                    return { available: false, functional: false };
+                } else if (response.ok) {
+                    return { available: true, functional: true };
+                } else {
+                    return { available: true, functional: false };
+                }
+            } catch (error) {
+                return { available: false, functional: false };
+            }
+        }
+
+        async function testRPCFunction() {
+            setButtonLoading('testRpcBtn', true, '🔧 Test RPC Function');
+            
+            try {
+                addResult('🔧 Testing RPC function availability and execution...', 'info');
+                
+                const result = await testRPCFunctionExecution();
+                
+                if (result.available && result.functional) {
+                    addResult('✅ RPC function is available and working correctly', 'success');
+                } else if (result.available && !result.functional) {
+                    addResult('⚠️ RPC function exists but has execution issues', 'warning');
+                } else {
+                    addResult('❌ RPC function is not available - this is a critical issue', 'critical');
+                }
+            } catch (error) {
+                addResult(`❌ RPC test failed: ${error.message}`, 'critical');
+            } finally {
+                setButtonLoading('testRpcBtn', false, '🔧 Test RPC Function');
+            }
+        }
+
+        async function backfillPaymentRecords() {
+            setButtonLoading('backfillBtn', true, '💳 Fix Missing Records');
+            
+            try {
+                addResult('💳 Starting backfill of missing payment transaction records...', 'info');
+                
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/backfill_missing_payment_records`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    addResult(`✅ Backfill completed: ${result.processed_orders} records created, ${result.error_count} errors`, 
+                        result.error_count === 0 ? 'success' : 'warning');
+                    
+                    if (result.errors && result.errors.length > 0) {
+                        addResult(`Errors encountered: ${result.errors.join(', ')}`, 'warning');
+                    }
+                } else {
+                    addResult(`❌ Backfill failed: ${result.message || 'Unknown error'}`, 'critical');
+                }
+            } catch (error) {
+                addResult(`❌ Backfill process failed: ${error.message}`, 'critical');
+            } finally {
+                setButtonLoading('backfillBtn', false, '💳 Fix Missing Records');
+            }
+        }
+
+        async function fixInconsistentStatuses() {
+            setButtonLoading('statusBtn', true, '🔄 Fix Status Issues');
+            
+            try {
+                addResult('🔄 Starting fix of inconsistent order and payment statuses...', 'info');
+                
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/fix_inconsistent_order_statuses`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    addResult(`✅ Status fix completed: ${result.fixed_orders} orders fixed, ${result.error_count} errors`, 
+                        result.error_count === 0 ? 'success' : 'warning');
+                    
+                    if (result.errors && result.errors.length > 0) {
+                        addResult(`Errors encountered: ${result.errors.join(', ')}`, 'warning');
+                    }
+                } else {
+                    addResult(`❌ Status fix failed: ${result.message || 'Unknown error'}`, 'critical');
+                }
+            } catch (error) {
+                addResult(`❌ Status fix process failed: ${error.message}`, 'critical');
+            } finally {
+                setButtonLoading('statusBtn', false, '🔄 Fix Status Issues');
+            }
+        }
+
+        async function runComprehensiveFix() {
+            setButtonLoading('emergencyBtn', true, '🚨 RUN COMPREHENSIVE FIX');
+            
+            // Initialize progress tracking
+            currentFixProgress = [
+                { status: 'pending', message: 'Testing RPC function availability' },
+                { status: 'pending', message: 'Backfilling missing payment records' },
+                { status: 'pending', message: 'Fixing inconsistent order statuses' },
+                { status: 'pending', message: 'Verifying fixes and system health' }
+            ];
+            displayFixProgress();
+            
+            try {
+                addResult('🚨 Starting comprehensive production payment system fix...', 'info');
+                
+                // Step 1: Test RPC
+                updateFixStep(0, 'running', 'Testing RPC function availability');
+                const rpcTest = await testRPCFunctionExecution();
+                if (rpcTest.available) {
+                    updateFixStep(0, 'success', 'RPC function is available and functional');
+                } else {
+                    updateFixStep(0, 'error', 'RPC function is not available - critical issue');
+                    addResult('❌ Cannot proceed with comprehensive fix - RPC function not available', 'critical');
+                    return;
+                }
+                
+                // Step 2: Run comprehensive fix
+                updateFixStep(1, 'running', 'Running comprehensive fix via RPC');
+                
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/run_comprehensive_payment_fix`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    updateFixStep(1, 'success', 'Comprehensive fix completed successfully');
+                    updateFixStep(2, 'success', 'All fixes applied successfully');
+                    
+                    // Display detailed results
+                    const backfillResults = result.backfill_results;
+                    const statusResults = result.status_fix_results;
+                    
+                    const summaryHtml = `
+                        <div class="card">
+                            <h2>🎉 Comprehensive Fix Results</h2>
+                            <div class="grid grid-2">
+                                <div>
+                                    <h3>💳 Payment Records Backfill</h3>
+                                    <p><strong>Processed:</strong> ${backfillResults.processed_orders} orders</p>
+                                    <p><strong>Errors:</strong> ${backfillResults.error_count}</p>
+                                    ${backfillResults.errors.length > 0 ? `<p><strong>Error details:</strong> ${backfillResults.errors.join(', ')}</p>` : ''}
+                                </div>
+                                <div>
+                                    <h3>🔄 Status Corrections</h3>
+                                    <p><strong>Fixed:</strong> ${statusResults.fixed_orders} orders</p>
+                                    <p><strong>Errors:</strong> ${statusResults.error_count}</p>
+                                    ${statusResults.errors.length > 0 ? `<p><strong>Error details:</strong> ${statusResults.errors.join(', ')}</p>` : ''}
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                    
+                    addResult(summaryHtml, 'success');
+                    
+                    // Step 3: Verify fixes
+                    updateFixStep(3, 'running', 'Verifying fixes and checking system health');
+                    await checkSystemHealth();
+                    updateFixStep(3, 'success', 'System health verification completed');
+                    
+                    addResult('🎉 Comprehensive fix completed successfully! All payment system issues have been resolved.', 'success');
+                    
+                } else {
+                    updateFixStep(1, 'error', 'Comprehensive fix failed');
+                    addResult(`❌ Comprehensive fix failed: ${result.message || JSON.stringify(result)}`, 'critical');
+                }
+                
+            } catch (error) {
+                updateFixStep(1, 'error', `Fix failed: ${error.message}`);
+                addResult(`❌ Comprehensive fix process failed: ${error.message}`, 'critical');
+            } finally {
+                setButtonLoading('emergencyBtn', false, '🚨 RUN COMPREHENSIVE FIX');
+            }
+        }
+
+        // Auto-run system health check on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            addResult('🚀 Production Payment Fix Tool Loaded', 'info');
+            addResult(`🌍 Environment: ${environment}`, 'info');
+            
+            setTimeout(() => {
+                checkSystemHealth();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

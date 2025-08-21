@@ -4,8 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, CheckCircle, Clipboard, Clock, Copy, Info, ListChecks, Trash2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { AlertCircle, CheckCircle, Clipboard, Clock, Copy, Info, ListChecks, Trash2, Shield, RefreshCw, ExternalLink } from 'lucide-react';
 import { paystackService, validateReferenceForVerification } from '@/lib/paystack';
+import { paystackDebug, type HealthCheckResult, type TransactionCheckResult } from '@/lib/paystackDebug';
 import { toast } from 'sonner';
 import { Helmet } from 'react-helmet-async';
 import { usePaystackConfig } from '@/hooks/usePaystackConfig';
@@ -51,6 +53,10 @@ export const PaymentDebugPanel: React.FC = () => {
   const [verificationResult, setVerificationResult] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [testMode, setTestMode] = useState(false);
+  const [healthData, setHealthData] = useState<HealthCheckResult | null>(null);
+  const [checkResult, setCheckResult] = useState<TransactionCheckResult | null>(null);
+  const [isChecking, setIsChecking] = useState(false);
+  const [keyMismatchWarning, setKeyMismatchWarning] = useState(false);
   const { config, loading: cfgLoading } = usePaystackConfig();
   const { items: recent, add: addRecent, clear: clearRecent } = useRecentReferences();
 
@@ -61,11 +67,89 @@ export const PaymentDebugPanel: React.FC = () => {
     return `${key.slice(0, 6)}…${key.slice(-2)}`;
   }, [config?.publicKey]);
 
+  // Check environment mismatch
+  useEffect(() => {
+    if (config?.publicKey && healthData) {
+      const frontendIsTest = config.publicKey.startsWith('pk_test_');
+      const backendIsTest = healthData.environment === 'test';
+      setKeyMismatchWarning(frontendIsTest !== backendIsTest);
+    }
+  }, [config?.publicKey, healthData]);
+
+  // Load health data on mount
+  useEffect(() => {
+    const loadHealth = async () => {
+      try {
+        const health = await paystackDebug.health();
+        setHealthData(health);
+      } catch (error) {
+        console.error('Health check failed:', error);
+      }
+    };
+    loadHealth();
+  }, []);
+
+  const handleCheckTransaction = async (ref: string) => {
+    if (!ref.trim()) return;
+    
+    setIsChecking(true);
+    setCheckResult(null);
+    
+    try {
+      const result = await paystackDebug.checkTransaction(ref);
+      setCheckResult(result);
+      
+      if (!result.exists) {
+        toast.warning('Paystack does not recognize this reference yet. This is normal for very recent payments.');
+      } else {
+        toast.success(`Transaction found! Status: ${result.status}`);
+      }
+    } catch (error) {
+      console.error('Check transaction error:', error);
+      toast.error(`Check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setCheckResult({ exists: false, latency_ms: 0 });
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
+  const handleWaitAndRetry = async (ref: string) => {
+    if (!ref.trim()) return;
+    
+    setIsChecking(true);
+    
+    try {
+      toast.info('Waiting 5 seconds before checking...');
+      await new Promise(resolve => setTimeout(resolve, 5000));
+      
+      const result = await paystackDebug.waitAndCheckTransaction(ref, 2);
+      setCheckResult(result);
+      toast.success('Transaction found after retry!');
+    } catch (error) {
+      console.error('Retry check failed:', error);
+      toast.error(`Still not found: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setIsChecking(false);
+    }
+  };
+
   const handleVerifyPayment = async () => {
     const ref = reference.trim();
     if (!ref) {
       toast.error('Please enter a payment reference');
       return;
+    }
+
+    // Pre-verification check
+    if (!checkResult || !checkResult.exists) {
+      toast.info('Checking transaction existence first...');
+      await handleCheckTransaction(ref);
+      
+      // If still doesn't exist after check, show helpful message
+      if (checkResult && !checkResult.exists) {
+        toast.warning('Transaction not found in Paystack. Try waiting a few seconds and check again.');
+        return;
+      }
     }
 
     if (!validateReferenceForVerification(ref)) {
@@ -81,6 +165,31 @@ export const PaymentDebugPanel: React.FC = () => {
     } catch (error) {
       console.error('Verification error:', error);
       toast.error(`Verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setVerificationResult(null);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDebugVerify = async () => {
+    const ref = reference.trim();
+    if (!ref) {
+      toast.error('Please enter a payment reference');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const result = await paystackDebug.verifyTransaction(ref);
+      setVerificationResult({
+        ...result.data,
+        debug_info: result.debug
+      });
+      addRecent(ref);
+      toast.success('Debug verification completed');
+    } catch (error) {
+      console.error('Debug verification error:', error);
+      toast.error(`Debug verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setVerificationResult(null);
     } finally {
       setLoading(false);
@@ -166,19 +275,36 @@ export const PaymentDebugPanel: React.FC = () => {
             </Label>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+          {keyMismatchWarning && (
+            <Alert variant="destructive">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>
+                <strong>Environment Mismatch:</strong> Frontend uses {config?.isTestMode ? 'test' : 'live'} keys 
+                but backend is configured for {healthData?.environment} environment. 
+                This will cause payment failures.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm">
             <div className="space-y-1">
               <div className="text-muted-foreground">Public key</div>
               <code className="text-xs break-all">{cfgLoading ? 'loading…' : maskedKey}</code>
             </div>
             <div className="space-y-1">
-              <div className="text-muted-foreground">Mode</div>
+              <div className="text-muted-foreground">Frontend Mode</div>
               <Badge variant={(config?.isTestMode ? 'secondary' : 'default')}>{config?.isTestMode ? 'Test' : 'Live'}</Badge>
             </div>
             <div className="space-y-1">
+              <div className="text-muted-foreground">Backend Mode</div>
+              <Badge variant={healthData?.environment === 'test' ? 'secondary' : 'default'}>
+                {healthData?.environment || 'Unknown'}
+              </Badge>
+            </div>
+            <div className="space-y-1">
               <div className="text-muted-foreground">Config</div>
-              <Badge variant={config?.isValid ? 'default' : 'destructive'}>
-                {config?.isValid ? 'Valid' : 'Invalid'}
+              <Badge variant={config?.isValid && healthData?.keyPresent ? 'default' : 'destructive'}>
+                {config?.isValid && healthData?.keyPresent ? 'Valid' : 'Invalid'}
               </Badge>
             </div>
           </div>
@@ -207,15 +333,58 @@ export const PaymentDebugPanel: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <Button onClick={handleVerifyPayment} disabled={loading} variant="outline">
-              Verify Payment
-            </Button>
-            {testMode && (
-              <Button onClick={handleTestInlinePayment} disabled={loading} variant="secondary">
-                Initialize Test Payment
+          <div className="space-y-3">
+            <div className="flex flex-wrap gap-2">
+              <Button 
+                onClick={() => handleCheckTransaction(reference.trim())} 
+                disabled={isChecking || !reference.trim()} 
+                variant="outline"
+                size="sm"
+              >
+                {isChecking ? <RefreshCw className="h-3 w-3 mr-1 animate-spin" /> : <Shield className="h-3 w-3 mr-1" />}
+                Quick Check
               </Button>
+              
+              {checkResult && !checkResult.exists && (
+                <Button 
+                  onClick={() => handleWaitAndRetry(reference.trim())} 
+                  disabled={isChecking} 
+                  variant="outline"
+                  size="sm"
+                >
+                  <Clock className="h-3 w-3 mr-1" />
+                  Wait & Retry
+                </Button>
+              )}
+            </div>
+
+            {checkResult && (
+              <Alert variant={checkResult.exists ? "default" : "destructive"}>
+                <Info className="h-4 w-4" />
+                <AlertDescription>
+                  {checkResult.exists 
+                    ? `✅ Transaction found! Status: ${checkResult.status}${checkResult.gateway_response ? ` (${checkResult.gateway_response})` : ''}`
+                    : '❌ Paystack does not recognize this reference yet. Wait 3-5 seconds and try "Wait & Retry".'
+                  }
+                  <span className="text-xs ml-2 opacity-70">({checkResult.latency_ms}ms)</span>
+                </AlertDescription>
+              </Alert>
             )}
+
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={handleVerifyPayment} disabled={loading || isChecking} variant="outline">
+                Verify Payment
+              </Button>
+              <Button onClick={handleDebugVerify} disabled={loading || isChecking} variant="secondary" size="sm">
+                <ExternalLink className="h-3 w-3 mr-1" />
+                Debug Verify
+              </Button>
+              {testMode && (
+                <Button onClick={handleTestInlinePayment} disabled={loading || isChecking} variant="secondary">
+                  Initialize Test Payment
+                </Button>
+              )}
+            </div>
           </div>
 
           {recent.length > 0 && (

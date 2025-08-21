@@ -34,6 +34,8 @@ export const PaystackPaymentHandler = ({
   onClose,
 }: PaystackPaymentHandlerProps) => {
   const [currentReference, setCurrentReference] = useState<string>('');
+  const [paymentStartTime, setPaymentStartTime] = useState<number | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   
   const {
     initializeSecurePayment,
@@ -93,6 +95,20 @@ export const PaystackPaymentHandler = ({
 
       if (result.success && result.reference) {
         setCurrentReference(result.reference);
+        setPaymentStartTime(Date.now());
+        
+        // Store reference and timing for debugging
+        sessionStorage.setItem('current_payment_reference', result.reference);
+        sessionStorage.setItem('payment_start_time', Date.now().toString());
+        sessionStorage.setItem('payment_order_id', orderId);
+        
+        console.log('🚀 Payment initialized:', {
+          reference: result.reference,
+          orderId,
+          amount,
+          email,
+          timestamp: new Date().toISOString()
+        });
         
         // Enhanced payment data storage with recovery utility
         PaymentRecoveryUtil.storePaymentData({
@@ -114,10 +130,16 @@ export const PaystackPaymentHandler = ({
     }
 
     try {
+      console.log('🔄 Redirecting to payment gateway:', {
+        reference: currentReference,
+        authorizationUrl: authorizationUrl.substring(0, 50) + '...',
+        duration_ms: paymentStartTime ? Date.now() - paymentStartTime : 0
+      });
+      
       window.location.href = authorizationUrl;
-      // Note: onSuccess will be called by the payment callback handler after verification
       toast.info('Redirecting to secure Paystack checkout...');
     } catch (error) {
+      console.error('❌ Payment redirect failed:', error);
       onError(error instanceof Error ? error.message : 'Payment failed');
     }
   };
@@ -140,16 +162,57 @@ export const PaystackPaymentHandler = ({
   };
 
   const handleClose = () => {
+    const storedReference = sessionStorage.getItem('current_payment_reference');
+    const startTime = sessionStorage.getItem('payment_start_time');
+    
+    console.log('🔍 Payment popup/flow closed:', {
+      storedReference,
+      currentReference,
+      duration_ms: startTime ? Date.now() - parseInt(startTime) : 0
+    });
+    
     // Check for pending payment after a short delay
     setTimeout(async () => {
       const pendingPayment = await checkPendingPayment();
       if (pendingPayment && pendingPayment.success) {
+        console.log('✅ Found completed payment after close:', pendingPayment.reference);
         onSuccess(pendingPayment.reference || '');
       } else {
         onClose();
       }
     }, 2000);
   };
+
+  // Enhanced error handling with retry logic
+  useEffect(() => {
+    if (error && currentReference && retryCount < 3) {
+      const isReferenceNotFound = error.toLowerCase().includes('reference not found') || 
+                                 error.toLowerCase().includes('transaction not found');
+      
+      if (isReferenceNotFound) {
+        console.log(`🔄 "Reference not found" error detected, scheduling retry ${retryCount + 1}/3 in 3s...`);
+        
+        PaymentRecoveryUtil.showUserFriendlyError(
+          'We couldn\'t find your payment yet. This can happen when the gateway is still processing. Retrying now…'
+        );
+        
+        setTimeout(async () => {
+          setRetryCount(prev => prev + 1);
+          
+          try {
+            const pendingPayment = await checkPendingPayment();
+            if (pendingPayment && pendingPayment.success) {
+              console.log('✅ Retry successful:', pendingPayment.reference);
+              onSuccess(pendingPayment.reference || '');
+              return;
+            }
+          } catch (retryError) {
+            console.error('❌ Retry failed:', retryError);
+          }
+        }, 3000 + Math.random() * 2000); // 3-5s with jitter
+      }
+    }
+  }, [error, currentReference, retryCount, checkPendingPayment, onSuccess]);
 
   return (
     <Card className="paystack-payment-handler w-full max-w-md mx-auto">

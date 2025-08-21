@@ -195,3 +195,6 @@ verify_jwt = false
 
 [functions.public-api]
 verify_jwt = false
+
+[functions.paystack-debug]
+verify_jwt = false

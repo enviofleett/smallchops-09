@@ -66,7 +66,7 @@ const PublicHeaderContent = () => {
               to="/booking" 
               className="text-foreground hover:text-primary transition-colors"
             >
-              Booking
+              Event
             </Link>
             <Link 
               to="/about" 
@@ -190,7 +190,7 @@ const PublicHeaderContent = () => {
                   className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium"
                   onClick={() => setIsMobileMenuOpen(false)}
                 >
-                  Booking
+                  Event
                 </Link>
                 {isAuthenticated && (
                   <button 

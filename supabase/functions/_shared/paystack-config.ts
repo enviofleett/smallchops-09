@@ -28,6 +28,8 @@ export function detectEnvironment(request?: Request): EnvironmentDetectionResult
   const productionDomains = [
     'startersmallchops.com',
     'www.startersmallchops.com',
+    'startersmallchops.lovableproject.com',
+    'startersmallchops.lovable.app'
     // Add your production domains here
   ]
   

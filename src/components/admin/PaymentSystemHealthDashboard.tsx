@@ -17,12 +17,15 @@ import {
   Shield,
   CreditCard
 } from 'lucide-react';
-import { 
-  paymentSystemTester, 
-  PaymentSystemHealthReport, 
-  PaymentTestResult, 
-  PaymentTests 
+import {
+  paymentSystemTester,
+  PaymentSystemHealthReport,
+  PaymentTestResult,
+  PaymentTests
 } from '@/utils/paymentSystemTesting';
+import { endToEndPaymentTester, EndToEndTestReport } from '@/utils/endToEndPaymentTest';
+import { supabaseLogMonitor } from '@/utils/supabaseLogMonitor';
+import { paystackWebhookTester, WebhookTestReport } from '@/utils/paystackWebhookTester';
 import { toast } from 'sonner';
 
 const PaymentSystemHealthDashboard: React.FC = () => {

@@ -300,10 +300,13 @@ const PaymentSystemHealthDashboard: React.FC = () => {
       )}
 
       <Tabs defaultValue="overview" className="space-y-4">
-        <TabsList>
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="individual">Individual Tests</TabsTrigger>
-          <TabsTrigger value="details">Detailed Results</TabsTrigger>
+          <TabsTrigger value="endtoend">End-to-End</TabsTrigger>
+          <TabsTrigger value="webhooks">Webhooks</TabsTrigger>
+          <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+          <TabsTrigger value="details">Details</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-4">

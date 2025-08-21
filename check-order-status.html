@@ -1,0 +1,358 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Order Status Check</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 1000px; margin: 0 auto; padding: 20px; }
+        .status-result { padding: 15px; margin: 10px 0; border-radius: 8px; }
+        .success { background: #d4edda; color: #155724; border: 1px solid #c3e6cb; }
+        .error { background: #f8d7da; color: #721c24; border: 1px solid #f5c6cb; }
+        .warning { background: #fff3cd; color: #856404; border: 1px solid #ffeaa7; }
+        .info { background: #d1ecf1; color: #0c5460; border: 1px solid #bee5eb; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 4px; overflow-x: auto; font-size: 12px; }
+        button { padding: 12px 24px; margin: 8px; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; }
+        .primary { background: #007bff; color: white; }
+        .secondary { background: #6c757d; color: white; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { padding: 10px; text-align: left; border-bottom: 1px solid #ddd; }
+        th { background-color: #f8f9fa; font-weight: bold; }
+        .status-badge { padding: 4px 8px; border-radius: 4px; font-size: 12px; font-weight: bold; }
+        .status-confirmed { background: #d4edda; color: #155724; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-paid { background: #d4edda; color: #155724; }
+        .timeline { margin: 20px 0; }
+        .timeline-item { display: flex; align-items: center; margin: 10px 0; }
+        .timeline-icon { width: 20px; height: 20px; border-radius: 50%; margin-right: 15px; }
+        .timeline-completed { background: #28a745; }
+        .timeline-pending { background: #ffc107; }
+        .timeline-failed { background: #dc3545; }
+    </style>
+</head>
+<body>
+    <h1>🔍 Order Status Checker</h1>
+    <p>Checking the status of order from payment callback URL</p>
+    
+    <div class="info status-result">
+        <strong>URL Parameters:</strong><br>
+        • Reference: <code>txn_1755814025373_f3fbf5d8</code><br>
+        • Order ID: <code>f3fbf5d8-74b1-481a-9cc3-a0cdb8232dfb</code><br>
+        • Frontend Status: <code>success</code>
+    </div>
+
+    <div id="results"></div>
+    
+    <button class="primary" onclick="checkOrderStatus()">🔍 Check Order Status</button>
+    <button class="secondary" onclick="checkPaymentReference()">💳 Check Payment Reference</button>
+    <button class="secondary" onclick="runRPCTest()">🔧 Test RPC Function</button>
+    <button class="secondary" onclick="clearResults()">🧹 Clear Results</button>
+
+    <script>
+        const SUPABASE_URL = 'https://oknnklksdiqaifhxaccs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA';
+        
+        const ORDER_ID = 'f3fbf5d8-74b1-481a-9cc3-a0cdb8232dfb';
+        const PAYMENT_REFERENCE = 'txn_1755814025373_f3fbf5d8';
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `status-result ${type}`;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            document.getElementById('results').appendChild(div);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+        
+        function clearResults() {
+            document.getElementById('results').innerHTML = '';
+            addResult('🧹 Results cleared', 'info');
+        }
+
+        function createStatusBadge(status) {
+            const statusClass = status === 'confirmed' ? 'status-confirmed' : 
+                               status === 'paid' ? 'status-paid' : 'status-pending';
+            return `<span class="status-badge ${statusClass}">${status}</span>`;
+        }
+
+        function formatTimestamp(timestamp) {
+            if (!timestamp) return 'Not set';
+            return new Date(timestamp).toLocaleString();
+        }
+
+        async function checkOrderStatus() {
+            addResult('🔍 Checking order status in database...', 'info');
+            
+            try {
+                // Check order by ID
+                const orderResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${ORDER_ID}&select=*`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                if (!orderResponse.ok) {
+                    throw new Error(`Failed to fetch order: ${orderResponse.status}`);
+                }
+
+                const orderData = await orderResponse.json();
+                
+                if (orderData.length === 0) {
+                    addResult('❌ Order not found in database', 'error');
+                    return;
+                }
+
+                const order = orderData[0];
+
+                // Check payment transactions
+                const transactionResponse = await fetch(`${SUPABASE_URL}/rest/v1/payment_transactions?or=(order_id.eq.${ORDER_ID},reference.eq.${PAYMENT_REFERENCE})&select=*`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                const transactionData = await transactionResponse.json();
+                const paymentTransaction = transactionData.length > 0 ? transactionData[0] : null;
+
+                // Create detailed status report
+                const isCompleted = order.status === 'confirmed' && order.payment_status === 'paid';
+                const statusIcon = isCompleted ? '✅' : '⚠️';
+                
+                let statusReport = `${statusIcon} <strong>Order Status Report</strong><br><br>`;
+                
+                statusReport += `<table>
+                    <tr><th>Field</th><th>Value</th><th>Status</th></tr>
+                    <tr>
+                        <td>Order ID</td>
+                        <td><code>${order.id}</code></td>
+                        <td>✅ Found</td>
+                    </tr>
+                    <tr>
+                        <td>Order Number</td>
+                        <td><strong>${order.order_number || 'Not set'}</strong></td>
+                        <td>${order.order_number ? '✅' : '⚠️'}</td>
+                    </tr>
+                    <tr>
+                        <td>Order Status</td>
+                        <td>${createStatusBadge(order.status)}</td>
+                        <td>${order.status === 'confirmed' ? '✅ Confirmed' : '⚠️ Not Confirmed'}</td>
+                    </tr>
+                    <tr>
+                        <td>Payment Status</td>
+                        <td>${createStatusBadge(order.payment_status)}</td>
+                        <td>${order.payment_status === 'paid' ? '✅ Paid' : '⚠️ Not Paid'}</td>
+                    </tr>
+                    <tr>
+                        <td>Payment Reference</td>
+                        <td><code>${order.payment_reference || 'Not set'}</code></td>
+                        <td>${order.payment_reference === PAYMENT_REFERENCE ? '✅ Matches' : '⚠️ Mismatch'}</td>
+                    </tr>
+                    <tr>
+                        <td>Total Amount</td>
+                        <td>₦${order.total_amount ? order.total_amount.toLocaleString() : 'Not set'}</td>
+                        <td>${order.total_amount ? '✅' : '⚠️'}</td>
+                    </tr>
+                    <tr>
+                        <td>Customer Email</td>
+                        <td>${order.customer_email || 'Not set'}</td>
+                        <td>${order.customer_email ? '✅' : '⚠️'}</td>
+                    </tr>
+                    <tr>
+                        <td>Created At</td>
+                        <td>${formatTimestamp(order.created_at)}</td>
+                        <td>✅</td>
+                    </tr>
+                    <tr>
+                        <td>Paid At</td>
+                        <td>${formatTimestamp(order.paid_at)}</td>
+                        <td>${order.paid_at ? '✅ Set' : '⚠️ Not Set'}</td>
+                    </tr>
+                    <tr>
+                        <td>Updated At</td>
+                        <td>${formatTimestamp(order.updated_at)}</td>
+                        <td>${order.updated_at !== order.created_at ? '✅ Updated' : '⚠️ No Updates'}</td>
+                    </tr>
+                </table>`;
+
+                if (paymentTransaction) {
+                    statusReport += `<br><strong>💳 Payment Transaction Record:</strong><br>
+                    <table>
+                        <tr><th>Field</th><th>Value</th></tr>
+                        <tr><td>Transaction ID</td><td><code>${paymentTransaction.id}</code></td></tr>
+                        <tr><td>Reference</td><td><code>${paymentTransaction.reference}</code></td></tr>
+                        <tr><td>Provider Reference</td><td><code>${paymentTransaction.provider_reference || 'Not set'}</code></td></tr>
+                        <tr><td>Amount</td><td>₦${paymentTransaction.amount ? paymentTransaction.amount.toLocaleString() : 'Not set'}</td></tr>
+                        <tr><td>Status</td><td>${createStatusBadge(paymentTransaction.status)}</td></tr>
+                        <tr><td>Verified At</td><td>${formatTimestamp(paymentTransaction.verified_at)}</td></tr>
+                    </table>`;
+                } else {
+                    statusReport += `<br><strong>⚠️ No Payment Transaction Record Found</strong><br>
+                    This could indicate that the payment verification process didn't complete properly.`;
+                }
+
+                // Add timeline
+                statusReport += `<br><div class="timeline"><strong>📅 Payment Timeline:</strong><br>`;
+                
+                const timelineEvents = [
+                    { name: 'Order Created', time: order.created_at, completed: true },
+                    { name: 'Payment Reference Set', time: order.created_at, completed: !!order.payment_reference },
+                    { name: 'Payment Verified', time: order.paid_at, completed: !!order.paid_at },
+                    { name: 'Order Confirmed', time: order.status === 'confirmed' ? order.updated_at : null, completed: order.status === 'confirmed' }
+                ];
+
+                timelineEvents.forEach(event => {
+                    const iconClass = event.completed ? 'timeline-completed' : 'timeline-pending';
+                    const status = event.completed ? '✅' : '⏳';
+                    statusReport += `
+                        <div class="timeline-item">
+                            <div class="timeline-icon ${iconClass}"></div>
+                            <strong>${event.name}</strong>: ${event.time ? formatTimestamp(event.time) : 'Pending'} ${status}
+                        </div>`;
+                });
+
+                statusReport += `</div>`;
+
+                // Add summary
+                if (isCompleted) {
+                    statusReport += `<br><div class="success status-result">
+                        <strong>✅ PAYMENT SUCCESSFUL</strong><br>
+                        The order has been successfully processed and confirmed. All systems working correctly.
+                    </div>`;
+                } else {
+                    statusReport += `<br><div class="warning status-result">
+                        <strong>⚠️ PAYMENT INCOMPLETE</strong><br>
+                        The order exists but is not fully processed. This may indicate an issue with the payment verification flow.
+                    </div>`;
+                }
+
+                addResult(statusReport, isCompleted ? 'success' : 'warning');
+
+                // Add raw data
+                addResult(`<details><summary>📋 Raw Order Data</summary><pre>${JSON.stringify(order, null, 2)}</pre></details>`, 'info');
+                
+                if (paymentTransaction) {
+                    addResult(`<details><summary>💳 Raw Payment Transaction Data</summary><pre>${JSON.stringify(paymentTransaction, null, 2)}</pre></details>`, 'info');
+                }
+
+            } catch (error) {
+                addResult(`❌ Error checking order status: ${error.message}`, 'error');
+            }
+        }
+
+        async function checkPaymentReference() {
+            addResult('🔍 Checking payment reference across tables...', 'info');
+            
+            try {
+                // Check in orders table
+                const orderResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?payment_reference=eq.${PAYMENT_REFERENCE}&select=*`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                // Check in payment_transactions table
+                const transactionResponse = await fetch(`${SUPABASE_URL}/rest/v1/payment_transactions?reference=eq.${PAYMENT_REFERENCE}&select=*`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                const orderData = await orderResponse.json();
+                const transactionData = await transactionResponse.json();
+
+                let report = `<strong>🔍 Payment Reference Analysis: ${PAYMENT_REFERENCE}</strong><br><br>`;
+                
+                report += `<table>
+                    <tr><th>Table</th><th>Found</th><th>Count</th><th>Details</th></tr>
+                    <tr>
+                        <td>Orders</td>
+                        <td>${orderData.length > 0 ? '✅ Yes' : '❌ No'}</td>
+                        <td>${orderData.length}</td>
+                        <td>${orderData.length > 0 ? `Order ID: ${orderData[0].id}` : 'Reference not found'}</td>
+                    </tr>
+                    <tr>
+                        <td>Payment Transactions</td>
+                        <td>${transactionData.length > 0 ? '✅ Yes' : '❌ No'}</td>
+                        <td>${transactionData.length}</td>
+                        <td>${transactionData.length > 0 ? `Transaction ID: ${transactionData[0].id}` : 'Reference not found'}</td>
+                    </tr>
+                </table>`;
+
+                const allGood = orderData.length > 0 && transactionData.length > 0;
+                addResult(report, allGood ? 'success' : 'warning');
+
+                if (orderData.length > 0) {
+                    addResult(`<details><summary>📋 Orders Table Data</summary><pre>${JSON.stringify(orderData, null, 2)}</pre></details>`, 'info');
+                }
+
+                if (transactionData.length > 0) {
+                    addResult(`<details><summary>💳 Transactions Table Data</summary><pre>${JSON.stringify(transactionData, null, 2)}</pre></details>`, 'info');
+                }
+
+            } catch (error) {
+                addResult(`❌ Error checking payment reference: ${error.message}`, 'error');
+            }
+        }
+
+        async function runRPCTest() {
+            addResult('🔧 Testing RPC function with this payment reference...', 'info');
+            
+            try {
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_and_update_payment_status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({
+                        payment_ref: PAYMENT_REFERENCE,
+                        new_status: 'confirmed',
+                        payment_amount: 1000,
+                        payment_gateway_response: {
+                            test: true,
+                            reference: PAYMENT_REFERENCE,
+                            amount: 100000,
+                            status: 'success'
+                        }
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.ok && data.length > 0) {
+                    const result = data[0];
+                    addResult(`✅ RPC Function Test: SUCCESS<br>
+                        Function executed successfully and returned order data:<br>
+                        • Order ID: ${result.order_id}<br>
+                        • Order Number: ${result.order_number}<br>
+                        • Status: ${result.status}<br>
+                        • Amount: ₦${result.amount}`, 'success');
+                } else {
+                    addResult(`⚠️ RPC Function Test: RESPONSE<br>
+                        Status: ${response.status}<br>
+                        Response: <pre>${JSON.stringify(data, null, 2)}</pre>`, 'warning');
+                }
+
+            } catch (error) {
+                addResult(`❌ RPC Function Test: ERROR<br>${error.message}`, 'error');
+            }
+        }
+
+        // Auto-run checks on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            addResult('🚀 Order Status Checker Loaded', 'info');
+            addResult('🎯 Ready to analyze the specific order from payment callback', 'info');
+            
+            // Auto-run the order status check after 1 second
+            setTimeout(() => {
+                checkOrderStatus();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

@@ -51,11 +51,6 @@ export async function getProductsWithDiscounts(categoryId?: string): Promise<Pro
       return [];
     }
     
-    // Safely handle promotions error
-    const activePromotions = Array.isArray(promotions) 
-      ? promotions.filter(p => p.status === 'active')
-      : [];
-    
     // Calculate discounts for each product
     const productsWithDiscounts = (products || []).map(product => 
       calculateProductDiscount(product, activePromotions)

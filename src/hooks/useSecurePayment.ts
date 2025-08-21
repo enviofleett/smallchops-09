@@ -102,6 +102,18 @@ export const useSecurePayment = () => {
         authorizationUrl: authorizationUrl,
       });
 
+      // 🔐 CRITICAL: Persist reference for callback recovery
+      if (reference) {
+        try {
+          sessionStorage.setItem('paystack_payment_reference', reference);
+          localStorage.setItem('paystack_last_reference', reference);
+          sessionStorage.setItem('payment_order_id', orderId);
+          console.log('💾 Payment reference stored in session/localStorage:', reference);
+        } catch (error) {
+          console.warn('⚠️ Failed to store payment reference in storage:', error);
+        }
+      }
+
       console.log('✅ Secure payment initialized:', {
         reference: reference,
         orderId: responseData?.order_id || orderId

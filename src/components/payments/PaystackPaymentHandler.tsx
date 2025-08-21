@@ -61,6 +61,16 @@ export const PaystackPaymentHandler = ({
 
       if (result.success && result.reference) {
         setCurrentReference(result.reference);
+        
+        // 🔐 Defense-in-depth: Store reference in multiple locations
+        try {
+          sessionStorage.setItem('paystack_payment_reference', result.reference);
+          localStorage.setItem('paystack_last_reference', result.reference);
+          sessionStorage.setItem('payment_order_id', orderId);
+          console.log('🛡️ Defense-in-depth reference storage:', result.reference);
+        } catch (error) {
+          console.warn('⚠️ Failed to store payment reference:', error);
+        }
       }
     };
 

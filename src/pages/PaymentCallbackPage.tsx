@@ -23,12 +23,40 @@ export const PaymentCallbackPage: React.FC = () => {
     const handlePaymentCallback = async () => {
       console.log('🔍 Processing payment callback...');
       
-      // Clean any legacy cache first
-      cleanupPaymentCache();
+      // Check if this is an error callback first
+      const status = searchParams.get('status');
+      const errorMessage = searchParams.get('message');
       
-      // Extract reference from URL parameters
-      const reference = searchParams.get('reference') || searchParams.get('trxref');
+      if (status === 'error') {
+        console.error('❌ Payment callback received error status:', errorMessage);
+        setVerificationStatus('failed');
+        setErrorMessage(decodeURIComponent(errorMessage || 'Payment processing failed'));
+        return;
+      }
+      
+      // Extract reference from multiple sources with fallback chain
+      let reference = searchParams.get('reference') || searchParams.get('trxref');
       const orderId = searchParams.get('order_id');
+      
+      // Fallback chain if reference not in URL
+      if (!reference) {
+        console.log('🔍 Reference not in URL, checking storage...');
+        try {
+          reference = sessionStorage.getItem('paystack_payment_reference') ||
+                     localStorage.getItem('paystack_last_reference') ||
+                     sessionStorage.getItem('paymentReference') ||
+                     localStorage.getItem('paymentReference');
+          
+          if (reference) {
+            console.log('✅ Reference recovered from storage:', reference.substring(0, 20) + '...');
+          }
+        } catch (error) {
+          console.warn('⚠️ Failed to access storage for reference recovery:', error);
+        }
+      }
+      
+      // Clean any legacy cache AFTER getting reference
+      cleanupPaymentCache();
       
       if (!reference) {
         console.error('❌ No payment reference found in callback URL');
@@ -79,7 +107,15 @@ export const PaymentCallbackPage: React.FC = () => {
             {
               onClearCart: clearCart,
               onNavigate: () => {
-                // Clean up payment cache after cart is cleared
+                // Clean up payment storage after successful verification
+                try {
+                  sessionStorage.removeItem('paystack_payment_reference');
+                  sessionStorage.removeItem('payment_order_id');
+                  localStorage.removeItem('paystack_last_reference');
+                  console.log('🧹 Payment storage cleaned after success');
+                } catch (error) {
+                  console.warn('⚠️ Failed to clean payment storage:', error);
+                }
                 cleanupPaymentCache();
               }
             }
@@ -89,6 +125,9 @@ export const PaymentCallbackPage: React.FC = () => {
           console.error('❌ Payment verification failed:', (result as any).error);
           setVerificationStatus('failed');
           setErrorMessage((result as any).error || 'Payment verification failed');
+          
+          // DON'T clear cart on failure - user should be able to retry
+          console.log('🛒 Cart preserved for retry - not clearing on failure');
           
           // Notify parent window of failure (if opened from checkout dialog)
           if (window.opener && !window.opener.closed) {
@@ -102,6 +141,9 @@ export const PaymentCallbackPage: React.FC = () => {
         console.error('❌ Payment verification error:', error);
         setVerificationStatus('failed');
         setErrorMessage(error instanceof Error ? error.message : 'Verification failed');
+        
+        // DON'T clear cart on error - user should be able to retry
+        console.log('🛒 Cart preserved for retry - not clearing on error');
         
         // Notify parent window of failure (if opened from checkout dialog)
         if (window.opener && !window.opener.closed) {
@@ -236,21 +278,27 @@ export const PaymentCallbackPage: React.FC = () => {
             {errorMessage || 'There was an issue processing your payment. Please try again.'}
           </p>
           
-          <div className="space-y-3">
-            <Button 
-              onClick={() => navigate('/')} 
-              className="w-full bg-red-500 hover:bg-red-600 h-12 text-base"
-            >
-              Return to Home
-            </Button>
-            <Button 
-              onClick={() => navigate('/customer-profile')} 
-              variant="outline" 
-              className="w-full h-12 text-base"
-            >
-              View Orders
-            </Button>
-          </div>
+            <div className="space-y-3">
+              <Button 
+                onClick={() => navigate('/')} 
+                className="w-full bg-red-500 hover:bg-red-600 h-12 text-base"
+              >
+                Try Again
+              </Button>
+              <Button 
+                onClick={() => navigate('/customer-profile')} 
+                variant="outline" 
+                className="w-full h-12 text-base"
+              >
+                View Orders
+              </Button>
+            </div>
+            
+            <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <p className="text-sm text-orange-700">
+                <strong>Need help?</strong> Your items are still in your cart. You can try paying again or contact support.
+              </p>
+            </div>
         </Card>
       </div>
     </div>

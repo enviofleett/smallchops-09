@@ -15,11 +15,11 @@ jobs:
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.SUPABASE_URL }}/functions/v1/enhanced-email-processor"
+            "https://startersmallchops.com/functions/v1/enhanced-email-processor"
       
       - name: Process Legacy Communication Events (fallback)
         run: |
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
-            "${{ secrets.SUPABASE_URL }}/functions/v1/process-communication-events-enhanced"
+            "https://startersmallchops.com/functions/v1/process-communication-events-enhanced"

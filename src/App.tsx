@@ -62,6 +62,7 @@ const PublicProducts = withLazyLoading(() => import("./pages/PublicProducts"));
 const Contact = withLazyLoading(() => import("./pages/Contact"));
 const About = withLazyLoading(() => import("./pages/About"));
 const PaystackTest = withLazyLoading(() => import("./pages/PaystackTest"));
+const PaystackTestingDashboard = withLazyLoading(() => import("./pages/PaystackTestingDashboard"));
 const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"));
 const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"));
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"));
@@ -175,6 +176,7 @@ const App = () => {
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />
               <Route path="/paystack-test" element={<PaystackTest />} />
+              <Route path="/paystack-testing" element={<PaystackTestingDashboard />} />
               <Route path="/emergency-fix" element={<EmergencyPaymentFix />} />
               <Route path="/product/:id" element={<ProductDetail />} />
               <Route path="/category/:categoryId" element={<CategoryProducts />} />

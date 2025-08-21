@@ -7,14 +7,60 @@ export type NewPromotion = Database['public']['Tables']['promotions']['Insert'];
 export type PromotionStatus = Database['public']['Enums']['promotion_status'];
 export type PromotionType = Database['public']['Enums']['promotion_type'];
 
-// Get all promotions
+// Cache for promotions to avoid repeated queries
+let promotionsCache: { data: Promotion[]; timestamp: number } | null = null;
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
+// Get all promotions with caching and timeout
 export async function getPromotions(): Promise<Promotion[]> {
-  const { data, error } = await supabase
-    .from("promotions")
-    .select("*")
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  try {
+    // Check cache first
+    if (promotionsCache && (Date.now() - promotionsCache.timestamp) < CACHE_DURATION) {
+      console.log('Using cached promotions data');
+      return promotionsCache.data;
+    }
+
+    // Query with timeout protection
+    const queryPromise = supabase
+      .from("promotions")
+      .select("*")
+      .order("created_at", { ascending: false });
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Promotions query timeout')), 3000)
+    );
+
+    const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+
+    if (error) {
+      console.error('Promotions query error:', error);
+      // Return cached data if available, otherwise empty array
+      return promotionsCache?.data ?? [];
+    }
+
+    const promotions = data ?? [];
+
+    // Update cache
+    promotionsCache = {
+      data: promotions,
+      timestamp: Date.now()
+    };
+
+    console.log(`Fetched ${promotions.length} promotions from database`);
+    return promotions;
+
+  } catch (error) {
+    console.error('Error fetching promotions:', error);
+
+    // Return cached data if available, otherwise empty array
+    if (promotionsCache && promotionsCache.data) {
+      console.log('Using stale cached promotions due to error');
+      return promotionsCache.data;
+    }
+
+    // Return empty array as fallback to prevent app breakage
+    return [];
+  }
 }
 
 

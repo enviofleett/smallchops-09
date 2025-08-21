@@ -7,13 +7,13 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Search, CheckCircle, XCircle, Clock, AlertTriangle } from 'lucide-react';
 import { verifyPayment, PaymentVerificationResult } from '@/utils/paymentVerification';
-import { paymentRecoveryManager, RecoveryAttempt } from '@/utils/paymentRecovery';
+import { PaymentRecoveryUtil } from '@/utils/paymentRecovery';
 
 export const PaymentStatusChecker = () => {
   const [reference, setReference] = useState('');
   const [isChecking, setIsChecking] = useState(false);
   const [result, setResult] = useState<PaymentVerificationResult | null>(null);
-  const [recoveryHistory, setRecoveryHistory] = useState<RecoveryAttempt[]>([]);
+  const [recoveryHistory, setRecoveryHistory] = useState<string[]>([]);
 
   const handleCheck = async () => {
     if (!reference.trim()) return;
@@ -26,9 +26,13 @@ export const PaymentStatusChecker = () => {
       const verificationResult = await verifyPayment(reference.trim());
       setResult(verificationResult);
       
-      // Get recovery history if available
-      const history = paymentRecoveryManager.getRecoveryHistory(reference.trim());
-      setRecoveryHistory(history);
+      // Check if there's stored payment data for recovery
+      if (PaymentRecoveryUtil.hasPaymentInProgress()) {
+        const storedData = PaymentRecoveryUtil.getStoredPaymentData();
+        if (storedData) {
+          setRecoveryHistory([`Found stored data: ${storedData.reference}`]);
+        }
+      }
     } catch (error) {
       setResult({
         success: false,
@@ -170,24 +174,17 @@ export const PaymentStatusChecker = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {recoveryHistory.map((attempt, index) => (
+              {recoveryHistory.map((item, index) => (
                 <div 
                   key={index}
                   className="flex items-center justify-between p-2 border rounded text-sm"
                 >
                   <div className="flex items-center gap-2">
-                    {attempt.success ? (
-                      <CheckCircle className="h-3 w-3 text-green-600" />
-                    ) : (
-                      <XCircle className="h-3 w-3 text-red-600" />
-                    )}
-                    <span className="font-medium capitalize">
-                      {attempt.method.replace(/_/g, ' ')}
+                    <CheckCircle className="h-3 w-3 text-green-600" />
+                    <span className="font-medium">
+                      {item}
                     </span>
                   </div>
-                  <span className="text-muted-foreground">
-                    {new Date(attempt.timestamp).toLocaleTimeString()}
-                  </span>
                 </div>
               ))}
             </div>

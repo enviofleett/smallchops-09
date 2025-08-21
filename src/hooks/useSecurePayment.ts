@@ -18,15 +18,21 @@ interface PaymentInitRequest {
   metadata?: any;
 }
 
+interface PaymentValidationError {
+  field: string;
+  message: string;
+}
+
 interface PaymentVerificationResult {
   success: boolean;
-  payment_status: string;
-  reference: string;
-  order_id: string;
-  amount: number;
+  payment_status?: string;
+  reference?: string;
+  order_id?: string;
+  amount?: number;
   paid_at?: string;
   channel?: string;
-  customer_email: string;
+  customer_email?: string;
+  error?: string;
 }
 
 export const useSecurePayment = () => {
@@ -37,6 +43,37 @@ export const useSecurePayment = () => {
     reference: null,
     authorizationUrl: null,
   });
+
+  // Enhanced validation function
+  const validatePaymentData = useCallback((data: PaymentInitRequest): PaymentValidationError[] => {
+    const errors: PaymentValidationError[] = [];
+
+    // Email validation
+    if (!data.customerEmail) {
+      errors.push({ field: 'email', message: 'Email is required' });
+    } else {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(data.customerEmail)) {
+        errors.push({ field: 'email', message: 'Invalid email format' });
+      }
+    }
+
+    // Amount validation
+    if (!data.amount || data.amount <= 0) {
+      errors.push({ field: 'amount', message: 'Amount must be greater than 0' });
+    } else if (data.amount < 1) {
+      errors.push({ field: 'amount', message: 'Minimum amount is ₦1' });
+    } else if (data.amount > 10000000) {
+      errors.push({ field: 'amount', message: 'Maximum amount is ₦10,000,000' });
+    }
+
+    // Order ID validation
+    if (!data.orderId) {
+      errors.push({ field: 'orderId', message: 'Order ID is required' });
+    }
+
+    return errors;
+  }, []);
 
   const updateState = useCallback((updates: Partial<SecurePaymentState>) => {
     setState(prev => ({ ...prev, ...updates }));
@@ -62,7 +99,24 @@ export const useSecurePayment = () => {
     updateState({ isLoading: true, error: null });
 
     try {
-      console.log('🔐 Initializing secure payment for order:', orderId);
+      // Enhanced validation
+      const validationErrors = validatePaymentData({
+        orderId,
+        amount,
+        customerEmail,
+        redirectUrl,
+        metadata
+      });
+
+      if (validationErrors.length > 0) {
+        const errorMessage = validationErrors.map(e => e.message).join(', ');
+        throw new Error(`Validation failed: ${errorMessage}`);
+      }
+
+      console.log('🔐 Initializing secure payment for order:', orderId, {
+        amount: amount,
+        email: customerEmail.substring(0, 3) + '***'
+      });
 
       const { data, error } = await supabase.functions.invoke('paystack-secure', {
         body: {
@@ -147,7 +201,7 @@ export const useSecurePayment = () => {
     updateState({ isProcessing: true, error: null });
 
     // Enhanced retry logic with exponential backoff
-    const maxRetries = 3;
+    const maxRetries = 4; // Increased retries
     let attempt = 0;
 
     while (attempt < maxRetries) {
@@ -214,8 +268,12 @@ export const useSecurePayment = () => {
 
         if (isRetryable && attempt < maxRetries) {
           console.log(`🔄 Retryable error, attempt ${attempt}/${maxRetries}: ${errorMessage}`);
-          // Exponential backoff: 1s, 2s, 4s
-          const delay = 1000 * Math.pow(2, attempt - 1);
+          // Enhanced exponential backoff: 1s, 2s, 4s, 8s with jitter
+          const baseDelay = 1000 * Math.pow(2, attempt - 1);
+          const jitter = Math.random() * 500; // Add randomness to avoid thundering herd
+          const delay = baseDelay + jitter;
+          
+          console.log(`⏰ Waiting ${Math.round(delay)}ms before retry...`);
           await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
@@ -237,7 +295,8 @@ export const useSecurePayment = () => {
         
         return {
           success: false,
-          error: finalError
+          error: finalError,
+          reference: reference
         };
       }
     }
@@ -245,7 +304,8 @@ export const useSecurePayment = () => {
     // This should never be reached, but TypeScript requires it
     return {
       success: false,
-      error: 'Payment verification failed after all retry attempts'
+      error: 'Payment verification failed after all retry attempts',
+      reference: reference
     };
   }, [updateState]);
 
@@ -268,6 +328,31 @@ export const useSecurePayment = () => {
     toast.success('Payment window opened');
   }, []);
 
+  // Recovery function to check for pending payments
+  const checkPendingPayment = useCallback(async () => {
+    try {
+      const storedReference = sessionStorage.getItem('paystack_payment_reference') || 
+                             localStorage.getItem('paystack_last_reference');
+      
+      if (!storedReference) return null;
+
+      console.log('🔍 Checking for pending payment:', storedReference);
+      
+      const verification = await verifySecurePayment(storedReference);
+      
+      if (verification.success) {
+        console.log('✅ Found successful pending payment');
+        toast.success('Payment completed successfully!');
+        return verification;
+      }
+      
+      return null;
+    } catch (error) {
+      console.log('❌ No pending payment found');
+      return null;
+    }
+  }, [verifySecurePayment]);
+
   return {
     // State
     ...state,
@@ -277,11 +362,15 @@ export const useSecurePayment = () => {
     verifySecurePayment,
     openSecurePayment,
     resetState,
+    checkPendingPayment,
     
     // Computed
     isReady: !state.isLoading && !state.isProcessing,
     hasPaymentUrl: !!state.authorizationUrl,
     hasReference: !!state.reference,
+    
+    // Utilities
+    validatePaymentData,
   };
 };
 

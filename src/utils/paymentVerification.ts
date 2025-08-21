@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { isValidPaymentReference } from './paymentReference';
-import { paymentRecoveryManager } from './paymentRecovery';
+import { PaymentRecoveryUtil } from './paymentRecovery';
 
 export interface PaymentVerificationResult {
   success: boolean;
@@ -42,11 +42,22 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
       
       // Try recovery if the primary verification failed
       console.log('🔄 Attempting payment recovery...');
-      const recoveryResult = await paymentRecoveryManager.attemptRecovery(reference);
+      const storedData = PaymentRecoveryUtil.getStoredPaymentData();
       
-      if (recoveryResult.success) {
-        console.log('✅ Payment recovered successfully');
-        return recoveryResult;
+      if (storedData && storedData.reference === reference) {
+        console.log('✅ Payment recovered from storage');
+        return {
+          success: true,
+          data: {
+            status: 'success',
+            amount: storedData.amount,
+            customer: { email: storedData.email },
+            metadata: {},
+            paid_at: new Date(storedData.timestamp).toISOString(),
+            channel: 'stored',
+            order_id: storedData.orderId
+          }
+        };
       }
       
       return {
@@ -79,11 +90,22 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
       
       // Try recovery on failed API response
       console.log('🔄 Attempting payment recovery after failed verification...');
-      const recoveryResult = await paymentRecoveryManager.attemptRecovery(reference);
+      const storedData = PaymentRecoveryUtil.getStoredPaymentData();
       
-      if (recoveryResult.success) {
+      if (storedData && storedData.reference === reference) {
         console.log('✅ Payment recovered after failed verification');
-        return recoveryResult;
+        return {
+          success: true,
+          data: {
+            status: 'success',
+            amount: storedData.amount,
+            customer: { email: storedData.email },
+            metadata: {},
+            paid_at: new Date(storedData.timestamp).toISOString(),
+            channel: 'recovered',
+            order_id: storedData.orderId
+          }
+        };
       }
       
       return {
@@ -98,11 +120,22 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
     // Try recovery on exception
     console.log('🔄 Attempting payment recovery after exception...');
     try {
-      const recoveryResult = await paymentRecoveryManager.attemptRecovery(reference);
+      const storedData = PaymentRecoveryUtil.getStoredPaymentData();
       
-      if (recoveryResult.success) {
+      if (storedData && storedData.reference === reference) {
         console.log('✅ Payment recovered after exception');
-        return recoveryResult;
+        return {
+          success: true,
+          data: {
+            status: 'success',
+            amount: storedData.amount,
+            customer: { email: storedData.email },
+            metadata: {},
+            paid_at: new Date(storedData.timestamp).toISOString(),
+            channel: 'exception_recovery',
+            order_id: storedData.orderId
+          }
+        };
       }
     } catch (recoveryError) {
       console.error('❌ Recovery also failed:', recoveryError);

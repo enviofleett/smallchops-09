@@ -5,8 +5,9 @@ import { Progress } from '@/components/ui/progress';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
-import { ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
+import { ExternalLink, AlertTriangle, RefreshCw, Shield } from 'lucide-react';
 import { useSecurePayment } from '@/hooks/useSecurePayment';
+import { PaymentRecoveryUtil } from '@/utils/paymentRecovery';
 import './payment-styles.css';
 
 interface PaystackPaymentHandlerProps {
@@ -37,17 +38,48 @@ export const PaystackPaymentHandler = ({
   const {
     initializeSecurePayment,
     openSecurePayment,
+    verifySecurePayment,
     isLoading,
     isProcessing,
     error,
     reference,
     authorizationUrl,
-    resetState
+    resetState,
+    checkPendingPayment,
+    validatePaymentData
   } = useSecurePayment();
 
-  // Initialize secure payment on mount
+  // Check for existing payment on mount
   useEffect(() => {
+    const checkExistingPayment = async () => {
+      // First check if there's a pending payment
+      const pendingPayment = await checkPendingPayment();
+      
+      if (pendingPayment && pendingPayment.success) {
+        onSuccess(pendingPayment.reference || '');
+        return;
+      }
+
+      // Initialize new payment if no pending payment found
+      await initPayment();
+    };
+
     const initPayment = async () => {
+      // Validate payment data before initialization
+      const validationErrors = validatePaymentData({
+        orderId,
+        amount,
+        customerEmail: email,
+        redirectUrl: successUrl,
+        metadata: { orderNumber }
+      });
+
+      if (validationErrors.length > 0) {
+        const errorMessage = validationErrors.map(e => e.message).join(', ');
+        onError(errorMessage);
+        return;
+      }
+
       const result = await initializeSecurePayment({
         orderId,
         amount,
@@ -62,20 +94,18 @@ export const PaystackPaymentHandler = ({
       if (result.success && result.reference) {
         setCurrentReference(result.reference);
         
-        // 🔐 Defense-in-depth: Store reference in multiple locations
-        try {
-          sessionStorage.setItem('paystack_payment_reference', result.reference);
-          localStorage.setItem('paystack_last_reference', result.reference);
-          sessionStorage.setItem('payment_order_id', orderId);
-          console.log('🛡️ Defense-in-depth reference storage:', result.reference);
-        } catch (error) {
-          console.warn('⚠️ Failed to store payment reference:', error);
-        }
+        // Enhanced payment data storage with recovery utility
+        PaymentRecoveryUtil.storePaymentData({
+          reference: result.reference,
+          orderId,
+          amount,
+          email
+        });
       }
     };
 
-    initPayment();
-  }, [orderId, amount, email, orderNumber, successUrl, cancelUrl, initializeSecurePayment]);
+    checkExistingPayment();
+  }, [orderId, amount, email, orderNumber, successUrl, cancelUrl, initializeSecurePayment, checkPendingPayment, validatePaymentData, onSuccess, onError]);
 
   const handlePayment = async () => {
     if (!authorizationUrl) {
@@ -104,14 +134,28 @@ export const PaystackPaymentHandler = ({
   };
 
   const handleRetry = () => {
+    PaymentRecoveryUtil.clearStoredData();
     resetState();
     window.location.reload();
+  };
+
+  const handleClose = () => {
+    // Check for pending payment after a short delay
+    setTimeout(async () => {
+      const pendingPayment = await checkPendingPayment();
+      if (pendingPayment && pendingPayment.success) {
+        onSuccess(pendingPayment.reference || '');
+      } else {
+        onClose();
+      }
+    }, 2000);
   };
 
   return (
     <Card className="paystack-payment-handler w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <CardTitle className="flex items-center justify-center gap-2">
+          <Shield className="h-4 w-4" />
           <span>Secure Payment</span>
           <Badge variant="outline" className="text-xs">
             ₦{amount?.toLocaleString() || '0'}

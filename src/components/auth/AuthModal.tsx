@@ -5,11 +5,13 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Eye, EyeOff, Mail, Lock, User, Phone, CheckCircle } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, User, Phone, CheckCircle, Loader2 } from 'lucide-react';
 import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
 import { useRegistrationFlow } from '@/hooks/useRegistrationFlow';
 import { RegistrationErrorHandler } from './RegistrationErrorHandler';
+import GoogleAuthButton from '@/components/auth/GoogleAuthButton';
 import { useToast } from '@/hooks/use-toast';
+import { retryGoogleAuth, handleGoogleAuthError } from '@/utils/googleAuthErrorHandler';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -36,7 +38,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     phone: ''
   });
 
-  const { login, isLoading: loginLoading } = useCustomerDirectAuth();
+  const { login, signUpWithGoogle, isLoading: loginLoading } = useCustomerDirectAuth();
   const { 
     isLoading: registerLoading, 
     error: registerError, 
@@ -85,6 +87,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   const handleTabChange = (value: string) => {
     setActiveTab(value as 'login' | 'register');
     resetFlow();
+  };
+
+  const handleGoogleAuth = async () => {
+    try {
+      const result = await retryGoogleAuth(signUpWithGoogle, 2, 1000);
+      if (result.success) {
+        onSuccess?.();
+        onClose();
+      }
+    } catch (error: any) {
+      const authError = handleGoogleAuthError(error);
+      toast({
+        title: "Google authentication failed",
+        description: authError.userMessage,
+        variant: "destructive"
+      });
+    }
   };
 
   const renderRegistrationStep = () => {
@@ -225,6 +244,24 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             >
               {registerLoading ? "Creating account..." : "Create Account"}
             </Button>
+
+            <div className="relative">
+              <div className="absolute inset-0 flex items-center">
+                <span className="w-full border-t" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+              </div>
+            </div>
+
+            <GoogleAuthButton 
+              onGoogleAuth={handleGoogleAuth}
+              isLoading={registerLoading}
+              text="Sign up with Google"
+              variant="outline"
+              mode="register"
+              disabled={registerLoading}
+            />
           </form>
         );
     }
@@ -296,6 +333,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                   >
                     {loginLoading ? "Signing in..." : "Sign In"}
                   </Button>
+
+                  <div className="relative">
+                    <div className="absolute inset-0 flex items-center">
+                      <span className="w-full border-t" />
+                    </div>
+                    <div className="relative flex justify-center text-xs uppercase">
+                      <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                    </div>
+                  </div>
+
+                  <GoogleAuthButton 
+                    onGoogleAuth={handleGoogleAuth}
+                    isLoading={loginLoading}
+                    text="Continue with Google"
+                    variant="outline"
+                    disabled={loginLoading}
+                  />
                 </form>
               </TabsContent>
 

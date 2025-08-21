@@ -483,6 +483,300 @@ const PaymentSystemHealthDashboard: React.FC = () => {
           </div>
         </TabsContent>
 
+        <TabsContent value="endtoend" className="space-y-4">
+          {endToEndReport ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Overall Status</p>
+                        <p className="text-2xl font-bold flex items-center gap-2">
+                          {getStatusIcon(endToEndReport.overall_status)}
+                          {endToEndReport.overall_status.toUpperCase()}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-green-600">{endToEndReport.passed_steps}</p>
+                      <p className="text-sm text-muted-foreground">Steps Passed</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-red-600">{endToEndReport.failed_steps}</p>
+                      <p className="text-sm text-muted-foreground">Steps Failed</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold">{formatDuration(endToEndReport.total_duration)}</p>
+                      <p className="text-sm text-muted-foreground">Total Duration</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>End-to-End Test Steps</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {endToEndReport.steps.map((step, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          {getStatusIcon(step.status)}
+                          <span className="font-medium">{step.step}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            {formatDuration(step.duration)}
+                          </span>
+                          <Badge variant={getStatusBadgeVariant(step.status)}>
+                            {step.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Recommendations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {endToEndReport.recommendations.map((rec, index) => (
+                      <li key={index} className="text-sm flex items-start gap-2">
+                        <span className="mt-1">•</span>
+                        <span>{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-8">
+                  <CreditCard className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No End-to-End Test Data</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Run an end-to-end test to see complete payment flow results
+                  </p>
+                  <Button onClick={runEndToEndTest} disabled={loading}>
+                    Run End-to-End Test
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="webhooks" className="space-y-4">
+          {webhookReport ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">Webhook Status</p>
+                        <p className="text-2xl font-bold flex items-center gap-2">
+                          {getStatusIcon(webhookReport.overall_status)}
+                          {webhookReport.overall_status.toUpperCase()}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-green-600">{webhookReport.tests_passed}</p>
+                      <p className="text-sm text-muted-foreground">Tests Passed</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-red-600">{webhookReport.tests_failed}</p>
+                      <p className="text-sm text-muted-foreground">Tests Failed</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-xs font-mono break-all">{webhookReport.webhook_url}</p>
+                      <p className="text-sm text-muted-foreground mt-1">Webhook URL</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Webhook Test Results</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {webhookReport.results.map((result, index) => (
+                      <div key={index} className="flex items-center justify-between p-3 border rounded-lg">
+                        <div className="flex items-center gap-3">
+                          <Server className="h-4 w-4" />
+                          <span className="font-medium">{result.event_type}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm text-muted-foreground">
+                            {result.response_status && `${result.response_status} • `}
+                            {formatDuration(result.duration)}
+                          </span>
+                          <Badge variant={getStatusBadgeVariant(result.status)}>
+                            {result.status}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>Webhook Recommendations</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <ul className="space-y-2">
+                    {webhookReport.recommendations.map((rec, index) => (
+                      <li key={index} className="text-sm flex items-start gap-2">
+                        <span className="mt-1">•</span>
+                        <span>{rec}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-8">
+                  <Server className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Webhook Test Data</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Run webhook tests to verify Paystack webhook functionality
+                  </p>
+                  <Button onClick={runWebhookTest} disabled={loading}>
+                    Run Webhook Tests
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="monitoring" className="space-y-4">
+          {monitoringReport ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground">System Health</p>
+                        <p className="text-2xl font-bold flex items-center gap-2">
+                          {getStatusIcon(monitoringReport.overall_health)}
+                          {monitoringReport.overall_health.toUpperCase()}
+                        </p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold">{monitoringReport.rpc_availability?.available ? '✅' : '❌'}</p>
+                      <p className="text-sm text-muted-foreground">RPC Available</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-red-600">{monitoringReport.transaction_errors?.recent_errors || 0}</p>
+                      <p className="text-sm text-muted-foreground">Recent Errors</p>
+                    </div>
+                  </CardContent>
+                </Card>
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-yellow-600">{monitoringReport.transaction_errors?.orphaned_payments || 0}</p>
+                      <p className="text-sm text-muted-foreground">Orphaned Payments</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              <Card>
+                <CardHeader>
+                  <CardTitle>System Monitoring Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div>
+                      <h4 className="font-medium mb-2">RPC Function Status</h4>
+                      <div className="p-3 bg-muted rounded-lg">
+                        <pre className="text-sm">
+                          {JSON.stringify(monitoringReport.rpc_availability, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                    <div>
+                      <h4 className="font-medium mb-2">Transaction Errors (Last 24h)</h4>
+                      <div className="p-3 bg-muted rounded-lg">
+                        <pre className="text-sm">
+                          {JSON.stringify(monitoringReport.transaction_errors, null, 2)}
+                        </pre>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="pt-6">
+                <div className="text-center py-8">
+                  <Shield className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
+                  <h3 className="text-lg font-semibold mb-2">No Monitoring Data</h3>
+                  <p className="text-muted-foreground mb-4">
+                    Run system monitoring to check logs and error rates
+                  </p>
+                  <Button onClick={runMonitoringCheck} disabled={loading}>
+                    Run Monitoring Check
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
         <TabsContent value="details" className="space-y-4">
           {healthReport ? (
             <div className="space-y-4">

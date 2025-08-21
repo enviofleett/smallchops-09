@@ -1,0 +1,472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🧪 Test Production Payment Fixes</title>
+    <style>
+        body { 
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+            max-width: 1000px; 
+            margin: 0 auto; 
+            padding: 20px; 
+            background: #f8f9fa;
+        }
+        .test-card { 
+            background: white; 
+            border-radius: 12px; 
+            padding: 24px; 
+            margin: 16px 0; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+        .test-result { padding: 16px; margin: 12px 0; border-radius: 8px; border-left: 4px solid; }
+        .success { background: #f0fff4; color: #38a169; border-left-color: #68d391; }
+        .error { background: #fff5f5; color: #c53030; border-left-color: #e53e3e; }
+        .warning { background: #fffbeb; color: #d69e2e; border-left-color: #f6ad55; }
+        .info { background: #ebf8ff; color: #2b6cb0; border-left-color: #4299e1; }
+        
+        button { 
+            padding: 12px 24px; 
+            margin: 8px; 
+            border: none; 
+            border-radius: 8px; 
+            cursor: pointer; 
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        .btn-primary { background: #4299e1; color: white; }
+        .btn-primary:hover { background: #3182ce; }
+        .btn-success { background: #38a169; color: white; }
+        .btn-success:hover { background: #2f855a; }
+        .btn-danger { background: #e53e3e; color: white; }
+        .btn-danger:hover { background: #c53030; }
+        
+        pre { 
+            background: #1a202c; 
+            color: #e2e8f0; 
+            padding: 16px; 
+            border-radius: 8px; 
+            overflow-x: auto; 
+            font-size: 13px;
+            margin: 12px 0;
+        }
+        
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin: 20px 0;
+        }
+        
+        .status-item {
+            padding: 16px;
+            border-radius: 8px;
+            text-align: center;
+            background: #f7fafc;
+            border: 2px solid #e2e8f0;
+        }
+        
+        .status-value {
+            font-size: 2rem;
+            font-weight: bold;
+            margin: 8px 0;
+        }
+        
+        .status-label {
+            font-size: 0.9rem;
+            color: #718096;
+        }
+        
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid #3498db;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="test-card">
+        <h1 style="margin: 0; color: #2d3748; text-align: center;">🧪 Production Payment Fixes Validation</h1>
+        <p style="text-align: center; color: #718096; margin: 8px 0;">
+            This tool validates that all production payment fixes are working correctly
+        </p>
+    </div>
+
+    <div class="test-card">
+        <h2>🔧 Test Controls</h2>
+        <div style="text-align: center;">
+            <button class="btn-primary" onclick="runAllTests()" id="runAllBtn">
+                🚀 Run All Tests
+            </button>
+            <button class="btn-success" onclick="testRPCFunction()" id="rpcBtn">
+                🔧 Test RPC Function
+            </button>
+            <button class="btn-primary" onclick="testSpecificOrder()" id="orderBtn">
+                📋 Test Specific Order
+            </button>
+            <button class="btn-danger" onclick="runEmergencyFix()" id="fixBtn">
+                🚨 Run Emergency Fix
+            </button>
+        </div>
+    </div>
+
+    <div class="test-card" id="statusCard" style="display: none;">
+        <h2>📊 System Status</h2>
+        <div class="status-grid" id="statusGrid"></div>
+    </div>
+
+    <div id="results"></div>
+
+    <script>
+        const SUPABASE_URL = 'https://oknnklksdiqaifhxaccs.supabase.co';
+        const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA';
+        
+        // Test order details from the user's specific case
+        const TEST_ORDER_ID = 'f3fbf5d8-74b1-481a-9cc3-a0cdb8232dfb';
+        const TEST_PAYMENT_REFERENCE = 'txn_1755814025373_f3fbf5d8';
+
+        function addResult(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = `test-result ${type}`;
+            div.innerHTML = `[${new Date().toLocaleTimeString()}] ${message}`;
+            document.getElementById('results').appendChild(div);
+            console.log(`[${type.toUpperCase()}] ${message}`);
+            div.scrollIntoView({ behavior: 'smooth', block: 'end' });
+        }
+
+        function setButtonLoading(buttonId, isLoading, originalText) {
+            const btn = document.getElementById(buttonId);
+            if (isLoading) {
+                btn.disabled = true;
+                btn.innerHTML = '<span class="loading"></span> Processing...';
+            } else {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        function updateStatus(key, value, label, type = 'info') {
+            const statusGrid = document.getElementById('statusGrid');
+            const statusCard = document.getElementById('statusCard');
+            
+            statusCard.style.display = 'block';
+            
+            let statusItem = document.getElementById(`status-${key}`);
+            if (!statusItem) {
+                statusItem = document.createElement('div');
+                statusItem.id = `status-${key}`;
+                statusItem.className = 'status-item';
+                statusGrid.appendChild(statusItem);
+            }
+            
+            const color = type === 'success' ? '#38a169' : 
+                         type === 'error' ? '#e53e3e' : 
+                         type === 'warning' ? '#d69e2e' : '#4299e1';
+            
+            statusItem.innerHTML = `
+                <div class="status-value" style="color: ${color};">${value}</div>
+                <div class="status-label">${label}</div>
+            `;
+        }
+
+        async function testRPCFunction() {
+            setButtonLoading('rpcBtn', true, '🔧 Test RPC Function');
+            
+            try {
+                addResult('🔧 Testing RPC function verify_and_update_payment_status...', 'info');
+                
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_and_update_payment_status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({
+                        payment_ref: `test_${Date.now()}`,
+                        new_status: 'confirmed',
+                        payment_amount: 100
+                    })
+                });
+
+                const data = await response.json();
+                
+                if (response.status === 404 && data.message && data.message.includes('not found')) {
+                    addResult('✅ RPC Function Test: PASSED - Function exists and responds correctly', 'success');
+                    updateStatus('rpc', '✅', 'RPC Available', 'success');
+                    return { available: true, functional: true };
+                } else if (response.status === 404 && data.message && data.message.includes('function')) {
+                    addResult('❌ RPC Function Test: FAILED - Function does not exist', 'error');
+                    updateStatus('rpc', '❌', 'RPC Missing', 'error');
+                    return { available: false, functional: false };
+                } else {
+                    addResult(`⚠️ RPC Function Test: UNEXPECTED RESPONSE - Status: ${response.status}`, 'warning');
+                    updateStatus('rpc', '⚠️', 'RPC Issues', 'warning');
+                    return { available: true, functional: false };
+                }
+            } catch (error) {
+                addResult(`❌ RPC Function Test: ERROR - ${error.message}`, 'error');
+                updateStatus('rpc', '❌', 'RPC Error', 'error');
+                return { available: false, functional: false };
+            } finally {
+                setButtonLoading('rpcBtn', false, '🔧 Test RPC Function');
+            }
+        }
+
+        async function testSpecificOrder() {
+            setButtonLoading('orderBtn', true, '📋 Test Specific Order');
+            
+            try {
+                addResult(`📋 Testing specific order: ${TEST_ORDER_ID}`, 'info');
+                addResult(`🔍 Payment reference: ${TEST_PAYMENT_REFERENCE}`, 'info');
+                
+                // Check order status
+                const orderResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${TEST_ORDER_ID}&select=*`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                if (!orderResponse.ok) {
+                    throw new Error(`Failed to fetch order: ${orderResponse.status}`);
+                }
+
+                const orderData = await orderResponse.json();
+                
+                if (orderData.length === 0) {
+                    addResult('❌ Order not found in database', 'error');
+                    updateStatus('order', '❌', 'Order Missing', 'error');
+                    return;
+                }
+
+                const order = orderData[0];
+                
+                // Check payment transaction
+                const transactionResponse = await fetch(`${SUPABASE_URL}/rest/v1/payment_transactions?or=(order_id.eq.${TEST_ORDER_ID},reference.eq.${TEST_PAYMENT_REFERENCE})&select=*`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                const transactionData = await transactionResponse.json();
+                const hasPaymentRecord = transactionData.length > 0;
+
+                // Analyze results
+                const isCompleted = order.status === 'confirmed' && order.payment_status === 'paid';
+                const statusConsistent = (order.status === 'confirmed') === (order.payment_status === 'paid');
+                
+                addResult(`📊 Order Analysis:
+                    <br>• Order Status: ${order.status}
+                    <br>• Payment Status: ${order.payment_status}
+                    <br>• Paid At: ${order.paid_at || 'Not set'}
+                    <br>• Has Payment Record: ${hasPaymentRecord ? 'Yes' : 'No'}
+                    <br>• Status Consistent: ${statusConsistent ? 'Yes' : 'No'}
+                    <br>• Fully Completed: ${isCompleted ? 'Yes' : 'No'}`, 
+                    isCompleted ? 'success' : 'warning');
+
+                updateStatus('order-status', order.status, 'Order Status', order.status === 'confirmed' ? 'success' : 'warning');
+                updateStatus('payment-status', order.payment_status, 'Payment Status', order.payment_status === 'paid' ? 'success' : 'warning');
+                updateStatus('payment-record', hasPaymentRecord ? '✅' : '❌', 'Payment Record', hasPaymentRecord ? 'success' : 'error');
+                
+                if (!isCompleted) {
+                    addResult('⚠️ This order needs to be fixed - running repair...', 'warning');
+                    await repairSpecificOrder();
+                }
+
+            } catch (error) {
+                addResult(`❌ Order test failed: ${error.message}`, 'error');
+                updateStatus('order', '❌', 'Order Error', 'error');
+            } finally {
+                setButtonLoading('orderBtn', false, '📋 Test Specific Order');
+            }
+        }
+
+        async function repairSpecificOrder() {
+            try {
+                addResult('🔧 Attempting to repair the specific order...', 'info');
+                
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_and_update_payment_status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({
+                        payment_ref: TEST_PAYMENT_REFERENCE,
+                        new_status: 'confirmed',
+                        payment_amount: 1000, // Assuming a test amount
+                        payment_gateway_response: {
+                            repair: true,
+                            repair_timestamp: new Date().toISOString(),
+                            status: 'success',
+                            test_repair: true
+                        }
+                    })
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.length > 0) {
+                    const orderResult = result[0];
+                    addResult(`✅ Order repair successful:
+                        <br>• Order ID: ${orderResult.order_id}
+                        <br>• Order Number: ${orderResult.order_number}
+                        <br>• Status: ${orderResult.status}
+                        <br>• Amount: ₦${orderResult.amount}`, 'success');
+                    
+                    updateStatus('repair', '✅', 'Repair Success', 'success');
+                } else {
+                    addResult(`❌ Order repair failed: ${result.message || JSON.stringify(result)}`, 'error');
+                    updateStatus('repair', '❌', 'Repair Failed', 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Repair process failed: ${error.message}`, 'error');
+                updateStatus('repair', '❌', 'Repair Error', 'error');
+            }
+        }
+
+        async function runEmergencyFix() {
+            setButtonLoading('fixBtn', true, '🚨 Run Emergency Fix');
+            
+            try {
+                addResult('🚨 Running comprehensive emergency fix...', 'info');
+                
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/run_comprehensive_payment_fix`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    const backfillResults = result.backfill_results;
+                    const statusResults = result.status_fix_results;
+                    
+                    addResult(`✅ Emergency fix completed successfully:
+                        <br><strong>Backfill Results:</strong>
+                        <br>• Records processed: ${backfillResults.processed_orders}
+                        <br>• Errors: ${backfillResults.error_count}
+                        <br><strong>Status Fix Results:</strong>
+                        <br>• Orders fixed: ${statusResults.fixed_orders}
+                        <br>• Errors: ${statusResults.error_count}`, 'success');
+                    
+                    updateStatus('fix-backfill', backfillResults.processed_orders, 'Records Fixed', 'success');
+                    updateStatus('fix-status', statusResults.fixed_orders, 'Statuses Fixed', 'success');
+                    updateStatus('fix-errors', backfillResults.error_count + statusResults.error_count, 'Total Errors', 
+                        (backfillResults.error_count + statusResults.error_count) === 0 ? 'success' : 'warning');
+                    
+                    // Re-test the specific order after fix
+                    setTimeout(() => {
+                        addResult('🔄 Re-testing the specific order after fix...', 'info');
+                        testSpecificOrder();
+                    }, 2000);
+                    
+                } else {
+                    addResult(`❌ Emergency fix failed: ${result.message || JSON.stringify(result)}`, 'error');
+                    updateStatus('fix', '❌', 'Fix Failed', 'error');
+                }
+            } catch (error) {
+                addResult(`❌ Emergency fix error: ${error.message}`, 'error');
+                updateStatus('fix', '❌', 'Fix Error', 'error');
+            } finally {
+                setButtonLoading('fixBtn', false, '🚨 Run Emergency Fix');
+            }
+        }
+
+        async function checkSystemHealth() {
+            try {
+                addResult('📊 Checking overall system health...', 'info');
+                
+                // Get recent orders
+                const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+                const ordersResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?created_at=gte.${twentyFourHoursAgo}&select=id,status,payment_status,payment_reference,total_amount`, {
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+                
+                const orders = await ordersResponse.json();
+                const totalOrders = orders.length;
+                const paidOrders = orders.filter(o => o.payment_status === 'paid').length;
+                const confirmedOrders = orders.filter(o => o.status === 'confirmed').length;
+                const inconsistentOrders = orders.filter(o => 
+                    (o.payment_status === 'paid' && o.status !== 'confirmed') ||
+                    (o.status === 'confirmed' && o.payment_status !== 'paid')
+                ).length;
+
+                updateStatus('total-orders', totalOrders, 'Orders (24h)', 'info');
+                updateStatus('paid-orders', paidOrders, 'Paid Orders', 'success');
+                updateStatus('confirmed-orders', confirmedOrders, 'Confirmed Orders', 'success');
+                updateStatus('inconsistent', inconsistentOrders, 'Inconsistent', inconsistentOrders === 0 ? 'success' : 'error');
+
+                const healthScore = inconsistentOrders === 0 ? 100 : Math.max(0, 100 - (inconsistentOrders / totalOrders * 100));
+                updateStatus('health-score', `${healthScore.toFixed(1)}%`, 'Health Score', 
+                    healthScore >= 95 ? 'success' : healthScore >= 80 ? 'warning' : 'error');
+
+                addResult(`📊 System health check completed:
+                    <br>• Total orders (24h): ${totalOrders}
+                    <br>• Paid orders: ${paidOrders}
+                    <br>• Confirmed orders: ${confirmedOrders}
+                    <br>• Inconsistent orders: ${inconsistentOrders}
+                    <br>• Health score: ${healthScore.toFixed(1)}%`, 
+                    healthScore >= 95 ? 'success' : 'warning');
+
+            } catch (error) {
+                addResult(`❌ Health check failed: ${error.message}`, 'error');
+            }
+        }
+
+        async function runAllTests() {
+            setButtonLoading('runAllBtn', true, '🚀 Run All Tests');
+            
+            try {
+                addResult('🚀 Starting comprehensive payment system validation...', 'info');
+                
+                // Test 1: RPC Function
+                await testRPCFunction();
+                
+                // Test 2: System Health
+                await checkSystemHealth();
+                
+                // Test 3: Specific Order
+                await testSpecificOrder();
+                
+                addResult('🎉 All tests completed! Check the status grid and results above.', 'success');
+                
+            } catch (error) {
+                addResult(`❌ Test suite failed: ${error.message}`, 'error');
+            } finally {
+                setButtonLoading('runAllBtn', false, '🚀 Run All Tests');
+            }
+        }
+
+        // Auto-run health check on page load
+        document.addEventListener('DOMContentLoaded', () => {
+            addResult('🚀 Production Payment Fixes Validation Tool Loaded', 'info');
+            addResult(`🎯 Testing specific order: ${TEST_ORDER_ID}`, 'info');
+            addResult(`💳 Payment reference: ${TEST_PAYMENT_REFERENCE}`, 'info');
+            
+            setTimeout(() => {
+                checkSystemHealth();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

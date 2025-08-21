@@ -68,6 +68,7 @@ const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPag
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"));
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
+const TrafficControlPanel = withLazyLoading(() => import("./components/admin/TrafficControlPanel").then(m => ({ default: m.default })));
 
 // Optimized QueryClient for better stability and faster loading
 const queryClient = new QueryClient({
@@ -237,6 +238,7 @@ const App = () => {
                 <Route path="/audit-logs" element={<ErrorBoundaryWrapper context="Audit Logs"><AuditLogs /></ErrorBoundaryWrapper>} />
                 <Route path="/settings" element={<ErrorBoundaryWrapper context="Settings"><Settings /></ErrorBoundaryWrapper>} />
                 <Route path="/payment-settings" element={<ErrorBoundaryWrapper context="Payment Settings"><PaymentSettings /></ErrorBoundaryWrapper>} />
+                <Route path="/admin/traffic-control" element={<ErrorBoundaryWrapper context="Traffic Control"><TrafficControlPanel /></ErrorBoundaryWrapper>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

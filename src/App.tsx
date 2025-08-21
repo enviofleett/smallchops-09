@@ -15,6 +15,7 @@ import { initPaymentMonitoring } from "./utils/paymentMonitoring";
 import DynamicFavicon from "./components/seo/DynamicFavicon";
 import { initializeConsoleCleanup, validatePaystackCSP, suppressWebSocketErrors } from "./utils/consoleCleanup";
 import { logEnvironmentStatus, validateEnvironment, createEnvironmentErrorElement } from "./utils/environmentValidator";
+import { logPaystackHealthCheck } from "./utils/paystackHealthCheck";
 import { ErrorTrackerComponent } from "./components/monitoring/ErrorTracker";
 import { NetworkProvider } from "./components/network/NetworkProvider";
 import { OnlineStatusBanner } from "./components/network/OnlineStatusBanner";
@@ -138,6 +139,9 @@ const App = () => {
     // Validate environment first
     const envStatus = logEnvironmentStatus();
     setEnvironmentStatus(envStatus);
+    
+    // Run Paystack configuration health check
+    logPaystackHealthCheck();
     
     // Initialize production optimizations
     initializeConsoleCleanup();

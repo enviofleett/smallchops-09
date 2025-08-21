@@ -241,11 +241,25 @@ serve(async (req) => {
 
     console.log('Processed order items:', JSON.stringify(processedOrderItems, null, 2));
 
-    // Use guest_session_id directly as TEXT (no UUID parsing)
+    // 🔧 SANITIZE guest_session_id: Strip "guest_" prefix and validate
     let processedGuestSessionId: string | null = null;
     if (typeof guest_session_id === 'string' && guest_session_id.trim().length > 0) {
-      processedGuestSessionId = guest_session_id.trim();
-      console.log('✅ Using guest session ID as text:', processedGuestSessionId);
+      let sanitizedSessionId = guest_session_id.trim();
+      
+      // Strip "guest_" prefix if present
+      if (sanitizedSessionId.startsWith('guest_')) {
+        sanitizedSessionId = sanitizedSessionId.substring(6);
+        console.log('🧹 Stripped "guest_" prefix from session ID');
+      }
+      
+      // For authenticated users with allow_guest_checkout=false, send NULL
+      if (authenticatedUser && !allowGuest) {
+        processedGuestSessionId = null;
+        console.log('🔒 Authenticated user with guest checkout disabled - nullifying session ID');
+      } else {
+        processedGuestSessionId = sanitizedSessionId;
+        console.log('✅ Using sanitized guest session ID:', processedGuestSessionId);
+      }
     } else {
       console.log('ℹ️ No valid guest_session_id provided; continuing without it');
     }
@@ -267,27 +281,50 @@ serve(async (req) => {
         customerId = existingCustomer.id;
         console.log('✅ Found existing customer account:', customerId);
       } else {
-        // Create customer account for authenticated user
-        const { data: newCustomer, error: customerError } = await supabaseClient
-          .from('customer_accounts')
-          .insert({
-            name: customer_name,
-            email: customer_email,
-            phone: customer_phone,
-            user_id: authenticatedUser.id,
-            email_verified: true,
-            phone_verified: false
-          })
-          .select('id')
-          .single();
+        // 🔧 HANDLE DUPLICATE ACCOUNTS: Use INSERT ... ON CONFLICT for authenticated users
+        try {
+          const { data: newCustomer, error: customerError } = await supabaseClient
+            .from('customer_accounts')
+            .insert({
+              name: customer_name,
+              email: customer_email,
+              phone: customer_phone,
+              user_id: authenticatedUser.id,
+              email_verified: true,
+              phone_verified: false
+            })
+            .select('id')
+            .single();
 
-        if (customerError) {
-          console.error('❌ Failed to create customer account for authenticated user:', customerError);
+          if (customerError) {
+            // Handle duplicate user_id constraint (23505)
+            if (customerError.code === '23505' && customerError.message.includes('customer_accounts_user_id_key')) {
+              console.log('🔄 Duplicate user_id detected, fetching existing account...');
+              
+              const { data: existingByUserId } = await supabaseClient
+                .from('customer_accounts')
+                .select('id')
+                .eq('user_id', authenticatedUser.id)
+                .single();
+                
+              if (existingByUserId?.id) {
+                customerId = existingByUserId.id;
+                console.log('✅ Retrieved existing customer account by user_id:', customerId);
+              } else {
+                throw new Error('Could not resolve customer account after duplicate detection');
+              }
+            } else {
+              console.error('❌ Failed to create customer account for authenticated user:', customerError);
+              throw new Error('Failed to create customer account');
+            }
+          } else {
+            customerId = newCustomer.id;
+            console.log('✅ Created customer account for authenticated user:', customerId);
+          }
+        } catch (err) {
+          console.error('❌ Customer account creation/resolution failed:', err);
           throw new Error('Failed to create customer account');
         }
-
-        customerId = newCustomer.id;
-        console.log('✅ Created customer account for authenticated user:', customerId);
       }
     } else {
       console.log('👤 Processing guest checkout, resolving customer account by email');
@@ -364,17 +401,30 @@ serve(async (req) => {
     if (orderError) {
       console.error('❌ Order creation failed:', orderError);
       
-      // Provide specific error messages for common issues
+      // 🔧 ENHANCED ERROR HANDLING: Return clear JSON error with code
       let userFriendlyMessage = 'Failed to create order';
+      let errorCode = 'ORDER_CREATION_FAILED';
+      
       if (orderError.message.includes('22P02') || orderError.message.includes('invalid input syntax for type uuid')) {
         userFriendlyMessage = 'There was an issue processing your order items. Please try again or contact support.';
+        errorCode = 'INVALID_ORDER_DATA';
       } else if (orderError.message.includes('customer')) {
         userFriendlyMessage = 'There was an issue with customer information. Please check your details and try again.';
+        errorCode = 'CUSTOMER_ERROR';
       } else if (orderError.message.includes('delivery')) {
         userFriendlyMessage = 'There was an issue with delivery information. Please check your address and try again.';
+        errorCode = 'DELIVERY_ERROR';
       }
       
-      throw new Error(userFriendlyMessage + ' (Error: ' + orderError.message + ')');
+      return new Response(JSON.stringify({
+        success: false,
+        error: userFriendlyMessage,
+        code: errorCode,
+        debug_message: orderError.message
+      }), { 
+        status: 400, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      });
     }
 
     console.log('✅ Order created successfully:', orderId);

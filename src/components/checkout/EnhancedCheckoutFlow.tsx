@@ -160,6 +160,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   const [paymentData, setPaymentData] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [failedAttempts, setFailedAttempts] = useState(0);
+  const [circuitBreakerActive, setCircuitBreakerActive] = useState(false);
   const [deliveryZone, setDeliveryZone] = useState<any>(null);
   const [pickupPoint, setPickupPoint] = useState<any>(null);
   const [lastPaymentError, setLastPaymentError] = useState<string | null>(null);
@@ -281,6 +283,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   // Remove the processOrder hook usage since it doesn't exist
 
   const handleFormSubmit = async () => {
+    // 🔧 CIRCUIT BREAKER: Block after 3 failures within 5 minutes
+    if (circuitBreakerActive) {
+      toast({
+        title: "Too Many Attempts",
+        description: "Please wait 5 minutes before trying again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setLastPaymentError(null);
@@ -322,7 +334,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         body: sanitizedData
       });
 
-      if (error) throw error;
+      // 🚨 CRITICAL: Stop flow immediately on order creation failure
+      if (error || !data?.success) {
+        console.error('❌ Order creation failed - stopping checkout flow:', error || data);
+        
+        const errorMessage = error?.message || data?.error || 'Order creation failed';
+        const errorCode = data?.code || 'ORDER_CREATION_FAILED';
+        
+        throw new Error(`${errorMessage} [${errorCode}]`);
+      }
 
       console.log('🔄 Raw server response:', data);
 
@@ -411,13 +431,30 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       console.error('🚨 Checkout submission error:', error);
       setIsSubmitting(false);
       
+      // 🔧 CIRCUIT BREAKER: Increment failure count and activate if needed
+      const newFailedAttempts = failedAttempts + 1;
+      setFailedAttempts(newFailedAttempts);
+      
+      if (newFailedAttempts >= 3) {
+        setCircuitBreakerActive(true);
+        // Reset circuit breaker after 5 minutes
+        setTimeout(() => {
+          setCircuitBreakerActive(false);
+          setFailedAttempts(0);
+        }, 5 * 60 * 1000);
+      }
+      
       // Enhanced error handling with safe message extraction
       const errorMessage = safeErrorMessage(error);
       
       // Map specific errors to user-friendly messages
       let userFriendlyMessage: string;
       
-      if (errorMessage.includes('Payment initialization incomplete - missing authorization URL from server')) {
+      if (errorMessage.includes('ORDER_CREATION_FAILED') || errorMessage.includes('INVALID_ORDER_DATA')) {
+        userFriendlyMessage = 'Order creation failed. Please check your details and try again.';
+      } else if (errorMessage.includes('CUSTOMER_ERROR')) {
+        userFriendlyMessage = 'There was an issue with customer information. Please verify your details.';
+      } else if (errorMessage.includes('Payment initialization incomplete - missing authorization URL from server')) {
         userFriendlyMessage = 'Payment system configuration issue. Please contact support.';
       } else if (errorMessage.includes('Payment URL not available')) {
         userFriendlyMessage = 'Unable to redirect to payment. Please try again or contact support.';
@@ -755,7 +792,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </CardHeader>
             <CardContent>
               <DeliveryScheduler
-                variant="horizontal"
                 onScheduleChange={(date, timeSlot) => {
                   handleFormChange('delivery_date', date);
                   handleFormChange('delivery_time_slot', timeSlot);

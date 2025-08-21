@@ -66,9 +66,12 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
       body: orderData
     });
 
+    // 🚨 STOP FLOW IMMEDIATELY on order creation failure  
     if (orderError || !data?.success) {
-      console.error('❌ Order creation failed:', orderError || data);
-      throw new Error(`Order creation failed: ${orderError?.message || data?.error || 'Unknown error'}`);
+      console.error('❌ Order creation failed - stopping payment flow:', orderError || data);
+      const errorCode = data?.code || 'ORDER_CREATION_FAILED';
+      const errorMessage = orderError?.message || data?.error || 'Order creation failed';
+      throw new Error(`${errorMessage} [${errorCode}]`);
     }
 
     const order = data.data || data;

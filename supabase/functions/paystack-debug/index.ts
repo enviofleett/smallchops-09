@@ -104,7 +104,7 @@ async function checkKeyHealth() {
 }
 
 async function checkReference(reference: string) {
-  const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+  const secretKey = getPaystackSecretKey();
   
   if (!secretKey) {
     return new Response(JSON.stringify({

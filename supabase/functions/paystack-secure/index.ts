@@ -27,6 +27,39 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Deterministic Paystack key selection (matching payment-callback logic)
+function getPaystackSecretKey(): string | null {
+  // Priority order: TEST key first, then general key, then LIVE key
+  const testKey = Deno.env.get('PAYSTACK_SECRET_KEY_TEST');
+  const generalKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+  const liveKey = Deno.env.get('PAYSTACK_SECRET_KEY_LIVE');
+
+  let selectedKey = testKey || generalKey || liveKey;
+
+  if (!selectedKey) {
+    console.error('❌ No Paystack secret key found in environment variables', {
+      checkedKeys: ['PAYSTACK_SECRET_KEY_TEST', 'PAYSTACK_SECRET_KEY', 'PAYSTACK_SECRET_KEY_LIVE']
+    });
+    return null;
+  }
+
+  // Validate key format
+  if (!selectedKey.startsWith('sk_')) {
+    console.error('❌ Invalid Paystack secret key format', {
+      keyPrefix: selectedKey.substring(0, 5)
+    });
+    return null;
+  }
+
+  console.log('🔑 Selected Paystack key', {
+    keyType: testKey ? 'TEST' : (generalKey ? 'GENERAL' : 'LIVE'),
+    keyPrefix: selectedKey.substring(0, 10) + '...',
+    environment: selectedKey.includes('test') ? 'TEST' : 'LIVE'
+  });
+
+  return selectedKey;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })

@@ -3,7 +3,6 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/hooks/useCart";
 import { useGuestSession } from "@/hooks/useGuestSession";
-import { useGuestSessionCleanup } from "@/hooks/useGuestSessionCleanup";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -26,6 +25,7 @@ import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
 import { safeErrorMessage, normalizePaymentResponse } from '@/utils/errorHandling';
 import { validatePaymentFlow, formatDiagnosticResults } from '@/utils/paymentDiagnostics';
 import { cn } from "@/lib/utils";
+import { edgeFunctionWarmer } from '@/utils/edgeFunctionWarmer';
 
 import {
   Dialog,
@@ -131,21 +131,18 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const navigate = useNavigate();
   const { cart, clearCart, getCartTotal } = useCart();
   const items = cart.items || [];
-  // 🔧 CLEANUP: Initialize guest session cleanup and remove usage
-  useGuestSessionCleanup();
-  // Remove guest session usage since guest mode is discontinued
-  // const { guestSession } = useGuestSession();
-  // const guestSessionId = guestSession?.sessionId;
+  const { guestSession } = useGuestSession();
+  const guestSessionId = guestSession?.sessionId;
   const { user, session, isAuthenticated, isLoading } = useCustomerAuth();
   const { profile } = useCustomerProfile();
   
-  // Initialize checkout step based on authentication status
-  const getInitialCheckoutStep = () => {
-    if (isAuthenticated) return 'details';
-    return 'auth';
+  // Fast-path initial step determination
+  const getInitialCheckoutStep = (): 'auth' | 'details' | 'payment' => {
+    // Default to details - auth check will redirect if needed
+    return 'details';
   };
   
-  const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>(getInitialCheckoutStep());
+  const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>(() => getInitialCheckoutStep());
   const [formData, setFormData] = useState<CheckoutData>({
     customer_email: '',
     customer_name: '',
@@ -164,8 +161,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   const [paymentData, setPaymentData] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [failedAttempts, setFailedAttempts] = useState(0);
-  const [circuitBreakerActive, setCircuitBreakerActive] = useState(false);
   const [deliveryZone, setDeliveryZone] = useState<any>(null);
   const [pickupPoint, setPickupPoint] = useState<any>(null);
   const [lastPaymentError, setLastPaymentError] = useState<string | null>(null);
@@ -180,6 +175,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   // Initialize order processing
   const { markCheckoutInProgress } = useOrderProcessing();
+
+  // Warm up edge functions on mount for faster checkout
+  useEffect(() => {
+    if (isOpen) {
+      edgeFunctionWarmer.warmCheckoutFunctions();
+    }
+  }, [isOpen]);
 
   const handleClose = () => {
     if (checkoutStep === 'payment' && paymentData) {
@@ -221,16 +223,16 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
     return () => window.removeEventListener('message', handleMessage);
   }, [handleClose]);
 
-  // Manage checkout step based on authentication status
+  // Non-blocking auth step management
   useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated) {
-        setCheckoutStep('details');
-      } else {
-        setCheckoutStep('auth');
-      }
+    // Only redirect to auth if explicitly not authenticated
+    if (!isLoading && !isAuthenticated && !guestSessionId) {
+      setCheckoutStep('auth');
+    } else if (isAuthenticated) {
+      setCheckoutStep('details');
     }
-  }, [isAuthenticated, isLoading]);
+    // Default to details step for guest users to avoid blocking
+  }, [isAuthenticated, isLoading, guestSessionId]);
 
   // Auto-fill form data from user profile
   useEffect(() => {
@@ -287,22 +289,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   // Remove the processOrder hook usage since it doesn't exist
 
   const handleFormSubmit = async () => {
-    // 🔧 CIRCUIT BREAKER: Block after 3 failures within 5 minutes
-    if (circuitBreakerActive) {
-      toast({
-        title: "Too Many Attempts",
-        description: "Please wait 5 minutes before trying again.",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    // 🔧 DEBOUNCE: Prevent double-clicks during submission
-    if (isSubmitting) {
-      console.log('⏳ Already submitting, ignoring duplicate request');
-      return;
-    }
-
     try {
       setIsSubmitting(true);
       setLastPaymentError(null);
@@ -332,8 +318,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           special_instructions: formData.special_instructions || null
         } : null,
         payment_method: formData.payment_method,
-        // 🔧 HOTFIX: Remove guest_session_id completely (guest mode discontinued)
-        // guest_session_id: null, // Explicitly omit since guest mode is discontinued
+        guest_session_id: guestSessionId,
         terms_accepted: termsRequired ? termsAccepted : undefined,
         timestamp: new Date().toISOString()
       };
@@ -345,19 +330,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         body: sanitizedData
       });
 
-      // 🚨 CRITICAL: Stop flow immediately on order creation failure
-      if (error || !data?.success) {
-        console.error('❌ Order creation failed - stopping checkout flow:', error || data);
-        
-        const errorMessage = error?.message || data?.error || 'Order creation failed';
-        const errorCode = data?.code || 'ORDER_CREATION_FAILED';
-        
-        throw new Error(`${errorMessage} [${errorCode}]`);
-      }
+      if (error) throw error;
 
       console.log('🔄 Raw server response:', data);
 
-      // Try to parse response, prioritizing backend-returned amounts
+      // Try to parse response, fall back to minimal order data if payment_url missing
       let parsedData;
       try {
         parsedData = normalizePaymentResponse(data);
@@ -368,22 +345,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         parsedData = {
           order_id: data?.order_id,
           order_number: data?.order_number,
-          amount: data?.amount || total, // Prioritize backend amount
+          amount: total,
           customer_email: sanitizedData.customer_email,
           success: true
         };
       }
-
-      // 🔧 CRITICAL: Use backend-returned amount if available
-      const authoritativeAmount = data?.amount || parsedData?.amount || total;
-      
-      console.log('💰 Amount prioritization:', {
-        client_calculated: total,
-        backend_returned: data?.amount,
-        authoritative_amount: authoritativeAmount,
-        items_subtotal: data?.items_subtotal,
-        delivery_fee: data?.delivery_fee
-      });
 
       // Check if process-checkout provided a payment_url to open
       if (data?.payment_url || data?.authorization_url) {
@@ -428,7 +394,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       setPaymentData({
         orderId: parsedData?.order_id,
         orderNumber: parsedData?.order_number || data?.order_number,
-        amount: authoritativeAmount, // Use authoritative amount from backend
+        amount: total,
         email: sanitizedData.customer_email,
         successUrl: `${window.location.origin}/payment-callback`,
         cancelUrl: window.location.href
@@ -442,30 +408,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       console.error('🚨 Checkout submission error:', error);
       setIsSubmitting(false);
       
-      // 🔧 CIRCUIT BREAKER: Increment failure count and activate if needed
-      const newFailedAttempts = failedAttempts + 1;
-      setFailedAttempts(newFailedAttempts);
-      
-      if (newFailedAttempts >= 3) {
-        setCircuitBreakerActive(true);
-        // Reset circuit breaker after 5 minutes
-        setTimeout(() => {
-          setCircuitBreakerActive(false);
-          setFailedAttempts(0);
-        }, 5 * 60 * 1000);
-      }
-      
       // Enhanced error handling with safe message extraction
       const errorMessage = safeErrorMessage(error);
       
       // Map specific errors to user-friendly messages
       let userFriendlyMessage: string;
       
-      if (errorMessage.includes('ORDER_CREATION_FAILED') || errorMessage.includes('INVALID_ORDER_DATA')) {
-        userFriendlyMessage = 'Order creation failed. Please check your details and try again.';
-      } else if (errorMessage.includes('CUSTOMER_ERROR')) {
-        userFriendlyMessage = 'There was an issue with customer information. Please verify your details.';
-      } else if (errorMessage.includes('Payment initialization incomplete - missing authorization URL from server')) {
+      if (errorMessage.includes('Payment initialization incomplete - missing authorization URL from server')) {
         userFriendlyMessage = 'Payment system configuration issue. Please contact support.';
       } else if (errorMessage.includes('Payment URL not available')) {
         userFriendlyMessage = 'Unable to redirect to payment. Please try again or contact support.';
@@ -803,6 +752,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </CardHeader>
             <CardContent>
               <DeliveryScheduler
+                variant="horizontal"
                 onScheduleChange={(date, timeSlot) => {
                   handleFormChange('delivery_date', date);
                   handleFormChange('delivery_time_slot', timeSlot);
@@ -936,20 +886,22 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </div>
 
             <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="space-y-4 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="text-muted-foreground">Checking account...</p>
+              {/* Non-blocking loading indicator */}
+              {isLoading && (
+                <div className="fixed top-4 right-4 z-50">
+                  <div className="bg-background/95 backdrop-blur-sm border rounded-lg px-3 py-2 shadow-lg">
+                    <div className="flex items-center gap-2 text-sm">
+                      <div className="w-3 h-3 border border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                      <span className="text-muted-foreground">Loading...</span>
+                    </div>
                   </div>
                 </div>
-              ) : (
-                <>
-                  {checkoutStep === 'auth' && renderAuthStep()}
-                  {checkoutStep === 'details' && renderDetailsStep()}
-                  {checkoutStep === 'payment' && renderPaymentStep()}
-                </>
               )}
+              
+              {/* Always render content - no blocking */}
+              {checkoutStep === 'auth' && renderAuthStep()}
+              {checkoutStep === 'details' && renderDetailsStep()}
+              {checkoutStep === 'payment' && renderPaymentStep()}
             </div>
 
             {/* Sticky Bottom Action */}

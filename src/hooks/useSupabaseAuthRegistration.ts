@@ -27,43 +27,42 @@ export const useSupabaseAuthRegistration = () => {
     try {
       setIsLoading(true);
       
-      // Use the secure edge function endpoint with enhanced validation
-      const { data: response, error } = await supabase.functions.invoke('auth-register', {
-        body: {
-          fullName: data.name,
-          email: data.email.toLowerCase(),
-          phoneNumber: data.phone || '+1000000000' // Default for validation
+      // Use Supabase Auth signInWithOtp for email verification
+      const { data: otpData, error } = await supabase.auth.signInWithOtp({
+        email: data.email.toLowerCase(),
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth-callback`,
+          data: {
+            name: data.name,
+            phone: data.phone,
+            registration_password: data.password, // Store temporarily in metadata
+            registration_flow: 'email_otp'
+          }
         }
       });
 
       if (error) {
-        const friendly = (response as any)?.error || error.message || "Failed to initiate registration";
         toast({
           title: "Registration failed",
-          description: friendly,
+          description: error.message,
           variant: "destructive"
         });
-        return { success: false, error: friendly };
+        return { success: false, error: error.message };
       }
 
-      if (response?.success) {
-        setRegistrationEmail(data.email.toLowerCase());
-        setRegistrationStep('otp_verification');
-        
-        toast({
-          title: "Verification code sent",
-          description: "Please check your email for the 6-character verification code.",
-        });
+      setRegistrationEmail(data.email.toLowerCase());
+      setRegistrationStep('otp_verification');
+      
+      toast({
+        title: "Verification code sent",
+        description: "Please check your email for the 6-character verification code.",
+      });
 
-        return { 
-          success: true, 
-          requiresOtpVerification: true,
-          email: data.email.toLowerCase(),
-          correlation_id: response.correlation_id
-        };
-      }
-
-      return { success: false, error: response?.error || "Registration failed" };
+      return { 
+        success: true, 
+        requiresOtpVerification: true,
+        email: data.email.toLowerCase()
+      };
     } catch (error: any) {
       toast({
         title: "Registration failed",
@@ -80,42 +79,77 @@ export const useSupabaseAuthRegistration = () => {
     try {
       setIsLoading(true);
       
-      // Use the secure edge function endpoint for OTP verification
-      const { data: response, error } = await supabase.functions.invoke('auth-verify-otp', {
+      // Verify the OTP token with Supabase Auth
+      const { data: verifyData, error: verifyError } = await supabase.auth.verifyOtp({
+        email: data.email.toLowerCase(),
+        token: data.token,
+        type: 'email'
+      });
+
+      if (verifyError) {
+        toast({
+          title: "Verification failed",
+          description: verifyError.message,
+          variant: "destructive"
+        });
+        return { success: false, error: verifyError.message };
+      }
+
+      if (!verifyData.user) {
+        toast({
+          title: "Verification failed",
+          description: "Invalid verification code",
+          variant: "destructive"
+        });
+        return { success: false, error: "Invalid verification code" };
+      }
+
+      // Set password for the user
+      const { error: passwordError } = await supabase.auth.updateUser({
+        password: data.password
+      });
+
+      if (passwordError) {
+        toast({
+          title: "Password setup failed",
+          description: passwordError.message,
+          variant: "destructive"
+        });
+        return { success: false, error: passwordError.message };
+      }
+
+      // Finalize registration by creating customer account and sending welcome email
+      const { data: finalizeData, error: finalizeError } = await supabase.functions.invoke('finalize-customer-registration', {
         body: {
           email: data.email.toLowerCase(),
-          token: data.token
+          name: data.name,
+          phone: data.phone
         }
       });
 
-      if (error) {
-        const friendly = (response as any)?.error || error.message || "Failed to verify OTP";
+      if (finalizeError || !finalizeData?.success) {
+        console.error('Finalization error:', finalizeError);
+        // Don't fail completely, user is already registered in Auth
         toast({
-          title: "Verification failed",
-          description: friendly,
+          title: "Registration completed with warnings",
+          description: "Your account was created but there may be issues with welcome email.",
           variant: "destructive"
         });
-        return { success: false, error: friendly };
-      }
-
-      if (response?.success) {
-        setRegistrationStep('completed');
-        
+      } else {
         toast({
           title: "Registration completed!",
           description: "Your account has been created successfully. Welcome email sent.",
         });
-
-        return { 
-          success: true, 
-          auth_user_id: response.auth_user_id,
-          customer_id: response.customer_id,
-          welcome_email_sent: response.welcome_email_sent,
-          correlation_id: response.correlation_id
-        };
       }
 
-      return { success: false, error: response?.error || "OTP verification failed" };
+      setRegistrationStep('completed');
+
+      return { 
+        success: true, 
+        user_id: verifyData.user.id,
+        customer_id: finalizeData?.customer_id,
+        welcome_email_sent: finalizeData?.welcome_email_queued
+      };
     } catch (error: any) {
       toast({
         title: "Verification failed",
@@ -132,38 +166,25 @@ export const useSupabaseAuthRegistration = () => {
     try {
       setIsLoading(true);
       
-      // Use the secure rate-limited resend function
-      const { data: response, error } = await supabase.functions.invoke('check-otp-rate-limit', {
-        body: {
-          email: email.toLowerCase(),
-          type: 'registration'
-        }
+      const { error } = await supabase.auth.resend({
+        type: 'signup',
+        email: email.toLowerCase()
       });
 
       if (error) {
         toast({
           title: "Resend failed",
-          description: error.message || "Failed to resend verification code",
+          description: error.message,
           variant: "destructive"
         });
         return { success: false, error: error.message };
       }
 
-      if (response?.allowed) {
-        toast({
-          title: "Code resent",
-          description: "A new verification code has been sent to your email.",
-        });
-        return { success: true };
-      } else {
-        const message = `Please wait ${Math.ceil((response?.retry_after_seconds || 300) / 60)} minutes before requesting another code.`;
-        toast({
-          title: "Rate limit exceeded",
-          description: message,
-          variant: "destructive"
-        });
-        return { success: false, error: message };
-      }
+      toast({
+        title: "Code resent",
+        description: "A new verification code has been sent to your email.",
+      });
+      return { success: true };
     } catch (error: any) {
       toast({
         title: "Resend failed",

@@ -42,20 +42,18 @@ serve(async (req) => {
       console.log('Webhook secret not configured - proceeding with IP validation only');
     }
 
-    // 🔒 CORRECT WEBHOOK SIGNATURE VERIFICATION using HMAC-SHA512
+    // Verify webhook signature only if both signature and secret are available
     let signatureValid = false;
     
     if (signature && webhookSecret) {
       try {
-        console.log('🔐 Verifying webhook signature with HMAC-SHA512');
-        
         const encoder = new TextEncoder();
         const key = await crypto.subtle.importKey(
           "raw",
           encoder.encode(webhookSecret),
           { name: "HMAC", hash: "SHA-512" },
           false,
-          ["sign", "verify"]
+          ["sign"]
         );
 
         const signatureBytes = await crypto.subtle.sign("HMAC", key, encoder.encode(payload));
@@ -63,29 +61,21 @@ serve(async (req) => {
           .map(b => b.toString(16).padStart(2, '0'))
           .join('');
 
-        // Clean up signature format - remove 'sha512=' prefix if present
+        // Remove 'sha512=' prefix if present in signature
         const cleanSignature = signature.startsWith('sha512=') ? signature.slice(7) : signature;
         
-        // Use timing-safe comparison
-        signatureValid = expectedSignature.length === cleanSignature.length && 
-                        expectedSignature === cleanSignature;
+        signatureValid = expectedSignature === cleanSignature;
         
         if (!signatureValid) {
-          console.warn('🚨 Webhook signature verification FAILED:', {
-            expected_length: expectedSignature.length,
-            received_length: cleanSignature.length,
-            expected_prefix: expectedSignature.substring(0, 10),
-            received_prefix: cleanSignature.substring(0, 10)
-          });
+          console.warn('Signature verification failed - processing with IP validation');
         } else {
-          console.log('✅ Webhook signature verified successfully with HMAC-SHA512');
+          console.log('Webhook signature verified successfully');
         }
       } catch (error) {
-        console.error('❌ Signature verification error:', error);
-        signatureValid = false;
+        console.warn('Signature verification error - processing with IP validation:', error);
       }
     } else {
-      console.log('⚠️ Webhook signature verification skipped - no signature or secret available');
+      console.log('Webhook signature verification skipped - no signature or secret available');
     }
 
     // Enhanced security: Validate IP address when signature verification is not available or fails

@@ -58,21 +58,17 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
       })),
       total_amount: params.totalAmount,
       delivery_fee: 0,
-      payment_method: 'paystack'
-      // 🔧 HOTFIX: Remove guest_session_id (guest mode discontinued)
-      // guest_session_id: null
+      payment_method: 'paystack',
+      guest_session_id: params.guestSessionId
     };
 
     const { data, error: orderError } = await supabase.functions.invoke('process-checkout', {
       body: orderData
     });
 
-    // 🚨 STOP FLOW IMMEDIATELY on order creation failure  
     if (orderError || !data?.success) {
-      console.error('❌ Order creation failed - stopping payment flow:', orderError || data);
-      const errorCode = data?.code || 'ORDER_CREATION_FAILED';
-      const errorMessage = orderError?.message || data?.error || 'Order creation failed';
-      throw new Error(`${errorMessage} [${errorCode}]`);
+      console.error('❌ Order creation failed:', orderError || data);
+      throw new Error(`Order creation failed: ${orderError?.message || data?.error || 'Unknown error'}`);
     }
 
     const order = data.data || data;

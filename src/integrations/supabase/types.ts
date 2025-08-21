@@ -5442,11 +5442,9 @@ export type Database = {
       }
       payment_transactions: {
         Row: {
-          access_code: string | null
           account_name: string | null
           amount: number
           authorization_code: string | null
-          authorization_url: string | null
           bank: string | null
           card_type: string | null
           channel: string | null
@@ -5466,23 +5464,17 @@ export type Database = {
           paid_at: string | null
           payment_method: string | null
           processed_at: string | null
-          provider: string
           provider_reference: string | null
           provider_response: Json | null
           provider_transaction_id: string | null
-          raw_provider_payload: Json | null
-          reference: string | null
           status: string
           transaction_type: string
           updated_at: string | null
-          verified_at: string | null
         }
         Insert: {
-          access_code?: string | null
           account_name?: string | null
           amount: number
           authorization_code?: string | null
-          authorization_url?: string | null
           bank?: string | null
           card_type?: string | null
           channel?: string | null
@@ -5502,23 +5494,17 @@ export type Database = {
           paid_at?: string | null
           payment_method?: string | null
           processed_at?: string | null
-          provider?: string
           provider_reference?: string | null
           provider_response?: Json | null
           provider_transaction_id?: string | null
-          raw_provider_payload?: Json | null
-          reference?: string | null
           status: string
           transaction_type?: string
           updated_at?: string | null
-          verified_at?: string | null
         }
         Update: {
-          access_code?: string | null
           account_name?: string | null
           amount?: number
           authorization_code?: string | null
-          authorization_url?: string | null
           bank?: string | null
           card_type?: string | null
           channel?: string | null
@@ -5538,16 +5524,12 @@ export type Database = {
           paid_at?: string | null
           payment_method?: string | null
           processed_at?: string | null
-          provider?: string
           provider_reference?: string | null
           provider_response?: Json | null
           provider_transaction_id?: string | null
-          raw_provider_payload?: Json | null
-          reference?: string | null
           status?: string
           transaction_type?: string
           updated_at?: string | null
-          verified_at?: string | null
         }
         Relationships: [
           {
@@ -7800,33 +7782,6 @@ export type Database = {
           },
         ]
       }
-      user_profiles: {
-        Row: {
-          created_at: string | null
-          full_name: string | null
-          id: string | null
-          is_verified: boolean | null
-          phone_number: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          full_name?: string | null
-          id?: string | null
-          is_verified?: boolean | null
-          phone_number?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          full_name?: string | null
-          id?: string | null
-          is_verified?: boolean | null
-          phone_number?: string | null
-          updated_at?: string | null
-        }
-        Relationships: []
-      }
     }
     Functions: {
       activate_admin_user: {
@@ -8710,17 +8665,6 @@ export type Database = {
         }
         Returns: string
       }
-      log_registration_security_event: {
-        Args: {
-          p_email: string
-          p_event_type: string
-          p_ip_address?: unknown
-          p_metadata?: Json
-          p_success?: boolean
-          p_user_agent?: string
-        }
-        Returns: string
-      }
       log_security_event: {
         Args:
           | {
@@ -9044,10 +8988,6 @@ export type Database = {
       }
       validate_paystack_webhook_ip: {
         Args: { request_ip: unknown }
-        Returns: boolean
-      }
-      validate_phone_number: {
-        Args: { phone_text: string }
         Returns: boolean
       }
       validate_promotion_usage: {

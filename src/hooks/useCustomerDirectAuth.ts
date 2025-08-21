@@ -1,8 +1,8 @@
+
 import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { handlePostLoginRedirect } from '@/utils/redirect';
-import { handleGoogleAuthError, retryGoogleAuth } from '@/utils/googleAuthErrorHandler';
 
 interface RegistrationData {
   name: string;
@@ -46,20 +46,6 @@ export const useCustomerDirectAuth = () => {
 
         toast({
           title: "Login failed",
-          description: errorMessage,
-          variant: "destructive"
-        });
-        return { success: false, error: errorMessage };
-      }
-
-      // Enforce email verification - sign out unverified users
-      if (data.user && !data.user.email_confirmed_at) {
-        console.log('Signing out unverified user:', data.user.email);
-        await supabase.auth.signOut();
-        
-        const errorMessage = 'Please verify your email address before signing in. Check your inbox for the verification link.';
-        toast({
-          title: "Email verification required",
           description: errorMessage,
           variant: "destructive"
         });
@@ -322,45 +308,33 @@ export const useCustomerDirectAuth = () => {
   const signUpWithGoogle = async () => {
     try {
       setIsLoading(true);
-
-      const performGoogleAuth = async () => {
-        const oauthOptions: any = {
-          provider: 'google',
-          options: {
-            redirectTo: `${window.location.origin}/auth/callback`,
-            scopes: 'openid email profile',
-            queryParams: {
-              access_type: 'offline',
-              prompt: 'consent'
-            }
-          }
-        };
-
-        return await supabase.auth.signInWithOAuth(oauthOptions);
+      
+      const oauthOptions: any = {
+        provider: 'google',
+        options: {
+          redirectTo: `${window.location.origin}/auth-callback`
+        }
       };
-
-      const { error } = await retryGoogleAuth(performGoogleAuth, 2, 1000);
+      
+      const { error } = await supabase.auth.signInWithOAuth(oauthOptions);
 
       if (error) {
-        const authError = handleGoogleAuthError(error);
         toast({
           title: "Google authentication failed",
-          description: authError.userMessage,
+          description: error.message,
           variant: "destructive"
         });
-        return { success: false, error: authError.userMessage };
+        return { success: false, error: error.message };
       }
 
-      // Success message will be shown after redirect
       return { success: true };
     } catch (error: any) {
-      const authError = handleGoogleAuthError(error);
       toast({
         title: "Google authentication failed",
-        description: authError.userMessage,
+        description: error.message || "An unexpected error occurred.",
         variant: "destructive"
       });
-      return { success: false, error: authError.userMessage };
+      return { success: false, error: error.message };
     } finally {
       setIsLoading(false);
     }

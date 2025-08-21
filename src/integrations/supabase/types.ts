@@ -5442,9 +5442,11 @@ export type Database = {
       }
       payment_transactions: {
         Row: {
+          access_code: string | null
           account_name: string | null
           amount: number
           authorization_code: string | null
+          authorization_url: string | null
           bank: string | null
           card_type: string | null
           channel: string | null
@@ -5464,17 +5466,23 @@ export type Database = {
           paid_at: string | null
           payment_method: string | null
           processed_at: string | null
+          provider: string
           provider_reference: string | null
           provider_response: Json | null
           provider_transaction_id: string | null
+          raw_provider_payload: Json | null
+          reference: string | null
           status: string
           transaction_type: string
           updated_at: string | null
+          verified_at: string | null
         }
         Insert: {
+          access_code?: string | null
           account_name?: string | null
           amount: number
           authorization_code?: string | null
+          authorization_url?: string | null
           bank?: string | null
           card_type?: string | null
           channel?: string | null
@@ -5494,17 +5502,23 @@ export type Database = {
           paid_at?: string | null
           payment_method?: string | null
           processed_at?: string | null
+          provider?: string
           provider_reference?: string | null
           provider_response?: Json | null
           provider_transaction_id?: string | null
+          raw_provider_payload?: Json | null
+          reference?: string | null
           status: string
           transaction_type?: string
           updated_at?: string | null
+          verified_at?: string | null
         }
         Update: {
+          access_code?: string | null
           account_name?: string | null
           amount?: number
           authorization_code?: string | null
+          authorization_url?: string | null
           bank?: string | null
           card_type?: string | null
           channel?: string | null
@@ -5524,12 +5538,16 @@ export type Database = {
           paid_at?: string | null
           payment_method?: string | null
           processed_at?: string | null
+          provider?: string
           provider_reference?: string | null
           provider_response?: Json | null
           provider_transaction_id?: string | null
+          raw_provider_payload?: Json | null
+          reference?: string | null
           status?: string
           transaction_type?: string
           updated_at?: string | null
+          verified_at?: string | null
         }
         Relationships: [
           {

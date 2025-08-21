@@ -307,35 +307,41 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       setIsSubmitting(true);
       setLastPaymentError(null);
 
-      // Enhanced data sanitization and validation
+      // Validate required fields before processing
+      if (!formData.customer_email?.trim()) {
+        throw new Error('Customer email is required');
+      }
+      if (!formData.customer_name?.trim()) {
+        throw new Error('Customer name is required');
+      }
+      if (!formData.fulfillment_type) {
+        throw new Error('Fulfillment type is required');
+      }
+
+      // Enhanced data sanitization and validation - Structure payload for backend
       const sanitizedData = {
-        customer_email: formData.customer_email.trim().toLowerCase(),
-        customer_name: formData.customer_name.trim(),
-        customer_phone: formData.customer_phone.trim(),
-        fulfillment_type: formData.fulfillment_type,
-        delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : null,
-        pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : null,
-        order_items: items.map(item => ({
+        customer: {
+          name: formData.customer_name.trim(),
+          email: formData.customer_email.trim().toLowerCase(),
+          phone: formData.customer_phone?.trim() || undefined
+        },
+        items: items.map(item => ({
           product_id: item.product_id,
+          product_name: item.product_name || 'Product',
           quantity: item.quantity,
           unit_price: item.price,
-          total_price: item.price * item.quantity
+          customizations: item.customizations || undefined
         })),
-        total_amount: total,
-        delivery_fee: deliveryFee,
-        delivery_zone_id: deliveryZone?.id || null,
-        delivery_schedule: formData.delivery_date ? {
-          delivery_date: formData.delivery_date,
-          delivery_time_start: formData.delivery_time_slot?.start_time || '09:00',
-          delivery_time_end: formData.delivery_time_slot?.end_time || '17:00',
-          is_flexible: false,
-          special_instructions: formData.special_instructions || null
-        } : null,
-        payment_method: formData.payment_method,
-        // 🔧 HOTFIX: Remove guest_session_id completely (guest mode discontinued)
-        // guest_session_id: null, // Explicitly omit since guest mode is discontinued
-        terms_accepted: termsRequired ? termsAccepted : undefined,
-        timestamp: new Date().toISOString()
+        fulfillment: {
+          type: formData.fulfillment_type,
+          address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : undefined,
+          pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : undefined,
+          delivery_zone_id: deliveryZone?.id || undefined,
+          scheduled_time: formData.delivery_date ? `${formData.delivery_date} ${formData.delivery_time_slot?.start_time || '09:00'}` : undefined
+        },
+        payment: {
+          method: formData.payment_method || 'paystack'
+        }
       };
 
       console.log('📦 Submitting checkout data:', sanitizedData);
@@ -369,7 +375,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           order_id: data?.order_id,
           order_number: data?.order_number,
           amount: data?.amount || total, // Prioritize backend amount
-          customer_email: sanitizedData.customer_email,
+          customer_email: sanitizedData.customer.email,
           success: true
         };
       }
@@ -385,30 +391,40 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         delivery_fee: data?.delivery_fee
       });
 
-      // Check if process-checkout provided a payment_url to open
-      if (data?.payment_url || data?.authorization_url) {
-        const paymentUrl = data.payment_url || data.authorization_url;
-        console.log('🔗 Opening process-checkout payment URL in new tab:', paymentUrl);
-        window.open(paymentUrl, '_blank');
-        toast({
-          title: "Payment opened",
-          description: "Complete payment in the new tab, then return here."
-        });
-        return; // Exit early if primary payment flow worked
+      // Handle direct payment redirection from backend
+      if (data?.payment?.authorization_url || data?.authorization_url) {
+        const paymentUrl = data.payment?.authorization_url || data.authorization_url;
+        console.log('🔗 Redirecting to payment URL:', paymentUrl);
+        
+        // Save state before redirecting  
+        savePrePaymentState(sanitizedData, checkoutStep, deliveryFee, 'direct_redirect');
+        
+        // Clear cart and redirect
+        clearCart();
+        window.location.href = paymentUrl;
+        return;
       }
 
       // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
-      if (parsedData?.order_id && sanitizedData.delivery_schedule) {
+      const deliverySchedule = formData.delivery_date ? {
+        delivery_date: formData.delivery_date,
+        delivery_time_start: formData.delivery_time_slot?.start_time || '09:00',
+        delivery_time_end: formData.delivery_time_slot?.end_time || '17:00',
+        is_flexible: false,
+        special_instructions: formData.special_instructions || null
+      } : null;
+      
+      if (parsedData?.order_id && deliverySchedule) {
         console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
         try {
           const { upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
           await upsertDeliverySchedule({
             order_id: parsedData.order_id,
-            delivery_date: sanitizedData.delivery_schedule.delivery_date,
-            delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
-            delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
-            is_flexible: sanitizedData.delivery_schedule.is_flexible || false,
-            special_instructions: sanitizedData.delivery_schedule.special_instructions || null
+            delivery_date: deliverySchedule.delivery_date,
+            delivery_time_start: deliverySchedule.delivery_time_start,
+            delivery_time_end: deliverySchedule.delivery_time_end,
+            is_flexible: deliverySchedule.is_flexible || false,
+            special_instructions: deliverySchedule.special_instructions || null
           });
           console.log('✅ [GUARDRAIL] Schedule upserted successfully');
           toast({
@@ -426,10 +442,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       
       // Set payment data for PaystackPaymentHandler to initialize securely
       setPaymentData({
-        orderId: parsedData?.order_id,
-        orderNumber: parsedData?.order_number || data?.order_number,
-        amount: authoritativeAmount, // Use authoritative amount from backend
-        email: sanitizedData.customer_email,
+        orderId: parsedData?.order_id || data?.order?.id,
+        orderNumber: parsedData?.order_number || data?.order?.order_number,
+        amount: authoritativeAmount,
+        email: sanitizedData.customer.email,
         successUrl: `${window.location.origin}/payment-callback`,
         cancelUrl: window.location.href
       });
@@ -479,7 +495,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       }
       
       setLastPaymentError(userFriendlyMessage);
-      logPaymentAttempt(null, 'failure', errorMessage);
+      logPaymentAttempt(null, 'failure');
       
       toast({
         title: "Checkout Error",

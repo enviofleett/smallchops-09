@@ -122,34 +122,117 @@ serve(async (req) => {
 
     console.log('[VERIFY-PAYMENT-V2] Verifying payment with Paystack:', { reference })
 
-    // Verify with Paystack API first
-    const paystackResponse = await fetch(
-      `https://api.paystack.co/transaction/verify/${reference}`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${finalSecretKey}`,
-          'Content-Type': 'application/json',
-        }
-      }
-    )
+    // Enhanced Paystack verification with retry logic
+    const maxRetries = 3;
+    let paystackResponse;
+    let paystackData;
+    let lastError = null;
 
-    if (!paystackResponse.ok) {
-      console.error('[VERIFY-PAYMENT-V2] Paystack API error:', paystackResponse.status)
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      console.log(`[VERIFY-PAYMENT-V2] Verification attempt ${attempt}/${maxRetries}:`, { reference });
+      
+      try {
+        paystackResponse = await fetch(
+          `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${finalSecretKey}`,
+              'Content-Type': 'application/json',
+              'User-Agent': 'VerifyPayment/V2'
+            },
+            signal: AbortSignal.timeout(15000)
+          }
+        );
+
+        const responseText = await paystackResponse.text();
+        
+        console.log('[VERIFY-PAYMENT-V2] API Response:', {
+          reference,
+          attempt,
+          status: paystackResponse.status,
+          statusText: paystackResponse.statusText,
+          responseLength: responseText.length
+        });
+
+        if (!paystackResponse.ok) {
+          const errorMessage = `Paystack API error: ${paystackResponse.status} - ${responseText}`;
+          
+          // Check if this is a retryable error (400 with "not found" or 404)
+          const isRetryableError = 
+            (paystackResponse.status === 400 && responseText.includes('Transaction reference not found')) ||
+            (paystackResponse.status === 404);
+          
+          if (isRetryableError && attempt < maxRetries) {
+            console.log(`[VERIFY-PAYMENT-V2] Retryable error, waiting before retry:`, { 
+              reference, 
+              attempt, 
+              status: paystackResponse.status,
+              isRetryableError 
+            });
+            lastError = errorMessage;
+            await new Promise(resolve => setTimeout(resolve, attempt * 2000));
+            continue;
+          }
+          
+          console.error('[VERIFY-PAYMENT-V2] Non-retryable Paystack API error:', paystackResponse.status, responseText);
+          return new Response(
+            JSON.stringify({
+              success: false,
+              error: 'Payment verification failed',
+              code: 'PAYSTACK_ERROR',
+              details: errorMessage
+            }),
+            { 
+              status: 400, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            }
+          );
+        }
+
+        // Try to parse the response
+        try {
+          paystackData = JSON.parse(responseText);
+          break; // Success - exit retry loop
+        } catch (parseError) {
+          if (attempt < maxRetries) {
+            console.log(`[VERIFY-PAYMENT-V2] JSON parse failed, retrying:`, { reference, attempt });
+            lastError = `Invalid JSON response: ${parseError.message}`;
+            await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+            continue;
+          }
+          throw parseError;
+        }
+
+      } catch (error) {
+        lastError = error.message;
+        if (attempt < maxRetries) {
+          console.log(`[VERIFY-PAYMENT-V2] Network error, retrying:`, { reference, attempt, error: error.message });
+          await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    // If we exit the loop without success, return the last error
+    if (!paystackData) {
+      console.error('[VERIFY-PAYMENT-V2] All verification attempts failed:', lastError);
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Payment verification failed',
-          code: 'PAYSTACK_ERROR'
+          error: 'Payment verification failed after retries',
+          code: 'VERIFICATION_FAILED',
+          details: lastError
         }),
         { 
           status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
-      )
+      );
     }
 
-    const paystackData: PaystackVerificationResponse = await paystackResponse.json()
+    // paystackData is already parsed in the retry loop above
 
     if (!paystackData.status) {
       console.error('[VERIFY-PAYMENT-V2] Paystack verification failed:', paystackData.message)

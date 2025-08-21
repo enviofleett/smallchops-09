@@ -146,7 +146,7 @@ async function extractReference(req: Request): Promise<string | null> {
   return reference;
 }
 
-// Validate reference format
+// Enhanced reference validation with placeholder detection
 function isValidReference(reference: string): boolean {
   if (!reference || typeof reference !== 'string') {
     return false;
@@ -157,6 +157,22 @@ function isValidReference(reference: string): boolean {
     return false;
   }
   
+  // Guard against placeholder/test references
+  const placeholderPatterns = [
+    /^(test_|demo_|sample_|placeholder)/i,
+    /^txn_0+_/,
+    /^pay_0+_/,
+    /example/i,
+    /dummy/i
+  ];
+  
+  const isPlaceholder = placeholderPatterns.some(pattern => pattern.test(reference));
+  
+  if (isPlaceholder) {
+    log('error', '❌ Placeholder reference detected', { reference });
+    return false;
+  }
+  
   // Check for valid characters (alphanumeric, underscore, hyphen)
   const validFormat = /^[a-zA-Z0-9_-]+$/.test(reference);
   
@@ -164,10 +180,11 @@ function isValidReference(reference: string): boolean {
     reference,
     length: reference.length,
     validFormat,
-    isValid: validFormat
+    isPlaceholder,
+    isValid: validFormat && !isPlaceholder
   });
   
-  return validFormat;
+  return validFormat && !isPlaceholder;
 }
 
 // Initialize Supabase client with error handling
@@ -249,16 +266,30 @@ async function verifyPaymentWithRetry(reference: string, maxAttempts: number = 3
       
       lastError = result.error;
       
-      // If transaction not found and we have more attempts, wait and retry
-      if (result.error.includes('not found') && attempt < maxAttempts) {
+      // Enhanced retry logic: retry on 400 "Transaction reference not found" AND 404 errors
+      const isRetryableError = result.error.includes('not found') || 
+                               result.error.includes('Transaction reference not found') ||
+                               result.error.includes('400');
+      
+      if (isRetryableError && attempt < maxAttempts) {
         const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
-        log('info', `⏳ Transaction not found, waiting ${delay}ms before retry...`, { reference, attempt });
+        log('info', `⏳ Retryable error detected, waiting ${delay}ms before retry...`, { 
+          reference, 
+          attempt, 
+          error: result.error,
+          isRetryableError 
+        });
         await new Promise(resolve => setTimeout(resolve, delay));
         continue;
       }
       
-      // For other errors, don't retry
-      if (!result.error.includes('not found')) {
+      // For non-retryable errors, break immediately
+      if (!isRetryableError) {
+        log('warn', '❌ Non-retryable error, stopping attempts', { 
+          reference, 
+          error: result.error,
+          attempt 
+        });
         break;
       }
       
@@ -390,24 +421,37 @@ async function verifyPaymentWithPaystack(reference: string) {
   }
 }
 
-// Get Paystack secret key with environment detection
+// Deterministic Paystack key selection (matching verify-payment logic)
 function getPaystackSecretKey(): string | null {
-  const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-
-  if (!secretKey) {
-    log('error', '❌ No Paystack secret key found in environment variables');
-    return null;
-  }
-
-  // Validate key format
-  if (!secretKey.startsWith('sk_')) {
-    log('error', '❌ Invalid Paystack secret key format', {
-      keyPrefix: secretKey.substring(0, 5)
+  // Priority order: TEST key first, then general key, then LIVE key
+  const testKey = Deno.env.get('PAYSTACK_SECRET_KEY_TEST');
+  const generalKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+  const liveKey = Deno.env.get('PAYSTACK_SECRET_KEY_LIVE');
+  
+  let selectedKey = testKey || generalKey || liveKey;
+  
+  if (!selectedKey) {
+    log('error', '❌ No Paystack secret key found in environment variables', {
+      checkedKeys: ['PAYSTACK_SECRET_KEY_TEST', 'PAYSTACK_SECRET_KEY', 'PAYSTACK_SECRET_KEY_LIVE']
     });
     return null;
   }
 
-  return secretKey;
+  // Validate key format
+  if (!selectedKey.startsWith('sk_')) {
+    log('error', '❌ Invalid Paystack secret key format', {
+      keyPrefix: selectedKey.substring(0, 5)
+    });
+    return null;
+  }
+
+  log('info', '🔑 Selected Paystack key', {
+    keyType: testKey ? 'TEST' : (generalKey ? 'GENERAL' : 'LIVE'),
+    keyPrefix: selectedKey.substring(0, 10) + '...',
+    environment: selectedKey.includes('test') ? 'TEST' : 'LIVE'
+  });
+
+  return selectedKey;
 }
 
 // Process verified payment

@@ -1,22 +1,6 @@
 
-
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-// Helper function to extract user ID from authorization header
-function extractUserIdFromToken(authHeader: string | null): string | null {
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-  
-  try {
-    const token = authHeader.substring(7);
-    const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload?.sub || null;
-  } catch {
-    return null;
-  }
-}
 
 interface CheckoutRequest {
   customer: {
@@ -61,71 +45,17 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('🔄 Process checkout function called (v2025-08-21-production-fix-final-v3)')
-    
-    // Extract user ID from authorization header for authenticated users
-    const authUserId = extractUserIdFromToken(req.headers.get('authorization'))
-    console.log('👤 User context analysis:', {
-      hasUser: !!authUserId,
-      userId: authUserId ? authUserId.substring(0, 8) + '...' : null,
-      isGuest: !authUserId,
-      guestSessionId: req.headers.get('x-guest-session')?.substring(0, 8)
-    })
+    console.log('🛒 Processing checkout request...')
     
     const requestBody: CheckoutRequest = await req.json()
-    
-    // **PRODUCTION-SAFE LOGGING:** Log masked payload for debugging
-    console.log('📥 Received checkout request:', {
-      customer_email: requestBody.customer?.email ? requestBody.customer.email.substring(0, 4) + '***' + requestBody.customer.email.split('@')[1] : 'MISSING/EMPTY',
-      customer_name: requestBody.customer?.name || 'MISSING',
-      customer_phone: requestBody.customer?.phone ? '*********' + requestBody.customer.phone.slice(-2) : 'MISSING',
+    console.log('📨 Checkout request received:', {
+      customer_email: requestBody.customer?.email,
+      items_count: requestBody.items?.length,
       fulfillment_type: requestBody.fulfillment?.type,
-      order_items_count: requestBody.items?.length || 0,
-      total_amount: requestBody.items?.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0) || 0,
-      has_email: !!requestBody.customer?.email,
-      email_length: requestBody.customer?.email?.length || 0,
-      timestamp: new Date().toISOString(),
-      raw_structure: Object.keys(requestBody || {})
+      has_guest_session: !!requestBody.guest_session_id
     })
 
-    // **BACKEND SAFETY NET:** Auto-fill missing email for authenticated users
-    if (authUserId && (!requestBody.customer?.email || requestBody.customer.email.trim() === '')) {
-      console.log('🔧 Auto-filling missing customer email for authenticated user...')
-      
-      // Try to get email from customer_accounts first
-      const { data: customerAccount } = await supabaseAdmin
-        .from('customer_accounts')
-        .select('email')
-        .eq('user_id', authUserId)
-        .single()
-      
-      if (customerAccount?.email) {
-        console.log('✅ Email auto-filled from customer_accounts')
-        requestBody.customer.email = customerAccount.email
-      } else {
-        // Fallback: get email from auth.users via admin API
-        try {
-          const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(authUserId)
-          if (authUser?.user?.email) {
-            console.log('✅ Email auto-filled from auth.users')
-            requestBody.customer.email = authUser.user.email
-          }
-        } catch (authError) {
-          console.warn('⚠️ Could not fetch email from auth.users:', authError)
-        }
-      }
-    }
-
-    // Fetch business settings for guest checkout enforcement
-    console.log('⚙️ Fetching business settings for guest checkout enforcement...')
-    const { data: businessSettings } = await supabaseAdmin
-      .from('business_settings')
-      .select('allow_guest_checkout')
-      .single()
-    
-    console.log('✅ Business settings loaded:', { allow_guest_checkout: businessSettings?.allow_guest_checkout ?? false })
-
-    // Force guest_session_id to null - guest mode discontinued
+    // CRITICAL FIX: Force guest_session_id to NULL (guest mode discontinued)
     const processedRequest = {
       ...requestBody,
       guest_session_id: null // Always null - guest mode discontinued
@@ -133,89 +63,52 @@ serve(async (req) => {
 
     console.log('🚫 Guest mode disabled - forcing guest_session_id to null')
 
-    // Validate request with detailed error messages
+    // Validate request
     if (!processedRequest.customer?.email) {
-      console.error('❌ Validation failed: Customer email missing', {
-        has_customer: !!processedRequest.customer,
-        customer_keys: processedRequest.customer ? Object.keys(processedRequest.customer) : 'NO_CUSTOMER'
-      })
       throw new Error('Customer email is required')
     }
 
-    if (!processedRequest.customer?.name) {
-      console.error('❌ Validation failed: Customer name missing')
-      throw new Error('Customer name is required')
-    }
-
     if (!processedRequest.items || processedRequest.items.length === 0) {
-      console.error('❌ Validation failed: No items in order', {
-        has_items: !!processedRequest.items,
-        items_length: processedRequest.items?.length || 0
-      })
       throw new Error('Order must contain at least one item')
     }
 
     if (!processedRequest.fulfillment?.type) {
-      console.error('❌ Validation failed: Fulfillment type missing')
       throw new Error('Fulfillment type is required')
     }
 
-    // **PRODUCTION FIX**: Validate delivery address for delivery orders
-    if (processedRequest.fulfillment?.type === 'delivery' && !processedRequest.fulfillment?.address) {
-      console.error('❌ Validation failed: Delivery address required for delivery orders')
-      throw new Error('Delivery address is required for delivery orders')
-    }
-
-    // Handle authenticated vs guest customers gracefully
+    // Create or get customer account
     let customerId: string
 
-    if (authUserId) {
-      console.log('🔍 Processing authenticated user checkout...')
-      
-      // **PRODUCTION FIX:** Use UPSERT to handle existing authenticated users gracefully
-      const { data: customerAccount, error: customerError } = await supabaseAdmin
+    if (processedRequest.customer.id) {
+      // Validate UUID format
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      if (!uuidRegex.test(processedRequest.customer.id)) {
+        throw new Error('Invalid customer ID format')
+      }
+      customerId = processedRequest.customer.id
+      console.log('👤 Using existing customer:', customerId)
+    } else {
+      // Create new customer account
+      const { data: newCustomer, error: customerError } = await supabaseAdmin
         .from('customer_accounts')
-        .upsert({
-          user_id: authUserId,
+        .insert({
           name: processedRequest.customer.name,
           email: processedRequest.customer.email.toLowerCase(),
           phone: processedRequest.customer.phone,
-          email_verified: false, // Will be updated by other processes
+          email_verified: false,
           phone_verified: false,
-          profile_completion_percentage: processedRequest.customer.phone ? 80 : 60,
-          updated_at: new Date().toISOString() // Force update timestamp
-        }, { 
-          onConflict: 'user_id',
-          ignoreDuplicates: false // Allow updates to existing records
+          profile_completion_percentage: 60
         })
         .select('id')
         .single()
 
       if (customerError) {
-        console.error('❌ Failed to upsert customer account for authenticated user:', customerError)
-        
-        // **PRODUCTION FIX:** Try to fetch existing customer account if upsert fails
-        const { data: existingCustomer, error: fetchError } = await supabaseAdmin
-          .from('customer_accounts')
-          .select('id')
-          .eq('user_id', authUserId)
-          .single()
-
-        if (fetchError || !existingCustomer) {
-          throw new Error(`Customer account creation failed: ${customerError.message}`)
-        }
-
-        console.log('✅ Using existing customer account after upsert conflict')
-        customerId = existingCustomer.id
-      } else {
-        customerId = customerAccount.id
+        console.error('❌ Customer creation failed:', customerError)
+        throw new Error('Failed to create customer account')
       }
 
-      console.log('👤 Customer account resolved for authenticated user:', customerId)
-    } else {
-      // For guest users (should not happen with guest mode disabled, but defensive)
-      console.log('🚫 Guest checkout attempted but disabled')
-      throw new Error('Guest checkout is disabled. Please create an account to continue.')
+      customerId = newCustomer.id
+      console.log('👤 Created new customer:', customerId)
     }
 
     console.log('📝 Creating order with items...')
@@ -229,7 +122,7 @@ serve(async (req) => {
       customizations: item.customizations
     }))
 
-    // **PRODUCTION FIX:** Enhanced error handling for order creation
+    // Create order using the database function
     const { data: orderId, error: orderError } = await supabaseAdmin
       .rpc('create_order_with_items', {
         p_customer_id: customerId,
@@ -243,15 +136,7 @@ serve(async (req) => {
 
     if (orderError) {
       console.error('❌ Order creation failed:', orderError)
-      
-      // Provide more specific error messages for common issues
-      if (orderError.message?.includes('duplicate key')) {
-        throw new Error('Order already exists or conflicting data detected')
-      } else if (orderError.message?.includes('foreign key')) {
-        throw new Error('Invalid product or customer data provided')
-      } else {
-        throw new Error(`Order creation failed: ${orderError.message}`)
-      }
+      throw new Error(`Order creation failed: ${orderError.message}`)
     }
 
     console.log('✅ Order created successfully:', orderId)
@@ -274,7 +159,7 @@ serve(async (req) => {
       customer_email: order.customer_email
     })
 
-    // **PRODUCTION FIX:** Enhanced payment initialization with better error handling
+    // Initialize payment using paystack-secure
     console.log('💳 Initializing payment via paystack-secure...')
     
     const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke('paystack-secure', {
@@ -298,111 +183,10 @@ serve(async (req) => {
 
     if (paymentError) {
       console.error('❌ Payment initialization failed:', paymentError)
-      
-      // Don't fail the entire checkout if payment initialization fails
-      // Allow frontend to retry payment
-      console.warn('⚠️ Payment initialization failed, returning order without payment URL')
-      
-      return new Response(JSON.stringify({
-        success: true,
-        order: {
-          id: order.id,
-          order_number: order.order_number,
-          total_amount: order.total_amount,
-          status: 'pending'
-        },
-        customer: {
-          id: customerId,
-          email: order.customer_email
-        },
-        payment: {
-          initialization_failed: true,
-          error: paymentError.message
-        }
-      }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      })
+      throw new Error(`Payment initialization failed: ${paymentError.message}`)
     }
 
-    // **PRODUCTION FIX:** Check for existing pending transactions before creating new ones
-    const paymentReference = paymentData?.data?.reference || paymentData?.reference
-    
-    if (paymentReference) {
-      // First check if transaction already exists
-      console.log('🔍 Checking for existing pending transactions for order:', order.id)
-      const { data: existingTransactions } = await supabaseAdmin
-        .from('payment_transactions')
-        .select('id, provider_reference, status')
-        .eq('order_id', order.id)
-        .in('status', ['pending', 'initialized'])
-      
-      console.log('🔁 Existing pending transactions for this order before insert:', existingTransactions?.length || 0)
-      
-      // Mark any existing pending transactions as superseded to avoid confusion
-      if (existingTransactions && existingTransactions.length > 0) {
-        await supabaseAdmin
-          .from('payment_transactions')
-          .update({ 
-            status: 'superseded',
-            updated_at: new Date().toISOString()
-          })
-          .eq('order_id', order.id)
-          .in('status', ['pending', 'initialized'])
-        
-        console.log('✅ Marked previous pending transactions as superseded')
-      }
-      
-      // Now create/update the current transaction with UPSERT
-      try {
-        const { error: transactionError } = await supabaseAdmin
-          .from('payment_transactions')
-          .upsert({
-            order_id: order.id,
-            reference: paymentReference,
-            provider_reference: paymentReference,
-            status: 'pending',
-            amount: order.total_amount,
-            currency: 'NGN',
-            provider: 'paystack',
-            authorization_url: paymentData?.data?.authorization_url || paymentData?.authorization_url,
-            access_code: paymentData?.data?.access_code || paymentData?.access_code,
-            customer_email: order.customer_email,
-            gateway_response: paymentData,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          }, {
-            onConflict: 'provider_reference',
-            ignoreDuplicates: false
-          })
-        
-        if (transactionError) {
-          console.warn('⚠️ Payment transaction upsert failed (non-blocking):', transactionError)
-        } else {
-          console.log('✅ Payment transaction record upserted successfully')
-        }
-      } catch (transactionErr) {
-        console.warn('⚠️ Payment transaction upsert error (non-blocking):', transactionErr)
-      }
-    }
-
-    // **PRODUCTION FIX:** Better handling of paystack-secure response format
-    const authorizationUrl = paymentData?.data?.authorization_url || 
-                             paymentData?.authorization_url ||
-                             null
-
-    const finalPaymentReference = paymentData?.data?.reference || 
-                                 paymentData?.reference ||
-                                 null
-
-    if (!authorizationUrl) {
-      console.warn('⚠️ No authorization URL in payment response:', paymentData)
-    }
-
-    console.log('✅ Payment initialized successfully via paystack-secure:', {
-      hasAuthUrl: !!authorizationUrl,
-      hasReference: !!finalPaymentReference
-    })
+    console.log('✅ Payment initialized successfully via paystack-secure')
 
     // Return success response
     return new Response(JSON.stringify({
@@ -418,8 +202,8 @@ serve(async (req) => {
         email: order.customer_email
       },
       payment: {
-        authorization_url: authorizationUrl,
-        reference: finalPaymentReference
+        authorization_url: paymentData.data?.authorization_url || paymentData.authorization_url,
+        reference: paymentData.data?.reference || paymentData.reference
       }
     }), {
       status: 200,
@@ -444,23 +228,36 @@ serve(async (req) => {
 })
 
 /*
-🛒 PRODUCTION CHECKOUT PROCESSOR (v2025-08-21-production-fix-final-v2)
-✅ Enhanced authenticated user handling with UPSERT logic
-✅ Comprehensive error handling and recovery patterns  
-✅ Better payment initialization with graceful failure handling
-✅ Detailed logging for production debugging
+🛒 PRODUCTION CHECKOUT PROCESSOR
 ✅ Guest mode completely disabled (guest_session_id always null)
 ✅ Robust UUID validation for customer IDs
 ✅ Uses paystack-secure for all payment initialization
+✅ Comprehensive error handling and logging
 ✅ Idempotent order creation with database function
 ✅ Production-ready error responses
 
-🔧 FIXES APPLIED:
-- UPSERT customer accounts to prevent unique constraint violations
-- Graceful handling of existing authenticated users 
-- Enhanced payment initialization error handling
-- Better paystack-secure response parsing
-- Detailed production logging for debugging
+🔧 USAGE:
+POST /functions/v1/process-checkout
+{
+  "customer": {
+    "id": "uuid-optional",
+    "name": "Customer Name",
+    "email": "customer@email.com",
+    "phone": "+234..."
+  },
+  "items": [
+    {
+      "product_id": "uuid",
+      "product_name": "Product Name",
+      "quantity": 2,
+      "unit_price": 1000
+    }
+  ],
+  "fulfillment": {
+    "type": "delivery",
+    "address": {...}
+  }
+}
 
 📊 RESPONSE:
 {
@@ -477,4 +274,3 @@ serve(async (req) => {
   }
 }
 */
-

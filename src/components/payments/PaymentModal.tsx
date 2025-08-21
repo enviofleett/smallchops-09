@@ -11,7 +11,7 @@ import { usePayment, type PaymentProvider } from '@/hooks/usePayment';
 import { useErrorHandler } from '@/hooks/useErrorHandler';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-
+import { PaystackButton } from './PaystackButton';
 import { PaymentsAPI } from '@/api/payments';
 
 interface PaymentModalProps {
@@ -130,7 +130,6 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const handlePayment = async () => {
-    setLoading(true);
     try {
       if (paymentMethod !== 'new_card' && selectedSavedMethod) {
         // Handle saved card payment - implement saved card logic
@@ -138,57 +137,50 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
         onSuccess({ status: 'success' });
         onClose();
       } else {
-        // Use direct redirection (bypass popup) consistently
+        // Use regular payment flow
         const success = await processPayment(
           orderData.id,
           orderData.total,
           orderData.customer_email,
-          true, // Open in new tab (bypass popup consistently)
+          false, // Don't open in new tab
           selectedProvider
         );
 
         if (success) {
-          toast.success('Payment initiated! Complete payment in the new tab.', {
-            description: `Order #${orderData.id} - ₦${orderData.total.toLocaleString()}`,
-            duration: 8000
-          });
           onClose();
         }
       }
     } catch (error) {
       console.error('Payment error:', error);
       toast.error('Payment failed. Please try again.');
-    } finally {
-      setLoading(false);
     }
   };
 
-  // Direct payment handler that bypasses popup
-  const handleDirectPayment = async (provider: PaymentProvider) => {
-    setLoading(true);
+  const handlePaystackSuccess = async (reference: string, transaction: any) => {
     try {
-      const success = await processPayment(
-        orderData.id,
-        orderData.total,
-        orderData.customer_email,
-        true, // Open in new tab (bypass popup)
-        provider
-      );
-
-      if (success) {
-        toast.success('Payment initiated! Complete payment in the new tab.', {
-          description: `Order #${orderData.id} - ₦${orderData.total.toLocaleString()}`,
-          duration: 8000
+      // Verify payment on the backend
+      const verification = await PaymentsAPI.verifyPayment(reference);
+      
+      if (verification.success && verification.data?.status === 'success') {
+        toast.success('Payment completed successfully!');
+        onSuccess({
+          status: 'success',
+          reference,
+          transaction: verification.data
         });
         onClose();
+      } else {
+        throw new Error('Payment verification failed');
       }
     } catch (error) {
-      toast.error('Payment failed', {
-        description: error instanceof Error ? error.message : 'Please try again',
-      });
-    } finally {
-      setLoading(false);
+      console.error('Payment verification error:', error);
+      toast.error('Payment verification failed. Please contact support.');
     }
+  };
+
+  const handlePaystackError = (error: string) => {
+    console.error('Paystack payment error:', error);
+    toast.error(`Payment failed: ${error}`);
   };
 
   const getAvailableMethodsForProvider = () => {
@@ -315,13 +307,20 @@ export const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
 
           {paymentMethod === 'new_card' ? (
-            <Button
+            <PaystackButton
+              email={orderData.customer_email}
+              amount={orderData.total}
+              orderId={orderData.id}
+              customerName={orderData.customer_name}
+              customerPhone={orderData.customer_phone}
+              onSuccess={handlePaystackSuccess}
+              onError={handlePaystackError}
+              onClose={() => setLoading(false)}
               className="w-full"
-              onClick={() => handleDirectPayment('paystack')}
               disabled={loading}
             >
               {loading ? 'Processing...' : `Pay ${formatCurrency(orderData.total)}`}
-            </Button>
+            </PaystackButton>
           ) : (
             <Button
               className="w-full"

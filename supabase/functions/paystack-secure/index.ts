@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -139,16 +140,21 @@ async function initializePayment({
       amount_source: 'database'
     })
 
-    // Check if order already has a pending/initialized transaction
+    // Check for existing pending/initialized transaction first (IDEMPOTENCY)
     const { data: existingTransaction } = await supabaseAdmin
       .from('payment_transactions')
-      .select('reference, authorization_url, access_code, status')
+      .select('reference, authorization_url, access_code, status, provider_reference')
       .eq('order_id', orderId)
       .in('status', ['pending', 'initialized'])
       .maybeSingle()
 
-    if (existingTransaction) {
-      console.log('✅ Reusing existing pending transaction:', existingTransaction.reference)
+    if (existingTransaction && existingTransaction.authorization_url) {
+      console.log('♻️ IDEMPOTENT REUSE: Found existing valid payment initialization', {
+        existing_reference: existingTransaction.reference,
+        existing_amount: authoritativeAmount,
+        authorization_url: existingTransaction.authorization_url.substring(0, 40) + '...'
+      })
+      
       return new Response(JSON.stringify({
         success: true,
         status: true,
@@ -157,7 +163,7 @@ async function initializePayment({
           access_code: existingTransaction.access_code,
           reference: existingTransaction.reference
         },
-        message: 'Reusing existing pending transaction'
+        message: 'Reusing existing valid payment initialization'
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -195,7 +201,7 @@ async function initializePayment({
     // Prepare Paystack payload
     const paystackPayload: PaystackInitializePayload = {
       email: email,
-      amount: amountInKobo.toString(),
+      amount: amountInKobo,
       currency: 'NGN',
       reference: finalReference,
       callback_url: callback_url || `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?reference=${finalReference}&order_id=${orderId}`,
@@ -211,18 +217,17 @@ async function initializePayment({
         authoritative_total: authoritativeAmount,
         amount_source: 'database',
         authoritative_amount: authoritativeAmount,
-        generated_by: 'paystack-secure-v3'
+        generated_by: 'paystack-secure-v4-production'
       }
     }
 
-    console.log('🔑 Using Paystack secret key:', paystackSecretKey.substring(0, 10) + '...')
     console.log('💳 Initializing payment:', finalReference, 'for', email, 'amount: ₦' + authoritativeAmount)
     console.log('🚀 Sending to Paystack:', JSON.stringify(paystackPayload))
 
     // Initialize with Paystack (with retry on duplicate reference)
     let paystackResponse: PaystackResponse
     let retryAttempt = 0
-    const maxRetries = 1
+    const maxRetries = 2
 
     while (retryAttempt <= maxRetries) {
       const response = await fetch('https://api.paystack.co/transaction/initialize', {
@@ -242,11 +247,36 @@ async function initializePayment({
         break
       }
 
-      // Handle duplicate reference error
+      // Handle duplicate reference error with intelligent retry
       if (response.status === 400 && 
           paystackResponse.message?.includes('Duplicate Transaction Reference')) {
         
-        console.log('❌ Paystack HTTP error:', response.status, JSON.stringify(paystackResponse))
+        console.log('❌ Duplicate reference detected:', finalReference)
+        
+        // Check if we have a pending record in our database
+        const { data: pendingRecord } = await supabaseAdmin
+          .from('payment_transactions')
+          .select('authorization_url, access_code, reference')
+          .eq('reference', finalReference)
+          .in('status', ['pending', 'initialized'])
+          .maybeSingle()
+
+        if (pendingRecord && pendingRecord.authorization_url) {
+          console.log('✅ Found existing pending record, reusing authorization_url')
+          return new Response(JSON.stringify({
+            success: true,
+            status: true,
+            data: {
+              authorization_url: pendingRecord.authorization_url,
+              access_code: pendingRecord.access_code,
+              reference: pendingRecord.reference
+            },
+            message: 'Reusing existing pending transaction'
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+        }
         
         if (retryAttempt < maxRetries) {
           // Generate new reference and retry
@@ -277,21 +307,21 @@ async function initializePayment({
 
     console.log('✅ Paystack payment initialized successfully:', paystackPayload.reference)
 
-    // Create payment transaction record with all required fields
+    // Create payment transaction record with all required fields and proper status
     const { error: transactionError } = await supabaseAdmin
       .from('payment_transactions')
       .upsert({
         reference: paystackPayload.reference,
         provider_reference: paystackPayload.reference,
         order_id: orderId,
+        provider: 'paystack',
         amount: authoritativeAmount,
         currency: 'NGN',
-        status: 'pending',
-        provider: 'paystack',
-        customer_email: email,
+        status: 'initialized', // Use proper status from constraint
         authorization_url: paystackResponse.data!.authorization_url,
         access_code: paystackResponse.data!.access_code,
-        raw_provider_payload: paystackResponse,
+        customer_email: email,
+        gateway_response: paystackResponse,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, {
@@ -300,9 +330,9 @@ async function initializePayment({
 
     if (transactionError) {
       console.error('⚠️ Failed to create payment transaction record:', transactionError)
-      // Don't fail the payment initialization - log and continue
+      // Continue - don't fail the payment initialization
     } else {
-      console.log('✅ Payment transaction record created/updated')
+      console.log('✅ Payment transaction record created with proper status')
     }
 
     return new Response(JSON.stringify({

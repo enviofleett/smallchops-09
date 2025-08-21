@@ -283,6 +283,35 @@ serve(async (req) => {
       })
     }
 
+    // **PRODUCTION FIX:** Add UPSERT for payment transactions to prevent duplicate key errors
+    const paymentReference = paymentData?.data?.reference || paymentData?.reference
+    
+    if (paymentReference) {
+      try {
+        const { error: transactionError } = await supabaseAdmin
+          .from('payment_transactions')
+          .upsert({
+            order_id: order.id,
+            provider_reference: paymentReference,
+            status: 'pending',
+            amount: order.total_amount,
+            provider: 'paystack',
+            created_at: new Date().toISOString()
+          }, {
+            onConflict: 'provider_reference',
+            ignoreDuplicates: false
+          })
+        
+        if (transactionError) {
+          console.warn('⚠️ Payment transaction upsert failed (non-blocking):', transactionError)
+        } else {
+          console.log('✅ Payment transaction record upserted successfully')
+        }
+      } catch (transactionErr) {
+        console.warn('⚠️ Payment transaction upsert error (non-blocking):', transactionErr)
+      }
+    }
+
     // **PRODUCTION FIX:** Better handling of paystack-secure response format
     const authorizationUrl = paymentData?.data?.authorization_url || 
                              paymentData?.authorization_url ||

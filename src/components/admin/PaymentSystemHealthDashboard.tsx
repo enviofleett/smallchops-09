@@ -30,6 +30,9 @@ import { toast } from 'sonner';
 
 const PaymentSystemHealthDashboard: React.FC = () => {
   const [healthReport, setHealthReport] = useState<PaymentSystemHealthReport | null>(null);
+  const [endToEndReport, setEndToEndReport] = useState<EndToEndTestReport | null>(null);
+  const [webhookReport, setWebhookReport] = useState<WebhookTestReport | null>(null);
+  const [monitoringReport, setMonitoringReport] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [runningTest, setRunningTest] = useState<string | null>(null);
 

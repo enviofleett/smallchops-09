@@ -11,13 +11,14 @@ export const PaymentCallbackHandler: React.FC = () => {
   const [message, setMessage] = useState('');
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const [isRetrying, setIsRetrying] = useState(false);
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
   useEffect(() => {
-    const handleCallback = async () => {
+    const handleCallback = async (attemptNumber = 0) => {
       try {
-        // Get reference from URL params
+        // Get reference from URL params (prefer reference over trxref)
         const reference = searchParams.get('reference') || searchParams.get('trxref');
         
         if (!reference) {
@@ -26,7 +27,16 @@ export const PaymentCallbackHandler: React.FC = () => {
           return;
         }
 
-        console.log('🔄 Processing payment callback for reference:', reference);
+        // Log if using trxref instead of reference
+        if (searchParams.get('trxref') && !searchParams.get('reference')) {
+          console.warn('🚨 Using trxref instead of reference - possible callback URL misconfiguration');
+        }
+
+        console.log(`🔄 Processing payment callback for reference: ${reference} (attempt ${attemptNumber + 1})`);
+        
+        if (attemptNumber === 0) {
+          setMessage('We\'re verifying your payment... This can take a few seconds.');
+        }
         
         // Verify the payment
         const verificationResult = await handlePaymentCallback(reference);
@@ -50,12 +60,29 @@ export const PaymentCallbackHandler: React.FC = () => {
           }, 3000);
           
         } else {
-          setStatus('failed');
-          setMessage(verificationResult.message || 'Payment verification failed');
+          // Check if this is a "transaction not found" error that we should retry
+          const shouldRetry = attemptNumber < 2 && 
+                            (verificationResult.message?.includes('Transaction reference not found') ||
+                             verificationResult.message?.includes('not found'));
           
-          toast.error('Payment Verification Failed', {
-            description: verificationResult.message || 'Unable to verify your payment'
-          });
+          if (shouldRetry) {
+            console.log(`⏳ Retrying verification in ${3 + attemptNumber * 2} seconds (attempt ${attemptNumber + 2}/3)...`);
+            setMessage(`Payment gateway is still processing... Retrying in ${3 + attemptNumber * 2} seconds.`);
+            setIsRetrying(true);
+            
+            setTimeout(() => {
+              setIsRetrying(false);
+              handleCallback(attemptNumber + 1);
+            }, (3 + attemptNumber * 2) * 1000);
+            
+          } else {
+            setStatus('failed');
+            setMessage(verificationResult.message || 'Payment verification failed');
+            
+            toast.error('Payment Verification Failed', {
+              description: verificationResult.message || 'Unable to verify your payment'
+            });
+          }
         }
         
       } catch (error) {
@@ -72,16 +99,42 @@ export const PaymentCallbackHandler: React.FC = () => {
     handleCallback();
   }, [searchParams, navigate]);
 
-  const handleRetry = () => {
+  const handleRetry = async () => {
     if (retryCount < 3) {
       setRetryCount(prev => prev + 1);
       setStatus('loading');
-      setMessage('');
+      setMessage('Retrying payment verification...');
+      setIsRetrying(true);
       
-      // Re-trigger the callback handling
+      // Use internal retry instead of window.reload
       setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+        const reference = searchParams.get('reference') || searchParams.get('trxref');
+        if (reference) {
+          handlePaymentCallback(reference).then(result => {
+            setIsRetrying(false);
+            if (result.success) {
+              setStatus('success');
+              setMessage('Payment successful! Your order has been confirmed.');
+              setOrderDetails(result.data);
+              
+              setTimeout(() => {
+                if (result.data?.order_id) {
+                  navigate(`/order-success?ref=${reference}&order_id=${result.data.order_id}`);
+                } else {
+                  navigate(`/order-success?ref=${reference}`);
+                }
+              }, 2000);
+            } else {
+              setStatus('failed');
+              setMessage(result.message || 'Payment verification failed');
+            }
+          }).catch(() => {
+            setIsRetrying(false);
+            setStatus('error');
+            setMessage('Retry failed. Please contact support.');
+          });
+        }
+      }, 2000);
     } else {
       toast.error('Maximum retries exceeded', {
         description: 'Please contact support for assistance.'
@@ -111,7 +164,10 @@ export const PaymentCallbackHandler: React.FC = () => {
           <>
             <h2 className="text-2xl font-semibold text-center">Verifying Payment</h2>
             <p className="text-muted-foreground text-center">
-              Please wait while we verify your payment...
+              {isRetrying 
+                ? 'Retrying verification... Payment gateways can take a few moments to process.'
+                : message || 'Please wait while we verify your payment...'
+              }
             </p>
           </>
         );

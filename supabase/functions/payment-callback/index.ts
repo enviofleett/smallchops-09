@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const VERSION = "v2025-08-17-production-ready";
+const VERSION = "v2025-08-21-fixed-reference-not-found";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,15 +10,17 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  // Log incoming request for debugging
+  const url = new URL(req.url);
   console.log(`[payment-callback ${VERSION}] 🔄 Callback function called`);
+  console.log(`[payment-callback ${VERSION}] 📋 Request URL: ${url.pathname}${url.search}`);
   
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Extract reference from multiple possible sources
-    const url = new URL(req.url);
+    // Extract reference from multiple possible sources (prefer reference over trxref)
     let reference = url.searchParams.get('reference') || 
                    url.searchParams.get('trxref') || 
                    url.searchParams.get('txref');
@@ -33,11 +35,25 @@ serve(async (req) => {
       }
     }
 
+    // Log reference source for debugging
+    if (url.searchParams.get('trxref') && !url.searchParams.get('reference')) {
+      console.log(`[payment-callback ${VERSION}] ⚠️ Using trxref instead of reference - possible callback misconfiguration`);
+    }
+
     console.log(`[payment-callback ${VERSION}] 📋 Processing reference: ${reference}`);
 
-    if (!reference) {
+    // Sanitize and validate reference
+    if (!reference?.trim()) {
       console.error(`[payment-callback ${VERSION}] ❌ No payment reference provided`);
       return createErrorRedirect('Missing payment reference');
+    }
+
+    reference = reference.trim();
+
+    // Check for placeholder reference (indicates callback URL issue)
+    if (reference === '__REFERENCE__' || reference === 'REFERENCE' || reference.includes('__')) {
+      console.error(`[payment-callback ${VERSION}] ❌ Placeholder reference detected: ${reference}`);
+      return createErrorRedirect('Invalid payment reference - callback URL misconfigured');
     }
 
     // Use SERVICE_ROLE_KEY for secure operations
@@ -47,9 +63,23 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    // Step 1: Verify payment with Paystack
+    // Step 1: Verify payment with Paystack (with intelligent retry)
     console.log(`[payment-callback ${VERSION}] 🔍 Verifying with Paystack...`);
-    const verificationResult = await verifyPaymentWithPaystack(reference);
+    let verificationResult = await verifyPaymentWithPaystack(reference);
+    
+    // Implement intelligent retry for "transaction not found"
+    if (!verificationResult.success && verificationResult.shouldRetry) {
+      console.log(`[payment-callback ${VERSION}] ⏳ Retrying verification in 3 seconds...`);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      
+      verificationResult = await verifyPaymentWithPaystack(reference, 1);
+      
+      if (!verificationResult.success && verificationResult.shouldRetry) {
+        console.log(`[payment-callback ${VERSION}] ⏳ Final retry in 5 seconds...`);
+        await new Promise(resolve => setTimeout(resolve, 5000));
+        verificationResult = await verifyPaymentWithPaystack(reference, 2);
+      }
+    }
     
     if (!verificationResult.success) {
       console.error(`[payment-callback ${VERSION}] ❌ Paystack verification failed:`, verificationResult.error);
@@ -140,29 +170,54 @@ serve(async (req) => {
   }
 });
 
-async function verifyPaymentWithPaystack(reference: string) {
+async function verifyPaymentWithPaystack(reference: string, retryCount = 0): Promise<{success: boolean, error?: string, data?: any, shouldRetry?: boolean}> {
   try {
-    const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY') ||
-                     Deno.env.get('PAYSTACK_SECRET_KEY_TEST') || 
-                     Deno.env.get('PAYSTACK_SECRET_KEY_LIVE');
+    // Use only PAYSTACK_SECRET_KEY (no fallbacks to avoid key mismatches)
+    const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
     
     if (!secretKey) {
       return { success: false, error: 'Paystack secret key not configured' };
     }
 
-    console.log(`[payment-callback ${VERSION}] 🔍 Verifying with Paystack API...`);
+    // Log key environment for debugging
+    const keyEnv = secretKey.startsWith('sk_test_') ? 'test' : secretKey.startsWith('sk_live_') ? 'live' : 'unknown';
+    console.log(`[payment-callback ${VERSION}] 🔍 Verifying with Paystack API (${keyEnv} mode, attempt ${retryCount + 1})...`);
 
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       headers: {
         'Authorization': `Bearer ${secretKey}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'User-Agent': 'PaymentCallback/1.0'
       }
     });
 
     if (!response.ok) {
       const errorText = await response.text();
       console.error(`[payment-callback ${VERSION}] ❌ Paystack API error:`, response.status, errorText);
-      return { success: false, error: `Paystack API error: ${response.status} - ${errorText}` };
+      
+      // Parse error for retry logic
+      let shouldRetry = false;
+      if (response.status === 400) {
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.message?.includes('Transaction reference not found') || 
+              errorData.code === 'transaction_not_found') {
+            shouldRetry = retryCount < 2; // Max 2 retries
+            console.log(`[payment-callback ${VERSION}] 🔄 Transaction not found, shouldRetry: ${shouldRetry}`);
+          }
+        } catch (e) {
+          // Fallback for unparseable error text
+          if (errorText.includes('not found')) {
+            shouldRetry = retryCount < 2;
+          }
+        }
+      }
+      
+      return { 
+        success: false, 
+        error: `Paystack API error: ${response.status} - ${errorText}`,
+        shouldRetry
+      };
     }
 
     const data = await response.json();

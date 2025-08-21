@@ -198,7 +198,7 @@ async function initializePayment({
       amount: amountInKobo.toString(),
       currency: 'NGN',
       reference: finalReference,
-      callback_url: callback_url || `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?reference=${finalReference}&order_id=${orderId}`,
+      callback_url: callback_url || `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?order_id=${orderId}`,
       channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
       metadata: {
         order_id: orderId,
@@ -217,6 +217,7 @@ async function initializePayment({
 
     console.log('🔑 Using Paystack secret key:', paystackSecretKey.substring(0, 10) + '...')
     console.log('💳 Initializing payment:', finalReference, 'for', email, 'amount: ₦' + authoritativeAmount)
+    console.log('🔗 Callback URL configured:', paystackPayload.callback_url)
     console.log('🚀 Sending to Paystack:', JSON.stringify(paystackPayload))
 
     // Initialize with Paystack (with retry on duplicate reference)
@@ -263,7 +264,7 @@ async function initializePayment({
             .eq('id', orderId)
           
           paystackPayload.reference = newReference
-          paystackPayload.callback_url = callback_url || `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?reference=${newReference}&order_id=${orderId}`
+          paystackPayload.callback_url = callback_url || `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?order_id=${orderId}`
           
           retryAttempt++
           continue

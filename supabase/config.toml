@@ -126,3 +126,72 @@ verify_jwt = true
 
 [functions.delivery-schedule-health]
 verify_jwt = false
+
+[functions.recover-order-schedule]
+verify_jwt = true
+
+[functions.customer-auth-register]
+verify_jwt = false
+
+[functions.customer-otp-verification]
+verify_jwt = false
+
+[functions.check-otp-rate-limit]
+verify_jwt = false
+
+[functions.auth-register]
+verify_jwt = false
+
+[functions.auth-verify-otp]
+verify_jwt = false
+
+[functions.auth-profile]
+verify_jwt = true
+
+[functions.customer-welcome-processor]
+verify_jwt = false
+
+[functions.enhanced-email-processor]
+verify_jwt = false
+
+[functions.production-smtp-sender]
+verify_jwt = false
+
+[functions.native-smtp-sender]
+verify_jwt = false
+
+[functions.secure-customer-auth]
+verify_jwt = false
+
+[functions.security-monitor]
+verify_jwt = false
+
+[functions.email-trigger-manager]
+verify_jwt = false
+
+[functions.email-automation-trigger]
+verify_jwt = false
+
+[functions.email-automation-engine]
+verify_jwt = false
+
+[functions.email-automation-cron]
+verify_jwt = false
+
+[functions.admin-email-processor]
+verify_jwt = false
+
+[functions.email-compliance-manager]
+verify_jwt = false
+
+[functions.automated-email-cron]
+verify_jwt = false
+
+[functions.welcome-series-processor]
+verify_jwt = false
+
+[functions.user-journey-automation]
+verify_jwt = false
+
+[functions.public-api]
+verify_jwt = false

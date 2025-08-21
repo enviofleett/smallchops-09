@@ -83,8 +83,8 @@ export const useCustomerAuth = () => {
                   ...prev,
                   customerAccount,
                   isLoading: false,
-                  isAuthenticated: !!customerAccount,
-                  error: customerAccount ? null : 'Customer account not found'
+                  isAuthenticated: true, // Session exists = authenticated
+                  error: null
                 }));
               }
             }, 0);
@@ -122,8 +122,8 @@ export const useCustomerAuth = () => {
               ...prev,
               customerAccount,
               isLoading: false,
-              isAuthenticated: !!customerAccount,
-              error: customerAccount ? null : 'Customer account not found'
+              isAuthenticated: true, // Session exists = authenticated
+              error: null
             }));
           }
         } else {

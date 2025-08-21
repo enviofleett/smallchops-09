@@ -7,6 +7,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { ExternalLink, AlertTriangle, RefreshCw } from 'lucide-react';
 import { useSecurePayment } from '@/hooks/useSecurePayment';
+import './payment-styles.css';
 
 interface PaystackPaymentHandlerProps {
   orderId: string;
@@ -73,19 +74,23 @@ export const PaystackPaymentHandler = ({
     }
 
     try {
-      openSecurePayment(authorizationUrl);
-      onSuccess(currentReference);
+      window.location.href = authorizationUrl;
+      // Note: onSuccess will be called by the payment callback handler after verification
+      toast.info('Redirecting to secure Paystack checkout...');
     } catch (error) {
       onError(error instanceof Error ? error.message : 'Payment failed');
     }
   };
 
   const handleFallback = () => {
-    if (currentReference) {
-      const fallbackUrl = `https://paystack.com/pay/${currentReference}`;
-      window.open(fallbackUrl, '_blank');
-      toast.info('Payment opened in new tab');
+    if (!authorizationUrl) {
+      onError('Payment not ready. Please try again.');
+      return;
     }
+    
+    // Use the same secure authorizationUrl for alternative payment
+    window.open(authorizationUrl, '_blank');
+    toast.info('Payment opened in new tab');
   };
 
   const handleRetry = () => {
@@ -94,12 +99,12 @@ export const PaystackPaymentHandler = ({
   };
 
   return (
-    <Card className="w-full max-w-md mx-auto">
+    <Card className="paystack-payment-handler w-full max-w-md mx-auto">
       <CardHeader className="text-center">
         <CardTitle className="flex items-center justify-center gap-2">
           <span>Secure Payment</span>
           <Badge variant="outline" className="text-xs">
-            ₦{amount.toLocaleString()}
+            ₦{amount?.toLocaleString() || '0'}
           </Badge>
         </CardTitle>
       </CardHeader>
@@ -131,7 +136,7 @@ export const PaystackPaymentHandler = ({
                 Processing Payment...
               </div>
             ) : (
-              `Pay ₦${amount.toLocaleString()}`
+              `Pay ₦${amount?.toLocaleString() || '0'}`
             )}
           </Button>
 

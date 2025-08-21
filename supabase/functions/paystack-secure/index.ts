@@ -63,38 +63,160 @@ async function initializePayment(supabaseClient, requestData) {
   try {
     const { email, amount, reference, metadata, channels } = requestData;
 
+    console.log('🔐 SECURE INIT: Backend authoritative amounts enabled', {
+      provided_email: email,
+      client_amount: amount,
+      metadata_order_id: metadata?.order_id,
+      client_reference: reference
+    });
+
     // Input validation
-    if (!email || !amount) {
-      throw new Error('Email and amount are required');
+    if (!email) {
+      throw new Error('Email is required');
     }
 
-    // FIX: Use provided reference if available, generate only if missing
-    let transactionRef = reference;
+    // Service client with elevated permissions for DB operations
+    const serviceClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+      { auth: { persistSession: false } }
+    );
+
+    let authoritativeAmount: number;
+    let transactionRef = reference as string | undefined;
+    let orderFound = false;
+
+    // 🔒 BACKEND AS SOURCE OF TRUTH: Always derive amount from DB when order_id is present
+    if (metadata?.order_id) {
+      try {
+        console.log('🔍 Fetching authoritative order data:', metadata.order_id);
+        const { data: orderData, error: orderError } = await serviceClient
+          .from('orders')
+          .select('id, payment_reference, total_amount, delivery_fee, status')
+          .eq('id', metadata.order_id)
+          .single();
+
+        if (orderError) {
+          console.error('❌ Failed to fetch order:', orderError);
+          throw new Error(`Order not found: ${metadata.order_id}`);
+        }
+
+        if (orderData) {
+          orderFound = true;
+          // AUTHORITATIVE AMOUNT: DB total_amount (excludes delivery) + delivery_fee
+          const dbTotalAmount = orderData.total_amount || 0;
+          const dbDeliveryFee = orderData.delivery_fee || 0;
+          authoritativeAmount = dbTotalAmount + dbDeliveryFee;
+
+          console.log('💰 AUTHORITATIVE AMOUNT (Backend-derived):', {
+            client_provided: amount,
+            db_total_amount: dbTotalAmount,
+            db_delivery_fee: dbDeliveryFee,
+            authoritative_amount: authoritativeAmount,
+            amount_source: 'database'
+          });
+
+          // Reference handling: prefer existing order.payment_reference
+          if (orderData.payment_reference && typeof orderData.payment_reference === 'string') {
+            transactionRef = orderData.payment_reference;
+            console.log('✅ Reusing existing order payment_reference:', transactionRef);
+          }
+
+          // Generate new reference if none exists
+          if (!transactionRef) {
+            transactionRef = `txn_${Date.now()}_${crypto.randomUUID()}`;
+            console.log('🆕 Generated new server reference:', transactionRef);
+          }
+
+          // Normalize reference format to txn_
+          if (!transactionRef.startsWith('txn_')) {
+            const oldRef = transactionRef;
+            if (transactionRef.startsWith('pay_')) {
+              transactionRef = `txn_${transactionRef.slice(4)}`;
+            } else {
+              transactionRef = `txn_${Date.now()}_${crypto.randomUUID()}`;
+            }
+            console.log(`🔄 Normalized reference: ${oldRef} -> ${transactionRef}`);
+          }
+
+          // Update order with canonical reference if changed
+          if (orderData.payment_reference !== transactionRef) {
+            await serviceClient
+              .from('orders')
+              .update({ 
+                payment_reference: transactionRef, 
+                updated_at: new Date().toISOString() 
+              })
+              .eq('id', orderData.id);
+            console.log('📝 Updated order with canonical reference');
+          }
+
+          // 🔄 IDEMPOTENCY: Check for existing pending payment initialization
+          const { data: existingTx } = await serviceClient
+            .from('payment_transactions')
+            .select('reference, provider_reference, authorization_url, access_code, status, amount')
+            .eq('order_id', orderData.id)
+            .in('status', ['pending', 'initialized'])
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (existingTx?.authorization_url && existingTx?.access_code) {
+            console.log('♻️ IDEMPOTENT REUSE: Found existing valid payment initialization', {
+              existing_reference: existingTx.reference,
+              existing_amount: existingTx.amount,
+              authorization_url: existingTx.authorization_url.substring(0, 50) + '...'
+            });
+
+            return new Response(JSON.stringify({
+              status: true,
+              data: {
+                authorization_url: existingTx.authorization_url,
+                access_code: existingTx.access_code,
+                reference: existingTx.provider_reference || existingTx.reference || transactionRef
+              },
+              reused: true,
+              amount_source: 'database',
+              authoritative_amount: authoritativeAmount
+            }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+        }
+      } catch (e) {
+        console.error('❌ Order context resolution failed:', e);
+        throw new Error(`Failed to resolve order: ${e.message}`);
+      }
+    }
+
+    // Fallback: if no order context, use client amount (with warning)
+    if (!orderFound) {
+      authoritativeAmount = amount;
+      console.warn('⚠️ NO ORDER CONTEXT: Using client-provided amount (less secure)', {
+        client_amount: amount,
+        amount_source: 'client'
+      });
+    }
+
+    // Final reference fallback
     if (!transactionRef) {
       transactionRef = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log('🆕 Generated new reference:', transactionRef);
-    } else {
-      console.log('✅ Using provided reference:', transactionRef);
-      
-      // Validate reference format
-      if (!transactionRef.startsWith('txn_') && !transactionRef.startsWith('pay_')) {
-        console.log('⚠️ Invalid reference format, generating new one');
-        transactionRef = `txn_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      }
-      
-      // Convert pay_ to txn_ for consistency
-      if (transactionRef.startsWith('pay_')) {
-        const oldRef = transactionRef;
-        transactionRef = transactionRef.replace('pay_', 'txn_');
-        console.log(`🔄 Converted reference: ${oldRef} -> ${transactionRef}`);
-      }
+      console.log('🆕 Generated fallback reference:', transactionRef);
     }
 
-    // Amount validation and conversion
-    const amountInKobo = Math.round(parseFloat(amount) * 100);
+    // Amount validation and conversion to kobo
+    const amountInKobo = Math.round(parseFloat(authoritativeAmount) * 100);
     if (isNaN(amountInKobo) || amountInKobo < 100) {
       throw new Error('Amount must be a number equal to or greater than ₦1.00');
     }
+
+    console.log('💰 FINAL AMOUNT DETAILS:', {
+      authoritative_amount_naira: authoritativeAmount,
+      amount_in_kobo: amountInKobo,
+      reference: transactionRef,
+      order_found: orderFound
+    })
 
     console.log(`💳 Initializing payment: ${transactionRef} for ${email}, amount: ₦${amountInKobo/100}`);
 
@@ -113,15 +235,22 @@ async function initializePayment(supabaseClient, requestData) {
     // Use provided callback_url or default to frontend success page
     const callbackUrl = requestData.callback_url || `${Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com'}/checkout/success`;
 
-    // Prepare Paystack payload
+    // Prepare Paystack payload with normalized metadata
+    const normalizedMetadata = {
+      ...(metadata && typeof metadata === 'object' ? metadata : {}),
+      amount_source: orderFound ? 'database' : 'client',
+      authoritative_amount: authoritativeAmount,
+      generated_by: 'paystack-secure-v3'
+    };
+
     const paystackPayload = {
       email,
       amount: amountInKobo.toString(),
       currency: 'NGN',
       reference: transactionRef,
-      callback_url: callbackUrl, // FIX: Added callback URL
+      callback_url: callbackUrl,
       channels: channels || ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
-      metadata: metadata || {} // FIX: Keep as object, don't stringify
+      metadata: normalizedMetadata
     };
 
     console.log('🚀 Sending to Paystack:', JSON.stringify(paystackPayload, null, 2));
@@ -169,27 +298,34 @@ async function initializePayment(supabaseClient, requestData) {
 
     console.log('✅ Paystack payment initialized successfully:', paystackData.data.reference);
 
-    // FIX: Try to store payment transaction (non-blocking)
+    // Create payment transaction record using service role client
     try {
-      await supabaseClient
+      const { error: transactionError } = await serviceClient
         .from('payment_transactions')
         .upsert({
+          order_id: metadata?.order_id || null,
           reference: transactionRef,
-          amount: amountInKobo / 100, // Convert back to naira
+          provider_reference: paystackData.data.reference,
+          amount: authoritativeAmount, // Use authoritative amount in Naira
           status: 'pending',
           provider: 'paystack',
-          provider_reference: paystackData.data.reference,
+          customer_email: email,
           authorization_url: paystackData.data.authorization_url,
           access_code: paystackData.data.access_code,
-          created_at: new Date().toISOString()
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }, {
           onConflict: 'reference'
-        });
+        })
       
-      console.log('✅ Payment transaction record created');
+      if (transactionError) {
+        console.error('⚠️ Failed to create payment transaction record:', transactionError)
+      } else {
+        console.log('✅ Payment transaction record created with authoritative amount')
+      }
     } catch (dbError) {
-      console.error('⚠️ Failed to create payment transaction record (non-blocking):', dbError.message);
-      // Don't fail the payment initialization
+      console.error('⚠️ Database error creating transaction record:', dbError)
+      // Non-blocking - payment initialization should still succeed
     }
 
     return new Response(JSON.stringify({
@@ -259,27 +395,46 @@ async function verifyPayment(supabaseClient, requestData) {
 
     console.log('✅ Paystack payment verified successfully:', reference);
 
-    // FIX: Update database records after successful verification
+    // Update database records after successful verification using service role
     if (paystackData.data.status === 'success') {
       try {
+        const serviceClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+          { auth: { persistSession: false } }
+        )
+
         // Update payment transaction
-        await supabaseClient
+        const { error: transactionUpdateError } = await serviceClient
           .from('payment_transactions')
           .update({ 
             status: 'completed',
-            verified_at: new Date().toISOString()
+            verified_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           })
-          .eq('reference', reference);
+          .eq('reference', reference)
+
+        if (transactionUpdateError) {
+          console.error('⚠️ Failed to update payment transaction:', transactionUpdateError)
+        }
 
         // Update order status
-        await supabaseClient
+        const { error: orderUpdateError } = await serviceClient
           .from('orders')
-          .update({ status: 'completed' })
-          .eq('payment_reference', reference);
+          .update({ 
+            status: 'confirmed',
+            paid_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .eq('payment_reference', reference)
 
-        console.log('✅ Database records updated after verification');
+        if (orderUpdateError) {
+          console.error('⚠️ Failed to update order status:', orderUpdateError)
+        } else {
+          console.log('✅ Database records updated after verification')
+        }
       } catch (dbError) {
-        console.error('⚠️ Failed to update database after verification:', dbError.message);
+        console.error('⚠️ Failed to update database after verification:', dbError)
         // Don't fail the verification response
       }
     }

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Paystack Configuration Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+        .success { color: green; }
+        .error { color: red; }
+        .info { color: blue; }
+        button { padding: 10px 20px; margin: 5px; cursor: pointer; }
+        pre { background: #f5f5f5; padding: 10px; border-radius: 3px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <h1>🔧 Paystack Configuration Test</h1>
+    
+    <div class="test-section">
+        <h3>Test 1: Key Health Check</h3>
+        <button onclick="testKeyHealth()">Check Key Health</button>
+        <div id="keyHealthResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 2: API Connectivity</h3>
+        <button onclick="testApiConnectivity()">Test API Connection</button>
+        <div id="apiResult"></div>
+    </div>
+    
+    <div class="test-section">
+        <h3>Test 3: Payment Initialization</h3>
+        <button onclick="testPaymentInit()">Test Payment Init</button>
+        <div id="paymentResult"></div>
+    </div>
+
+    <script>
+        async function testKeyHealth() {
+            const resultDiv = document.getElementById('keyHealthResult');
+            resultDiv.innerHTML = '<p class="info">Testing...</p>';
+            
+            try {
+                const response = await fetch('/functions/v1/paystack-debug', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'check_key_health' })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.health_check) {
+                    const health = data.health_check;
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Key Health Check Passed</p>
+                        <pre>${JSON.stringify(health, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `<p class="error">❌ Key health check failed</p><pre>${JSON.stringify(data, null, 2)}</pre>`;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        async function testApiConnectivity() {
+            const resultDiv = document.getElementById('apiResult');
+            resultDiv.innerHTML = '<p class="info">Testing API connectivity...</p>';
+            
+            try {
+                const testRef = 'test_ref_' + Date.now();
+                const response = await fetch('/functions/v1/paystack-debug', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        action: 'check_reference', 
+                        reference: testRef 
+                    })
+                });
+                
+                const data = await response.json();
+                resultDiv.innerHTML = `
+                    <p class="info">📡 API Response (expected to fail for test reference):</p>
+                    <pre>${JSON.stringify(data, null, 2)}</pre>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        }
+        
+        async function testPaymentInit() {
+            const resultDiv = document.getElementById('paymentResult');
+            resultDiv.innerHTML = '<p class="info">Testing payment initialization...</p>';
+            
+            try {
+                const response = await fetch('/functions/v1/paystack-secure', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'initialize',
+                        email: 'test@example.com',
+                        amount: 100000, // 1000 NGN in kobo
+                        currency: 'NGN',
+                        callback_url: window.location.origin + '/test-callback'
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.innerHTML = `
+                        <p class="success">✅ Payment initialization successful!</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <p class="error">❌ Payment initialization failed</p>
+                        <pre>${JSON.stringify(data, null, 2)}</pre>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `<p class="error">❌ Error: ${error.message}</p>`;
+            }
+        }
+    </script>
+</body>
+</html>

@@ -61,7 +61,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('🔄 Process checkout function called (v2025-08-21-production-fix-final-v2)')
+    console.log('🔄 Process checkout function called (v2025-08-21-production-fix-final-v3)')
     
     // Extract user ID from authorization header for authenticated users
     const authUserId = extractUserIdFromToken(req.headers.get('authorization'))
@@ -84,7 +84,8 @@ serve(async (req) => {
       total_amount: requestBody.items?.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0) || 0,
       has_email: !!requestBody.customer?.email,
       email_length: requestBody.customer?.email?.length || 0,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      raw_structure: Object.keys(requestBody || {})
     })
 
     // **BACKEND SAFETY NET:** Auto-fill missing email for authenticated users
@@ -132,17 +133,37 @@ serve(async (req) => {
 
     console.log('🚫 Guest mode disabled - forcing guest_session_id to null')
 
-    // Validate request
+    // Validate request with detailed error messages
     if (!processedRequest.customer?.email) {
+      console.error('❌ Validation failed: Customer email missing', {
+        has_customer: !!processedRequest.customer,
+        customer_keys: processedRequest.customer ? Object.keys(processedRequest.customer) : 'NO_CUSTOMER'
+      })
       throw new Error('Customer email is required')
     }
 
+    if (!processedRequest.customer?.name) {
+      console.error('❌ Validation failed: Customer name missing')
+      throw new Error('Customer name is required')
+    }
+
     if (!processedRequest.items || processedRequest.items.length === 0) {
+      console.error('❌ Validation failed: No items in order', {
+        has_items: !!processedRequest.items,
+        items_length: processedRequest.items?.length || 0
+      })
       throw new Error('Order must contain at least one item')
     }
 
     if (!processedRequest.fulfillment?.type) {
+      console.error('❌ Validation failed: Fulfillment type missing')
       throw new Error('Fulfillment type is required')
+    }
+
+    // **PRODUCTION FIX**: Validate delivery address for delivery orders
+    if (processedRequest.fulfillment?.type === 'delivery' && !processedRequest.fulfillment?.address) {
+      console.error('❌ Validation failed: Delivery address required for delivery orders')
+      throw new Error('Delivery address is required for delivery orders')
     }
 
     // Handle authenticated vs guest customers gracefully
@@ -370,9 +391,9 @@ serve(async (req) => {
                              paymentData?.authorization_url ||
                              null
 
-    const paymentReference = paymentData?.data?.reference || 
-                            paymentData?.reference ||
-                            null
+    const finalPaymentReference = paymentData?.data?.reference || 
+                                 paymentData?.reference ||
+                                 null
 
     if (!authorizationUrl) {
       console.warn('⚠️ No authorization URL in payment response:', paymentData)
@@ -380,7 +401,7 @@ serve(async (req) => {
 
     console.log('✅ Payment initialized successfully via paystack-secure:', {
       hasAuthUrl: !!authorizationUrl,
-      hasReference: !!paymentReference
+      hasReference: !!finalPaymentReference
     })
 
     // Return success response
@@ -398,7 +419,7 @@ serve(async (req) => {
       },
       payment: {
         authorization_url: authorizationUrl,
-        reference: paymentReference
+        reference: finalPaymentReference
       }
     }), {
       status: 200,

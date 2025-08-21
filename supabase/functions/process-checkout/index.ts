@@ -1,4 +1,5 @@
 
+
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -60,7 +61,7 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('🔄 Process checkout function called (v2025-08-21-production-fix-final)')
+    console.log('🔄 Process checkout function called (v2025-08-21-production-fix-final-v2)')
     
     // Extract user ID from authorization header for authenticated users
     const authUserId = extractUserIdFromToken(req.headers.get('authorization'))
@@ -129,7 +130,7 @@ serve(async (req) => {
     if (authUserId) {
       console.log('🔍 Processing authenticated user checkout...')
       
-      // For authenticated users, upsert customer account to handle existing users
+      // **PRODUCTION FIX:** Use UPSERT to handle existing authenticated users gracefully
       const { data: customerAccount, error: customerError } = await supabaseAdmin
         .from('customer_accounts')
         .upsert({
@@ -139,20 +140,35 @@ serve(async (req) => {
           phone: processedRequest.customer.phone,
           email_verified: false, // Will be updated by other processes
           phone_verified: false,
-          profile_completion_percentage: processedRequest.customer.phone ? 80 : 60
+          profile_completion_percentage: processedRequest.customer.phone ? 80 : 60,
+          updated_at: new Date().toISOString() // Force update timestamp
         }, { 
           onConflict: 'user_id',
-          ignoreDuplicates: false 
+          ignoreDuplicates: false // Allow updates to existing records
         })
         .select('id')
         .single()
 
       if (customerError) {
-        console.error('❌ Failed to create customer account for authenticated user:', customerError)
-        throw new Error('Failed to create customer account')
+        console.error('❌ Failed to upsert customer account for authenticated user:', customerError)
+        
+        // **PRODUCTION FIX:** Try to fetch existing customer account if upsert fails
+        const { data: existingCustomer, error: fetchError } = await supabaseAdmin
+          .from('customer_accounts')
+          .select('id')
+          .eq('user_id', authUserId)
+          .single()
+
+        if (fetchError || !existingCustomer) {
+          throw new Error(`Customer account creation failed: ${customerError.message}`)
+        }
+
+        console.log('✅ Using existing customer account after upsert conflict')
+        customerId = existingCustomer.id
+      } else {
+        customerId = customerAccount.id
       }
 
-      customerId = customerAccount.id
       console.log('👤 Customer account resolved for authenticated user:', customerId)
     } else {
       // For guest users (should not happen with guest mode disabled, but defensive)
@@ -171,7 +187,7 @@ serve(async (req) => {
       customizations: item.customizations
     }))
 
-    // Create order using the database function
+    // **PRODUCTION FIX:** Enhanced error handling for order creation
     const { data: orderId, error: orderError } = await supabaseAdmin
       .rpc('create_order_with_items', {
         p_customer_id: customerId,
@@ -185,7 +201,15 @@ serve(async (req) => {
 
     if (orderError) {
       console.error('❌ Order creation failed:', orderError)
-      throw new Error(`Order creation failed: ${orderError.message}`)
+      
+      // Provide more specific error messages for common issues
+      if (orderError.message?.includes('duplicate key')) {
+        throw new Error('Order already exists or conflicting data detected')
+      } else if (orderError.message?.includes('foreign key')) {
+        throw new Error('Invalid product or customer data provided')
+      } else {
+        throw new Error(`Order creation failed: ${orderError.message}`)
+      }
     }
 
     console.log('✅ Order created successfully:', orderId)
@@ -208,7 +232,7 @@ serve(async (req) => {
       customer_email: order.customer_email
     })
 
-    // Initialize payment using paystack-secure
+    // **PRODUCTION FIX:** Enhanced payment initialization with better error handling
     console.log('💳 Initializing payment via paystack-secure...')
     
     const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke('paystack-secure', {
@@ -232,10 +256,50 @@ serve(async (req) => {
 
     if (paymentError) {
       console.error('❌ Payment initialization failed:', paymentError)
-      throw new Error(`Payment initialization failed: ${paymentError.message}`)
+      
+      // Don't fail the entire checkout if payment initialization fails
+      // Allow frontend to retry payment
+      console.warn('⚠️ Payment initialization failed, returning order without payment URL')
+      
+      return new Response(JSON.stringify({
+        success: true,
+        order: {
+          id: order.id,
+          order_number: order.order_number,
+          total_amount: order.total_amount,
+          status: 'pending'
+        },
+        customer: {
+          id: customerId,
+          email: order.customer_email
+        },
+        payment: {
+          initialization_failed: true,
+          error: paymentError.message
+        }
+      }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      })
     }
 
-    console.log('✅ Payment initialized successfully via paystack-secure')
+    // **PRODUCTION FIX:** Better handling of paystack-secure response format
+    const authorizationUrl = paymentData?.data?.authorization_url || 
+                             paymentData?.authorization_url ||
+                             null
+
+    const paymentReference = paymentData?.data?.reference || 
+                            paymentData?.reference ||
+                            null
+
+    if (!authorizationUrl) {
+      console.warn('⚠️ No authorization URL in payment response:', paymentData)
+    }
+
+    console.log('✅ Payment initialized successfully via paystack-secure:', {
+      hasAuthUrl: !!authorizationUrl,
+      hasReference: !!paymentReference
+    })
 
     // Return success response
     return new Response(JSON.stringify({
@@ -251,8 +315,8 @@ serve(async (req) => {
         email: order.customer_email
       },
       payment: {
-        authorization_url: paymentData.data?.authorization_url || paymentData.authorization_url,
-        reference: paymentData.data?.reference || paymentData.reference
+        authorization_url: authorizationUrl,
+        reference: paymentReference
       }
     }), {
       status: 200,
@@ -277,36 +341,23 @@ serve(async (req) => {
 })
 
 /*
-🛒 PRODUCTION CHECKOUT PROCESSOR
+🛒 PRODUCTION CHECKOUT PROCESSOR (v2025-08-21-production-fix-final-v2)
+✅ Enhanced authenticated user handling with UPSERT logic
+✅ Comprehensive error handling and recovery patterns  
+✅ Better payment initialization with graceful failure handling
+✅ Detailed logging for production debugging
 ✅ Guest mode completely disabled (guest_session_id always null)
 ✅ Robust UUID validation for customer IDs
 ✅ Uses paystack-secure for all payment initialization
-✅ Comprehensive error handling and logging
 ✅ Idempotent order creation with database function
 ✅ Production-ready error responses
 
-🔧 USAGE:
-POST /functions/v1/process-checkout
-{
-  "customer": {
-    "id": "uuid-optional",
-    "name": "Customer Name",
-    "email": "customer@email.com",
-    "phone": "+234..."
-  },
-  "items": [
-    {
-      "product_id": "uuid",
-      "product_name": "Product Name",
-      "quantity": 2,
-      "unit_price": 1000
-    }
-  ],
-  "fulfillment": {
-    "type": "delivery",
-    "address": {...}
-  }
-}
+🔧 FIXES APPLIED:
+- UPSERT customer accounts to prevent unique constraint violations
+- Graceful handling of existing authenticated users 
+- Enhanced payment initialization error handling
+- Better paystack-secure response parsing
+- Detailed production logging for debugging
 
 📊 RESPONSE:
 {
@@ -323,3 +374,4 @@ POST /functions/v1/process-checkout
   }
 }
 */
+

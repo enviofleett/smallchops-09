@@ -1,1048 +1,345 @@
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { toast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
-import { useCart } from "@/hooks/useCart";
-import { useGuestSession } from "@/hooks/useGuestSession";
-import { useGuestSessionCleanup } from "@/hooks/useGuestSessionCleanup";
-import { useCustomerAuth } from "@/hooks/useCustomerAuth";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { useCustomerProfile } from "@/hooks/useCustomerProfile";
-import { useNavigate } from "react-router-dom";
-import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText, ChevronLeft } from "lucide-react";
-import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
-import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
-import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
-import { DeliveryScheduler } from "./DeliveryScheduler";
-import { OrderSummaryCard } from "./OrderSummaryCard";
-import { PaystackPaymentHandler } from "@/components/payments/PaystackPaymentHandler";
-import { storeRedirectUrl } from "@/utils/redirect";
-import { useOrderProcessing } from "@/hooks/useOrderProcessing";
-import '@/components/payments/payment-styles.css';
-import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
-import { debugPaymentInitialization, quickPaymentDiagnostic, logPaymentAttempt } from "@/utils/paymentDebugger";
-import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
-import { safeErrorMessage, normalizePaymentResponse } from '@/utils/errorHandling';
-import { validatePaymentFlow, formatDiagnosticResults } from '@/utils/paymentDiagnostics';
-import { cn } from "@/lib/utils";
+import React, { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+import { CheckCircle, Clock, AlertCircle, Package, CreditCard, Loader2 } from 'lucide-react';
+import { toast } from 'sonner';
+import { useCart } from '@/hooks/useCart';
+import { useAuth } from '@/hooks/useAuth';
+import { createOrderWithPayment } from '@/utils/paymentOrderCreation';
+import { OrderSummary } from './OrderSummary';
+import { CustomerInformationForm } from './CustomerInformationForm';
+import { FulfillmentOptionsForm } from './FulfillmentOptionsForm';
+import { DeliveryScheduleForm } from './DeliveryScheduleForm';
+import { PaymentMethodSelector } from './PaymentMethodSelector';
+import { TermsAndConditions } from './TermsAndConditions';
 
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogClose,
-} from "@/components/ui/dialog";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Separator } from "@/components/ui/separator";
-
-interface DeliveryAddress {
-  address_line_1: string;
-  address_line_2?: string;
-  city: string;
-  state: string;
-  postal_code: string;
-  landmark?: string;
+interface CheckoutState {
+  step: 'customer' | 'fulfillment' | 'schedule' | 'payment' | 'review' | 'processing' | 'complete';
+  customerInfo: {
+    name: string;
+    email: string;
+    phone: string;
+  } | null;
+  fulfillment: {
+    type: 'delivery' | 'pickup';
+    address?: any;
+    pickupPointId?: string;
+    deliveryZoneId?: string;
+  } | null;
+  deliverySchedule: {
+    delivery_date: string;
+    delivery_time_start: string;
+    delivery_time_end: string;
+    special_instructions?: string;
+    is_flexible?: boolean;
+  } | null;
+  paymentMethod: string;
+  termsAccepted: boolean;
+  orderId?: string;
+  orderNumber?: string;
 }
 
-interface CheckoutData {
-  customer_email: string;
-  customer_name: string;
-  customer_phone: string;
-  delivery_address: DeliveryAddress;
-  payment_method: string;
-  delivery_zone_id?: string;
-  fulfillment_type: 'delivery' | 'pickup';
-  pickup_point_id?: string;
-  delivery_date?: string;
-  delivery_time_slot?: {
-    start_time: string;
-    end_time: string;
-  };
-  special_instructions?: string;
-}
-
-interface EnhancedCheckoutFlowProps {
-  isOpen: boolean;
-  onClose: () => void;
-}
-
-// Error boundary component
-class CheckoutErrorBoundary extends React.Component<
-  { children: React.ReactNode },
-  { hasError: boolean }
-> {
-  constructor(props: any) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError() {
-    return { hasError: true };
-  }
-
-  componentDidCatch(error: Error, errorInfo: any) {
-    console.error('🚨 Checkout error boundary caught:', error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <Dialog open>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <AlertTriangle className="w-5 h-5 text-destructive" />
-                Checkout Error
-              </DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <p>Something went wrong with the checkout process. Please try again.</p>
-              <Button onClick={() => window.location.reload()}>
-                <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh Page
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      );
-    }
-
-    return this.props.children;
-  }
-}
-
-const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ isOpen, onClose }) => {
-  const navigate = useNavigate();
-  const { cart, clearCart, getCartTotal } = useCart();
-  const items = cart.items || [];
-  // 🔧 CLEANUP: Initialize guest session cleanup and remove usage
-  useGuestSessionCleanup();
-  // Remove guest session usage since guest mode is discontinued
-  // const { guestSession } = useGuestSession();
-  // const guestSessionId = guestSession?.sessionId;
-  const { user, session, isAuthenticated, isLoading } = useCustomerAuth();
-  const { profile } = useCustomerProfile();
-  
-  // Initialize checkout step based on authentication status
-  const getInitialCheckoutStep = () => {
-    if (isAuthenticated) return 'details';
-    return 'auth';
-  };
-  
-  const [checkoutStep, setCheckoutStep] = useState<'auth' | 'details' | 'payment'>(getInitialCheckoutStep());
-  const [formData, setFormData] = useState<CheckoutData>({
-    customer_email: '',
-    customer_name: '',
-    customer_phone: '',
-    delivery_address: {
-      address_line_1: '',
-      address_line_2: '',
-      city: '',
-      state: '',
-      postal_code: '',
-      landmark: ''
-    },
-    payment_method: 'paystack',
-    fulfillment_type: 'delivery'
+export const EnhancedCheckoutFlow: React.FC = () => {
+  const { items, totalAmount, clearCart } = useCart();
+  const { user } = useAuth();
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [state, setState] = useState<CheckoutState>({
+    step: 'customer',
+    customerInfo: null,
+    fulfillment: null,
+    deliverySchedule: null,
+    paymentMethod: 'paystack',
+    termsAccepted: false,
   });
 
-  const [paymentData, setPaymentData] = useState<any>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [failedAttempts, setFailedAttempts] = useState(0);
-  const [circuitBreakerActive, setCircuitBreakerActive] = useState(false);
-  const [deliveryZone, setDeliveryZone] = useState<any>(null);
-  const [pickupPoint, setPickupPoint] = useState<any>(null);
-  const [lastPaymentError, setLastPaymentError] = useState<string | null>(null);
-
-  // Initialize checkout state recovery
-  const { 
-    savePrePaymentState, 
-    markPaymentCompleted, 
-    clearState: clearRecoveryState,
-    hasRecoverableState 
-  } = useCheckoutStateRecovery();
-
-  // Initialize order processing
-  const { markCheckoutInProgress } = useOrderProcessing();
-
-  const handleClose = () => {
-    if (checkoutStep === 'payment' && paymentData) {
-      // Don't close during payment process
-      toast({
-        title: "Payment in Progress",
-        description: "Please complete your payment before closing.",
-        variant: "destructive",
-      });
-      return;
-    }
-    onClose();
-  };
-
-  // Listen for payment completion messages from popup window
+  // Pre-fill customer info if user is authenticated
   useEffect(() => {
-    const handleMessage = (event: MessageEvent) => {
-      // Verify origin for security
-      if (event.origin !== window.location.origin) return;
-      
-      if (event.data.type === 'PAYMENT_SUCCESS') {
-        console.log('Payment successful, closing checkout dialog');
-        handleClose();
-        toast({
-          title: "Payment Successful!",
-          description: "Your order has been confirmed.",
-        });
-      } else if (event.data.type === 'PAYMENT_FAILED') {
-        console.log('Payment failed:', event.data.error);
-        toast({
-          title: "Payment Failed",
-          description: "Please try again or contact support.",
-          variant: "destructive",
-        });
-      }
-    };
-
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [handleClose]);
-
-  // Manage checkout step based on authentication status
-  useEffect(() => {
-    if (!isLoading) {
-      if (isAuthenticated) {
-        setCheckoutStep('details');
-      } else {
-        setCheckoutStep('auth');
-      }
-    }
-  }, [isAuthenticated, isLoading]);
-
-  // Auto-fill form data from user profile
-  useEffect(() => {
-    if (isAuthenticated && profile) {
-      setFormData(prev => ({
+    if (user && !state.customerInfo) {
+      setState(prev => ({
         ...prev,
-        customer_email: (profile as any).email || '',
-        customer_name: (profile as any).name || '',
-        customer_phone: (profile as any).phone || ''
+        customerInfo: {
+          name: user.user_metadata?.full_name || user.email?.split('@')[0] || '',
+          email: user.email || '',
+          phone: user.user_metadata?.phone || ''
+        }
       }));
     }
-  }, [isAuthenticated, profile]);
+  }, [user, state.customerInfo]);
 
-  // Calculate delivery fee (simple calculation since no getDeliveryFee from useCart)
-  const deliveryFee = deliveryZone?.base_fee || 0;
-  
-  // Calculate totals
-  const subtotal = getCartTotal();
-  const total = subtotal + deliveryFee;
-
-  const handleFormChange = (field: string, value: any) => {
-    if (field.includes('.')) {
-      const [parent, child] = field.split('.');
-      setFormData(prev => {
-        const parentData = prev[parent as keyof CheckoutData] as any;
-        return {
-          ...prev,
-          [parent]: {
-            ...parentData,
-            [child]: value
-          }
-        };
-      });
-    } else {
-      setFormData(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    }
+  const handleCustomerInfoSubmit = (customerInfo: CheckoutState['customerInfo']) => {
+    setState(prev => ({ ...prev, customerInfo, step: 'fulfillment' }));
   };
 
-  const handlePaymentFailure = useCallback((error: any) => {
-    console.error('💳 Payment failure handled:', error);
-    setIsSubmitting(false);
-    
-    const errorMessage = error?.message || 'Payment processing failed';
-    toast({
-      title: "Payment Failed",
-      description: errorMessage,
-      variant: "destructive",
-    });
-  }, []);
+  const handleFulfillmentSubmit = (fulfillment: CheckoutState['fulfillment']) => {
+    setState(prev => ({ 
+      ...prev, 
+      fulfillment,
+      step: fulfillment?.type === 'delivery' ? 'schedule' : 'payment'
+    }));
+  };
 
-  // Remove the processOrder hook usage since it doesn't exist
+  const handleScheduleSubmit = (schedule: CheckoutState['deliverySchedule']) => {
+    setState(prev => ({ ...prev, deliverySchedule: schedule, step: 'payment' }));
+  };
 
-  const handleFormSubmit = async () => {
-    // 🔧 CIRCUIT BREAKER: Block after 3 failures within 5 minutes
-    if (circuitBreakerActive) {
-      toast({
-        title: "Too Many Attempts",
-        description: "Please wait 5 minutes before trying again.",
-        variant: "destructive",
-      });
+  const handlePaymentMethodSelect = (method: string) => {
+    setState(prev => ({ ...prev, paymentMethod: method, step: 'review' }));
+  };
+
+  const handleTermsAcceptance = (accepted: boolean) => {
+    setState(prev => ({ ...prev, termsAccepted: accepted }));
+  };
+
+  const processCheckout = async () => {
+    if (!state.customerInfo || !state.fulfillment || !state.termsAccepted) {
+      toast.error('Please complete all required fields');
       return;
     }
 
-    // 🔧 DEBOUNCE: Prevent double-clicks during submission
-    if (isSubmitting) {
-      console.log('⏳ Already submitting, ignoring duplicate request');
-      return;
-    }
+    setIsProcessing(true);
+    setState(prev => ({ ...prev, step: 'processing' }));
 
     try {
-      setIsSubmitting(true);
-      setLastPaymentError(null);
+      console.log('🛒 Starting enhanced checkout process...');
 
-      // Enhanced data sanitization and validation
-      const sanitizedData = {
-        customer_email: formData.customer_email.trim().toLowerCase(),
-        customer_name: formData.customer_name.trim(),
-        customer_phone: formData.customer_phone.trim(),
-        fulfillment_type: formData.fulfillment_type,
-        delivery_address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : null,
-        pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : null,
-        order_items: items.map(item => ({
+      // Use the unified checkout that already handles payment initialization
+      const checkoutResult = await createOrderWithPayment({
+        items: items.map(item => ({
           product_id: item.product_id,
+          product_name: item.product_name,
           quantity: item.quantity,
-          unit_price: item.price,
-          total_price: item.price * item.quantity
+          price: item.unit_price,
+          customization_items: item.customizations
         })),
-        total_amount: total,
-        delivery_fee: deliveryFee,
-        delivery_zone_id: deliveryZone?.id || null,
-        delivery_schedule: formData.delivery_date ? {
-          delivery_date: formData.delivery_date,
-          delivery_time_start: formData.delivery_time_slot?.start_time || '09:00',
-          delivery_time_end: formData.delivery_time_slot?.end_time || '17:00',
-          is_flexible: false,
-          special_instructions: formData.special_instructions || null
-        } : null,
-        payment_method: formData.payment_method,
-        // 🔧 HOTFIX: Remove guest_session_id completely (guest mode discontinued)
-        // guest_session_id: null, // Explicitly omit since guest mode is discontinued
-        terms_accepted: termsRequired ? termsAccepted : undefined,
-        timestamp: new Date().toISOString()
-      };
-
-      console.log('📦 Submitting checkout data:', sanitizedData);
-
-      // Call Supabase edge function
-      const { data, error } = await supabase.functions.invoke('process-checkout', {
-        body: sanitizedData
+        customerInfo: state.customerInfo,
+        totalAmount,
+        fulfillmentType: state.fulfillment.type,
+        deliveryAddress: state.fulfillment.address,
+        pickupPointId: state.fulfillment.pickupPointId,
+        deliveryZoneId: state.fulfillment.deliveryZoneId,
+        deliverySchedule: state.deliverySchedule || undefined
       });
 
-      // 🚨 CRITICAL: Stop flow immediately on order creation failure
-      if (error || !data?.success) {
-        console.error('❌ Order creation failed - stopping checkout flow:', error || data);
-        
-        const errorMessage = error?.message || data?.error || 'Order creation failed';
-        const errorCode = data?.code || 'ORDER_CREATION_FAILED';
-        
-        throw new Error(`${errorMessage} [${errorCode}]`);
-      }
-
-      console.log('🔄 Raw server response:', data);
-
-      // Try to parse response, prioritizing backend-returned amounts
-      let parsedData;
-      try {
-        parsedData = normalizePaymentResponse(data);
-        console.log('✅ Parsed server response successfully:', parsedData);
-      } catch (error) {
-        console.warn('⚠️ Could not parse payment_url from response, proceeding to secure payment handler:', error);
-        // Fall back to minimal order data without payment_url
-        parsedData = {
-          order_id: data?.order_id,
-          order_number: data?.order_number,
-          amount: data?.amount || total, // Prioritize backend amount
-          customer_email: sanitizedData.customer_email,
-          success: true
-        };
-      }
-
-      // 🔧 CRITICAL: Use backend-returned amount if available
-      const authoritativeAmount = data?.amount || parsedData?.amount || total;
-      
-      console.log('💰 Amount prioritization:', {
-        client_calculated: total,
-        backend_returned: data?.amount,
-        authoritative_amount: authoritativeAmount,
-        items_subtotal: data?.items_subtotal,
-        delivery_fee: data?.delivery_fee
+      console.log('✅ Checkout completed successfully:', {
+        orderId: checkoutResult.order?.id,
+        orderNumber: checkoutResult.order?.order_number,
+        hasPaymentUrl: !!checkoutResult.paymentUrl
       });
 
-      // Check if process-checkout provided a payment_url to open
-      if (data?.payment_url || data?.authorization_url) {
-        const paymentUrl = data.payment_url || data.authorization_url;
-        console.log('🔗 Opening process-checkout payment URL in new tab:', paymentUrl);
-        window.open(paymentUrl, '_blank');
-        toast({
-          title: "Payment opened",
-          description: "Complete payment in the new tab, then return here."
-        });
-        return; // Exit early if primary payment flow worked
-      }
+      // Update state with order details
+      setState(prev => ({
+        ...prev,
+        orderId: checkoutResult.order?.id,
+        orderNumber: checkoutResult.order?.order_number,
+        step: 'complete'
+      }));
 
-      // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
-      if (parsedData?.order_id && sanitizedData.delivery_schedule) {
-        console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
-        try {
-          const { upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
-          await upsertDeliverySchedule({
-            order_id: parsedData.order_id,
-            delivery_date: sanitizedData.delivery_schedule.delivery_date,
-            delivery_time_start: sanitizedData.delivery_schedule.delivery_time_start,
-            delivery_time_end: sanitizedData.delivery_schedule.delivery_time_end,
-            is_flexible: sanitizedData.delivery_schedule.is_flexible || false,
-            special_instructions: sanitizedData.delivery_schedule.special_instructions || null
-          });
-          console.log('✅ [GUARDRAIL] Schedule upserted successfully');
-          toast({
-            title: "Schedule saved",
-            description: "Your delivery schedule has been confirmed."
-          });
-        } catch (error) {
-          console.error('🛡️ [GUARDRAIL] Fallback failed:', error);
-          toast({
-            title: "Processing delivery schedule",
-            description: "We'll finalize your delivery window after payment."
-          });
+      // Clear cart after successful order creation
+      clearCart();
+
+      // **CRITICAL FIX:** Use the authorization URL directly from process-checkout
+      // This prevents duplicate payment initialization
+      if (checkoutResult.paymentUrl) {
+        console.log('🔐 Opening payment window with URL from process-checkout');
+        
+        // Open payment in new tab
+        const paymentWindow = window.open(checkoutResult.paymentUrl, '_blank');
+        
+        if (!paymentWindow) {
+          toast.error('Please allow popups to complete payment');
+          return;
         }
-      }
-      
-      // Set payment data for PaystackPaymentHandler to initialize securely
-      setPaymentData({
-        orderId: parsedData?.order_id,
-        orderNumber: parsedData?.order_number || data?.order_number,
-        amount: authoritativeAmount, // Use authoritative amount from backend
-        email: sanitizedData.customer_email,
-        successUrl: `${window.location.origin}/payment-callback`,
-        cancelUrl: window.location.href
-      });
-      setCheckoutStep('payment');
-      setIsSubmitting(false);
-      
-      logPaymentAttempt(sanitizedData, 'success');
-      
-    } catch (error: any) {
-      console.error('🚨 Checkout submission error:', error);
-      setIsSubmitting(false);
-      
-      // 🔧 CIRCUIT BREAKER: Increment failure count and activate if needed
-      const newFailedAttempts = failedAttempts + 1;
-      setFailedAttempts(newFailedAttempts);
-      
-      if (newFailedAttempts >= 3) {
-        setCircuitBreakerActive(true);
-        // Reset circuit breaker after 5 minutes
-        setTimeout(() => {
-          setCircuitBreakerActive(false);
-          setFailedAttempts(0);
-        }, 5 * 60 * 1000);
-      }
-      
-      // Enhanced error handling with safe message extraction
-      const errorMessage = safeErrorMessage(error);
-      
-      // Map specific errors to user-friendly messages
-      let userFriendlyMessage: string;
-      
-      if (errorMessage.includes('ORDER_CREATION_FAILED') || errorMessage.includes('INVALID_ORDER_DATA')) {
-        userFriendlyMessage = 'Order creation failed. Please check your details and try again.';
-      } else if (errorMessage.includes('CUSTOMER_ERROR')) {
-        userFriendlyMessage = 'There was an issue with customer information. Please verify your details.';
-      } else if (errorMessage.includes('Payment initialization incomplete - missing authorization URL from server')) {
-        userFriendlyMessage = 'Payment system configuration issue. Please contact support.';
-      } else if (errorMessage.includes('Payment URL not available')) {
-        userFriendlyMessage = 'Unable to redirect to payment. Please try again or contact support.';
-      } else {
-        // Generate user-friendly error with safe fallback
-        const validationResult = validatePaymentInitializationData({
-          success: false,
-          error: errorMessage
+
+        toast.success('Order created successfully! Complete payment in the new tab.', {
+          duration: 8000,
+          description: `Order #${checkoutResult.order?.order_number} - ₦${totalAmount.toLocaleString()}`
         });
-        userFriendlyMessage = generateUserFriendlyErrorMessage(validationResult);
+      } else {
+        throw new Error('Payment URL not provided by checkout process');
       }
+
+    } catch (error) {
+      console.error('❌ Enhanced checkout failed:', error);
       
-      setLastPaymentError(userFriendlyMessage);
-      logPaymentAttempt(null, 'failure', errorMessage);
-      
-      toast({
-        title: "Checkout Error",
-        description: userFriendlyMessage,
-        variant: "destructive",
+      const errorMessage = error instanceof Error ? error.message : 'Checkout failed';
+      toast.error('Checkout Failed', {
+        description: errorMessage,
+        duration: 5000,
       });
+
+      // Reset to review step on error
+      setState(prev => ({ ...prev, step: 'review' }));
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handlePaymentSuccess = useCallback((reference: string) => {
-    console.log('🎉 Payment success callback triggered with reference:', reference);
-    
-    // Save states and mark checkout progress when we get valid reference
-    if (reference && reference.startsWith('txn_')) {
-      savePrePaymentState(formData, checkoutStep, deliveryFee, reference);
-      markCheckoutInProgress(reference);
-    }
-    
-    markPaymentCompleted();
-    clearCart();
-    clearRecoveryState();
-    onClose();
-    
-    toast({
-      title: "Payment Successful!",
-      description: "Your order has been confirmed. Check your email for details.",
-    });
-    
-    navigate('/orders');
-  }, [formData, checkoutStep, deliveryFee, savePrePaymentState, markCheckoutInProgress, markPaymentCompleted, clearCart, clearRecoveryState, onClose, navigate]);
-
-
-  // Validation
-  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
-  const isValidPhone = (phone: string) => /^[\d\s\-\+\(\)]{10,}$/.test(phone);
-
-  // Terms and conditions state
-  const [termsAccepted, setTermsAccepted] = useState(false);
-  const [termsRequired, setTermsRequired] = useState(false);
-  const [termsContent, setTermsContent] = useState('');
-  const [showTermsDialog, setShowTermsDialog] = useState(false);
-
-  // Load terms settings on mount
-  useEffect(() => {
-    const loadTermsSettings = async () => {
-      try {
-        const { data: requireTermsData } = await supabase
-          .from('content_management')
-          .select('content')
-          .eq('key', 'legal_require_terms_acceptance')
-          .single();
-
-        const { data: termsContentData } = await supabase
-          .from('content_management')
-          .select('content, is_published')
-          .eq('key', 'legal_terms')
-          .single();
-
-        if (requireTermsData?.content === 'true' && termsContentData?.is_published) {
-          setTermsRequired(true);
-          setTermsContent(termsContentData.content || '');
-        }
-      } catch (error) {
-        console.log('Terms settings not configured or error loading:', error);
-      }
-    };
-
-    loadTermsSettings();
-  }, []);
-
-  const canProceedToDetails = useMemo(() => {
-    if (checkoutStep !== 'details') return false;
-    
-    const baseValidation = 
-      formData.customer_name.trim() &&
-      isValidEmail(formData.customer_email) &&
-      isValidPhone(formData.customer_phone);
-
-    // Terms validation - only required if admin enabled it
-    const termsValidation = !termsRequired || termsAccepted;
-
-    if (formData.fulfillment_type === 'delivery') {
-      // Make city and postal code optional, delivery schedule mandatory
-      const deliveryValidation = baseValidation &&
-        formData.delivery_address.address_line_1.trim() &&
-        formData.delivery_address.state.trim() &&
-        deliveryZone &&
-        formData.delivery_date && 
-        formData.delivery_time_slot;
-      
-      return deliveryValidation && termsValidation;
-    } else {
-      return baseValidation && pickupPoint && termsValidation;
-    }
-  }, [formData, deliveryZone, pickupPoint, checkoutStep, termsRequired, termsAccepted]);
-
-  const renderAuthStep = () => (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h3 className="text-lg font-semibold">Complete Your Order</h3>
-        <p className="text-muted-foreground">
-          {items.length} item{items.length > 1 ? 's' : ''} • ₦{total.toLocaleString()}
-        </p>
-      </div>
-      
-      <GuestOrLoginChoice
-        onContinueAsGuest={() => setCheckoutStep('details')}
-        onLogin={() => {
-          storeRedirectUrl('/checkout');
-          onClose();
-          navigate('/auth');
-        }}
-        totalAmount={total}
-      />
-    </div>
-  );
-
-  const renderDetailsStep = () => (
-    <div className="space-y-6">
-      <div className="space-y-4">
-        {!isAuthenticated && (
-          <div className="flex items-center justify-between md:hidden mb-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setCheckoutStep('auth')}
-              className="flex items-center gap-2"
-            >
-              <ChevronLeft className="w-4 h-4" />
-              Back
-            </Button>
-          </div>
-        )}
-
-        {/* Customer Information */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Mail className="w-4 h-4" />
-              Contact Information
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <Label htmlFor="customer_name">Full Name *</Label>
-                <Input
-                  id="customer_name"
-                  type="text"
-                  value={formData.customer_name}
-                  onChange={(e) => handleFormChange('customer_name', e.target.value)}
-                  placeholder="Enter your full name"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="customer_email">Email Address *</Label>
-                <Input
-                  id="customer_email"
-                  type="email"
-                  value={formData.customer_email}
-                  onChange={(e) => handleFormChange('customer_email', e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
-            </div>
-            <div>
-              <Label htmlFor="customer_phone">Phone Number *</Label>
-              <Input
-                id="customer_phone"
-                type="tel"
-                value={formData.customer_phone}
-                onChange={(e) => handleFormChange('customer_phone', e.target.value)}
-                placeholder="Enter your phone number"
-                required
-              />
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Fulfillment Type */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Fulfillment Method</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RadioGroup
-              value={formData.fulfillment_type}
-              onValueChange={(value) => handleFormChange('fulfillment_type', value)}
-              className="space-y-3"
-            >
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="delivery" id="delivery" />
-                <Label htmlFor="delivery" className="flex items-center gap-2 cursor-pointer">
-                  <Truck className="w-4 h-4" />
-                  Delivery
-                </Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="pickup" id="pickup" />
-                <Label htmlFor="pickup" className="flex items-center gap-2 cursor-pointer">
-                  <MapPin className="w-4 h-4" />
-                  Pickup
-                </Label>
-              </div>
-            </RadioGroup>
-          </CardContent>
-        </Card>
-
-        {/* Delivery Address */}
-        {formData.fulfillment_type === 'delivery' && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                Delivery Address
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="address_line_1">Street Address *</Label>
-                <Input
-                  id="address_line_1"
-                  value={formData.delivery_address.address_line_1}
-                  onChange={(e) => handleFormChange('delivery_address.address_line_1', e.target.value)}
-                  placeholder="Enter street address"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="address_line_2">Apartment, suite, etc. (optional)</Label>
-                <Input
-                  id="address_line_2"
-                  value={formData.delivery_address.address_line_2}
-                  onChange={(e) => handleFormChange('delivery_address.address_line_2', e.target.value)}
-                  placeholder="Apartment, suite, etc."
-                />
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="city">City</Label>
-                  <Input
-                    id="city"
-                    value={formData.delivery_address.city}
-                    onChange={(e) => handleFormChange('delivery_address.city', e.target.value)}
-                    placeholder="City"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="state">State *</Label>
-                  <Input
-                    id="state"
-                    value={formData.delivery_address.state}
-                    onChange={(e) => handleFormChange('delivery_address.state', e.target.value)}
-                    placeholder="State"
-                    required
-                  />
-                </div>
-                <div className="sm:col-span-2 lg:col-span-1">
-                  <Label htmlFor="postal_code">Postal Code</Label>
-                  <Input
-                    id="postal_code"
-                    value={formData.delivery_address.postal_code}
-                    onChange={(e) => handleFormChange('delivery_address.postal_code', e.target.value)}
-                    placeholder="Postal code"
-                  />
-                </div>
-              </div>
-              <div>
-                <Label htmlFor="landmark">Landmark (optional)</Label>
-                <Input
-                  id="landmark"
-                  value={formData.delivery_address.landmark}
-                  onChange={(e) => handleFormChange('delivery_address.landmark', e.target.value)}
-                  placeholder="Nearby landmark"
-                />
-              </div>
-              
-              <DeliveryZoneDropdown
-                selectedZoneId={deliveryZone?.id}
-                onZoneSelect={(zoneId, fee) => {
-                  const zone = { id: zoneId, base_fee: fee };
-                  setDeliveryZone(zone);
-                }}
-                orderSubtotal={subtotal}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Pickup Point Selection */}
-        {formData.fulfillment_type === 'pickup' && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                Pickup Location
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <PickupPointSelector
-                selectedPointId={pickupPoint?.id}
-                onSelect={(point) => {
-                  setPickupPoint(point);
-                  handleFormChange('pickup_point_id', point?.id);
-                }}
-              />
-            </CardContent>
-          </Card>
-        )}
-
-        {/* Delivery Scheduling */}
-        {formData.fulfillment_type === 'delivery' && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Delivery Schedule *
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DeliveryScheduler
-                onScheduleChange={(date, timeSlot) => {
-                  handleFormChange('delivery_date', date);
-                  handleFormChange('delivery_time_slot', timeSlot);
-                }}
-                selectedDate={formData.delivery_date}
-                selectedTimeSlot={formData.delivery_time_slot}
-                showHeader={false}
-              />
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      {lastPaymentError && (
-        <div className="p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
-          <div className="flex items-start gap-2">
-            <AlertTriangle className="w-5 h-5 text-destructive mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-destructive">Payment Error</p>
-              <p className="text-sm text-destructive/80">{lastPaymentError}</p>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-
-  const renderPaymentStep = () => (
-    <div className="space-y-6">
-      <div className="text-center space-y-2">
-        <h3 className="text-lg font-semibold">Complete Payment</h3>
-        <p className="text-muted-foreground">
-          Secure payment powered by Paystack
-        </p>
-      </div>
-
-      {paymentData && (
-        <PaystackPaymentHandler
-          orderId={paymentData.orderId}
-          amount={paymentData.amount}
-          email={paymentData.email}
-          orderNumber={paymentData.orderNumber}
-          successUrl={paymentData.successUrl}
-          cancelUrl={paymentData.cancelUrl}
-          onSuccess={handlePaymentSuccess}
-          onError={(error) => handlePaymentFailure({ message: error })}
-          onClose={() => setCheckoutStep('details')}
-        />
-      )}
-    </div>
-  );
-
-  return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden overscroll-contain p-0">
-        {/* Mobile Header */}
-        <div className="flex md:hidden items-center justify-between p-4 border-b bg-background flex-shrink-0">
-          <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <h2 className="text-lg font-semibold">
-              {checkoutStep === 'auth' && 'Complete Order'}
-              {checkoutStep === 'details' && 'Checkout'}
-              {checkoutStep === 'payment' && 'Payment'}
-            </h2>
-          </div>
-        </div>
-
-        {/* Mobile Order Summary */}
-        <div className="md:hidden flex-shrink-0">
-          <OrderSummaryCard
-            items={items}
-            subtotal={subtotal}
-            deliveryFee={deliveryFee}
-            total={total}
-            collapsibleOnMobile={true}
+  const renderStep = () => {
+    switch (state.step) {
+      case 'customer':
+        return (
+          <CustomerInformationForm
+            initialData={state.customerInfo}
+            onSubmit={handleCustomerInfoSubmit}
           />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0 overflow-hidden">
-          {/* Desktop Left Panel - Order Details */}
-          <div className="hidden lg:block lg:col-span-1 bg-muted/30 border-r overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onClose}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-                <h2 className="text-lg font-semibold">Order Details</h2>
-              </div>
-              
-              <OrderSummaryCard
-                items={items}
-                subtotal={subtotal}
-                deliveryFee={deliveryFee}
-                total={total}
-                collapsibleOnMobile={false}
-                className="shadow-none border-0 bg-transparent"
-              />
-            </div>
-          </div>
-
-          {/* Main Content Panel */}
-          <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
-            {/* Desktop Header */}
-            <div className="hidden md:block flex-shrink-0">
-              <DialogHeader className="px-6 py-4 border-b">
-                <div className="flex items-center justify-between">
-                  <DialogTitle className="text-xl">
-                    {checkoutStep === 'auth' && 'Complete Your Order'}
-                    {checkoutStep === 'details' && 'Delivery Details'}
-                    {checkoutStep === 'payment' && 'Payment'}
-                  </DialogTitle>
-                  <DialogClose asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </DialogClose>
-                </div>
-              </DialogHeader>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="space-y-4 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="text-muted-foreground">Checking account...</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {checkoutStep === 'auth' && renderAuthStep()}
-                  {checkoutStep === 'details' && renderDetailsStep()}
-                  {checkoutStep === 'payment' && renderPaymentStep()}
-                </>
-              )}
-            </div>
-
-            {/* Sticky Bottom Action */}
-            {checkoutStep === 'details' && (
-              <div className="flex-shrink-0 p-4 md:p-6 border-t bg-background/80 backdrop-blur-sm">
+        );
+      case 'fulfillment':
+        return (
+          <FulfillmentOptionsForm
+            onSubmit={handleFulfillmentSubmit}
+          />
+        );
+      case 'schedule':
+        return (
+          <DeliveryScheduleForm
+            onSubmit={handleScheduleSubmit}
+          />
+        );
+      case 'payment':
+        return (
+          <PaymentMethodSelector
+            onSelect={handlePaymentMethodSelect}
+          />
+        );
+      case 'review':
+        return (
+          <div className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-green-600" />
+                  Review Your Order
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                {/* Order Summary */}
+                <OrderSummary />
+                
                 {/* Terms and Conditions */}
-                {termsRequired && (
-                  <div className="mb-4 flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      id="terms-checkbox"
-                      checked={termsAccepted}
-                      onChange={(e) => setTermsAccepted(e.target.checked)}
-                      className="mt-1 h-4 w-4 accent-primary"
-                    />
-                    <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer">
-                      I agree to the{' '}
-                      <button
-                        type="button"
-                        onClick={() => setShowTermsDialog(true)}
-                        className="text-primary hover:underline font-medium"
-                      >
-                        Terms and Conditions
-                      </button>
-                    </Label>
-                  </div>
-                )}
+                <TermsAndConditions
+                  accepted={state.termsAccepted}
+                  onAcceptanceChange={handleTermsAcceptance}
+                />
 
+                {/* Complete Order Button */}
                 <Button
-                  onClick={handleFormSubmit}
-                  disabled={!canProceedToDetails || isSubmitting}
-                  className="w-full h-12 md:h-14 text-base md:text-lg font-medium"
+                  onClick={processCheckout}
+                  disabled={!state.termsAccepted || isProcessing}
+                  className="w-full"
                   size="lg"
                 >
-                  {isSubmitting ? (
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  Proceed to Payment • ₦{total.toLocaleString()}
+                  {isProcessing ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Processing Order...
+                    </>
+                  ) : (
+                    <>
+                      <CreditCard className="w-4 h-4 mr-2" />
+                      Complete Order - ₦{totalAmount.toLocaleString()}
+                    </>
+                  )}
                 </Button>
-                
-                {lastPaymentError && (
-                  <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                    <p className="text-sm text-destructive">{lastPaymentError}</p>
-                  </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      case 'processing':
+        return (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+              <h3 className="text-xl font-semibold mb-2">Processing Your Order</h3>
+              <p className="text-muted-foreground text-center">
+                Please wait while we create your order and initialize payment...
+              </p>
+            </CardContent>
+          </Card>
+        );
+      case 'complete':
+        return (
+          <Card>
+            <CardContent className="flex flex-col items-center justify-center py-12">
+              <CheckCircle className="w-16 h-16 text-green-600 mb-4" />
+              <h3 className="text-2xl font-bold text-green-600 mb-2">Order Created!</h3>
+              <p className="text-muted-foreground text-center mb-4">
+                Order #{state.orderNumber} has been created successfully.
+                Complete your payment to confirm the order.
+              </p>
+              <Badge variant="outline" className="text-lg px-4 py-2">
+                Total: ₦{totalAmount.toLocaleString()}
+              </Badge>
+            </CardContent>
+          </Card>
+        );
+      default:
+        return null;
+    }
+  };
+
+  const getSteps = () => [
+    { key: 'customer', title: 'Customer Info', icon: Package },
+    { key: 'fulfillment', title: 'Delivery', icon: Package },
+    { key: 'schedule', title: 'Schedule', icon: Clock },
+    { key: 'payment', title: 'Payment', icon: CreditCard },
+    { key: 'review', title: 'Review', icon: CheckCircle },
+  ];
+
+  const getStepNumber = (step: CheckoutState['step']): number => {
+    const stepMap: Record<string, number> = {
+      customer: 1,
+      fulfillment: 2,
+      schedule: 3,
+      payment: 4,
+      review: 5,
+      processing: 5,
+      complete: 5,
+    };
+    return stepMap[step] || 1;
+  };
+
+  const getCurrentStepIndex = (): number => {
+    const steps = getSteps();
+    return steps.findIndex(s => s.key === state.step);
+  };
+
+  return (
+    <div className="container mx-auto py-8 px-4">
+      <div className="max-w-4xl mx-auto">
+        {/* Progress indicator */}
+        <div className="mb-8">
+          <div className="flex items-center justify-between mb-4">
+            <h1 className="text-3xl font-bold">Checkout</h1>
+            <Badge variant={state.step === 'complete' ? 'default' : 'outline'}>
+              {state.step === 'complete' ? 'Complete' : `Step ${getStepNumber(state.step)} of 5`}
+            </Badge>
+          </div>
+          
+          {/* Step indicator */}
+          <div className="flex items-center space-x-2 overflow-x-auto pb-2">
+            {getSteps().map((step, index) => (
+              <React.Fragment key={step.key}>
+                <div className={`flex items-center space-x-2 whitespace-nowrap px-3 py-2 rounded-lg ${
+                  getCurrentStepIndex() >= index 
+                    ? 'bg-primary text-primary-foreground' 
+                    : 'bg-muted text-muted-foreground'
+                }`}>
+                  <step.icon className="w-4 h-4" />
+                  <span className="text-sm font-medium">{step.title}</span>
+                </div>
+                {index < getSteps().length - 1 && (
+                  <div className="w-2 h-0.5 bg-border" />
                 )}
-              </div>
-            )}
+              </React.Fragment>
+            ))}
           </div>
         </div>
 
-        {/* Terms and Conditions Dialog */}
-        <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Terms and Conditions
-              </DialogTitle>
-            </DialogHeader>
-            <div className="prose prose-sm max-w-none">
-              {termsContent ? (
-                <div dangerouslySetInnerHTML={{ __html: termsContent }} />
-              ) : (
-                <p>Terms and conditions content is being loaded...</p>
-              )}
-            </div>
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => setShowTermsDialog(false)}
-              >
-                Close
-              </Button>
-              <Button
-                onClick={() => {
-                  setTermsAccepted(true);
-                  setShowTermsDialog(false);
-                }}
-              >
-                I Agree
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </DialogContent>
-    </Dialog>
+        {/* Step content */}
+        {renderStep()}
+      </div>
+    </div>
   );
-});
-
-EnhancedCheckoutFlowComponent.displayName = 'EnhancedCheckoutFlowComponent';
-
-export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = (props) => (
-  <CheckoutErrorBoundary>
-    <EnhancedCheckoutFlowComponent {...props} />
-  </CheckoutErrorBoundary>
-);
+};

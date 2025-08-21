@@ -64,6 +64,12 @@ export async function getPromotions(): Promise<Promotion[]> {
 }
 
 
+// Clear promotions cache
+export function clearPromotionsCache() {
+  promotionsCache = null;
+  console.log('Promotions cache cleared');
+}
+
 // Create new promotion
 export async function createPromotion(promo: NewPromotion) {
   const { data, error } = await supabase
@@ -72,6 +78,9 @@ export async function createPromotion(promo: NewPromotion) {
     .select()
     .single();
   if (error) throw error;
+
+  // Clear cache when promotion is created
+  clearPromotionsCache();
   return data;
 }
 

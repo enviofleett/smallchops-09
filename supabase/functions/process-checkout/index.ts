@@ -264,66 +264,91 @@ serve(async (req) => {
       console.log('ℹ️ No valid guest_session_id provided; continuing without it');
     }
 
-    // Find or create customer account
+    // Find or create customer account with idempotent operations
     let customerId: string | null = null;
     
     if (authenticatedUser) {
       console.log('🔍 Processing authenticated user checkout...');
       
-      // Check if customer account exists for authenticated user (by email)
-      const { data: existingCustomer } = await supabaseClient
+      // 🔧 IDEMPOTENT CUSTOMER CREATION: First check by user_id (most reliable)
+      const { data: existingByUserId } = await supabaseClient
         .from('customer_accounts')
         .select('id')
-        .eq('email', customer_email)
+        .eq('user_id', authenticatedUser.id)
         .maybeSingle();
 
-      if (existingCustomer?.id) {
-        customerId = existingCustomer.id;
-        console.log('✅ Found existing customer account:', customerId);
+      if (existingByUserId?.id) {
+        customerId = existingByUserId.id;
+        console.log('✅ Found existing customer account by user_id:', customerId);
       } else {
-        // 🔧 HANDLE DUPLICATE ACCOUNTS: Use INSERT ... ON CONFLICT for authenticated users
-        try {
-          const { data: newCustomer, error: customerError } = await supabaseClient
-            .from('customer_accounts')
-            .insert({
-              name: customer_name,
-              email: customer_email,
-              phone: customer_phone,
-              user_id: authenticatedUser.id,
-              email_verified: true,
-              phone_verified: false
-            })
-            .select('id')
-            .single();
+        // Check by email as fallback
+        const { data: existingByEmail } = await supabaseClient
+          .from('customer_accounts')
+          .select('id')
+          .eq('email', customer_email)
+          .maybeSingle();
 
-          if (customerError) {
-            // Handle duplicate user_id constraint (23505)
-            if (customerError.code === '23505' && customerError.message.includes('customer_accounts_user_id_key')) {
-              console.log('🔄 Duplicate user_id detected, fetching existing account...');
+        if (existingByEmail?.id) {
+          customerId = existingByEmail.id;
+          console.log('✅ Found existing customer account by email:', customerId);
+        } else {
+          // 🔧 SAFE CUSTOMER CREATION: Use UPSERT to handle race conditions
+          try {
+            const { data: customerResult, error: customerError } = await supabaseClient
+              .from('customer_accounts')
+              .upsert({
+                user_id: authenticatedUser.id,
+                name: customer_name,
+                email: customer_email,
+                phone: customer_phone,
+                email_verified: true,
+                phone_verified: false,
+                updated_at: new Date().toISOString()
+              }, { 
+                onConflict: 'user_id',
+                ignoreDuplicates: false 
+              })
+              .select('id')
+              .single();
+
+            if (customerError) {
+              console.error('❌ Customer upsert failed:', customerError);
               
-              const { data: existingByUserId } = await supabaseClient
+              // Fallback: try to fetch existing account
+              const { data: fallbackCustomer } = await supabaseClient
                 .from('customer_accounts')
                 .select('id')
                 .eq('user_id', authenticatedUser.id)
-                .single();
-                
-              if (existingByUserId?.id) {
-                customerId = existingByUserId.id;
-                console.log('✅ Retrieved existing customer account by user_id:', customerId);
+                .maybeSingle();
+              
+              if (fallbackCustomer?.id) {
+                customerId = fallbackCustomer.id;
+                console.log('✅ Fallback: Retrieved existing customer account:', customerId);
               } else {
-                throw new Error('Could not resolve customer account after duplicate detection');
+                return new Response(JSON.stringify({
+                  success: false,
+                  error: 'Unable to create or retrieve customer account. Please try again.',
+                  code: 'CUSTOMER_ACCOUNT_ERROR'
+                }), { 
+                  status: 400, 
+                  headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+                });
               }
             } else {
-              console.error('❌ Failed to create customer account for authenticated user:', customerError);
-              throw new Error('Failed to create customer account');
+              customerId = customerResult.id;
+              console.log('✅ Customer account upserted successfully:', customerId);
             }
-          } else {
-            customerId = newCustomer.id;
-            console.log('✅ Created customer account for authenticated user:', customerId);
+          } catch (err) {
+            console.error('❌ Customer account operation failed:', err);
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Database error while processing customer information.',
+              code: 'CUSTOMER_DATABASE_ERROR'
+            }), { 
+              status: 400, 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+            });
           }
-        } catch (err) {
-          console.error('❌ Customer account creation/resolution failed:', err);
-          throw new Error('Failed to create customer account');
         }
       }
     } else {
@@ -401,26 +426,30 @@ serve(async (req) => {
     if (orderError) {
       console.error('❌ Order creation failed:', orderError);
       
-      // 🔧 ENHANCED ERROR HANDLING: Return clear JSON error with code
-      let userFriendlyMessage = 'Failed to create order';
+      // 🔧 ENHANCED ERROR HANDLING: Return clear 400 JSON error with code
+      let userFriendlyMessage = 'Failed to create order. Please check your information and try again.';
       let errorCode = 'ORDER_CREATION_FAILED';
       
       if (orderError.message.includes('22P02') || orderError.message.includes('invalid input syntax for type uuid')) {
-        userFriendlyMessage = 'There was an issue processing your order items. Please try again or contact support.';
+        userFriendlyMessage = 'Invalid order data format. Please refresh the page and try again.';
         errorCode = 'INVALID_ORDER_DATA';
-      } else if (orderError.message.includes('customer')) {
-        userFriendlyMessage = 'There was an issue with customer information. Please check your details and try again.';
-        errorCode = 'CUSTOMER_ERROR';
-      } else if (orderError.message.includes('delivery')) {
-        userFriendlyMessage = 'There was an issue with delivery information. Please check your address and try again.';
+      } else if (orderError.message.includes('customer') || orderError.message.includes('duplicate key')) {
+        userFriendlyMessage = 'Customer account issue. Please sign out and back in, then try again.';
+        errorCode = 'CUSTOMER_ACCOUNT_ERROR';
+      } else if (orderError.message.includes('delivery') || orderError.message.includes('address')) {
+        userFriendlyMessage = 'Delivery information issue. Please check your address and try again.';
         errorCode = 'DELIVERY_ERROR';
+      } else if (orderError.message.includes('product') || orderError.message.includes('item')) {
+        userFriendlyMessage = 'Cart items issue. Please refresh your cart and try again.';
+        errorCode = 'CART_ITEMS_ERROR';
       }
       
       return new Response(JSON.stringify({
         success: false,
         error: userFriendlyMessage,
         code: errorCode,
-        debug_message: orderError.message
+        technical_details: orderError.message,
+        timestamp: new Date().toISOString()
       }), { 
         status: 400, 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

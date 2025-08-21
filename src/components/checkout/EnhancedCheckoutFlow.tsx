@@ -293,6 +293,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       return;
     }
 
+    // 🔧 DEBOUNCE: Prevent double-clicks during submission
+    if (isSubmitting) {
+      console.log('⏳ Already submitting, ignoring duplicate request');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setLastPaymentError(null);

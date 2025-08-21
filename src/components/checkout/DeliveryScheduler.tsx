@@ -11,6 +11,7 @@ import { useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
+import { HorizontalDatePicker } from './HorizontalDatePicker';
 interface DeliverySchedulerProps {
   selectedDate?: string;
   selectedTimeSlot?: {
@@ -23,13 +24,15 @@ interface DeliverySchedulerProps {
   }) => void;
   className?: string;
   showHeader?: boolean;
+  variant?: 'calendar' | 'horizontal';
 }
 export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
   selectedDate,
   selectedTimeSlot,
   onScheduleChange,
   className,
-  showHeader = true
+  showHeader = true,
+  variant = 'calendar'
 }) => {
   console.log('🚀 DeliveryScheduler component initializing');
   const [availableSlots, setAvailableSlots] = useState<DeliverySlot[]>([]);
@@ -89,6 +92,14 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
       onScheduleChange(dateStr, selectedTimeSlot);
     }
   };
+
+  const handleHorizontalDateSelect = (dateStr: string) => {
+    const date = parseISO(dateStr);
+    setCalendarDate(date);
+    if (selectedTimeSlot) {
+      onScheduleChange(dateStr, selectedTimeSlot);
+    }
+  };
   const handleTimeSlotSelect = (timeSlot: DeliveryTimeSlot) => {
     if (!timeSlot.available || !calendarDate) return;
     const dateStr = format(calendarDate, 'yyyy-MM-dd');
@@ -116,6 +127,79 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         </Card>
       </DeliverySchedulingErrorBoundary>;
   }
+  if (variant === 'horizontal') {
+    return (
+      <DeliverySchedulingErrorBoundary>
+        <div className={cn("space-y-6", className)}>
+          {error && (
+            <Alert variant="destructive">
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                {error}
+                <Button variant="outline" size="sm" onClick={loadAvailableSlots} className="ml-2">
+                  Retry
+                </Button>
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* Horizontal Date Picker */}
+          <HorizontalDatePicker
+            selectedDate={selectedDate}
+            availableSlots={availableSlots}
+            onDateSelect={handleHorizontalDateSelect}
+          />
+
+          {/* Time Slots Section */}
+          {calendarDate && selectedDateSlots.length > 0 && (
+            <div className="space-y-4">
+              <h3 className="font-medium text-foreground flex items-center gap-2">
+                <Clock className="w-4 h-4" />
+                Select delivery time
+              </h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
+                {selectedDateSlots.map((timeSlot, index) => {
+                  const isSelected = selectedTimeSlot?.start_time === timeSlot.start_time && 
+                                   selectedTimeSlot?.end_time === timeSlot.end_time;
+                  
+                  return (
+                    <Button
+                      key={index}
+                      variant={isSelected ? "default" : "outline"}
+                      disabled={!timeSlot.available}
+                      onClick={() => handleTimeSlotSelect(timeSlot)}
+                      className={cn(
+                        "h-14 px-3 flex items-center justify-center",
+                        "border-2 transition-all duration-200 hover:scale-105 active:scale-95",
+                        "text-center touch-manipulation rounded-lg",
+                        !timeSlot.available && "opacity-50 cursor-not-allowed",
+                        isSelected && "bg-primary text-primary-foreground border-primary shadow-md",
+                        !isSelected && "hover:bg-muted/50 hover:border-primary/20"
+                      )}
+                    >
+                      <span className="font-medium text-sm leading-tight">
+                        {timeSlot.start_time} - {timeSlot.end_time}
+                      </span>
+                    </Button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {calendarDate && selectedDateSlots.length === 0 && !selectedSlot?.is_holiday && (
+            <Alert>
+              <AlertTriangle className="h-4 w-4" />
+              <AlertDescription>
+                No delivery slots available for the selected date.
+              </AlertDescription>
+            </Alert>
+          )}
+        </div>
+      </DeliverySchedulingErrorBoundary>
+    );
+  }
+
   return <DeliverySchedulingErrorBoundary>
       <Card className={`border-primary/20 ${className}`}>
         {showHeader}

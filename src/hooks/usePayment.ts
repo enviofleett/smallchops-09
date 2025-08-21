@@ -144,39 +144,45 @@ export const usePayment = () => {
     // Validate reference format (warn but support both txn_ and legacy formats during transition)
     if (!validateReferenceForVerification(reference)) {
       console.warn('⚠️ Unexpected reference format for verification:', reference);
-      // Don't throw error during transition period - let backend handle it
     }
+    
     try {
-      const { data, error } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference }
+      console.log('🔍 Verifying payment with secure verify-payment RPC:', reference);
+      
+      // Use the dedicated verify-payment function instead of paystack-secure
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { reference }
       });
 
       if (error) throw new Error(error.message);
 
-      const success = data?.status === true || data?.success === true;
+      const success = data?.success === true;
       if (!success) {
-        return { success: false };
+        console.warn('❌ Payment verification failed:', data);
+        return { 
+          success: false, 
+          message: data?.error || 'Payment verification failed'
+        };
       }
 
-      const d: any = data?.data || data;
-      const order = d?.order || data?.order;
-
-      const ref = d?.reference || d?.provider_reference || d?.payment_reference;
-      const rawAmount = typeof d?.total_amount === 'number' ? d.total_amount : (typeof d?.amount === 'number' ? d.amount : undefined);
-      const amountNaira = typeof rawAmount === 'number' ? (rawAmount > 10000 ? rawAmount / 100 : rawAmount) : undefined;
+      console.log('✅ Payment verification successful:', {
+        reference: data.reference,
+        order_id: data.order_id,
+        amount: data.amount
+      });
 
       return {
         success: true,
-        paymentStatus: d?.payment_status || d?.status || (success ? 'paid' : undefined),
-        orderStatus: order?.status || d?.order_status,
-        orderNumber: order?.order_number || d?.order_number,
-        orderId: d?.order_id || order?.id,
-        amount: rawAmount,
-        amountNaira,
-        paidAt: d?.paid_at,
-        channel: d?.channel,
-        reference: ref,
-        message: d?.gateway_response || d?.message,
+        paymentStatus: data.payment_status || 'paid',
+        orderStatus: data.order_status,
+        orderNumber: data.order_number,
+        orderId: data.order_id,
+        amount: data.amount,
+        amountNaira: data.amount,
+        paidAt: data.paid_at,
+        channel: data.channel,
+        reference: data.reference,
+        message: data.gateway_response || 'Payment verified successfully',
       };
     } catch (error) {
       console.error('Payment verification error:', error);

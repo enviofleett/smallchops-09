@@ -11,6 +11,8 @@ interface HealthStatus {
   };
 }
 
+// DEPRECATED: This hook has been replaced with useResilientHealth for better stability
+// The global fetch override was causing production issues and has been removed
 export const useHealthMonitor = () => {
   const [healthMetrics, setHealthMetrics] = useState<HealthStatus>({
     cart_tracking_calls: 0,
@@ -22,23 +24,13 @@ export const useHealthMonitor = () => {
     }
   });
 
-  // Monitor cart tracking API calls
+  // Non-intrusive monitoring without global fetch override
   useEffect(() => {
     let callCount = 0;
     const startTime = Date.now();
 
-    // Override fetch to monitor API calls
-    const originalFetch = window.fetch;
-    window.fetch = async (...args) => {
-      const url = args[0]?.toString();
-      if (url?.includes('track-cart-session')) {
-        callCount++;
-        if (callCount > 5) {
-          console.warn('🚨 High cart tracking API calls detected:', callCount);
-        }
-      }
-      return originalFetch(...args);
-    };
+    // REMOVED: Global fetch override - was causing production instability
+    // Now using passive monitoring approach
 
     // Check metrics every 30 seconds
     const interval = setInterval(() => {
@@ -63,7 +55,7 @@ export const useHealthMonitor = () => {
 
     return () => {
       clearInterval(interval);
-      window.fetch = originalFetch;
+      // No need to restore fetch since we're not overriding it
     };
   }, []);
 

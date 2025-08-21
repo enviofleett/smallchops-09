@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Supabase Functions Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px 0; }
+        .success { background: #f0f8f0; border-left: 4px solid #10b981; padding: 15px; margin: 10px 0; }
+        .error { background: #fdf2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 10px 0; }
+        .info { background: #f0f4ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 10px 0; }
+        .warning { background: #fff8f0; border-left: 4px solid #f59e0b; padding: 15px; margin: 10px 0; }
+        button { padding: 12px 24px; margin: 8px; cursor: pointer; border: none; border-radius: 5px; font-size: 14px; background: #3b82f6; color: white; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 12px; }
+        .function-test { margin: 15px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>🔧 Supabase Functions Accessibility Test</h1>
+            <p>This test checks if Supabase functions are properly deployed and accessible.</p>
+            
+            <div class="info">
+                <h3>📊 Current Configuration</h3>
+                <p><strong>Supabase URL:</strong> <code id="supabaseUrl">Loading...</code></p>
+                <p><strong>Environment:</strong> Development with hosted Supabase</p>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>🎯 Function Tests</h2>
+            <button onclick="testAllFunctions()">Test All Functions</button>
+            <div id="testResults"></div>
+        </div>
+
+        <div class="card">
+            <h2>🛠️ Debug Information</h2>
+            <button onclick="showDebugInfo()">Show Debug Info</button>
+            <div id="debugInfo"></div>
+        </div>
+    </div>
+
+    <script>
+        // Display current configuration
+        document.getElementById('supabaseUrl').textContent = 'https://oknnklksdiqaifhxaccs.supabase.co';
+
+        async function testAllFunctions() {
+            const resultDiv = document.getElementById('testResults');
+            resultDiv.innerHTML = '<div class="info">🔄 Testing Supabase functions...</div>';
+
+            const functionsToTest = [
+                { name: 'paystack-debug', payload: { action: 'check_key_health' } },
+                { name: 'paystack-secure', payload: { action: 'initialize', email: 'test@test.com', amount: 100000, currency: 'NGN' } },
+                { name: 'payment-callback', payload: {}, method: 'GET', url: '?reference=test_ref_123' },
+                { name: 'public-api', payload: {}, method: 'GET' }
+            ];
+
+            let results = '';
+
+            for (const func of functionsToTest) {
+                try {
+                    results += await testFunction(func);
+                } catch (error) {
+                    results += `
+                        <div class="function-test">
+                            <h4>❌ ${func.name}</h4>
+                            <div class="error">
+                                <p><strong>Test Failed:</strong> ${error.message}</p>
+                            </div>
+                        </div>
+                    `;
+                }
+            }
+
+            resultDiv.innerHTML = results;
+        }
+
+        async function testFunction(func) {
+            const startTime = Date.now();
+            
+            try {
+                let response;
+                const url = func.method === 'GET' && func.url
+                    ? `/functions/v1/${func.name}${func.url}`
+                    : `/functions/v1/${func.name}`;
+
+                if (func.method === 'GET') {
+                    response = await fetch(url);
+                } else {
+                    response = await fetch(url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(func.payload)
+                    });
+                }
+
+                const duration = Date.now() - startTime;
+                const status = response.status;
+                
+                let responseText = '';
+                let responseData = null;
+                
+                try {
+                    responseText = await response.text();
+                    responseData = JSON.parse(responseText);
+                } catch {
+                    // Response is not JSON
+                }
+
+                const isSuccess = status >= 200 && status < 300;
+                const className = isSuccess ? 'success' : 'error';
+
+                return `
+                    <div class="function-test">
+                        <h4>${isSuccess ? '✅' : '❌'} ${func.name}</h4>
+                        <div class="${className}">
+                            <p><strong>Status:</strong> ${status}</p>
+                            <p><strong>Duration:</strong> ${duration}ms</p>
+                            <p><strong>URL:</strong> <code>${url}</code></p>
+                            ${responseData ? `
+                                <details>
+                                    <summary>Response Data</summary>
+                                    <pre>${JSON.stringify(responseData, null, 2)}</pre>
+                                </details>
+                            ` : responseText ? `
+                                <details>
+                                    <summary>Response Text</summary>
+                                    <pre>${responseText}</pre>
+                                </details>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+
+            } catch (error) {
+                const duration = Date.now() - startTime;
+                
+                return `
+                    <div class="function-test">
+                        <h4>❌ ${func.name}</h4>
+                        <div class="error">
+                            <p><strong>Network Error:</strong> ${error.message}</p>
+                            <p><strong>Duration:</strong> ${duration}ms</p>
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        async function showDebugInfo() {
+            const debugDiv = document.getElementById('debugInfo');
+            
+            const debugInfo = {
+                currentUrl: window.location.href,
+                origin: window.location.origin,
+                userAgent: navigator.userAgent,
+                timestamp: new Date().toISOString(),
+                supabaseConfig: {
+                    url: 'https://oknnklksdiqaifhxaccs.supabase.co',
+                    hasLocalStorage: typeof localStorage !== 'undefined',
+                    hasSessionStorage: typeof sessionStorage !== 'undefined'
+                }
+            };
+
+            debugDiv.innerHTML = `
+                <div class="info">
+                    <h3>🔍 Debug Information</h3>
+                    <pre>${JSON.stringify(debugInfo, null, 2)}</pre>
+                </div>
+                
+                <div class="warning">
+                    <h4>⚠️ Common Issues</h4>
+                    <ul>
+                        <li><strong>404 Errors:</strong> Functions not deployed to Supabase</li>
+                        <li><strong>CORS Errors:</strong> Function not configured for browser access</li>
+                        <li><strong>401/403 Errors:</strong> Authentication/authorization issues</li>
+                        <li><strong>500 Errors:</strong> Function runtime errors (check Supabase logs)</li>
+                    </ul>
+                </div>
+
+                <div class="info">
+                    <h4>📝 Next Steps Based on Results</h4>
+                    <ul>
+                        <li><strong>If all 404:</strong> Functions need to be deployed to Supabase</li>
+                        <li><strong>If some work:</strong> Specific functions have issues</li>
+                        <li><strong>If 500 errors:</strong> Check environment variables in Supabase</li>
+                        <li><strong>If timeout:</strong> Functions are slow or hanging</li>
+                    </ul>
+                </div>
+            `;
+        }
+
+        // Auto-run basic test on load
+        window.addEventListener('load', () => {
+            setTimeout(testAllFunctions, 1000);
+        });
+    </script>
+</body>
+</html>

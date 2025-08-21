@@ -43,41 +43,66 @@ serve(async (req) => {
     let customerId;
     const customerEmail = requestBody.customer.email.toLowerCase();
 
-    // The FIX: First, check if a customer with this email already exists
+    // Race-safe customer resolution: Check if customer exists
+    console.log('👤 Looking up customer by email:', customerEmail);
     const { data: existingCustomer, error: findError } = await supabaseAdmin
       .from('customer_accounts')
-      .select('id')
+      .select('id, name')
       .eq('email', customerEmail)
-      .single();
+      .maybeSingle();
     
-    // Check for an error that is NOT a "not found" error.
-    if (findError && findError.code !== 'PGRST116') {
+    if (findError) {
       console.error('❌ Failed to check for existing customer:', findError);
       throw new Error('Failed to find customer account');
     }
 
     if (existingCustomer) {
-      // If a customer is found, use their existing ID
+      // Customer exists, use their ID
       customerId = existingCustomer.id;
-      console.log('👤 Using existing customer:', customerId);
+      console.log('👤 Using existing customer:', customerId, 'Name:', existingCustomer.name);
     } else {
-      // If no customer is found, proceed with creating a new account
-      const { data: newCustomer, error: createError } = await supabaseAdmin.from('customer_accounts').insert({
-        name: requestBody.customer.name,
-        email: customerEmail,
-        phone: requestBody.customer.phone,
-        email_verified: false,
-        phone_verified: false,
-        profile_completion_percentage: 60
-      }).select('id').single();
+      // Customer doesn't exist, create new account with race condition handling
+      console.log('👤 Creating new customer account for:', customerEmail);
+      const { data: newCustomer, error: createError } = await supabaseAdmin
+        .from('customer_accounts')
+        .insert({
+          name: requestBody.customer.name,
+          email: customerEmail,
+          phone: requestBody.customer.phone,
+          email_verified: false,
+          phone_verified: false,
+          profile_completion_percentage: 60
+        })
+        .select('id')
+        .maybeSingle();
       
       if (createError) {
-        console.error('❌ Customer creation failed:', createError);
-        throw new Error('Failed to create customer account');
+        // Handle potential race condition - another process might have created the customer
+        if (createError.code === '23505') { // Unique constraint violation
+          console.log('⚠️ Customer creation race condition detected, fetching existing customer');
+          const { data: raceCustomer, error: raceError } = await supabaseAdmin
+            .from('customer_accounts')
+            .select('id, name')
+            .eq('email', customerEmail)
+            .maybeSingle();
+            
+          if (raceError || !raceCustomer) {
+            console.error('❌ Failed to resolve customer after race condition:', raceError);
+            throw new Error('Failed to resolve customer account');
+          }
+          
+          customerId = raceCustomer.id;
+          console.log('👤 Resolved race condition, using existing customer:', customerId);
+        } else {
+          console.error('❌ Customer creation failed:', createError);
+          throw new Error('Failed to create customer account');
+        }
+      } else if (!newCustomer) {
+        throw new Error('Customer creation returned no data');
+      } else {
+        customerId = newCustomer.id;
+        console.log('👤 Created new customer:', customerId);
       }
-      
-      customerId = newCustomer.id;
-      console.log('👤 Created new customer:', customerId);
     }
     
     // The rest of the logic remains unchanged, using the determined customerId
@@ -109,10 +134,20 @@ serve(async (req) => {
 
     console.log('✅ Order created successfully:', orderId);
     
-    const { data: order, error: fetchError } = await supabaseAdmin.from('orders').select('id, order_number, total_amount, customer_email').eq('id', orderId).single();
+    const { data: order, error: fetchError } = await supabaseAdmin
+      .from('orders')
+      .select('id, order_number, total_amount, customer_email')
+      .eq('id', orderId)
+      .maybeSingle();
 
-    if (fetchError || !order) {
+    if (fetchError) {
+      console.error('❌ Failed to fetch order:', fetchError);
       throw new Error('Failed to fetch created order');
+    }
+    
+    if (!order) {
+      console.error('❌ Order not found after creation:', orderId);
+      throw new Error('Order not found after creation');
     }
 
     console.log('💰 Order details:', {
@@ -121,6 +156,10 @@ serve(async (req) => {
       total_amount: order.total_amount,
       customer_email: order.customer_email
     });
+    
+    // Construct callback URL and log for debugging
+    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?order_id=${order.id}`;
+    console.log('🔗 Payment callback URL:', callbackUrl);
     
     console.log('💳 Initializing payment via paystack-secure...');
     const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke('paystack-secure', {
@@ -138,8 +177,7 @@ serve(async (req) => {
           client_total: order.total_amount,
           authoritative_total: order.total_amount
         },
-        // FIX: Removed the __REFERENCE__ placeholder. Paystack automatically appends the reference to the callback URL.
-        callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?order_id=${order.id}`
+        callback_url: callbackUrl
       }
     });
 
@@ -148,7 +186,11 @@ serve(async (req) => {
       throw new Error(`Payment initialization failed: ${paymentError.message}`);
     }
 
+    // Log payment reference for debugging
+    const paymentReference = paymentData.data?.reference || paymentData.reference;
     console.log('✅ Payment initialized successfully via paystack-secure');
+    console.log('💳 Payment reference:', paymentReference);
+    console.log('🌐 Authorization URL:', paymentData.data?.authorization_url || paymentData.authorization_url);
 
     return new Response(JSON.stringify({
       success: true,

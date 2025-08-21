@@ -96,6 +96,9 @@ export async function updatePromotion(
     .select()
     .single();
   if (error) throw error;
+
+  // Clear cache when promotion is updated
+  clearPromotionsCache();
   return data;
 }
 
@@ -103,5 +106,8 @@ export async function updatePromotion(
 export async function deletePromotion(id: string) {
   const { error } = await supabase.from("promotions").delete().eq("id", id);
   if (error) throw error;
+
+  // Clear cache when promotion is deleted
+  clearPromotionsCache();
   return true;
 }

@@ -307,8 +307,8 @@ async function initializePayment({
 
     console.log('✅ Paystack payment initialized successfully:', paystackPayload.reference)
 
-    // Create payment transaction record with all required fields and proper status
-    const { error: transactionError } = await supabaseAdmin
+    // Create payment transaction record with UPSERT for idempotency
+    const { data: upsertResult, error: transactionError } = await supabaseAdmin
       .from('payment_transactions')
       .upsert({
         reference: paystackPayload.reference,
@@ -317,7 +317,7 @@ async function initializePayment({
         provider: 'paystack',
         amount: authoritativeAmount,
         currency: 'NGN',
-        status: 'initialized', // Use proper status from constraint
+        status: 'pending', // Use pending as it's just initialized
         authorization_url: paystackResponse.data!.authorization_url,
         access_code: paystackResponse.data!.access_code,
         customer_email: email,
@@ -325,8 +325,10 @@ async function initializePayment({
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }, {
-        onConflict: 'reference'
+        onConflict: 'provider_reference',
+        ignoreDuplicates: false
       })
+      .select()
 
     if (transactionError) {
       console.error('⚠️ Failed to create payment transaction record:', transactionError)

@@ -283,20 +283,52 @@ serve(async (req) => {
       })
     }
 
-    // **PRODUCTION FIX:** Add UPSERT for payment transactions to prevent duplicate key errors
+    // **PRODUCTION FIX:** Check for existing pending transactions before creating new ones
     const paymentReference = paymentData?.data?.reference || paymentData?.reference
     
     if (paymentReference) {
+      // First check if transaction already exists
+      console.log('🔍 Checking for existing pending transactions for order:', order.id)
+      const { data: existingTransactions } = await supabaseAdmin
+        .from('payment_transactions')
+        .select('id, provider_reference, status')
+        .eq('order_id', order.id)
+        .in('status', ['pending', 'initialized'])
+      
+      console.log('🔁 Existing pending transactions for this order before insert:', existingTransactions?.length || 0)
+      
+      // Mark any existing pending transactions as superseded to avoid confusion
+      if (existingTransactions && existingTransactions.length > 0) {
+        await supabaseAdmin
+          .from('payment_transactions')
+          .update({ 
+            status: 'superseded',
+            updated_at: new Date().toISOString()
+          })
+          .eq('order_id', order.id)
+          .in('status', ['pending', 'initialized'])
+        
+        console.log('✅ Marked previous pending transactions as superseded')
+      }
+      
+      // Now create/update the current transaction with UPSERT
       try {
         const { error: transactionError } = await supabaseAdmin
           .from('payment_transactions')
           .upsert({
             order_id: order.id,
+            reference: paymentReference,
             provider_reference: paymentReference,
             status: 'pending',
             amount: order.total_amount,
+            currency: 'NGN',
             provider: 'paystack',
-            created_at: new Date().toISOString()
+            authorization_url: paymentData?.data?.authorization_url || paymentData?.authorization_url,
+            access_code: paymentData?.data?.access_code || paymentData?.access_code,
+            customer_email: order.customer_email,
+            gateway_response: paymentData,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           }, {
             onConflict: 'provider_reference',
             ignoreDuplicates: false

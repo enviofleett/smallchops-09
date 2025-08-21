@@ -57,11 +57,80 @@ const PaymentSystemHealthDashboard: React.FC = () => {
     }
   };
 
+  const runEndToEndTest = async () => {
+    setLoading(true);
+    setRunningTest('End-to-End Payment Flow');
+    try {
+      toast.info('Running comprehensive end-to-end payment flow test...');
+      const report = await endToEndPaymentTester.runCompletePaymentFlowTest();
+      setEndToEndReport(report);
+
+      if (report.overall_status === 'passed') {
+        toast.success('End-to-end payment flow test completed successfully!');
+      } else if (report.overall_status === 'partial') {
+        toast.warning('End-to-end test completed with some issues');
+      } else {
+        toast.error('End-to-end test failed - critical issues found');
+      }
+    } catch (error) {
+      toast.error(`End-to-end test failed: ${error.message}`);
+    } finally {
+      setLoading(false);
+      setRunningTest(null);
+    }
+  };
+
+  const runWebhookTest = async () => {
+    setLoading(true);
+    setRunningTest('Webhook Functionality');
+    try {
+      toast.info('Testing Paystack webhook functionality...');
+      const report = await paystackWebhookTester.runCompleteWebhookTest();
+      setWebhookReport(report);
+
+      if (report.overall_status === 'passed') {
+        toast.success('Webhook tests completed successfully!');
+      } else if (report.overall_status === 'partial') {
+        toast.warning('Webhook tests completed with some issues');
+      } else {
+        toast.error('Webhook tests failed - check webhook configuration');
+      }
+    } catch (error) {
+      toast.error(`Webhook test failed: ${error.message}`);
+    } finally {
+      setLoading(false);
+      setRunningTest(null);
+    }
+  };
+
+  const runMonitoringCheck = async () => {
+    setLoading(true);
+    setRunningTest('System Monitoring');
+    try {
+      toast.info('Running system monitoring and log analysis...');
+      const report = await supabaseLogMonitor.generateMonitoringReport();
+      setMonitoringReport(report);
+
+      if (report.overall_health === 'healthy') {
+        toast.success('System monitoring check completed - all systems healthy!');
+      } else if (report.overall_health === 'degraded') {
+        toast.warning('System monitoring completed - some degradation detected');
+      } else {
+        toast.error('System monitoring completed - critical issues found');
+      }
+    } catch (error) {
+      toast.error(`Monitoring check failed: ${error.message}`);
+    } finally {
+      setLoading(false);
+      setRunningTest(null);
+    }
+  };
+
   const runIndividualTest = async (testName: string, testFunction: () => Promise<PaymentTestResult>) => {
     setRunningTest(testName);
     try {
       const result = await testFunction();
-      
+
       if (result.status === 'passed') {
         toast.success(`${testName} test passed`);
       } else if (result.status === 'warning') {
@@ -69,7 +138,7 @@ const PaymentSystemHealthDashboard: React.FC = () => {
       } else {
         toast.error(`${testName} test failed: ${result.message}`);
       }
-      
+
       return result;
     } catch (error) {
       toast.error(`${testName} test error: ${error.message}`);

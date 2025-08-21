@@ -379,16 +379,29 @@ serve(async (req) => {
 
     console.log('✅ Order created successfully:', orderId);
 
-    // Get the created order details
+    // Get the created order details with authoritative amount calculation
     const { data: orderDetails } = await supabaseClient
       .from('orders')
-      .select('*')
+      .select('*, delivery_zones(base_fee)')
       .eq('id', orderId)
       .single();
 
     if (!orderDetails) {
       throw new Error('Failed to retrieve created order');
     }
+
+    // 🔧 CRITICAL: Calculate authoritative amount from database
+    const itemsSubtotal = orderDetails.total_amount || 0;
+    const orderDeliveryFee = orderDetails.delivery_fee || 0;
+    const authoritativeAmount = itemsSubtotal + orderDeliveryFee;
+    
+    console.log('💰 Amount calculation verification:', {
+      client_provided_total: total_amount,
+      items_subtotal: itemsSubtotal,
+      delivery_fee: orderDeliveryFee,
+      authoritative_total: authoritativeAmount,
+      amount_discrepancy: Math.abs(authoritativeAmount - (total_amount || 0))
+    });
 
     // AUTHORITATIVE DELIVERY SCHEDULE PERSISTENCE
     let scheduleId: string | null = null;
@@ -499,14 +512,18 @@ serve(async (req) => {
           body: {
             action: 'initialize',
             email: customer_email,
-            amount: total_amount, // Amount already in naira from database
-            reference: authoritativePaymentReference, // 🔧 Use backend-generated reference
+            amount: authoritativeAmount, // Use authoritative amount from database
+            reference: authoritativePaymentReference,
             callback_url: `https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/payment-callback?reference=${authoritativePaymentReference}&order_id=${orderId}`,
             metadata: {
               order_id: orderId,
               customer_name: customer_name,
               order_number: orderDetails.order_number,
-              fulfillment_type: fulfillment_type
+              fulfillment_type: fulfillment_type,
+              items_subtotal: itemsSubtotal,
+              delivery_fee: orderDeliveryFee,
+              client_total: total_amount,
+              authoritative_total: authoritativeAmount
             }
           }
         });
@@ -710,15 +727,19 @@ serve(async (req) => {
         order_id: orderId,
         provider: 'paystack',
         provider_reference: effectiveReference,
-        amount: total_amount,
+        amount: authoritativeAmount, // Use authoritative amount from database
         currency: 'NGN',
         status: 'pending',
         metadata: {
           customer_id: customerId,
           user_id: customerId,
           order_number: orderDetails.order_number,
-          init_version: (pendingCount ?? 0) + 1, // 1 for first init, 2 for second, etc.
-          canonical_reference: effectiveReference
+          init_version: (pendingCount ?? 0) + 1,
+          canonical_reference: effectiveReference,
+          items_subtotal: itemsSubtotal,
+          delivery_fee: orderDeliveryFee,
+          client_total: total_amount,
+          authoritative_total: authoritativeAmount
         }
       });
 
@@ -748,12 +769,17 @@ serve(async (req) => {
       version: VERSION,
       order_id: orderId,
       order_number: orderDetails.order_number,
-      total_amount: total_amount,
+      amount: authoritativeAmount, // Use authoritative amount from database
+      total_amount: authoritativeAmount, // Use authoritative amount from database
+      items_subtotal: itemsSubtotal,
+      delivery_fee: orderDeliveryFee,
+      customer_email: customer_email,
+      fulfillment_type: fulfillment_type,
       payment: {
-        payment_url: responsePaymentUrl, // CRITICAL: Always include this
-        authorization_url: responsePaymentUrl, // Duplicate for compatibility
+        payment_url: responsePaymentUrl,
+        authorization_url: responsePaymentUrl,
         access_code: finalAccessCode,
-        reference: authoritativePaymentReference // Always use server txn_ reference
+        reference: authoritativePaymentReference
       },
       schedule: scheduleId ? {
         schedule_id: scheduleId,

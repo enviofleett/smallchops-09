@@ -272,6 +272,15 @@ export default function PaymentCallback() {
         detail: { orderId: payload?.order_id, orderReference: reference }
       }));
 
+      // Notify parent window (if opened from checkout dialog)
+      if (window.opener && !window.opener.closed) {
+        window.opener.postMessage({ 
+          type: 'PAYMENT_SUCCESS', 
+          orderId: payload?.order_id,
+          reference: reference
+        }, window.location.origin);
+      }
+
       // Invalidate caches
       await invalidateOrdersCaches();
       if (refetchOrders) {
@@ -299,6 +308,14 @@ export default function PaymentCallback() {
     if (!mountedRef.current || navigationHandledRef.current) return;
     
     console.error('❌ Payment verification failed:', errorData);
+    
+    // Notify parent window of failure (if opened from checkout dialog)
+    if (window.opener && !window.opener.closed) {
+      window.opener.postMessage({ 
+        type: 'PAYMENT_FAILED', 
+        error: errorData.error || 'Verification failed'
+      }, window.location.origin);
+    }
     
     setStatus('failed');
     setResult({

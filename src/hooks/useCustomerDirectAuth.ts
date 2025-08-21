@@ -52,6 +52,20 @@ export const useCustomerDirectAuth = () => {
         return { success: false, error: errorMessage };
       }
 
+      // Enforce email verification - sign out unverified users
+      if (data.user && !data.user.email_confirmed_at) {
+        console.log('Signing out unverified user:', data.user.email);
+        await supabase.auth.signOut();
+        
+        const errorMessage = 'Please verify your email address before signing in. Check your inbox for the verification link.';
+        toast({
+          title: "Email verification required",
+          description: errorMessage,
+          variant: "destructive"
+        });
+        return { success: false, error: errorMessage };
+      }
+
       toast({
         title: "Welcome back!",
         description: "You have been successfully logged in.",

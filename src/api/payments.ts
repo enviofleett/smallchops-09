@@ -45,19 +45,19 @@ interface VerifyPaymentResponse {
 
 export class PaymentsAPI {
   /**
-   * Initialize a new payment transaction
+   * Initialize a new payment transaction (DEPRECATED - use usePayment hook)
    */
   static async initializePayment(request: InitializePaymentRequest): Promise<InitializePaymentResponse> {
+    console.warn('DEPRECATED: PaymentsAPI.initializePayment is deprecated. Use usePayment hook with secure-payment-processor instead.')
+    
     try {
-      const { data, error } = await supabase.functions.invoke('paystack-secure', {
+      // Delegate to secure-payment-processor
+      const { data, error } = await supabase.functions.invoke('secure-payment-processor', {
         body: {
           action: 'initialize',
-          email: request.email,
-          amount: request.amount, // Amount in naira, Paystack function will handle conversion
-          reference: request.reference, // Use provided txn_ reference
-          channels: request.channels || ['card', 'bank', 'ussd', 'mobile_money'],
+          order_id: request.orderDetails.id,
+          customer_email: request.email,
           metadata: {
-            order_id: request.orderDetails.id,
             customer_name: request.customerInfo.name,
             customer_phone: request.customerInfo.phone,
             customer_address: request.customerInfo.address,
@@ -73,22 +73,12 @@ export class PaymentsAPI {
         };
       }
 
-      // Handle both success and status response formats
-      const isSuccess = data?.status === true || data?.success === true;
-      if (!isSuccess) {
-        return {
-          success: false,
-          error: data?.error || data?.message || 'Failed to initialize payment'
-        };
-      }
-
-      const responseData = data.data || data;
       return {
         success: true,
         data: {
-          access_code: responseData.access_code,
-          reference: responseData.reference,
-          authorization_url: responseData.authorization_url
+          access_code: data.access_code,
+          reference: data.reference,
+          authorization_url: data.authorization_url
         }
       };
     } catch (error) {
@@ -101,54 +91,14 @@ export class PaymentsAPI {
   }
 
   /**
-   * Verify a payment transaction with enhanced error handling
+   * Verify a payment transaction (DEPRECATED - use usePayment hook)
    */
   static async verifyPayment(reference: string): Promise<VerifyPaymentResponse> {
+    console.warn('DEPRECATED: PaymentsAPI.verifyPayment is deprecated. Use usePayment hook instead.')
+    
     try {
-      // Prefer secure verifier that performs atomic updates
-      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference }
-      });
-
-      const normalize = (res: any): VerifyPaymentResponse => {
-        // paystack-verify returns { success, amount (NGN), ... }
-        if (res?.success === true) {
-          return {
-            success: true,
-            data: {
-              status: 'success',
-              amount: typeof res.amount === 'number' ? res.amount : 0,
-              customer: res.customer ?? null,
-              metadata: res.metadata ?? null,
-              paid_at: res.paid_at ?? '',
-              channel: res.channel ?? ''
-            }
-          };
-        }
-        // paystack-secure returns { status: true, data: {...} }
-        if (res?.status === true) {
-          return {
-            success: true,
-            data: {
-              status: res.data?.status || 'success',
-              amount: typeof res.data?.amount === 'number' ? res.data.amount / 100 : 0,
-              customer: res.data?.customer,
-              metadata: res.data?.metadata,
-              paid_at: res.data?.paid_at,
-              channel: res.data?.channel
-            }
-          };
-        }
-        return { success: false, error: res?.error || res?.message || 'Payment verification failed' };
-      };
-
-      if (!primaryError && primaryData) {
-        const normalized = normalize(primaryData);
-        if (normalized.success) return normalized;
-      }
-
-      // Fallback to secure verifier
-      const { data, error } = await supabase.functions.invoke('paystack-secure', {
+      // Use unified secure-payment-processor for verification
+      const { data, error } = await supabase.functions.invoke('secure-payment-processor', {
         body: { action: 'verify', reference }
       });
 
@@ -156,7 +106,22 @@ export class PaymentsAPI {
         return { success: false, error: error.message };
       }
 
-      return normalize(data);
+      // Normalize response
+      if (data?.success === true) {
+        return {
+          success: true,
+          data: {
+            status: 'success',
+            amount: typeof data.amount === 'number' ? data.amount : 0,
+            customer: data.customer ?? null,
+            metadata: data.metadata ?? null,
+            paid_at: data.paid_at ?? '',
+            channel: data.channel ?? ''
+          }
+        };
+      }
+
+      return { success: false, error: data?.error || data?.message || 'Payment verification failed' };
     } catch (error) {
       console.error('Payment verification error:', error);
       return {

@@ -109,6 +109,62 @@ const AuthCallback: React.FC = () => {
               return;
             }
 
+            // Only process welcome email for email-verified users
+            if (!user.email_confirmed_at) {
+              console.log('Email not confirmed, skipping welcome email for:', user.email);
+              // Don't allow access until email is confirmed
+              setStatus('error');
+              setError('Please verify your email address before accessing the platform.');
+              return;
+            }
+
+            // Check if welcome email has been sent
+            const welcomeSent = user.user_metadata?.welcome_sent;
+            console.log('Welcome email status for verified user:', user.email, 'welcome_sent:', welcomeSent, 'email_confirmed_at:', user.email_confirmed_at);
+            
+            if (!welcomeSent) {
+              console.log('Triggering welcome email for verified user:', user.email);
+              try {
+                // Trigger welcome email processor
+                const welcomeResponse = await supabase.functions.invoke('customer-welcome-processor', {
+                  body: {
+                    customer_email: user.email,
+                    customer_name: customerAccount.name || user.user_metadata?.name || user.user_metadata?.full_name || 'Customer',
+                    trigger_type: 'auth_link'
+                  }
+                });
+
+                if (welcomeResponse.error) {
+                  console.error('Welcome email failed:', welcomeResponse.error);
+                } else {
+                  console.log('Welcome email triggered successfully for:', user.email);
+                  
+                  // Mark welcome email as sent in user metadata
+                  await supabase.auth.updateUser({
+                    data: { welcome_sent: true }
+                  });
+                  console.log('User metadata updated with welcome_sent=true');
+                }
+
+                // Also update customer_accounts email_verified status (non-blocking)
+                try {
+                  await supabase
+                    .from('customer_accounts')
+                    .update({ email_verified: true })
+                    .eq('user_id', user.id);
+                  console.log('Customer account email_verified updated');
+                } catch (updateError) {
+                  console.warn('Non-blocking: Failed to update customer email_verified:', updateError);
+                }
+
+              } catch (welcomeError) {
+                console.error('Non-blocking welcome email error:', welcomeError);
+                // Don't block authentication flow for welcome email failures
+              }
+            } else {
+              console.log('Welcome email already sent for user:', user.email);
+            }
+
             // Customer authenticated with phone
             setStatus('success');
             toast({

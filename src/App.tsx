@@ -68,9 +68,8 @@ const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPag
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"));
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
-const TrafficControlPanel = withLazyLoading(() => import("./components/admin/TrafficControlPanel").then(m => ({ default: m.default })));
 
-// Optimized QueryClient for better stability and faster loading
+// Hardened QueryClient with comprehensive error handling and performance optimizations
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -81,22 +80,41 @@ const queryClient = new QueryClient({
       refetchInterval: false,
       refetchOnMount: false,             // Use cached data when available
       retry: (failureCount, error: any) => {
-        // Smart retry logic for better UX
-        if (error?.status >= 400 && error?.status < 500) {
-          return false; // Don't retry client errors
+        // Enhanced retry logic for stability
+        const errorStatus = error?.status || error?.response?.status;
+        
+        // Never retry client errors (4xx)
+        if (errorStatus >= 400 && errorStatus < 500) {
+          return false;
         }
-        return failureCount < 1; // Single retry for faster failures
+        
+        // Never retry auth errors
+        if (error?.message?.includes('auth') || error?.message?.includes('unauthorized')) {
+          return false;
+        }
+        
+        // Limit retries to prevent infinite loops
+        return failureCount < 1;
       },
-      retryDelay: attemptIndex => Math.min(300 * 2 ** attemptIndex, 1500), // Faster retry delays
+      retryDelay: attemptIndex => Math.min(300 * 2 ** attemptIndex, 1500),
       networkMode: 'online',
-      // Add timeout for faster error detection
+      throwOnError: false, // Prevent uncaught errors from crashing the app
       meta: {
-        timeout: 8000, // 8 second timeout
+        timeout: 8000,
       },
     },
     mutations: {
-      retry: 0, // No retries for mutations for faster UX
+      retry: (failureCount, error: any) => {
+        // Only retry mutations for network errors
+        const errorStatus = error?.status || error?.response?.status;
+        if (errorStatus >= 500 && failureCount < 1) {
+          return true;
+        }
+        return false;
+      },
+      retryDelay: 1000,
       networkMode: 'online',
+      throwOnError: false, // Prevent uncaught mutation errors
     },
   },
 });
@@ -238,7 +256,6 @@ const App = () => {
                 <Route path="/audit-logs" element={<ErrorBoundaryWrapper context="Audit Logs"><AuditLogs /></ErrorBoundaryWrapper>} />
                 <Route path="/settings" element={<ErrorBoundaryWrapper context="Settings"><Settings /></ErrorBoundaryWrapper>} />
                 <Route path="/payment-settings" element={<ErrorBoundaryWrapper context="Payment Settings"><PaymentSettings /></ErrorBoundaryWrapper>} />
-                <Route path="/admin/traffic-control" element={<ErrorBoundaryWrapper context="Traffic Control"><TrafficControlPanel /></ErrorBoundaryWrapper>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

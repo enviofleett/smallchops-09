@@ -1,7 +1,6 @@
 import { useState, useCallback } from 'react';
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { paymentProtection } from '@/utils/clientSidePaymentProtection';
 
 interface SecurePaymentState {
   isLoading: boolean;
@@ -62,97 +61,66 @@ export const useSecurePayment = () => {
   }: PaymentInitRequest) => {
     updateState({ isLoading: true, error: null });
 
-    const orderData = { orderId, amount, email: customerEmail };
-
-    // Use client-side protection
-    if (!paymentProtection.canAttemptPayment(orderData)) {
-      const error = 'Please wait before attempting another payment';
-      updateState({ isLoading: false, error });
-      toast.error(error);
-      return { success: false, error };
-    }
-
-    // Check cache first
-    const cachedPayment = paymentProtection.getCachedPayment(orderData);
-    if (cachedPayment?.authorizationUrl) {
-      console.log('✅ Using cached payment URL');
-      updateState({
-        isLoading: false,
-        reference: cachedPayment.reference,
-        authorizationUrl: cachedPayment.authorizationUrl,
-      });
-      return {
-        success: true,
-        reference: cachedPayment.reference,
-        authorizationUrl: cachedPayment.authorizationUrl
-      };
-    }
-
-    paymentProtection.startPaymentProcessing(orderData);
-
     try {
-      console.log('🔐 Initializing minimal secure payment for order:', orderId);
+      console.log('🔐 Initializing secure payment for order:', orderId);
 
-      // Only use Edge Function for order creation, not payment initialization
-      const { data, error } = await supabase.functions.invoke('create-order-minimal', {
+      const { data, error } = await supabase.functions.invoke('paystack-secure', {
         body: {
-          order_id: orderId,
-          amount: amount,
-          customer_email: customerEmail,
+          action: 'initialize',
+          email: customerEmail,
+          amount: amount, // Send amount as-is (in naira)
           metadata: {
+            order_id: orderId,
             customer_name: metadata?.customer_name,
             order_number: metadata?.order_number
-          }
+          },
+          callback_url: redirectUrl
         }
       });
 
       if (error) throw error;
 
-      if (!data?.success) {
-        throw new Error(data?.error || 'Order creation failed');
+      // Handle both success and status response formats
+      const isSuccess = data?.success === true || data?.status === true;
+      if (!isSuccess) {
+        throw new Error(data?.error || data?.message || 'Payment initialization failed (no authorization_url returned)');
       }
 
-      // Generate client-side Paystack URL (no server initialization needed)
-      const clientRef = `pay_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      const authorizationUrl = `https://checkout.paystack.com/${clientRef}`;
+      // Extract authorization_url and reference from response
+      const responseData = data?.data || data;
+      const authorizationUrl = responseData?.authorization_url || 
+                              (responseData?.access_code ? `https://checkout.paystack.com/${responseData.access_code}` : null);
+      const reference = responseData?.reference;
 
-      // Cache the result
-      paymentProtection.cachePaymentData(orderData, {
-        reference: clientRef,
-        authorizationUrl,
-        orderId: data.order_id || orderId
-      });
+      if (!authorizationUrl) {
+        throw new Error('Payment initialization failed (no authorization_url returned)');
+      }
 
       updateState({
         isLoading: false,
-        reference: clientRef,
+        reference: reference,
         authorizationUrl: authorizationUrl,
       });
 
-      console.log('✅ Minimal payment initialized:', {
-        reference: clientRef,
-        orderId: data.order_id || orderId
+      console.log('✅ Secure payment initialized:', {
+        reference: reference,
+        orderId: responseData?.order_id || orderId
       });
-
-      paymentProtection.recordPaymentSuccess();
-      paymentProtection.stopPaymentProcessing(orderData);
 
       return {
         success: true,
-        reference: clientRef,
+        reference: reference,
         authorizationUrl: authorizationUrl,
-        orderId: data.order_id || orderId,
-        amount: amount
+        accessCode: responseData?.access_code,
+        orderId: responseData?.order_id || orderId,
+        amount: responseData?.amount || amount
       };
 
     } catch (error: any) {
-      console.error('❌ Minimal payment initialization failed:', error);
+      console.error('❌ Secure payment initialization failed:', error);
       
-      const errorMessage = error.message || 'Failed to initialize payment';
+      const errorMessage = error.message || 'Failed to initialize secure payment';
       updateState({ isLoading: false, error: errorMessage });
-      
-      paymentProtection.recordPaymentFailure();
-      paymentProtection.stopPaymentProcessing(orderData);
       
       toast.error(errorMessage);
       
@@ -166,55 +134,107 @@ export const useSecurePayment = () => {
   const verifySecurePayment = useCallback(async (reference: string, orderId?: string) => {
     updateState({ isProcessing: true, error: null });
 
-    // No retries - single verification call only
-    try {
-      console.log(`🔍 Verifying minimal payment:`, reference);
+    // Enhanced retry logic with exponential backoff
+    const maxRetries = 3;
+    let attempt = 0;
 
-      // Use the new minimal verification endpoint
-      const { data, error } = await supabase.functions.invoke('verify-payment-minimal', {
-        body: {
-          reference,
-          order_id: orderId
+    while (attempt < maxRetries) {
+      try {
+        console.log(`🔍 Verifying secure payment (attempt ${attempt + 1}):`, reference);
+
+        // 🚨 SECURITY: Validate reference format before sending to backend
+        if (reference.startsWith('pay_')) {
+          throw new Error('Cannot verify frontend-generated payment references');
         }
-      });
 
-      if (error) throw error;
+        if (!reference.startsWith('txn_')) {
+          throw new Error('Invalid payment reference format');
+        }
 
-      updateState({ isProcessing: false });
-
-      // Handle response
-      const isSuccess = data?.success === true;
-      if (isSuccess) {
-        toast.success('Payment verified successfully!');
-        console.log('✅ Payment verification successful:', {
-          reference: data?.reference,
-          orderId: data?.order_id,
-          amount: data?.amount
+        const { data, error } = await supabase.functions.invoke('verify-payment', {
+          body: {
+            reference,
+            order_id: orderId
+          }
         });
+
+        if (error) {
+          // Check if error is retryable
+          if (error.message?.includes('503') || error.message?.includes('timeout') || error.message?.includes('unavailable')) {
+            throw new Error(`RETRYABLE: ${error.message}`);
+          }
+          throw error;
+        }
+
+        updateState({ isProcessing: false });
+
+        // Handle both success and status response formats
+        const isSuccess = data?.success === true || data?.status === true;
+        if (isSuccess) {
+          toast.success('Payment verified successfully!');
+          console.log('✅ Payment verification successful:', {
+            reference: data?.reference,
+            orderId: data?.order_id,
+            amount: data?.amount
+          });
+        } else {
+          // Check if error suggests retrying
+          if (data?.code === 'CONFIG_ERROR' || data?.retryable) {
+            throw new Error(`RETRYABLE: ${data?.error || data?.message || 'Payment verification failed'}`);
+          }
+          
+          toast.error(data?.error || data?.message || 'Payment verification failed');
+          console.log('❌ Payment verification failed:', data);
+        }
+
+        return data as PaymentVerificationResult;
+
+      } catch (error: any) {
+        attempt++;
+        const errorMessage = error.message || 'Payment verification failed';
         
-        paymentProtection.recordPaymentSuccess();
-      } else {
-        toast.error(data?.error || 'Payment verification failed');
-        console.log('❌ Payment verification failed:', data);
-        paymentProtection.recordPaymentFailure();
+        // Check if this is a retryable error
+        const isRetryable = errorMessage.includes('RETRYABLE:') || 
+                           errorMessage.includes('503') || 
+                           errorMessage.includes('timeout') ||
+                           errorMessage.includes('unavailable') ||
+                           errorMessage.includes('CONFIG_ERROR');
+
+        if (isRetryable && attempt < maxRetries) {
+          console.log(`🔄 Retryable error, attempt ${attempt}/${maxRetries}: ${errorMessage}`);
+          // Exponential backoff: 1s, 2s, 4s
+          const delay = 1000 * Math.pow(2, attempt - 1);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+
+        // Non-retryable error or max retries reached
+        console.error('❌ Payment verification error after retries:', errorMessage);
+        
+        const finalError = errorMessage.replace('RETRYABLE: ', '');
+        updateState({ isProcessing: false, error: finalError });
+        
+        // Show user-friendly error message
+        if (finalError.includes('CONFIG_ERROR') || finalError.includes('Secret key not configured')) {
+          toast.error('Payment service is temporarily unavailable. Please try again later.');
+        } else if (finalError.includes('ORDER_NOT_FOUND')) {
+          toast.error('Payment reference not found. Please contact support.');
+        } else {
+          toast.error(finalError);
+        }
+        
+        return {
+          success: false,
+          error: finalError
+        };
       }
-
-      return data as PaymentVerificationResult;
-
-    } catch (error: any) {
-      console.error('❌ Payment verification error:', error);
-      
-      const errorMessage = error.message || 'Payment verification failed';
-      updateState({ isProcessing: false, error: errorMessage });
-      
-      paymentProtection.recordPaymentFailure();
-      toast.error(errorMessage);
-      
-      return {
-        success: false,
-        error: errorMessage
-      };
     }
+
+    // This should never be reached, but TypeScript requires it
+    return {
+      success: false,
+      error: 'Payment verification failed after all retry attempts'
+    };
   }, [updateState]);
 
   const openSecurePayment = useCallback((authorizationUrl: string) => {

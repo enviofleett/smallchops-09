@@ -73,26 +73,47 @@ serve(async (req) => {
     })
     
     const requestBody: CheckoutRequest = await req.json()
+    
+    // **PRODUCTION-SAFE LOGGING:** Log masked payload for debugging
     console.log('📥 Received checkout request:', {
-      customer_email: requestBody.customer?.email ? requestBody.customer.email.substring(0, 4) + '***' + requestBody.customer.email.split('@')[1] : 'none',
-      customer_name: requestBody.customer?.name,
-      customer_phone: requestBody.customer?.phone ? '*********' + requestBody.customer.phone.slice(-2) : 'none',
+      customer_email: requestBody.customer?.email ? requestBody.customer.email.substring(0, 4) + '***' + requestBody.customer.email.split('@')[1] : 'MISSING/EMPTY',
+      customer_name: requestBody.customer?.name || 'MISSING',
+      customer_phone: requestBody.customer?.phone ? '*********' + requestBody.customer.phone.slice(-2) : 'MISSING',
       fulfillment_type: requestBody.fulfillment?.type,
-      delivery_address: requestBody.fulfillment?.address ? {
-        address_line_1: requestBody.fulfillment.address.address_line_1,
-        city: requestBody.fulfillment.address.city,
-        state: requestBody.fulfillment.address.state
-      } : null,
-      pickup_point_id: requestBody.fulfillment?.pickup_point_id,
-      order_items: `items[x${requestBody.items?.length || 0}]`,
+      order_items_count: requestBody.items?.length || 0,
       total_amount: requestBody.items?.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0) || 0,
-      delivery_fee: requestBody.fulfillment?.delivery_fee || 0,
-      delivery_zone_id: requestBody.fulfillment?.delivery_zone_id,
-      delivery_schedule: requestBody.fulfillment?.delivery_schedule || null,
-      payment_method: requestBody.payment?.method || 'paystack',
-      terms_accepted: requestBody.terms_accepted || false,
+      has_email: !!requestBody.customer?.email,
+      email_length: requestBody.customer?.email?.length || 0,
       timestamp: new Date().toISOString()
     })
+
+    // **BACKEND SAFETY NET:** Auto-fill missing email for authenticated users
+    if (authUserId && (!requestBody.customer?.email || requestBody.customer.email.trim() === '')) {
+      console.log('🔧 Auto-filling missing customer email for authenticated user...')
+      
+      // Try to get email from customer_accounts first
+      const { data: customerAccount } = await supabaseAdmin
+        .from('customer_accounts')
+        .select('email')
+        .eq('user_id', authUserId)
+        .single()
+      
+      if (customerAccount?.email) {
+        console.log('✅ Email auto-filled from customer_accounts')
+        requestBody.customer.email = customerAccount.email
+      } else {
+        // Fallback: get email from auth.users via admin API
+        try {
+          const { data: authUser } = await supabaseAdmin.auth.admin.getUserById(authUserId)
+          if (authUser?.user?.email) {
+            console.log('✅ Email auto-filled from auth.users')
+            requestBody.customer.email = authUser.user.email
+          }
+        } catch (authError) {
+          console.warn('⚠️ Could not fetch email from auth.users:', authError)
+        }
+      }
+    }
 
     // Fetch business settings for guest checkout enforcement
     console.log('⚙️ Fetching business settings for guest checkout enforcement...')

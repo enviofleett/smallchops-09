@@ -48,17 +48,38 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
 
   const processCheckout = async () => {
-    if (cart.items.length === 0) {
+    // **FRONTEND GUARDRAILS:** Validate all required fields before proceeding
+    
+    // 1. Require authentication
+    if (!user) {
+      toast.error('Please log in to complete your order');
+      return;
+    }
+
+    // 2. Validate customer email
+    if (!user.email || user.email.trim() === '') {
+      toast.error('Valid email address is required for checkout');
+      return;
+    }
+
+    // 3. Validate cart has items
+    if (!cart.items || cart.items.length === 0) {
       toast.error('Your cart is empty');
+      return;
+    }
+
+    // 4. Validate total amount
+    if (!cart.summary.total_amount || cart.summary.total_amount <= 0) {
+      toast.error('Invalid order total amount');
       return;
     }
 
     setIsProcessing(true);
 
     try {
-      console.log('🛒 Starting enhanced checkout process...');
-
-      // Use the unified checkout that already handles payment initialization
+      console.log('🛒 Starting enhanced checkout process with validated data...');
+      
+      // **PRODUCTION-SAFE:** All required fields are now guaranteed to exist
       const checkoutResult = await createOrderWithPayment({
         items: cart.items.map(item => ({
           product_id: item.product_id,
@@ -68,11 +89,11 @@ export const EnhancedCheckoutFlow: React.FC<EnhancedCheckoutFlowProps> = ({
           customization_items: item.customizations ? [item.customizations] : []
         })),
         customerInfo: {
-          name: user?.email?.split('@')[0] || 'Customer',
-          email: user?.email || '',
+          name: user.email.split('@')[0] || 'Customer', // Fallback name from email
+          email: user.email, // Guaranteed to exist and be non-empty
           phone: ''
         },
-        totalAmount: cart.summary.total_amount,
+        totalAmount: cart.summary.total_amount, // Guaranteed to be valid
         fulfillmentType: 'delivery'
       });
 

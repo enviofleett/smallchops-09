@@ -38,9 +38,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
+    const paystackSecretKey = getPaystackSecretKey()
     if (!paystackSecretKey) {
-      console.error('❌ PAYSTACK_SECRET_KEY not configured')
+      console.error('❌ No valid Paystack secret key configured')
       return new Response(JSON.stringify({
         success: false,
         error: 'Payment service configuration error'

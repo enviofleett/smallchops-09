@@ -47,8 +47,23 @@ serve(async (req: Request) => {
   }
 });
 
+// Deterministic Paystack key selection (matching payment-callback logic)
+function getPaystackSecretKey(): string | null {
+  const testKey = Deno.env.get('PAYSTACK_SECRET_KEY_TEST');
+  const generalKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+  const liveKey = Deno.env.get('PAYSTACK_SECRET_KEY_LIVE');
+
+  let selectedKey = testKey || generalKey || liveKey;
+
+  if (!selectedKey || !selectedKey.startsWith('sk_')) {
+    return null;
+  }
+
+  return selectedKey;
+}
+
 async function checkKeyHealth() {
-  const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+  const secretKey = getPaystackSecretKey();
   
   const healthCheck = {
     key_configured: !!secretKey,

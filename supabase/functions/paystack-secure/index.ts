@@ -215,9 +215,11 @@ async function initializePayment({
       }
     }
 
-    console.log('🔑 Using Paystack secret key:', paystackSecretKey.substring(0, 10) + '...')
+    const keyEnvironment = paystackSecretKey.includes('test') ? 'TEST' : 'LIVE';
+    console.log('🔑 Using Paystack secret key:', paystackSecretKey.substring(0, 10) + '...', `[${keyEnvironment}]`)
     console.log('💳 Initializing payment:', finalReference, 'for', email, 'amount: ₦' + authoritativeAmount)
-    console.log('🔗 Callback URL configured:', paystackPayload.callback_url)
+    console.log('🔗 Callback URL configured (no reference injection):', paystackPayload.callback_url)
+    console.log('📝 Canonical reference for verification:', finalReference)
     console.log('🚀 Sending to Paystack:', JSON.stringify(paystackPayload))
 
     // Initialize with Paystack (with retry on duplicate reference)

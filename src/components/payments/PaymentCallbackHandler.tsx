@@ -27,7 +27,7 @@ export const PaymentCallbackHandler: React.FC = () => {
           return;
         }
 
-        // Log if using trxref instead of reference
+        // Log if using trxref instead of reference for debugging
         if (searchParams.get('trxref') && !searchParams.get('reference')) {
           console.warn('🚨 Using trxref instead of reference - possible callback URL misconfiguration');
         }
@@ -36,6 +36,8 @@ export const PaymentCallbackHandler: React.FC = () => {
         
         if (attemptNumber === 0) {
           setMessage('We\'re verifying your payment... This can take a few seconds.');
+        } else {
+          setMessage(`Payment gateway is still processing... Attempt ${attemptNumber + 1}/3`);
         }
         
         // Verify the payment
@@ -63,17 +65,19 @@ export const PaymentCallbackHandler: React.FC = () => {
           // Check if this is a "transaction not found" error that we should retry
           const shouldRetry = attemptNumber < 2 && 
                             (verificationResult.message?.includes('Transaction reference not found') ||
-                             verificationResult.message?.includes('not found'));
+                             verificationResult.message?.includes('not found') ||
+                             verificationResult.message?.includes('verification failed'));
           
           if (shouldRetry) {
-            console.log(`⏳ Retrying verification in ${3 + attemptNumber * 2} seconds (attempt ${attemptNumber + 2}/3)...`);
-            setMessage(`Payment gateway is still processing... Retrying in ${3 + attemptNumber * 2} seconds.`);
+            const delay = 3 + attemptNumber * 2; // 3s, 5s delays
+            console.log(`⏳ Retrying verification in ${delay} seconds (attempt ${attemptNumber + 2}/3)...`);
+            setMessage(`Payment gateway is still processing... Retrying in ${delay} seconds. This is normal for new transactions.`);
             setIsRetrying(true);
             
             setTimeout(() => {
               setIsRetrying(false);
               handleCallback(attemptNumber + 1);
-            }, (3 + attemptNumber * 2) * 1000);
+            }, delay * 1000);
             
           } else {
             setStatus('failed');

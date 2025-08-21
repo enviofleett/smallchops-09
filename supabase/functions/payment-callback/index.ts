@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
-const VERSION = "v2025-08-21-fixed-reference-not-found";
+const VERSION = "v2025-08-21-fixed-transaction-debug";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -9,238 +9,524 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE'
 };
 
-serve(async (req) => {
-  // Log incoming request for debugging
-  const url = new URL(req.url);
-  console.log(`[payment-callback ${VERSION}] 🔄 Callback function called`);
-  console.log(`[payment-callback ${VERSION}] 📋 Request URL: ${url.pathname}${url.search}`);
+// Enhanced logging function
+function log(level: 'info' | 'warn' | 'error', message: string, data?: any) {
+  const timestamp = new Date().toISOString();
+  const logMessage = `[${timestamp}] [payment-callback ${VERSION}] ${level.toUpperCase()}: ${message}`;
   
+  if (data) {
+    console.log(logMessage, data);
+  } else {
+    console.log(logMessage);
+  }
+}
+
+serve(async (req: Request) => {
+  log('info', '🔄 Payment callback function invoked', {
+    method: req.method,
+    url: req.url,
+    headers: Object.fromEntries(req.headers.entries())
+  });
+
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    // Extract reference from multiple possible sources (prefer reference over trxref)
-    let reference = url.searchParams.get('reference') || 
-                   url.searchParams.get('trxref') || 
-                   url.searchParams.get('txref');
-
-    // For POST requests, also check body
-    if (!reference && (req.method === 'POST' || req.method === 'PUT')) {
-      try {
-        const body = await req.json();
-        reference = body.reference || body.trxref || body.txref;
-      } catch (e) {
-        console.log(`[payment-callback ${VERSION}] ⚠️ Could not parse request body`);
-      }
-    }
-
-    // Log reference source for debugging
-    if (url.searchParams.get('trxref') && !url.searchParams.get('reference')) {
-      console.log(`[payment-callback ${VERSION}] ⚠️ Using trxref instead of reference - possible callback misconfiguration`);
-    }
-
-    console.log(`[payment-callback ${VERSION}] 📋 Processing reference: ${reference}`);
-
-    // Sanitize and validate reference
-    if (!reference?.trim()) {
-      console.error(`[payment-callback ${VERSION}] ❌ No payment reference provided`);
-      return createErrorRedirect('Missing payment reference');
-    }
-
-    reference = reference.trim();
-
-    // Check for placeholder reference (indicates callback URL issue)
-    if (reference === '__REFERENCE__' || reference === 'REFERENCE' || reference.includes('__')) {
-      console.error(`[payment-callback ${VERSION}] ❌ Placeholder reference detected: ${reference}`);
-      return createErrorRedirect('Invalid payment reference - callback URL misconfigured');
-    }
-
-    // Use SERVICE_ROLE_KEY for secure operations
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { persistSession: false } }
-    );
-
-    // Step 1: Verify payment with Paystack (with intelligent retry)
-    console.log(`[payment-callback ${VERSION}] 🔍 Verifying with Paystack...`);
-    let verificationResult = await verifyPaymentWithPaystack(reference);
+    // Step 1: Extract reference with comprehensive debugging
+    const reference = await extractReference(req);
     
-    // Implement intelligent retry for "transaction not found"
-    if (!verificationResult.success && verificationResult.shouldRetry) {
-      console.log(`[payment-callback ${VERSION}] ⏳ Retrying verification in 3 seconds...`);
-      await new Promise(resolve => setTimeout(resolve, 3000));
-      
-      verificationResult = await verifyPaymentWithPaystack(reference, 1);
-      
-      if (!verificationResult.success && verificationResult.shouldRetry) {
-        console.log(`[payment-callback ${VERSION}] ⏳ Final retry in 5 seconds...`);
-        await new Promise(resolve => setTimeout(resolve, 5000));
-        verificationResult = await verifyPaymentWithPaystack(reference, 2);
-      }
+    if (!reference) {
+      log('error', '❌ No payment reference found in request');
+      return createErrorRedirect('Missing payment reference - please ensure the payment was completed properly');
     }
+
+    log('info', '📋 Processing payment reference', { reference });
+
+    // Step 2: Validate reference format
+    if (!isValidReference(reference)) {
+      log('error', '❌ Invalid reference format', { reference });
+      return createErrorRedirect(`Invalid payment reference format: ${reference}`);
+    }
+
+    // Step 3: Initialize Supabase client
+    const supabase = createSupabaseClient();
+    if (!supabase) {
+      log('error', '❌ Failed to initialize Supabase client');
+      return createErrorRedirect('Database connection failed');
+    }
+
+    // Step 4: Check if payment is already processed
+    const existingPayment = await checkExistingPayment(supabase, reference);
+    if (existingPayment?.processed) {
+      log('info', '✅ Payment already processed, redirecting to success', { reference });
+      return createSuccessRedirect(reference, existingPayment.order_id);
+    }
+
+    // Step 5: Verify payment with Paystack (with retries)
+    log('info', '🔍 Starting Paystack verification...');
+    const verificationResult = await verifyPaymentWithRetry(reference, 3);
     
     if (!verificationResult.success) {
-      console.error(`[payment-callback ${VERSION}] ❌ Paystack verification failed:`, verificationResult.error);
+      log('error', '❌ Paystack verification failed', {
+        reference,
+        error: verificationResult.error,
+        attempts: verificationResult.attempts
+      });
       return createErrorRedirect(`Payment verification failed: ${verificationResult.error}`);
     }
 
-    console.log(`[payment-callback ${VERSION}] ✅ Paystack verification successful`);
-    
-    // Get payment amount from Paystack for verification
-    const paystackAmount = verificationResult.data?.amount ? verificationResult.data.amount / 100 : null;
-
-    // Step 2: Use secure RPC to verify and update payment status
-    console.log(`[payment-callback ${VERSION}] 🔧 Calling secure RPC for order update...`);
-    const { data: orderResult, error: rpcError } = await supabase
-      .rpc('verify_and_update_payment_status', {
-        payment_ref: reference,
-        new_status: 'confirmed',
-        payment_amount: paystackAmount,
-        payment_gateway_response: verificationResult.data
-      });
-
-    if (rpcError) {
-      console.error(`[payment-callback ${VERSION}] ❌ RPC verification failed:`, rpcError);
-      return createErrorRedirect(`Order processing failed: ${rpcError.message}`);
-    }
-
-    if (!orderResult || orderResult.length === 0) {
-      console.error(`[payment-callback ${VERSION}] ❌ No order data returned from RPC`);
-      return createErrorRedirect('Order not found or already processed');
-    }
-
-    const orderData = orderResult[0];
-    console.log(`[payment-callback ${VERSION}] ✅ Order ${orderData.order_number} confirmed via secure RPC`);
-
-    // Step 3: Update payment_status to 'paid' explicitly (RPC handles 'status' but we need payment_status)
-    try {
-      await supabase
-        .from('orders')
-        .update({ payment_status: 'paid' })
-        .eq('id', orderData.order_id);
-      
-      console.log(`[payment-callback ${VERSION}] ✅ Payment status updated to 'paid'`);
-    } catch (paymentStatusError) {
-      console.error(`[payment-callback ${VERSION}] ⚠️ Payment status update failed (non-blocking):`, paymentStatusError);
-      // Continue - don't fail callback for this
-    }
-
-    // Step 4: Optional non-blocking operations (don't fail callback on these)
-    try {
-      // Update payment transaction record if it exists
-      await supabase
-        .from('payment_transactions')
-        .upsert({
-          reference: reference,
-          provider_reference: reference,
-          amount: paystackAmount || orderData.amount,
-          currency: 'NGN',
-          status: 'completed',
-          gateway_response: JSON.stringify(verificationResult.data),
-          verified_at: new Date().toISOString(),
-          order_id: orderData.order_id
-        }, {
-          onConflict: 'reference'
-        });
-      
-      console.log(`[payment-callback ${VERSION}] ✅ Payment transaction record updated`);
-    } catch (txnError) {
-      console.error(`[payment-callback ${VERSION}] ⚠️ Payment transaction update failed (non-blocking):`, txnError);
-      // Continue - this shouldn't fail the callback
-    }
-
-    console.log(`[payment-callback ${VERSION}] ✅ Payment callback completed successfully for order ${orderData.order_number}`);
-
-    // Step 5: Always redirect to success page (302)
-    const successUrl = `${Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com'}/payment/callback?reference=${reference}&status=success&order_id=${orderData.order_id}`;
-    
-    return new Response(null, {
-      status: 302,
-      headers: {
-        ...corsHeaders,
-        'Location': successUrl
-      }
+    log('info', '✅ Paystack verification successful', {
+      reference,
+      amount: verificationResult.data.amount,
+      status: verificationResult.data.status
     });
 
+    // Step 6: Process the verified payment
+    const orderResult = await processVerifiedPayment(supabase, reference, verificationResult.data);
+    
+    if (!orderResult.success) {
+      log('error', '❌ Order processing failed', { reference, error: orderResult.error });
+      return createErrorRedirect(`Order processing failed: ${orderResult.error}`);
+    }
+
+    log('info', '✅ Payment callback completed successfully', {
+      reference,
+      order_id: orderResult.order_id,
+      order_number: orderResult.order_number
+    });
+
+    // Step 7: Redirect to success page
+    return createSuccessRedirect(reference, orderResult.order_id);
+
   } catch (error) {
-    console.error(`[payment-callback ${VERSION}] ❌ Unexpected error:`, error);
+    log('error', '❌ Unexpected error in payment callback', {
+      error: error.message,
+      stack: error.stack
+    });
     return createErrorRedirect(`Callback processing failed: ${error.message}`);
   }
 });
 
-async function verifyPaymentWithPaystack(reference: string, retryCount = 0): Promise<{success: boolean, error?: string, data?: any, shouldRetry?: boolean}> {
+// Enhanced reference extraction with multiple fallbacks
+async function extractReference(req: Request): Promise<string | null> {
+  const url = new URL(req.url);
+  
+  // Check URL parameters first
+  let reference = url.searchParams.get('reference') || 
+                 url.searchParams.get('trxref') || 
+                 url.searchParams.get('txref') ||
+                 url.searchParams.get('tx_ref');
+
+  log('info', '🔍 Checking URL parameters for reference', {
+    urlParams: Object.fromEntries(url.searchParams.entries()),
+    foundReference: reference
+  });
+
+  // If not in URL, check request body
+  if (!reference && (req.method === 'POST' || req.method === 'PUT')) {
+    try {
+      const contentType = req.headers.get('content-type') || '';
+      
+      if (contentType.includes('application/json')) {
+        const body = await req.json();
+        reference = body.reference || body.trxref || body.txref || body.tx_ref;
+        log('info', '🔍 Checking JSON body for reference', { body, foundReference: reference });
+      } else if (contentType.includes('application/x-www-form-urlencoded')) {
+        const formData = await req.formData();
+        reference = formData.get('reference') || formData.get('trxref') || formData.get('txref');
+        log('info', '🔍 Checking form data for reference', { foundReference: reference });
+      }
+    } catch (e) {
+      log('warn', '⚠️ Could not parse request body', { error: e.message });
+    }
+  }
+
+  return reference;
+}
+
+// Validate reference format
+function isValidReference(reference: string): boolean {
+  if (!reference || typeof reference !== 'string') {
+    return false;
+  }
+  
+  // Check length (reasonable bounds)
+  if (reference.length < 5 || reference.length > 200) {
+    return false;
+  }
+  
+  // Check for valid characters (alphanumeric, underscore, hyphen)
+  const validFormat = /^[a-zA-Z0-9_-]+$/.test(reference);
+  
+  log('info', '🔍 Reference validation', {
+    reference,
+    length: reference.length,
+    validFormat,
+    isValid: validFormat
+  });
+  
+  return validFormat;
+}
+
+// Initialize Supabase client with error handling
+function createSupabaseClient() {
   try {
-    // Use only PAYSTACK_SECRET_KEY (no fallbacks to avoid key mismatches)
-    const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
-    if (!secretKey) {
-      return { success: false, error: 'Paystack secret key not configured' };
+    if (!supabaseUrl || !serviceRoleKey) {
+      log('error', '❌ Missing Supabase configuration', {
+        hasUrl: !!supabaseUrl,
+        hasServiceKey: !!serviceRoleKey
+      });
+      return null;
     }
 
-    // Log key environment for debugging
-    const keyEnv = secretKey.startsWith('sk_test_') ? 'test' : secretKey.startsWith('sk_live_') ? 'live' : 'unknown';
-    console.log(`[payment-callback ${VERSION}] 🔍 Verifying with Paystack API (${keyEnv} mode, attempt ${retryCount + 1})...`);
-
-    const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-      headers: {
-        'Authorization': `Bearer ${secretKey}`,
-        'Content-Type': 'application/json',
-        'User-Agent': 'PaymentCallback/1.0'
-      }
+    return createClient(supabaseUrl, serviceRoleKey, {
+      auth: { persistSession: false }
     });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[payment-callback ${VERSION}] ❌ Paystack API error:`, response.status, errorText);
-      
-      // Parse error for retry logic
-      let shouldRetry = false;
-      if (response.status === 400) {
-        try {
-          const errorData = JSON.parse(errorText);
-          if (errorData.message?.includes('Transaction reference not found') || 
-              errorData.code === 'transaction_not_found') {
-            shouldRetry = retryCount < 2; // Max 2 retries
-            console.log(`[payment-callback ${VERSION}] 🔄 Transaction not found, shouldRetry: ${shouldRetry}`);
-          }
-        } catch (e) {
-          // Fallback for unparseable error text
-          if (errorText.includes('not found')) {
-            shouldRetry = retryCount < 2;
-          }
-        }
-      }
-      
-      return { 
-        success: false, 
-        error: `Paystack API error: ${response.status} - ${errorText}`,
-        shouldRetry
-      };
-    }
-
-    const data = await response.json();
-    
-    if (!data.status || data.data.status !== 'success') {
-      console.error(`[payment-callback ${VERSION}] ❌ Payment not successful:`, data);
-      return { success: false, error: `Payment not successful: ${data.message || 'Unknown error'}` };
-    }
-
-    console.log(`[payment-callback ${VERSION}] ✅ Paystack verification successful for ${reference}`);
-    return { success: true, data: data.data };
-
   } catch (error) {
-    console.error(`[payment-callback ${VERSION}] ❌ Paystack verification error:`, error);
-    return { success: false, error: error.message };
+    log('error', '❌ Failed to create Supabase client', { error: error.message });
+    return null;
   }
 }
 
-function createErrorRedirect(message: string) {
-  console.error(`[payment-callback ${VERSION}] ❌ Creating error redirect: ${message}`);
+// Check if payment is already processed
+async function checkExistingPayment(supabase: any, reference: string) {
+  try {
+    log('info', '🔍 Checking for existing payment', { reference });
+    
+    const { data, error } = await supabase
+      .from('orders')
+      .select('id, order_number, status, payment_status')
+      .eq('payment_reference', reference)
+      .single();
+
+    if (error && error.code !== 'PGRST116') { // PGRST116 = not found
+      log('warn', '⚠️ Error checking existing payment', { reference, error });
+      return null;
+    }
+
+    if (data) {
+      const processed = data.status === 'confirmed' && data.payment_status === 'paid';
+      log('info', '🔍 Existing payment found', {
+        reference,
+        order_id: data.id,
+        status: data.status,
+        payment_status: data.payment_status,
+        processed
+      });
+      
+      return {
+        order_id: data.id,
+        order_number: data.order_number,
+        processed
+      };
+    }
+
+    return null;
+  } catch (error) {
+    log('error', '❌ Failed to check existing payment', { reference, error: error.message });
+    return null;
+  }
+}
+
+// Enhanced Paystack verification with retry logic
+async function verifyPaymentWithRetry(reference: string, maxAttempts: number = 3) {
+  let lastError = null;
   
-  // Always redirect to error page instead of returning JSON (prevents 4xx/5xx)
-  const errorUrl = `${Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com'}/payment/callback?status=error&message=${encodeURIComponent(message)}`;
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    log('info', `🔍 Paystack verification attempt ${attempt}/${maxAttempts}`, { reference });
+    
+    try {
+      const result = await verifyPaymentWithPaystack(reference);
+      
+      if (result.success) {
+        return { ...result, attempts: attempt };
+      }
+      
+      lastError = result.error;
+      
+      // If transaction not found and we have more attempts, wait and retry
+      if (result.error.includes('not found') && attempt < maxAttempts) {
+        const delay = attempt * 2000; // Exponential backoff: 2s, 4s, 6s
+        log('info', `⏳ Transaction not found, waiting ${delay}ms before retry...`, { reference, attempt });
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
+      }
+      
+      // For other errors, don't retry
+      if (!result.error.includes('not found')) {
+        break;
+      }
+      
+    } catch (error) {
+      lastError = error.message;
+      log('error', `❌ Attempt ${attempt} failed`, { reference, error: error.message });
+      
+      if (attempt < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 1000 * attempt));
+      }
+    }
+  }
+  
+  return {
+    success: false,
+    error: lastError || 'All verification attempts failed',
+    attempts: maxAttempts
+  };
+}
+
+// Enhanced Paystack verification function
+async function verifyPaymentWithPaystack(reference: string) {
+  try {
+    const secretKey = getPaystackSecretKey();
+    if (!secretKey) {
+      return {
+        success: false,
+        error: 'Paystack secret key not configured'
+      };
+    }
+
+    log('info', '🔍 Making Paystack API request', {
+      reference,
+      keyEnvironment: secretKey.includes('test') ? 'TEST' : 'LIVE',
+      keyPrefix: secretKey.substring(0, 10) + '...'
+    });
+
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${secretKey}`,
+        'Content-Type': 'application/json',
+        'User-Agent': 'PaystackCallback/2.0'
+      },
+      // Add timeout
+      signal: AbortSignal.timeout(15000)
+    });
+
+    log('info', '🔍 Paystack API response received', {
+      reference,
+      status: response.status,
+      statusText: response.statusText,
+      headers: Object.fromEntries(response.headers.entries())
+    });
+
+    const responseText = await response.text();
+    
+    if (!response.ok) {
+      log('error', '❌ Paystack API error response', {
+        reference,
+        status: response.status,
+        responseText
+      });
+      return {
+        success: false,
+        error: `Paystack API error: ${response.status} - ${responseText}`
+      };
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (parseError) {
+      log('error', '❌ Failed to parse Paystack response', {
+        reference,
+        responseText,
+        parseError: parseError.message
+      });
+      return {
+        success: false,
+        error: 'Invalid response format from Paystack'
+      };
+    }
+
+    log('info', '🔍 Parsed Paystack response', {
+      reference,
+      dataStatus: data.status,
+      transactionStatus: data.data?.status,
+      amount: data.data?.amount,
+      currency: data.data?.currency
+    });
+
+    if (!data.status) {
+      return {
+        success: false,
+        error: data.message || 'Paystack verification failed'
+      };
+    }
+
+    if (data.data.status !== 'success') {
+      return {
+        success: false,
+        error: `Payment status is ${data.data.status}: ${data.data.gateway_response || 'Transaction not successful'}`
+      };
+    }
+
+    log('info', '✅ Paystack verification successful', {
+      reference,
+      amount: data.data.amount / 100,
+      currency: data.data.currency,
+      customer: data.data.customer?.email
+    });
+
+    return {
+      success: true,
+      data: data.data
+    };
+
+  } catch (error) {
+    log('error', '❌ Paystack verification exception', {
+      reference,
+      error: error.message,
+      stack: error.stack
+    });
+    return {
+      success: false,
+      error: `Verification failed: ${error.message}`
+    };
+  }
+}
+
+// Get Paystack secret key with environment detection
+function getPaystackSecretKey(): string | null {
+  const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+
+  if (!secretKey) {
+    log('error', '❌ No Paystack secret key found in environment variables');
+    return null;
+  }
+
+  // Validate key format
+  if (!secretKey.startsWith('sk_')) {
+    log('error', '❌ Invalid Paystack secret key format', {
+      keyPrefix: secretKey.substring(0, 5)
+    });
+    return null;
+  }
+
+  return secretKey;
+}
+
+// Process verified payment
+async function processVerifiedPayment(supabase: any, reference: string, paystackData: any) {
+  try {
+    const paystackAmount = paystackData.amount ? paystackData.amount / 100 : null;
+
+    log('info', '🔧 Processing verified payment via RPC', {
+      reference,
+      amount: paystackAmount,
+      currency: paystackData.currency
+    });
+
+    // Use secure RPC to verify and update payment status
+    const { data: orderResult, error: rpcError } = await supabase.rpc('verify_and_update_payment_status', {
+      payment_ref: reference,
+      new_status: 'confirmed',
+      payment_amount: paystackAmount,
+      payment_gateway_response: paystackData
+    });
+
+    if (rpcError) {
+      log('error', '❌ RPC verification failed', { reference, error: rpcError });
+      return {
+        success: false,
+        error: rpcError.message || 'Database operation failed'
+      };
+    }
+
+    if (!orderResult || orderResult.length === 0) {
+      log('error', '❌ No order data returned from RPC', { reference });
+      return {
+        success: false,
+        error: 'Order not found or already processed'
+      };
+    }
+
+    const orderData = orderResult[0];
+    log('info', '✅ RPC operation successful', {
+      reference,
+      order_id: orderData.order_id,
+      order_number: orderData.order_number
+    });
+
+    // Update payment_status explicitly (non-blocking)
+    try {
+      await supabase.from('orders').update({
+        payment_status: 'paid'
+      }).eq('id', orderData.order_id);
+      
+      log('info', '✅ Payment status updated to paid');
+    } catch (paymentStatusError) {
+      log('warn', '⚠️ Payment status update failed (non-blocking)', {
+        error: paymentStatusError.message
+      });
+    }
+
+    // Update/create payment transaction record (non-blocking)
+    try {
+      await supabase.from('payment_transactions').upsert({
+        reference: reference,
+        provider_reference: reference,
+        amount: paystackAmount || orderData.amount,
+        currency: paystackData.currency || 'NGN',
+        status: 'completed',
+        gateway_response: JSON.stringify(paystackData),
+        verified_at: new Date().toISOString(),
+        order_id: orderData.order_id
+      }, {
+        onConflict: 'reference'
+      });
+      
+      log('info', '✅ Payment transaction record updated');
+    } catch (txnError) {
+      log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
+        error: txnError.message
+      });
+    }
+
+    return {
+      success: true,
+      order_id: orderData.order_id,
+      order_number: orderData.order_number
+    };
+
+  } catch (error) {
+    log('error', '❌ Payment processing failed', {
+      reference,
+      error: error.message
+    });
+    return {
+      success: false,
+      error: error.message
+    };
+  }
+}
+
+// Create success redirect
+function createSuccessRedirect(reference: string, orderId: string) {
+  const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com';
+  const successUrl = `${frontendUrl}/payment/callback?reference=${encodeURIComponent(reference)}&status=success&order_id=${encodeURIComponent(orderId)}`;
+  
+  log('info', '✅ Creating success redirect', { successUrl });
+  
+  return new Response(null, {
+    status: 302,
+    headers: {
+      ...corsHeaders,
+      'Location': successUrl
+    }
+  });
+}
+
+// Create error redirect
+function createErrorRedirect(message: string) {
+  const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com';
+  const errorUrl = `${frontendUrl}/payment/callback?status=error&message=${encodeURIComponent(message)}`;
+  
+  log('error', '❌ Creating error redirect', { errorUrl, message });
   
   return new Response(null, {
     status: 302,

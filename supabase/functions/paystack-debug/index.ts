@@ -1,149 +1,161 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS'
 };
 
-interface DebugRequest {
-  action: 'check' | 'verify';
-  reference: string;
-}
-
-interface PaystackResponse {
-  status: boolean;
-  message: string;
-  data?: any;
-}
-
-serve(async (req) => {
+serve(async (req: Request) => {
+  // Handle preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const url = new URL(req.url);
-  const startTime = Date.now();
-
   try {
-    // Health check endpoint
-    if (url.searchParams.get('health') === '1') {
-      const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY_TEST') || Deno.env.get('PAYSTACK_SECRET_KEY');
-      const environment = secretKey?.startsWith('sk_test_') ? 'test' : 
-                         secretKey?.startsWith('sk_live_') ? 'live' : 'unknown';
-      
-      console.log(`🏥 Health check - Environment: ${environment}, Key present: ${!!secretKey}`);
-      
-      return new Response(JSON.stringify({
-        environment,
-        keyPresent: !!secretKey,
-        keyPrefix: secretKey ? secretKey.substring(0, 8) + '...' : null,
-        timestamp: new Date().toISOString()
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+    const { action, reference } = await req.json();
+    
+    console.log('🔍 Paystack Debug Helper called:', { action, reference });
+
+    if (action === 'check_key_health') {
+      return await checkKeyHealth();
     }
 
-    // Parse request body for debug actions
-    if (req.method !== 'POST') {
-      throw new Error('Only POST requests supported for debug actions');
+    if (action === 'check_reference' && reference) {
+      return await checkReference(reference);
     }
 
-    const body: DebugRequest = await req.json();
-    const { action, reference } = body;
-
-    if (!reference?.trim()) {
-      throw new Error('Reference is required');
-    }
-
-    const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY_TEST') || Deno.env.get('PAYSTACK_SECRET_KEY');
-    if (!secretKey) {
-      throw new Error('Paystack secret key not configured');
-    }
-
-    console.log(`🔍 Debug action: ${action} for reference: ${reference}`);
-
-    const paystackResponse = await makePaystackRequest(secretKey, reference);
-    const latency = Date.now() - startTime;
-
-    let result;
-    if (action === 'check') {
-      // Simplified check response
-      result = {
-        exists: paystackResponse.status && paystackResponse.data,
-        status: paystackResponse.data?.status,
-        amount: paystackResponse.data?.amount,
-        currency: paystackResponse.data?.currency,
-        paid_at: paystackResponse.data?.paid_at,
-        gateway_response: paystackResponse.data?.gateway_response,
-        latency_ms: latency
-      };
-    } else if (action === 'verify') {
-      // Full verification response (read-only)
-      result = {
-        success: paystackResponse.status && paystackResponse.data?.status === 'success',
-        data: paystackResponse.data ? {
-          status: paystackResponse.data.status,
-          amount: paystackResponse.data.amount,
-          customer: paystackResponse.data.customer,
-          metadata: paystackResponse.data.metadata,
-          paid_at: paystackResponse.data.paid_at,
-          channel: paystackResponse.data.channel,
-          reference: paystackResponse.data.reference
-        } : null,
-        debug: {
-          gateway_response: paystackResponse.data?.gateway_response,
-          fees: paystackResponse.data?.fees,
-          authorization: paystackResponse.data?.authorization,
-          latency_ms: latency,
-          paystack_status_code: 200 // We only get here if request succeeded
-        }
-      };
-    } else {
-      throw new Error(`Unknown action: ${action}`);
-    }
-
-    console.log(`✅ Debug ${action} completed in ${latency}ms - exists: ${result.exists || result.success}`);
-
-    return new Response(JSON.stringify(result), {
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Invalid action. Use "check_key_health" or "check_reference"'
+    }), {
+      status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
-    const latency = Date.now() - startTime;
-    console.error(`❌ Debug request failed in ${latency}ms:`, error.message);
-
+    console.error('❌ Paystack Debug Helper error:', error);
     return new Response(JSON.stringify({
-      error: error.message,
-      latency_ms: latency,
-      timestamp: new Date().toISOString()
+      success: false,
+      error: 'Internal server error',
+      message: error.message
     }), {
-      status: 400,
+      status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
 
-async function makePaystackRequest(secretKey: string, reference: string): Promise<PaystackResponse> {
-  const url = `https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`;
+async function checkKeyHealth() {
+  const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
   
-  const response = await fetch(url, {
-    method: 'GET',
-    headers: {
-      'Authorization': `Bearer ${secretKey}`,
-      'Content-Type': 'application/json',
-      'User-Agent': 'PaystackDebugHandler/1.0'
+  const healthCheck = {
+    key_configured: !!secretKey,
+    key_format_valid: secretKey?.startsWith('sk_') || false,
+    key_environment: secretKey?.includes('test') ? 'TEST' : (secretKey?.includes('live') ? 'LIVE' : 'UNKNOWN'),
+    key_prefix: secretKey ? secretKey.substring(0, 10) + '...' : null,
+    timestamp: new Date().toISOString()
+  };
+
+  console.log('🔍 Paystack Key Health Check:', healthCheck);
+
+  // Test API connectivity if key is present
+  if (secretKey && healthCheck.key_format_valid) {
+    try {
+      const testResponse = await fetch('https://api.paystack.co/transaction/verify/invalid_ref_test_connectivity', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${secretKey}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      healthCheck.api_connectivity = testResponse.status === 404; // Expected for invalid ref
+      healthCheck.api_status_code = testResponse.status;
+      
+    } catch (apiError) {
+      healthCheck.api_connectivity = false;
+      healthCheck.api_error = apiError.message;
     }
+  }
+
+  return new Response(JSON.stringify({
+    success: true,
+    health_check: healthCheck
+  }), {
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
   });
+}
 
-  if (!response.ok) {
-    throw new Error(`Paystack API error: ${response.status} ${response.statusText}`);
-  }
-
-  const data: PaystackResponse = await response.json();
+async function checkReference(reference: string) {
+  const secretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
   
-  if (!data.status) {
-    throw new Error(data.message || 'Transaction verification failed');
+  if (!secretKey) {
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Paystack secret key not configured'
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
 
-  return data;
+  console.log('🔍 Checking reference existence (non-mutating):', reference);
+
+  try {
+    const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
+      method: 'GET',
+      headers: {
+        'Authorization': `Bearer ${secretKey}`,
+        'Content-Type': 'application/json'
+      }
+    });
+
+    const responseText = await response.text();
+    let responseData = null;
+    
+    try {
+      responseData = JSON.parse(responseText);
+    } catch (parseError) {
+      responseData = { raw_response: responseText };
+    }
+
+    const debugInfo = {
+      reference,
+      exists: response.ok && responseData?.status === true,
+      http_status: response.status,
+      paystack_status: responseData?.status || false,
+      paystack_message: responseData?.message || 'No message',
+      transaction_status: responseData?.data?.status || null,
+      amount: responseData?.data?.amount ? responseData.data.amount / 100 : null,
+      currency: responseData?.data?.currency || null,
+      customer_email: responseData?.data?.customer?.email || null,
+      created_at: responseData?.data?.created_at || null,
+      key_environment: secretKey.includes('test') ? 'TEST' : 'LIVE',
+      timestamp: new Date().toISOString()
+    };
+
+    console.log('🔍 Reference check result:', debugInfo);
+
+    return new Response(JSON.stringify({
+      success: true,
+      debug_info: debugInfo,
+      raw_response: responseData
+    }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+
+  } catch (error) {
+    console.error('❌ Reference check failed:', error);
+    return new Response(JSON.stringify({
+      success: false,
+      error: 'Reference check failed',
+      message: error.message,
+      reference
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
+  }
 }

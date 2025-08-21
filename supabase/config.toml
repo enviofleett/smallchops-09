@@ -28,6 +28,9 @@ verify_jwt = false
 [functions.verify-payment]
 verify_jwt = false
 
+[functions.paystack-verify]
+verify_jwt = false
+
 [functions.enhanced-smtp-sender]
 verify_jwt = false
 
@@ -53,9 +56,6 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.process-checkout]
-verify_jwt = false
-
-[functions.paystack-verify]
 verify_jwt = false
 
 [functions.paystack-webhook-secure]
@@ -89,9 +89,6 @@ verify_jwt = true
 verify_jwt = true
 
 [functions.get-turnstile-key]
-verify_jwt = false
-
-[functions.payment-health-check]
 verify_jwt = false
 
 [functions.test-paystack-credentials]

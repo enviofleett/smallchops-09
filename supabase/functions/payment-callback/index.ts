@@ -1,13 +1,8 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+import { getCorsHeaders } from '../_shared/cors.ts';
 
 const VERSION = "v2025-08-21-fixed-transaction-debug";
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS, PUT, DELETE'
-};
 
 // Enhanced logging function
 function log(level: 'info' | 'warn' | 'error', message: string, data?: any) {
@@ -22,6 +17,8 @@ function log(level: 'info' | 'warn' | 'error', message: string, data?: any) {
 }
 
 serve(async (req: Request) => {
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
+  
   log('info', '🔄 Payment callback function invoked', {
     method: req.method,
     url: req.url,
@@ -556,6 +553,8 @@ function createSuccessRedirect(reference: string, orderId: string) {
   
   log('info', '✅ Creating success redirect', { successUrl });
   
+  const corsHeaders = getCorsHeaders(null);
+  
   return new Response(null, {
     status: 302,
     headers: {
@@ -571,6 +570,8 @@ function createErrorRedirect(message: string) {
   const errorUrl = `${frontendUrl}/payment/callback?status=error&message=${encodeURIComponent(message)}`;
   
   log('error', '❌ Creating error redirect', { errorUrl, message });
+  
+  const corsHeaders = getCorsHeaders(null);
   
   return new Response(null, {
     status: 302,

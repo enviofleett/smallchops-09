@@ -3,6 +3,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useCart } from "@/hooks/useCart";
 import { useGuestSession } from "@/hooks/useGuestSession";
+import { useGuestSessionCleanup } from "@/hooks/useGuestSessionCleanup";
 import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -130,8 +131,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const navigate = useNavigate();
   const { cart, clearCart, getCartTotal } = useCart();
   const items = cart.items || [];
-  const { guestSession } = useGuestSession();
-  const guestSessionId = guestSession?.sessionId;
+  // 🔧 CLEANUP: Initialize guest session cleanup and remove usage
+  useGuestSessionCleanup();
+  // Remove guest session usage since guest mode is discontinued
+  // const { guestSession } = useGuestSession();
+  // const guestSessionId = guestSession?.sessionId;
   const { user, session, isAuthenticated, isLoading } = useCustomerAuth();
   const { profile } = useCustomerProfile();
   
@@ -328,7 +332,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           special_instructions: formData.special_instructions || null
         } : null,
         payment_method: formData.payment_method,
-        guest_session_id: guestSessionId,
+        // 🔧 HOTFIX: Remove guest_session_id completely (guest mode discontinued)
+        // guest_session_id: null, // Explicitly omit since guest mode is discontinued
         terms_accepted: termsRequired ? termsAccepted : undefined,
         timestamp: new Date().toISOString()
       };

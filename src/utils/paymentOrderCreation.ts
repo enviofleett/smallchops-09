@@ -58,8 +58,9 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
       })),
       total_amount: params.totalAmount,
       delivery_fee: 0,
-      payment_method: 'paystack',
-      guest_session_id: params.guestSessionId
+      payment_method: 'paystack'
+      // 🔧 HOTFIX: Remove guest_session_id (guest mode discontinued)
+      // guest_session_id: null
     };
 
     const { data, error: orderError } = await supabase.functions.invoke('process-checkout', {

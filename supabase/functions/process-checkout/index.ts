@@ -241,27 +241,43 @@ serve(async (req) => {
 
     console.log('Processed order items:', JSON.stringify(processedOrderItems, null, 2));
 
-    // 🔧 SANITIZE guest_session_id: Strip "guest_" prefix and validate
+    // 🔧 HOTFIX: Force guest_session_id to NULL for production (guest mode discontinued)
     let processedGuestSessionId: string | null = null;
-    if (typeof guest_session_id === 'string' && guest_session_id.trim().length > 0) {
-      let sanitizedSessionId = guest_session_id.trim();
-      
-      // Strip "guest_" prefix if present
-      if (sanitizedSessionId.startsWith('guest_')) {
-        sanitizedSessionId = sanitizedSessionId.substring(6);
-        console.log('🧹 Stripped "guest_" prefix from session ID');
-      }
-      
-      // For authenticated users with allow_guest_checkout=false, send NULL
-      if (authenticatedUser && !allowGuest) {
-        processedGuestSessionId = null;
-        console.log('🔒 Authenticated user with guest checkout disabled - nullifying session ID');
-      } else {
-        processedGuestSessionId = sanitizedSessionId;
-        console.log('✅ Using sanitized guest session ID:', processedGuestSessionId);
-      }
+    
+    console.log('🔧 HOTFIX: Guest mode discontinued - forcing guest_session_id to NULL');
+    console.log('📋 Original guest_session_id received:', guest_session_id);
+    
+    // FORCE NULL for all scenarios since guest mode is discontinued
+    if (authenticatedUser) {
+      processedGuestSessionId = null;
+      console.log('✅ Authenticated user - guest_session_id forced to NULL');
+    } else if (!allowGuest) {
+      processedGuestSessionId = null;
+      console.log('🚫 Guest checkout disabled - guest_session_id forced to NULL');
     } else {
-      console.log('ℹ️ No valid guest_session_id provided; continuing without it');
+      // Even for allowed guest checkout, validate UUID format strictly
+      if (typeof guest_session_id === 'string' && guest_session_id.trim().length > 0) {
+        let sanitizedSessionId = guest_session_id.trim();
+        
+        // Strip "guest_" prefix if present (legacy cleanup)
+        if (sanitizedSessionId.startsWith('guest_')) {
+          sanitizedSessionId = sanitizedSessionId.substring(6);
+          console.log('🧹 Stripped legacy "guest_" prefix from session ID');
+        }
+        
+        // Validate UUID format strictly
+        const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+        if (uuidRegex.test(sanitizedSessionId)) {
+          processedGuestSessionId = sanitizedSessionId;
+          console.log('✅ Valid UUID guest session ID:', processedGuestSessionId);
+        } else {
+          processedGuestSessionId = null;
+          console.log('❌ Invalid UUID format - forcing guest_session_id to NULL:', sanitizedSessionId);
+        }
+      } else {
+        processedGuestSessionId = null;
+        console.log('ℹ️ No valid guest_session_id provided - using NULL');
+      }
     }
 
     // Find or create customer account with idempotent operations

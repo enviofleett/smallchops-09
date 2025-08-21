@@ -199,14 +199,31 @@
                     }
 
                     const isSuccess = response.status === 200 || (response.status >= 200 && response.status < 300);
-                    const responseText = await response.text();
-                    
+
+                    let responseText = '';
+                    let responseData = null;
+
+                    try {
+                        // Clone response to avoid "body stream already read" error
+                        const responseClone = response.clone();
+                        responseText = await responseClone.text();
+
+                        // Try to parse as JSON
+                        if (responseText.trim().startsWith('{') || responseText.trim().startsWith('[')) {
+                            responseData = JSON.parse(responseText);
+                        }
+                    } catch (parseError) {
+                        // If parsing fails, just use the text
+                        console.warn(`Failed to parse response for ${func.name}:`, parseError);
+                    }
+
                     results.push({
                         function: func.name,
                         status: response.status,
                         success: isSuccess,
                         critical: func.critical,
-                        response: responseText
+                        response: responseText.length > 500 ? responseText.substring(0, 500) + '...' : responseText,
+                        responseData: responseData
                     });
 
                 } catch (error) {

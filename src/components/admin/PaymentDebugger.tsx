@@ -22,25 +22,23 @@ export const PaymentDebugger: React.FC = () => {
     
     try {
       const testPayload = {
-        customer_email: 'test@debug.com',
-        customer_name: 'Debug Test',
-        customer_phone: '08012345678',
-        fulfillment_type: 'pickup',
-        pickup_point_id: '00000000-0000-0000-0000-000000000001',
-        order_items: [{
+        customer: {
+          name: 'Debug Test',
+          email: 'test@debug.com',
+          phone: '08012345678'
+        },
+        items: [{
           product_id: 'debug-test-item',
           product_name: 'Debug Test Item',
           quantity: 1,
-          unit_price: 1000,
-          total_price: 1000
+          unit_price: 1000
         }],
-        total_amount: 1000,
-        delivery_fee: 0,
-        payment_method: 'paystack',
-        delivery_schedule: {
-          delivery_date: '2025-08-20',
-          delivery_time_start: '10:00',
-          delivery_time_end: '11:00'
+        fulfillment: {
+          type: 'pickup',
+          pickup_point_id: '00000000-0000-0000-0000-000000000001'
+        },
+        payment: {
+          method: 'paystack'
         }
       };
       
@@ -210,23 +208,23 @@ export const PaymentDebugger: React.FC = () => {
       // Test 4: Test a simple checkout call
       try {
         const testPayload = {
-          customer_email: 'test@example.com',
-          customer_name: 'Test User',
-          customer_phone: '1234567890',
-          fulfillment_type: 'delivery',
-          order_items: [
-            {
-              product_id: 'test-product',
-              quantity: 1,
-              unit_price: 1000,
-              total_price: 1000
-            }
-          ],
-          total_amount: 1000,
-          delivery_fee: 0,
-          payment_method: 'paystack',
-          guest_session_id: null,
-          timestamp: new Date().toISOString()
+          customer: {
+            name: 'Test User',
+            email: 'test@example.com',
+            phone: '1234567890'
+          },
+          items: [{
+            product_id: 'test-product',
+            product_name: 'Test Product',
+            quantity: 1,
+            unit_price: 1000
+          }],
+          fulfillment: {
+            type: 'delivery'
+          },
+          payment: {
+            method: 'paystack'
+          }
         };
 
         const { data, error } = await supabase.functions.invoke('process-checkout', {

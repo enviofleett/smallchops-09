@@ -51,33 +51,30 @@
             
             try {
                 const testData = {
-                    customer_email: 'test@example.com',
-                    customer_name: 'Test Customer',
-                    customer_phone: '+2348123456789',
-                    fulfillment_type: 'delivery',
-                    delivery_address: {
-                        address_line_1: '123 Test Street',
-                        city: 'Lagos',
-                        state: 'Lagos',
-                        postal_code: '100001'
+                    customer: {
+                        name: 'Test Customer',
+                        email: 'test@example.com',
+                        phone: '+2348123456789'
                     },
-                    order_items: [{
+                    items: [{
                         product_id: '00000000-0000-0000-0000-000000000001',
+                        product_name: 'Test Product',
                         quantity: 1,
-                        unit_price: 1000,
-                        total_price: 1000,
-                        product_name: 'Test Product'
+                        unit_price: 1000
                     }],
-                    total_amount: 1000,
-                    delivery_fee: 500,
-                    delivery_zone_id: '00000000-0000-0000-0000-000000000001',
-                    delivery_schedule: {
-                        delivery_date: '2025-08-18',
-                        delivery_time_start: '10:00',
-                        delivery_time_end: '11:00'
+                    fulfillment: {
+                        type: 'delivery',
+                        address: {
+                            address_line_1: '123 Test Street',
+                            city: 'Lagos',
+                            state: 'Lagos',
+                            postal_code: '100001'
+                        },
+                        delivery_zone_id: '00000000-0000-0000-0000-000000000001'
                     },
-                    payment_method: 'paystack',
-                    guest_session_id: null
+                    payment: {
+                        method: 'paystack'
+                    }
                 };
 
                 const response = await fetch(`${SUPABASE_URL}/functions/v1/process-checkout`, {
@@ -222,26 +219,24 @@
                         'Authorization': `Bearer ${SUPABASE_ANON_KEY}`
                     },
                     body: JSON.stringify({
-                        customer_email: 'hotfix-test@example.com',
-                        customer_name: 'Hotfix Test User',
-                        customer_phone: '+2348123456789',
-                        fulfillment_type: 'pickup',
-                        pickup_point_id: '00000000-0000-0000-0000-000000000001',
-                        order_items: [{
-                            product_id: '00000000-0000-0000-0000-000000000001',
-                            quantity: 1,
-                            unit_price: 500,
-                            total_price: 500,
-                            product_name: 'Hotfix Test Product'
-                        }],
-                        total_amount: 500,
-                        delivery_fee: 0,
-                        delivery_schedule: {
-                            delivery_date: '2025-08-18',
-                            delivery_time_start: '14:00',
-                            delivery_time_end: '15:00'
+                        customer: {
+                            name: 'Hotfix Test User',
+                            email: 'hotfix-test@example.com',
+                            phone: '+2348123456789'
                         },
-                        payment_method: 'paystack'
+                        items: [{
+                            product_id: '00000000-0000-0000-0000-000000000001',
+                            product_name: 'Hotfix Test Product',
+                            quantity: 1,
+                            unit_price: 500
+                        }],
+                        fulfillment: {
+                            type: 'pickup',
+                            pickup_point_id: '00000000-0000-0000-0000-000000000001'
+                        },
+                        payment: {
+                            method: 'paystack'
+                        }
                     })
                 });
                 

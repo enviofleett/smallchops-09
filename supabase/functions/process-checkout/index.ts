@@ -1,114 +1,151 @@
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-interface CheckoutRequest {
-  customer: {
-    id?: string
-    name: string
-    email: string
-    phone?: string
-  }
-  items: Array<{
-    product_id: string
-    product_name: string
-    quantity: number
-    unit_price: number
-    customizations?: any
-  }>
-  fulfillment: {
-    type: 'delivery' | 'pickup'
-    address?: any
-    pickup_point_id?: string
-    delivery_zone_id?: string
-    scheduled_time?: string
-  }
-  payment?: {
-    method?: string
-  }
-  guest_session_id?: string | null
-}
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+};
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_URL') ?? '', 
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    );
 
-    console.log('🛒 Processing checkout request...')
+    console.log('🛒 Processing checkout request...');
     
-    const requestBody: CheckoutRequest = await req.json()
-    console.log('📨 Checkout request received:', {
-      customer_email: requestBody.customer?.email,
-      items_count: requestBody.items?.length,
-      fulfillment_type: requestBody.fulfillment?.type,
-      has_guest_session: !!requestBody.guest_session_id
-    })
+    // Parse request body
+    const requestBody = await req.json();
+    
+    // Enhanced logging to debug the issue
+    console.log('📨 Raw request body structure:', {
+      hasCustomer: !!requestBody.customer,
+      customerKeys: requestBody.customer ? Object.keys(requestBody.customer) : [],
+      customerEmail: requestBody.customer?.email,
+      customerEmailType: typeof requestBody.customer?.email,
+      customerEmailLength: requestBody.customer?.email?.length,
+      hasItems: !!requestBody.items,
+      itemsLength: requestBody.items?.length,
+      hasFulfillment: !!requestBody.fulfillment,
+      fulfillmentType: requestBody.fulfillment?.type
+    });
 
     // CRITICAL FIX: Force guest_session_id to NULL (guest mode discontinued)
     const processedRequest = {
       ...requestBody,
       guest_session_id: null // Always null - guest mode discontinued
+    };
+
+    console.log('🚫 Guest mode disabled - forcing guest_session_id to null');
+
+    // Enhanced validation with better error messages
+    if (!processedRequest.customer) {
+      throw new Error('Customer information is required');
     }
 
-    console.log('🚫 Guest mode disabled - forcing guest_session_id to null')
+    if (!processedRequest.customer.email || 
+        typeof processedRequest.customer.email !== 'string' || 
+        processedRequest.customer.email.trim() === '') {
+      console.error('❌ Customer email validation failed:', {
+        email: processedRequest.customer.email,
+        type: typeof processedRequest.customer.email,
+        trimmed: processedRequest.customer.email?.trim?.()
+      });
+      throw new Error('Customer email is required and must be a valid string');
+    }
 
-    // Validate request
-    if (!processedRequest.customer?.email) {
-      throw new Error('Customer email is required')
+    if (!processedRequest.customer.name || 
+        typeof processedRequest.customer.name !== 'string' || 
+        processedRequest.customer.name.trim() === '') {
+      throw new Error('Customer name is required');
     }
 
     if (!processedRequest.items || processedRequest.items.length === 0) {
-      throw new Error('Order must contain at least one item')
+      throw new Error('Order must contain at least one item');
     }
 
     if (!processedRequest.fulfillment?.type) {
-      throw new Error('Fulfillment type is required')
+      throw new Error('Fulfillment type is required');
     }
 
-    // Create or get customer account
-    let customerId: string
+    // Sanitize email
+    const sanitizedEmail = processedRequest.customer.email.trim().toLowerCase();
+    
+    console.log('✅ Validation passed for customer:', {
+      email: sanitizedEmail,
+      name: processedRequest.customer.name.trim(),
+      items_count: processedRequest.items.length,
+      fulfillment_type: processedRequest.fulfillment.type
+    });
 
+    // Create or get customer account
+    let customerId;
     if (processedRequest.customer.id) {
       // Validate UUID format
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
       if (!uuidRegex.test(processedRequest.customer.id)) {
-        throw new Error('Invalid customer ID format')
+        throw new Error('Invalid customer ID format');
       }
-      customerId = processedRequest.customer.id
-      console.log('👤 Using existing customer:', customerId)
+      customerId = processedRequest.customer.id;
+      console.log('👤 Using existing customer:', customerId);
     } else {
-      // Create new customer account
-      const { data: newCustomer, error: customerError } = await supabaseAdmin
+      // First, try to find existing customer by email
+      const { data: existingCustomer, error: findError } = await supabaseAdmin
         .from('customer_accounts')
-        .insert({
-          name: processedRequest.customer.name,
-          email: processedRequest.customer.email.toLowerCase(),
-          phone: processedRequest.customer.phone,
-          email_verified: false,
-          phone_verified: false,
-          profile_completion_percentage: 60
-        })
-        .select('id')
-        .single()
+        .select('id, name, phone')
+        .eq('email', sanitizedEmail)
+        .single();
 
-      if (customerError) {
-        console.error('❌ Customer creation failed:', customerError)
-        throw new Error('Failed to create customer account')
+      if (existingCustomer) {
+        // Customer exists, use existing ID
+        customerId = existingCustomer.id;
+        console.log('👤 Found existing customer:', {
+          id: customerId,
+          email: sanitizedEmail,
+          name: existingCustomer.name
+        });
+
+        // Optionally update customer info if provided data is more complete
+        if (processedRequest.customer.name?.trim() && 
+            processedRequest.customer.name.trim() !== existingCustomer.name) {
+          console.log('📝 Updating customer name from:', existingCustomer.name, 'to:', processedRequest.customer.name.trim());
+          await supabaseAdmin
+            .from('customer_accounts')
+            .update({ 
+              name: processedRequest.customer.name.trim(),
+              phone: processedRequest.customer.phone?.trim() || existingCustomer.phone
+            })
+            .eq('id', customerId);
+        }
+      } else {
+        // Customer doesn't exist, create new one
+        const { data: newCustomer, error: customerError } = await supabaseAdmin
+          .from('customer_accounts')
+          .insert({
+            name: processedRequest.customer.name.trim(),
+            email: sanitizedEmail,
+            phone: processedRequest.customer.phone?.trim() || null,
+            email_verified: false,
+            phone_verified: false,
+            profile_completion_percentage: 60
+          })
+          .select('id')
+          .single();
+
+        if (customerError) {
+          console.error('❌ Customer creation failed:', customerError);
+          throw new Error('Failed to create customer account');
+        }
+
+        customerId = newCustomer.id;
+        console.log('👤 Created new customer:', customerId);
       }
-
-      customerId = newCustomer.id
-      console.log('👤 Created new customer:', customerId)
     }
 
     console.log('📝 Creating order with items...')
@@ -160,8 +197,7 @@ serve(async (req) => {
     })
 
     // Initialize payment using paystack-secure
-    console.log('💳 Initializing payment via paystack-secure...')
-    
+    console.log('💳 Initializing payment via paystack-secure...');
     const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke('paystack-secure', {
       body: {
         action: 'initialize',
@@ -169,7 +205,7 @@ serve(async (req) => {
         amount: order.total_amount,
         metadata: {
           order_id: order.id,
-          customer_name: processedRequest.customer.name,
+          customer_name: processedRequest.customer.name.trim(),
           order_number: order.order_number,
           fulfillment_type: processedRequest.fulfillment.type,
           items_subtotal: order.total_amount,
@@ -179,7 +215,7 @@ serve(async (req) => {
         },
         callback_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?reference=__REFERENCE__&order_id=${order.id}`
       }
-    })
+    });
 
     if (paymentError) {
       console.error('❌ Payment initialization failed:', paymentError)
@@ -210,22 +246,27 @@ serve(async (req) => {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     })
 
-  } catch (error: any) {
-    console.error('❌ Checkout processing error:', error)
+  } catch (error) {
+    console.error('❌ Checkout processing error:', error);
     
+    // Enhanced error response with more debugging info
     return new Response(JSON.stringify({
       success: false,
       error: error.message || 'Checkout processing failed',
       details: {
         timestamp: new Date().toISOString(),
-        error_type: error.constructor.name
+        error_type: error.constructor.name,
+        stack: error.stack // Include stack trace for debugging
       }
     }), {
       status: 400,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    })
+      headers: {
+        ...corsHeaders,
+        'Content-Type': 'application/json'
+      }
+    });
   }
-})
+});
 
 /*
 🛒 PRODUCTION CHECKOUT PROCESSOR

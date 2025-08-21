@@ -40,27 +40,29 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
   console.log('🔄 Creating order - backend will generate txn_ reference');
   
   try {
-    // Use the existing order creation function instead of direct insert
+    // Use new nested structure for process-checkout
     const orderData = {
-      customer_email: params.customerInfo.email,
-      customer_name: params.customerInfo.name,
-      customer_phone: params.customerInfo.phone,
-      fulfillment_type: params.fulfillmentType || 'delivery',
-      delivery_address: params.deliveryAddress,
-      pickup_point_id: params.pickupPointId,
-      delivery_zone_id: params.deliveryZoneId,
-      order_items: params.items.map(item => ({
+      customer: {
+        name: params.customerInfo.name,
+        email: params.customerInfo.email,
+        phone: params.customerInfo.phone
+      },
+      items: params.items.map(item => ({
         product_id: item.product_id,
+        product_name: item.product_name,
         quantity: item.quantity,
         unit_price: item.price,
-        total_price: item.price * item.quantity,
-        customization_items: item.customization_items
+        customizations: item.customization_items
       })),
-      total_amount: params.totalAmount,
-      delivery_fee: 0,
-      payment_method: 'paystack'
-      // 🔧 HOTFIX: Remove guest_session_id (guest mode discontinued)
-      // guest_session_id: null
+      fulfillment: {
+        type: params.fulfillmentType || 'delivery',
+        address: params.deliveryAddress,
+        pickup_point_id: params.pickupPointId,
+        delivery_zone_id: params.deliveryZoneId
+      },
+      payment: {
+        method: 'paystack'
+      }
     };
 
     const { data, error: orderError } = await supabase.functions.invoke('process-checkout', {

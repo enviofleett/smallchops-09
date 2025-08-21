@@ -276,11 +276,177 @@
             }
         }
 
+        // New Test Functions for RPC and Payment Verification
+        async function testRPCFunction() {
+            addResult('🧪 Testing verify_and_update_payment_status RPC function...', 'info');
+
+            try {
+                // Test if the RPC function exists by calling it with a test reference
+                const response = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_and_update_payment_status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({
+                        payment_ref: 'test_rpc_function_exists_check',
+                        new_status: 'confirmed',
+                        payment_amount: 100
+                    })
+                });
+
+                const data = await response.json();
+
+                // We expect this to fail with "Order not found" if function exists
+                if (response.status === 404 && data.message && data.message.includes('not found')) {
+                    addResult(`✅ RPC Function Test: PASSED<br>
+                        Function exists and is accessible<br>
+                        Expected error received: ${data.message}`, 'success');
+                } else if (response.status === 404 && data.message && data.message.includes('function')) {
+                    addResult(`❌ RPC Function Test: FAILED<br>
+                        Function does not exist in database<br>
+                        Error: ${data.message}`, 'error');
+                } else if (response.ok && data.length > 0) {
+                    addResult(`⚠️ RPC Function Test: UNEXPECTED SUCCESS<br>
+                        Function exists but found test order<br>
+                        This shouldn't happen with test reference`, 'info');
+                } else {
+                    addResult(`🔍 RPC Function Test: RESPONSE<br>
+                        Status: ${response.status}<br>
+                        Response: ${JSON.stringify(data, null, 2)}`, 'info');
+                }
+            } catch (error) {
+                addResult(`❌ RPC Function Test: ERROR<br>${error.message}`, 'error');
+            }
+        }
+
+        async function testPaymentVerification() {
+            addResult('🧪 Testing payment verification flow...', 'info');
+
+            try {
+                // First, create a test order
+                const testOrderData = {
+                    customer_email: 'test.verification@example.com',
+                    customer_name: 'Test Verification User',
+                    customer_phone: '+2348123456789',
+                    order_type: 'pickup',
+                    status: 'pending',
+                    payment_status: 'pending',
+                    total_amount: 1000,
+                    payment_reference: `test_verify_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    created_at: new Date().toISOString()
+                };
+
+                addResult(`📋 Creating test order with reference: ${testOrderData.payment_reference}`, 'info');
+
+                // Insert test order
+                const createOrderResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY,
+                        'Prefer': 'return=representation'
+                    },
+                    body: JSON.stringify(testOrderData)
+                });
+
+                if (!createOrderResponse.ok) {
+                    const errorData = await createOrderResponse.json();
+                    throw new Error(`Failed to create test order: ${JSON.stringify(errorData)}`);
+                }
+
+                const orderData = await createOrderResponse.json();
+                const testOrder = Array.isArray(orderData) ? orderData[0] : orderData;
+
+                addResult(`✅ Test order created: ID ${testOrder.id}`, 'success');
+
+                // Now test the RPC function with the real order
+                const rpcResponse = await fetch(`${SUPABASE_URL}/rest/v1/rpc/verify_and_update_payment_status`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    },
+                    body: JSON.stringify({
+                        payment_ref: testOrderData.payment_reference,
+                        new_status: 'confirmed',
+                        payment_amount: 1000,
+                        payment_gateway_response: {
+                            test: true,
+                            reference: testOrderData.payment_reference,
+                            amount: 100000, // in kobo
+                            status: 'success',
+                            channel: 'test'
+                        }
+                    })
+                });
+
+                const rpcData = await rpcResponse.json();
+
+                if (rpcResponse.ok && rpcData.length > 0) {
+                    const result = rpcData[0];
+                    addResult(`✅ Payment Verification Test: PASSED<br>
+                        Order updated successfully<br>
+                        Order ID: ${result.order_id}<br>
+                        Order Number: ${result.order_number}<br>
+                        Status: ${result.status}<br>
+                        Amount: ₦${result.amount}`, 'success');
+
+                    // Verify the order was actually updated
+                    const checkOrderResponse = await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${testOrder.id}&select=*`, {
+                        headers: {
+                            'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                            'apikey': SUPABASE_ANON_KEY
+                        }
+                    });
+
+                    const updatedOrderData = await checkOrderResponse.json();
+                    const updatedOrder = updatedOrderData[0];
+
+                    if (updatedOrder && updatedOrder.status === 'confirmed' && updatedOrder.payment_status === 'paid') {
+                        addResult(`✅ Order Status Verification: PASSED<br>
+                            Order successfully updated to confirmed/paid`, 'success');
+                    } else {
+                        addResult(`❌ Order Status Verification: FAILED<br>
+                            Order status: ${updatedOrder?.status}<br>
+                            Payment status: ${updatedOrder?.payment_status}`, 'error');
+                    }
+                } else {
+                    addResult(`❌ Payment Verification Test: FAILED<br>
+                        Status: ${rpcResponse.status}<br>
+                        Error: ${JSON.stringify(rpcData)}`, 'error');
+                }
+
+                // Clean up: Delete test order
+                await fetch(`${SUPABASE_URL}/rest/v1/orders?id=eq.${testOrder.id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+                        'apikey': SUPABASE_ANON_KEY
+                    }
+                });
+
+                addResult(`🧹 Test order cleaned up`, 'info');
+
+            } catch (error) {
+                addResult(`❌ Payment Verification Test: ERROR<br>${error.message}`, 'error');
+            }
+        }
+
         // Auto-run basic health checks on page load
         document.addEventListener('DOMContentLoaded', () => {
-            addResult('🚀 Production Payment Test Suite v2025-08-17 Loaded', 'info');
+            addResult('🚀 Production Payment Test Suite v2025-08-21 Enhanced', 'info');
             addResult(`Environment: ${SUPABASE_URL}`, 'info');
-            addResult('🎯 Ready to test hotfix implementation', 'info');
+            addResult('🎯 Ready to test payment system with new RPC functions', 'info');
+
+            // Auto-test RPC function on load
+            setTimeout(() => {
+                addResult('🔧 Auto-running RPC function test...', 'info');
+                testRPCFunction();
+            }, 1000);
         });
     </script>
 </body>

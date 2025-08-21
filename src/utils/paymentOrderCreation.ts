@@ -37,77 +37,68 @@ interface CreateOrderParams {
  * Create order with consistent payment reference format
  */
 export const createOrderWithPayment = async (params: CreateOrderParams) => {
-  console.log('🔄 Creating order - backend will generate txn_ reference');
+  console.log('🔄 Creating order with unified checkout flow');
   
   try {
-    // Use the existing order creation function instead of direct insert
-    const orderData = {
-      customer_email: params.customerInfo.email,
-      customer_name: params.customerInfo.name,
-      customer_phone: params.customerInfo.phone,
-      fulfillment_type: params.fulfillmentType || 'delivery',
-      delivery_address: params.deliveryAddress,
-      pickup_point_id: params.pickupPointId,
-      delivery_zone_id: params.deliveryZoneId,
-      order_items: params.items.map(item => ({
+    // Prepare comprehensive checkout data for process-checkout
+    const checkoutData = {
+      customer: {
+        name: params.customerInfo.name,
+        email: params.customerInfo.email,
+        phone: params.customerInfo.phone
+      },
+      items: params.items.map(item => ({
         product_id: item.product_id,
+        product_name: item.product_name,
         quantity: item.quantity,
         unit_price: item.price,
-        total_price: item.price * item.quantity,
-        customization_items: item.customization_items
+        customizations: item.customization_items
       })),
-      total_amount: params.totalAmount,
-      delivery_fee: 0,
-      payment_method: 'paystack'
-      // 🔧 HOTFIX: Remove guest_session_id (guest mode discontinued)
-      // guest_session_id: null
+      fulfillment: {
+        type: params.fulfillmentType || 'delivery',
+        address: params.deliveryAddress,
+        pickup_point_id: params.pickupPointId,
+        delivery_zone_id: params.deliveryZoneId,
+        delivery_schedule: params.deliverySchedule
+      },
+      payment: {
+        method: 'paystack'
+      },
+      terms_accepted: true
     };
 
-    const { data, error: orderError } = await supabase.functions.invoke('process-checkout', {
-      body: orderData
+    console.log('📤 Sending comprehensive checkout request to process-checkout...')
+
+    // Single call to process-checkout handles everything
+    const { data, error: checkoutError } = await supabase.functions.invoke('process-checkout', {
+      body: checkoutData
     });
 
-    // 🚨 STOP FLOW IMMEDIATELY on order creation failure  
-    if (orderError || !data?.success) {
-      console.error('❌ Order creation failed - stopping payment flow:', orderError || data);
-      const errorCode = data?.code || 'ORDER_CREATION_FAILED';
-      const errorMessage = orderError?.message || data?.error || 'Order creation failed';
-      throw new Error(`${errorMessage} [${errorCode}]`);
+    // Handle checkout errors immediately
+    if (checkoutError || !data?.success) {
+      console.error('❌ Unified checkout failed:', checkoutError || data);
+      const errorMessage = checkoutError?.message || data?.error || 'Checkout process failed';
+      throw new Error(errorMessage);
     }
 
-    const order = data.data || data;
-    console.log('✅ Order created successfully via process-checkout:', order);
-
-    // Backend provides the payment reference - we don't generate it
-    const backendReference = order.payment_reference || order.reference;
-    
-    if (!backendReference) {
-      throw new Error('Backend did not provide payment reference');
-    }
-
-    // Initialize payment with backend-provided reference
-    const { data: paymentData, error: paymentError } = await supabase.functions.invoke('paystack-secure', {
-      body: {
-        action: 'initialize',
-        reference: backendReference, // Use backend-provided reference
-        order_reference: backendReference, // Same reference for consistency
-        email: params.customerInfo.email,
-        amount: params.totalAmount, // Send in naira - backend will convert to kobo
-        metadata: {
-          order_id: order.id,
-          customer_name: params.customerInfo.name,
-          order_number: order.order_number
-        },
-        callback_url: `${window.location.origin}/payment/callback?order_id=${order.id}`
-      }
+    console.log('✅ Unified checkout completed successfully:', {
+      order_id: data.order?.id,
+      order_number: data.order?.order_number,
+      payment_url_available: !!data.payment?.authorization_url,
+      reference_generated: !!data.payment?.reference
     });
 
-    if (paymentError || !paymentData?.status) {
-      console.error('❌ Payment initialization failed:', paymentError || paymentData);
-      throw new Error(`Payment initialization failed: ${paymentError?.message || paymentData?.error || 'Unknown error'}`);
+    // Extract order and payment data from unified response
+    const order = data.order;
+    const payment = data.payment;
+
+    if (!payment?.authorization_url) {
+      throw new Error('Payment authorization URL not provided by backend');
     }
 
-    console.log('✅ Payment initialized:', paymentData.data);
+    if (!payment?.reference) {
+      throw new Error('Payment reference not provided by backend');
+    }
 
     // INDEPENDENT: Create delivery schedule if provided (non-blocking with upsert)
     if (params.deliverySchedule && order.id) {
@@ -143,8 +134,8 @@ export const createOrderWithPayment = async (params: CreateOrderParams) => {
 
     return {
       order,
-      paymentUrl: paymentData.data.authorization_url,
-      reference: backendReference // Backend-generated txn_ reference
+      paymentUrl: payment.authorization_url, // Direct from process-checkout
+      reference: payment.reference // Backend-generated txn_ reference
     };
 
   } catch (error) {

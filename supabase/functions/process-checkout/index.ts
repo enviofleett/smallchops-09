@@ -2,6 +2,21 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+// Helper function to extract user ID from authorization header
+function extractUserIdFromToken(authHeader: string | null): string | null {
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return null;
+  }
+  
+  try {
+    const token = authHeader.substring(7);
+    const payload = JSON.parse(atob(token.split('.')[1]));
+    return payload?.sub || null;
+  } catch {
+    return null;
+  }
+}
+
 interface CheckoutRequest {
   customer: {
     id?: string
@@ -45,17 +60,49 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    console.log('🛒 Processing checkout request...')
+    console.log('🔄 Process checkout function called (v2025-08-21-production-fix-final)')
+    
+    // Extract user ID from authorization header for authenticated users
+    const authUserId = extractUserIdFromToken(req.headers.get('authorization'))
+    console.log('👤 User context analysis:', {
+      hasUser: !!authUserId,
+      userId: authUserId ? authUserId.substring(0, 8) + '...' : null,
+      isGuest: !authUserId,
+      guestSessionId: req.headers.get('x-guest-session')?.substring(0, 8)
+    })
     
     const requestBody: CheckoutRequest = await req.json()
-    console.log('📨 Checkout request received:', {
-      customer_email: requestBody.customer?.email,
-      items_count: requestBody.items?.length,
+    console.log('📥 Received checkout request:', {
+      customer_email: requestBody.customer?.email ? requestBody.customer.email.substring(0, 4) + '***' + requestBody.customer.email.split('@')[1] : 'none',
+      customer_name: requestBody.customer?.name,
+      customer_phone: requestBody.customer?.phone ? '*********' + requestBody.customer.phone.slice(-2) : 'none',
       fulfillment_type: requestBody.fulfillment?.type,
-      has_guest_session: !!requestBody.guest_session_id
+      delivery_address: requestBody.fulfillment?.address ? {
+        address_line_1: requestBody.fulfillment.address.address_line_1,
+        city: requestBody.fulfillment.address.city,
+        state: requestBody.fulfillment.address.state
+      } : null,
+      pickup_point_id: requestBody.fulfillment?.pickup_point_id,
+      order_items: `items[x${requestBody.items?.length || 0}]`,
+      total_amount: requestBody.items?.reduce((sum, item) => sum + (item.unit_price * item.quantity), 0) || 0,
+      delivery_fee: requestBody.fulfillment?.delivery_fee || 0,
+      delivery_zone_id: requestBody.fulfillment?.delivery_zone_id,
+      delivery_schedule: requestBody.fulfillment?.delivery_schedule || null,
+      payment_method: requestBody.payment?.method || 'paystack',
+      terms_accepted: requestBody.terms_accepted || false,
+      timestamp: new Date().toISOString()
     })
 
-    // CRITICAL FIX: Force guest_session_id to NULL (guest mode discontinued)
+    // Fetch business settings for guest checkout enforcement
+    console.log('⚙️ Fetching business settings for guest checkout enforcement...')
+    const { data: businessSettings } = await supabaseAdmin
+      .from('business_settings')
+      .select('allow_guest_checkout')
+      .single()
+    
+    console.log('✅ Business settings loaded:', { allow_guest_checkout: businessSettings?.allow_guest_checkout ?? false })
+
+    // Force guest_session_id to null - guest mode discontinued
     const processedRequest = {
       ...requestBody,
       guest_session_id: null // Always null - guest mode discontinued
@@ -76,39 +123,41 @@ serve(async (req) => {
       throw new Error('Fulfillment type is required')
     }
 
-    // Create or get customer account
+    // Handle authenticated vs guest customers gracefully
     let customerId: string
 
-    if (processedRequest.customer.id) {
-      // Validate UUID format
-      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-      if (!uuidRegex.test(processedRequest.customer.id)) {
-        throw new Error('Invalid customer ID format')
-      }
-      customerId = processedRequest.customer.id
-      console.log('👤 Using existing customer:', customerId)
-    } else {
-      // Create new customer account
-      const { data: newCustomer, error: customerError } = await supabaseAdmin
+    if (authUserId) {
+      console.log('🔍 Processing authenticated user checkout...')
+      
+      // For authenticated users, upsert customer account to handle existing users
+      const { data: customerAccount, error: customerError } = await supabaseAdmin
         .from('customer_accounts')
-        .insert({
+        .upsert({
+          user_id: authUserId,
           name: processedRequest.customer.name,
           email: processedRequest.customer.email.toLowerCase(),
           phone: processedRequest.customer.phone,
-          email_verified: false,
+          email_verified: false, // Will be updated by other processes
           phone_verified: false,
-          profile_completion_percentage: 60
+          profile_completion_percentage: processedRequest.customer.phone ? 80 : 60
+        }, { 
+          onConflict: 'user_id',
+          ignoreDuplicates: false 
         })
         .select('id')
         .single()
 
       if (customerError) {
-        console.error('❌ Customer creation failed:', customerError)
+        console.error('❌ Failed to create customer account for authenticated user:', customerError)
         throw new Error('Failed to create customer account')
       }
 
-      customerId = newCustomer.id
-      console.log('👤 Created new customer:', customerId)
+      customerId = customerAccount.id
+      console.log('👤 Customer account resolved for authenticated user:', customerId)
+    } else {
+      // For guest users (should not happen with guest mode disabled, but defensive)
+      console.log('🚫 Guest checkout attempted but disabled')
+      throw new Error('Guest checkout is disabled. Please create an account to continue.')
     }
 
     console.log('📝 Creating order with items...')

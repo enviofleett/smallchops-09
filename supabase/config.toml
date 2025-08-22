@@ -195,3 +195,9 @@ verify_jwt = false
 
 [functions.paystack-debug]
 verify_jwt = false
+
+[functions.paystack-batch-verifier]
+verify_jwt = false
+
+[functions.paystack-health-monitor]
+verify_jwt = false

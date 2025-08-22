@@ -7275,6 +7275,30 @@ export type Database = {
         }
         Relationships: []
       }
+      system_health_checks: {
+        Row: {
+          created_at: string
+          details: Json | null
+          id: string
+          service: string
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          service: string
+          status: string
+        }
+        Update: {
+          created_at?: string
+          details?: Json | null
+          id?: string
+          service?: string
+          status?: string
+        }
+        Relationships: []
+      }
       system_health_metrics: {
         Row: {
           id: string
@@ -8026,6 +8050,10 @@ export type Database = {
       cleanup_old_guest_sessions: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      cleanup_old_health_checks: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       confirm_payment_atomic: {
         Args: {

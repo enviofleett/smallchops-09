@@ -141,15 +141,16 @@ serve(async (req) => {
       
       const { data: deliveryZone, error: zoneError } = await supabaseAdmin
         .from('delivery_zones')
-        .select('delivery_fee')
+        .select('base_fee, name')
         .eq('id', requestBody.fulfillment.delivery_zone_id)
+        .eq('is_active', true)
         .maybeSingle();
       
       if (zoneError) {
         console.error('⚠️ Failed to fetch delivery zone fee:', zoneError);
       } else if (deliveryZone) {
-        deliveryFee = deliveryZone.delivery_fee || 0;
-        console.log('💰 Delivery fee for zone:', deliveryFee);
+        deliveryFee = deliveryZone.base_fee || 0;
+        console.log('💰 Delivery fee for zone:', deliveryZone.name, '- Fee:', deliveryFee);
       }
     }
     

@@ -272,7 +272,7 @@ export default function CustomerPortal() {
                           </div>
                           <div>
                             <p className="text-sm">
-                              {order.order_items.map(item => item.product_name).join(', ')}
+                              {order.order_items?.map(item => item.product_name).join(', ') || 'No items'}
                             </p>
                             <p className="text-sm font-medium">${order.total_amount}</p>
                           </div>
@@ -331,7 +331,7 @@ export default function CustomerPortal() {
                           </div>
                           <div>
                             <p className="text-sm">
-                              {order.order_items.map(item => item.product_name).join(', ')}
+                              {order.order_items?.map(item => item.product_name).join(', ') || 'No items'}
                             </p>
                             <p className="text-sm font-medium">${order.total_amount}</p>
                           </div>

@@ -142,7 +142,7 @@ export function OrderTrackingCard({
           </div>
           <div className="text-left sm:text-right">
             <p className="text-2xl font-bold">{formatCurrency(order.total_amount)}</p>
-            <p className="text-sm text-muted-foreground">{order.order_items.length} items</p>
+            <p className="text-sm text-muted-foreground">{order.order_items?.length || 0} items</p>
           </div>
         </div>
 
@@ -226,7 +226,7 @@ export function OrderTrackingCard({
         <div className="mb-6">
           <h4 className="font-medium mb-3">Order Items</h4>
           <div className="space-y-3">
-            {order.order_items.slice(0, 3).map((item) => (
+            {order.order_items?.slice(0, 3).map((item) => (
               <div key={item.id} className="flex items-center gap-3">
                 {item.products?.image_url && (
                   <img
@@ -246,9 +246,9 @@ export function OrderTrackingCard({
                 <p className="font-medium">{formatCurrency(item.total_price)}</p>
               </div>
             ))}
-            {order.order_items.length > 3 && (
+            {(order.order_items?.length || 0) > 3 && (
               <p className="text-sm text-muted-foreground text-center py-2">
-                +{order.order_items.length - 3} more items
+                +{(order.order_items?.length || 0) - 3} more items
               </p>
             )}
           </div>

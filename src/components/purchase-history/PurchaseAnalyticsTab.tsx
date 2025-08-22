@@ -44,7 +44,7 @@ export function PurchaseAnalyticsTab({ customerEmail, analytics }: PurchaseAnaly
         // Calculate top products
         const productMap = new Map<string, ProductFrequency>();
         orders.forEach(order => {
-          order.order_items.forEach(item => {
+          order.order_items?.forEach(item => {
             const existing = productMap.get(item.product_name);
             if (existing) {
               existing.count += item.quantity;
@@ -279,7 +279,7 @@ export function PurchaseAnalyticsTab({ customerEmail, analytics }: PurchaseAnaly
                     <p className="font-medium">{order.order_number}</p>
                     <p className="text-sm text-muted-foreground">
                       {new Date(order.order_time).toLocaleDateString()} • 
-                      {order.order_items.length} item{order.order_items.length !== 1 ? 's' : ''}
+                      {order.order_items?.length || 0} item{(order.order_items?.length || 0) !== 1 ? 's' : ''}
                     </p>
                   </div>
                   <div className="text-right">

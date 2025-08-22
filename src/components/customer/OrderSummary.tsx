@@ -98,7 +98,7 @@ export function OrderSummary({ detailed = false }: OrderSummaryProps) {
                       <>
                         <Separator />
                         <div className="space-y-2">
-                          <h5 className="text-sm font-medium">Items ({order.order_items.length})</h5>
+                          <h5 className="text-sm font-medium">Items ({order.order_items?.length || 0})</h5>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {order.order_items.slice(0, detailed ? undefined : 3).map((item, index) => (
                               <div key={index} className="flex items-center gap-2 text-sm">

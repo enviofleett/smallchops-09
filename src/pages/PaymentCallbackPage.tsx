@@ -7,6 +7,7 @@ import { useSecurePayment } from '@/hooks/useSecurePayment';
 import { cleanupPaymentCache, validateStoredReference } from '@/utils/paymentCacheCleanup';
 import { paymentCompletionCoordinator } from '@/utils/paymentCompletion';
 import { useCart } from '@/hooks/useCart';
+import { supabase } from '@/integrations/supabase/client';
 import startersLogo from '@/assets/starters-logo.png';
 
 export const PaymentCallbackPage: React.FC = () => {
@@ -18,6 +19,27 @@ export const PaymentCallbackPage: React.FC = () => {
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'failed'>('loading');
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
+
+  // Helper to fetch order amount from database
+  const fetchOrderAmount = async (orderId: string) => {
+    try {
+      const { data: order, error } = await supabase
+        .from('orders')
+        .select('total_amount, order_number')
+        .eq('id', orderId)
+        .single();
+      
+      if (error) {
+        console.warn('Failed to fetch order amount:', error);
+        return null;
+      }
+      
+      return order;
+    } catch (error) {
+      console.warn('Error fetching order amount:', error);
+      return null;
+    }
+  };
 
   useEffect(() => {
     const handlePaymentCallback = async () => {
@@ -33,9 +55,13 @@ export const PaymentCallbackPage: React.FC = () => {
       if (status === 'success' && reference && validateStoredReference(reference)) {
         console.log('✅ URL indicates success - showing success immediately');
         setVerificationStatus('success');
+        
+        // Fetch actual order amount immediately
+        const orderData = orderId ? await fetchOrderAmount(orderId) : null;
+        
         setOrderDetails({
-          orderNumber: orderId || 'Processing...',
-          amount: 'Confirming...',
+          orderNumber: orderData?.order_number || orderId || 'Processing...',
+          amount: orderData?.total_amount || 'Pending confirmation',
           reference: reference
         });
         
@@ -44,11 +70,12 @@ export const PaymentCallbackPage: React.FC = () => {
           const result = await verifySecurePayment(reference, orderId || undefined);
           if (result.success) {
             console.log('✅ Background verification confirmed success');
-            setOrderDetails({
-              orderNumber: (result as any).order_id || orderId,
-              amount: (result as any).amount,
+            setOrderDetails(prev => ({
+              ...prev,
+              orderNumber: (result as any).order_id || prev.orderNumber,
+              amount: (result as any).amount || prev.amount,
               reference: reference
-            });
+            }));
             
             // Handle cart clearing and notifications
             paymentCompletionCoordinator.coordinatePaymentCompletion(
@@ -267,7 +294,11 @@ export const PaymentCallbackPage: React.FC = () => {
             {/* Amount Display */}
             <Card className="p-6 bg-green-500 text-white text-center">
               <p className="text-green-100 text-sm mb-2">Total Amount</p>
-              <p className="text-3xl font-bold">₦{orderDetails?.amount?.toLocaleString()}</p>
+              <p className="text-3xl font-bold">
+                {typeof orderDetails?.amount === 'number' 
+                  ? `₦${orderDetails.amount.toLocaleString()}` 
+                  : orderDetails?.amount || '₦0'}
+              </p>
             </Card>
 
             {/* Status */}
@@ -281,7 +312,14 @@ export const PaymentCallbackPage: React.FC = () => {
             {/* Action Buttons */}
             <div className="space-y-3">
               <Button 
-                onClick={() => navigate('/customer-profile')} 
+                onClick={() => {
+                  const orderId = searchParams.get('order_id');
+                  if (orderId) {
+                    navigate(`/orders/${orderId}`);
+                  } else {
+                    navigate('/customer-profile');
+                  }
+                }} 
                 className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-base font-medium"
               >
                 Track Your Order

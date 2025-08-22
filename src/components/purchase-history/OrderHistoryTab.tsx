@@ -178,13 +178,13 @@ export function OrderHistoryTab({ customerEmail }: OrderHistoryTabProps) {
                     
                     <p className="text-sm text-muted-foreground">
                       {new Date(order.order_time).toLocaleDateString()} • 
-                      {order.order_items.length} item{order.order_items.length !== 1 ? 's' : ''}
+                      {order.order_items?.length || 0} item{(order.order_items?.length || 0) !== 1 ? 's' : ''}
                     </p>
                     
                     <p className="font-medium">${order.total_amount}</p>
                     
                     <div className="text-sm text-muted-foreground">
-                      Items: {order.order_items.map(item => item.product_name).join(', ')}
+                      Items: {order.order_items?.map(item => item.product_name).join(', ') || 'No items'}
                     </div>
                   </div>
                   

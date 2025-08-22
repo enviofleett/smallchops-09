@@ -129,9 +129,10 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
     return colors[status as keyof typeof colors] || 'bg-muted text-muted-foreground';
   };
 
-  const subtotal = order.order_items.reduce((sum, item) => sum + Number(item.total_price ?? Number(item.unit_price ?? 0) * Number(item.quantity ?? 0)), 0);
-  const totalVat = order.order_items.reduce((sum, item) => sum + Number(item.vat_amount ?? 0), 0);
-  const totalDiscount = order.order_items.reduce((sum, item) => sum + Number(item.discount_amount ?? 0), 0);
+  const orderItems = order.order_items || [];
+  const subtotal = orderItems.reduce((sum, item) => sum + Number(item.total_price ?? Number(item.unit_price ?? 0) * Number(item.quantity ?? 0)), 0);
+  const totalVat = orderItems.reduce((sum, item) => sum + Number(item.vat_amount ?? 0), 0);
+  const totalDiscount = orderItems.reduce((sum, item) => sum + Number(item.discount_amount ?? 0), 0);
 
   // Helper to get delivery location
   const getDeliveryLocation = () => {
@@ -211,81 +212,89 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Package className="h-5 w-5" />
-                Order Items ({order.order_items.length} items)
+                Order Items ({orderItems.length} items)
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {order.order_items.map((item) => (
-                  <div key={item.id} className="border rounded-lg p-4">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <h4 className="font-medium">{item.product_name}</h4>
-                        {item.special_instructions && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            <strong>Special Instructions:</strong> {item.special_instructions}
+              {orderItems.length === 0 ? (
+                <div className="text-center py-8 text-muted-foreground">
+                  <Package className="h-8 w-8 mx-auto mb-2 opacity-50" />
+                  <p>No order items found</p>
+                  <p className="text-sm">Order details may still be processing</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {orderItems.map((item) => (
+                    <div key={item.id} className="border rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-2">
+                        <div className="flex-1">
+                          <h4 className="font-medium">{item.product_name}</h4>
+                          {item.special_instructions && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              <strong>Special Instructions:</strong> {item.special_instructions}
+                            </p>
+                          )}
+                          {item.customizations && (
+                            <p className="text-sm text-muted-foreground mt-1">
+                              <strong>Customizations:</strong> {JSON.stringify(item.customizations)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-right ml-4 min-w-0">
+                          <p className="font-medium">{formatCurrency(Number(item.total_price ?? 0))}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {Number(item.quantity ?? 0)} × {formatCurrency(Number(item.unit_price ?? 0))}
                           </p>
-                        )}
-                        {item.customizations && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            <strong>Customizations:</strong> {JSON.stringify(item.customizations)}
-                          </p>
-                        )}
+                        </div>
                       </div>
-                      <div className="text-right ml-4 min-w-0">
-                        <p className="font-medium">{formatCurrency(Number(item.total_price ?? 0))}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {Number(item.quantity ?? 0)} × {formatCurrency(Number(item.unit_price ?? 0))}
-                        </p>
-                      </div>
+                      
+                      {(Number(item.vat_amount ?? 0) > 0 || Number(item.discount_amount ?? 0) > 0) && (
+                        <div className="flex justify-between text-sm text-muted-foreground pt-2 border-t">
+                          {Number(item.vat_amount ?? 0) > 0 && (
+                            <span>VAT: {formatCurrency(Number(item.vat_amount ?? 0))}</span>
+                          )}
+                          {Number(item.discount_amount ?? 0) > 0 && (
+                            <span>Discount: -{formatCurrency(Number(item.discount_amount ?? 0))}</span>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    
-                    {(Number(item.vat_amount ?? 0) > 0 || Number(item.discount_amount ?? 0) > 0) && (
-                      <div className="flex justify-between text-sm text-muted-foreground pt-2 border-t">
-                        {Number(item.vat_amount ?? 0) > 0 && (
-                          <span>VAT: {formatCurrency(Number(item.vat_amount ?? 0))}</span>
-                        )}
-                        {Number(item.discount_amount ?? 0) > 0 && (
-                          <span>Discount: -{formatCurrency(Number(item.discount_amount ?? 0))}</span>
-                        )}
+                  ))}
+
+                  <Separator />
+
+                  {/* Order Summary */}
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Subtotal:</span>
+                      <span>{formatCurrency(subtotal)}</span>
+                    </div>
+                    {totalVat > 0 && (
+                      <div className="flex justify-between text-sm">
+                        <span>VAT (7.5%):</span>
+                        <span>{formatCurrency(totalVat)}</span>
                       </div>
                     )}
-                  </div>
-                ))}
-
-                <Separator />
-
-                {/* Order Summary */}
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm">
-                    <span>Subtotal:</span>
-                    <span>{formatCurrency(subtotal)}</span>
-                  </div>
-                  {totalVat > 0 && (
-                    <div className="flex justify-between text-sm">
-                      <span>VAT (7.5%):</span>
-                      <span>{formatCurrency(totalVat)}</span>
+                    {totalDiscount > 0 && (
+                      <div className="flex justify-between text-sm text-green-600">
+                        <span>Total Discount:</span>
+                        <span>-{formatCurrency(totalDiscount)}</span>
+                      </div>
+                    )}
+                    {(order.delivery_fee || deliverySchedule?.delivery_fee) && (
+                      <div className="flex justify-between text-sm">
+                        <span>Delivery Fee:</span>
+                        <span>{formatCurrency(Number(order.delivery_fee || deliverySchedule?.delivery_fee || 0))}</span>
+                      </div>
+                    )}
+                    <Separator />
+                    <div className="flex justify-between font-semibold text-lg">
+                      <span>Total:</span>
+                      <span>{formatCurrency(order.total_amount)}</span>
                     </div>
-                  )}
-                  {totalDiscount > 0 && (
-                    <div className="flex justify-between text-sm text-green-600">
-                      <span>Total Discount:</span>
-                      <span>-{formatCurrency(totalDiscount)}</span>
-                    </div>
-                  )}
-                  {(order.delivery_fee || deliverySchedule?.delivery_fee) && (
-                    <div className="flex justify-between text-sm">
-                      <span>Delivery Fee:</span>
-                      <span>{formatCurrency(Number(order.delivery_fee || deliverySchedule?.delivery_fee || 0))}</span>
-                    </div>
-                  )}
-                  <Separator />
-                  <div className="flex justify-between font-semibold text-lg">
-                    <span>Total:</span>
-                    <span>{formatCurrency(order.total_amount)}</span>
                   </div>
                 </div>
-              </div>
+              )}
             </CardContent>
           </Card>
 

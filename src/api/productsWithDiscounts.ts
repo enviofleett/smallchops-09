@@ -2,6 +2,16 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPromotions } from "./promotions";
 import { calculateProductDiscount, ProductWithDiscount, isPromotionValidForCurrentDay } from "@/lib/discountCalculations";
 
+// Cache for products to avoid repeated queries
+let productsCache: { data: any[]; timestamp: number; categoryId?: string } | null = null;
+const PRODUCTS_CACHE_DURATION = 3 * 60 * 1000; // 3 minutes
+
+// Clear products cache
+export function clearProductsCache() {
+  productsCache = null;
+  console.log('Products cache cleared');
+}
+
 // Get products with calculated discounts - Optimized for faster loading
 export async function getProductsWithDiscounts(categoryId?: string): Promise<ProductWithDiscount[]> {
   try {

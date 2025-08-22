@@ -107,35 +107,48 @@ export async function getProductWithDiscounts(productId: string): Promise<Produc
     
     const promotionsPromise = getPromotions();
     
-    // Parallel execution with timeout
+    // Parallel execution with improved timeout and error handling
     const [
-      { data: product, error: productError },
-      promotions
-    ] = await Promise.all([
+      productResult,
+      promotionsResult
+    ] = await Promise.allSettled([
       Promise.race([
         productPromise,
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Product query timeout')), 3000)
+          setTimeout(() => reject(new Error('Product query timeout')), 5000) // Increased timeout
         )
       ]) as Promise<any>,
       Promise.race([
         promotionsPromise,
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Promotions query timeout')), 2000)
+          setTimeout(() => reject(new Error('Promotions query timeout')), 3000) // Increased timeout
         )
       ]) as Promise<any>
     ]);
     
+    // Handle product result
+    if (productResult.status === 'rejected') {
+      console.error('Product query failed:', productResult.reason);
+      return null;
+    }
+    
+    const { data: product, error: productError } = productResult.value;
     if (productError) {
       console.error('Product query error:', productError);
       return null;
     }
     if (!product) return null;
     
-    // Safely handle promotions error
-    const activePromotions = Array.isArray(promotions) 
-      ? promotions.filter(p => p.status === 'active')
-      : [];
+    // Handle promotions gracefully
+    let activePromotions = [];
+    if (promotionsResult.status === 'fulfilled') {
+      const promotions = promotionsResult.value;
+      activePromotions = Array.isArray(promotions) 
+        ? promotions.filter(p => p.status === 'active')
+        : [];
+    } else {
+      console.warn('Promotions query failed for single product, continuing without promotions:', promotionsResult.reason);
+    }
     
     // Calculate discounts for the product
     return calculateProductDiscount(product, activePromotions);

@@ -62,6 +62,30 @@ export const useErrorHandler = () => {
           description: "The request took too long to complete. Please try again.",
           variant: "destructive",
         };
+      } else if (error.message.includes("rate limit") || error.message.includes("Too many")) {
+        errorDetails = {
+          title: "Rate Limit Exceeded",
+          description: "Too many requests. Please wait a moment before trying again.",
+          variant: "destructive",
+        };
+      } else if (error.message.includes("not found") || error.message.includes("404")) {
+        errorDetails = {
+          title: "Not Found",
+          description: "The requested resource could not be found.",
+          variant: "destructive",
+        };
+      } else if (error.message.includes("permission") || error.message.includes("unauthorized") || error.message.includes("403")) {
+        errorDetails = {
+          title: "Permission Denied",
+          description: "You don't have permission to perform this action.",
+          variant: "destructive",
+        };
+      } else if (error.message.includes("server error") || error.message.includes("500")) {
+        errorDetails = {
+          title: "Server Error",
+          description: "A server error occurred. Please try again later.",
+          variant: "destructive",
+        };
       } else {
         errorDetails = {
           title: "Error",

@@ -35,7 +35,7 @@ export const useCustomerAuth = () => {
     let mounted = true;
     let subscription: any;
 
-    const loadCustomerAccount = async (userId: string) => {
+    const loadCustomerAccount = async (userId: string): Promise<CustomerAccount | null> => {
       try {
         const { data, error } = await supabase
           .from('customer_accounts')
@@ -45,14 +45,17 @@ export const useCustomerAuth = () => {
         
         if (error) {
           console.error('Error fetching customer account:', error);
-          return null;
+          throw new Error(`Failed to load customer account: ${error.message}`);
         }
         
         console.log('🔍 Customer account data:', data);
         return data;
       } catch (error) {
         console.error('Customer account fetch error:', error);
-        return null;
+        if (error instanceof Error) {
+          throw error;
+        }
+        throw new Error('Failed to load customer account');
       }
     };
 
@@ -61,6 +64,8 @@ export const useCustomerAuth = () => {
         // Set up auth state listener
         const { data } = supabase.auth.onAuthStateChange(async (event, session) => {
           if (!mounted) return;
+          
+          console.log('Auth state change:', event, session?.user?.email);
           
           if (session?.user) {
             // Use setTimeout to prevent potential Supabase deadlocks
@@ -75,17 +80,30 @@ export const useCustomerAuth = () => {
                 error: null
               }));
 
-              // Load customer account
-              const customerAccount = await loadCustomerAccount(session.user.id);
-              
-              if (mounted) {
-                setAuthState(prev => ({
-                  ...prev,
-                  customerAccount,
-                  isLoading: false,
-                  isAuthenticated: true, // Session exists = authenticated
-                  error: null
-                }));
+              try {
+                // Load customer account with error handling
+                const customerAccount = await loadCustomerAccount(session.user.id);
+                
+                if (mounted) {
+                  setAuthState(prev => ({
+                    ...prev,
+                    customerAccount,
+                    isLoading: false,
+                    isAuthenticated: true, // Session exists = authenticated
+                    error: null
+                  }));
+                }
+              } catch (error) {
+                console.error('Failed to load customer account:', error);
+                if (mounted) {
+                  setAuthState(prev => ({
+                    ...prev,
+                    customerAccount: null,
+                    isLoading: false,
+                    isAuthenticated: true, // Still authenticated even if account load fails
+                    error: error instanceof Error ? error.message : 'Failed to load account details'
+                  }));
+                }
               }
             }, 0);
           } else {
@@ -103,7 +121,19 @@ export const useCustomerAuth = () => {
         subscription = data.subscription;
 
         // Check for existing session
-        const { data: { session: initialSession } } = await supabase.auth.getSession();
+        const { data: { session: initialSession }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('Failed to get initial session:', sessionError);
+          if (mounted) {
+            setAuthState(prev => ({ 
+              ...prev, 
+              isLoading: false,
+              error: 'Failed to initialize authentication'
+            }));
+          }
+          return;
+        }
         
         if (!mounted) return;
 
@@ -112,19 +142,33 @@ export const useCustomerAuth = () => {
             ...prev, 
             user: initialSession.user, 
             session: initialSession, 
-            isLoading: true 
+            isLoading: true,
+            error: null
           }));
 
-          const customerAccount = await loadCustomerAccount(initialSession.user.id);
-          
-          if (mounted) {
-            setAuthState(prev => ({
-              ...prev,
-              customerAccount,
-              isLoading: false,
-              isAuthenticated: true, // Session exists = authenticated
-              error: null
-            }));
+          try {
+            const customerAccount = await loadCustomerAccount(initialSession.user.id);
+            
+            if (mounted) {
+              setAuthState(prev => ({
+                ...prev,
+                customerAccount,
+                isLoading: false,
+                isAuthenticated: true, // Session exists = authenticated
+                error: null
+              }));
+            }
+          } catch (error) {
+            console.error('Failed to load initial customer account:', error);
+            if (mounted) {
+              setAuthState(prev => ({
+                ...prev,
+                customerAccount: null,
+                isLoading: false,
+                isAuthenticated: true, // Still authenticated even if account load fails
+                error: error instanceof Error ? error.message : 'Failed to load account details'
+              }));
+            }
           }
         } else {
           if (mounted) {
@@ -151,8 +195,10 @@ export const useCustomerAuth = () => {
     };
   }, []);
 
-  const refreshAccount = async () => {
-    if (!authState.session?.user) return;
+  const refreshAccount = async (): Promise<{ success: boolean; error?: string }> => {
+    if (!authState.session?.user) {
+      return { success: false, error: 'No active session' };
+    }
     
     try {
       const { data, error } = await supabase
@@ -161,53 +207,92 @@ export const useCustomerAuth = () => {
         .eq('user_id', authState.session.user.id)
         .maybeSingle();
       
-      if (!error && data) {
+      if (error) {
+        console.error('Error refreshing customer account:', error);
+        setAuthState(prev => ({
+          ...prev,
+          error: `Failed to refresh account: ${error.message}`
+        }));
+        return { success: false, error: error.message };
+      }
+
+      if (data) {
         setAuthState(prev => ({
           ...prev,
           customerAccount: data,
           isAuthenticated: true,
           error: null
         }));
+        return { success: true };
+      } else {
+        setAuthState(prev => ({
+          ...prev,
+          customerAccount: null,
+          error: 'Account not found'
+        }));
+        return { success: false, error: 'Account not found' };
       }
     } catch (error) {
       console.error('Error refreshing customer account:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to refresh account';
+      setAuthState(prev => ({
+        ...prev,
+        error: errorMessage
+      }));
+      return { success: false, error: errorMessage };
     }
   };
 
-  const logout = async () => {
-    // Log security event for logout
+  const logout = async (): Promise<{ success: boolean; error?: string }> => {
     try {
-      await SecurityMonitor.logEvent(
-        'customer_logout',
-        'low',
-        'Customer logged out successfully',
-        {
-          customer_id: authState.customerAccount?.id,
-          email: authState.customerAccount?.email,
-          timestamp: new Date().toISOString()
-        }
-      );
-    } catch (error) {
-      console.error('Failed to log logout event:', error);
-    }
-
-    // Clear cart and shopping data before signing out
-    localStorage.removeItem('restaurant_cart');
-    localStorage.removeItem('guest_session');
-    localStorage.removeItem('cart_abandonment_tracking');
-    
-    // Clear React Query cache (if available)
-    try {
-      const queryClient = (window as any)?.queryClient;
-      if (queryClient && typeof queryClient.clear === 'function') {
-        queryClient.clear();
+      // Log security event for logout
+      try {
+        await SecurityMonitor.logEvent(
+          'customer_logout',
+          'low',
+          'Customer logged out successfully',
+          {
+            customer_id: authState.customerAccount?.id,
+            email: authState.customerAccount?.email,
+            timestamp: new Date().toISOString()
+          }
+        );
+      } catch (error) {
+        console.error('Failed to log logout event:', error);
+        // Don't fail logout for logging errors
       }
+
+      // Clear cart and shopping data before signing out
+      try {
+        localStorage.removeItem('restaurant_cart');
+        localStorage.removeItem('guest_session');
+        localStorage.removeItem('cart_abandonment_tracking');
+      } catch (error) {
+        console.warn('Failed to clear localStorage:', error);
+      }
+      
+      // Clear React Query cache (if available)
+      try {
+        const queryClient = (window as any)?.queryClient;
+        if (queryClient && typeof queryClient.clear === 'function') {
+          queryClient.clear();
+        }
+      } catch (error) {
+        console.log('Query client not available for clearing');
+      }
+      
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Logout error:', error);
+        return { success: false, error: error.message };
+      }
+
+      return { success: true };
     } catch (error) {
-      console.log('Query client not available for clearing');
+      const errorMessage = error instanceof Error ? error.message : 'Logout failed';
+      console.error('Logout error:', error);
+      return { success: false, error: errorMessage };
     }
-    
-    const { error } = await supabase.auth.signOut();
-    if (error) throw error;
   };
 
   // Secure customer registration function
@@ -293,24 +378,35 @@ export const useCustomerAuth = () => {
     }
   };
 
-  const updateCustomerAccount = async (updates: Partial<CustomerAccount>) => {
-    if (!authState.customerAccount) return;
+  const updateCustomerAccount = async (updates: Partial<CustomerAccount>): Promise<{ success: boolean; data?: CustomerAccount; error?: string }> => {
+    if (!authState.customerAccount) {
+      return { success: false, error: 'No customer account found' };
+    }
 
-    const { data, error } = await supabase
-      .from('customer_accounts')
-      .update(updates)
-      .eq('id', authState.customerAccount.id)
-      .select()
-      .single();
+    try {
+      const { data, error } = await supabase
+        .from('customer_accounts')
+        .update(updates)
+        .eq('id', authState.customerAccount.id)
+        .select()
+        .single();
 
-    if (error) throw error;
+      if (error) {
+        console.error('Update customer account error:', error);
+        return { success: false, error: error.message };
+      }
 
-    setAuthState(prev => ({
-      ...prev,
-      customerAccount: data,
-    }));
+      setAuthState(prev => ({
+        ...prev,
+        customerAccount: data,
+      }));
 
-    return data;
+      return { success: true, data };
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Failed to update account';
+      console.error('Update customer account error:', error);
+      return { success: false, error: errorMessage };
+    }
   };
 
   return {

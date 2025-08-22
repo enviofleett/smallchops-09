@@ -656,13 +656,43 @@ function DeliveryOrderCard({
             </div>
           )}
           
-          {/* Delivery Fee */}
-          {order.delivery_fee && order.delivery_fee > 0 && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Delivery Fee:</span>
-              <span className="text-xs sm:text-sm">₦{order.delivery_fee?.toLocaleString()}</span>
+          {/* Enhanced Delivery Fee and Promo Information */}
+          <div className="space-y-2">
+            {order.delivery_fee && Number(order.delivery_fee) > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Delivery Fee:</span>
+                <span className="text-green-600 font-medium">₦{Number(order.delivery_fee).toLocaleString()}</span>
+              </div>
+            )}
+            
+            {order.discount_amount && Number(order.discount_amount) > 0 && (
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Promo Discount:</span>
+                <span className="text-red-600 font-medium">-₦{Number(order.discount_amount).toLocaleString()}</span>
+              </div>
+            )}
+            
+            {/* Total Amount Breakdown */}
+            <div className="flex items-center justify-between text-sm font-semibold border-t pt-2">
+              <span className="text-muted-foreground">Total Amount:</span>
+              <span className="text-primary">₦{Number(order.total_amount).toLocaleString()}</span>
             </div>
-          )}
+            
+            {/* Missing Delivery Schedule Warning */}
+            {!schedule && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded p-2 mt-2">
+                <div className="flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3 text-yellow-600" />
+                  <span className="text-xs text-yellow-700 font-medium">
+                    No delivery schedule found
+                  </span>
+                </div>
+                <p className="text-xs text-yellow-600 mt-1">
+                  Contact customer or attempt schedule recovery
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       </CardContent>
     </Card>

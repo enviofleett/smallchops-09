@@ -481,9 +481,21 @@ function AdminOrderCard({
           <div>
             <p className="text-sm text-muted-foreground">Order Type & Amount</p>
             <p className="font-medium capitalize">{order.order_type}</p>
-            <p className="text-lg font-bold text-primary">
-              {formatCurrency(order.total_amount)}
-            </p>
+            <div className="space-y-1">
+              <p className="text-lg font-bold text-primary">
+                {formatCurrency(order.total_amount)}
+              </p>
+              {order.delivery_fee && Number(order.delivery_fee) > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  (includes {formatCurrency(Number(order.delivery_fee))} delivery)
+                </p>
+              )}
+              {order.discount_amount && Number(order.discount_amount) > 0 && (
+                <p className="text-xs text-green-600">
+                  Promo discount: -{formatCurrency(Number(order.discount_amount))}
+                </p>
+              )}
+            </div>
           </div>
           
           <div>
@@ -598,6 +610,37 @@ function AdminOrderCard({
                   orderStatus={order.status}
                   className="mt-3"
                 />
+              ) : order.order_type === 'delivery' ? (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-3">
+                  <div className="flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 text-yellow-600" />
+                    <p className="text-sm font-medium text-yellow-800">
+                      Delivery Schedule Missing
+                    </p>
+                  </div>
+                  <p className="text-xs text-yellow-700 mt-1">
+                    No delivery schedule found for this order. Contact customer for delivery preferences.
+                  </p>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    className="mt-2 h-7 text-xs"
+                    onClick={async () => {
+                      try {
+                        await supabase.functions.invoke('recover-order-schedule', {
+                          body: { order_id: order.id }
+                        });
+                        // Trigger refetch
+                        window.location.reload();
+                      } catch (error) {
+                        console.error('Schedule recovery failed:', error);
+                      }
+                    }}
+                  >
+                    <Activity className="w-3 h-3 mr-1" />
+                    Attempt Recovery
+                  </Button>
+                </div>
               ) : (
                 <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mt-3">
                   <div className="flex items-start gap-2">

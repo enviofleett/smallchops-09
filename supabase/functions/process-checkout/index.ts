@@ -226,6 +226,52 @@ serve(async (req) => {
     console.log("💳 Payment reference:", paymentReference);
     console.log("🌐 Authorization URL:", authorizationUrl);
 
+    // ✅ Create/upsert delivery schedule if delivery order with schedule data
+    if (requestBody.fulfillment.type === 'delivery' && requestBody.delivery_schedule) {
+      try {
+        console.log('🗓️ Creating delivery schedule for order:', order.id);
+        
+        const scheduleData = {
+          order_id: order.id,
+          delivery_date: requestBody.delivery_schedule.delivery_date,
+          delivery_time_start: requestBody.delivery_schedule.delivery_time_start,
+          delivery_time_end: requestBody.delivery_schedule.delivery_time_end,
+          is_flexible: requestBody.delivery_schedule.is_flexible || false,
+          special_instructions: requestBody.delivery_schedule.special_instructions || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        };
+
+        const { error: scheduleError } = await supabaseAdmin
+          .from('order_delivery_schedule')
+          .upsert(scheduleData, { 
+            onConflict: 'order_id',
+            ignoreDuplicates: false 
+          });
+
+        if (scheduleError) {
+          console.warn('⚠️ Delivery schedule creation failed (non-blocking):', scheduleError);
+          
+          // Log for recovery - non-blocking
+          await supabaseAdmin
+            .from('api_request_logs')
+            .insert({
+              endpoint: 'process-checkout',
+              request_payload: requestBody,
+              response_status: 'schedule_creation_failed',
+              error_details: scheduleError,
+              created_at: new Date().toISOString()
+            })
+            .then(() => console.log('📝 Logged failed schedule creation for recovery'))
+            .catch(err => console.warn('⚠️ Failed to log schedule creation failure:', err));
+        } else {
+          console.log('✅ Delivery schedule created successfully');
+        }
+      } catch (scheduleErr) {
+        console.warn('⚠️ Delivery schedule creation error (non-blocking):', scheduleErr);
+      }
+    }
+
     // ✅ Success response
     return new Response(
       JSON.stringify({

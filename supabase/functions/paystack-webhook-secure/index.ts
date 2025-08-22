@@ -277,6 +277,79 @@ serve(async (req) => {
           .single()
 
         if (order) {
+          // 🔒 AMOUNT VALIDATION: Verify paid amount against expected total
+          const paidAmountNaira = amount;
+          
+          // Calculate expected amount: items + delivery - promo discounts
+          const { data: orderItems } = await supabase
+            .from('order_items')
+            .select('total_price')
+            .eq('order_id', order.id);
+          
+          const itemsSubtotal = (orderItems || []).reduce((sum, item) => sum + (Number(item.total_price) || 0), 0);
+          const deliveryFee = Number(order.delivery_fee) || 0;
+          const promoDiscount = Number(order.discount_amount) || 0;
+          const expectedAmount = itemsSubtotal + deliveryFee - promoDiscount;
+          
+          const amountDifference = Math.abs(paidAmountNaira - expectedAmount);
+          const amountMismatch = amountDifference > 0.01; // Allow 1 kobo tolerance
+          
+          console.log(`💰 AMOUNT VALIDATION: paid=₦${paidAmountNaira}, expected=₦${expectedAmount}, diff=₦${amountDifference}`);
+          
+          if (amountMismatch) {
+            // 🚨 SECURITY INCIDENT: Amount mismatch detected
+            await supabase.from('security_incidents').insert({
+              type: 'webhook_payment_amount_mismatch',
+              description: `Webhook payment amount mismatch: paid ₦${paidAmountNaira}, expected ₦${expectedAmount}`,
+              severity: 'critical',
+              reference: reference,
+              expected_amount: expectedAmount,
+              received_amount: paidAmountNaira,
+              order_id: order.id,
+              created_at: new Date().toISOString()
+            });
+            
+            console.error(`🚨 CRITICAL: Webhook amount mismatch for order ${order.id}!`);
+            
+            // Create payment record but don't mark order as paid
+            await supabase
+              .from('payment_transactions')
+              .upsert({
+                provider_reference: reference,
+                order_id: order.id,
+                amount: paidAmountNaira,
+                currency: data.currency || 'NGN',
+                status: 'mismatch',
+                gateway_response: `Amount mismatch: paid ₦${paidAmountNaira}, expected ₦${expectedAmount}`,
+                metadata: { 
+                  paystack_data: data,
+                  webhook_timestamp: new Date().toISOString(),
+                  lookup_method,
+                  amount_validation: {
+                    paid: paidAmountNaira,
+                    expected: expectedAmount,
+                    items_subtotal: itemsSubtotal,
+                    delivery_fee: deliveryFee,
+                    promo_discount: promoDiscount
+                  }
+                }
+              }, {
+                onConflict: 'provider_reference'
+              });
+
+            return new Response(JSON.stringify({
+              success: false,
+              error: 'Payment amount mismatch - payment not processed',
+              reference,
+              paid_amount: paidAmountNaira,
+              expected_amount: expectedAmount
+            }), {
+              status: 400,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            });
+          }
+
+          // Update order status if amount validation passes
           // Update order status
           await supabase
             .from('orders')

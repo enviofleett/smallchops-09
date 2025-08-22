@@ -23,6 +23,10 @@ export const initializeConsoleCleanup = () => {
       'ws://localhost',
       'wss://localhost',
       'Failed to construct \'WebSocket\'',
+      'Datadog Browser SDK: No vendor',  // Datadog SDK storage errors
+      'No storage available for session', // Datadog specific storage issue
+      'sessionStorage is not available',   // Generic session storage issues
+      'localStorage is not available',     // Generic local storage issues
     ];
     
     // Warning patterns to suppress in production  
@@ -80,7 +84,8 @@ export const validatePaystackCSP = () => {
       const requiredDomains = [
         'checkout.paystack.com',
         'js.paystack.co', 
-        'api.paystack.co'
+        'api.paystack.co',
+        'paystack.com'  // Added for button.min.css and other assets
       ];
       
       const missingDomains = requiredDomains.filter(domain => !content.includes(domain));

@@ -41,19 +41,28 @@ export const useOptimizedProducts = (params: ProductsQueryParams = {}) => {
         searchParams.set('q', search);
       }
 
-      const { data, error } = await supabase.functions.invoke('get-public-products', {
+      // Build the URL with query parameters  
+      const SUPABASE_URL = "https://oknnklksdiqaifhxaccs.supabase.co";
+      const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA";
+      
+      const functionUrl = `${SUPABASE_URL}/functions/v1/get-public-products?${searchParams.toString()}`;
+      
+      const response = await fetch(functionUrl, {
         method: 'GET',
         headers: {
+          'Authorization': `Bearer ${SUPABASE_ANON_KEY}`,
+          'apikey': SUPABASE_ANON_KEY,
           'Content-Type': 'application/json',
         },
-        body: null,
       });
 
-      if (error) {
-        console.error('Products fetch error:', error);
-        throw new Error(`Failed to fetch products: ${error.message}`);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Products fetch error:', errorText);
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
       }
 
+      const data = await response.json();
       return data;
     },
     staleTime: 5 * 60 * 1000, // 5 minutes

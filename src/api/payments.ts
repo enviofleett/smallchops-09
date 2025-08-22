@@ -39,30 +39,39 @@ interface VerifyPaymentResponse {
     metadata: any;
     paid_at: string;
     channel: string;
+    order_id?: string;
+    order_number?: string;
+    amount_verified?: boolean;
   };
   error?: string;
 }
 
 export class PaymentsAPI {
   /**
-   * Initialize a new payment transaction
+   * Initialize a new payment transaction (Production-Ready with Integer Math)
    */
   static async initializePayment(request: InitializePaymentRequest): Promise<InitializePaymentResponse> {
     try {
-      const { data, error } = await supabase.functions.invoke('paystack-secure', {
+      // Convert amount to kobo (integer) to avoid floating point issues
+      const amountKobo = Math.round(request.amount * 100);
+      
+      const { data, error } = await supabase.functions.invoke('secure-payment-processor', {
         body: {
-          action: 'initialize',
           email: request.email,
-          amount: request.amount, // Amount in naira, Paystack function will handle conversion
+          amount_kobo: amountKobo, // Always use integer amounts
           reference: request.reference, // Use provided txn_ reference
           channels: request.channels || ['card', 'bank', 'ussd', 'mobile_money'],
-          metadata: {
-            order_id: request.orderDetails.id,
-            customer_name: request.customerInfo.name,
-            customer_phone: request.customerInfo.phone,
-            customer_address: request.customerInfo.address,
+          order_details: {
+            id: request.orderDetails.id,
             items: request.orderDetails.items
-          }
+          },
+          customer_info: {
+            name: request.customerInfo.name,
+            phone: request.customerInfo.phone,
+            address: request.customerInfo.address
+          },
+          // Generate idempotency key for this request
+          idempotency_key: `init_${request.reference}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         }
       });
 
@@ -101,62 +110,48 @@ export class PaymentsAPI {
   }
 
   /**
-   * Verify a payment transaction with enhanced error handling
+   * Verify a payment transaction (Production-Ready with Idempotency)
    */
-  static async verifyPayment(reference: string): Promise<VerifyPaymentResponse> {
+  static async verifyPayment(reference: string, idempotencyKey?: string): Promise<VerifyPaymentResponse> {
     try {
-      // Prefer secure verifier that performs atomic updates
-      const { data: primaryData, error: primaryError } = await supabase.functions.invoke('verify-payment', {
-        body: { reference }
-      });
-
-      const normalize = (res: any): VerifyPaymentResponse => {
-        // paystack-verify returns { success, amount (NGN), ... }
-        if (res?.success === true) {
-          return {
-            success: true,
-            data: {
-              status: 'success',
-              amount: typeof res.amount === 'number' ? res.amount : 0,
-              customer: res.customer ?? null,
-              metadata: res.metadata ?? null,
-              paid_at: res.paid_at ?? '',
-              channel: res.channel ?? ''
-            }
-          };
+      // Use secure atomic verifier
+      const { data, error } = await supabase.functions.invoke('verify-payment', {
+        body: { 
+          reference,
+          idempotency_key: idempotencyKey || `verify_${reference}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
         }
-        // paystack-secure returns { status: true, data: {...} }
-        if (res?.status === true) {
-          return {
-            success: true,
-            data: {
-              status: res.data?.status || 'success',
-              amount: typeof res.data?.amount === 'number' ? res.data.amount / 100 : 0,
-              customer: res.data?.customer,
-              metadata: res.data?.metadata,
-              paid_at: res.data?.paid_at,
-              channel: res.data?.channel
-            }
-          };
-        }
-        return { success: false, error: res?.error || res?.message || 'Payment verification failed' };
-      };
-
-      if (!primaryError && primaryData) {
-        const normalized = normalize(primaryData);
-        if (normalized.success) return normalized;
-      }
-
-      // Fallback to secure verifier
-      const { data, error } = await supabase.functions.invoke('paystack-secure', {
-        body: { action: 'verify', reference }
       });
 
       if (error) {
-        return { success: false, error: error.message };
+        return { 
+          success: false, 
+          error: error.message || 'Payment verification failed' 
+        };
       }
 
-      return normalize(data);
+      // Handle successful verification
+      if (data?.success === true) {
+        return {
+          success: true,
+          data: {
+            status: 'success',
+            amount: data.amount || 0, // Amount already converted from kobo to naira
+            customer: data.customer || null,
+            metadata: data.metadata || null,
+            paid_at: data.paid_at || '',
+            channel: data.channel || '',
+            order_id: data.order_id,
+            order_number: data.order_number,
+            amount_verified: data.amount_verified || false
+          }
+        };
+      }
+
+      return { 
+        success: false, 
+        error: data?.error || 'Payment verification failed' 
+      };
+      
     } catch (error) {
       console.error('Payment verification error:', error);
       return {

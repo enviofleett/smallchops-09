@@ -1,359 +1,271 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Helper functions
-function getClientIP(request: Request): string {
-  const forwardedFor = request.headers.get('x-forwarded-for')
-  const realIP = request.headers.get('x-real-ip')
-  const cfConnectingIP = request.headers.get('cf-connecting-ip')
-  
-  return cfConnectingIP || realIP || forwardedFor?.split(',')[0]?.trim() || 'unknown'
-}
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-paystack-signature',
+};
 
-function isPaystackIP(clientIP: string): boolean {
-  const PAYSTACK_IPS = [
-    '52.31.139.75',
-    '52.49.173.169', 
-    '52.214.14.220'
-  ]
-  return PAYSTACK_IPS.includes(clientIP)
-}
-
-function verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
-  try {
-    // Basic signature verification - should be enhanced with proper crypto
-    return signature && secret && payload && signature.length > 0
-  } catch (error) {
-    console.error('Signature verification error:', error)
-    return false
-  }
-}
-
-async function logSecurityIncident(type: string, severity: string, description: string, userId?: string, ipAddress?: string, userAgent?: string, signature?: string) {
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-    
-    await supabase
-      .from('security_incidents')
-      .insert({
-        type,
-        severity,
-        description,
-        user_id: userId,
-        ip_address: ipAddress,
-        user_agent: userAgent,
-        received_signature: signature,
-        created_at: new Date().toISOString()
-      })
-  } catch (error) {
-    console.error('Failed to log security incident:', error)
-  }
-}
-
-// FIXED: Make webhook public to prevent JWT issues
-export const _config = {
-  verify_jwt: false
+interface PaystackWebhookEvent {
+  event: string;
+  data: {
+    id: number;
+    status: string;
+    reference: string;
+    amount: number;
+    gateway_response: string;
+    paid_at: string;
+    created_at: string;
+    channel: string;
+    currency: string;
+    customer: any;
+    metadata?: any;
+  };
 }
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
-  const rawBody = await req.text()
-  const clientIP = getClientIP(req)
-  
-  console.log(`🎯 WEBHOOK: ${req.method} from ${clientIP}`)
-  console.log(`📦 Payload length: ${rawBody.length}`)
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { 
+      status: 405, 
+      headers: corsHeaders 
+    });
+  }
 
   try {
-    if (req.method !== 'POST') {
-      return new Response('Method not allowed', { 
-        status: 405, 
+    // Get the raw body for signature verification
+    const rawBody = await req.text();
+    const paystackSignature = req.headers.get('x-paystack-signature');
+    
+    console.log('🔐 Webhook received:', {
+      hasSignature: !!paystackSignature,
+      bodyLength: rawBody.length,
+      timestamp: new Date().toISOString()
+    });
+
+    // Verify webhook signature
+    const webhookSecret = Deno.env.get('PAYSTACK_WEBHOOK_SECRET');
+    if (!webhookSecret) {
+      console.error('❌ PAYSTACK_WEBHOOK_SECRET not configured');
+      return new Response('Webhook secret not configured', { 
+        status: 500, 
         headers: corsHeaders 
-      })
+      });
     }
 
-    // Get Paystack configuration 
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
-    if (!paystackSecretKey) {
-      console.error('❌ PAYSTACK_SECRET_KEY not configured')
-      return new Response('Configuration error', { 
-        status: 503, 
-        headers: corsHeaders 
-      })
+    if (paystackSignature) {
+      const crypto = new TextEncoder().encode(webhookSecret);
+      const key = await crypto.subtle.importKey(
+        'raw',
+        crypto,
+        { name: 'HMAC', hash: 'SHA-512' },
+        false,
+        ['sign']
+      );
+      
+      const signature = await crypto.subtle.sign(
+        'HMAC',
+        key,
+        new TextEncoder().encode(rawBody)
+      );
+      
+      const expectedSignature = Array.from(new Uint8Array(signature))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('');
+        
+      if (paystackSignature !== expectedSignature) {
+        console.error('❌ Invalid webhook signature');
+        return new Response('Invalid signature', { 
+          status: 401, 
+          headers: corsHeaders 
+        });
+      }
     }
 
-    // TEMPORARY: Allow all webhooks for debugging (remove in production)
-    console.log(`⚠️ WEBHOOK SECURITY TEMPORARILY DISABLED FOR DEBUGGING`)
-    console.log(`📍 Request from IP: ${clientIP}`)
+    // Parse the webhook payload
+    const event: PaystackWebhookEvent = JSON.parse(rawBody);
     
-    const webhookData = JSON.parse(rawBody)
-    const { event, data } = webhookData
-    
-    console.log(`🎯 Processing webhook: ${event}`, {
-      reference: data?.reference,
-      status: data?.status,
-      amount: data?.amount ? (data.amount / 100) : 'unknown'
-    })
+    console.log('📨 Processing webhook event:', {
+      event: event.event,
+      reference: event.data?.reference,
+      amount: event.data?.amount,
+      status: event.data?.status
+    });
 
     // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    switch (event) {
-      case 'charge.success': {
-        const reference = data.reference
-        const amount = data.amount / 100 // Convert from kobo
-        
-        console.log(`💰 SUCCESS: ${reference}, ₦${amount}`)
+    // Generate idempotency key for this webhook event
+    const idempotencyKey = `webhook_${event.data.id}_${event.event}_${Date.now()}`;
 
-        // ENHANCED: Try multiple reference lookup strategies
-        let order = null
-        let lookupMethod = ''
+    // Check if this webhook event was already processed
+    const { data: existingTransaction } = await supabase
+      .from('payment_transactions')
+      .select('id, webhook_event_id')
+      .eq('webhook_event_id', event.data.id.toString())
+      .single();
 
-        // Strategy 1: Direct order lookup by payment reference
-        const { data: orderByRef, error: refError } = await supabase
-          .from('orders')
-          .select('*')
-          .or(`payment_reference.eq.${reference},paystack_reference.eq.${reference}`)
-          .single()
-
-        if (orderByRef && !refError) {
-          order = orderByRef
-          lookupMethod = 'direct_reference'
-          console.log(`📋 Found order by reference: ${order.id}`)
-        } else {
-          // Strategy 2: Find by order_id in webhook metadata
-          const orderId = data.metadata?.order_id
-          if (orderId) {
-            const { data: orderById, error: idError } = await supabase
-              .from('orders')
-              .select('*')
-              .eq('id', orderId)
-              .single()
-
-            if (orderById && !idError) {
-              order = orderById
-              lookupMethod = 'metadata_order_id'
-              console.log(`📋 Found order by metadata ID: ${order.id}`)
-            }
-          }
-        }
-
-        // Strategy 3: Find by amount and recent timestamp (fallback)
-        if (!order) {
-          const { data: ordersByAmount, error: amountError } = await supabase
-            .from('orders')
-            .select('*')
-            .eq('total_amount', amount)
-            .eq('payment_status', 'pending')
-            .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
-            .order('created_at', { ascending: false })
-            .limit(1)
-
-          if (ordersByAmount && ordersByAmount.length > 0 && !amountError) {
-            order = ordersByAmount[0]
-            lookupMethod = 'amount_time_match'
-            console.log(`📋 Found order by amount/time: ${order.id}`)
-          }
-        }
-
-        if (!order) {
-          console.error(`❌ No order found for payment: ${reference}`)
-          
-          // Create orphaned payment record
-          await supabase
-            .from('payment_transactions')
-            .insert({
-              provider_reference: reference,
-              amount,
-              currency: data.currency || 'NGN',
-              status: 'orphaned',
-              gateway_response: 'Webhook payment - no matching order found',
-              metadata: { 
-                paystack_data: data,
-                webhook_timestamp: new Date().toISOString(),
-                lookup_method: 'all_failed'
-              }
-            })
-
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Order not found',
-            reference
-          }), {
-            status: 404,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          })
-        }
-
-        // Update order with resilient error handling
-        const { error: orderUpdateError } = await supabase
-          .from('orders')
-          .update({
-            payment_status: 'paid',
-            status: 'confirmed',
-            paystack_reference: reference,
-            paid_at: new Date(data.paid_at || new Date()),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', order.id)
-
-        if (orderUpdateError) {
-          console.error('❌ Failed to update order:', orderUpdateError)
-          // Continue processing - don't fail the webhook
-        } else {
-          console.log(`✅ Order ${order.id} updated (method: ${lookupMethod})`)
-        }
-
-        // Update/create payment transaction with resilient handling
-        try {
-          await supabase
-            .from('payment_transactions')
-            .upsert({
-              provider_reference: reference,
-              order_id: order.id,
-              amount,
-              currency: data.currency || 'NGN',
-              status: 'paid',
-              gateway_response: data.gateway_response || 'Webhook payment success',
-              metadata: {
-                paystack_data: data,
-                webhook_processed_at: new Date().toISOString(),
-                lookup_method
-              },
-              paid_at: data.paid_at || new Date().toISOString(),
-              processed_at: new Date().toISOString()
-            }, {
-              onConflict: 'provider_reference'
-            })
-          
-          console.log(`✅ Payment transaction updated for ${reference}`)
-        } catch (ptError) {
-          console.error('⚠️ Payment transaction update failed:', ptError)
-          // Don't fail webhook - order is already updated
-        }
-
-        // Log audit trail
-        try {
-          await supabase
-            .from('audit_logs')
-            .insert({
-              action: 'webhook_payment_success_fixed',
-              category: 'Payment Processing',
-              message: `Payment confirmed via webhook: ${reference} (${lookupMethod})`,
-              entity_id: order.id,
-              new_values: {
-                reference,
-                amount,
-                channel: data.channel,
-                lookup_method
-              }
-            })
-        } catch (auditError) {
-          console.error('⚠️ Audit log failed:', auditError)
-        }
-
-        break
-      }
-
-      case 'charge.failed': {
-        const reference = data.reference
-        
-        console.log(`❌ FAILED: ${reference}`)
-
-        // Find order (same strategy as success)
-        const { data: order } = await supabase
-          .from('orders')
-          .select('*')
-          .or(`payment_reference.eq.${reference},paystack_reference.eq.${reference}`)
-          .single()
-
-        if (order) {
-          // Update order status
-          await supabase
-            .from('orders')
-            .update({
-              payment_status: 'failed',
-              status: 'payment_failed',
-              updated_at: new Date().toISOString()
-            })
-            .eq('id', order.id)
-
-          console.log(`✅ Order ${order.id} marked as failed`)
-        }
-
-        // Update/create payment transaction
-        await supabase
-          .from('payment_transactions')
-          .upsert({
-            provider_reference: reference,
-            order_id: order?.id,
-            amount: data.amount ? data.amount / 100 : 0,
-            currency: data.currency || 'NGN',
-            status: 'failed',
-            gateway_response: data.gateway_response || 'Payment failed',
-            metadata: {
-              paystack_data: data,
-              webhook_processed_at: new Date().toISOString()
-            },
-            processed_at: new Date().toISOString()
-          }, {
-            onConflict: 'provider_reference'
-          })
-
-        break
-      }
-
-      default:
-        console.log(`ℹ️ Unhandled webhook event: ${event}`)
+    if (existingTransaction) {
+      console.log('✅ Webhook already processed:', event.data.id);
+      return new Response(JSON.stringify({ message: 'Already processed' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
     }
 
-    return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: 'Webhook processed successfully',
-        event,
-        timestamp: new Date().toISOString()
-      }),
-      { 
-        status: 200, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+    if (event.event === 'charge.success') {
+      // Process successful payment
+      const amountKobo = event.data.amount; // Paystack sends amount in kobo
+      const reference = event.data.reference;
+
+      try {
+        // Use atomic payment processing function
+        const { data: processResult, error: processError } = await supabase
+          .rpc('process_payment_atomically', {
+            p_payment_reference: reference,
+            p_idempotency_key: idempotencyKey,
+            p_amount_kobo: amountKobo,
+            p_status: 'confirmed',
+            p_webhook_event_id: event.data.id.toString()
+          });
+
+        if (processError) {
+          console.error('❌ Payment processing failed:', processError);
+          
+          // Log orphaned payment for manual review
+          await supabase.from('payment_transactions').insert({
+            provider_reference: reference,
+            amount: amountKobo / 100, // Convert kobo to naira
+            amount_kobo: amountKobo,
+            currency: 'NGN',
+            status: 'orphaned',
+            idempotency_key: idempotencyKey,
+            webhook_event_id: event.data.id.toString(),
+            last_webhook_at: new Date().toISOString(),
+            provider_response: event.data,
+            customer_email: event.data.customer?.email || null
+          });
+
+          return new Response(JSON.stringify({ 
+            message: 'Payment logged as orphaned', 
+            reference 
+          }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+
+        console.log('✅ Payment processed successfully:', {
+          reference,
+          orderId: processResult?.[0]?.order_id,
+          orderNumber: processResult?.[0]?.order_number
+        });
+
+        // Trigger communication event for payment confirmation
+        if (processResult?.[0]?.order_id) {
+          await supabase.from('communication_events').insert({
+            order_id: processResult[0].order_id,
+            event_type: 'payment_confirmed_webhook',
+            recipient_email: event.data.customer?.email || null,
+            template_key: 'payment_confirmation',
+            status: 'queued',
+            variables: {
+              customerName: event.data.customer?.first_name || 'Customer',
+              orderNumber: processResult[0].order_number,
+              amount: (amountKobo / 100).toFixed(2),
+              paymentMethod: event.data.channel || 'Online Payment',
+              paidAt: event.data.paid_at
+            }
+          });
+        }
+
+      } catch (error) {
+        console.error('❌ Critical payment processing error:', error);
+        
+        // Log critical error for immediate attention
+        await supabase.from('audit_logs').insert({
+          action: 'webhook_payment_processing_failed',
+          category: 'Payment Critical',
+          message: `Critical webhook processing failure: ${error.message}`,
+          new_values: {
+            reference,
+            amount_kobo: amountKobo,
+            event_id: event.data.id,
+            error: error.message
+          }
+        });
+
+        return new Response(JSON.stringify({ 
+          message: 'Critical error logged', 
+          reference 
+        }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
-    )
+
+    } else if (event.event === 'charge.failed') {
+      // Process failed payment
+      const reference = event.data.reference;
+      const amountKobo = event.data.amount;
+
+      try {
+        const { error: processError } = await supabase
+          .rpc('process_payment_atomically', {
+            p_payment_reference: reference,
+            p_idempotency_key: idempotencyKey,
+            p_amount_kobo: amountKobo,
+            p_status: 'failed',
+            p_webhook_event_id: event.data.id.toString()
+          });
+
+        if (processError) {
+          console.warn('⚠️  Failed payment processing warning:', processError.message);
+        }
+
+        console.log('📝 Failed payment recorded:', reference);
+
+      } catch (error) {
+        console.error('❌ Failed payment logging error:', error);
+      }
+
+    } else {
+      // Log unhandled webhook events for monitoring
+      console.log('ℹ️  Unhandled webhook event:', event.event);
+      
+      await supabase.from('audit_logs').insert({
+        action: 'webhook_unhandled_event',
+        category: 'Webhook Monitoring',
+        message: `Unhandled webhook event: ${event.event}`,
+        new_values: {
+          event: event.event,
+          reference: event.data?.reference,
+          event_id: event.data?.id
+        }
+      });
+    }
+
+    return new Response(JSON.stringify({ message: 'Webhook processed' }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
 
   } catch (error) {
-    console.error('❌ Webhook processing error:', error)
+    console.error('❌ Webhook processing error:', error);
     
-    // Log the error but return 200 to prevent retries for parsing errors
-    return new Response(
-      JSON.stringify({
-        success: false,
-        error: 'Webhook processing failed',
-        message: error.message,
-        timestamp: new Date().toISOString()
-      }),
-      { 
-        status: 200, // Return 200 to prevent retries for malformed payloads
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
+    // Return 200 to prevent Paystack retries for malformed data
+    return new Response(JSON.stringify({ 
+      message: 'Error logged', 
+      error: error.message 
+    }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    });
   }
-})
-
-/*
-🔧 HOTFIXED PAYSTACK WEBHOOK 
-- ✅ Made public (verify_jwt: false) to prevent JWT errors
-- ✅ Enhanced order lookup with multiple strategies  
-- ✅ Graceful error handling (doesn't fail on analytics errors)
-- ✅ Creates orphaned payment records for unmatched payments
-- ✅ Temporarily disabled security for debugging production issues
-- ⚠️ RE-ENABLE SECURITY AFTER DEBUGGING!
-*/
+});

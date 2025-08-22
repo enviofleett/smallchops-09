@@ -1,232 +1,224 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { getCorsHeaders } from '../_shared/cors.ts';
-import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts';
 
-const VERSION = "v2025-08-22-batch-verifier";
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
-// Enhanced logging function
-function log(level: 'info' | 'warn' | 'error', message: string, data?: any) {
-  const timestamp = new Date().toISOString();
-  const logMessage = `[${timestamp}] [batch-verifier ${VERSION}] ${level.toUpperCase()}: ${message}`;
-  
-  if (data) {
-    console.log(logMessage, data);
-  } else {
-    console.log(logMessage);
-  }
+interface BatchVerificationRequest {
+  batch_size?: number;
+  max_age_hours?: number;
 }
 
-serve(async (req: Request) => {
-  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
-  
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { 
+      status: 405, 
+      headers: corsHeaders 
+    });
+  }
+
   try {
-    log('info', '🔄 Batch payment verifier started');
-    
+    const { 
+      batch_size = 50, 
+      max_age_hours = 24 
+    }: BatchVerificationRequest = await req.json();
+
+    console.log('🔄 Starting batch payment verification:', { batch_size, max_age_hours });
+
     // Initialize Supabase client
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get Paystack configuration
-    let paystackConfig;
-    try {
-      paystackConfig = getPaystackConfig(req);
-      const validation = validatePaystackConfig(paystackConfig);
-      
-      if (!validation.isValid) {
-        log('error', '❌ Paystack configuration invalid', { errors: validation.errors });
-        return new Response(JSON.stringify({
-          success: false,
-          error: 'Payment service configuration error',
-          details: validation.errors
-        }), {
-          status: 503,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-      
-      logPaystackConfigStatus(paystackConfig);
-    } catch (configError) {
-      log('error', '❌ Configuration error', { error: configError.message });
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Configuration error',
-        details: configError.message
-      }), {
-        status: 503,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Get pending payments that need verification
-    const { data: pendingPayments, error: fetchError } = await supabase
-      .from('payment_transactions')
-      .select('reference, provider_reference, order_id, amount, created_at')
-      .in('status', ['pending', 'initialized'])
-      .lt('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // At least 5 minutes old
-      .limit(50);
-
-    if (fetchError) {
-      log('error', '❌ Failed to fetch pending payments', { error: fetchError });
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Database error',
-        details: fetchError.message
+    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+    if (!paystackSecretKey) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Payment service not configured' 
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    if (!pendingPayments || pendingPayments.length === 0) {
-      log('info', '✅ No pending payments to verify');
+    // Fetch pending payments for reconciliation
+    const cutoffTime = new Date();
+    cutoffTime.setHours(cutoffTime.getHours() - max_age_hours);
+
+    const { data: pendingTransactions, error: fetchError } = await supabase
+      .from('payment_transactions')
+      .select('id, provider_reference, amount_kobo, order_id, status, created_at')
+      .in('status', ['pending', 'processing'])
+      .gte('created_at', cutoffTime.toISOString())
+      .order('created_at', { ascending: true })
+      .limit(batch_size);
+
+    if (fetchError) {
+      console.error('❌ Failed to fetch pending transactions:', fetchError);
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: 'Failed to fetch pending transactions' 
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    console.log(`📋 Found ${pendingTransactions?.length || 0} pending transactions to verify`);
+
+    if (!pendingTransactions || pendingTransactions.length === 0) {
       return new Response(JSON.stringify({
         success: true,
-        message: 'No pending payments found',
-        verified_count: 0
+        processed: 0,
+        verified: 0,
+        failed: 0,
+        message: 'No pending transactions to verify'
       }), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    log('info', `🔍 Found ${pendingPayments.length} pending payments to verify`);
+    let processed = 0;
+    let verified = 0;
+    let failed = 0;
+    const errors: string[] = [];
 
-    const results = {
-      total: pendingPayments.length,
-      verified: 0,
-      failed: 0,
-      errors: [] as string[]
-    };
-
-    // Process each payment with rate limiting
-    for (const payment of pendingPayments) {
-      const reference = payment.provider_reference || payment.reference;
-      
+    // Process each transaction with rate limiting
+    for (const transaction of pendingTransactions) {
       try {
-        log('info', `🔍 Verifying payment: ${reference}`);
-        
-        // Verify with Paystack
-        const verificationResult = await verifyPaymentWithPaystack(reference, paystackConfig);
-        
-        if (verificationResult.success) {
-          // Use the verify-payment function to handle the update
-          const { error: updateError } = await supabase.functions.invoke('verify-payment', {
-            body: { reference },
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`
-            }
-          });
+        console.log(`🔍 Verifying transaction: ${transaction.provider_reference}`);
 
-          if (!updateError) {
-            results.verified++;
-            log('info', `✅ Payment verified: ${reference}`);
-          } else {
-            results.failed++;
-            results.errors.push(`Update failed for ${reference}: ${updateError.message}`);
-            log('error', `❌ Update failed for ${reference}`, { error: updateError });
+        // Rate limiting: 10 requests per second max
+        if (processed > 0 && processed % 10 === 0) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+
+        // Verify with Paystack
+        const paystackResponse = await fetch(
+          `https://api.paystack.co/transaction/verify/${transaction.provider_reference}`,
+          {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${paystackSecretKey}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+
+        if (!paystackResponse.ok) {
+          console.warn(`⚠️  Paystack verification failed for ${transaction.provider_reference}: ${paystackResponse.statusText}`);
+          failed++;
+          errors.push(`${transaction.provider_reference}: Paystack API error`);
+          continue;
+        }
+
+        const paystackData = await paystackResponse.json();
+        
+        if (paystackData.status && paystackData.data?.status === 'success') {
+          // Payment successful - use atomic processing with idempotency
+          const idempotencyKey = `batch_verify_${transaction.id}_${Date.now()}`;
+          
+          try {
+            const { error: processError } = await supabase
+              .rpc('process_payment_atomically', {
+                p_payment_reference: transaction.provider_reference,
+                p_idempotency_key: idempotencyKey,
+                p_amount_kobo: paystackData.data.amount,
+                p_status: 'confirmed'
+              });
+
+            if (processError) {
+              console.error(`❌ Atomic processing failed for ${transaction.provider_reference}:`, processError);
+              failed++;
+              errors.push(`${transaction.provider_reference}: Processing error - ${processError.message}`);
+            } else {
+              verified++;
+              console.log(`✅ Verified and processed: ${transaction.provider_reference}`);
+            }
+          } catch (processErr) {
+            console.error(`❌ Critical processing error for ${transaction.provider_reference}:`, processErr);
+            failed++;
+            errors.push(`${transaction.provider_reference}: Critical processing error`);
+          }
+          
+        } else if (paystackData.data?.status === 'failed' || paystackData.data?.status === 'abandoned') {
+          // Payment failed - mark as failed
+          const idempotencyKey = `batch_verify_failed_${transaction.id}_${Date.now()}`;
+          
+          try {
+            await supabase
+              .rpc('process_payment_atomically', {
+                p_payment_reference: transaction.provider_reference,
+                p_idempotency_key: idempotencyKey,
+                p_amount_kobo: paystackData.data.amount || transaction.amount_kobo,
+                p_status: 'failed'
+              });
+
+            console.log(`❌ Marked as failed: ${transaction.provider_reference}`);
+          } catch (failedProcessErr) {
+            console.error(`❌ Failed to process failed payment ${transaction.provider_reference}:`, failedProcessErr);
           }
         } else {
-          results.failed++;
-          results.errors.push(`Verification failed for ${reference}: ${verificationResult.error}`);
-          log('error', `❌ Verification failed for ${reference}`, { error: verificationResult.error });
+          console.log(`⏳ Still pending: ${transaction.provider_reference} (status: ${paystackData.data?.status})`);
         }
-        
-        // Rate limiting: wait 100ms between requests
-        await new Promise(resolve => setTimeout(resolve, 100));
-        
+
+        processed++;
+
       } catch (error) {
-        results.failed++;
-        results.errors.push(`Exception for ${reference}: ${error.message}`);
-        log('error', `❌ Exception verifying ${reference}`, { error: error.message });
+        console.error(`❌ Error processing transaction ${transaction.provider_reference}:`, error);
+        failed++;
+        errors.push(`${transaction.provider_reference}: ${error.message}`);
+        processed++;
       }
     }
 
-    log('info', '✅ Batch verification completed', results);
+    // Log batch verification results
+    await supabase.from('audit_logs').insert({
+      action: 'batch_payment_verification_completed',
+      category: 'Payment Reconciliation',
+      message: `Batch verification completed: ${processed} processed, ${verified} verified, ${failed} failed`,
+      new_values: {
+        processed,
+        verified,
+        failed,
+        batch_size,
+        max_age_hours,
+        errors: errors.slice(0, 10), // Limit error details
+        timestamp: new Date().toISOString()
+      }
+    });
+
+    console.log('✅ Batch verification completed:', { processed, verified, failed });
 
     return new Response(JSON.stringify({
       success: true,
-      results,
-      message: `Verified ${results.verified}/${results.total} payments`
+      processed,
+      verified,
+      failed,
+      errors: errors.slice(0, 5), // Return first 5 errors only
+      message: `Batch verification completed: ${verified} verified, ${failed} failed out of ${processed} processed`
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
 
   } catch (error) {
-    log('error', '❌ Batch verifier error', { error: error.message, stack: error.stack });
+    console.error('❌ Batch verification error:', error);
+    
     return new Response(JSON.stringify({
       success: false,
-      error: 'Batch verification failed',
-      details: error.message
+      error: error.message || 'Batch verification failed'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });
-
-// Verify payment with Paystack API
-async function verifyPaymentWithPaystack(reference: string, paystackConfig: any) {
-  try {
-    const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
-      method: 'GET',
-      headers: {
-        'Authorization': `Bearer ${paystackConfig.secretKey}`,
-        'Content-Type': 'application/json',
-        'User-Agent': `PaystackBatchVerifier/${VERSION}`
-      },
-      signal: AbortSignal.timeout(15000)
-    });
-
-    const responseText = await response.text();
-    
-    if (!response.ok) {
-      return {
-        success: false,
-        error: `Paystack API error: ${response.status} - ${responseText}`
-      };
-    }
-
-    let data;
-    try {
-      data = JSON.parse(responseText);
-    } catch (parseError) {
-      return {
-        success: false,
-        error: 'Invalid response format from Paystack'
-      };
-    }
-
-    if (!data.status) {
-      return {
-        success: false,
-        error: data.message || 'Paystack verification failed'
-      };
-    }
-
-    if (data.data.status !== 'success') {
-      return {
-        success: false,
-        error: `Payment status is ${data.data.status}`
-      };
-    }
-
-    return {
-      success: true,
-      data: data.data
-    };
-
-  } catch (error) {
-    return {
-      success: false,
-      error: `Verification failed: ${error.message}`
-    };
-  }
-}

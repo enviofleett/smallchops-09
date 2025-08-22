@@ -4454,6 +4454,7 @@ export type Database = {
       }
       orders: {
         Row: {
+          amount_kobo: number | null
           assigned_rider_id: string | null
           created_at: string
           created_by: string | null
@@ -4471,6 +4472,7 @@ export type Database = {
           estimated_delivery_date: string | null
           guest_session_id: string | null
           id: string
+          idempotency_key: string | null
           order_number: string
           order_time: string
           order_type: Database["public"]["Enums"]["order_type"]
@@ -4484,6 +4486,7 @@ export type Database = {
           pickup_ready: boolean | null
           pickup_time: string | null
           preferred_delivery_time: string | null
+          processing_lock: boolean | null
           reference_updated_at: string | null
           special_instructions: string | null
           status: Database["public"]["Enums"]["order_status"]
@@ -4497,6 +4500,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          amount_kobo?: number | null
           assigned_rider_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -4514,6 +4518,7 @@ export type Database = {
           estimated_delivery_date?: string | null
           guest_session_id?: string | null
           id?: string
+          idempotency_key?: string | null
           order_number: string
           order_time?: string
           order_type?: Database["public"]["Enums"]["order_type"]
@@ -4527,6 +4532,7 @@ export type Database = {
           pickup_ready?: boolean | null
           pickup_time?: string | null
           preferred_delivery_time?: string | null
+          processing_lock?: boolean | null
           reference_updated_at?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -4540,6 +4546,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          amount_kobo?: number | null
           assigned_rider_id?: string | null
           created_at?: string
           created_by?: string | null
@@ -4557,6 +4564,7 @@ export type Database = {
           estimated_delivery_date?: string | null
           guest_session_id?: string | null
           id?: string
+          idempotency_key?: string | null
           order_number?: string
           order_time?: string
           order_type?: Database["public"]["Enums"]["order_type"]
@@ -4570,6 +4578,7 @@ export type Database = {
           pickup_ready?: boolean | null
           pickup_time?: string | null
           preferred_delivery_time?: string | null
+          processing_lock?: boolean | null
           reference_updated_at?: string | null
           special_instructions?: string | null
           status?: Database["public"]["Enums"]["order_status"]
@@ -5445,6 +5454,7 @@ export type Database = {
           access_code: string | null
           account_name: string | null
           amount: number
+          amount_kobo: number | null
           authorization_code: string | null
           authorization_url: string | null
           bank: string | null
@@ -5460,12 +5470,15 @@ export type Database = {
           fees: number | null
           gateway_response: string | null
           id: string
+          idempotency_key: string | null
+          last_webhook_at: string | null
           last4: string | null
           metadata: Json | null
           order_id: string | null
           paid_at: string | null
           payment_method: string | null
           processed_at: string | null
+          processing_lock: boolean | null
           provider: string
           provider_reference: string | null
           provider_response: Json | null
@@ -5476,11 +5489,13 @@ export type Database = {
           transaction_type: string
           updated_at: string | null
           verified_at: string | null
+          webhook_event_id: string | null
         }
         Insert: {
           access_code?: string | null
           account_name?: string | null
           amount: number
+          amount_kobo?: number | null
           authorization_code?: string | null
           authorization_url?: string | null
           bank?: string | null
@@ -5496,12 +5511,15 @@ export type Database = {
           fees?: number | null
           gateway_response?: string | null
           id?: string
+          idempotency_key?: string | null
+          last_webhook_at?: string | null
           last4?: string | null
           metadata?: Json | null
           order_id?: string | null
           paid_at?: string | null
           payment_method?: string | null
           processed_at?: string | null
+          processing_lock?: boolean | null
           provider?: string
           provider_reference?: string | null
           provider_response?: Json | null
@@ -5512,11 +5530,13 @@ export type Database = {
           transaction_type?: string
           updated_at?: string | null
           verified_at?: string | null
+          webhook_event_id?: string | null
         }
         Update: {
           access_code?: string | null
           account_name?: string | null
           amount?: number
+          amount_kobo?: number | null
           authorization_code?: string | null
           authorization_url?: string | null
           bank?: string | null
@@ -5532,12 +5552,15 @@ export type Database = {
           fees?: number | null
           gateway_response?: string | null
           id?: string
+          idempotency_key?: string | null
+          last_webhook_at?: string | null
           last4?: string | null
           metadata?: Json | null
           order_id?: string | null
           paid_at?: string | null
           payment_method?: string | null
           processed_at?: string | null
+          processing_lock?: boolean | null
           provider?: string
           provider_reference?: string | null
           provider_response?: Json | null
@@ -5548,6 +5571,7 @@ export type Database = {
           transaction_type?: string
           updated_at?: string | null
           verified_at?: string | null
+          webhook_event_id?: string | null
         }
         Relationships: [
           {
@@ -8214,6 +8238,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_payment_idempotency_key: {
+        Args: { p_prefix?: string }
+        Returns: string
+      }
       generate_payment_reference: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -8844,6 +8872,22 @@ export type Database = {
       process_email_queue_secure: {
         Args: { batch_size?: number; priority_filter?: string }
         Returns: Json
+      }
+      process_payment_atomically: {
+        Args: {
+          p_amount_kobo: number
+          p_idempotency_key: string
+          p_payment_reference: string
+          p_status?: string
+          p_webhook_event_id?: string
+        }
+        Returns: {
+          amount_verified: boolean
+          new_status: string
+          order_id: string
+          order_number: string
+          previous_status: string
+        }[]
       }
       process_stuck_emails: {
         Args: Record<PropertyKey, never>

@@ -126,6 +126,7 @@ const queryClient = new QueryClient({
 if (typeof window !== 'undefined') {
   preloadRoute(() => import("./pages/PublicProducts"));
   preloadRoute(() => import("./pages/Cart"));
+  preloadRoute(() => import("./pages/Checkout"));
   preloadRoute(() => import("./pages/Booking"));
 }
 

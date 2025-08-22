@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts"
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { getCorsHeaders } from '../_shared/cors.ts'
+import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts'
 
 interface PaystackInitializePayload {
   email: string
@@ -22,37 +24,59 @@ interface PaystackResponse {
   meta?: any
 }
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-}
+const VERSION = "v2025-08-22-centralized-config"
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
+  
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
   try {
+    console.log(`🔄 Paystack secure function called [${VERSION}]`)
+    
+    // Initialize Supabase client
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
-    if (!paystackSecretKey) {
-      console.error('❌ PAYSTACK_SECRET_KEY not configured')
+    // Get environment-specific Paystack configuration
+    let paystackConfig;
+    try {
+      paystackConfig = getPaystackConfig(req);
+      const validation = validatePaystackConfig(paystackConfig);
+      
+      if (!validation.isValid) {
+        console.error('❌ Paystack configuration invalid:', validation.errors);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Payment service configuration error',
+          code: 'PAYSTACK_CONFIG_INVALID',
+          details: validation.errors.join(', ')
+        }), {
+          status: 503,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+      }
+      
+      logPaystackConfigStatus(paystackConfig);
+      
+    } catch (configError) {
+      console.error('❌ Environment config failed:', configError);
       return new Response(JSON.stringify({
         success: false,
-        error: 'Payment service configuration error'
+        error: 'Payment service configuration error',
+        code: 'CONFIG_ERROR',
+        details: configError.message
       }), {
-        status: 500,
+        status: 503,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       })
     }
 
     const requestBody = await req.json()
-    console.log('🔄 Paystack secure function called [v2025-08-21-production-fix]')
     console.log('📨 Request payload:', JSON.stringify(requestBody))
 
     const { action, email, amount, reference, metadata, callback_url } = requestBody
@@ -60,7 +84,7 @@ serve(async (req) => {
     if (action === 'initialize') {
       return await initializePayment({
         supabaseAdmin,
-        paystackSecretKey,
+        paystackConfig,
         email,
         amount,
         reference,
@@ -73,7 +97,7 @@ serve(async (req) => {
     if (action === 'verify') {
       return await verifyPayment({
         supabaseAdmin,
-        paystackSecretKey,
+        paystackConfig,
         reference: reference || requestBody.reference,
         corsHeaders
       })
@@ -101,7 +125,7 @@ serve(async (req) => {
 
 async function initializePayment({
   supabaseAdmin,
-  paystackSecretKey,
+  paystackConfig,
   email,
   amount,
   reference,
@@ -253,8 +277,8 @@ async function initializePayment({
       }
     }
 
-    const keyEnvironment = paystackSecretKey.includes('test') ? 'TEST' : 'LIVE';
-    console.log('🔑 Using Paystack secret key:', paystackSecretKey.substring(0, 10) + '...', `[${keyEnvironment}]`)
+    const keyEnvironment = paystackConfig.isTestMode ? 'TEST' : 'LIVE';
+    console.log('🔑 Using Paystack secret key:', paystackConfig.secretKey.substring(0, 10) + '...', `[${keyEnvironment}]`)
     console.log('💳 Initializing payment:', finalReference, 'for', email, 'amount: ₦' + authoritativeAmount)
     console.log('🔗 Callback URL configured (no reference injection):', paystackPayload.callback_url)
     console.log('📝 Canonical reference for verification:', finalReference)
@@ -269,10 +293,12 @@ async function initializePayment({
       const response = await fetch('https://api.paystack.co/transaction/initialize', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${paystackSecretKey}`,
+          'Authorization': `Bearer ${paystackConfig.secretKey}`,
           'Content-Type': 'application/json',
+          'User-Agent': `PaystackSecure/${VERSION}`
         },
-        body: JSON.stringify(paystackPayload)
+        body: JSON.stringify(paystackPayload),
+        signal: AbortSignal.timeout(15000) // 15 second timeout
       })
 
       console.log('📡 Paystack response status:', response.status)
@@ -369,7 +395,7 @@ async function initializePayment({
 
 async function verifyPayment({
   supabaseAdmin,
-  paystackSecretKey,
+  paystackConfig,
   reference,
   corsHeaders
 }: any) {
@@ -379,9 +405,11 @@ async function verifyPayment({
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${paystackSecretKey}`,
+        'Authorization': `Bearer ${paystackConfig.secretKey}`,
         'Content-Type': 'application/json',
-      }
+        'User-Agent': `PaystackSecure/${VERSION}`
+      },
+      signal: AbortSignal.timeout(15000)
     })
 
     const verificationData = await response.json()

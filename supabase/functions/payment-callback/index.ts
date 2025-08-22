@@ -1,8 +1,9 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { getCorsHeaders } from '../_shared/cors.ts';
+import { getPaystackConfig, validatePaystackConfig, logPaystackConfigStatus } from '../_shared/paystack-config.ts';
 
-const VERSION = "v2025-08-21-fixed-transaction-debug";
+const VERSION = "v2025-08-22-centralized-config";
 
 // Enhanced logging function
 function log(level: 'info' | 'warn' | 'error', message: string, data?: any) {
@@ -63,7 +64,7 @@ serve(async (req: Request) => {
 
     // Step 5: Verify payment with Paystack (with retries)
     log('info', '🔍 Starting Paystack verification...');
-    const verificationResult = await verifyPaymentWithRetry(reference, 3);
+    const verificationResult = await verifyPaymentWithRetry(reference, 3, req);
     
     if (!verificationResult.success) {
       log('error', '❌ Paystack verification failed', {
@@ -248,14 +249,14 @@ async function checkExistingPayment(supabase: any, reference: string) {
 }
 
 // Enhanced Paystack verification with retry logic
-async function verifyPaymentWithRetry(reference: string, maxAttempts: number = 3) {
+async function verifyPaymentWithRetry(reference: string, maxAttempts: number = 3, req?: Request) {
   let lastError = null;
   
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
     log('info', `🔍 Paystack verification attempt ${attempt}/${maxAttempts}`, { reference });
     
     try {
-      const result = await verifyPaymentWithPaystack(reference);
+      const result = await verifyPaymentWithPaystack(reference, req);
       
       if (result.success) {
         return { ...result, attempts: attempt };
@@ -308,30 +309,30 @@ async function verifyPaymentWithRetry(reference: string, maxAttempts: number = 3
 }
 
 // Enhanced Paystack verification function
-async function verifyPaymentWithPaystack(reference: string) {
+async function verifyPaymentWithPaystack(reference: string, req?: Request) {
   try {
-    const secretKey = getPaystackSecretKey();
-    if (!secretKey) {
+    // Get centralized configuration
+    const paystackConfig = getPaystackConfiguration(req || new Request('https://example.com'));
+    if (!paystackConfig) {
       return {
         success: false,
-        error: 'Paystack secret key not configured'
+        error: 'Paystack configuration not available'
       };
     }
 
     log('info', '🔍 Making Paystack API request', {
       reference,
-      keyEnvironment: secretKey.includes('test') ? 'TEST' : 'LIVE',
-      keyPrefix: secretKey.substring(0, 10) + '...'
+      keyEnvironment: paystackConfig.isTestMode ? 'TEST' : 'LIVE',
+      keyPrefix: paystackConfig.secretKey.substring(0, 10) + '...'
     });
 
     const response = await fetch(`https://api.paystack.co/transaction/verify/${encodeURIComponent(reference)}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${secretKey}`,
+        'Authorization': `Bearer ${paystackConfig.secretKey}`,
         'Content-Type': 'application/json',
-        'User-Agent': 'PaystackCallback/2.0'
+        'User-Agent': `PaystackCallback/${VERSION}`
       },
-      // Add timeout
       signal: AbortSignal.timeout(15000)
     });
 
@@ -418,37 +419,23 @@ async function verifyPaymentWithPaystack(reference: string) {
   }
 }
 
-// Deterministic Paystack key selection (matching verify-payment logic)
-function getPaystackSecretKey(): string | null {
-  // Priority order: TEST key first, then general key, then LIVE key
-  const testKey = Deno.env.get('PAYSTACK_SECRET_KEY_TEST');
-  const generalKey = Deno.env.get('PAYSTACK_SECRET_KEY');
-  const liveKey = Deno.env.get('PAYSTACK_SECRET_KEY_LIVE');
-  
-  let selectedKey = testKey || generalKey || liveKey;
-  
-  if (!selectedKey) {
-    log('error', '❌ No Paystack secret key found in environment variables', {
-      checkedKeys: ['PAYSTACK_SECRET_KEY_TEST', 'PAYSTACK_SECRET_KEY', 'PAYSTACK_SECRET_KEY_LIVE']
-    });
+// Enhanced Paystack configuration using centralized config
+function getPaystackConfiguration(req: Request) {
+  try {
+    const config = getPaystackConfig(req);
+    const validation = validatePaystackConfig(config);
+    
+    if (!validation.isValid) {
+      log('error', '❌ Paystack configuration invalid', { errors: validation.errors });
+      return null;
+    }
+    
+    logPaystackConfigStatus(config);
+    return config;
+  } catch (error) {
+    log('error', '❌ Failed to get Paystack configuration', { error: error.message });
     return null;
   }
-
-  // Validate key format
-  if (!selectedKey.startsWith('sk_')) {
-    log('error', '❌ Invalid Paystack secret key format', {
-      keyPrefix: selectedKey.substring(0, 5)
-    });
-    return null;
-  }
-
-  log('info', '🔑 Selected Paystack key', {
-    keyType: testKey ? 'TEST' : (generalKey ? 'GENERAL' : 'LIVE'),
-    keyPrefix: selectedKey.substring(0, 10) + '...',
-    environment: selectedKey.includes('test') ? 'TEST' : 'LIVE'
-  });
-
-  return selectedKey;
 }
 
 // Process verified payment

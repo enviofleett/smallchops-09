@@ -1,65 +1,85 @@
-// Shared CORS utilities for Supabase Edge Functions
-// Environment-aware CORS configuration for production security
+// ============================================
+// CORS CONFIGURATION WITH ORIGIN ALLOWLIST
+// Centralized CORS handling for all edge functions
+// ============================================
 
-export function getAllowedOrigins(): string[] {
-  const envType = Deno.env.get('DENO_ENV') || 'development';
-  const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS') || '*';
-  
-  if (envType === 'production') {
-    return allowedOrigins.split(',').map(origin => origin.trim().toLowerCase());
-  }
-  
-  return ['*']; // Allow all in development
-}
+// Production domains that should be allowed
+const ALLOWED_ORIGINS = [
+  'https://startersmallchops.com',
+  'https://www.startersmallchops.com', 
+  'https://startersmallchops.lovableproject.com',
+  'https://startersmallchops.lovable.app',
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'http://localhost:8080',
+  // Add any additional domains as needed
+];
+
+// Paystack domains for payment callbacks
+const PAYSTACK_DOMAINS = [
+  'https://checkout.paystack.com',
+  'https://js.paystack.co',
+  'https://api.paystack.co'
+];
+
+// Development patterns
+const DEV_PATTERNS = [
+  /^http:\/\/localhost:\d+$/,
+  /^https:\/\/.*\.lovable\.app$/,
+  /^https:\/\/.*\.lovableproject\.com$/,
+  /^https:\/\/.*\.supabase\.co$/
+];
 
 export function getCorsHeaders(origin?: string | null): Record<string, string> {
-  const allowedOrigins = getAllowedOrigins();
-  const envType = Deno.env.get('DENO_ENV') || 'development';
-  
-  // For production, enforce strict origin checking
-  let allowOrigin = '*';
-  
-  if (envType === 'production' && !allowedOrigins.includes('*')) {
-    if (origin) {
-      const normalizedOrigin = origin.toLowerCase();
-      if (allowedOrigins.includes(normalizedOrigin)) {
-        allowOrigin = origin; // Use original case
-      } else {
-        // Reject unauthorized origins in production
-        allowOrigin = 'null';
-      }
-    } else {
-      allowOrigin = 'null';
-    }
-  } else if (origin && !allowedOrigins.includes('*')) {
-    const normalizedOrigin = origin.toLowerCase();
-    allowOrigin = allowedOrigins.includes(normalizedOrigin) ? origin : allowedOrigins[0] || '*';
-  }
-    
-  return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  const baseHeaders = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
-    'Access-Control-Max-Age': '86400', // 24 hours
-    'Access-Control-Allow-Credentials': 'true',
+    'Access-Control-Allow-Headers': 
+      'authorization, x-client-info, apikey, content-type, x-requested-with, user-agent',
+    'Access-Control-Max-Age': '86400',
+    'Access-Control-Allow-Credentials': 'false'
+  };
+
+  // If no origin specified, allow all (fallback for development)
+  if (!origin) {
+    return {
+      ...baseHeaders,
+      'Access-Control-Allow-Origin': '*'
+    };
+  }
+
+  // Check if origin is explicitly allowed
+  if (ALLOWED_ORIGINS.includes(origin) || PAYSTACK_DOMAINS.includes(origin)) {
+    return {
+      ...baseHeaders,
+      'Access-Control-Allow-Origin': origin,
+      'Vary': 'Origin'
+    };
+  }
+
+  // Check against development patterns
+  const isDevOrigin = DEV_PATTERNS.some(pattern => pattern.test(origin));
+  if (isDevOrigin) {
+    return {
+      ...baseHeaders,
+      'Access-Control-Allow-Origin': origin,
+      'Vary': 'Origin'
+    };
+  }
+
+  // Log rejected origins for monitoring
+  console.log('🚫 CORS: Origin not allowed:', origin);
+  
+  // Return restrictive headers for unknown origins
+  return {
+    ...baseHeaders,
+    'Access-Control-Allow-Origin': 'null'
   };
 }
 
-export function validateOrigin(origin: string | null): boolean {
-  if (!origin) return true; // Allow requests without origin (like server-to-server)
+export function validateOrigin(origin?: string | null): boolean {
+  if (!origin) return false;
   
-  const allowedOrigins = getAllowedOrigins();
-  
-  if (allowedOrigins.includes('*')) {
-    return true;
-  }
-  
-  return allowedOrigins.includes(origin.toLowerCase());
-}
-
-// Simple CORS headers for backward compatibility
-export const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
+  return ALLOWED_ORIGINS.includes(origin) || 
+         PAYSTACK_DOMAINS.includes(origin) ||
+         DEV_PATTERNS.some(pattern => pattern.test(origin));
 }

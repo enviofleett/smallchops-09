@@ -28,6 +28,39 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
 }
 
+// Deterministic Paystack key selection (matching payment-callback logic)
+function getPaystackSecretKey(): string | null {
+  // Priority order: TEST key first, then general key, then LIVE key
+  const testKey = Deno.env.get('PAYSTACK_SECRET_KEY_TEST');
+  const generalKey = Deno.env.get('PAYSTACK_SECRET_KEY');
+  const liveKey = Deno.env.get('PAYSTACK_SECRET_KEY_LIVE');
+
+  let selectedKey = testKey || generalKey || liveKey;
+
+  if (!selectedKey) {
+    console.error('❌ No Paystack secret key found in environment variables', {
+      checkedKeys: ['PAYSTACK_SECRET_KEY_TEST', 'PAYSTACK_SECRET_KEY', 'PAYSTACK_SECRET_KEY_LIVE']
+    });
+    return null;
+  }
+
+  // Validate key format
+  if (!selectedKey.startsWith('sk_')) {
+    console.error('❌ Invalid Paystack secret key format', {
+      keyPrefix: selectedKey.substring(0, 5)
+    });
+    return null;
+  }
+
+  console.log('🔑 Selected Paystack key', {
+    keyType: testKey ? 'TEST' : (generalKey ? 'GENERAL' : 'LIVE'),
+    keyPrefix: selectedKey.substring(0, 10) + '...',
+    environment: selectedKey.includes('test') ? 'TEST' : 'LIVE'
+  });
+
+  return selectedKey;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -39,9 +72,9 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
-    const paystackSecretKey = Deno.env.get('PAYSTACK_SECRET_KEY')
+    const paystackSecretKey = getPaystackSecretKey()
     if (!paystackSecretKey) {
-      console.error('❌ PAYSTACK_SECRET_KEY not configured')
+      console.error('❌ No valid Paystack secret key configured')
       return new Response(JSON.stringify({
         success: false,
         error: 'Payment service configuration error'

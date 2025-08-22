@@ -10,86 +10,171 @@ interface RegistrationData {
   phone: string;
 }
 
+interface RegistrationFlowState {
+  isLoading: boolean;
+  error: string | null;
+  step: 'form' | 'verification' | 'success';
+  registrationEmail: string;
+}
+
+interface RegistrationResult {
+  success: boolean;
+  requiresEmailVerification?: boolean;
+  error?: string;
+  user?: any;
+  email?: string;
+}
+
 export const useRegistrationFlow = () => {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [step, setStep] = useState<'form' | 'verification' | 'success'>('form');
-  const [registrationEmail, setRegistrationEmail] = useState<string>('');
+  const [state, setState] = useState<RegistrationFlowState>({
+    isLoading: false,
+    error: null,
+    step: 'form',
+    registrationEmail: ''
+  });
   
   const { register, resendOtp } = useCustomerDirectAuth();
   const { toast } = useToast();
 
-  const handleRegister = useCallback(async (data: RegistrationData) => {
-    setIsLoading(true);
-    setError(null);
+  const handleRegister = useCallback(async (data: RegistrationData): Promise<RegistrationResult> => {
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
     
     try {
+      // Client-side validation
+      if (!data.name?.trim()) {
+        const error = 'Full name is required';
+        setState(prev => ({ ...prev, error, isLoading: false }));
+        return { success: false, error };
+      }
+      
+      if (!data.email?.trim()) {
+        const error = 'Email address is required';
+        setState(prev => ({ ...prev, error, isLoading: false }));
+        return { success: false, error };
+      }
+      
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        const error = 'Please enter a valid email address';
+        setState(prev => ({ ...prev, error, isLoading: false }));
+        return { success: false, error };
+      }
+      
+      if (!data.phone?.trim()) {
+        const error = 'Phone number is required';
+        setState(prev => ({ ...prev, error, isLoading: false }));
+        return { success: false, error };
+      }
+      
+      if (!data.password?.trim()) {
+        const error = 'Password is required';
+        setState(prev => ({ ...prev, error, isLoading: false }));
+        return { success: false, error };
+      }
+
       const result = await register(data);
       
       if (result.success) {
-        setRegistrationEmail(data.email);
+        setState(prev => ({
+          ...prev,
+          registrationEmail: data.email,
+          isLoading: false,
+          error: null
+        }));
+
         if (result.requiresEmailVerification) {
-          setStep('verification');
+          setState(prev => ({ ...prev, step: 'verification' }));
           toast({
             title: "Check your email",
             description: "We've sent you a verification link. Please check your inbox.",
           });
         } else {
-          setStep('success');
+          setState(prev => ({ ...prev, step: 'success' }));
           toast({
             title: "Registration successful!",
             description: "Welcome! You can now start shopping.",
           });
         }
       } else {
-        setError(result.error || 'Registration failed');
+        setState(prev => ({ 
+          ...prev, 
+          error: result.error || 'Registration failed',
+          isLoading: false
+        }));
       }
+
+      return result;
     } catch (err) {
       console.error('Registration error:', err);
-      setError('An unexpected error occurred. Please try again.');
-    } finally {
-      setIsLoading(false);
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.';
+      setState(prev => ({ 
+        ...prev, 
+        error: errorMessage,
+        isLoading: false
+      }));
+      return { success: false, error: errorMessage };
     }
   }, [register, toast]);
 
-  const handleResendVerification = useCallback(async () => {
-    if (!registrationEmail) return;
+  const handleResendVerification = useCallback(async (): Promise<{ success: boolean; error?: string }> => {
+    if (!state.registrationEmail) {
+      const error = 'No email address found for resending verification';
+      setState(prev => ({ ...prev, error }));
+      return { success: false, error };
+    }
     
-    setIsLoading(true);
+    setState(prev => ({ ...prev, isLoading: true, error: null }));
+    
     try {
-      const result = await resendOtp(registrationEmail);
+      const result = await resendOtp(state.registrationEmail);
+      
       if (result.success) {
         toast({
           title: "Email sent",
           description: "We've sent another verification email to your inbox.",
         });
+        setState(prev => ({ ...prev, isLoading: false }));
       } else {
-        setError(result.error || 'Failed to resend verification email');
+        setState(prev => ({ 
+          ...prev, 
+          error: result.error || 'Failed to resend verification email',
+          isLoading: false
+        }));
       }
+      
+      return result;
     } catch (err) {
-      setError('Failed to resend verification email. Please try again.');
-    } finally {
-      setIsLoading(false);
+      const errorMessage = err instanceof Error ? err.message : 'Failed to resend verification email. Please try again.';
+      setState(prev => ({ 
+        ...prev, 
+        error: errorMessage,
+        isLoading: false
+      }));
+      return { success: false, error: errorMessage };
     }
-  }, [registrationEmail, resendOtp, toast]);
+  }, [state.registrationEmail, resendOtp, toast]);
 
   const resetFlow = useCallback(() => {
-    setStep('form');
-    setError(null);
-    setRegistrationEmail('');
-    setIsLoading(false);
+    setState({
+      step: 'form',
+      error: null,
+      registrationEmail: '',
+      isLoading: false
+    });
   }, []);
 
   const retryRegistration = useCallback(() => {
-    setError(null);
-    setIsLoading(false);
+    setState(prev => ({ 
+      ...prev, 
+      error: null,
+      isLoading: false
+    }));
   }, []);
 
   return {
-    isLoading,
-    error,
-    step,
-    registrationEmail,
+    isLoading: state.isLoading,
+    error: state.error,
+    step: state.step,
+    registrationEmail: state.registrationEmail,
     handleRegister,
     handleResendVerification,
     resetFlow,

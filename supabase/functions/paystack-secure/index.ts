@@ -120,7 +120,7 @@ async function initializePayment({
     // Get order details for authoritative amount
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
-      .select('id, total_amount, delivery_fee, payment_reference, customer_name, order_number, order_type')
+      .select('id, total_amount, delivery_fee, delivery_zone_id, payment_reference, customer_name, order_number, order_type')
       .eq('id', orderId)
       .single()
 
@@ -128,16 +128,53 @@ async function initializePayment({
       throw new Error(`Order not found: ${orderId}`)
     }
 
-    // Use authoritative amount from database
-    const authoritativeAmount = order.total_amount
-    const deliveryFee = order.delivery_fee || 0
+    // Compute authoritative amount to ensure delivery fee is included
+    let deliveryFee = Number(order.delivery_fee) || 0
+
+    // If delivery fee isn't set but order is delivery, try to derive from delivery zone
+    if ((!deliveryFee || deliveryFee <= 0) && order.order_type === 'delivery' && order.delivery_zone_id) {
+      const { data: zone, error: zoneError } = await supabaseAdmin
+        .from('delivery_zones')
+        .select('base_fee')
+        .eq('id', order.delivery_zone_id)
+        .eq('is_active', true)
+        .maybeSingle()
+      if (!zoneError && zone?.base_fee) {
+        deliveryFee = Number(zone.base_fee) || 0
+      }
+    }
+
+    // Sum items subtotal directly from order_items to avoid stale totals
+    const { data: orderItems, error: itemsError } = await supabaseAdmin
+      .from('order_items')
+      .select('total_price')
+      .eq('order_id', orderId)
+    const itemsSubtotal = (orderItems || []).reduce((sum: number, it: any) => sum + (Number(it.total_price) || 0), 0)
+
+    // Prefer the computed total (items + delivery) if it differs meaningfully
+    let authoritativeAmount = Number(order.total_amount) || 0
+    const computedTotal = Number(itemsSubtotal) + Number(deliveryFee)
+
+    // If order.total_amount is missing or out-of-sync (> 1 naira diff), correct it
+    if (!authoritativeAmount || Math.abs(authoritativeAmount - computedTotal) > 1) {
+      authoritativeAmount = computedTotal
+      await supabaseAdmin
+        .from('orders')
+        .update({ 
+          delivery_fee: deliveryFee,
+          total_amount: authoritativeAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId)
+    }
 
     console.log('💰 AUTHORITATIVE AMOUNT (Backend-derived):', {
       client_provided: amount,
-      db_total_amount: authoritativeAmount,
-      db_delivery_fee: deliveryFee,
+      db_total_amount: order.total_amount,
+      db_delivery_fee: order.delivery_fee,
+      items_subtotal: itemsSubtotal,
       authoritative_amount: authoritativeAmount,
-      amount_source: 'database'
+      amount_source: 'database+recomputed'
     })
 
     // Check if order already has a pending/initialized transaction

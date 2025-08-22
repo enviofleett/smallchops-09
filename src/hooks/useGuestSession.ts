@@ -22,23 +22,30 @@ export const useGuestSession = (): GuestSessionHook => {
   // Generate a new guest session ID
   const generateGuestSession = useCallback(async (): Promise<string> => {
     try {
-      // Call Supabase function to generate secure guest session ID
+      // Try to call Supabase function to generate secure guest session ID
       const { data, error } = await supabase.rpc('generate_guest_session_id');
-      
+
       if (error) {
-        console.error('Error generating guest session:', error);
+        console.warn('RPC generate_guest_session_id not available, using fallback:', error.message);
         // Fallback to client-side generation
         const fallbackId = `guest_${crypto.randomUUID()}`;
         storeGuestSession(fallbackId);
         return fallbackId;
       }
 
-      const sessionId = data as string;
-      storeGuestSession(sessionId);
-      return sessionId;
+      if (data && typeof data === 'string') {
+        const sessionId = data as string;
+        storeGuestSession(sessionId);
+        return sessionId;
+      } else {
+        console.warn('RPC returned invalid data, using fallback:', data);
+        const fallbackId = `guest_${crypto.randomUUID()}`;
+        storeGuestSession(fallbackId);
+        return fallbackId;
+      }
     } catch (error) {
-      console.error('Error in generateGuestSession:', error);
-      // Fallback to client-side generation
+      console.warn('RPC call failed, using fallback:', error);
+      // Always fallback to client-side generation
       const fallbackId = `guest_${crypto.randomUUID()}`;
       storeGuestSession(fallbackId);
       return fallbackId;

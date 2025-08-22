@@ -8,6 +8,7 @@ import { cleanupPaymentCache, validateStoredReference } from '@/utils/paymentCac
 import { paymentCompletionCoordinator } from '@/utils/paymentCompletion';
 import { useCart } from '@/hooks/useCart';
 import startersLogo from '@/assets/starters-logo.png';
+import { RobustStorage } from '@/utils/robustStorage';
 
 export const PaymentCallbackPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -18,6 +19,8 @@ export const PaymentCallbackPage: React.FC = () => {
   const [verificationStatus, setVerificationStatus] = useState<'loading' | 'success' | 'failed'>('loading');
   const [orderDetails, setOrderDetails] = useState<any>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [errorCode, setErrorCode] = useState<string>('');
+  const [paymentReference, setPaymentReference] = useState<string>('');
 
   useEffect(() => {
     const handlePaymentCallback = async () => {
@@ -38,20 +41,30 @@ export const PaymentCallbackPage: React.FC = () => {
       let reference = searchParams.get('reference') || searchParams.get('trxref');
       const orderId = searchParams.get('order_id');
       
+      // Store reference for error reporting
+      setPaymentReference(reference || 'unknown');
+      
       // Fallback chain if reference not in URL
       if (!reference) {
         console.log('🔍 Reference not in URL, checking storage...');
         try {
-          reference = sessionStorage.getItem('paystack_payment_reference') ||
-                     localStorage.getItem('paystack_last_reference') ||
-                     sessionStorage.getItem('paymentReference') ||
-                     localStorage.getItem('paymentReference');
+          reference = RobustStorage.getItem('paystack_payment_reference') ||
+                     RobustStorage.getItem('paystack_last_reference') ||
+                     RobustStorage.getItem('paymentReference');
           
           if (reference) {
             console.log('✅ Reference recovered from storage:', reference.substring(0, 20) + '...');
+            setPaymentReference(reference);
           }
         } catch (error) {
           console.warn('⚠️ Failed to access storage for reference recovery:', error);
+          // Log storage access failure for debugging
+          console.error('💾 Storage Access Error:', {
+            error: error instanceof Error ? error.message : String(error),
+            timestamp: Date.now(),
+            userAgent: navigator.userAgent,
+            storageStatus: RobustStorage.getStorageStatus()
+          });
         }
       }
       
@@ -109,9 +122,9 @@ export const PaymentCallbackPage: React.FC = () => {
               onNavigate: () => {
                 // Clean up payment storage after successful verification
                 try {
-                  sessionStorage.removeItem('paystack_payment_reference');
-                  sessionStorage.removeItem('payment_order_id');
-                  localStorage.removeItem('paystack_last_reference');
+                  RobustStorage.removeItem('paystack_payment_reference');
+                  RobustStorage.removeItem('payment_order_id');
+                  RobustStorage.removeItem('paystack_last_reference');
                   console.log('🧹 Payment storage cleaned after success');
                 } catch (error) {
                   console.warn('⚠️ Failed to clean payment storage:', error);
@@ -124,16 +137,29 @@ export const PaymentCallbackPage: React.FC = () => {
         } else {
           console.error('❌ Payment verification failed:', (result as any).error);
           setVerificationStatus('failed');
-          setErrorMessage((result as any).error || 'Payment verification failed');
+          setErrorMessage((result as any).message || (result as any).error || 'Payment verification failed');
+          setErrorCode((result as any).errorCode || 'UNKNOWN');
           
           // DON'T clear cart on failure - user should be able to retry
           console.log('🛒 Cart preserved for retry - not clearing on failure');
+          
+          // Enhanced error logging
+          console.error('💥 Payment Verification Failed:', {
+            reference: reference,
+            orderId: orderId,
+            error: (result as any).error,
+            errorCode: (result as any).errorCode,
+            message: (result as any).message,
+            timestamp: new Date().toISOString()
+          });
           
           // Notify parent window of failure (if opened from checkout dialog)
           if (window.opener && !window.opener.closed) {
             window.opener.postMessage({ 
               type: 'PAYMENT_FAILED', 
-              error: (result as any).error || 'Payment verification failed'
+              error: (result as any).error || 'Payment verification failed',
+              errorCode: (result as any).errorCode,
+              reference: reference
             }, window.location.origin);
           }
         }
@@ -141,6 +167,17 @@ export const PaymentCallbackPage: React.FC = () => {
         console.error('❌ Payment verification error:', error);
         setVerificationStatus('failed');
         setErrorMessage(error instanceof Error ? error.message : 'Verification failed');
+        setErrorCode('EXCEPTION');
+        
+        // Enhanced error logging
+        console.error('💥 Payment Verification Exception:', {
+          reference: reference,
+          orderId: orderId,
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent
+        });
         
         // DON'T clear cart on error - user should be able to retry
         console.log('🛒 Cart preserved for retry - not clearing on error');
@@ -149,7 +186,9 @@ export const PaymentCallbackPage: React.FC = () => {
         if (window.opener && !window.opener.closed) {
           window.opener.postMessage({ 
             type: 'PAYMENT_FAILED', 
-            error: error instanceof Error ? error.message : 'Verification failed'
+            error: error instanceof Error ? error.message : 'Verification failed',
+            errorCode: 'EXCEPTION',
+            reference: reference
           }, window.location.origin);
         }
       }
@@ -278,6 +317,34 @@ export const PaymentCallbackPage: React.FC = () => {
             {errorMessage || 'There was an issue processing your payment. Please try again.'}
           </p>
           
+          {/* Enhanced error details based on error code */}
+          {errorCode === 'TIMEOUT' && (
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+              <h4 className="font-medium text-yellow-800 mb-1">Payment Verification Timed Out</h4>
+              <p className="text-sm text-yellow-700">
+                Your payment may still be processing. Please check your order history or contact support if the issue persists.
+              </p>
+            </div>
+          )}
+          
+          {errorCode === 'API_ERROR' && (
+            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+              <h4 className="font-medium text-blue-800 mb-1">Service Temporarily Unavailable</h4>
+              <p className="text-sm text-blue-700">
+                Our payment verification service is temporarily down. If you completed payment, it will be processed automatically.
+              </p>
+            </div>
+          )}
+          
+          {paymentReference && (
+            <div className="mb-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+              <h4 className="font-medium text-gray-700 mb-1">Reference for Support</h4>
+              <p className="text-sm text-gray-600 font-mono break-all">
+                {paymentReference}
+              </p>
+            </div>
+          )}
+          
             <div className="space-y-3">
               <Button 
                 onClick={() => navigate('/')} 
@@ -299,6 +366,22 @@ export const PaymentCallbackPage: React.FC = () => {
                 <strong>Need help?</strong> Your items are still in your cart. You can try paying again or contact support.
               </p>
             </div>
+            
+            {/* Debug Information for troubleshooting */}
+            {process.env.NODE_ENV === 'development' && (
+              <details className="mt-4 p-3 bg-gray-50 border border-gray-200 rounded-lg">
+                <summary className="cursor-pointer text-sm font-medium text-gray-700">
+                  Debug Information
+                </summary>
+                <div className="mt-2 text-xs text-gray-600">
+                  <p><strong>Reference:</strong> {paymentReference}</p>
+                  <p><strong>Error Code:</strong> {errorCode}</p>
+                  <p><strong>Storage Status:</strong> {JSON.stringify(RobustStorage.getStorageStatus())}</p>
+                  <p><strong>URL Params:</strong> {window.location.search}</p>
+                  <p><strong>Timestamp:</strong> {new Date().toISOString()}</p>
+                </div>
+              </details>
+            )}
         </Card>
       </div>
     </div>

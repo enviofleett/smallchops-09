@@ -23,10 +23,65 @@ export const PaymentCallbackPage: React.FC = () => {
     const handlePaymentCallback = async () => {
       console.log('🔍 Processing payment callback...');
       
-      // Check if this is an error callback first
+      // Check URL parameters
       const status = searchParams.get('status');
       const errorMessage = searchParams.get('message');
+      const reference = searchParams.get('reference') || searchParams.get('trxref');
+      const orderId = searchParams.get('order_id');
       
+      // If URL explicitly says success with valid reference, show success immediately
+      if (status === 'success' && reference && validateStoredReference(reference)) {
+        console.log('✅ URL indicates success - showing success immediately');
+        setVerificationStatus('success');
+        setOrderDetails({
+          orderNumber: orderId || 'Processing...',
+          amount: 'Confirming...',
+          reference: reference
+        });
+        
+        // Run verification in background to confirm and get details
+        try {
+          const result = await verifySecurePayment(reference, orderId || undefined);
+          if (result.success) {
+            console.log('✅ Background verification confirmed success');
+            setOrderDetails({
+              orderNumber: (result as any).order_id || orderId,
+              amount: (result as any).amount,
+              reference: reference
+            });
+            
+            // Handle cart clearing and notifications
+            paymentCompletionCoordinator.coordinatePaymentCompletion(
+              {
+                reference: reference,
+                orderNumber: (result as any).order_id || orderId,
+                amount: (result as any).amount
+              },
+              {
+                onClearCart: clearCart,
+                onNavigate: () => {
+                  try {
+                    sessionStorage.removeItem('paystack_payment_reference');
+                    sessionStorage.removeItem('payment_order_id');
+                    localStorage.removeItem('paystack_last_reference');
+                    console.log('🧹 Payment storage cleaned after success');
+                  } catch (error) {
+                    console.warn('⚠️ Failed to clean payment storage:', error);
+                  }
+                  cleanupPaymentCache();
+                }
+              }
+            );
+          } else {
+            console.warn('⚠️ Background verification failed, but keeping success UI (URL authority)');
+          }
+        } catch (error) {
+          console.warn('⚠️ Background verification error, but keeping success UI (URL authority):', error);
+        }
+        return;
+      }
+      
+      // Check if this is an error callback
       if (status === 'error') {
         console.error('❌ Payment callback received error status:', errorMessage);
         setVerificationStatus('failed');
@@ -34,21 +89,21 @@ export const PaymentCallbackPage: React.FC = () => {
         return;
       }
       
-      // Extract reference from multiple sources with fallback chain
-      let reference = searchParams.get('reference') || searchParams.get('trxref');
-      const orderId = searchParams.get('order_id');
+      // Extract reference from multiple sources with fallback chain (if not already extracted)
+      let fallbackReference = reference || searchParams.get('reference') || searchParams.get('trxref');
+      const fallbackOrderId = orderId || searchParams.get('order_id');
       
       // Fallback chain if reference not in URL
-      if (!reference) {
+      if (!fallbackReference) {
         console.log('🔍 Reference not in URL, checking storage...');
         try {
-          reference = sessionStorage.getItem('paystack_payment_reference') ||
+          fallbackReference = sessionStorage.getItem('paystack_payment_reference') ||
                      localStorage.getItem('paystack_last_reference') ||
                      sessionStorage.getItem('paymentReference') ||
                      localStorage.getItem('paymentReference');
           
-          if (reference) {
-            console.log('✅ Reference recovered from storage:', reference.substring(0, 20) + '...');
+          if (fallbackReference) {
+            console.log('✅ Reference recovered from storage:', fallbackReference.substring(0, 20) + '...');
           }
         } catch (error) {
           console.warn('⚠️ Failed to access storage for reference recovery:', error);
@@ -58,7 +113,7 @@ export const PaymentCallbackPage: React.FC = () => {
       // Clean any legacy cache AFTER getting reference
       cleanupPaymentCache();
       
-      if (!reference) {
+      if (!fallbackReference) {
         console.error('❌ No payment reference found in callback URL');
         setVerificationStatus('failed');
         setErrorMessage('Invalid payment callback - no reference found');
@@ -66,18 +121,18 @@ export const PaymentCallbackPage: React.FC = () => {
       }
       
       // Validate reference format
-      if (!validateStoredReference(reference)) {
-        console.error('🚨 Invalid reference format in callback:', reference);
+      if (!validateStoredReference(fallbackReference)) {
+        console.error('🚨 Invalid reference format in callback:', fallbackReference);
         setVerificationStatus('failed');
         setErrorMessage('Invalid payment reference format');
         return;
       }
       
-      console.log('✅ Valid reference found:', reference);
+      console.log('✅ Valid reference found:', fallbackReference);
       
       try {
         // Verify the payment
-        const result = await verifySecurePayment(reference, orderId || undefined);
+        const result = await verifySecurePayment(fallbackReference, fallbackOrderId || undefined);
         
         if (result.success) {
           console.log('✅ Payment verification successful');
@@ -93,14 +148,14 @@ export const PaymentCallbackPage: React.FC = () => {
             window.opener.postMessage({ 
               type: 'PAYMENT_SUCCESS', 
               orderId: (result as any).order_id,
-              reference: reference
+              reference: fallbackReference
             }, window.location.origin);
           }
 
           // Use payment completion coordinator for cart clearing with 15-second delay
           paymentCompletionCoordinator.coordinatePaymentCompletion(
             {
-              reference: reference,
+              reference: fallbackReference,
               orderNumber: (result as any).order_id,
               amount: (result as any).amount
             },

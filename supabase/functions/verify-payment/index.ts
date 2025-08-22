@@ -1,10 +1,18 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+// Enhanced CORS headers for production reliability
+function getCorsHeaders(origin?: string): Record<string, string> {
+  return {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-requested-with',
+    'Access-Control-Allow-Credentials': 'false',
+    'Access-Control-Max-Age': '86400',
+    'Vary': 'Origin',
+    'Content-Type': 'application/json'
+  };
+}
 
 interface VerifyPaymentRequest {
   reference: string;
@@ -12,12 +20,21 @@ interface VerifyPaymentRequest {
 }
 
 serve(async (req) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      status: 200,
+      headers: corsHeaders 
+    });
   }
 
   if (req.method !== 'POST') {
-    return new Response('Method not allowed', { 
+    return new Response(JSON.stringify({ 
+      success: false, 
+      error: 'Method not allowed - POST required' 
+    }), { 
       status: 405, 
       headers: corsHeaders 
     });
@@ -190,10 +207,19 @@ serve(async (req) => {
         customer: paystackData.data.customer,
         channel: paystackData.data.channel,
         paid_at: paystackData.data.paid_at,
-        amount_verified: result.amount_verified
+        amount_verified: result.amount_verified,
+        // Add data wrapper for compatibility
+        data: {
+          order_id: result.order_id,
+          order_number: result.order_number,
+          amount: amountKobo / 100,
+          status: 'success',
+          customer: paystackData.data.customer,
+          reference: reference
+        }
       }), {
         status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        headers: corsHeaders
       });
 
     } catch (error) {

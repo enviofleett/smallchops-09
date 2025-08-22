@@ -418,6 +418,31 @@ serve(async (req) => {
       orderStatus: orderResult.status
     })
 
+    // Check and recover delivery schedule if missing (non-blocking)
+    try {
+      const { data: existingSchedule } = await supabaseClient
+        .from('order_delivery_schedule')
+        .select('id')
+        .eq('order_id', orderResult.order_id)
+        .maybeSingle();
+
+      if (!existingSchedule) {
+        console.log('[VERIFY-PAYMENT-V2] No delivery schedule found, triggering recovery...');
+        
+        // Trigger recovery function (non-blocking)
+        supabaseClient.functions.invoke('recover-order-schedule', {
+          body: { order_id: orderResult.order_id },
+          headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` }
+        }).then(() => {
+          console.log('[VERIFY-PAYMENT-V2] Schedule recovery triggered successfully');
+        }).catch(err => {
+          console.warn('[VERIFY-PAYMENT-V2] Schedule recovery failed (non-critical):', err);
+        });
+      }
+    } catch (scheduleCheckError) {
+      console.warn('[VERIFY-PAYMENT-V2] Schedule check failed (non-critical):', scheduleCheckError);
+    }
+
     // Create/update payment transaction record (non-blocking)
     try {
       await supabaseClient

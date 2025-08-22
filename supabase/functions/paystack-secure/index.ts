@@ -175,9 +175,30 @@ async function initializePayment({
       .eq('order_id', orderId)
     const itemsSubtotal = (orderItems || []).reduce((sum: number, it: any) => sum + (Number(it.total_price) || 0), 0)
 
-    // Prefer the computed total (items + delivery) if it differs meaningfully
+    // Get promotional discounts applied to this order
+    let promoDiscount = Number(order.discount_amount) || 0
+    
+    // If promo discount is not set, check for applied promotions
+    if (!promoDiscount) {
+      const { data: appliedPromotions } = await supabaseAdmin
+        .from('order_promotions')
+        .select('discount_amount')
+        .eq('order_id', orderId)
+      
+      promoDiscount = (appliedPromotions || []).reduce((sum: number, promo: any) => sum + (Number(promo.discount_amount) || 0), 0)
+    }
+
+    // Compute the authoritative total: items + delivery - promo discounts
     let authoritativeAmount = Number(order.total_amount) || 0
-    const computedTotal = Number(itemsSubtotal) + Number(deliveryFee)
+    const computedTotal = Number(itemsSubtotal) + Number(deliveryFee) - Number(promoDiscount)
+
+    console.log('💰 AMOUNT BREAKDOWN:', {
+      items_subtotal: itemsSubtotal,
+      delivery_fee: deliveryFee,
+      promo_discount: promoDiscount,
+      computed_total: computedTotal,
+      stored_total: authoritativeAmount
+    })
 
     // If order.total_amount is missing or out-of-sync (> 1 naira diff), correct it
     if (!authoritativeAmount || Math.abs(authoritativeAmount - computedTotal) > 1) {
@@ -186,10 +207,17 @@ async function initializePayment({
         .from('orders')
         .update({ 
           delivery_fee: deliveryFee,
+          discount_amount: promoDiscount,
           total_amount: authoritativeAmount,
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
+      
+      console.log('🔄 Updated order with recalculated total:', {
+        delivery_fee: deliveryFee,
+        discount_amount: promoDiscount,
+        total_amount: authoritativeAmount
+      })
     }
 
     console.log('💰 AUTHORITATIVE AMOUNT (Backend-derived):', {
@@ -267,11 +295,12 @@ async function initializePayment({
         customer_name: order.customer_name,
         order_number: order.order_number,
         fulfillment_type: order.order_type,
-        items_subtotal: authoritativeAmount - deliveryFee,
+        items_subtotal: itemsSubtotal,
         delivery_fee: deliveryFee,
+        promo_discount: promoDiscount,
         client_total: amount,
         authoritative_total: authoritativeAmount,
-        amount_source: 'database',
+        amount_source: 'database_with_promo',
         authoritative_amount: authoritativeAmount,
         generated_by: 'paystack-secure-v3'
       }

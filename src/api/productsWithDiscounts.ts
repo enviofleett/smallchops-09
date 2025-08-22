@@ -15,49 +15,119 @@ export function clearProductsCache() {
 // Get products with calculated discounts - Optimized for faster loading
 export async function getProductsWithDiscounts(categoryId?: string): Promise<ProductWithDiscount[]> {
   try {
-    // Build the query
+    // Check cache first
+    if (productsCache &&
+        (Date.now() - productsCache.timestamp) < PRODUCTS_CACHE_DURATION &&
+        productsCache.categoryId === categoryId) {
+      console.log('Using cached products data');
+
+      // Still get fresh promotions for discount calculations
+      const promotions = await getPromotions();
+      const activePromotions = Array.isArray(promotions)
+        ? promotions.filter(p => p.status === 'active')
+        : [];
+
+      const productsWithDiscounts = productsCache.data.map(product =>
+        calculateProductDiscount(product, activePromotions)
+      );
+
+      return productsWithDiscounts;
+    }
+
+    // Build optimized query with fewer fields initially
     let query = supabase
       .from("products")
       .select(`
-        *,
-        categories (
+        id,
+        name,
+        description,
+        price,
+        image_url,
+        stock_quantity,
+        category_id,
+        status,
+        created_at,
+        categories!inner (
           id,
           name
         )
       `)
       .eq("status", "active")
-      .gt("stock_quantity", 0);
-    
+      .gt("stock_quantity", 0)
+      .limit(100); // Add limit to improve performance
+
     if (categoryId) {
       query = query.eq("category_id", categoryId);
     }
-    
-    // Execute query with faster timeout
+
+    // Execute query with timeout and retry logic
     const productsPromise = query.order("name");
     const promotionsPromise = getPromotions();
-    
-    // Parallel execution with improved timeout handling
-    const [productsResult, promotions] = await Promise.allSettled([
-      Promise.race([
-        productsPromise,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Products query timeout')), 5000)
-        )
-      ]) as Promise<any>,
-      promotionsPromise // getPromotions now has its own timeout handling
-    ]);
 
-    // Handle products result
-    const { data: products, error: productsError } =
-      productsResult.status === 'fulfilled' ? productsResult.value : { data: null, error: productsResult.reason };
+    let products = null;
+    let productsError = null;
 
-    // Handle promotions result - getPromotions now handles its own errors/cache
-    const activePromotions = promotions.status === 'fulfilled' && Array.isArray(promotions.value)
-      ? promotions.value.filter(p => p.status === 'active')
+    // Try the query with progressively longer timeouts
+    for (const timeout of [3000, 6000, 10000]) {
+      try {
+        console.log(`Attempting products query with ${timeout}ms timeout...`);
+
+        const [productsResult, promotions] = await Promise.allSettled([
+          Promise.race([
+            productsPromise,
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error(`Products query timeout (${timeout}ms)`)), timeout)
+            )
+          ]) as Promise<any>,
+          promotionsPromise
+        ]);
+
+        // Handle products result
+        const queryResult = productsResult.status === 'fulfilled' ?
+          productsResult.value :
+          { data: null, error: productsResult.reason };
+
+        if (queryResult.data) {
+          products = queryResult.data;
+
+          // Update cache
+          productsCache = {
+            data: products,
+            timestamp: Date.now(),
+            categoryId
+          };
+
+          console.log(`Successfully fetched ${products.length} products`);
+          break; // Success, exit retry loop
+        } else {
+          productsError = queryResult.error;
+          console.warn(`Query attempt failed with ${timeout}ms timeout:`, productsError);
+        }
+
+      } catch (attemptError) {
+        console.warn(`Query attempt failed:`, attemptError);
+        productsError = attemptError;
+      }
+    }
+
+    // Handle promotions result
+    const promotions = await getPromotions();
+    const activePromotions = Array.isArray(promotions)
+      ? promotions.filter(p => p.status === 'active')
       : [];
-    
-    if (productsError) {
-      console.error('Products query error:', productsError);
+
+    if (!products) {
+      console.error('All product query attempts failed:', productsError);
+
+      // Return cached data if available, otherwise empty array
+      if (productsCache && productsCache.data) {
+        console.log('Using stale cached products due to query failure');
+        const productsWithDiscounts = productsCache.data.map(product =>
+          calculateProductDiscount(product, activePromotions)
+        );
+        return productsWithDiscounts;
+      }
+
       return [];
     }
     

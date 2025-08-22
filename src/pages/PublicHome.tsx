@@ -112,6 +112,16 @@ const PublicHome = () => {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
   });
 
+  // Debug logging for production troubleshooting
+  console.log('🏠 PublicHome Debug:', {
+    productsCount: products?.length || 0,
+    isLoading: isLoadingProducts,
+    hasError: !!productsError,
+    activeCategory,
+    searchTerm,
+    productsPreview: products?.slice(0, 2)?.map(p => ({ id: p.id, name: p.name }))
+  });
+
   // Fetch categories (PRODUCTION OPTIMIZED)
   const { data: categories = [] } = useQuery({
     queryKey: ['categories'],
@@ -120,10 +130,34 @@ const PublicHome = () => {
     gcTime: 30 * 60 * 1000, // 30 minutes (renamed from cacheTime)
   });
 
-  // Filter products based on search
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Filter products based on search - Fixed for production
+  const filteredProducts = React.useMemo(() => {
+    if (!Array.isArray(products)) {
+      console.warn('🚨 Products is not an array:', products);
+      return [];
+    }
+    
+    if (products.length === 0) {
+      console.log('📦 No products available');
+      return [];
+    }
+
+    const filtered = products.filter(product => {
+      if (!product?.name) {
+        console.warn('🚨 Product missing name:', product);
+        return false;
+      }
+      return product.name.toLowerCase().includes(searchTerm.toLowerCase());
+    });
+    
+    console.log('🔍 Filtered products:', {
+      total: products.length,
+      filtered: filtered.length,
+      searchTerm
+    });
+    
+    return filtered;
+  }, [products, searchTerm]);
 
   // Pagination
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);

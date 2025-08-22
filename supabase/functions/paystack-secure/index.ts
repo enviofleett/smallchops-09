@@ -206,6 +206,7 @@ async function initializePayment({
         .update({ 
           delivery_fee: deliveryFee,
           total_amount: authoritativeAmount,
+          amount_kobo: Math.round(authoritativeAmount * 100), // Store kobo for validation
           updated_at: new Date().toISOString()
         })
         .eq('id', orderId)
@@ -269,11 +270,25 @@ async function initializePayment({
 
     const amountInKobo = Math.round(authoritativeAmount * 100)
 
+    // Critical validation: Ensure amount is positive
+    if (amountInKobo <= 0) {
+      console.error('❌ CRITICAL ERROR: Cannot send zero or negative amount to Paystack:', {
+        order_id: orderId,
+        authoritative_amount: authoritativeAmount,
+        amount_in_kobo: amountInKobo,
+        items_subtotal: itemsSubtotal,
+        delivery_fee: deliveryFee,
+        order_type: order.order_type
+      })
+      throw new Error(`Invalid payment amount: ₦${authoritativeAmount} (${amountInKobo} kobo)`)
+    }
+
     console.log('💰 FINAL AMOUNT DETAILS:', {
       authoritative_amount_naira: authoritativeAmount,
       amount_in_kobo: amountInKobo,
       reference: finalReference,
-      order_found: true
+      order_found: true,
+      validation_passed: amountInKobo > 0
     })
 
     // Prepare Paystack payload
@@ -374,6 +389,7 @@ async function initializePayment({
         provider_reference: paystackPayload.reference,
         order_id: orderId,
         amount: authoritativeAmount,
+        amount_kobo: amountInKobo, // Store kobo amount for validation
         currency: 'NGN',
         status: 'pending',
         provider: 'paystack',

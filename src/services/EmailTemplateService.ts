@@ -109,39 +109,56 @@ class EmailTemplateService {
       priority?: 'high' | 'normal' | 'low';
       sendImmediate?: boolean;
     } = {}
-  ): Promise<boolean> {
+  ): Promise<{ success: boolean; error?: string; messageId?: string }> {
     try {
-      const template = await this.getTemplate(templateKey);
-      if (!template) {
-        console.error(`Template not found: ${templateKey}`);
-        return false;
+      // Validate inputs
+      if (!templateKey) {
+        return { success: false, error: 'Template key is required' };
+      }
+      
+      if (!recipient || !recipient.includes('@')) {
+        return { success: false, error: 'Valid recipient email is required' };
       }
 
-      const processed = this.processTemplate(template, variables);
-
-      // Use the enhanced SMTP sender function
-      const { error } = await supabase.functions.invoke('production-smtp-sender', {
+      // Use the enhanced production email processor
+      const { data, error } = await supabase.functions.invoke('production-email-processor', {
         body: {
-          to: recipient,
-          subject: processed.subject,
-          html: processed.html,
-          text: processed.text,
-          template_key: templateKey,
+          recipient: { email: recipient },
+          templateKey: templateKey,
           variables: variables,
-          priority: options.priority || 'normal'
+          priority: options.priority || 'normal',
+          emailType: 'transactional'
         }
       });
 
       if (error) {
         console.error('Error sending templated email:', error);
-        return false;
+        return { 
+          success: false, 
+          error: error.message || 'Email sending failed',
+          messageId: undefined
+        };
       }
 
-      console.log(`Templated email sent: ${templateKey} to ${recipient}`);
-      return true;
+      if (!data?.success) {
+        return {
+          success: false,
+          error: data?.error || 'Email sending failed',
+          messageId: data?.messageId
+        };
+      }
+
+      console.log(`✅ Templated email sent: ${templateKey} to ${recipient}`);
+      return {
+        success: true,
+        messageId: data.messageId
+      };
     } catch (error) {
       console.error('Error in sendTemplatedEmail:', error);
-      return false;
+      return {
+        success: false,
+        error: error.message || 'Unknown error occurred'
+      };
     }
   }
 

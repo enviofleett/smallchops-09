@@ -1,0 +1,343 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Process Checkout Function Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .card { background: white; padding: 20px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); margin: 20px 0; }
+        .success { background: #f0f8f0; border-left: 4px solid #10b981; padding: 15px; margin: 10px 0; }
+        .error { background: #fdf2f2; border-left: 4px solid #ef4444; padding: 15px; margin: 10px 0; }
+        .info { background: #f0f4ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 10px 0; }
+        .warning { background: #fff8f0; border-left: 4px solid #f59e0b; padding: 15px; margin: 10px 0; }
+        button { padding: 12px 24px; margin: 8px; cursor: pointer; border: none; border-radius: 5px; font-size: 14px; background: #3b82f6; color: white; }
+        .btn-success { background: #10b981; }
+        .btn-warning { background: #f59e0b; }
+        pre { background: #f8f9fa; padding: 15px; border-radius: 5px; overflow-x: auto; font-size: 12px; }
+        .test-section { margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="card">
+            <h1>��� Process Checkout Function Test</h1>
+            <p>Test the new production-ready process-checkout function with comprehensive validation.</p>
+        </div>
+
+        <div class="card">
+            <h2>🧪 Test Categories</h2>
+            <button onclick="testValidCheckout()" class="btn-success">✅ Valid Checkout</button>
+            <button onclick="testInvalidInputs()" class="btn-warning">❌ Invalid Inputs</button>
+            <button onclick="testEdgeCases()" class="btn-warning">⚠️ Edge Cases</button>
+            <button onclick="testErrorHandling()">🔍 Error Handling</button>
+        </div>
+
+        <div class="card">
+            <h2>📊 Test Results</h2>
+            <div id="testResults">
+                <div class="info">Click a test button to begin testing the process-checkout function.</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <h2>📋 Function Improvements</h2>
+            <div class="info">
+                <h4>✅ Production Enhancements Applied:</h4>
+                <ul>
+                    <li><strong>Security:</strong> Input validation, request size limits, SQL injection protection</li>
+                    <li><strong>Resilience:</strong> Retry mechanisms, race condition handling, graceful degradation</li>
+                    <li><strong>Validation:</strong> Email format, phone format, item limits, price validation</li>
+                    <li><strong>Error Handling:</strong> Proper HTTP codes, detailed logging, error categorization</li>
+                    <li><strong>Performance:</strong> Connection pooling, efficient queries, timeout handling</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function testValidCheckout() {
+            const resultDiv = document.getElementById('testResults');
+            resultDiv.innerHTML = '<div class="info">🧪 Testing valid checkout flow...</div>';
+
+            const validPayload = {
+                customer: {
+                    name: "Test Customer",
+                    email: "test@example.com",
+                    phone: "+1234567890"
+                },
+                items: [
+                    {
+                        product_id: "test-product-1",
+                        product_name: "Test Product",
+                        quantity: 2,
+                        unit_price: 25.99,
+                        customizations: { size: "Large" }
+                    }
+                ],
+                fulfillment: {
+                    type: "delivery",
+                    address: "123 Test Street, Test City, TC 12345"
+                }
+            };
+
+            try {
+                const response = await fetch('/functions/v1/process-checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(validPayload)
+                });
+
+                const data = await response.json();
+                
+                resultDiv.innerHTML = `
+                    <div class="${data.success ? 'success' : 'error'}">
+                        <h3>✅ Valid Checkout Test</h3>
+                        <p><strong>Status:</strong> ${response.status}</p>
+                        <p><strong>Success:</strong> ${data.success}</p>
+                        ${data.success ? `
+                            <p><strong>Order ID:</strong> ${data.order?.id}</p>
+                            <p><strong>Payment Reference:</strong> ${data.payment?.reference}</p>
+                            <p><strong>Total Amount:</strong> ₦${data.order?.total_amount}</p>
+                        ` : `
+                            <p><strong>Error:</strong> ${data.error}</p>
+                        `}
+                        <details>
+                            <summary>Full Response</summary>
+                            <pre>${JSON.stringify(data, null, 2)}</pre>
+                        </details>
+                    </div>
+                `;
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="error">
+                        <h3>❌ Test Failed</h3>
+                        <p><strong>Error:</strong> ${error.message}</p>
+                    </div>
+                `;
+            }
+        }
+
+        async function testInvalidInputs() {
+            const resultDiv = document.getElementById('testResults');
+            resultDiv.innerHTML = '<div class="info">🧪 Testing input validation...</div>';
+
+            const invalidTests = [
+                {
+                    name: "Missing Email",
+                    payload: {
+                        customer: { name: "Test" },
+                        items: [{ product_id: "test", product_name: "Test", quantity: 1, unit_price: 10 }],
+                        fulfillment: { type: "delivery", address: "123 Test St" }
+                    }
+                },
+                {
+                    name: "Invalid Email Format",
+                    payload: {
+                        customer: { email: "invalid-email" },
+                        items: [{ product_id: "test", product_name: "Test", quantity: 1, unit_price: 10 }],
+                        fulfillment: { type: "delivery", address: "123 Test St" }
+                    }
+                },
+                {
+                    name: "Empty Items Array",
+                    payload: {
+                        customer: { email: "test@example.com" },
+                        items: [],
+                        fulfillment: { type: "delivery", address: "123 Test St" }
+                    }
+                },
+                {
+                    name: "Invalid Quantity",
+                    payload: {
+                        customer: { email: "test@example.com" },
+                        items: [{ product_id: "test", product_name: "Test", quantity: 0, unit_price: 10 }],
+                        fulfillment: { type: "delivery", address: "123 Test St" }
+                    }
+                },
+                {
+                    name: "Missing Delivery Address",
+                    payload: {
+                        customer: { email: "test@example.com" },
+                        items: [{ product_id: "test", product_name: "Test", quantity: 1, unit_price: 10 }],
+                        fulfillment: { type: "delivery" }
+                    }
+                }
+            ];
+
+            let results = '<h3>🔍 Input Validation Tests</h3>';
+
+            for (const test of invalidTests) {
+                try {
+                    const response = await fetch('/functions/v1/process-checkout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(test.payload)
+                    });
+
+                    const data = await response.json();
+                    const expectedFailure = !data.success && response.status === 400;
+
+                    results += `
+                        <div class="test-section">
+                            <h4>${expectedFailure ? '✅' : '❌'} ${test.name}</h4>
+                            <p><strong>Status:</strong> ${response.status}</p>
+                            <p><strong>Expected:</strong> 400 Bad Request</p>
+                            <p><strong>Got:</strong> ${data.success ? 'Success (unexpected)' : data.error}</p>
+                        </div>
+                    `;
+                } catch (error) {
+                    results += `
+                        <div class="test-section">
+                            <h4>❌ ${test.name}</h4>
+                            <p><strong>Network Error:</strong> ${error.message}</p>
+                        </div>
+                    `;
+                }
+            }
+
+            resultDiv.innerHTML = `<div class="info">${results}</div>`;
+        }
+
+        async function testEdgeCases() {
+            const resultDiv = document.getElementById('testResults');
+            resultDiv.innerHTML = '<div class="info">🧪 Testing edge cases...</div>';
+
+            const edgeTests = [
+                {
+                    name: "Maximum Items (50)",
+                    payload: {
+                        customer: { email: "test@example.com" },
+                        items: Array(50).fill(null).map((_, i) => ({
+                            product_id: `product-${i}`,
+                            product_name: `Product ${i}`,
+                            quantity: 1,
+                            unit_price: 10
+                        })),
+                        fulfillment: { type: "delivery", address: "123 Test St" }
+                    }
+                },
+                {
+                    name: "Very Long Customer Name",
+                    payload: {
+                        customer: { 
+                            name: "A".repeat(200), 
+                            email: "test@example.com" 
+                        },
+                        items: [{ product_id: "test", product_name: "Test", quantity: 1, unit_price: 10 }],
+                        fulfillment: { type: "delivery", address: "123 Test St" }
+                    }
+                },
+                {
+                    name: "High Unit Price",
+                    payload: {
+                        customer: { email: "test@example.com" },
+                        items: [{ product_id: "test", product_name: "Test", quantity: 1, unit_price: 999999 }],
+                        fulfillment: { type: "delivery", address: "123 Test St" }
+                    }
+                }
+            ];
+
+            let results = '<h3>⚠️ Edge Case Tests</h3>';
+
+            for (const test of edgeTests) {
+                try {
+                    const response = await fetch('/functions/v1/process-checkout', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(test.payload)
+                    });
+
+                    const data = await response.json();
+
+                    results += `
+                        <div class="test-section">
+                            <h4>${test.name}</h4>
+                            <p><strong>Status:</strong> ${response.status}</p>
+                            <p><strong>Result:</strong> ${data.success ? 'Success' : data.error}</p>
+                        </div>
+                    `;
+                } catch (error) {
+                    results += `
+                        <div class="test-section">
+                            <h4>❌ ${test.name}</h4>
+                            <p><strong>Error:</strong> ${error.message}</p>
+                        </div>
+                    `;
+                }
+            }
+
+            resultDiv.innerHTML = `<div class="info">${results}</div>`;
+        }
+
+        async function testErrorHandling() {
+            const resultDiv = document.getElementById('testResults');
+            resultDiv.innerHTML = '<div class="info">🧪 Testing error handling...</div>';
+
+            const errorTests = [
+                {
+                    name: "Invalid JSON",
+                    payload: "{ invalid json"
+                },
+                {
+                    name: "Wrong HTTP Method",
+                    method: "GET"
+                },
+                {
+                    name: "Large Payload",
+                    payload: { data: "A".repeat(60000) } // Exceeds 50KB limit
+                }
+            ];
+
+            let results = '<h3>🔍 Error Handling Tests</h3>';
+
+            for (const test of errorTests) {
+                try {
+                    const fetchOptions = {
+                        method: test.method || 'POST',
+                        headers: { 'Content-Type': 'application/json' }
+                    };
+
+                    if (test.payload && test.method !== 'GET') {
+                        fetchOptions.body = typeof test.payload === 'string' 
+                            ? test.payload 
+                            : JSON.stringify(test.payload);
+                    }
+
+                    const response = await fetch('/functions/v1/process-checkout', fetchOptions);
+
+                    let data = {};
+                    try {
+                        data = await response.json();
+                    } catch {
+                        data = { error: 'Non-JSON response' };
+                    }
+
+                    results += `
+                        <div class="test-section">
+                            <h4>${test.name}</h4>
+                            <p><strong>Status:</strong> ${response.status}</p>
+                            <p><strong>Handled Gracefully:</strong> ${response.status >= 400 ? '✅ Yes' : '❌ No'}</p>
+                            <p><strong>Error:</strong> ${data.error || 'No error message'}</p>
+                        </div>
+                    `;
+                } catch (error) {
+                    results += `
+                        <div class="test-section">
+                            <h4>${test.name}</h4>
+                            <p><strong>Network Error:</strong> ${error.message}</p>
+                        </div>
+                    `;
+                }
+            }
+
+            resultDiv.innerHTML = `<div class="info">${results}</div>`;
+        }
+
+        // Auto-run a basic test
+        window.addEventListener('load', () => {
+            console.log('🛒 Process Checkout Function Test Ready');
+            console.log('Production-ready function deployed with comprehensive validation');
+        });
+    </script>
+</body>
+</html>

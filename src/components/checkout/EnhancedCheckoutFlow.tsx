@@ -10,7 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useCustomerProfile } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
-import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText, ChevronLeft } from "lucide-react";
+import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText, ChevronLeft, Edit } from "lucide-react";
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
 import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
@@ -169,6 +169,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const [deliveryZone, setDeliveryZone] = useState<any>(null);
   const [pickupPoint, setPickupPoint] = useState<any>(null);
   const [lastPaymentError, setLastPaymentError] = useState<string | null>(null);
+  const [isContactInfoLocked, setIsContactInfoLocked] = useState(false);
 
   // Initialize checkout state recovery
   const { 
@@ -283,6 +284,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       variant: "destructive",
     });
   }, []);
+
+  const handleUnlockContactInfo = () => {
+    setIsContactInfoLocked(false);
+    setCheckoutStep('details'); // Go back to details step to allow editing
+  };
 
   // Remove the processOrder hook usage since it doesn't exist
 
@@ -423,6 +429,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         cancelUrl: window.location.href
       });
       setCheckoutStep('payment');
+      setIsContactInfoLocked(true); // Lock contact info when proceeding to payment
       setIsSubmitting(false);
       
       logPaymentAttempt(sanitizedData, 'success');
@@ -607,10 +614,28 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         {/* Customer Information */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Mail className="w-4 h-4" />
-              Contact Information
+            <CardTitle className="text-base flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Mail className="w-4 h-4" />
+                Contact Information
+              </div>
+              {isContactInfoLocked && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleUnlockContactInfo}
+                  className="text-xs h-8 px-3"
+                >
+                  <Edit className="w-3 h-3 mr-1" />
+                  Edit
+                </Button>
+              )}
             </CardTitle>
+            {isContactInfoLocked && (
+              <p className="text-xs text-muted-foreground">
+                Contact information is locked for security during payment
+              </p>
+            )}
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 gap-4">
@@ -623,6 +648,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                   onChange={(e) => handleFormChange('customer_name', e.target.value)}
                   placeholder="Enter your full name"
                   required
+                  disabled={isContactInfoLocked}
+                  className={cn(isContactInfoLocked && "bg-muted text-muted-foreground cursor-not-allowed")}
                 />
               </div>
               <div>
@@ -634,6 +661,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                   onChange={(e) => handleFormChange('customer_email', e.target.value)}
                   placeholder="Enter your email"
                   required
+                  disabled={isContactInfoLocked}
+                  className={cn(isContactInfoLocked && "bg-muted text-muted-foreground cursor-not-allowed")}
                 />
               </div>
             </div>
@@ -646,6 +675,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                 onChange={(e) => handleFormChange('customer_phone', e.target.value)}
                 placeholder="Enter your phone number"
                 required
+                disabled={isContactInfoLocked}
+                className={cn(isContactInfoLocked && "bg-muted text-muted-foreground cursor-not-allowed")}
               />
             </div>
           </CardContent>
@@ -841,7 +872,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           cancelUrl={paymentData.cancelUrl}
           onSuccess={handlePaymentSuccess}
           onError={(error) => handlePaymentFailure({ message: error })}
-          onClose={() => setCheckoutStep('details')}
+          onClose={() => {
+            setCheckoutStep('details');
+            setIsContactInfoLocked(false); // Unlock contact info when going back
+          }}
         />
       )}
     </div>

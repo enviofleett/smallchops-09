@@ -1,13 +1,7 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
-// ✅ Updated CORS headers with allowed methods
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS"
-};
+import { getCorsHeaders } from '../_shared/cors.ts';
 
 // ✅ Validate environment variables before client creation
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -20,6 +14,8 @@ if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
 serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
+  
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -190,9 +186,11 @@ serve(async (req) => {
     const callbackUrl = `${SUPABASE_URL}/functions/v1/payment-callback?order_id=${order.id}`;
     console.log("🔗 Payment callback URL:", callbackUrl);
 
-    // ✅ Initialize payment
+    // ✅ Initialize payment with timeout
     console.log("💳 Initializing payment via paystack-secure...");
-    const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke("paystack-secure", {
+    
+    // Add timeout to the Edge Function call
+    const paymentInitPromise = supabaseAdmin.functions.invoke("paystack-secure", {
       body: {
         action: "initialize",
         email: order.customer_email,
@@ -210,6 +208,22 @@ serve(async (req) => {
         callback_url: callbackUrl,
       },
     });
+
+    // Create timeout promise
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Payment initialization timeout after 15 seconds')), 15000);
+    });
+
+    let paymentData, paymentError;
+    try {
+      ({ data: paymentData, error: paymentError } = await Promise.race([
+        paymentInitPromise,
+        timeoutPromise
+      ]));
+    } catch (timeoutError) {
+      console.error("❌ Payment initialization timeout:", timeoutError);
+      throw new Error(`Payment service temporarily unavailable. Please try again.`);
+    }
 
     if (paymentError) {
       console.error("❌ Payment initialization failed:", paymentError);

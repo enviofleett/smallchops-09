@@ -4,6 +4,7 @@ import { calculateProductDiscount, ProductWithDiscount, isPromotionValidForCurre
 
 // Get products with calculated discounts - Optimized for faster loading
 export async function getProductsWithDiscounts(categoryId?: string): Promise<ProductWithDiscount[]> {
+  console.log('🔍 [getProductsWithDiscounts] Called with categoryId:', categoryId);
   try {
     // Build the query
     let query = supabase
@@ -20,49 +21,68 @@ export async function getProductsWithDiscounts(categoryId?: string): Promise<Pro
     
     if (categoryId) {
       query = query.eq("category_id", categoryId);
+      console.log('🔍 [getProductsWithDiscounts] Applied category filter:', categoryId);
+    } else {
+      console.log('🔍 [getProductsWithDiscounts] No category filter applied (all products)');
     }
     
-    // Execute query with faster timeout
+    // Execute query with increased timeout for better reliability
     const productsPromise = query.order("name");
     const promotionsPromise = getPromotions();
     
-    // Parallel execution with timeout fallback
+    // Use Promise.allSettled to handle promotions failure gracefully
     const [
-      { data: products, error: productsError },
-      promotions
-    ] = await Promise.all([
+      productsResult,
+      promotionsResult
+    ] = await Promise.allSettled([
       Promise.race([
         productsPromise,
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Products query timeout')), 4000)
+          setTimeout(() => reject(new Error('Products query timeout')), 8000) // Increased timeout
         )
       ]) as Promise<any>,
       Promise.race([
         promotionsPromise,
         new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Promotions query timeout')), 2000)
+          setTimeout(() => reject(new Error('Promotions query timeout')), 3000) // Increased timeout
         )
       ]) as Promise<any>
     ]);
     
+    // Handle products result
+    if (productsResult.status === 'rejected') {
+      console.error('Products query failed:', productsResult.reason);
+      return [];
+    }
+    
+    const { data: products, error: productsError } = productsResult.value;
     if (productsError) {
       console.error('Products query error:', productsError);
       return [];
     }
     
-    // Safely handle promotions error
-    const activePromotions = Array.isArray(promotions) 
-      ? promotions.filter(p => p.status === 'active')
-      : [];
+    // Handle promotions gracefully - don't fail if promotions can't be loaded
+    let activePromotions = [];
+    if (promotionsResult.status === 'fulfilled') {
+      const promotions = promotionsResult.value;
+      activePromotions = Array.isArray(promotions) 
+        ? promotions.filter(p => p.status === 'active')
+        : [];
+    } else {
+      console.warn('Promotions query failed, continuing without promotions:', promotionsResult.reason);
+    }
     
     // Calculate discounts for each product
     const productsWithDiscounts = (products || []).map(product => 
       calculateProductDiscount(product, activePromotions)
     );
     
+    console.log('🔍 [getProductsWithDiscounts] Returning', productsWithDiscounts.length, 'products');
     return productsWithDiscounts;
   } catch (error) {
     console.error('Error fetching products with discounts:', error);
+    console.error('CategoryId:', categoryId);
+    console.error('Full error details:', JSON.stringify(error, null, 2));
     // Return empty array on error to prevent complete page failure
     return [];
   }

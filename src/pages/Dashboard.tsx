@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Package, ShoppingCart, Users, TrendingUp, RefreshCw } from 'lucide-react';
+import { Package, ShoppingCart, Users, TrendingUp, RefreshCw, AlertCircle } from 'lucide-react';
 import DashboardCard from '@/components/DashboardCard';
 import RevenueChart from '@/components/charts/RevenueChart';
 import OrdersChart from '@/components/charts/OrdersChart';
@@ -10,10 +10,12 @@ import { useDashboardData } from '@/hooks/useDashboardData';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ProgressiveLoader } from '@/components/ui/progressive-loader';
-
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { useNetwork } from '@/components/network/NetworkProvider';
 
 const Dashboard = () => {
   const { data, isLoading, error, refresh } = useDashboardData();
+  const { isOnline, apiAvailable, connectionQuality } = useNetwork();
 
   if (isLoading) {
     return (
@@ -64,21 +66,56 @@ const Dashboard = () => {
     <div className="space-y-4 md:space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <DashboardHeader />
-        <Button
-          onClick={() => refresh(true)}
-          disabled={isLoading}
-          variant="outline"
-          size="sm"
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-          Refresh
-        </Button>
+        <div className="flex items-center gap-2">
+          {/* Network status indicator */}
+          {(!isOnline || !apiAvailable || connectionQuality === 'poor') && (
+            <div className="flex items-center text-xs text-muted-foreground">
+              <div className={`w-2 h-2 rounded-full mr-1 ${
+                !isOnline ? 'bg-red-500' : 
+                !apiAvailable ? 'bg-orange-500' : 
+                'bg-yellow-500'
+              }`} />
+              {!isOnline ? 'Offline' : !apiAvailable ? 'API Issues' : 'Poor Connection'}
+            </div>
+          )}
+          <Button
+            onClick={() => refresh(true)}
+            disabled={isLoading}
+            variant="outline"
+            size="sm"
+            className="flex items-center gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+        </div>
       </div>
+
+      {/* Network status alerts */}
+      {error && (
+        <Alert variant={error.severity === 'critical' || error.severity === 'high' ? 'destructive' : 'default'}>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription>
+            <div className="space-y-2">
+              <p>{error.message}</p>
+              {error.suggestedActions && error.suggestedActions.length > 0 && (
+                <div>
+                  <p className="text-sm font-medium">Suggestions:</p>
+                  <ul className="list-disc list-inside text-sm">
+                    {error.suggestedActions.slice(0, 2).map((action, index) => (
+                      <li key={index}>{action}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       <ProgressiveLoader
         isLoading={isLoading}
-        error={error ? new Error(error) : null}
+        error={error}
         data={data}
         skeletonType="card"
         retryFn={() => refresh(true)}
@@ -129,7 +166,7 @@ const Dashboard = () => {
         />
       </ProgressiveLoader>
 
-      {(!data || (!data.stats.totalProducts && !data.stats.totalOrders)) && !isLoading && (
+      {(!data || (!data.stats.totalProducts && !data.stats.totalOrders)) && !isLoading && !error && (
         <div className="text-center py-8 space-y-4">
           <div className="text-muted-foreground">
             <Package className="mx-auto h-12 w-12 mb-4 opacity-50" />

@@ -165,8 +165,8 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
                   <CheckCircle className="h-4 w-4 text-muted-foreground" />
                   <div>
                     <p className="text-sm text-muted-foreground">Current Status</p>
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status.replace('_', ' ').toUpperCase()}
+                    <Badge className={getStatusColor(order.status || 'pending')}>
+                      {(order.status || 'pending').replace('_', ' ').toUpperCase()}
                     </Badge>
                   </div>
                 </div>

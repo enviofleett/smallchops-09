@@ -172,8 +172,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               <CardContent className="pt-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge className={getStatusColor(order.status)}>
-                      {order.status.replace('_', ' ').toUpperCase()}
+                    <Badge className={getStatusColor(order.status || 'pending')}>
+                      {(order.status || 'pending').replace('_', ' ').toUpperCase()}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">Order Status</p>
@@ -185,8 +185,8 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               <CardContent className="pt-4">
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
-                    <Badge className={getPaymentStatusColor(order.payment_status)}>
-                      {order.payment_status.toUpperCase()}
+                    <Badge className={getPaymentStatusColor(order.payment_status || 'pending')}>
+                      {(order.payment_status || 'pending').toUpperCase()}
                     </Badge>
                   </div>
                   <p className="text-sm text-muted-foreground">Payment Status</p>

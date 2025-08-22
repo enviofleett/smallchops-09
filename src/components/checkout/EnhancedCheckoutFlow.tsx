@@ -336,9 +336,15 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           type: formData.fulfillment_type,
           address: formData.fulfillment_type === 'delivery' ? formData.delivery_address : undefined,
           pickup_point_id: formData.fulfillment_type === 'pickup' ? formData.pickup_point_id : undefined,
-          delivery_zone_id: deliveryZone?.id || undefined,
-          scheduled_time: formData.delivery_date ? `${formData.delivery_date} ${formData.delivery_time_slot?.start_time || '09:00'}` : undefined
+          delivery_zone_id: deliveryZone?.id || undefined
         },
+        delivery_schedule: formData.delivery_date ? {
+          delivery_date: formData.delivery_date,
+          delivery_time_start: formData.delivery_time_slot?.start_time || '09:00',
+          delivery_time_end: formData.delivery_time_slot?.end_time || '17:00',
+          is_flexible: false,
+          special_instructions: formData.special_instructions || null
+        } : null,
         payment: {
           method: formData.payment_method || 'paystack'
         }
@@ -405,40 +411,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         return;
       }
 
-      // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
-      const deliverySchedule = formData.delivery_date ? {
-        delivery_date: formData.delivery_date,
-        delivery_time_start: formData.delivery_time_slot?.start_time || '09:00',
-        delivery_time_end: formData.delivery_time_slot?.end_time || '17:00',
-        is_flexible: false,
-        special_instructions: formData.special_instructions || null
-      } : null;
-      
-      if (parsedData?.order_id && deliverySchedule) {
-        console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
-        try {
-          const { upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
-          await upsertDeliverySchedule({
-            order_id: parsedData.order_id,
-            delivery_date: deliverySchedule.delivery_date,
-            delivery_time_start: deliverySchedule.delivery_time_start,
-            delivery_time_end: deliverySchedule.delivery_time_end,
-            is_flexible: deliverySchedule.is_flexible || false,
-            special_instructions: deliverySchedule.special_instructions || null
-          });
-          console.log('✅ [GUARDRAIL] Schedule upserted successfully');
-          toast({
-            title: "Schedule saved",
-            description: "Your delivery schedule has been confirmed."
-          });
-        } catch (error) {
-          console.error('🛡️ [GUARDRAIL] Fallback failed:', error);
-          toast({
-            title: "Processing delivery schedule",
-            description: "We'll finalize your delivery window after payment."
-          });
-        }
-      }
+      // Note: Delivery schedule is now saved atomically in the backend during order creation
       
       // Set payment data for PaystackPaymentHandler to initialize securely
       setPaymentData({

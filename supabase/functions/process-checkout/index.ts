@@ -128,6 +128,35 @@ serve(async (req) => {
     }
 
     console.log("✅ Order created successfully:", orderId);
+    
+    // ✅ Save delivery schedule atomically if provided
+    if (requestBody.delivery_schedule && orderId) {
+      console.log("📅 Saving delivery schedule for order:", orderId);
+      try {
+        const { error: scheduleError } = await supabaseAdmin
+          .from("order_delivery_schedule")
+          .insert({
+            order_id: orderId,
+            delivery_date: requestBody.delivery_schedule.delivery_date,
+            delivery_time_start: requestBody.delivery_schedule.delivery_time_start,
+            delivery_time_end: requestBody.delivery_schedule.delivery_time_end,
+            is_flexible: requestBody.delivery_schedule.is_flexible || false,
+            special_instructions: requestBody.delivery_schedule.special_instructions,
+            requested_at: new Date().toISOString()
+          });
+
+        if (scheduleError) {
+          console.error("⚠️ Failed to save delivery schedule:", scheduleError);
+          // Don't fail the entire order creation, but log the error
+        } else {
+          console.log("✅ Delivery schedule saved successfully");
+        }
+      } catch (error) {
+        console.error("⚠️ Delivery schedule save error:", error);
+        // Don't fail the entire order creation
+      }
+    }
+
     // ✅ Fetch the created order
     const { data: order, error: fetchError } = await supabaseAdmin
       .from("orders")

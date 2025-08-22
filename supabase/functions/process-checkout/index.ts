@@ -1,140 +1,146 @@
 
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
+// ✅ Updated CORS headers with allowed methods
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type'
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS"
 };
 
+// ✅ Validate environment variables before client creation
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+
+if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+  throw new Error("Missing Supabase environment variables");
+}
+
+const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
 serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', {
-      headers: corsHeaders
-    });
+  // Handle CORS preflight
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
     
-    console.log('🛒 Processing checkout request...');
+    console.log("🛒 Processing checkout request...");
+
     const requestBody = await req.json();
 
-    console.log('📨 Checkout request received:', {
+    console.log("📨 Checkout request received:", {
       customer_email: requestBody.customer?.email,
-      items_count: requestBody.items?.length
+      items_count: requestBody.items?.length,
     });
 
-    // Validate request
-    if (!requestBody.customer?.email) {
-      throw new Error('Customer email is required');
-    }
-    if (!requestBody.items || requestBody.items.length === 0) {
-      throw new Error('Order must contain at least one item');
-    }
-    if (!requestBody.fulfillment?.type) {
-      throw new Error('Fulfillment type is required');
-    }
+    // ✅ Validate request
+    if (!requestBody.customer?.email) throw new Error("Customer email is required");
+    if (!requestBody.items || requestBody.items.length === 0) throw new Error("Order must contain at least one item");
+    if (!requestBody.fulfillment?.type) throw new Error("Fulfillment type is required");
 
-    let customerId;
     const customerEmail = requestBody.customer.email.toLowerCase();
+    let customerId;
 
-    // Race-safe customer resolution: Check if customer exists
-    console.log('👤 Looking up customer by email:', customerEmail);
+    // ✅ Look up existing customer
+    console.log("👤 Looking up customer by email:", customerEmail);
     const { data: existingCustomer, error: findError } = await supabaseAdmin
-      .from('customer_accounts')
-      .select('id, name')
-      .eq('email', customerEmail)
+      .from("customer_accounts")
+      .select("id, name")
+      .eq("email", customerEmail)
       .maybeSingle();
-    
+
     if (findError) {
-      console.error('❌ Failed to check for existing customer:', findError);
-      throw new Error('Failed to find customer account');
+      console.error("❌ Failed to check for existing customer:", findError);
+      throw new Error("Failed to find customer account");
     }
 
     if (existingCustomer) {
-      // Customer exists, use their ID
       customerId = existingCustomer.id;
-      console.log('👤 Using existing customer:', customerId, 'Name:', existingCustomer.name);
+      console.log("👤 Using existing customer:", customerId);
     } else {
-      // Customer doesn't exist, create new account with race condition handling
-      console.log('👤 Creating new customer account for:', customerEmail);
+      // ✅ Create new customer safely
+      console.log("👤 Creating new customer account for:", customerEmail);
+
       const { data: newCustomer, error: createError } = await supabaseAdmin
-        .from('customer_accounts')
+        .from("customer_accounts")
         .insert({
           name: requestBody.customer.name,
           email: customerEmail,
           phone: requestBody.customer.phone,
           email_verified: false,
           phone_verified: false,
-          profile_completion_percentage: 60
+          profile_completion_percentage: 60,
         })
-        .select('id')
-        .maybeSingle();
-      
+        .select("id")
+        .single(); // ✅ FIX: use .single()
+
       if (createError) {
-        // Handle potential race condition - another process might have created the customer
-        if (createError.code === '23505') { // Unique constraint violation
-          console.log('⚠️ Customer creation race condition detected, fetching existing customer');
+        if (createError.code === "23505") {
+          console.log("⚠️ Race condition detected. Fetching existing customer...");
           const { data: raceCustomer, error: raceError } = await supabaseAdmin
-            .from('customer_accounts')
-            .select('id, name')
-            .eq('email', customerEmail)
+            .from("customer_accounts")
+            .select("id, name")
+            .eq("email", customerEmail)
             .maybeSingle();
-            
+
           if (raceError || !raceCustomer) {
-            console.error('❌ Failed to resolve customer after race condition:', raceError);
-            throw new Error('Failed to resolve customer account');
+            console.error("❌ Failed to resolve customer after race condition:", raceError);
+            throw new Error("Failed to resolve customer account");
           }
-          
           customerId = raceCustomer.id;
-          console.log('👤 Resolved race condition, using existing customer:', customerId);
+          console.log("👤 Resolved race condition, using existing customer:", customerId);
         } else {
-          console.error('❌ Customer creation failed:', createError);
-          throw new Error('Failed to create customer account');
+          console.error("❌ Customer creation failed:", createError);
+          throw new Error("Failed to create customer account");
         }
-      } else if (!newCustomer) {
-        throw new Error('Customer creation returned no data');
       } else {
         customerId = newCustomer.id;
-        console.log('👤 Created new customer:', customerId);
+        console.log("👤 Created new customer:", customerId);
       }
     }
-    
-    // The rest of the logic remains unchanged, using the determined customerId
-    console.log('📝 Creating order with items...');
-    
+    // ✅ Prepare order items
+    console.log("📝 Creating order with items...");
     const orderItems = requestBody.items.map((item) => ({
       product_id: item.product_id,
       product_name: item.product_name,
       quantity: item.quantity,
       unit_price: item.unit_price,
-      customizations: item.customizations
+      customizations: item.customizations,
     }));
 
-    // Create order using the database function
-    const { data: orderId, error: orderError } = await supabaseAdmin.rpc('create_order_with_items', {
+    // ✅ Call database function
+    const { data: orderId, error: orderError } = await supabaseAdmin.rpc("create_order_with_items", {
       p_customer_id: customerId,
       p_fulfillment_type: requestBody.fulfillment.type,
       p_delivery_address: requestBody.fulfillment.address || null,
       p_pickup_point_id: requestBody.fulfillment.pickup_point_id || null,
       p_delivery_zone_id: requestBody.fulfillment.delivery_zone_id || null,
       p_guest_session_id: null,
-      p_items: orderItems
+      p_items: orderItems,
     });
 
     if (orderError) {
-      console.error('❌ Order creation failed:', orderError);
+      console.error("❌ Order creation failed:", orderError);
       throw new Error(`Order creation failed: ${orderError.message}`);
     }
 
-    console.log('✅ Order created successfully:', orderId);
-    
-    // Compute delivery fee if delivery order
+    console.log("✅ Order created successfully:", orderId);
+    // ✅ Fetch the created order
+    const { data: order, error: fetchError } = await supabaseAdmin
+      .from("orders")
+      .select("id, order_number, total_amount, customer_email")
+      .eq("id", orderId)
+      .maybeSingle();
+
+    if (fetchError || !order) {
+      console.error("❌ Failed to fetch created order:", fetchError);
+      throw new Error("Order not found after creation");
+    }
+
+    // ✅ Compute delivery fee if delivery order
     let deliveryFee = 0;
     if (requestBody.fulfillment.type === 'delivery' && requestBody.fulfillment.delivery_zone_id) {
       console.log('💰 Computing delivery fee for zone:', requestBody.fulfillment.delivery_zone_id);
@@ -153,24 +159,8 @@ serve(async (req) => {
         console.log('💰 Delivery fee for zone:', deliveryZone.name, '- Fee:', deliveryFee);
       }
     }
-    
-    const { data: order, error: fetchError } = await supabaseAdmin
-      .from('orders')
-      .select('id, order_number, total_amount, customer_email')
-      .eq('id', orderId)
-      .maybeSingle();
 
-    if (fetchError) {
-      console.error('❌ Failed to fetch order:', fetchError);
-      throw new Error('Failed to fetch created order');
-    }
-    
-    if (!order) {
-      console.error('❌ Order not found after creation:', orderId);
-      throw new Error('Order not found after creation');
-    }
-
-    // Update order with delivery fee
+    // ✅ Update order with delivery fee if applicable
     if (deliveryFee > 0) {
       console.log('💰 Updating order with delivery fee:', deliveryFee);
       
@@ -194,21 +184,17 @@ serve(async (req) => {
       }
     }
 
-    console.log('💰 Order details:', {
-      order_id: order.id,
-      order_number: order.order_number,
-      total_amount: order.total_amount,
-      customer_email: order.customer_email
-    });
-    
-    // Construct callback URL and log for debugging
-    const callbackUrl = `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?order_id=${order.id}`;
-    console.log('🔗 Payment callback URL:', callbackUrl);
-    
-    console.log('💳 Initializing payment via paystack-secure...');
-    const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke('paystack-secure', {
+    console.log("💰 Order details:", order);
+
+    // ✅ Build payment callback URL
+    const callbackUrl = `${SUPABASE_URL}/functions/v1/payment-callback?order_id=${order.id}`;
+    console.log("🔗 Payment callback URL:", callbackUrl);
+
+    // ✅ Initialize payment
+    console.log("💳 Initializing payment via paystack-secure...");
+    const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke("paystack-secure", {
       body: {
-        action: 'initialize',
+        action: "initialize",
         email: order.customer_email,
         amount: order.total_amount,
         metadata: {
@@ -219,62 +205,66 @@ serve(async (req) => {
           items_subtotal: order.total_amount - deliveryFee,
           delivery_fee: deliveryFee,
           client_total: order.total_amount,
-          authoritative_total: order.total_amount
+          authoritative_total: order.total_amount,
         },
-        callback_url: callbackUrl
-      }
+        callback_url: callbackUrl,
+      },
     });
 
     if (paymentError) {
-      console.error('❌ Payment initialization failed:', paymentError);
+      console.error("❌ Payment initialization failed:", paymentError);
       throw new Error(`Payment initialization failed: ${paymentError.message}`);
     }
 
-    // Log payment reference for debugging
-    const paymentReference = paymentData.data?.reference || paymentData.reference;
-    console.log('✅ Payment initialized successfully via paystack-secure');
-    console.log('💳 Payment reference:', paymentReference);
-    console.log('🌐 Authorization URL:', paymentData.data?.authorization_url || paymentData.authorization_url);
+    console.log("🔍 Raw paymentData:", paymentData);
 
-    return new Response(JSON.stringify({
-      success: true,
-      order: {
-        id: order.id,
-        order_number: order.order_number,
-        total_amount: order.total_amount,
-        status: 'pending'
-      },
-      customer: {
-        id: customerId,
-        email: order.customer_email
-      },
-      payment: {
-        authorization_url: paymentData.data?.authorization_url || paymentData.authorization_url,
-        reference: paymentData.data?.reference || paymentData.reference
-      }
-    }), {
-      status: 200,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
-    });
+    // ✅ Extract payment info safely
+    const paymentReference = paymentData?.data?.reference || paymentData?.reference;
+    const authorizationUrl = paymentData?.data?.authorization_url || paymentData?.authorization_url;
 
+    console.log("✅ Payment initialized successfully");
+    console.log("💳 Payment reference:", paymentReference);
+    console.log("🌐 Authorization URL:", authorizationUrl);
+
+    // ✅ Success response
+    return new Response(
+      JSON.stringify({
+        success: true,
+        order: {
+          id: order.id,
+          order_number: order.order_number,
+          total_amount: order.total_amount,
+          status: "pending",
+        },
+        customer: {
+          id: customerId,
+          email: order.customer_email,
+        },
+        payment: {
+          authorization_url: authorizationUrl,
+          reference: paymentReference,
+        },
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   } catch (error) {
-    console.error('❌ Checkout processing error:', error);
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message || 'Checkout processing failed',
-      details: {
-        timestamp: new Date().toISOString(),
-        error_type: error.constructor.name
-      }
-    }), {
-      status: 400,
-      headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json'
-      }
-    });
+    console.error("❌ Checkout processing error:", error);
+    return new Response(
+      JSON.stringify({
+        success: false,
+        error: error.message || "Checkout processing failed",
+        details: {
+          timestamp: new Date().toISOString(),
+          error_type: error.constructor.name,
+        },
+      }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
   }
 });

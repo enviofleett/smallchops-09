@@ -32,47 +32,99 @@ export const useEmailAutomation = () => {
     try {
       setIsProcessing(true);
 
-      // Create communication event for welcome email
+      // Validate inputs
+      if (!customerEmail || !customerEmail.includes('@')) {
+        return { success: false, error: 'Valid email address is required' };
+      }
+
+      if (!customerName?.trim()) {
+        return { success: false, error: 'Customer name is required' };
+      }
+
+      // Use enhanced email processor for immediate sending
+      const { data: emailResult, error: emailError } = await supabase.functions.invoke(
+        'production-email-processor',
+        {
+          body: {
+            recipient: { 
+              email: customerEmail,
+              name: customerName 
+            },
+            templateKey: 'customer_welcome',
+            variables: {
+              customer_name: customerName,
+              store_name: metadata.storeName || 'Starters Small Chops',
+              support_email: metadata.supportEmail || 'support@startersmallchops.com',
+              ...metadata
+            },
+            priority: 'normal',
+            emailType: 'transactional'
+          }
+        }
+      );
+
+      if (emailError) {
+        console.error('Welcome email sending failed:', emailError);
+        toast({
+          title: 'Welcome Email Failed',
+          description: emailError.message || 'Could not send welcome email',
+          variant: 'destructive'
+        });
+        return { success: false, error: emailError.message };
+      }
+
+      if (!emailResult?.success) {
+        const errorMsg = emailResult?.error || 'Unknown error occurred';
+        toast({
+          title: 'Welcome Email Failed',
+          description: errorMsg,
+          variant: 'destructive'
+        });
+        return { success: false, error: errorMsg };
+      }
+
+      // Also create communication event for tracking
       const { data: eventData, error: eventError } = await supabase
         .from('communication_events')
         .insert({
           event_type: 'customer_welcome',
           recipient_email: customerEmail,
-          status: 'queued',
+          status: 'sent',
           template_key: 'customer_welcome',
           template_variables: {
             customer_name: customerName,
-            store_name: 'Starters',
-            support_email: 'support@starters.com',
+            store_name: metadata.storeName || 'Starters Small Chops',
             ...metadata
           },
-          priority: 'normal'
+          priority: 'normal',
+          external_id: emailResult.messageId
         })
         .select()
         .single();
 
       if (eventError) {
-        throw new Error(`Failed to queue welcome email: ${eventError.message}`);
+        console.warn('Failed to log communication event:', eventError);
       }
 
-      // Trigger immediate processing for welcome emails
-      const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'instant-welcome-processor', 
-        { body: { event_id: eventData.id } }
-      );
-
-      if (processError) {
-        console.warn('Failed to trigger immediate processing, email will be processed in queue:', processError);
-      }
+      toast({
+        title: 'Welcome Email Sent',
+        description: `Welcome email sent successfully to ${customerEmail}`,
+        variant: 'default'
+      });
 
       return { 
         success: true, 
-        eventId: eventData.id,
-        messageId: processResult?.message_id 
+        eventId: eventData?.id,
+        messageId: emailResult.messageId 
       };
 
     } catch (error: any) {
       console.error('Welcome email trigger error:', error);
+      toast({
+        title: 'Email System Error',
+        description: 'An unexpected error occurred while sending the welcome email',
+        variant: 'destructive'
+      });
       return { 
         success: false, 
         error: error.message 
@@ -80,7 +132,7 @@ export const useEmailAutomation = () => {
     } finally {
       setIsProcessing(false);
     }
-  }, []);
+  }, [toast]);
 
   const triggerOrderConfirmationEmail = useCallback(async (
     orderId: string,

@@ -275,7 +275,17 @@ export const PaymentCallbackPage: React.FC = () => {
           <XCircle className="h-16 w-16 text-red-500 mx-auto mb-6" />
           <h2 className="text-2xl font-bold text-foreground mb-2">Payment Failed</h2>
           <p className="text-muted-foreground mb-6 text-sm">
-            {errorMessage || 'There was an issue processing your payment. Please try again.'}
+            {errorMessage ? (
+              errorMessage.toLowerCase().includes('timeout') ? (
+                'Payment verification is taking longer than expected. Your payment may still be processing.'
+              ) : errorMessage.toLowerCase().includes('temporarily unavailable') ? (
+                'Our payment service is temporarily unavailable. Please try again in a few moments.'
+              ) : (
+                errorMessage
+              )
+            ) : (
+              'There was an issue processing your payment. Please try again.'
+            )}
           </p>
           
             <div className="space-y-3">
@@ -296,7 +306,15 @@ export const PaymentCallbackPage: React.FC = () => {
             
             <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <p className="text-sm text-orange-700">
-                <strong>Need help?</strong> Your items are still in your cart. You can try paying again or contact support.
+                <strong>Need help?</strong> {
+                  errorMessage?.toLowerCase().includes('timeout') ? (
+                    'If your bank has charged you, the payment will be processed automatically. Check your order status in a few minutes.'
+                  ) : errorMessage?.toLowerCase().includes('temporarily unavailable') ? (
+                    'Your items are saved in your cart. You can try paying again in a few minutes.'
+                  ) : (
+                    'Your items are still in your cart. You can try paying again or contact support.'
+                  )
+                }
               </p>
             </div>
         </Card>

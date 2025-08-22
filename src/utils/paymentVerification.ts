@@ -30,11 +30,21 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
   }
   
   try {
-    // Try verify-payment function first (preferred for production)
+    // Try verify-payment function first (preferred for production) with timeout
     console.log('🔄 Attempting verification via verify-payment function...');
-    const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
+    
+    const verificationPromise = supabase.functions.invoke('verify-payment', {
       body: { reference }
     });
+    
+    const timeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Payment verification timeout after 20 seconds')), 20000);
+    });
+
+    const { data: verifyData, error: verifyError } = await Promise.race([
+      verificationPromise,
+      timeoutPromise
+    ]) as any;
 
     if (!verifyError && verifyData?.success) {
       console.log('✅ Payment verified via verify-payment function');
@@ -46,13 +56,22 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
 
     console.log('⚠️ verify-payment failed, falling back to paystack-secure:', verifyError?.message);
     
-    // Fallback to paystack-secure
-    const { data, error } = await supabase.functions.invoke('paystack-secure', {
+    // Fallback to paystack-secure with timeout
+    const fallbackPromise = supabase.functions.invoke('paystack-secure', {
       body: {
         action: 'verify',
         reference: reference
       }
     });
+
+    const fallbackTimeoutPromise = new Promise((_, reject) => {
+      setTimeout(() => reject(new Error('Fallback verification timeout after 20 seconds')), 20000);
+    });
+
+    const { data, error } = await Promise.race([
+      fallbackPromise,
+      fallbackTimeoutPromise
+    ]) as any;
 
     if (error) {
       console.error('❌ Payment verification failed:', error);
@@ -134,6 +153,12 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
   } catch (error) {
     console.error('❌ Payment verification error:', error);
     
+    // Enhanced error handling for timeouts
+    const isTimeoutError = (error as Error).message?.includes('timeout');
+    const errorMessage = isTimeoutError 
+      ? 'Payment verification is taking longer than expected. Your payment may still be processing. Please check your order status or contact support.'
+      : (error as Error).message || 'Payment verification failed';
+    
     // Try recovery on exception
     console.log('🔄 Attempting payment recovery after exception...');
     try {
@@ -160,7 +185,7 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
     
     return {
       success: false,
-      message: (error as Error).message || 'Payment verification failed'
+      message: errorMessage
     };
   }
 };

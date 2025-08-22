@@ -87,12 +87,22 @@ export async function initializeSecurePayment(
     try {
       console.log(`🔄 Payment initialization attempt ${attempt + 1}/${maxRetries + 1}`)
 
-      const { data, error } = await supabase.functions.invoke('process-checkout', {
+      // Add timeout to the checkout process
+      const checkoutPromise = supabase.functions.invoke('process-checkout', {
         body: request,
         headers: {
           'Content-Type': 'application/json'
         }
-      })
+      });
+
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Payment initialization timeout after 30 seconds')), 30000);
+      });
+
+      const { data, error } = await Promise.race([
+        checkoutPromise,
+        timeoutPromise
+      ]) as any;
 
       if (error) {
         const isRetryable = isRetryableError(error)
@@ -131,11 +141,17 @@ export async function initializeSecurePayment(
           throw error
         }
       } else {
+        // Enhanced error handling for timeouts
+        const isTimeoutError = error instanceof Error && error.message.includes('timeout');
+        const errorMessage = isTimeoutError 
+          ? 'Payment service is temporarily unavailable. Please try again in a few moments.'
+          : error instanceof Error ? error.message : 'Unknown error occurred';
+        
         lastError = new PaymentError(
-          error instanceof Error ? error.message : 'Unknown error occurred',
-          'UNKNOWN_ERROR',
+          errorMessage,
+          isTimeoutError ? 'TIMEOUT_ERROR' : 'UNKNOWN_ERROR',
           error,
-          true
+          isTimeoutError // Timeout errors are retryable
         )
       }
 

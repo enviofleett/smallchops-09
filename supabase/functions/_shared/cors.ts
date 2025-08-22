@@ -34,7 +34,7 @@ export function getCorsHeaders(origin?: string | null): Record<string, string> {
   const baseHeaders = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 
-      'authorization, x-client-info, apikey, content-type, x-requested-with, user-agent',
+      'authorization, x-client-info, apikey, content-type, x-requested-with, user-agent, x-paystack-signature',
     'Access-Control-Max-Age': '86400',
     'Access-Control-Allow-Credentials': 'false'
   };

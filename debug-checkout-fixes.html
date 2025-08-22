@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Checkout & Guest Session Fixes</title>
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: system-ui, -apple-system, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f8fafc;
+        }
+        .container {
+            background: white;
+            padding: 24px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 24px;
+            padding: 16px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+        }
+        .test-result {
+            margin-top: 12px;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 14px;
+        }
+        .success { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+        .error { background: #fef2f2; color: #dc2626; border: 1px solid #fecaca; }
+        .info { background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe; }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin-right: 8px;
+        }
+        button:hover { background: #2563eb; }
+        button:disabled { background: #9ca3af; cursor: not-allowed; }
+        .status { font-weight: bold; margin-bottom: 8px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Checkout & Guest Session Debug Tool</h1>
+        <p>This tool tests the fixes for:</p>
+        <ul>
+            <li><strong>404 Error:</strong> Missing /checkout route</li>
+            <li><strong>Guest Session Error:</strong> RPC function generate_guest_session_id</li>
+        </ul>
+    </div>
+
+    <div class="container">
+        <h2>1. Checkout Route Test</h2>
+        <div class="test-section">
+            <h3>Route Availability Test</h3>
+            <button onclick="testCheckoutRoute()">Test /checkout Route</button>
+            <div id="route-test-result"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>2. Guest Session RPC Test</h2>
+        <div class="test-section">
+            <h3>Generate Guest Session ID</h3>
+            <button onclick="testGuestSessionRPC()">Test RPC Function</button>
+            <button onclick="testGuestSessionFallback()">Test Fallback Generation</button>
+            <div id="guest-session-result"></div>
+        </div>
+    </div>
+
+    <div class="container">
+        <h2>3. Navigation Test</h2>
+        <div class="test-section">
+            <h3>Direct Navigation</h3>
+            <button onclick="navigateToCheckout()">Navigate to /checkout</button>
+            <button onclick="navigateToCart()">Navigate to /cart</button>
+            <div id="navigation-result"></div>
+        </div>
+    </div>
+
+    <script>
+        const supabaseUrl = 'https://oknnklksdiqaifhxaccs.supabase.co';
+        const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MjMzNDQwOTQsImV4cCI6MjAzODkyMDA5NH0.BUJ8UayCTbwKTBjB5jCYB0V9LkmP8QZwk2r3d2JsJaE';
+        const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+
+        function showResult(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="test-result ${type}"><div class="status">${type.toUpperCase()}:</div>${message}</div>`;
+        }
+
+        async function testCheckoutRoute() {
+            showResult('route-test-result', 'Testing checkout route...', 'info');
+            
+            try {
+                const response = await fetch('/checkout', { method: 'HEAD' });
+                
+                if (response.ok || response.status === 200) {
+                    showResult('route-test-result', '✅ /checkout route is accessible (Status: ' + response.status + ')', 'success');
+                } else if (response.status === 404) {
+                    showResult('route-test-result', '❌ /checkout route returns 404 - Route not found', 'error');
+                } else {
+                    showResult('route-test-result', `⚠️ /checkout route returns status: ${response.status}`, 'info');
+                }
+            } catch (error) {
+                showResult('route-test-result', '❌ Failed to test route: ' + error.message, 'error');
+            }
+        }
+
+        async function testGuestSessionRPC() {
+            showResult('guest-session-result', 'Testing RPC function generate_guest_session_id...', 'info');
+            
+            try {
+                console.log('Calling supabase.rpc(generate_guest_session_id)...');
+                const { data, error } = await supabase.rpc('generate_guest_session_id');
+                
+                if (error) {
+                    showResult('guest-session-result', 
+                        `❌ RPC Error: ${error.message}\n\nDetails: ${JSON.stringify(error, null, 2)}`, 
+                        'error'
+                    );
+                } else {
+                    showResult('guest-session-result', 
+                        `✅ RPC Success!\n\nGenerated ID: ${data}\nType: ${typeof data}`, 
+                        'success'
+                    );
+                }
+            } catch (error) {
+                showResult('guest-session-result', 
+                    `❌ JavaScript Error: ${error.message}\n\nStack: ${error.stack}`, 
+                    'error'
+                );
+            }
+        }
+
+        async function testGuestSessionFallback() {
+            showResult('guest-session-result', 'Testing fallback guest session generation...', 'info');
+            
+            try {
+                // Test the fallback method (client-side generation)
+                const fallbackId = `guest_${crypto.randomUUID()}`;
+                
+                showResult('guest-session-result', 
+                    `✅ Fallback Success!\n\nGenerated ID: ${fallbackId}\nMethod: crypto.randomUUID()`, 
+                    'success'
+                );
+            } catch (error) {
+                showResult('guest-session-result', 
+                    `❌ Fallback Failed: ${error.message}`, 
+                    'error'
+                );
+            }
+        }
+
+        function navigateToCheckout() {
+            showResult('navigation-result', 'Navigating to /checkout...', 'info');
+            
+            setTimeout(() => {
+                try {
+                    window.location.href = '/checkout';
+                } catch (error) {
+                    showResult('navigation-result', '❌ Navigation failed: ' + error.message, 'error');
+                }
+            }, 500);
+        }
+
+        function navigateToCart() {
+            showResult('navigation-result', 'Navigating to /cart...', 'info');
+            
+            setTimeout(() => {
+                try {
+                    window.location.href = '/cart';
+                } catch (error) {
+                    showResult('navigation-result', '❌ Navigation failed: ' + error.message, 'error');
+                }
+            }, 500);
+        }
+
+        // Auto-run basic tests on page load
+        window.addEventListener('load', () => {
+            console.log('🔧 Debug tool loaded');
+            console.log('Current URL:', window.location.href);
+            console.log('Supabase client initialized:', !!supabase);
+            
+            // Auto-test route after a short delay
+            setTimeout(() => {
+                testCheckoutRoute();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>

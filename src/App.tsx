@@ -58,6 +58,7 @@ const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfile"))
 const AuthPage = withLazyLoading(() => import("./pages/AuthPage"));
 const AdminAuth = withLazyLoading(() => import("./pages/admin/AdminAuth"));
 const Cart = withLazyLoading(() => import("./pages/Cart"));
+const Checkout = withLazyLoading(() => import("./pages/Checkout"));
 const Booking = withLazyLoading(() => import("./pages/Booking"));
 const PublicProducts = withLazyLoading(() => import("./pages/PublicProducts"));
 const Contact = withLazyLoading(() => import("./pages/Contact"));
@@ -195,6 +196,7 @@ const App = () => {
               <Route path="/home" element={<Navigate to="/" replace />} />
               <Route path="/products" element={<PublicProducts />} />
               <Route path="/cart" element={<Cart />} />
+              <Route path="/checkout" element={<Checkout />} />
               <Route path="/booking" element={<Booking />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />

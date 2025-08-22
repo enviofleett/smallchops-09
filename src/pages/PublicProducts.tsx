@@ -32,12 +32,18 @@ const PublicProducts = () => {
   const { toast } = useToast();
   const { customerAccount } = useCustomerAuth();
   
-  // Fetch products with discounts - optimized for faster loading
-  const { data: products = [], isLoading: isLoadingProducts, error: productsError } = useQuery({
+  // Fetch products with discounts - Production Ready
+  const { 
+    data: products = [], 
+    isLoading: isLoadingProducts, 
+    error: productsError,
+    refetch: refetchProducts 
+  } = useQuery({
     queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
     queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
-    retry: 1, // Reduce retries for faster UX
-    staleTime: 60000, // 1 minute cache
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
+    staleTime: 2 * 60 * 1000, // 2 minutes
     refetchOnWindowFocus: false,
   });
 
@@ -264,15 +270,15 @@ const PublicProducts = () => {
                 </div>
               ) : productsError ? (
                 <div className="text-center py-12">
-                  <h3 className="text-xl font-semibold mb-2">Unable to load products</h3>
+                  <h3 className="text-xl font-semibold mb-2 text-red-600">Unable to load products</h3>
                   <p className="text-gray-600 mb-4">
                     There was an issue loading our products. Please try again.
                   </p>
                   <Button 
-                    onClick={() => window.location.reload()}
+                    onClick={() => refetchProducts()}
                     variant="outline"
                   >
-                    Try Again
+                    Retry
                   </Button>
                 </div>
               ) : filteredProducts.length === 0 ? (

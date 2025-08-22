@@ -2,76 +2,80 @@ import { supabase } from "@/integrations/supabase/client";
 import { getPromotions } from "./promotions";
 import { calculateProductDiscount, ProductWithDiscount, isPromotionValidForCurrentDay } from "@/lib/discountCalculations";
 
-// Get products with calculated discounts - Optimized for faster loading
+// Get products with calculated discounts - Production Ready
 export async function getProductsWithDiscounts(categoryId?: string): Promise<ProductWithDiscount[]> {
+  console.log('🔍 Fetching products with discounts:', { categoryId });
+  
+  // Build the query
+  let query = supabase
+    .from("products")
+    .select(`
+      *,
+      categories (
+        id,
+        name
+      )
+    `)
+    .eq("status", "active")
+    .gt("stock_quantity", 0);
+  
+  if (categoryId) {
+    query = query.eq("category_id", categoryId);
+  }
+  
   try {
-    // Build the query
-    let query = supabase
-      .from("products")
-      .select(`
-        *,
-        categories (
-          id,
-          name
-        )
-      `)
-      .eq("status", "active")
-      .gt("stock_quantity", 0);
-    
-    if (categoryId) {
-      query = query.eq("category_id", categoryId);
-    }
-    
-    // Execute query with faster timeout
-    const productsPromise = query.order("name");
-    const promotionsPromise = getPromotions();
-    
-    // Parallel execution with timeout fallback
-    const [
-      { data: products, error: productsError },
-      promotions
-    ] = await Promise.all([
-      Promise.race([
-        productsPromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Products query timeout')), 4000)
-        )
-      ]) as Promise<any>,
-      Promise.race([
-        promotionsPromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Promotions query timeout')), 2000)
-        )
-      ]) as Promise<any>
-    ]);
+    // Execute products query - let React Query handle retries
+    const { data: products, error: productsError } = await query.order("name");
     
     if (productsError) {
-      console.error('Products query error:', productsError);
+      console.error('❌ Products query error:', productsError);
+      throw new Error(`Products fetch failed: ${productsError.message}`);
+    }
+    
+    if (!products || products.length === 0) {
+      console.log('📦 No products found for category:', categoryId);
       return [];
     }
     
-    // Safely handle promotions error
-    const activePromotions = Array.isArray(promotions) 
-      ? promotions.filter(p => p.status === 'active')
-      : [];
+    console.log('✅ Products fetched successfully:', products.length);
+    
+    // Fetch promotions - non-fatal, default to empty array on failure
+    let activePromotions: any[] = [];
+    try {
+      const promotions = await getPromotions();
+      activePromotions = Array.isArray(promotions) 
+        ? promotions.filter(p => p.status === 'active')
+        : [];
+      console.log('✅ Promotions fetched successfully:', activePromotions.length);
+    } catch (promotionsError) {
+      console.warn('⚠️ Promotions fetch failed (non-fatal):', promotionsError);
+      // Continue without promotions - products will have no discounts
+    }
     
     // Calculate discounts for each product
-    const productsWithDiscounts = (products || []).map(product => 
+    const productsWithDiscounts = products.map(product => 
       calculateProductDiscount(product, activePromotions)
     );
     
+    console.log('✅ Products with discounts calculated:', {
+      total: productsWithDiscounts.length,
+      withDiscounts: productsWithDiscounts.filter(p => p.has_discount).length
+    });
+    
     return productsWithDiscounts;
   } catch (error) {
-    console.error('Error fetching products with discounts:', error);
-    // Return empty array on error to prevent complete page failure
-    return [];
+    console.error('❌ Error fetching products with discounts:', error);
+    // Re-throw error to let React Query handle retries properly
+    throw error;
   }
 }
 
-// Get a single product with discounts - Optimized
+// Get a single product with discounts - Production Ready
 export async function getProductWithDiscounts(productId: string): Promise<ProductWithDiscount | null> {
+  console.log('🔍 Fetching single product with discounts:', { productId });
+  
   try {
-    const productPromise = supabase
+    const { data: product, error: productError } = await supabase
       .from("products")
       .select(`
         *,
@@ -85,42 +89,39 @@ export async function getProductWithDiscounts(productId: string): Promise<Produc
       .gt("stock_quantity", 0)
       .single();
     
-    const promotionsPromise = getPromotions();
-    
-    // Parallel execution with timeout
-    const [
-      { data: product, error: productError },
-      promotions
-    ] = await Promise.all([
-      Promise.race([
-        productPromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Product query timeout')), 3000)
-        )
-      ]) as Promise<any>,
-      Promise.race([
-        promotionsPromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Promotions query timeout')), 2000)
-        )
-      ]) as Promise<any>
-    ]);
-    
     if (productError) {
-      console.error('Product query error:', productError);
+      console.error('❌ Product query error:', productError);
       return null;
     }
-    if (!product) return null;
+    if (!product) {
+      console.log('📦 Product not found:', productId);
+      return null;
+    }
     
-    // Safely handle promotions error
-    const activePromotions = Array.isArray(promotions) 
-      ? promotions.filter(p => p.status === 'active')
-      : [];
+    console.log('✅ Product fetched successfully:', product.name);
+    
+    // Fetch promotions - non-fatal
+    let activePromotions: any[] = [];
+    try {
+      const promotions = await getPromotions();
+      activePromotions = Array.isArray(promotions) 
+        ? promotions.filter(p => p.status === 'active')
+        : [];
+      console.log('✅ Promotions fetched for single product:', activePromotions.length);
+    } catch (promotionsError) {
+      console.warn('⚠️ Promotions fetch failed for single product (non-fatal):', promotionsError);
+    }
     
     // Calculate discounts for the product
-    return calculateProductDiscount(product, activePromotions);
+    const productWithDiscount = calculateProductDiscount(product, activePromotions);
+    console.log('✅ Single product with discount calculated:', {
+      name: productWithDiscount.name,
+      hasDiscount: productWithDiscount.has_discount
+    });
+    
+    return productWithDiscount;
   } catch (error) {
-    console.error('Error fetching product with discounts:', error);
+    console.error('❌ Error fetching single product with discounts:', error);
     return null;
   }
 }

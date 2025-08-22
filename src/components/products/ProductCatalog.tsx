@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Search, Filter, Tag } from 'lucide-react';
 import { DiscountedProductCard } from './DiscountedProductCard';
 import { getProductsWithDiscounts } from '@/api/productsWithDiscounts';
@@ -26,10 +27,17 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
   const { addItem } = useCart();
   const { toast } = useToast();
   
-  // Fetch products with discounts
-  const { data: products = [], isLoading: isLoadingProducts } = useQuery({
+  // Fetch products with discounts - Production Ready
+  const { 
+    data: products = [], 
+    isLoading: isLoadingProducts, 
+    error: productsError,
+    refetch: refetchProducts 
+  } = useQuery({
     queryKey: ['products-with-discounts', selectedCategory === 'all' ? undefined : selectedCategory],
     queryFn: () => getProductsWithDiscounts(selectedCategory === 'all' ? undefined : selectedCategory),
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
   
   // Fetch categories
@@ -218,8 +226,24 @@ export function ProductCatalog({ onToggleFavorite, favoriteProducts = [] }: Prod
         </div>
       )}
       
+      {/* Error State */}
+      {!isLoadingProducts && productsError && (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <div className="text-muted-foreground">
+              <Filter className="w-12 h-12 mx-auto mb-4 opacity-50 text-red-500" />
+              <h3 className="text-lg font-medium mb-2 text-red-600">Unable to load products</h3>
+              <p className="mb-4">There was an issue loading our products. Please try again.</p>
+              <Button onClick={() => refetchProducts()} variant="outline">
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* No Results */}
-      {!isLoadingProducts && filteredProducts.length === 0 && (
+      {!isLoadingProducts && !productsError && filteredProducts.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
             <div className="text-muted-foreground">

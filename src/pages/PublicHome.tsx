@@ -102,14 +102,19 @@ const PublicHome = () => {
     '/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png'
   ]);
 
-  // Fetch products with discounts (STABILITY OPTIMIZED)
-  const { data: products = [], isLoading: isLoadingProducts, error: productsError, refetch: refetchProducts } = useQuery({
+  // Fetch products with discounts - Production Ready
+  const { 
+    data: products = [], 
+    isLoading: isLoadingProducts, 
+    error: productsError, 
+    refetch: refetchProducts 
+  } = useQuery({
     queryKey: ['products-with-discounts', activeCategory === 'all' ? undefined : activeCategory],
     queryFn: () => getProductsWithDiscounts(activeCategory === 'all' ? undefined : activeCategory),
-    staleTime: 90 * 1000, // 90 seconds for fresher data
-    gcTime: 5 * 60 * 1000, // 5 minutes cache
-    retry: 3,
-    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 10000),
+    staleTime: 2 * 60 * 1000, // 2 minutes for better UX
+    gcTime: 10 * 60 * 1000, // 10 minutes cache
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
 
   // Debug logging for production troubleshooting
@@ -335,23 +340,45 @@ const PublicHome = () => {
                 </div>
               </div>
 
-              {/* Products with Progressive Loading */}
-              <ProgressiveLoader
-                isLoading={isLoadingProducts}
-                error={productsError}
-                data={products}
-                skeletonType="product"
-                retryFn={() => refetchProducts()}
-                timeout={8000}
-              >
-                {filteredProducts.length === 0 ? (
-                  <div className="text-center py-8 sm:py-12">
-                    <h3 className="text-lg sm:text-xl font-semibold mb-2">No products found</h3>
-                    <p className="text-gray-600 mb-4 px-4">
-                      {searchTerm ? 'Try adjusting your search terms.' : 'No products available yet.'}
-                    </p>
-                  </div>
-                ) : (
+              {/* Products Loading State */}
+              {isLoadingProducts ? (
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
+                  {[...Array(9)].map((_, i) => (
+                    <Card key={i} className="h-80 animate-pulse">
+                      <CardContent className="p-0">
+                        <div className="aspect-square bg-muted" />
+                        <div className="p-4 space-y-2">
+                          <div className="h-4 bg-muted rounded" />
+                          <div className="h-3 bg-muted rounded w-2/3" />
+                          <div className="h-6 bg-muted rounded w-1/2" />
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : productsError ? (
+                <div className="text-center py-8 sm:py-12">
+                  <h3 className="text-lg sm:text-xl font-semibold mb-2 text-red-600">Unable to load products</h3>
+                  <p className="text-gray-600 mb-4 px-4">
+                    There was an issue loading our products. Please try again.
+                  </p>
+                  <Button onClick={() => refetchProducts()} variant="outline">
+                    Try Again
+                  </Button>
+                </div>
+              ) : filteredProducts.length === 0 ? (
+                <div className="text-center py-8 sm:py-12">
+                  <h3 className="text-lg sm:text-xl font-semibold mb-2">No products found</h3>
+                  <p className="text-gray-600 mb-4 px-4">
+                    {searchTerm ? 'Try adjusting your search terms.' : 'No products available yet.'}
+                  </p>
+                  {searchTerm && (
+                    <Button onClick={() => setSearchTerm('')} variant="outline">
+                      Clear Search
+                    </Button>
+                  )}
+                </div>
+              ) : (
                   <>
                     {/* Products Grid - Mobile optimized */}
                     <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-8">
@@ -410,7 +437,6 @@ const PublicHome = () => {
                     )}
                   </>
                 )}
-              </ProgressiveLoader>
             </div>
           </div>
         </div>

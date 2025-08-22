@@ -374,3 +374,34 @@ export async function validatePromotionCode(
     return { valid: false, error: "Error validating promotion code" };
   }
 }
+
+// Cache management functions
+export function clearAllProductsCaches() {
+  clearProductsCache();
+  singleProductCache = {};
+  console.log('All products caches cleared');
+}
+
+export function clearSingleProductCache(productId: string) {
+  delete singleProductCache[productId];
+  console.log(`Product cache cleared for ${productId}`);
+}
+
+// Get cache status for debugging
+export function getProductsCacheStatus() {
+  return {
+    productsCache: {
+      exists: !!productsCache,
+      age: productsCache ? Date.now() - productsCache.timestamp : null,
+      categoryId: productsCache?.categoryId,
+      itemCount: productsCache?.data?.length || 0
+    },
+    singleProductCache: {
+      entries: Object.keys(singleProductCache).length,
+      products: Object.keys(singleProductCache).map(id => ({
+        id,
+        age: Date.now() - singleProductCache[id].timestamp
+      }))
+    }
+  };
+}

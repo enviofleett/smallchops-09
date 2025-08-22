@@ -1,7 +1,8 @@
-// Production Email Processor - Consolidated & Secure
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.0';
 import { getCorsHeaders } from "../_shared/cors.ts";
+import { EmailRateLimiter } from "../_shared/email-rate-limiter.ts";
+import { EmailRetryManager } from "../_shared/email-retry-manager.ts";
 
 // Email system health check
 function validateEmailEnvironment(): { valid: boolean; issues: string[] } {
@@ -326,21 +327,50 @@ serve(async (req) => {
       throw new Error('Invalid recipient email format');
     }
 
-    // Check rate limits using new secure function
-    const { data: rateLimitResult } = await supabase.rpc('check_email_rate_limit', {
-      p_recipient_email: emailData.to
+    // Enhanced rate limiting with email-specific logic
+    const rateLimitResult = await EmailRateLimiter.checkEmailRateLimit({
+      recipient: emailData.to,
+      emailType: emailData.emailType as 'transactional' | 'marketing' | 'notification' | 'system',
+      senderIp: req.headers.get('cf-connecting-ip') || req.headers.get('x-forwarded-for') || 'unknown',
+      templateKey: emailData.templateKey
     });
 
-    if (rateLimitResult && !rateLimitResult.allowed) {
-      console.log(`🚫 Rate limit exceeded for ${emailData.to}: ${rateLimitResult.reason}`);
+    if (!rateLimitResult.allowed) {
+      console.log(`🚫 Email rate limit exceeded for ${emailData.to}: ${rateLimitResult.reason}`);
       return new Response(
         JSON.stringify({
           success: false,
-          error: 'Rate limit exceeded',
-          details: rateLimitResult
+          error: 'Email rate limit exceeded',
+          reason: rateLimitResult.reason,
+          retryAfter: rateLimitResult.retryAfter,
+          limits: {
+            hourlyRemaining: rateLimitResult.hourlyRemaining,
+            dailyRemaining: rateLimitResult.dailyRemaining
+          }
         }),
         { 
           status: 429, 
+          headers: { 
+            ...corsHeaders, 
+            'Content-Type': 'application/json',
+            'Retry-After': rateLimitResult.retryAfter?.toString() || '3600'
+          }
+        }
+      );
+    }
+
+    // Check email suppression (bounces, complaints, etc.)
+    const suppressionCheck = await EmailRateLimiter.checkEmailSuppression(emailData.to);
+    if (suppressionCheck.suppressed) {
+      console.log(`🚫 Email suppressed for ${emailData.to}: ${suppressionCheck.reason}`);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: 'Email address is suppressed',
+          reason: suppressionCheck.reason
+        }),
+        { 
+          status: 400, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
@@ -503,21 +533,40 @@ serve(async (req) => {
       text: emailData.text || (emailData.html ? emailData.html.replace(/<[^>]*>/g, '') : ''),
     };
 
-    console.log('📤 Sending email via enhanced SMTP...');
+    console.log('📤 Sending email via enhanced SMTP with retry logic...');
     const startTime = Date.now();
     
-    // Send email via SMTP with error handling
+    // Send email via SMTP with enhanced retry logic and circuit breaker
     let result;
     try {
-      result = await sendViaSMTP(smtpConfig, finalEmailData);
+      result = await EmailRetryManager.executeWithRetry(
+        () => sendViaSMTP(smtpConfig, finalEmailData),
+        {
+          maxRetries: 3,
+          baseDelay: 2000,
+          maxDelay: 30000,
+          backoffMultiplier: 2,
+          jitter: true
+        },
+        {
+          recipient: emailData.to,
+          templateKey: emailData.templateKey
+        }
+      );
     } catch (smtpError) {
-      console.error('❌ SMTP sending failed:', smtpError);
+      console.error('❌ SMTP sending failed after all retries:', smtpError);
+      
+      // Check if it's a circuit breaker failure
+      if (smtpError.message.includes('circuit breaker')) {
+        throw new Error(`Email service temporarily unavailable: ${smtpError.message}`);
+      }
+      
       throw new Error(`Email delivery failed: ${smtpError.message}`);
     }
     
     const deliveryTime = Date.now() - startTime;
 
-    // Log email delivery using new secure function
+    // Enhanced delivery logging with retry information
     await supabase.rpc('log_email_delivery', {
       p_message_id: result.messageId,
       p_recipient_email: emailData.to,
@@ -526,7 +575,9 @@ serve(async (req) => {
       p_status: 'sent',
       p_template_key: emailData.templateKey,
       p_variables: emailData.variables,
-      p_smtp_response: result.response
+      p_smtp_response: result.response,
+      p_delivery_time_ms: deliveryTime,
+      p_sender_ip: req.headers.get('cf-connecting-ip') || 'unknown'
     });
 
     console.log('✅ Email sent and logged successfully');
@@ -539,7 +590,11 @@ serve(async (req) => {
         provider: 'production_smtp',
         deliveryTime,
         templateUsed: emailData.templateKey || null,
-        rateLimitInfo: rateLimitResult
+        rateLimitInfo: {
+          hourlyRemaining: rateLimitResult.hourlyRemaining,
+          dailyRemaining: rateLimitResult.dailyRemaining
+        },
+        circuitBreakerStatus: EmailRetryManager.getCircuitStatus()
       }),
       {
         status: 200,

@@ -164,14 +164,40 @@ export async function getProductsWithDiscounts(categoryId?: string): Promise<Pro
   }
 }
 
+// Cache for individual products
+let singleProductCache: { [key: string]: { data: any; timestamp: number } } = {};
+const SINGLE_PRODUCT_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
+
 // Get a single product with discounts - Optimized
 export async function getProductWithDiscounts(productId: string): Promise<ProductWithDiscount | null> {
   try {
+    // Check cache first
+    const cached = singleProductCache[productId];
+    if (cached && (Date.now() - cached.timestamp) < SINGLE_PRODUCT_CACHE_DURATION) {
+      console.log(`Using cached product data for ${productId}`);
+
+      // Get fresh promotions for discount calculations
+      const promotions = await getPromotions();
+      const activePromotions = Array.isArray(promotions)
+        ? promotions.filter(p => p.status === 'active')
+        : [];
+
+      return calculateProductDiscount(cached.data, activePromotions);
+    }
+
     const productPromise = supabase
       .from("products")
       .select(`
-        *,
-        categories (
+        id,
+        name,
+        description,
+        price,
+        image_url,
+        stock_quantity,
+        category_id,
+        status,
+        created_at,
+        categories!inner (
           id,
           name
         )
@@ -180,39 +206,87 @@ export async function getProductWithDiscounts(productId: string): Promise<Produc
       .eq("status", "active")
       .gt("stock_quantity", 0)
       .single();
-    
+
     const promotionsPromise = getPromotions();
-    
-    // Parallel execution with improved timeout handling
-    const [productResult, promotions] = await Promise.allSettled([
-      Promise.race([
-        productPromise,
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Product query timeout')), 4000)
-        )
-      ]) as Promise<any>,
-      promotionsPromise // getPromotions now has its own timeout handling
-    ]);
 
-    // Handle product result
-    const { data: product, error: productError } =
-      productResult.status === 'fulfilled' ? productResult.value : { data: null, error: productResult.reason };
+    // Try with shorter timeout first, then fallback
+    let product = null;
+    let productError = null;
 
-    if (productError) {
-      console.error('Product query error:', productError);
+    for (const timeout of [2000, 5000]) {
+      try {
+        const [productResult] = await Promise.allSettled([
+          Promise.race([
+            productPromise,
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error(`Product query timeout (${timeout}ms)`)), timeout)
+            )
+          ]) as Promise<any>
+        ]);
+
+        if (productResult.status === 'fulfilled' && productResult.value.data) {
+          product = productResult.value.data;
+
+          // Update cache
+          singleProductCache[productId] = {
+            data: product,
+            timestamp: Date.now()
+          };
+
+          break;
+        } else {
+          productError = productResult.status === 'rejected' ?
+            productResult.reason :
+            productResult.value.error;
+        }
+      } catch (attemptError) {
+        productError = attemptError;
+      }
+    }
+
+    if (!product) {
+      console.error('Product query failed:', productError);
+
+      // Return cached data if available
+      if (cached && cached.data) {
+        console.log('Using stale cached product due to query failure');
+        const promotions = await getPromotions();
+        const activePromotions = Array.isArray(promotions)
+          ? promotions.filter(p => p.status === 'active')
+          : [];
+        return calculateProductDiscount(cached.data, activePromotions);
+      }
+
       return null;
     }
-    if (!product) return null;
 
-    // Handle promotions result - getPromotions now handles its own errors/cache
-    const activePromotions = promotions.status === 'fulfilled' && Array.isArray(promotions.value)
-      ? promotions.value.filter(p => p.status === 'active')
+    // Get promotions and calculate discounts
+    const promotions = await getPromotions();
+    const activePromotions = Array.isArray(promotions)
+      ? promotions.filter(p => p.status === 'active')
       : [];
-    
+
     // Calculate discounts for the product
     return calculateProductDiscount(product, activePromotions);
   } catch (error) {
     console.error('Error fetching product with discounts:', error);
+
+    // Return cached data if available
+    const cached = singleProductCache[productId];
+    if (cached && cached.data) {
+      console.log('Using stale cached product due to error');
+      try {
+        const promotions = await getPromotions();
+        const activePromotions = Array.isArray(promotions)
+          ? promotions.filter(p => p.status === 'active')
+          : [];
+        return calculateProductDiscount(cached.data, activePromotions);
+      } catch {
+        // Return product without discounts as final fallback
+        return { ...cached.data, has_discount: false };
+      }
+    }
+
     return null;
   }
 }

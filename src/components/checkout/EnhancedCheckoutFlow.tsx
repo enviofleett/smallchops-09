@@ -572,7 +572,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
     const baseValidation = 
       formData.customer_name.trim() &&
       isValidEmail(formData.customer_email) &&
-      isValidPhone(formData.customer_phone);
+      isValidPhone(formData.customer_phone) &&
+      formData.delivery_date && 
+      formData.delivery_time_slot; // Required for both delivery and pickup
 
     // Terms validation - only required if admin enabled it
     const termsValidation = !termsRequired || termsAccepted;
@@ -582,12 +584,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       const deliveryValidation = baseValidation &&
         formData.delivery_address.address_line_1.trim() &&
         formData.delivery_address.state.trim() &&
-        deliveryZone &&
-        formData.delivery_date && 
-        formData.delivery_time_slot;
+        deliveryZone;
       
       return deliveryValidation && termsValidation;
     } else {
+      // For pickup, require pickup point selection
       return baseValidation && pickupPoint && termsValidation;
     }
   }, [formData, deliveryZone, pickupPoint, checkoutStep, termsRequired, termsAccepted]);
@@ -674,6 +675,30 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                 required
               />
             </div>
+          </CardContent>
+        </Card>
+
+        {/* Order Scheduling - Required for both delivery and pickup */}
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base flex items-center gap-2">
+              <Clock className="w-4 h-4" />
+              When do you need your order? *
+            </CardTitle>
+            <CardDescription>
+              Select your preferred date and time for {formData.fulfillment_type === 'delivery' ? 'delivery' : 'pickup'}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DeliveryScheduler
+              onScheduleChange={(date, timeSlot) => {
+                handleFormChange('delivery_date', date);
+                handleFormChange('delivery_time_slot', timeSlot);
+              }}
+              selectedDate={formData.delivery_date}
+              selectedTimeSlot={formData.delivery_time_slot}
+              showHeader={false}
+            />
           </CardContent>
         </Card>
 
@@ -808,28 +833,6 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           </Card>
         )}
 
-        {/* Delivery Scheduling */}
-        {formData.fulfillment_type === 'delivery' && (
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                Delivery Schedule *
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <DeliveryScheduler
-                onScheduleChange={(date, timeSlot) => {
-                  handleFormChange('delivery_date', date);
-                  handleFormChange('delivery_time_slot', timeSlot);
-                }}
-                selectedDate={formData.delivery_date}
-                selectedTimeSlot={formData.delivery_time_slot}
-                showHeader={false}
-              />
-            </CardContent>
-          </Card>
-        )}
       </div>
 
       {lastPaymentError && (

@@ -165,7 +165,26 @@ async function initializePayment({
         .maybeSingle()
       if (!zoneError && zone?.base_fee) {
         deliveryFee = Number(zone.base_fee) || 0
+        console.log('🚚 Derived delivery fee from zone:', { delivery_zone_id: order.delivery_zone_id, deliveryFee })
+      } else {
+        console.warn('⚠️ Could not derive delivery fee from zone:', { 
+          delivery_zone_id: order.delivery_zone_id, 
+          zoneError: zoneError?.message,
+          zone_found: !!zone
+        })
       }
+    }
+
+    // Critical check: Log if delivery fee is zero for delivery orders
+    if (order.order_type === 'delivery' && (!deliveryFee || deliveryFee <= 0)) {
+      console.error('❌ DELIVERY FEE MISSING FOR DELIVERY ORDER:', {
+        order_id: orderId,
+        order_type: order.order_type,
+        delivery_zone_id: order.delivery_zone_id,
+        db_delivery_fee: order.delivery_fee,
+        computed_delivery_fee: deliveryFee,
+        critical_error: 'Delivery order has zero delivery fee'
+      })
     }
 
     // Sum items subtotal directly from order_items to avoid stale totals
@@ -196,9 +215,12 @@ async function initializePayment({
       client_provided: amount,
       db_total_amount: order.total_amount,
       db_delivery_fee: order.delivery_fee,
+      computed_delivery_fee: deliveryFee,
       items_subtotal: itemsSubtotal,
       authoritative_amount: authoritativeAmount,
-      amount_source: 'database+recomputed'
+      amount_source: 'database+recomputed',
+      delivery_fee_included: deliveryFee > 0,
+      order_type: order.order_type
     })
 
     // Check if order already has a pending/initialized transaction

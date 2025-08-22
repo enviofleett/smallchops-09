@@ -26,6 +26,7 @@ import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
 import { safeErrorMessage, normalizePaymentResponse } from '@/utils/errorHandling';
 import { validatePaymentFlow, formatDiagnosticResults } from '@/utils/paymentDiagnostics';
 import { cn } from "@/lib/utils";
+import { format } from 'date-fns';
 
 import {
   Dialog,
@@ -286,6 +287,28 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
   // Remove the processOrder hook usage since it doesn't exist
 
+  const getOrderSchedule = () => {
+    if (formData.fulfillment_type === 'delivery') {
+      return {
+        delivery_date: formData.delivery_date,
+        delivery_time_start: formData.delivery_time_slot?.start_time || '09:00',
+        delivery_time_end: formData.delivery_time_slot?.end_time || '17:00',
+        is_flexible: false,
+        special_instructions: formData.special_instructions || null,
+      };
+    }
+    if (formData.fulfillment_type === 'pickup') {
+      return {
+        delivery_date: formData.delivery_date || format(new Date(), 'yyyy-MM-dd'),
+        delivery_time_start: formData.delivery_time_slot?.start_time || '09:00',
+        delivery_time_end: formData.delivery_time_slot?.end_time || '17:00',
+        is_flexible: false,
+        special_instructions: formData.special_instructions || null,
+      };
+    }
+    return null;
+  };
+
   const handleFormSubmit = async () => {
     // 🔧 CIRCUIT BREAKER: Block after 3 failures within 5 minutes
     if (circuitBreakerActive) {
@@ -319,6 +342,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       }
 
       // Enhanced data sanitization and validation - Structure payload for backend
+      const orderSchedule = getOrderSchedule();
       const sanitizedData = {
         customer: {
           name: formData.customer_name.trim(),
@@ -339,6 +363,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
           delivery_zone_id: deliveryZone?.id || undefined,
           scheduled_time: formData.delivery_date ? `${formData.delivery_date} ${formData.delivery_time_slot?.start_time || '09:00'}` : undefined
         },
+        delivery_schedule: orderSchedule, // Always include schedule for both delivery and pickup
         payment: {
           method: formData.payment_method || 'paystack'
         }
@@ -406,36 +431,31 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       }
 
       // GUARDRAIL: Client-side delivery schedule verification (non-blocking)
-      const deliverySchedule = formData.delivery_date ? {
-        delivery_date: formData.delivery_date,
-        delivery_time_start: formData.delivery_time_slot?.start_time || '09:00',
-        delivery_time_end: formData.delivery_time_slot?.end_time || '17:00',
-        is_flexible: false,
-        special_instructions: formData.special_instructions || null
-      } : null;
+      // Use getOrderSchedule to ensure both delivery and pickup orders have schedules
+      const orderSchedule = getOrderSchedule();
       
-      if (parsedData?.order_id && deliverySchedule) {
-        console.log('🔍 [GUARDRAIL] Verifying delivery schedule was persisted (client-side, non-blocking)...');
+      if (parsedData?.order_id && orderSchedule) {
+        console.log('🔍 [GUARDRAIL] Verifying order schedule was persisted (client-side, non-blocking)...');
         try {
           const { upsertDeliverySchedule } = await import('@/api/deliveryScheduleApi');
           await upsertDeliverySchedule({
             order_id: parsedData.order_id,
-            delivery_date: deliverySchedule.delivery_date,
-            delivery_time_start: deliverySchedule.delivery_time_start,
-            delivery_time_end: deliverySchedule.delivery_time_end,
-            is_flexible: deliverySchedule.is_flexible || false,
-            special_instructions: deliverySchedule.special_instructions || null
+            delivery_date: orderSchedule.delivery_date,
+            delivery_time_start: orderSchedule.delivery_time_start,
+            delivery_time_end: orderSchedule.delivery_time_end,
+            is_flexible: orderSchedule.is_flexible || false,
+            special_instructions: orderSchedule.special_instructions || null
           });
           console.log('✅ [GUARDRAIL] Schedule upserted successfully');
           toast({
             title: "Schedule saved",
-            description: "Your delivery schedule has been confirmed."
+            description: `Your ${formData.fulfillment_type} schedule has been confirmed.`
           });
         } catch (error) {
           console.error('🛡️ [GUARDRAIL] Fallback failed:', error);
           toast({
-            title: "Processing delivery schedule",
-            description: "We'll finalize your delivery window after payment."
+            title: "Processing schedule",
+            description: `We'll finalize your ${formData.fulfillment_type} window after payment.`
           });
         }
       }

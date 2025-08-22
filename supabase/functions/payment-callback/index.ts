@@ -376,11 +376,19 @@ async function verifyPaymentWithPaystack(reference: string, req?: Request) {
       reference,
       dataStatus: data.status,
       transactionStatus: data.data?.status,
-      amount: data.data?.amount,
-      currency: data.data?.currency
+      amount_kobo: data.data?.amount,
+      amount_naira: data.data?.amount ? data.data.amount / 100 : null,
+      currency: data.data?.currency,
+      customer_email: data.data?.customer?.email,
+      gateway_response: data.data?.gateway_response
     });
 
     if (!data.status) {
+      log('error', '❌ Paystack verification status false', {
+        reference,
+        message: data.message,
+        full_response: data
+      });
       return {
         success: false,
         error: data.message || 'Paystack verification failed'
@@ -388,6 +396,13 @@ async function verifyPaymentWithPaystack(reference: string, req?: Request) {
     }
 
     if (data.data.status !== 'success') {
+      log('error', '❌ Paystack transaction not successful', {
+        reference,
+        transaction_status: data.data.status,
+        gateway_response: data.data.gateway_response,
+        amount: data.data.amount,
+        currency: data.data.currency
+      });
       return {
         success: false,
         error: `Payment status is ${data.data.status}: ${data.data.gateway_response || 'Transaction not successful'}`
@@ -438,77 +453,170 @@ function getPaystackConfiguration(req: Request) {
   }
 }
 
-// Process verified payment
+// Process verified payment with strict validation
 async function processVerifiedPayment(supabase: any, reference: string, paystackData: any) {
   try {
-    const paystackAmount = paystackData.amount ? paystackData.amount / 100 : null;
+    const paystackAmountKobo = paystackData.amount;
+    const paystackAmount = paystackAmountKobo ? paystackAmountKobo / 100 : null;
+    const paystackCurrency = paystackData.currency;
 
-    log('info', '🔧 Processing verified payment via RPC', {
+    log('info', '🔧 Starting verified payment processing with validation', {
       reference,
-      amount: paystackAmount,
-      currency: paystackData.currency
+      paystack_amount_kobo: paystackAmountKobo,
+      paystack_amount: paystackAmount,
+      paystack_currency: paystackCurrency
     });
 
-    // Use secure RPC to verify and update payment status
-    const { data: orderResult, error: rpcError } = await supabase.rpc('verify_and_update_payment_status', {
-      payment_ref: reference,
-      new_status: 'confirmed',
-      payment_amount: paystackAmount,
-      payment_gateway_response: paystackData
+    // Step 1: Get authoritative order data for validation
+    const { data: orderData, error: orderError } = await supabase
+      .from('orders')
+      .select('id, order_number, total_amount, delivery_fee, currency, status, payment_status, amount_kobo')
+      .eq('payment_reference', reference)
+      .single();
+
+    if (orderError || !orderData) {
+      log('error', '❌ Order not found for payment reference', { reference, error: orderError });
+      return {
+        success: false,
+        error: `Order not found for reference: ${reference}`
+      };
+    }
+
+    // Step 2: Strict validation against order data
+    const validationErrors = [];
+    
+    // Amount validation
+    const expectedAmountKobo = orderData.amount_kobo || Math.round((orderData.total_amount || 0) * 100);
+    if (paystackAmountKobo !== expectedAmountKobo) {
+      validationErrors.push(`Amount mismatch: expected ${expectedAmountKobo} kobo, received ${paystackAmountKobo} kobo`);
+    }
+
+    // Currency validation (default to NGN if not set in order)
+    const expectedCurrency = orderData.currency || 'NGN';
+    if (paystackCurrency !== expectedCurrency) {
+      validationErrors.push(`Currency mismatch: expected ${expectedCurrency}, received ${paystackCurrency}`);
+    }
+
+    // Reference validation (already done by finding the order, but log for audit)
+    log('info', '🔍 Payment validation checks', {
+      reference,
+      expected_amount_kobo: expectedAmountKobo,
+      received_amount_kobo: paystackAmountKobo,
+      amount_match: paystackAmountKobo === expectedAmountKobo,
+      expected_currency: expectedCurrency,
+      received_currency: paystackCurrency,
+      currency_match: paystackCurrency === expectedCurrency,
+      validation_errors: validationErrors
+    });
+
+    // Step 3: Reject payment if validation fails
+    if (validationErrors.length > 0) {
+      log('error', '❌ Payment validation failed - REJECTING PAYMENT', {
+        reference,
+        order_id: orderData.id,
+        validation_errors: validationErrors,
+        paystack_data: {
+          amount_kobo: paystackAmountKobo,
+          currency: paystackCurrency
+        },
+        order_data: {
+          expected_amount_kobo: expectedAmountKobo,
+          expected_currency: expectedCurrency
+        }
+      });
+
+      return {
+        success: false,
+        error: `Payment validation failed: ${validationErrors.join('; ')}`
+      };
+    }
+
+    // Step 4: Check for duplicate processing (idempotency)
+    if (orderData.status === 'confirmed' && orderData.payment_status === 'paid') {
+      log('info', '✅ Payment already processed successfully (idempotency check)', {
+        reference,
+        order_id: orderData.id,
+        current_status: orderData.status,
+        payment_status: orderData.payment_status
+      });
+
+      return {
+        success: true,
+        order_id: orderData.id,
+        order_number: orderData.order_number,
+        already_processed: true
+      };
+    }
+
+    // Step 5: Generate idempotency key for atomic processing
+    const idempotencyKey = `callback_${reference}_${Date.now()}`;
+
+    log('info', '🔧 Processing payment atomically via RPC', {
+      reference,
+      order_id: orderData.id,
+      idempotency_key: idempotencyKey,
+      validated_amount_kobo: paystackAmountKobo
+    });
+
+    // Step 6: Use atomic RPC with strict validation
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('process_payment_atomically', {
+      p_payment_reference: reference,
+      p_idempotency_key: idempotencyKey,
+      p_amount_kobo: paystackAmountKobo,
+      p_status: 'confirmed'
     });
 
     if (rpcError) {
-      log('error', '❌ RPC verification failed', { reference, error: rpcError });
+      log('error', '❌ RPC atomic processing failed', { 
+        reference, 
+        error: rpcError,
+        idempotency_key: idempotencyKey
+      });
       return {
         success: false,
         error: rpcError.message || 'Database operation failed'
       };
     }
 
-    if (!orderResult || orderResult.length === 0) {
-      log('error', '❌ No order data returned from RPC', { reference });
+    if (!rpcResult || rpcResult.length === 0) {
+      log('error', '❌ No result returned from atomic RPC', { reference });
       return {
         success: false,
-        error: 'Order not found or already processed'
+        error: 'Order processing failed - no result returned'
       };
     }
 
-    const orderData = orderResult[0];
-    log('info', '✅ RPC operation successful', {
+    const result = rpcResult[0];
+    log('info', '✅ Payment processed successfully via atomic RPC', {
       reference,
-      order_id: orderData.order_id,
-      order_number: orderData.order_number
+      order_id: result.order_id,
+      order_number: result.order_number,
+      previous_status: result.previous_status,
+      new_status: result.new_status,
+      amount_verified: result.amount_verified
     });
 
-    // Update payment_status explicitly (non-blocking)
-    try {
-      await supabase.from('orders').update({
-        payment_status: 'paid'
-      }).eq('id', orderData.order_id);
-      
-      log('info', '✅ Payment status updated to paid');
-    } catch (paymentStatusError) {
-      log('warn', '⚠️ Payment status update failed (non-blocking)', {
-        error: paymentStatusError.message
-      });
-    }
-
-    // Update/create payment transaction record (non-blocking)
+    // Step 7: Update payment transaction record with full audit trail
     try {
       await supabase.from('payment_transactions').upsert({
         reference: reference,
         provider_reference: reference,
-        amount: paystackAmount || orderData.amount,
-        currency: paystackData.currency || 'NGN',
+        order_id: result.order_id,
+        amount: paystackAmount,
+        amount_kobo: paystackAmountKobo,
+        currency: paystackCurrency,
         status: 'completed',
+        provider: 'paystack',
         gateway_response: JSON.stringify(paystackData),
         verified_at: new Date().toISOString(),
-        order_id: orderData.order_id
+        idempotency_key: idempotencyKey,
+        raw_provider_payload: paystackData,
+        updated_at: new Date().toISOString()
       }, {
         onConflict: 'reference'
       });
       
-      log('info', '✅ Payment transaction record updated');
+      log('info', '✅ Payment transaction record updated with full audit trail');
     } catch (txnError) {
       log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
         error: txnError.message
@@ -517,14 +625,16 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
 
     return {
       success: true,
-      order_id: orderData.order_id,
-      order_number: orderData.order_number
+      order_id: result.order_id,
+      order_number: result.order_number,
+      amount_verified: result.amount_verified
     };
 
   } catch (error) {
-    log('error', '❌ Payment processing failed', {
+    log('error', '❌ Payment processing failed with exception', {
       reference,
-      error: error.message
+      error: error.message,
+      stack: error.stack
     });
     return {
       success: false,

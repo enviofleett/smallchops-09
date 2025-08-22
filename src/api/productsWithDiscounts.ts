@@ -132,14 +132,34 @@ export async function getProductsWithDiscounts(categoryId?: string): Promise<Pro
     }
     
     // Calculate discounts for each product
-    const productsWithDiscounts = (products || []).map(product => 
+    const productsWithDiscounts = products.map(product =>
       calculateProductDiscount(product, activePromotions)
     );
-    
+
     return productsWithDiscounts;
   } catch (error) {
     console.error('Error fetching products with discounts:', error);
-    // Return empty array on error to prevent complete page failure
+
+    // Return cached data if available, otherwise empty array
+    if (productsCache && productsCache.data) {
+      console.log('Using stale cached products due to error');
+      try {
+        const promotions = await getPromotions();
+        const activePromotions = Array.isArray(promotions)
+          ? promotions.filter(p => p.status === 'active')
+          : [];
+
+        const productsWithDiscounts = productsCache.data.map(product =>
+          calculateProductDiscount(product, activePromotions)
+        );
+        return productsWithDiscounts;
+      } catch {
+        // If even promotions fail, return products without discounts
+        return productsCache.data.map(product => ({ ...product, has_discount: false }));
+      }
+    }
+
+    // Return empty array as final fallback
     return [];
   }
 }

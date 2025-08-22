@@ -23,7 +23,7 @@ enable_phone_autoconfirm = false
 verify_jwt = false
 
 [functions.secure-payment-processor]
-verify_jwt = false
+verify_jwt = true
 
 [functions.verify-payment]
 verify_jwt = false

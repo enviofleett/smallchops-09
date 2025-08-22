@@ -4081,6 +4081,38 @@ export type Database = {
         }
         Relationships: []
       }
+      order_access_tokens: {
+        Row: {
+          created_at: string | null
+          expires_at: string
+          id: string
+          order_id: string
+          token: string
+        }
+        Insert: {
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          order_id: string
+          token: string
+        }
+        Update: {
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          order_id?: string
+          token?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_access_tokens_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_assignments: {
         Row: {
           accepted_at: string | null
@@ -8234,6 +8266,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      generate_order_access_token: {
+        Args: { p_order_id: string }
+        Returns: string
+      }
       generate_order_number: {
         Args: Record<PropertyKey, never>
         Returns: string
@@ -8610,6 +8646,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      increment_api_rate_limit: {
+        Args: {
+          p_endpoint: string
+          p_identifier: string
+          p_max_requests?: number
+          p_window_minutes?: number
+        }
+        Returns: Json
+      }
       increment_email_rate_limit: {
         Args: { email_address: string }
         Returns: undefined
@@ -8853,7 +8898,7 @@ export type Database = {
         Args: { p_order_id: string }
         Returns: boolean
       }
-      pg_notify: {
+      pg_notify_safe: {
         Args: { channel: string; payload: string }
         Returns: undefined
       }
@@ -9097,6 +9142,10 @@ export type Database = {
       validate_email_template: {
         Args: { template_data: Json }
         Returns: Json
+      }
+      validate_order_access_token: {
+        Args: { p_order_id: string; p_token: string }
+        Returns: boolean
       }
       validate_order_data: {
         Args: {

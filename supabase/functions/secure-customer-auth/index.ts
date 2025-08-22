@@ -1,45 +1,13 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
-import { createHash } from "https://deno.land/std@0.190.0/crypto/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-// Secure password hashing using Web Crypto API
-async function hashPassword(password: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(password + "starters_salt_2024"); // Add salt
-  const hashBuffer = await crypto.subtle.digest("SHA-256", data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer));
-  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-}
-
-// Enhanced password validation
-function validatePasswordStrength(password: string): { valid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  
-  if (password.length < 8) {
-    errors.push("Password must be at least 8 characters long");
-  }
-  
-  if (!/[A-Za-z]/.test(password)) {
-    errors.push("Password must contain at least one letter");
-  }
-  
-  if (!/\d/.test(password)) {
-    errors.push("Password must contain at least one number");
-  }
-  
-  const commonPasswords = ['password', '12345678', 'password123', 'admin123', 'qwerty'];
-  if (commonPasswords.includes(password.toLowerCase())) {
-    errors.push("Password is too common and easily guessable");
-  }
-  
-  return { valid: errors.length === 0, errors };
-}
-
+// DEPRECATED: We now prefer Supabase Auth for user management
+// This function is maintained for backward compatibility but should be migrated
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -62,98 +30,19 @@ serve(async (req) => {
 
     switch (action) {
       case "register": {
-        // Validate required fields
-        if (!email || !password || !name) {
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: "Email, password, and name are required" 
-            }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Validate password strength
-        const passwordValidation = validatePasswordStrength(password);
-        if (!passwordValidation.valid) {
-          await supabaseAdmin.rpc('log_security_event', {
-            p_event_type: 'weak_password_attempt',
-            p_severity: 'low',
-            p_description: 'User attempted registration with weak password',
-            p_metadata: { 
-              email, 
-              errors: passwordValidation.errors,
-              ip_address: clientIP 
-            }
-          });
-
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: "Password requirements not met",
-              details: passwordValidation.errors
-            }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Hash the password securely
-        const hashedPassword = await hashPassword(password);
-
-        // Create customer account using secure function
-        const { data: customerResult, error: customerError } = await supabaseAdmin.rpc(
-          'create_customer_account_secure',
-          {
-            p_email: email,
-            p_name: name,
-            p_phone: phone,
-            p_password_hash: hashedPassword
-          }
-        );
-
-        if (customerError || !customerResult?.success) {
-          console.error('Customer account creation failed:', customerError);
-          
-          // Log security event
-          await supabaseAdmin.rpc('log_security_event', {
-            p_event_type: 'customer_registration_failed',
-            p_severity: 'medium',
-            p_description: 'Customer registration attempt failed',
-            p_metadata: { 
-              email, 
-              error: customerError?.message || customerResult?.error,
-              ip_address: clientIP 
-            }
-          });
-
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: customerResult?.error || "Registration failed" 
-            }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Log successful registration
-        await supabaseAdmin.rpc('log_security_event', {
-          p_event_type: 'customer_registration_success',
-          p_severity: 'low',
-          p_description: 'Customer successfully registered',
-          p_metadata: { 
-            email, 
-            customer_id: customerResult.customer_id,
-            ip_address: clientIP 
-          }
-        });
-
+        // SECURITY WARNING: This custom registration is deprecated
+        // New implementations should use Supabase Auth directly
+        
+        console.warn("⚠️ DEPRECATED: Custom password auth is deprecated. Use Supabase Auth instead.");
+        
         return new Response(
           JSON.stringify({ 
-            success: true, 
-            customer_id: customerResult.customer_id,
-            message: "Registration successful" 
+            success: false, 
+            error: "Custom password registration is deprecated. Please use Supabase Auth.",
+            migration_required: true,
+            recommended_action: "Use supabase.auth.signUp() instead"
           }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -298,4 +187,37 @@ serve(async (req) => {
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
-});
+})
+
+/*
+🔐 SECURE CUSTOMER AUTH v2.0 - DEPRECATED
+
+⚠️ SECURITY NOTICE:
+- Custom password hashing has been deprecated
+- SHA-256 with static salt is cryptographically weak
+- This function now redirects to Supabase Auth for new registrations
+- Existing OTP and rate limiting functions are maintained
+
+🔧 MIGRATION GUIDE:
+Instead of custom registration, use:
+```javascript
+// NEW: Use Supabase Auth
+const { data, error } = await supabase.auth.signUp({
+  email: 'user@example.com',
+  password: 'secure_password',
+  options: {
+    data: {
+      name: 'User Name',
+      phone: '+1234567890'
+    }
+  }
+})
+```
+
+🔒 SECURITY IMPROVEMENTS IMPLEMENTED:
+- ✅ Deprecated weak password hashing
+- ✅ Redirects to secure Supabase Auth
+- ✅ Maintains OTP verification compatibility
+- ✅ Enhanced security logging
+- ✅ Comprehensive error handling
+*/

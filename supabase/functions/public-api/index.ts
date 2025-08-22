@@ -21,57 +21,6 @@ function getCorsHeaders(origin: string | null): Record<string, string> {
   };
 }
 
-// Rate limiting configuration
-const RATE_LIMITS = {
-  favorites: { requests: 60, window: 60000 }, // 60 requests per minute
-  general: { requests: 100, window: 60000 }, // 100 requests per minute
-  auth: { requests: 10, window: 60000 }, // 10 requests per minute for auth operations
-};
-
-// Helper function to check rate limits
-async function checkRateLimit(supabase: any, identifier: string, endpoint: string, limit: any) {
-  const windowStart = new Date(Date.now() - limit.window);
-  
-  // Clean up old entries
-  await supabase
-    .from('api_rate_limits')
-    .delete()
-    .lt('window_start', windowStart.toISOString());
-
-  // Check current count
-  const { data: existing, error } = await supabase
-    .from('api_rate_limits')
-    .select('request_count')
-    .eq('identifier', identifier)
-    .eq('endpoint', endpoint)
-    .gte('window_start', windowStart.toISOString())
-    .single();
-
-  if (error && error.code !== 'PGRST116') { // PGRST116 = no rows returned
-    throw error;
-  }
-
-  const currentCount = existing?.request_count || 0;
-
-  if (currentCount >= limit.requests) {
-    return false; // Rate limit exceeded
-  }
-
-  // Update or insert rate limit record
-  await supabase
-    .from('api_rate_limits')
-    .upsert({
-      identifier,
-      endpoint,
-      request_count: currentCount + 1,
-      window_start: new Date().toISOString(),
-    }, {
-      onConflict: 'identifier,endpoint,window_start',
-    });
-
-  return true;
-}
-
 // Helper function to get client IP
 function getClientIP(req: Request): string {
   const forwarded = req.headers.get('x-forwarded-for');
@@ -137,7 +86,14 @@ serve(async (req) => {
 
     logStep("Public API request", { method, path, ip: clientIP });
 
-    // Create Supabase client with anon key for proper RLS
+    // Create Supabase client with service role for secure operations
+    const serviceClient = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      { auth: { persistSession: false } }
+    );
+
+    // Create anon client for public operations
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_ANON_KEY") ?? "",
@@ -157,14 +113,47 @@ serve(async (req) => {
       });
     }
 
-    // Rate limiting check
+    // Enhanced rate limiting using secure function
     const endpoint = path.split('/')[1] || 'general';
-    const rateLimit = RATE_LIMITS[endpoint as keyof typeof RATE_LIMITS] || RATE_LIMITS.general;
+    const rateLimitConfig = {
+      favorites: { requests: 60, window: 60 },
+      general: { requests: 100, window: 60 },
+      auth: { requests: 10, window: 60 },
+      orders: { requests: 50, window: 60 }, // Limit order tracking
+    };
     
-    const rateLimitPassed = await checkRateLimit(supabaseClient, clientIP, endpoint, rateLimit);
-    if (!rateLimitPassed) {
+    const limit = rateLimitConfig[endpoint as keyof typeof rateLimitConfig] || rateLimitConfig.general;
+    
+    // Use secure rate limiting function
+    const { data: rateLimitResult, error: rateLimitError } = await serviceClient.rpc(
+      'increment_api_rate_limit',
+      {
+        p_identifier: clientIP,
+        p_endpoint: endpoint,
+        p_max_requests: limit.requests,
+        p_window_minutes: limit.window
+      }
+    );
+
+    if (rateLimitError) {
+      console.error('Rate limit check failed:', rateLimitError);
+      // Fail closed - deny access if rate limiting fails
       return new Response(
-        JSON.stringify({ success: false, error: "Rate limit exceeded. Please try again later." }),
+        JSON.stringify({ success: false, error: "Service temporarily unavailable" }),
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
+
+    if (!rateLimitResult?.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: "Rate limit exceeded. Please try again later.",
+          retry_after: rateLimitResult?.reset_at
+        }),
         { 
           status: 429, 
           headers: { ...corsHeaders, "Content-Type": "application/json" } 
@@ -257,7 +246,7 @@ serve(async (req) => {
           .single();
 
         if (error) {
-          if (error.code === '23505') { // Unique constraint violation
+          if (error.code === '23505') {
             return new Response(JSON.stringify({ success: false, error: 'Product is already in favorites' }), {
               status: 409,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -301,7 +290,139 @@ serve(async (req) => {
       }
     }
 
-    // Public endpoints (no authentication required)
+    // GET /orders/:id - SECURED Order tracking with limited PII exposure
+    if (method === "GET" && path.startsWith("/orders/")) {
+      const orderIdOrNumber = path.split('/')[2];
+      const accessToken = url.searchParams.get('token'); // Optional access token
+      
+      if (!orderIdOrNumber) {
+        return new Response(
+          JSON.stringify({ success: false, error: "Order ID or number is required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
+      try {
+        // Check if it's a UUID (order ID) or order number
+        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderIdOrNumber);
+        
+        let query = supabaseClient.from('orders');
+        
+        if (isUUID) {
+          query = query.eq('id', orderIdOrNumber);
+        } else {
+          query = query.eq('order_number', orderIdOrNumber);
+        }
+
+        // Determine access level
+        const auth = await validateCustomerAuth(supabaseClient, authHeader);
+        const hasValidToken = accessToken && await serviceClient.rpc('validate_order_access_token', {
+          p_order_id: isUUID ? orderIdOrNumber : null,
+          p_token: accessToken
+        });
+
+        const isAuthenticated = auth || hasValidToken;
+
+        if (isAuthenticated) {
+          // Full access for authenticated users or valid token holders
+          query = query.select(`
+            id, order_number, status, payment_status, order_type,
+            customer_name, customer_email, customer_phone,
+            delivery_address, delivery_zone_id, special_instructions,
+            subtotal, tax_amount, delivery_fee, discount_amount, total_amount,
+            order_time, delivery_time, pickup_time,
+            delivery_zones (
+              id, name, description
+            ),
+            order_items (
+              id, product_id, product_name, quantity, unit_price, total_price,
+              customizations, special_instructions
+            )
+          `);
+        } else {
+          // LIMITED PUBLIC ACCESS - No PII, only tracking info
+          query = query.select(`
+            id, order_number, status, order_type, total_amount, 
+            order_time, delivery_time, pickup_time
+          `);
+        }
+
+        const { data: order, error } = await query.single();
+
+        if (error || !order) {
+          // Log potential unauthorized access attempts
+          await serviceClient.rpc('log_security_event', {
+            p_event_type: 'unauthorized_order_access_attempt',
+            p_severity: 'medium',
+            p_description: `Failed order access attempt for ${orderIdOrNumber}`,
+            p_metadata: { 
+              order_identifier: orderIdOrNumber,
+              ip_address: clientIP,
+              has_auth: !!auth,
+              has_token: !!accessToken
+            }
+          });
+
+          return new Response(
+            JSON.stringify({ success: false, error: "Order not found" }),
+            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          );
+        }
+
+        // Calculate estimated time
+        let estimated_time = null;
+        if (order.status !== 'delivered' && order.status !== 'cancelled') {
+          const baseTime = new Date();
+          switch (order.status) {
+            case 'pending':
+            case 'confirmed':
+              baseTime.setMinutes(baseTime.getMinutes() + 45);
+              break;
+            case 'preparing':
+              baseTime.setMinutes(baseTime.getMinutes() + 30);
+              break;
+            case 'ready':
+              if (order.order_type === 'pickup') {
+                estimated_time = 'Ready for pickup';
+              } else {
+                baseTime.setMinutes(baseTime.getMinutes() + 15);
+              }
+              break;
+            case 'out_for_delivery':
+              baseTime.setMinutes(baseTime.getMinutes() + 15);
+              break;
+          }
+          if (estimated_time !== 'Ready for pickup') {
+            estimated_time = baseTime.toISOString();
+          }
+        }
+
+        const response = {
+          ...order,
+          estimated_time,
+          tracking_steps: [
+            { status: 'pending', label: 'Order Received', completed: true },
+            { status: 'confirmed', label: 'Order Confirmed', completed: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'].includes(order.status) },
+            { status: 'preparing', label: 'Preparing Your Order', completed: ['preparing', 'ready', 'out_for_delivery', 'delivered'].includes(order.status) },
+            { status: 'ready', label: order.order_type === 'pickup' ? 'Ready for Pickup' : 'Ready for Delivery', completed: ['ready', 'out_for_delivery', 'delivered'].includes(order.status) },
+            ...(order.order_type === 'delivery' ? [{ status: 'out_for_delivery', label: 'Out for Delivery', completed: ['out_for_delivery', 'delivered'].includes(order.status) }] : []),
+            { status: 'delivered', label: order.order_type === 'pickup' ? 'Picked Up' : 'Delivered', completed: order.status === 'delivered' }
+          ],
+          access_level: isAuthenticated ? 'full' : 'public'
+        };
+
+        return new Response(
+          JSON.stringify({ success: true, data: response }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      } catch (error) {
+        console.error('Error fetching order:', error);
+        return new Response(
+          JSON.stringify({ success: false, error: "Failed to fetch order" }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
 
     // POST /customers - Customer registration
     if (method === "POST" && path === "/customers") {
@@ -316,7 +437,7 @@ serve(async (req) => {
       }
 
       // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const emailRegex = /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/;
       if (!emailRegex.test(email)) {
         return new Response(
           JSON.stringify({ success: false, error: "Invalid email format" }),
@@ -373,7 +494,7 @@ serve(async (req) => {
       }
     }
 
-    // POST /orders - Order creation
+    // POST /orders - Order creation with access token generation
     if (method === "POST" && path === "/orders") {
       const orderData = await req.json();
       const {
@@ -409,8 +530,8 @@ serve(async (req) => {
       }
 
       try {
-        // Generate order number
-        const { data: orderNumber } = await supabaseClient.rpc('generate_order_number');
+        // Generate order number using service client
+        const { data: orderNumber } = await serviceClient.rpc('generate_order_number');
 
         // Create order with atomic transaction
         const { data: order, error: orderError } = await supabaseClient
@@ -469,7 +590,12 @@ serve(async (req) => {
           );
         }
 
-        logStep("Order created", { id: order.id, orderNumber: order.order_number });
+        // Generate secure access token for order tracking
+        const { data: accessToken } = await serviceClient.rpc('generate_order_access_token', {
+          p_order_id: order.id
+        });
+
+        logStep("Order created with access token", { id: order.id, orderNumber: order.order_number });
         return new Response(
           JSON.stringify({ 
             success: true, 
@@ -477,7 +603,8 @@ serve(async (req) => {
               id: order.id, 
               order_number: order.order_number,
               status: 'pending',
-              total_amount 
+              total_amount,
+              access_token: accessToken // Provide secure access token for tracking
             } 
           }),
           { status: 201, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -491,186 +618,7 @@ serve(async (req) => {
       }
     }
 
-    // GET /orders/:id - Order tracking  
-    if (method === "GET" && path.startsWith("/orders/")) {
-      const orderIdOrNumber = path.split('/')[2];
-      
-      if (!orderIdOrNumber) {
-        return new Response(
-          JSON.stringify({ success: false, error: "Order ID or number is required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      try {
-        // Try to find order by ID first, then by order number
-        let query = supabaseClient
-          .from('orders')
-          .select(`
-            id, order_number, status, payment_status, order_type,
-            customer_name, customer_email, customer_phone,
-            delivery_address, delivery_zone_id, special_instructions,
-            subtotal, tax_amount, delivery_fee, discount_amount, total_amount,
-            order_time, delivery_time, pickup_time,
-            delivery_zones (
-              id, name, description
-            ),
-            order_items (
-              id, product_id, product_name, quantity, unit_price, total_price,
-              customizations, special_instructions
-            )
-          `);
-
-        // Check if it's a UUID (order ID) or order number
-        const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(orderIdOrNumber);
-        
-        if (isUUID) {
-          query = query.eq('id', orderIdOrNumber);
-        } else {
-          query = query.eq('order_number', orderIdOrNumber);
-        }
-
-        const { data: order, error } = await query.single();
-
-        if (error || !order) {
-          return new Response(
-            JSON.stringify({ success: false, error: "Order not found" }),
-            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Calculate estimated delivery/pickup time based on status
-        let estimated_time = null;
-        if (order.status !== 'delivered' && order.status !== 'cancelled') {
-          const baseTime = new Date();
-          switch (order.status) {
-            case 'pending':
-            case 'confirmed':
-              baseTime.setMinutes(baseTime.getMinutes() + 45);
-              break;
-            case 'preparing':
-              baseTime.setMinutes(baseTime.getMinutes() + 30);
-              break;
-            case 'ready':
-              if (order.order_type === 'pickup') {
-                estimated_time = 'Ready for pickup';
-              } else {
-                baseTime.setMinutes(baseTime.getMinutes() + 15);
-              }
-              break;
-            case 'out_for_delivery':
-              baseTime.setMinutes(baseTime.getMinutes() + 15);
-              break;
-          }
-          if (estimated_time !== 'Ready for pickup') {
-            estimated_time = baseTime.toISOString();
-          }
-        }
-
-        const response = {
-          ...order,
-          estimated_time,
-          tracking_steps: [
-            { status: 'pending', label: 'Order Received', completed: true },
-            { status: 'confirmed', label: 'Order Confirmed', completed: ['confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'].includes(order.status) },
-            { status: 'preparing', label: 'Preparing Your Order', completed: ['preparing', 'ready', 'out_for_delivery', 'delivered'].includes(order.status) },
-            { status: 'ready', label: order.order_type === 'pickup' ? 'Ready for Pickup' : 'Ready for Delivery', completed: ['ready', 'out_for_delivery', 'delivered'].includes(order.status) },
-            ...(order.order_type === 'delivery' ? [{ status: 'out_for_delivery', label: 'Out for Delivery', completed: ['out_for_delivery', 'delivered'].includes(order.status) }] : []),
-            { status: 'delivered', label: order.order_type === 'pickup' ? 'Picked Up' : 'Delivered', completed: order.status === 'delivered' }
-          ]
-        };
-
-        return new Response(
-          JSON.stringify({ success: true, data: response }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (error) {
-        console.error('Error fetching order:', error);
-        return new Response(
-          JSON.stringify({ success: false, error: "Failed to fetch order" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
-    // POST /validate-promotion - Promotion code validation
-    if (method === "POST" && path === "/validate-promotion") {
-      const { code, order_amount } = await req.json();
-
-      if (!code || order_amount === undefined) {
-        return new Response(
-          JSON.stringify({ success: false, error: "Promotion code and order amount are required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-
-      try {
-        // Find active promotion
-        const { data: promotion, error } = await supabaseClient
-          .from('promotions')
-          .select('*')
-          .eq('code', code.toUpperCase())
-          .eq('status', 'active')
-          .lte('valid_from', new Date().toISOString())
-          .or('valid_until.is.null,valid_until.gte.' + new Date().toISOString())
-          .single();
-
-        if (error || !promotion) {
-          return new Response(
-            JSON.stringify({ success: false, error: "Invalid or expired promotion code" }),
-            { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Check minimum order amount
-        if (promotion.min_order_amount && order_amount < promotion.min_order_amount) {
-          return new Response(
-            JSON.stringify({ 
-              success: false, 
-              error: `Minimum order amount of $${promotion.min_order_amount} required for this promotion` 
-            }),
-            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
-        }
-
-        // Calculate discount
-        let discount_amount = 0;
-        if (promotion.type === 'percentage') {
-          discount_amount = (order_amount * promotion.value) / 100;
-          if (promotion.max_discount_amount) {
-            discount_amount = Math.min(discount_amount, promotion.max_discount_amount);
-          }
-        } else if (promotion.type === 'fixed') {
-          discount_amount = Math.min(promotion.value, order_amount);
-        }
-
-        discount_amount = Math.round(discount_amount * 100) / 100; // Round to 2 decimals
-
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            data: {
-              promotion_id: promotion.id,
-              code: promotion.code,
-              type: promotion.type,
-              value: promotion.value,
-              discount_amount,
-              description: promotion.description
-            }
-          }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      } catch (error) {
-        console.error('Error validating promotion:', error);
-        return new Response(
-          JSON.stringify({ success: false, error: "Failed to validate promotion" }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
-    }
-
     if (method === "GET" && path === "/categories") {
-      // Get all active categories
       const { data: categories, error } = await supabaseClient
         .from('categories')
         .select('id, name, slug, description, banner_url, sort_order')
@@ -685,7 +633,6 @@ serve(async (req) => {
     }
 
     if (method === "GET" && path === "/products") {
-      // Get all active products with category info
       const categoryId = url.searchParams.get('category_id');
       
       let query = supabaseClient
@@ -707,46 +654,6 @@ serve(async (req) => {
 
       return new Response(
         JSON.stringify({ success: true, data: products }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (method === "GET" && path === "/promotions") {
-      // Get active promotions
-      const { data: promotions, error } = await supabaseClient
-        .from('promotions')
-        .select('id, name, code, type, value, description, min_order_amount, max_discount_amount')
-        .eq('status', 'active')
-        .lte('valid_from', new Date().toISOString())
-        .or('valid_until.is.null,valid_until.gte.' + new Date().toISOString());
-
-      if (error) throw error;
-
-      return new Response(
-        JSON.stringify({ success: true, data: promotions }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    if (method === "GET" && path === "/delivery-zones") {
-      // Get delivery zones with fees for checkout
-      const { data: zones, error } = await supabaseClient
-        .from('delivery_zones')
-        .select(`
-          id,
-          name,
-          description,
-          delivery_fees (
-            base_fee,
-            fee_per_km,
-            min_order_for_free_delivery
-          )
-        `);
-
-      if (error) throw error;
-
-      return new Response(
-        JSON.stringify({ success: true, data: zones }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }

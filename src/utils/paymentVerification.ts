@@ -30,6 +30,23 @@ export const verifyPayment = async (reference: string): Promise<PaymentVerificat
   }
   
   try {
+    // Try verify-payment function first (preferred for production)
+    console.log('🔄 Attempting verification via verify-payment function...');
+    const { data: verifyData, error: verifyError } = await supabase.functions.invoke('verify-payment', {
+      body: { reference }
+    });
+
+    if (!verifyError && verifyData?.success) {
+      console.log('✅ Payment verified via verify-payment function');
+      return {
+        success: true,
+        data: verifyData.data
+      };
+    }
+
+    console.log('⚠️ verify-payment failed, falling back to paystack-secure:', verifyError?.message);
+    
+    // Fallback to paystack-secure
     const { data, error } = await supabase.functions.invoke('paystack-secure', {
       body: {
         action: 'verify',

@@ -134,6 +134,25 @@ serve(async (req) => {
 
     console.log('✅ Order created successfully:', orderId);
     
+    // Compute delivery fee if delivery order
+    let deliveryFee = 0;
+    if (requestBody.fulfillment.type === 'delivery' && requestBody.fulfillment.delivery_zone_id) {
+      console.log('💰 Computing delivery fee for zone:', requestBody.fulfillment.delivery_zone_id);
+      
+      const { data: deliveryZone, error: zoneError } = await supabaseAdmin
+        .from('delivery_zones')
+        .select('delivery_fee')
+        .eq('id', requestBody.fulfillment.delivery_zone_id)
+        .maybeSingle();
+      
+      if (zoneError) {
+        console.error('⚠️ Failed to fetch delivery zone fee:', zoneError);
+      } else if (deliveryZone) {
+        deliveryFee = deliveryZone.delivery_fee || 0;
+        console.log('💰 Delivery fee for zone:', deliveryFee);
+      }
+    }
+    
     const { data: order, error: fetchError } = await supabaseAdmin
       .from('orders')
       .select('id, order_number, total_amount, customer_email')
@@ -148,6 +167,29 @@ serve(async (req) => {
     if (!order) {
       console.error('❌ Order not found after creation:', orderId);
       throw new Error('Order not found after creation');
+    }
+
+    // Update order with delivery fee
+    if (deliveryFee > 0) {
+      console.log('💰 Updating order with delivery fee:', deliveryFee);
+      
+      const newTotalAmount = order.total_amount + deliveryFee;
+      
+      const { error: updateError } = await supabaseAdmin
+        .from('orders')
+        .update({ 
+          delivery_fee: deliveryFee,
+          total_amount: newTotalAmount,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', orderId);
+      
+      if (updateError) {
+        console.error('⚠️ Failed to update order with delivery fee:', updateError);
+      } else {
+        console.log('✅ Order updated with delivery fee. New total:', newTotalAmount);
+        order.total_amount = newTotalAmount;
+      }
     }
 
     console.log('💰 Order details:', {
@@ -172,8 +214,8 @@ serve(async (req) => {
           customer_name: requestBody.customer.name,
           order_number: order.order_number,
           fulfillment_type: requestBody.fulfillment.type,
-          items_subtotal: order.total_amount,
-          delivery_fee: 0,
+          items_subtotal: order.total_amount - deliveryFee,
+          delivery_fee: deliveryFee,
           client_total: order.total_amount,
           authoritative_total: order.total_amount
         },

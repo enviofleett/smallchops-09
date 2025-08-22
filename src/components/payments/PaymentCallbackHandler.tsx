@@ -20,10 +20,52 @@ export const PaymentCallbackHandler: React.FC = () => {
       try {
         // Get reference from URL params (prefer reference over trxref)
         const reference = searchParams.get('reference') || searchParams.get('trxref');
+        const urlStatus = searchParams.get('status');
+        const orderId = searchParams.get('order_id');
         
         if (!reference) {
           setStatus('error');
           setMessage('No payment reference found in callback URL');
+          return;
+        }
+
+        // If URL indicates success, show success immediately and verify in background
+        if (urlStatus === 'success') {
+          console.log('✅ URL indicates successful payment, showing success immediately');
+          setStatus('success');
+          setMessage('Payment successful! Your order has been confirmed.');
+          
+          if (orderId) {
+            setOrderDetails({ 
+              order_id: orderId, 
+              order_number: `Order #${orderId.substring(0, 8)}...`,
+              amount: null // Will be filled by background verification if successful
+            });
+          }
+          
+          toast.success('Payment Successful!', {
+            description: 'Your payment has been processed successfully.'
+          });
+          
+          // Redirect immediately on success
+          setTimeout(() => {
+            navigate(`/order-success?ref=${reference}${orderId ? `&order_id=${orderId}` : ''}`);
+          }, 2000);
+          
+          // Verify in background (don't downgrade UI on failure)
+          handlePaymentCallback(reference).then(result => {
+            if (result.success && result.data?.amount) {
+              console.log('✅ Background verification confirmed payment details');
+              setOrderDetails(prev => ({
+                ...prev,
+                ...result.data,
+                amount: result.data.amount
+              }));
+            }
+          }).catch(error => {
+            console.warn('⚠️ Background verification failed but payment already confirmed by URL:', error);
+          });
+          
           return;
         }
 

@@ -10,6 +10,7 @@ import { useCustomerDirectAuth } from '@/hooks/useCustomerDirectAuth';
 import { useRegistrationFlow } from '@/hooks/useRegistrationFlow';
 import { RegistrationErrorHandler } from './RegistrationErrorHandler';
 import { useToast } from '@/hooks/use-toast';
+import GoogleAuthButton from './GoogleAuthButton';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -36,7 +37,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     phone: ''
   });
 
-  const { login, isLoading: loginLoading } = useCustomerDirectAuth();
+  const { login, signUpWithGoogle, isLoading: loginLoading } = useCustomerDirectAuth();
   const { 
     isLoading: registerLoading, 
     error: registerError, 
@@ -48,6 +49,17 @@ export const AuthModal: React.FC<AuthModalProps> = ({
     retryRegistration
   } = useRegistrationFlow();
   const { toast } = useToast();
+
+  const handleGoogleAuth = async () => {
+    try {
+      await signUpWithGoogle();
+      onSuccess?.();
+      onClose();
+    } catch (error) {
+      // Error handling is done in signUpWithGoogle via toast
+      console.log('Google auth cancelled or failed:', error);
+    }
+  };
 
   const handleLoginSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -225,6 +237,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
             >
               {registerLoading ? "Creating account..." : "Create Account"}
             </Button>
+            
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center text-xs uppercase">
+                <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+              </div>
+            </div>
+            
+            <GoogleAuthButton
+              onGoogleAuth={handleGoogleAuth}
+              isLoading={registerLoading}
+              text="Continue with Google"
+              variant="outline"
+              mode="register"
+            />
           </form>
         );
     }
@@ -297,6 +326,23 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                     {loginLoading ? "Signing in..." : "Sign In"}
                   </Button>
                 </form>
+                
+                <div className="relative my-6">
+                  <div className="absolute inset-0 flex items-center">
+                    <div className="w-full border-t border-border" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-background px-2 text-muted-foreground">Or continue with</span>
+                  </div>
+                </div>
+                
+                <GoogleAuthButton
+                  onGoogleAuth={handleGoogleAuth}
+                  isLoading={loginLoading}
+                  text="Continue with Google"
+                  variant="outline"
+                  mode="login"
+                />
               </TabsContent>
 
               <TabsContent value="register" className="mt-6">

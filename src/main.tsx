@@ -5,6 +5,12 @@ import App from "./App.tsx";
 import "./index.css";
 import { initWebVitals } from "./utils/webVitals";
 import { productionMonitoring } from "./utils/productionMonitoring";
+import { initializeConsoleCleanup, validatePaystackCSP } from "./utils/consoleCleanup";
+
+// Initialize console cleanup and CSP validation
+// This suppresses Datadog SDK storage errors and validates Paystack CSP
+initializeConsoleCleanup();
+validatePaystackCSP();
 
 // Initialize performance monitoring
 initWebVitals();

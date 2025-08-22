@@ -152,13 +152,30 @@ serve(async (req) => {
         console.error('⚠️ Failed to fetch delivery zone fee:', zoneError);
       } else if (deliveryZone) {
         deliveryFee = deliveryZone.base_fee || 0;
-        console.log('💰 Delivery fee for zone:', deliveryZone.name, '- Fee:', deliveryFee);
+        console.log('💰 Delivery fee calculated:', {
+          zone_id: requestBody.fulfillment.delivery_zone_id,
+          zone_name: deliveryZone.name, 
+          base_fee: deliveryFee,
+          order_id: orderId
+        });
+      } else {
+        console.warn('⚠️ Delivery zone not found or inactive:', {
+          zone_id: requestBody.fulfillment.delivery_zone_id,
+          order_id: orderId
+        });
       }
+    } else {
+      console.log('💰 No delivery fee - fulfillment type:', requestBody.fulfillment.type);
     }
 
     // ✅ Update order with delivery fee if applicable
     if (deliveryFee > 0) {
-      console.log('💰 Updating order with delivery fee:', deliveryFee);
+      console.log('💰 Updating order with delivery fee:', {
+        order_id: orderId,
+        original_total: order.total_amount,
+        delivery_fee: deliveryFee,
+        new_total: order.total_amount + deliveryFee
+      });
       
       const newTotalAmount = order.total_amount + deliveryFee;
       
@@ -174,20 +191,33 @@ serve(async (req) => {
       if (updateError) {
         console.error('⚠️ Failed to update order with delivery fee:', updateError);
       } else {
-        console.log('✅ Order updated with delivery fee. New total:', newTotalAmount);
+        console.log('✅ Order updated with delivery fee successfully:', {
+          order_id: orderId,
+          final_total: newTotalAmount,
+          delivery_fee: deliveryFee
+        });
         // CRITICAL: Update the order object to reflect the new total
         order.total_amount = newTotalAmount;
       }
+    } else {
+      console.log('💰 No delivery fee to add - order total remains:', order.total_amount);
     }
 
-    console.log("💰 Order details:", order);
+    console.log("💰 Final order details before payment:", {
+      order_id: order.id,
+      order_number: order.order_number,
+      total_amount: order.total_amount,
+      delivery_fee: deliveryFee,
+      customer_email: order.customer_email,
+      fulfillment_type: requestBody.fulfillment.type
+    });
 
     // ✅ Build payment callback URL
     const callbackUrl = `${SUPABASE_URL}/functions/v1/payment-callback?order_id=${order.id}`;
     console.log("🔗 Payment callback URL:", callbackUrl);
 
     // ✅ Initialize payment with timeout
-    console.log("💳 Initializing payment via paystack-secure...");
+    console.log("💳 Initializing payment via paystack-secure with amount:", order.total_amount);
     
     // Add timeout to the Edge Function call
     const paymentInitPromise = supabaseAdmin.functions.invoke("paystack-secure", {

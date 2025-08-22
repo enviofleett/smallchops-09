@@ -189,6 +189,7 @@ serve(async (req) => {
         console.error('⚠️ Failed to update order with delivery fee:', updateError);
       } else {
         console.log('✅ Order updated with delivery fee. New total:', newTotalAmount);
+        // CRITICAL: Update the order object to reflect the new total
         order.total_amount = newTotalAmount;
       }
     }

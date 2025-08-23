@@ -187,28 +187,28 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
 
   return (
     <ResponsiveTable
-      className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden"
+      className="bg-background rounded-2xl shadow-sm border border-border overflow-hidden"
       mobileComponent={mobileComponent}
     >
       <div className="overflow-x-auto">
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-100">
+          <thead className="bg-muted/50 border-b border-border">
             <tr>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">
+              <th className="text-left py-3 md:py-4 px-3 md:px-6 font-medium text-foreground text-sm">
                 <Checkbox
                   checked={selectedOrders.length === orders.length && orders.length > 0}
                   onCheckedChange={onSelectAll}
                 />
               </th>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">Order ID</th>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">Customer</th>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">Order Time</th>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">Amount</th>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">Type/Zone</th>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">Delivery Schedule</th>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">Status</th>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">Payment</th>
-              <th className="text-left py-4 px-6 font-medium text-gray-600">Actions</th>
+              <th className="text-left py-3 md:py-4 px-3 md:px-6 font-medium text-foreground text-sm min-w-[120px]">Order ID</th>
+              <th className="text-left py-3 md:py-4 px-3 md:px-6 font-medium text-foreground text-sm min-w-[180px]">Customer</th>
+              <th className="text-left py-3 md:py-4 px-3 md:px-6 font-medium text-foreground text-sm min-w-[140px]">Order Time</th>
+              <th className="text-left py-3 md:py-4 px-3 md:px-6 font-medium text-foreground text-sm min-w-[120px]">Amount</th>
+              <th className="text-left py-3 md:py-4 px-3 md:px-6 font-medium text-foreground text-sm min-w-[140px]">Type/Zone</th>
+              <th className="text-left py-3 md:py-4 px-3 md:px-6 font-medium text-foreground text-sm min-w-[160px]">Schedule</th>
+              <th className="text-left py-3 md:py-4 px-3 md:px-6 font-medium text-foreground text-sm min-w-[100px]">Status</th>
+              <th className="text-left py-3 md:py-4 px-3 md:px-6 font-medium text-foreground text-sm min-w-[120px]">Payment</th>
+              <th className="text-left py-3 md:py-4 px-3 md:px-6 font-medium text-foreground text-sm min-w-[200px]">Actions</th>
             </tr>
           </thead>
           <tbody>

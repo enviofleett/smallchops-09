@@ -21,6 +21,8 @@ const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [startDate, setStartDate] = useState<Date>();
+  const [endDate, setEndDate] = useState<Date>();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
@@ -65,12 +67,14 @@ const Orders = () => {
     orders: OrderWithItems[];
     count: number;
   }>({
-    queryKey: ['orders', { currentPage, statusFilter, searchQuery }],
+    queryKey: ['orders', { currentPage, statusFilter, searchQuery, startDate, endDate }],
     queryFn: () => getOrders({ 
       page: currentPage, 
       pageSize: PAGE_SIZE, 
       status: statusFilter,
-      searchQuery 
+      searchQuery,
+      startDate: startDate?.toISOString().split('T')[0],
+      endDate: endDate?.toISOString().split('T')[0]
     }),
     placeholderData: keepPreviousData,
   });
@@ -193,6 +197,12 @@ const Orders = () => {
     setCurrentPage(1);
   };
 
+  const handleDateRangeChange = (newStartDate?: Date, newEndDate?: Date) => {
+    setStartDate(newStartDate);
+    setEndDate(newEndDate);
+    setCurrentPage(1);
+  };
+
   const handleViewOrder = (order: OrderWithItems) => {
     setSelectedOrder(order);
     setIsDialogOpen(true);
@@ -243,6 +253,9 @@ const Orders = () => {
           statusFilter={statusFilter}
           onStatusChange={handleStatusChange}
           onSearch={handleSearch}
+          startDate={startDate}
+          endDate={endDate}
+          onDateRangeChange={handleDateRangeChange}
         />
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
           <Skeleton className="h-12 w-full" />
@@ -262,6 +275,9 @@ const Orders = () => {
           statusFilter={statusFilter}
           onStatusChange={handleStatusChange}
           onSearch={handleSearch}
+          startDate={startDate}
+          endDate={endDate}
+          onDateRangeChange={handleDateRangeChange}
         />
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
           <p className="text-red-600 font-medium">Failed to load orders.</p>
@@ -290,6 +306,9 @@ const Orders = () => {
               statusFilter={statusFilter}
               onStatusChange={handleStatusChange}
               onSearch={handleSearch}
+              startDate={startDate}
+              endDate={endDate}
+              onDateRangeChange={handleDateRangeChange}
             />
             <div className="flex justify-end">
               <Button onClick={handleReconcilePayments} variant="secondary">Reconcile Payments</Button>

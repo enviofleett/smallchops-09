@@ -21,8 +21,8 @@ const OrdersPagination = ({
   const endResult = Math.min(currentPage * pageSize, totalResults);
 
   return (
-    <div className="flex items-center justify-between px-6 py-4 bg-white rounded-b-2xl shadow-sm border-t border-gray-100 mt-[-1px]">
-      <p className="text-sm text-gray-600">
+    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 px-4 md:px-6 py-4 bg-background rounded-b-2xl shadow-sm border-t border-border mt-[-1px]">
+      <p className="text-sm text-muted-foreground text-center sm:text-left">
         Showing {startResult} to {endResult} of {totalResults} results
       </p>
 
@@ -33,10 +33,12 @@ const OrdersPagination = ({
             size="sm"
             onClick={() => onPageChange(currentPage - 1)}
             disabled={currentPage === 1}
+            className="text-xs md:text-sm"
           >
-            Previous
+            <span className="hidden sm:inline">Previous</span>
+            <span className="sm:hidden">Prev</span>
           </Button>
-          <span className="px-2 text-sm text-gray-700 font-medium">
+          <span className="px-2 text-sm text-foreground font-medium whitespace-nowrap">
             Page {currentPage} of {totalPages}
           </span>
           <Button
@@ -44,6 +46,7 @@ const OrdersPagination = ({
             size="sm"
             onClick={() => onPageChange(currentPage + 1)}
             disabled={currentPage === totalPages}
+            className="text-xs md:text-sm"
           >
             Next
           </Button>

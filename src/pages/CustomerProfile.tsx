@@ -33,7 +33,7 @@ import { EnhancedWishlistSection } from '@/components/customer/EnhancedWishlistS
 import { TransactionHistoryTab } from '@/components/purchase-history/TransactionHistoryTab';
 import { CustomerBookingsSection } from '@/components/customer/CustomerBookingsSection';
 
-type ProfileSection = 'orders' | 'tracking' | 'wishlist' | 'payment' | 'address' | 'help' | 'bookings';
+type ProfileSection = 'orders' | 'tracking' | 'address' | 'help' | 'bookings';
 
 // Loading skeleton component
 const ContentSkeleton = () => (
@@ -61,8 +61,6 @@ export default function CustomerProfile() {
   const sidebarItems = useMemo(() => [
     { id: 'orders' as const, label: 'My Orders', icon: ShoppingBag, path: '/purchase-history' },
     { id: 'bookings' as const, label: 'Catering Bookings', icon: Calendar },
-    { id: 'wishlist' as const, label: 'Wishlist', icon: Heart, path: '/customer-favorites' },
-    { id: 'payment' as const, label: 'Payment Method', icon: CreditCard },
     { id: 'address' as const, label: 'Delivery Address', icon: MapPin },
     { id: 'help' as const, label: 'Help', icon: HelpCircle },
   ], []);
@@ -128,10 +126,6 @@ export default function CustomerProfile() {
         return <EnhancedOrdersSection />;
       case 'bookings':
         return <CustomerBookingsSection />;
-      case 'wishlist':
-        return <EnhancedWishlistSection />;
-      case 'payment':
-        return <PaymentSection />;
       case 'address':
         return <AddressManager />;
       case 'help':

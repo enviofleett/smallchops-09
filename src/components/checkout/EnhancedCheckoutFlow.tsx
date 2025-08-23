@@ -8,7 +8,7 @@ import { useCustomerAuth } from "@/hooks/useCustomerAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useCustomerProfile } from "@/hooks/useCustomerProfile";
+import { useCustomerProfile, useCustomerAddresses } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
 import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText, ChevronLeft } from "lucide-react";
 import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
@@ -139,6 +139,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   // const guestSessionId = guestSession?.sessionId;
   const { user, session, isAuthenticated, isLoading } = useCustomerAuth();
   const { profile } = useCustomerProfile();
+  const { addresses } = useCustomerAddresses();
   
   // Initialize checkout step based on authentication status
   const getInitialCheckoutStep = () => {
@@ -244,6 +245,26 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       }));
     }
   }, [isAuthenticated, profile]);
+
+  // Auto-load default delivery address
+  useEffect(() => {
+    if (isAuthenticated && addresses && addresses.length > 0) {
+      const defaultAddress = addresses.find(addr => addr.is_default) || addresses[0];
+      if (defaultAddress) {
+        setFormData(prev => ({
+          ...prev,
+          delivery_address: {
+            address_line_1: defaultAddress.address_line_1 || '',
+            address_line_2: defaultAddress.address_line_2 || '',
+            city: defaultAddress.city || '',
+            state: defaultAddress.state || '',
+            postal_code: defaultAddress.postal_code || '',
+            landmark: defaultAddress.landmark || ''
+          }
+        }));
+      }
+    }
+  }, [isAuthenticated, addresses]);
 
   // Calculate delivery fee (simple calculation since no getDeliveryFee from useCart)
   const deliveryFee = deliveryZone?.base_fee || 0;

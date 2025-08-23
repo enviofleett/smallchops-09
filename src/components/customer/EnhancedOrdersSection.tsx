@@ -31,16 +31,14 @@ export function EnhancedOrdersSection() {
   const { handleError } = useErrorHandler();
   const [selectedOrder, setSelectedOrder] = React.useState<any>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
+  const [isInitialLoad, setIsInitialLoad] = React.useState(true);
   
-  // Debug logging for order data
+  // Handle initial load state
   React.useEffect(() => {
-    console.log('📊 EnhancedOrdersSection - Orders data:', {
-      ordersData,
-      loading: ordersLoading,
-      error: ordersError,
-      ordersCount: ordersData?.orders?.length || 0,
-    });
-  }, [ordersData, ordersLoading, ordersError]);
+    if (!ordersLoading && isInitialLoad) {
+      setIsInitialLoad(false);
+    }
+  }, [ordersLoading, isInitialLoad]);
   
   // Get delivery schedules for all orders - with null safety
   const orders = React.useMemo(() => {
@@ -80,7 +78,7 @@ export function EnhancedOrdersSection() {
     );
   }
 
-  if (ordersLoading) {
+  if (ordersLoading || isInitialLoad) {
     return <ContentSkeleton />;
   }
 

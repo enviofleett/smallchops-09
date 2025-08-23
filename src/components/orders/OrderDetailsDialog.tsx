@@ -9,7 +9,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Constants } from '@/integrations/supabase/types';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
-import { User, Phone, MapPin, Calendar, Hash, X, RefreshCw, ShieldCheck, Package, Truck } from 'lucide-react';
+import { User, Phone, MapPin, Calendar, Hash, X, RefreshCw, ShieldCheck, Package, Truck, Clock } from 'lucide-react';
 import { formatAddressMultiline } from '@/utils/formatAddress';
 import { supabase } from '@/integrations/supabase/client';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
@@ -365,6 +365,45 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                   </p>
                 )}
               </div>
+              {/* Order Timeline Panel */}
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <h4 className="font-medium mb-3 flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  Order Timeline
+                </h4>
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span>Order Placed:</span>
+                    <span className="text-xs">{format(new Date(order.order_time), 'MMM d, h:mm a')}</span>
+                  </div>
+                  {order.payment_status === 'paid' && (
+                    <div className="flex justify-between">
+                      <span>Payment Confirmed:</span>
+                      <span className="text-xs text-green-600">
+                        {order.paid_at ? format(new Date(order.paid_at), 'MMM d, h:mm a') : format(new Date(order.order_time), 'MMM d, h:mm a')}
+                      </span>
+                    </div>
+                  )}
+                  {(order.status !== 'pending' && order.status !== 'cancelled') && (
+                    <div className="flex justify-between">
+                      <span>Order Confirmed:</span>
+                      <span className="text-xs text-blue-600">
+                        {order.status === 'preparing' ? 'Being prepared' : 
+                         order.status === 'ready' ? 'Ready' :
+                         order.status === 'out_for_delivery' ? 'Out for delivery' :
+                         order.status === 'delivered' || order.status === 'completed' ? 'Completed' : 'Confirmed'}
+                      </span>
+                    </div>
+                  )}
+                  {deliverySchedule && (
+                    <div className="flex justify-between">
+                      <span>{order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Scheduled:</span>
+                      <span className="text-xs">{format(new Date(deliverySchedule.delivery_date), 'MMM d')}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               <div>
                 <label className="text-sm font-medium block mb-2">Send Manual Notification</label>
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">

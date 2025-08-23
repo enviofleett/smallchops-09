@@ -310,7 +310,9 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm text-muted-foreground">Payment Method</p>
-                  <p className="font-medium">{order.payment_method || 'Online Payment'}</p>
+                  <p className="font-medium">
+                    {order.payment_status === 'paid' ? 'Paystack' : (order.payment_method || 'Online Payment')}
+                  </p>
                 </div>
                 {order.payment_reference && (
                   <div>
@@ -322,6 +324,76 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
                   <div>
                     <p className="text-sm text-muted-foreground">Paid At</p>
                     <p className="font-medium">{formatDateTime(order.paid_at)}</p>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Order Timeline */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Order Timeline
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-4">
+                <div className="flex items-start gap-3">
+                  <div className="w-2 h-2 rounded-full bg-green-500 mt-2"></div>
+                  <div>
+                    <p className="font-medium">Order Placed</p>
+                    <p className="text-sm text-muted-foreground">
+                      {format(new Date(order.order_time), 'EEEE, d MMMM yyyy \'at\' h:mm a')}
+                    </p>
+                  </div>
+                </div>
+                
+                {order.payment_status === 'paid' && (
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 rounded-full bg-green-500 mt-2"></div>
+                    <div>
+                      <p className="font-medium">Payment Confirmed</p>
+                      <p className="text-sm text-muted-foreground">
+                        {order.paid_at 
+                          ? format(new Date(order.paid_at), 'EEEE, d MMMM yyyy \'at\' h:mm a')
+                          : format(new Date(order.order_time), 'EEEE, d MMMM yyyy \'at\' h:mm a')
+                        }
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {(order.status === 'confirmed' || order.status === 'preparing' || order.status === 'ready' || order.status === 'out_for_delivery' || order.status === 'delivered' || order.status === 'completed') && (
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 rounded-full bg-green-500 mt-2"></div>
+                    <div>
+                      <p className="font-medium">Order Confirmed</p>
+                      <p className="text-sm text-muted-foreground">
+                        {order.status === 'preparing' ? 'Being prepared' : 
+                         order.status === 'ready' ? 'Ready for pickup/delivery' :
+                         order.status === 'out_for_delivery' ? 'Out for delivery' :
+                         order.status === 'delivered' || order.status === 'completed' ? 'Completed' : 'Confirmed'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+                
+                {deliverySchedule && (
+                  <div className="flex items-start gap-3">
+                    <div className="w-2 h-2 rounded-full bg-blue-500 mt-2"></div>
+                    <div>
+                      <p className="font-medium">
+                        {order.order_type === 'delivery' ? 'Delivery Scheduled' : 'Pickup Scheduled'}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {format(new Date(deliverySchedule.delivery_date), 'EEEE, d MMMM yyyy')}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {formatTime(deliverySchedule.delivery_time_start)} - {formatTime(deliverySchedule.delivery_time_end)}
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>

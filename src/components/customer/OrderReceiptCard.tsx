@@ -190,11 +190,9 @@ export function OrderReceiptCard({
             <p className="text-sm font-medium text-green-800 dark:text-green-200">
               Payment Status: {order.payment_status === 'paid' ? 'Paid' : 'Pending'}
             </p>
-            {order.payment_method && (
-              <p className="text-sm text-green-700 dark:text-green-300">
-                Payment Method: {order.payment_method}
-              </p>
-            )}
+            <p className="text-sm text-green-700 dark:text-green-300">
+              Payment Method: {order.payment_status === 'paid' ? 'Paystack' : (order.payment_method || 'Online Payment')}
+            </p>
           </div>
         </div>
 

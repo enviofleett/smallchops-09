@@ -1,4 +1,4 @@
-import React, { useState, memo } from 'react';
+import React, { useState, memo, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Star, Search } from 'lucide-react';
@@ -22,6 +22,7 @@ import { OptimizedImage } from '@/components/OptimizedImage';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
 import { ProgressiveLoader } from '@/components/ui/progressive-loader';
 import { CheckoutButton } from '@/components/ui/checkout-button';
+import ProductsFilters, { FilterState } from '@/components/products/ProductsFilters';
 
 // Memoized components for better performance
 const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
@@ -92,6 +93,11 @@ const PublicHome = () => {
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [filters, setFilters] = useState<FilterState>({
+    priceRange: [0, 50000],
+    onlyPromotions: false,
+    minRating: 0
+  });
   const itemsPerPage = 9;
 
   const { addItem } = useCart();
@@ -135,8 +141,68 @@ const PublicHome = () => {
     gcTime: 30 * 60 * 1000, // 30 minutes (renamed from cacheTime)
   });
 
-  // Filter products based on search - Fixed for production
-  const filteredProducts = React.useMemo(() => {
+  // Calculate price range from products for filters
+  const priceRange: [number, number] = useMemo(() => {
+    if (!products.length) return [0, 50000];
+    const prices = products.map(p => p.discounted_price || p.price);
+    return [Math.floor(Math.min(...prices) / 1000) * 1000, Math.ceil(Math.max(...prices) / 1000) * 1000];
+  }, [products]);
+
+  // Update filters when products change
+  useMemo(() => {
+    if (products.length && filters.priceRange[0] === 0 && filters.priceRange[1] === 50000) {
+      setFilters(prev => ({ ...prev, priceRange: priceRange }));
+    }
+  }, [products.length, priceRange, filters.priceRange]);
+
+  // Smart Product Reshuffling Algorithm - Production Ready
+  const createBalancedProductShuffle = useMemo(() => {
+    return (productList: any[]) => {
+      if (!Array.isArray(productList) || productList.length === 0) {
+        return [];
+      }
+
+      // Sort products by price
+      const sortedByPrice = [...productList].sort((a, b) => 
+        (a.discounted_price || a.price) - (b.discounted_price || b.price)
+      );
+
+      // Divide into price tiers for equal distribution
+      const tierSize = Math.ceil(sortedByPrice.length / 3);
+      const lowPriceTier = sortedByPrice.slice(0, tierSize);
+      const midPriceTier = sortedByPrice.slice(tierSize, tierSize * 2);
+      const highPriceTier = sortedByPrice.slice(tierSize * 2);
+
+      // Shuffle each tier individually
+      const shuffleTier = (tier: any[]) => {
+        const shuffled = [...tier];
+        for (let i = shuffled.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+        }
+        return shuffled;
+      };
+
+      const shuffledLow = shuffleTier(lowPriceTier);
+      const shuffledMid = shuffleTier(midPriceTier);
+      const shuffledHigh = shuffleTier(highPriceTier);
+
+      // Interleave products from different tiers for equal visibility
+      const balanced = [];
+      const maxLength = Math.max(shuffledLow.length, shuffledMid.length, shuffledHigh.length);
+      
+      for (let i = 0; i < maxLength; i++) {
+        if (shuffledLow[i]) balanced.push(shuffledLow[i]);
+        if (shuffledMid[i]) balanced.push(shuffledMid[i]);
+        if (shuffledHigh[i]) balanced.push(shuffledHigh[i]);
+      }
+
+      return balanced;
+    };
+  }, []);
+
+  // Filter and shuffle products - Enhanced with advanced filtering
+  const filteredAndShuffledProducts = useMemo(() => {
     if (!Array.isArray(products)) {
       console.warn('🚨 Products is not an array:', products);
       return [];
@@ -147,27 +213,50 @@ const PublicHome = () => {
       return [];
     }
 
+    // Apply all filters
     const filtered = products.filter(product => {
       if (!product?.name) {
         console.warn('🚨 Product missing name:', product);
         return false;
       }
-      return product.name.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Search filter
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Price filter
+      const productPrice = product.discounted_price || product.price;
+      const matchesPrice = productPrice >= filters.priceRange[0] && productPrice <= filters.priceRange[1];
+      
+      // Promotion filter
+      const matchesPromotion = !filters.onlyPromotions || (product.discount_percentage && product.discount_percentage > 0);
+      
+      // Rating filter (placeholder for future rating implementation)
+      const matchesRating = filters.minRating === 0;
+      
+      return matchesSearch && matchesPrice && matchesPromotion && matchesRating;
     });
+
+    // Apply smart reshuffling for equal visibility
+    const shuffled = createBalancedProductShuffle(filtered);
     
-    console.log('🔍 Filtered products:', {
+    console.log('🔍 Filtered and shuffled products:', {
       total: products.length,
       filtered: filtered.length,
-      searchTerm
+      searchTerm,
+      filtersActive: filters.onlyPromotions || 
+        filters.priceRange[0] > priceRange[0] || 
+        filters.priceRange[1] < priceRange[1] ||
+        filters.minRating > 0
     });
     
-    return filtered;
-  }, [products, searchTerm]);
+    return shuffled;
+  }, [products, searchTerm, filters, createBalancedProductShuffle, priceRange]);
 
-  // Pagination
-  const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
+  // Pagination with shuffled products
+  const totalPages = Math.ceil(filteredAndShuffledProducts.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
-  const currentProducts = filteredProducts.slice(startIndex, startIndex + itemsPerPage);
+  const currentProducts = filteredAndShuffledProducts.slice(startIndex, startIndex + itemsPerPage);
 
   const handleAddToCart = React.useCallback((product: any) => {
     try {
@@ -327,17 +416,21 @@ const PublicHome = () => {
 
             {/* Right Side - Products */}
             <div className="col-span-full lg:col-span-3">
-              {/* Search Bar - Mobile optimized */}
+              {/* Advanced Filters */}
               <div className="mb-6">
-                <div className="relative max-w-md mx-auto lg:mx-0">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    placeholder="Search products..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 py-3 text-base"
-                  />
-                </div>
+                <ProductsFilters
+                  categoryFilter={activeCategory}
+                  onCategoryChange={setActiveCategory}
+                  searchQuery={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  categories={categories}
+                  isLoadingCategories={false}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  priceRange={priceRange}
+                  totalProducts={products.length}
+                  filteredProducts={filteredAndShuffledProducts.length}
+                />
               </div>
 
               {/* Products Loading State */}
@@ -366,15 +459,33 @@ const PublicHome = () => {
                     Try Again
                   </Button>
                 </div>
-              ) : filteredProducts.length === 0 ? (
+              ) : filteredAndShuffledProducts.length === 0 ? (
                 <div className="text-center py-8 sm:py-12">
                   <h3 className="text-lg sm:text-xl font-semibold mb-2">No products found</h3>
                   <p className="text-gray-600 mb-4 px-4">
-                    {searchTerm ? 'Try adjusting your search terms.' : 'No products available yet.'}
+                    {searchTerm || filters.onlyPromotions || 
+                     filters.priceRange[0] > priceRange[0] || 
+                     filters.priceRange[1] < priceRange[1] ||
+                     filters.minRating > 0
+                      ? 'Try adjusting your search or filter settings.' 
+                      : 'No products available yet.'}
                   </p>
-                  {searchTerm && (
-                    <Button onClick={() => setSearchTerm('')} variant="outline">
-                      Clear Search
+                  {(searchTerm || filters.onlyPromotions || 
+                    filters.priceRange[0] > priceRange[0] || 
+                    filters.priceRange[1] < priceRange[1] ||
+                    filters.minRating > 0) && (
+                    <Button 
+                      onClick={() => {
+                        setSearchTerm('');
+                        setFilters({
+                          priceRange: priceRange,
+                          onlyPromotions: false,
+                          minRating: 0
+                        });
+                      }} 
+                      variant="outline"
+                    >
+                      Clear All Filters
                     </Button>
                   )}
                 </div>

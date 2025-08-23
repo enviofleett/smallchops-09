@@ -45,7 +45,8 @@ export const ProductForm = ({
       is_promotional: Boolean(product?.is_promotional),
       preparation_time: typeof product?.preparation_time === 'number' ? product.preparation_time : undefined,
       vat_rate: product?.vat_rate || 7.5,
-      allergen_info: Array.isArray(product?.allergen_info) ? product.allergen_info as string[] : []
+      allergen_info: Array.isArray(product?.allergen_info) ? product.allergen_info as string[] : [],
+      minimum_order_quantity: (product as any)?.minimum_order_quantity || 1,
     }
   });
 
@@ -248,6 +249,29 @@ export const ProductForm = ({
                       onChange={e => field.onChange(parseInt(e.target.value) || undefined)}
                     />
                   </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            <FormField
+              control={form.control}
+              name="minimum_order_quantity"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Minimum Order Quantity (MOQ)</FormLabel>
+                  <FormControl>
+                    <Input
+                      type="number"
+                      placeholder="1"
+                      {...field}
+                      onChange={e => field.onChange(parseInt(e.target.value) || 1)}
+                      min="1"
+                    />
+                  </FormControl>
+                  <FormDescription>
+                    The minimum quantity a customer must order for this product
+                  </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}

@@ -35,6 +35,8 @@ const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
     ));
   };
 
+  const moq = product.minimum_order_quantity || 1;
+
   return (
     <Card 
       className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
@@ -53,6 +55,13 @@ const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
               discountPercentage={product.discount_percentage || 0}
               size="sm"
             />
+          </div>
+        )}
+        {moq > 1 && (
+          <div className="absolute top-1 sm:top-2 right-1 sm:right-2">
+            <div className="bg-blue-100 text-blue-800 text-xs font-medium px-2 py-1 rounded-full border border-blue-200">
+              MOQ: {moq}
+            </div>
           </div>
         )}
       </div>
@@ -77,9 +86,14 @@ const MemoizedProductCard = memo(({ product, onAddToCart, navigate }: any) => {
             }}
             className="text-xs sm:text-sm px-2 sm:px-3 py-1 sm:py-2"
           >
-            Add
+            Add {moq > 1 ? `${moq}+` : ''}
           </Button>
         </div>
+        {moq > 1 && (
+          <div className="text-xs text-muted-foreground mt-1 text-center">
+            Min. order: {moq} units
+          </div>
+        )}
       </CardContent>
     </Card>
   );
@@ -260,6 +274,8 @@ const PublicHome = () => {
 
   const handleAddToCart = React.useCallback((product: any) => {
     try {
+      const moq = product.minimum_order_quantity || 1;
+      
       addItem({
         id: product.id,
         name: product.name,
@@ -268,11 +284,12 @@ const PublicHome = () => {
         discount_amount: product.discount_amount,
         vat_rate: product.vat_rate || 7.5,
         image_url: product.image_url,
-      });
+        minimum_order_quantity: moq
+      }, moq); // Add MOQ quantity instead of 1
       
       toast({
         title: "Added to cart",
-        description: `${product.name} has been added to your cart.`,
+        description: `${moq > 1 ? `${moq} units of ` : ''}${product.name} ${moq > 1 ? '(minimum order)' : ''} added to your cart.`,
       });
     } catch (error) {
       console.error('Error adding to cart:', error);

@@ -18,6 +18,7 @@ export const productSchema = z.object({
   preparation_time: z.number().int().min(1, 'Preparation time must be at least 1 minute').optional(),
   allergen_info: z.array(z.string().min(1, 'Allergen info cannot be empty')).default([]),
   vat_rate: z.number().min(0).max(100).default(7.5),
+  minimum_order_quantity: z.number().int().min(1, 'Minimum order quantity must be at least 1').default(1),
 });
 
 export type ProductFormData = z.infer<typeof productSchema>;

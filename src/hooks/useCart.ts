@@ -19,6 +19,7 @@ export interface CartItem {
   image_url?: string;
   customizations?: Record<string, any>;
   special_instructions?: string;
+  minimum_order_quantity?: number; // Add MOQ to cart items
 }
 
 export interface OrderSummary {
@@ -194,11 +195,14 @@ export const useCart = () => {
     image_url?: string;
     customizations?: Record<string, any>;
     special_instructions?: string;
+    minimum_order_quantity?: number; // Add MOQ to product interface
   }, quantity = 1) => {
     console.log('🛒 addItem called with:', { product, quantity });
     console.log('🛒 Current cart state:', cart);
     
     try {
+      const moq = product.minimum_order_quantity || 1;
+      
       // Check if product already exists in cart
       const existingItemIndex = cart.items.findIndex(item => item.product_id === product.id);
       console.log('🛒 Existing item index:', existingItemIndex);
@@ -208,14 +212,31 @@ export const useCart = () => {
       if (existingItemIndex >= 0) {
         // Product exists, update quantity
         console.log('🛒 Updating existing item quantity');
-        updatedItems = cart.items.map((item, index) => 
-          index === existingItemIndex 
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
+        const newQuantity = cart.items[existingItemIndex].quantity + quantity;
+        
+        // Validate MOQ for updated quantity
+        if (newQuantity < moq) {
+          console.warn(`🛒 MOQ violation: ${product.name} requires minimum ${moq}, attempting to set ${newQuantity}`);
+          // Automatically adjust to MOQ if below minimum
+          updatedItems = cart.items.map((item, index) => 
+            index === existingItemIndex 
+              ? { ...item, quantity: moq }
+              : item
+          );
+        } else {
+          updatedItems = cart.items.map((item, index) => 
+            index === existingItemIndex 
+              ? { ...item, quantity: newQuantity }
+              : item
+          );
+        }
       } else {
         // New product, add to cart
         console.log('🛒 Adding new item to cart');
+        
+        // Ensure quantity meets MOQ
+        const validQuantity = Math.max(quantity, moq);
+        
         const newItem: CartItem = {
           id: `${product.id}_${Date.now()}`,
           product_id: product.id,
@@ -223,11 +244,12 @@ export const useCart = () => {
           price: product.price,
           original_price: product.original_price,
           discount_amount: product.discount_amount,
-          quantity,
+          quantity: validQuantity,
           vat_rate: product.vat_rate || 7.5,
           image_url: product.image_url,
           customizations: product.customizations,
-          special_instructions: product.special_instructions
+          special_instructions: product.special_instructions,
+          minimum_order_quantity: moq
         };
         console.log('🛒 New item created:', newItem);
         updatedItems = [...cart.items, newItem];
@@ -254,9 +276,15 @@ export const useCart = () => {
       return;
     }
 
-    const updatedItems = cart.items.map(item =>
-      item.id === cartItemId ? { ...item, quantity } : item
-    );
+    const updatedItems = cart.items.map(item => {
+      if (item.id === cartItemId) {
+        const moq = item.minimum_order_quantity || 1;
+        // Ensure quantity meets MOQ
+        const validQuantity = Math.max(quantity, moq);
+        return { ...item, quantity: validQuantity };
+      }
+      return item;
+    });
     setCart(calculateCartSummary(updatedItems, 0, cart.promotion_code)); // No delivery fee in cart
   };
 

@@ -1,6 +1,5 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.0';
-import { Resend } from "npm:resend@2.0.0";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,8 +27,6 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
-
-const resend = new Resend(Deno.env.get('RESEND_API_KEY'));
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -91,44 +88,46 @@ serve(async (req) => {
         const changeType = isIncrease ? 'increased' : 'decreased';
         const changeColor = isIncrease ? '#ef4444' : '#22c55e';
 
-        // Send email notification
-        const emailResult = await resend.emails.send({
-          from: 'Restaurant Notifications <noreply@resend.dev>',
-          to: [authUser.user.email],
-          subject: `Price Alert: ${data.product_name} ${changeType}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-              <h2 style="color: #333;">Price Alert!</h2>
-              <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="margin: 0 0 10px 0;">${data.product_name}</h3>
-                <p style="margin: 5px 0;">
-                  <strong>Previous price:</strong> ₦${data.old_price.toLocaleString()}
-                </p>
-                <p style="margin: 5px 0;">
-                  <strong>New price:</strong> 
-                  <span style="color: ${changeColor}; font-weight: bold;">
-                    ₦${data.new_price.toLocaleString()}
-                  </span>
-                </p>
-                <p style="margin: 5px 0;">
-                  <strong>Change:</strong> 
-                  <span style="color: ${changeColor}; font-weight: bold;">
-                    ${Math.abs(priceChange)}% ${changeType}
-                  </span>
+        // Send email notification via SMTP
+        const emailResult = await supabase.functions.invoke('production-email-processor', {
+          body: {
+            to: authUser.user.email,
+            subject: `Price Alert: ${data.product_name} ${changeType}`,
+            html: `
+              <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                <h2 style="color: #333;">Price Alert!</h2>
+                <div style="background: #f9f9f9; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                  <h3 style="margin: 0 0 10px 0;">${data.product_name}</h3>
+                  <p style="margin: 5px 0;">
+                    <strong>Previous price:</strong> ₦${data.old_price.toLocaleString()}
+                  </p>
+                  <p style="margin: 5px 0;">
+                    <strong>New price:</strong> 
+                    <span style="color: ${changeColor}; font-weight: bold;">
+                      ₦${data.new_price.toLocaleString()}
+                    </span>
+                  </p>
+                  <p style="margin: 5px 0;">
+                    <strong>Change:</strong> 
+                    <span style="color: ${changeColor}; font-weight: bold;">
+                      ${Math.abs(priceChange)}% ${changeType}
+                    </span>
+                  </p>
+                </div>
+                <p>This is one of your favorite products. ${!isIncrease ? 'Great news - the price has dropped!' : 'The price has increased.'}</p>
+                <div style="margin: 30px 0;">
+                  <a href="${Deno.env.get('SUPABASE_URL')?.replace('supabase.co', 'vercel.app') || 'https://your-app.com'}/customer-portal" 
+                     style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
+                    View Product
+                  </a>
+                </div>
+                <p style="color: #666; font-size: 12px;">
+                  You can manage your notification preferences in your account settings.
                 </p>
               </div>
-              <p>This is one of your favorite products. ${!isIncrease ? 'Great news - the price has dropped!' : 'The price has increased.'}</p>
-              <div style="margin: 30px 0;">
-                <a href="${Deno.env.get('SUPABASE_URL')?.replace('supabase.co', 'vercel.app') || 'https://your-app.com'}/customer-portal" 
-                   style="background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; display: inline-block;">
-                  View Product
-                </a>
-              </div>
-              <p style="color: #666; font-size: 12px;">
-                You can manage your notification preferences in your account settings.
-              </p>
-            </div>
-          `,
+            `,
+            emailType: 'notification'
+          }
         });
 
         if (emailResult.error) {

@@ -505,7 +505,6 @@ async function sendSMTPEmail(emailData: EmailRequest) {
       console.error("   - Test with known working providers:");
       console.error("     • Gmail: smtp.gmail.com:587 (use App Password)");
       console.error("     • Outlook: smtp-mail.outlook.com:587");
-      console.error("     • SendGrid: smtp.sendgrid.net:587");
       
       throw new Error(`SMTP server not responding correctly. Tested ${smtpHost} and alternatives. Check if the hostname and port are correct.`);
     }

@@ -140,14 +140,10 @@ const handler = async (req: Request): Promise<Response> => {
           });
 
         } else if (channel === 'sms') {
-          // For SMS, we would integrate with a provider like Twilio
-          // For now, we'll log it as a placeholder
-          console.log('SMS would be sent:', {
-            to: request.recipient,
-            message: processedContent
-          });
+          // SMS delivery is not supported in SMTP-only configuration
+          console.log('SMS delivery not supported in SMTP-only mode');
 
-          // Log SMS attempt (placeholder - would be real with Twilio integration)
+          // Log SMS attempt as not supported
           await supabase.from('notification_delivery_log').insert({
             order_id: request.order_id,
             customer_id: request.customer_id,

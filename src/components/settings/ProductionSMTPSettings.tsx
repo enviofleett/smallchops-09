@@ -427,7 +427,7 @@ export const ProductionSMTPSettings = () => {
                       <Input
                         id="name"
                         {...register('name')}
-                        placeholder="e.g., SendGrid, Amazon SES"
+                        placeholder="e.g., Company SMTP, Mail Server"
                       />
                       {errors.name && (
                         <p className="text-sm text-destructive mt-1">{errors.name.message}</p>

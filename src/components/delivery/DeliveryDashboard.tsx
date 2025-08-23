@@ -235,11 +235,28 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
                             {order.status.replace('_', ' ')}
                           </Badge>
                         </div>
-                        <p className="text-sm text-muted-foreground">{order.customer_name}</p>
+                        <div className="space-y-1">
+                          <p className="font-medium text-sm">{order.customer_name}</p>
+                          <div className="flex items-center gap-4 text-sm text-muted-foreground flex-wrap">
+                            {order.customer_email && (
+                              <div className="flex items-center gap-1">
+                                <Mail className="h-3 w-3" />
+                                <span className="hidden sm:inline">{order.customer_email}</span>
+                                <span className="sm:hidden">{order.customer_email.substring(0, 20)}...</span>
+                              </div>
+                            )}
+                            {order.customer_phone && (
+                              <div className="flex items-center gap-1">
+                                <Phone className="h-3 w-3" />
+                                <span>{order.customer_phone}</span>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
                       
                       <div className="flex items-center gap-2">
-                        <div className="text-right hidden sm:block">
+                        <div className="text-right">
                           <div className="font-semibold">₦{order.total_amount?.toLocaleString()}</div>
                           <div className="text-sm text-muted-foreground">
                             {getPaymentMethodDisplay(order.payment_method || 'online')}
@@ -260,24 +277,63 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
                       </div>
                     </div>
 
-                    {/* Quick Info - Mobile */}
-                    <div className="flex justify-between items-center mb-3 sm:hidden">
-                      <div className="font-semibold">₦{order.total_amount?.toLocaleString()}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {getPaymentMethodDisplay(order.payment_method || 'online')}
+                    {/* Order Summary */}
+                    <div className="mb-4 space-y-3">
+                      {/* Items Summary */}
+                      <div className="bg-muted/50 p-3 rounded-lg">
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="font-medium text-sm">Order Items ({order.order_items?.length || 0})</h4>
+                          <div className="text-sm text-muted-foreground">
+                            Total: ₦{order.total_amount?.toLocaleString()}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          {order.order_items?.slice(0, 3).map((item, index) => (
+                            <div key={index} className="flex justify-between items-center text-sm">
+                              <span className="truncate">{item.product_name} × {item.quantity}</span>
+                              <span className="font-medium whitespace-nowrap ml-2">₦{item.total_price?.toLocaleString()}</span>
+                            </div>
+                          ))}
+                          {(order.order_items?.length || 0) > 3 && (
+                            <div className="text-xs text-muted-foreground">
+                              +{(order.order_items?.length || 0) - 3} more items
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Payment & Delivery Info */}
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-sm">
+                        <div className="space-y-1">
+                          <div className="flex justify-between">
+                            <span className="text-muted-foreground">Subtotal:</span>
+                            <span>₦{((order.total_amount || 0) - (order.delivery_fee || 0)).toLocaleString()}</span>
+                          </div>
+                          {order.delivery_fee && (
+                            <div className="flex justify-between">
+                              <span className="text-muted-foreground">Delivery Fee:</span>
+                              <span>₦{order.delivery_fee.toLocaleString()}</span>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <CreditCard className="h-3 w-3" />
+                            <span className="text-muted-foreground">Payment:</span>
+                            <span className="capitalize">{order.payment_status}</span>
+                          </div>
+                          {schedule && (
+                            <div className="flex items-center gap-2 text-blue-600">
+                              <MapPin className="h-3 w-3" />
+                              <span className="text-xs">
+                                {format(parseISO(schedule.delivery_date), 'MMM dd')} • {schedule.delivery_time_start}-{schedule.delivery_time_end}
+                              </span>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
-
-                    {/* Delivery Schedule */}
-                    {schedule && (
-                      <div className="flex items-center gap-2 text-sm text-blue-600 mb-3">
-                        <MapPin className="h-4 w-4" />
-                        <span>
-                          {format(parseISO(schedule.delivery_date), 'PPP')} • 
-                          {schedule.delivery_time_start}-{schedule.delivery_time_end}
-                        </span>
-                      </div>
-                    )}
 
                     {/* Expanded Details */}
                     {isExpanded && (

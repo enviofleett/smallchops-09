@@ -314,14 +314,7 @@ export const PaymentCallbackPage: React.FC = () => {
             {/* Action Buttons */}
             <div className="space-y-3">
               <Button 
-                onClick={() => {
-                  const orderId = searchParams.get('order_id');
-                  if (orderId) {
-                    navigate(`/orders/${orderId}`);
-                  } else {
-                    navigate('/customer-profile');
-                  }
-                }} 
+                onClick={() => navigate('/customer-profile')} 
                 className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-base font-medium"
               >
                 Track Your Order

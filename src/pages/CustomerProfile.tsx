@@ -59,10 +59,10 @@ export default function CustomerProfile() {
 
   // Memoize sidebar items to prevent unnecessary re-renders
   const sidebarItems = useMemo(() => [
-    { id: 'orders' as const, label: 'My Orders', icon: ShoppingBag, path: '/purchase-history' },
-    { id: 'bookings' as const, label: 'Catering Bookings', icon: Calendar },
-    { id: 'address' as const, label: 'Delivery Address', icon: MapPin },
-    { id: 'help' as const, label: 'Help', icon: HelpCircle },
+    { id: 'orders' as const, label: 'My Orders', icon: ShoppingBag, path: undefined },
+    { id: 'bookings' as const, label: 'Catering Bookings', icon: Calendar, path: undefined },
+    { id: 'address' as const, label: 'Delivery Address', icon: MapPin, path: undefined },
+    { id: 'help' as const, label: 'Help', icon: HelpCircle, path: undefined },
   ], []);
 
   const handleLogout = React.useCallback(async () => {

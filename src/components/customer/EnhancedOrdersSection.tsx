@@ -32,6 +32,7 @@ export function EnhancedOrdersSection() {
   const [selectedOrder, setSelectedOrder] = React.useState<any>(null);
   const [isModalOpen, setIsModalOpen] = React.useState(false);
   const [isInitialLoad, setIsInitialLoad] = React.useState(true);
+  const [showAllOrders, setShowAllOrders] = React.useState(false);
   
   // Handle initial load state
   React.useEffect(() => {
@@ -136,7 +137,7 @@ export function EnhancedOrdersSection() {
       
       {/* Mobile-first responsive orders list */}
       <div className="space-y-4">
-        {orders.slice(0, 10).map((order) => {
+        {orders.slice(0, showAllOrders ? orders.length : 10).map((order) => {
           try {
             return (
               <div 
@@ -164,14 +165,26 @@ export function EnhancedOrdersSection() {
           }
         })}
         
-        {orders.length > 10 && (
+        {orders.length > 10 && !showAllOrders && (
           <div className="text-center pt-4">
             <Button 
               variant="outline" 
-              onClick={() => window.location.href = '/orders'}
+              onClick={() => setShowAllOrders(true)}
               className="w-full sm:w-auto"
             >
               View All Orders ({orders.length})
+            </Button>
+          </div>
+        )}
+        
+        {showAllOrders && orders.length > 10 && (
+          <div className="text-center pt-4">
+            <Button 
+              variant="ghost" 
+              onClick={() => setShowAllOrders(false)}
+              className="w-full sm:w-auto"
+            >
+              Show Less
             </Button>
           </div>
         )}

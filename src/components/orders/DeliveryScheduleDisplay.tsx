@@ -194,7 +194,7 @@ export const DeliveryScheduleDisplay: React.FC<DeliveryScheduleDisplayProps> = (
           <div className="space-y-1">
             <div className="flex items-center gap-2">
               <FileText className="w-4 h-4 text-blue-600" />
-              <p className="text-sm font-medium text-gray-700">Special Instructions</p>
+              <p className="text-sm font-medium text-gray-700">Delivery Instructions</p>
             </div>
             <p className="text-sm text-gray-600 bg-white/70 p-2 rounded border">
               {schedule.special_instructions}

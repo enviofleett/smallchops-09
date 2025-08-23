@@ -808,6 +808,29 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                   placeholder="Nearby landmark"
                 />
               </div>
+              <div>
+                <Label htmlFor="delivery_instructions">Delivery Instructions (optional)</Label>
+                <div className="relative">
+                  <Input
+                    id="delivery_instructions"
+                    value={formData.special_instructions || ''}
+                    onChange={(e) => {
+                      const value = e.target.value.slice(0, 160); // Limit to 160 characters
+                      handleFormChange('special_instructions', value);
+                    }}
+                    placeholder="Gate code, building entrance, floor, special handling notes..."
+                    maxLength={160}
+                  />
+                  <div className="flex justify-between mt-1">
+                    <span className="text-xs text-muted-foreground">
+                      Help our drivers find you and deliver your order smoothly
+                    </span>
+                    <span className={`text-xs ${(formData.special_instructions?.length || 0) >= 150 ? 'text-amber-600' : 'text-muted-foreground'}`}>
+                      {formData.special_instructions?.length || 0}/160
+                    </span>
+                  </div>
+                </div>
+              </div>
               
               <DeliveryZoneDropdown
                 selectedZoneId={deliveryZone?.id}

@@ -129,11 +129,21 @@ serve(async (req) => {
       customizations: item.customizations,
     }));
 
+    // Sanitize delivery instructions (max 160 chars, strip HTML)
+    const delivery_instructions = requestBody.delivery_instructions ? 
+      requestBody.delivery_instructions.toString().replace(/<[^>]*>/g, '').trim().slice(0, 160) || null : null;
+    
+    // Add delivery instructions to delivery address if provided
+    const enhanced_delivery_address = requestBody.fulfillment.address ? {
+      ...requestBody.fulfillment.address,
+      delivery_instructions: delivery_instructions
+    } : null;
+
     // ✅ Call database function
     const { data: orderId, error: orderError } = await supabaseAdmin.rpc("create_order_with_items", {
       p_customer_id: customerId,
       p_fulfillment_type: requestBody.fulfillment.type,
-      p_delivery_address: requestBody.fulfillment.address || null,
+      p_delivery_address: enhanced_delivery_address,
       p_pickup_point_id: requestBody.fulfillment.pickup_point_id || null,
       p_delivery_zone_id: requestBody.fulfillment.delivery_zone_id || null,
       p_guest_session_id: null,
@@ -159,7 +169,7 @@ serve(async (req) => {
             delivery_time_start: requestBody.delivery_schedule.delivery_time_start,
             delivery_time_end: requestBody.delivery_schedule.delivery_time_end,
             is_flexible: requestBody.delivery_schedule.is_flexible || false,
-            special_instructions: requestBody.delivery_schedule.special_instructions,
+            special_instructions: requestBody.delivery_schedule.special_instructions || delivery_instructions,
             requested_at: new Date().toISOString()
           });
 

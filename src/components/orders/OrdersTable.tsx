@@ -14,6 +14,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
+import { formatDeliveryInstructionsForDisplay, getDeliveryInstructionsFromAddress } from '@/utils/deliveryInstructions';
 
 interface OrdersTableProps {
   orders: OrderWithItems[];
@@ -129,13 +130,25 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
             <MobileCardRow 
               label="Type" 
               value={
-                <div className="flex items-center gap-2">
-                  {order.order_type === 'delivery' ? (
-                    <Truck className="h-4 w-4 text-gray-500" />
-                  ) : (
-                    <Package className="h-4 w-4 text-gray-500" />
+                <div className="flex flex-col gap-1">
+                  <div className="flex items-center gap-2">
+                    {order.order_type === 'delivery' ? (
+                      <Truck className="h-4 w-4 text-gray-500" />
+                    ) : (
+                      <Package className="h-4 w-4 text-gray-500" />
+                    )}
+                    <span className="capitalize">{order.order_type}</span>
+                  </div>
+                  {order.order_type === 'delivery' && (order as any).delivery_zones && (
+                    <span className="text-xs text-gray-500 ml-6">
+                      {(order as any).delivery_zones.name}
+                    </span>
                   )}
-                  <span className="capitalize">{order.order_type}</span>
+                  {getDeliveryInstructionsFromAddress((order as any).delivery_address) && (
+                    <span className="text-xs text-blue-600 ml-6" title={getDeliveryInstructionsFromAddress((order as any).delivery_address) || ''}>
+                      📝 {formatDeliveryInstructionsForDisplay(getDeliveryInstructionsFromAddress((order as any).delivery_address), 25)}
+                    </span>
+                  )}
                 </div>
               } 
             />
@@ -240,14 +253,19 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                     ) : (
                       <Package className="h-4 w-4 text-gray-500" />
                     )}
-                    <div>
-                      <span className="text-gray-600 capitalize">{order.order_type}</span>
-                      {order.order_type === 'delivery' && (order as any).delivery_zones && (
-                        <p className="text-xs text-gray-500">
-                          {(order as any).delivery_zones.name}
-                        </p>
-                      )}
-                    </div>
+                     <div>
+                       <span className="text-gray-600 capitalize">{order.order_type}</span>
+                       {order.order_type === 'delivery' && (order as any).delivery_zones && (
+                         <p className="text-xs text-gray-500">
+                           {(order as any).delivery_zones.name}
+                         </p>
+                       )}
+                       {getDeliveryInstructionsFromAddress((order as any).delivery_address) && (
+                         <p className="text-xs text-blue-600 mt-1" title={getDeliveryInstructionsFromAddress((order as any).delivery_address) || ''}>
+                           📝 {formatDeliveryInstructionsForDisplay(getDeliveryInstructionsFromAddress((order as any).delivery_address))}
+                         </p>
+                       )}
+                     </div>
                   </div>
                  </td>
                  <td className="py-4 px-6">

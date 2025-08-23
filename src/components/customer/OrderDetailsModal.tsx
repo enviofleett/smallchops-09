@@ -3,11 +3,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone } from 'lucide-react';
+import { Clock, MapPin, CreditCard, Package, Truck, Calendar, Phone, FileText } from 'lucide-react';
 import { formatAddressMultiline } from '@/utils/formatAddress';
 import { format } from 'date-fns';
 import type { PickupPoint } from '@/hooks/usePickupPoints';
 import { FullDeliveryInformation } from './FullDeliveryInformation';
+import { getDeliveryInstructionsFromAddress } from '@/utils/deliveryInstructions';
 
 interface OrderItem {
   id: string;
@@ -399,6 +400,23 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
               </div>
             </CardContent>
           </Card>
+
+          {/* Delivery Instructions */}
+          {getDeliveryInstructionsFromAddress(order.delivery_address) && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FileText className="h-5 w-5" />
+                  Delivery Instructions
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-sm bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  {getDeliveryInstructionsFromAddress(order.delivery_address)}
+                </p>
+              </CardContent>
+            </Card>
+          )}
 
           {/* Full Delivery Information */}
           <FullDeliveryInformation

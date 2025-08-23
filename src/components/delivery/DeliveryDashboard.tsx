@@ -35,15 +35,17 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
 
   // Fetch orders for selected date
-  const { data: ordersData, isLoading } = useQuery({
+  const { data: ordersData, isLoading, error } = useQuery({
     queryKey: ['delivery-orders', formattedDate],
     queryFn: () => getOrders({
       page: 1,
-      pageSize: 50,
+      pageSize: 100,
       startDate: formattedDate,
       endDate: formattedDate,
     }),
     refetchInterval: 30000,
+    retry: 2,
+    staleTime: 1000 * 60 * 2, // 2 minutes
   });
 
   // Filter delivery orders and get order IDs
@@ -188,12 +190,30 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center space-y-3">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                <p className="text-sm text-muted-foreground">Loading delivery orders...</p>
+              </div>
+            </div>
+          ) : error ? (
+            <div className="flex items-center justify-center py-12">
+              <div className="text-center space-y-3">
+                <p className="text-sm text-destructive">Failed to load orders</p>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => window.location.reload()}
+                >
+                  Retry
+                </Button>
+              </div>
             </div>
           ) : deliveryOrders.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              No delivery orders for {format(selectedDate, 'PPP')}
+            <div className="text-center py-12 text-muted-foreground space-y-2">
+              <Package className="h-12 w-12 mx-auto opacity-50" />
+              <p className="font-medium">No delivery orders</p>
+              <p className="text-sm">No orders scheduled for delivery on {format(selectedDate, 'PPP')}</p>
             </div>
           ) : (
             <div className="divide-y">
@@ -206,11 +226,11 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
                     {/* Order Header */}
                     <div className="flex items-center justify-between mb-4">
                       <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
                           <h3 className="font-semibold text-lg">{order.order_number}</h3>
                           <Badge 
                             variant="outline" 
-                            className={cn("text-xs", getStatusColor(order.status))}
+                            className={cn("text-xs whitespace-nowrap", getStatusColor(order.status))}
                           >
                             {order.status.replace('_', ' ')}
                           </Badge>

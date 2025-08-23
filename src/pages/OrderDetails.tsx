@@ -148,21 +148,8 @@ export default function OrderDetails() {
   const [retryCount, setRetryCount] = React.useState(0);
   const { data: pickupPoints = [] } = usePickupPoints();
 
-  // Use detailed order data hook with network resilience
-  const detailedOrderQuery = useDetailedOrderData(id || '');
-  const detailedOrderWithResilience = useNetworkResilience(detailedOrderQuery, {
-    fallbackData: null,
-    onError: (error) => {
-      console.error('Network error in detailed order data:', error);
-      if (retryCount < 3) {
-        setTimeout(() => {
-          setRetryCount(prev => prev + 1);
-          detailedOrderQuery.refetch();
-        }, 2000 * Math.pow(2, retryCount)); // Exponential backoff
-      }
-    },
-    showToast: false // Handle toasts manually for better UX
-  });
+  // Remove the detailed order data hook to prevent flickering
+  // We'll use direct database queries instead for better stability
 
   const canView = React.useMemo(() => {
     if (!order) return false;
@@ -550,7 +537,11 @@ const reconcileNow = async () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <p className="text-sm text-muted-foreground">Payment Method</p>
-              <p className="font-medium capitalize">{order.payment_method || 'Paystack'}</p>
+              <p className="font-medium capitalize">
+                {order.payment_status === 'paid' && (!order.payment_method || order.payment_method === 'pending') 
+                  ? 'Paystack' 
+                  : order.payment_method || 'Pending'}
+              </p>
             </div>
             <div>
               <p className="text-sm text-muted-foreground">Payment Status</p>

@@ -106,12 +106,14 @@ export function PaymentDetailsCard({
         </div>
 
         {/* Payment Method */}
-        {paymentMethod && (
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-gray-600">Method</span>
-            <span className="font-medium capitalize">{paymentMethod}</span>
-          </div>
-        )}
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-gray-600">Method</span>
+          <span className="font-medium capitalize">
+            {paymentStatus === 'paid' && (!paymentMethod || paymentMethod === 'pending') 
+              ? 'Paystack' 
+              : paymentMethod || 'Pending'}
+          </span>
+        </div>
 
         {/* Payment Reference */}
         {paymentReference && (

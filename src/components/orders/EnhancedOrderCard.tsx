@@ -35,7 +35,7 @@ export function EnhancedOrderCard({
   className = "" 
 }: EnhancedOrderCardProps) {
   const [isExpanded, setIsExpanded] = useState(showExpandedByDefault);
-  const { data: detailedOrderData, isLoading: isLoadingDetails } = useDetailedOrderData(order.id);
+  // Note: Removed useDetailedOrderData to prevent flickering - using direct order data instead
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);

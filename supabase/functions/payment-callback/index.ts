@@ -480,15 +480,16 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       order_number: orderData.order_number
     });
 
-    // Update payment_status explicitly (non-blocking)
+    // Update payment status and method explicitly (non-blocking)
     try {
       await supabase.from('orders').update({
-        payment_status: 'paid'
+        payment_status: 'paid',
+        payment_method: 'Paystack'
       }).eq('id', orderData.order_id);
       
-      log('info', '✅ Payment status updated to paid');
+      log('info', '✅ Payment status and method updated (paid, Paystack)');
     } catch (paymentStatusError) {
-      log('warn', '⚠️ Payment status update failed (non-blocking)', {
+      log('warn', '⚠️ Payment status/method update failed (non-blocking)', {
         error: paymentStatusError.message
       });
     }

@@ -35,6 +35,7 @@ import { format, isToday, parseISO, isAfter, isBefore, addMinutes } from 'date-f
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { formatAddress } from '@/utils/formatAddress';
 import { cn } from '@/lib/utils';
+import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 
 export default function AdminDelivery() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -68,16 +69,39 @@ export default function AdminDelivery() {
     ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
   ) || [];
 
-  // Filter for ready orders only (for Delivery Orders tab)
-  const readyOrders = deliveryOrders.filter(order => order.status === 'ready');
-
+  // Get ready orders first
+  const readyOrdersBasic = deliveryOrders.filter(order => order.status === 'ready');
+  
   // Fetch delivery schedules in bulk for ready orders only
-  const readyOrderIds = readyOrders.map(order => order.id);
+  const readyOrderIds = readyOrdersBasic.map(order => order.id);
   const { data: deliverySchedules = {}, error: schedulesError } = useQuery({
     queryKey: ['delivery-schedules-bulk', readyOrderIds],
     queryFn: () => getSchedulesByOrderIds(readyOrderIds),
     enabled: readyOrderIds.length > 0,
   });
+
+  // Sort ready orders by delivery priority
+  const readyOrders = useMemo(() => 
+    readyOrdersBasic.sort((a, b) => {
+      const scheduleA = deliverySchedules[a.id];
+      const scheduleB = deliverySchedules[b.id];
+      
+      // Priority: orders with schedules first, then by earliest delivery time
+      if (scheduleA && scheduleB) {
+        const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
+        const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
+        return dateTimeA.getTime() - dateTimeB.getTime();
+      }
+      
+      if (scheduleA && !scheduleB) return -1;
+      if (!scheduleA && scheduleB) return 1;
+      
+      // Fallback to order time
+      return new Date(a.order_time || a.created_at).getTime() - 
+             new Date(b.order_time || b.created_at).getTime();
+    }),
+    [readyOrdersBasic, deliverySchedules]
+  );
 
   // Fetch delivery zones
   const { zones, loading: zonesLoading } = useDeliveryZones();
@@ -611,12 +635,25 @@ function DeliveryOrderCard({
         <div className="space-y-2 sm:space-y-3">
           {/* Delivery Schedule */}
           {schedule && (
-            <div className="bg-muted/30 rounded-md p-2 sm:p-3">
+            <div className="bg-muted/30 rounded-md p-2 sm:p-3 space-y-2">
               <DeliveryScheduleDisplay 
                 schedule={schedule}
                 orderType="delivery"
                 orderStatus={order.status}
               />
+              {/* Countdown Timer for Ready Orders */}
+              {order.status === 'ready' && (
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3 h-3 text-muted-foreground" />
+                  <MiniCountdownTimer
+                    deliveryDate={schedule.delivery_date}
+                    deliveryTimeStart={schedule.delivery_time_start}
+                    deliveryTimeEnd={schedule.delivery_time_end}
+                    orderStatus={order.status}
+                    className="text-xs"
+                  />
+                </div>
+              )}
             </div>
           )}
           

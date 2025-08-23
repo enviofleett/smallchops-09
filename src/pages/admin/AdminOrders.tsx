@@ -21,6 +21,7 @@ import { format } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { PickupPointDisplay } from '@/components/admin/PickupPointDisplay';
 import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
+import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -63,14 +64,43 @@ export default function AdminOrders() {
     return scheduleMap;
   }, [orders]);
 
+  // Priority sort confirmed orders by delivery/pickup schedule
+  const prioritySortedOrders = useMemo(() => {
+    const ordersCopy = [...orders];
+    
+    if (statusFilter === 'confirmed') {
+      return ordersCopy.sort((a, b) => {
+        const scheduleA = deliverySchedules[a.id];
+        const scheduleB = deliverySchedules[b.id];
+        
+        // If both have schedules, sort by delivery date + time
+        if (scheduleA && scheduleB) {
+          const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
+          const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
+          return dateTimeA.getTime() - dateTimeB.getTime();
+        }
+        
+        // Orders with schedules come first
+        if (scheduleA && !scheduleB) return -1;
+        if (!scheduleA && scheduleB) return 1;
+        
+        // Fallback to order time
+        return new Date(a.order_time || a.created_at).getTime() - 
+               new Date(b.order_time || b.created_at).getTime();
+      });
+    }
+    
+    return ordersCopy;
+  }, [orders, deliverySchedules, statusFilter]);
+
   // Filter orders by delivery schedule
   const filteredOrders = useMemo(() => {
-    if (deliveryFilter === 'all') return orders;
+    if (deliveryFilter === 'all') return prioritySortedOrders;
     
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    return orders.filter(order => {
+    return prioritySortedOrders.filter(order => {
       // Only apply delivery filter to paid delivery orders
       if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
         return true; // Show non-delivery or unpaid orders when filtering for all
@@ -90,7 +120,7 @@ export default function AdminOrders() {
       
       return false;
     });
-  }, [orders, deliverySchedules, deliveryFilter]);
+  }, [prioritySortedOrders, deliverySchedules, deliveryFilter]);
 
   // Get order counts by status for tab badges
   const orderCounts = useMemo(() => ({
@@ -592,12 +622,27 @@ function AdminOrderCard({
               
               {/* Delivery Schedule Display or Fallback */}
               {deliverySchedule ? (
-                <DeliveryScheduleDisplay 
-                  schedule={deliverySchedule}
-                  orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}
-                  orderStatus={order.status}
-                  className="mt-3"
-                />
+                <div className="space-y-3">
+                  <DeliveryScheduleDisplay 
+                    schedule={deliverySchedule}
+                    orderType={order.order_type === 'dine_in' ? 'pickup' : order.order_type}
+                    orderStatus={order.status}
+                    className="mt-3"
+                  />
+                  {/* Countdown Timer for Confirmed Orders */}
+                  {order.status === 'confirmed' && (
+                    <div className="flex items-center gap-2">
+                      <Clock className="w-4 h-4 text-muted-foreground" />
+                      <MiniCountdownTimer
+                        deliveryDate={deliverySchedule.delivery_date}
+                        deliveryTimeStart={deliverySchedule.delivery_time_start}
+                        deliveryTimeEnd={deliverySchedule.delivery_time_end}
+                        orderStatus={order.status}
+                        className="text-sm"
+                      />
+                    </div>
+                  )}
+                </div>
               ) : (
                 <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mt-3">
                   <div className="flex items-start gap-2">

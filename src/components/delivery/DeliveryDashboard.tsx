@@ -22,6 +22,7 @@ import { useQuery } from '@tanstack/react-query';
 import { getOrders } from '@/api/orders';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { OrderWithItems } from '@/api/orders';
+import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 
 interface DeliveryDashboardProps {
   className?: string;
@@ -48,8 +49,8 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
 
-  // Filter delivery orders and get order IDs
-  const deliveryOrders = useMemo(() => 
+  // Get basic delivery orders first
+  const basicDeliveryOrders = useMemo(() => 
     ordersData?.orders?.filter(order => 
       order.order_type === 'delivery' && 
       ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
@@ -58,12 +59,36 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
   );
 
   const orderIds = useMemo(() => 
-    deliveryOrders.map(order => order.id),
-    [deliveryOrders]
+    basicDeliveryOrders.map(order => order.id),
+    [basicDeliveryOrders]
   );
 
   // Fetch delivery schedules
   const { schedules } = useOrderDeliverySchedules(orderIds);
+
+  // Priority sort orders by delivery schedule for confirmed orders
+  const deliveryOrders = useMemo(() => {
+    return basicDeliveryOrders.sort((a, b) => {
+      // Priority sort for confirmed orders by delivery schedule
+      if (a.status === 'confirmed' && b.status === 'confirmed') {
+        const scheduleA = schedules[a.id];
+        const scheduleB = schedules[b.id];
+        
+        if (scheduleA && scheduleB) {
+          const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
+          const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
+          return dateTimeA.getTime() - dateTimeB.getTime();
+        }
+        
+        if (scheduleA && !scheduleB) return -1;
+        if (!scheduleA && scheduleB) return 1;
+      }
+      
+      // Fallback to order time
+      return new Date(a.order_time || a.created_at).getTime() - 
+             new Date(b.order_time || b.created_at).getTime();
+    });
+  }, [basicDeliveryOrders, schedules]);
 
   // Calculate metrics
   const metrics = useMemo(() => {
@@ -324,11 +349,26 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
                             <span className="capitalize">{order.payment_status}</span>
                           </div>
                           {schedule && (
-                            <div className="flex items-center gap-2 text-blue-600">
-                              <MapPin className="h-3 w-3" />
-                              <span className="text-xs">
-                                {format(parseISO(schedule.delivery_date), 'MMM dd')} • {schedule.delivery_time_start}-{schedule.delivery_time_end}
-                              </span>
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 text-blue-600">
+                                <MapPin className="h-3 w-3" />
+                                <span className="text-xs">
+                                  {format(parseISO(schedule.delivery_date), 'MMM dd')} • {schedule.delivery_time_start}-{schedule.delivery_time_end}
+                                </span>
+                              </div>
+                              {/* Countdown Timer for Confirmed Orders */}
+                              {order.status === 'confirmed' && (
+                                <div className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3 text-muted-foreground" />
+                                  <MiniCountdownTimer
+                                    deliveryDate={schedule.delivery_date}
+                                    deliveryTimeStart={schedule.delivery_time_start}
+                                    deliveryTimeEnd={schedule.delivery_time_end}
+                                    orderStatus={order.status}
+                                    className="text-xs"
+                                  />
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

@@ -16,6 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import OrdersErrorBoundary from '@/components/orders/OrdersErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
 import { runPaystackBatchVerify } from '@/utils/paystackBatchVerify';
+import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
 
 const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
@@ -83,9 +84,45 @@ const Orders = () => {
   const totalCount = data?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
+  // Fetch delivery schedules for confirmed orders to enable priority sorting
+  const confirmedOrderIds = React.useMemo(() => 
+    orders.filter(order => order.status === 'confirmed').map(order => order.id),
+    [orders]
+  );
+
+  const { data: deliverySchedules = {} } = useQuery({
+    queryKey: ['delivery-schedules-priority', confirmedOrderIds],
+    queryFn: () => getSchedulesByOrderIds(confirmedOrderIds),
+    enabled: confirmedOrderIds.length > 0 && statusFilter === 'confirmed',
+  });
+
+  // Priority sort confirmed orders by delivery schedule
+  const prioritySortedOrders = React.useMemo(() => {
+    if (statusFilter !== 'confirmed') return orders;
+    
+    return [...orders].sort((a, b) => {
+      const scheduleA = deliverySchedules[a.id];
+      const scheduleB = deliverySchedules[b.id];
+      
+      // Orders with schedules come first, sorted by delivery time
+      if (scheduleA && scheduleB) {
+        const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
+        const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
+        return dateTimeA.getTime() - dateTimeB.getTime();
+      }
+      
+      if (scheduleA && !scheduleB) return -1;
+      if (!scheduleA && scheduleB) return 1;
+      
+      // Fallback to order time
+      return new Date(a.order_time || a.created_at).getTime() - 
+             new Date(b.order_time || b.created_at).getTime();
+    });
+  }, [orders, deliverySchedules, statusFilter]);
+
   // Derive "paid" display from payment_transactions for currently loaded orders
-  const orderIds = React.useMemo(() => orders.map(o => o.id), [orders]);
-  const refs = React.useMemo(() => orders.map(o => (o as any).payment_reference).filter(Boolean) as string[], [orders]);
+  const orderIds = React.useMemo(() => prioritySortedOrders.map(o => o.id), [prioritySortedOrders]);
+  const refs = React.useMemo(() => prioritySortedOrders.map(o => (o as any).payment_reference).filter(Boolean) as string[], [prioritySortedOrders]);
 
   const { data: txData } = useQuery({
     queryKey: ['payment_tx_for_orders', orderIds],
@@ -136,8 +173,8 @@ const Orders = () => {
   }, [txByRef]);
 
   const adjustedOrders = React.useMemo(() => {
-    if (!orders?.length) return orders;
-    return orders.map(o => {
+    if (!prioritySortedOrders?.length) return prioritySortedOrders;
+    return prioritySortedOrders.map(o => {
       const finalPaidFlag = (o as any).final_paid as boolean | undefined;
       if (typeof finalPaidFlag !== 'undefined') {
         return finalPaidFlag ? { ...o, payment_status: 'paid' as any } : o;
@@ -148,7 +185,7 @@ const Orders = () => {
           : o
       );
     });
-  }, [orders, paidMap, paidByRefMap]);
+  }, [prioritySortedOrders, paidMap, paidByRefMap]);
 
   const deleteOrderMutation = useMutation({
     mutationFn: deleteOrder,
@@ -227,7 +264,7 @@ const Orders = () => {
   };
 
   const handleSelectAll = (selected: boolean) => {
-    setSelectedOrders(selected ? orders.map(order => order.id) : []);
+    setSelectedOrders(selected ? prioritySortedOrders.map(order => order.id) : []);
   };
 
   const handleBulkDelete = () => {

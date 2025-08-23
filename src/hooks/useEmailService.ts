@@ -50,21 +50,34 @@ interface EmailDeliveryLog {
 export const useEmailService = () => {
   const { toast } = useToast();
 
-  // Send email mutation with Auth system priority
+  // Send email mutation using SMTP sender
   const sendEmailMutation = useMutation({
     mutationFn: async (emailRequest: EmailRequest) => {
-      console.log('Sending email via Production Email Processor:', emailRequest);
+      console.log('Sending email via SMTP Email Sender:', emailRequest);
       
       try {
-        const { data, error } = await supabase.functions.invoke('production-email-processor', {
-          body: emailRequest
+        // Convert to SMTP sender format
+        const smtpRequest = emailRequest.templateId ? {
+          templateId: emailRequest.templateId,
+          recipient: { email: emailRequest.to },
+          variables: emailRequest.variables || {},
+          emailType: emailRequest.emailType || 'transactional'
+        } : {
+          to: emailRequest.to,
+          subject: emailRequest.subject,
+          html: emailRequest.html,
+          text: emailRequest.text
+        };
+
+        const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+          body: smtpRequest
         });
 
         if (error) {
           throw new Error(`Email sending failed: ${error.message}`);
         }
 
-        console.log('Email sent successfully via Production Email Processor:', data);
+        console.log('Email sent successfully via SMTP Email Sender:', data);
         return data;
       } catch (error) {
         console.error('Email sending failed:', error);
@@ -74,7 +87,7 @@ export const useEmailService = () => {
     onSuccess: () => {
       toast({
         title: "Email sent successfully",
-        description: "Your email has been sent successfully",
+        description: "Your email has been sent successfully via SMTP",
       });
     },
     onError: (error: any) => {

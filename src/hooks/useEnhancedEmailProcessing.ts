@@ -17,19 +17,29 @@ export const useEnhancedEmailProcessing = () => {
     setIsProcessing(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
-        body: { priority }
+      const { data, error } = await supabase.functions.invoke('email-queue-processor', {
+        body: { 
+          action: priority === 'all' ? 'process_all_priorities' : 'process_queue',
+          priority: priority === 'high' ? 'high' : 'normal'
+        }
       });
 
       if (error) {
         throw new Error(error.message);
       }
 
+      const processedCount = priority === 'all' 
+        ? data.total?.processed || 0 
+        : data.processed || 0;
+      const failedCount = priority === 'all' 
+        ? data.total?.failed || 0 
+        : data.failed || 0;
+
       const result = {
         success: true,
-        processed: data.processed || 0,
-        failed: data.failed || 0,
-        message: `Successfully processed ${data.processed || 0} emails`
+        processed: processedCount,
+        failed: failedCount,
+        message: `Successfully processed ${processedCount} emails via SMTP`
       };
 
       toast({
@@ -62,7 +72,9 @@ export const useEnhancedEmailProcessing = () => {
     setIsProcessing(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('instant-welcome-processor');
+      const { data, error } = await supabase.functions.invoke('email-queue-processor', {
+        body: { action: 'process_queue', priority: 'normal' }
+      });
 
       if (error) {
         throw new Error(error.message);
@@ -72,7 +84,7 @@ export const useEnhancedEmailProcessing = () => {
         success: true,
         processed: data.processed || 0,
         failed: data.failed || 0,
-        message: `Successfully processed ${data.processed || 0} welcome emails`
+        message: `Successfully processed ${data.processed || 0} welcome emails via SMTP`
       };
 
       toast({

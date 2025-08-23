@@ -68,12 +68,12 @@ export const getCustomerEmailStatuses = async (customerEmails: string[]): Promis
 // Resend welcome email for a customer
 export const resendWelcomeEmail = async (customerEmail: string): Promise<boolean> => {
   try {
-    const { error } = await supabase.functions.invoke('production-email-processor', {
+    const { error } = await supabase.functions.invoke('smtp-email-sender', {
       body: {
-        to: customerEmail,
-        templateKey: 'customer_welcome',
+        templateId: 'customer_welcome',
+        recipient: { email: customerEmail, name: customerEmail.split('@')[0] },
         variables: {
-          customerName: customerEmail.split('@')[0], // Fallback name
+          customer_name: customerEmail.split('@')[0], // Fallback name
           companyName: 'Starters Small Chops',
           supportEmail: 'support@startersmallchops.com',
           websiteUrl: window.location.origin,

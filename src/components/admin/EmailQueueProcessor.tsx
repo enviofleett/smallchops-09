@@ -276,10 +276,10 @@ export const EmailQueueProcessor = () => {
         
         {/* Processing Actions */}
         <div className="space-y-3">
-          <h4 className="text-sm font-medium">Queue Processing</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          <h4 className="text-sm font-medium">SMTP Queue Processing</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <Button
-              onClick={() => processQueue('production-email-processor', 'Production Email Processor')}
+              onClick={() => processQueue('email-queue-processor', 'SMTP Email Queue Processor')}
               disabled={isProcessing || isTesting}
               className="justify-start"
               size="sm"
@@ -289,11 +289,11 @@ export const EmailQueueProcessor = () => {
               ) : (
                 <Play className="h-4 w-4 mr-2" />
               )}
-              Process (Production)
+              Process Queue (All Priorities)
             </Button>
             
             <Button
-              onClick={() => processQueue('enhanced-email-processor', 'Enhanced Email Processor')}
+              onClick={() => processQueue('email-queue-processor', 'SMTP High Priority Processor')}
               disabled={isProcessing || isTesting}
               variant="outline"
               className="justify-start"
@@ -304,22 +304,7 @@ export const EmailQueueProcessor = () => {
               ) : (
                 <Play className="h-4 w-4 mr-2" />
               )}
-              Process (Enhanced)
-            </Button>
-            
-            <Button
-              onClick={() => processQueue('instant-email-processor', 'Instant Email Processor')}
-              disabled={isProcessing || isTesting}
-              variant="outline"
-              className="justify-start"
-              size="sm"
-            >
-              {isProcessing ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <Play className="h-4 w-4 mr-2" />
-              )}
-              Process (Instant)
+              Process High Priority
             </Button>
           </div>
         </div>

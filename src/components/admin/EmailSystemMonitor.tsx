@@ -91,15 +91,17 @@ export const EmailSystemMonitor = () => {
   const processHighPriorityEmails = async () => {
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('instant-email-processor');
+      const { data, error } = await supabase.functions.invoke('email-queue-processor', {
+        body: { action: 'process_queue', priority: 'high' }
+      });
       
       if (error) {
         throw error;
       }
       
       toast({
-        title: 'Email Processing Triggered',
-        description: `Processed ${data.successful || 0} emails successfully`,
+        title: 'SMTP Email Processing Triggered',
+        description: `Processed ${data.successful || 0} emails successfully via SMTP`,
       });
       
       // Refresh health status
@@ -119,7 +121,9 @@ export const EmailSystemMonitor = () => {
   const processWelcomeEmails = async () => {
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('instant-welcome-processor');
+      const { data, error } = await supabase.functions.invoke('email-queue-processor', {
+        body: { action: 'process_queue', priority: 'normal' }
+      });
       
       if (error) {
         throw error;
@@ -127,7 +131,7 @@ export const EmailSystemMonitor = () => {
       
       toast({
         title: 'Welcome Emails Processed',
-        description: `Processed ${data.successful || 0} welcome emails`,
+        description: `Processed ${data.successful || 0} welcome emails via SMTP`,
       });
       
       await fetchEmailHealth();

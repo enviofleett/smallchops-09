@@ -185,15 +185,16 @@ export const EmailTemplateManager: React.FC = () => {
 
   const testTemplate = async (template: EmailTemplate) => {
     try {
-      const { data, error } = await supabase.functions.invoke('production-email-processor', {
+      const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
         body: {
-          to: 'test@example.com',
-          template_key: template.template_key,
+          templateId: template.template_key,
+          recipient: { email: 'test@example.com', name: 'Test User' },
           variables: {
-            customerName: 'Test User',
-            orderNumber: 'TEST-001',
-            amount: '100.00'
-          }
+            customer_name: 'Test User',
+            order_number: 'TEST-001',
+            order_total: '₦100.00'
+          },
+          emailType: 'transactional'
         }
       });
 
@@ -201,7 +202,7 @@ export const EmailTemplateManager: React.FC = () => {
 
       toast({
         title: "Test Email Sent",
-        description: "Template test email sent successfully",
+        description: "Template test email sent successfully via SMTP",
       });
     } catch (error: any) {
       toast({

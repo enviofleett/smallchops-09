@@ -80,15 +80,22 @@ export const EmailSystemDashboard: React.FC = () => {
   const processQueue = async (priority: 'high' | 'all' = 'all') => {
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
-        body: { priority }
+      const action = priority === 'all' ? 'process_all_priorities' : 'process_queue';
+      const queuePriority = priority === 'high' ? 'high' : 'normal';
+      
+      const { data, error } = await supabase.functions.invoke('email-queue-processor', {
+        body: { action, priority: queuePriority }
       });
 
       if (error) throw error;
 
+      const processedCount = priority === 'all' 
+        ? data.total?.processed || 0 
+        : data.processed || 0;
+
       toast({
-        title: "Queue Processing Complete",
-        description: `Processed ${data.processed || 0} emails`,
+        title: "SMTP Queue Processing Complete",
+        description: `Processed ${processedCount} emails via SMTP`,
       });
 
       await fetchMetrics();

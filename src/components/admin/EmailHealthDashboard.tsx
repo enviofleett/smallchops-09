@@ -273,11 +273,13 @@ export const EmailHealthDashboard = () => {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <Button
-              onClick={() => supabase.functions.invoke('instant-email-processor')}
+              onClick={() => supabase.functions.invoke('email-queue-processor', {
+                body: { action: 'process_all_priorities' }
+              })}
               className="flex items-center gap-2"
             >
               <Mail className="h-4 w-4" />
-              Process Queue
+              Process SMTP Queue
             </Button>
             
             <Button

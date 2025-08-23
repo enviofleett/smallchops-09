@@ -55,10 +55,10 @@ export const useEmailAutomation = () => {
         throw new Error(`Failed to queue welcome email: ${eventError.message}`);
       }
 
-      // Trigger immediate processing for welcome emails
+      // Trigger immediate processing for welcome emails via SMTP
       const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'instant-welcome-processor', 
-        { body: { event_id: eventData.id } }
+        'smtp-email-sender', 
+        { body: { templateId: 'customer_welcome', recipient: { email: customerEmail, name: customerName }, variables: metadata } }
       );
 
       if (processError) {
@@ -126,9 +126,10 @@ export const useEmailAutomation = () => {
       // Also trigger admin notification
       await triggerAdminOrderNotification(orderId, orderData);
 
-      // Trigger immediate processing for order confirmations
+      // Trigger immediate processing for order confirmations via SMTP
       const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'enhanced-email-processor'
+        'email-queue-processor',
+        { body: { action: 'process_queue', priority: 'high' } }
       );
 
       if (processError) {
@@ -351,16 +352,18 @@ export const useEmailAutomation = () => {
     failed: number;
   }> => {
     try {
-      const { data: result, error } = await supabase.functions.invoke('enhanced-email-processor');
+      const { data: result, error } = await supabase.functions.invoke('email-queue-processor', {
+        body: { action: 'process_all_priorities' }
+      });
       
       if (error) {
         throw new Error(`Queue processing failed: ${error.message}`);
       }
 
       return {
-        processed: result?.processed || 0,
-        success: result?.sent || 0,
-        failed: result?.failed || 0
+        processed: result?.total?.processed || 0,
+        success: result?.total?.successful || 0,
+        failed: result?.total?.failed || 0
       };
 
     } catch (error: any) {

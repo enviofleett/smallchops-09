@@ -103,20 +103,19 @@ export const useSMTPSettings = () => {
     },
   });
 
-  // Test email connection using production email processor
+  // Test email connection using SMTP sender
   const testConnectionMutation = useMutation({
     mutationFn: async (testEmail: string) => {
       try {
-        console.log('Testing email with Production Email Processor...');
+        console.log('Testing email with SMTP Email Sender...');
         
-        const { data, error } = await supabase.functions.invoke('production-email-processor', {
+        const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
           body: {
-            to: testEmail,
-            subject: 'SMTP Test - Connection Successful',
-            templateKey: 'smtp_test',
+            templateId: 'smtp_test',
+            recipient: { email: testEmail, name: 'Test User' },
             variables: {
               test_time: new Date().toLocaleString(),
-              smtp_host: 'Production SMTP System',
+              smtp_host: 'SMTP System',
               business_name: 'Starters Small Chops'
             },
             emailType: 'transactional'
@@ -127,10 +126,10 @@ export const useSMTPSettings = () => {
           throw new Error(error.message || 'Failed to send test email');
         }
 
-        console.log('Test email sent successfully via Production Email Processor');
+        console.log('Test email sent successfully via SMTP Email Sender');
         return data;
       } catch (error) {
-        console.error('Production email test failed:', error);
+        console.error('SMTP email test failed:', error);
         throw new Error(`Email test failed: ${error.message}`);
       }
     },

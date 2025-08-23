@@ -14,7 +14,7 @@ interface TimeRemaining {
   days: number;
   hours: number;
   minutes: number;
-  status: 'upcoming' | 'today' | 'active' | 'passed';
+  status: 'upcoming' | 'today' | 'active' | 'passed' | 'within_two_hours';
 }
 
 export const MiniCountdownTimer: React.FC<MiniCountdownTimerProps> = ({
@@ -43,7 +43,18 @@ export const MiniCountdownTimer: React.FC<MiniCountdownTimerProps> = ({
     }
     
     if (now > deliveryEnd) {
-      return { days: 0, hours: 0, minutes: 0, status: 'passed' };
+      // Calculate overdue time
+      const overdueMs = now.getTime() - deliveryEnd.getTime();
+      const overdueDays = Math.floor(overdueMs / (1000 * 60 * 60 * 24));
+      const overdueHours = Math.floor((overdueMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const overdueMinutes = Math.floor((overdueMs % (1000 * 60 * 60)) / (1000 * 60));
+      
+      return { 
+        days: overdueDays, 
+        hours: overdueHours, 
+        minutes: overdueMinutes, 
+        status: 'passed' 
+      };
     }
     
     const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -51,12 +62,14 @@ export const MiniCountdownTimer: React.FC<MiniCountdownTimerProps> = ({
     const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     
     const isToday = format(deliveryStart, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd');
+    const totalMinutesUntil = Math.floor(diffMs / (1000 * 60));
+    const isWithinTwoHours = totalMinutesUntil <= 120 && totalMinutesUntil > 0;
     
     return {
       days: Math.max(0, days),
       hours: Math.max(0, hours),
       minutes: Math.max(0, minutes),
-      status: isToday ? 'today' : 'upcoming'
+      status: isWithinTwoHours ? 'within_two_hours' : (isToday ? 'today' : 'upcoming')
     };
   };
 
@@ -95,6 +108,12 @@ export const MiniCountdownTimer: React.FC<MiniCountdownTimerProps> = ({
           text: 'Delivery Active',
           className: 'bg-green-50 text-green-700 border-green-200'
         };
+      case 'within_two_hours':
+        return {
+          icon: <Clock className="h-3 w-3 text-green-500" />,
+          text: `${timeRemaining.hours}h ${timeRemaining.minutes}m`,
+          className: 'bg-green-50 text-green-700 border-green-200'
+        };
       case 'today':
         return {
           icon: <Clock className="h-3 w-3 text-orange-500" />,
@@ -115,9 +134,15 @@ export const MiniCountdownTimer: React.FC<MiniCountdownTimerProps> = ({
           className: 'bg-gray-50 text-gray-700 border-gray-200'
         };
       case 'passed':
+        const overdueText = timeRemaining.days > 0 
+          ? `${timeRemaining.days}d ${timeRemaining.hours}h overdue`
+          : timeRemaining.hours > 0
+          ? `${timeRemaining.hours}h ${timeRemaining.minutes}m overdue`
+          : `${timeRemaining.minutes}m overdue`;
+        
         return {
           icon: <Clock className="h-3 w-3 text-red-500" />,
-          text: 'Overdue',
+          text: overdueText,
           className: 'bg-red-50 text-red-700 border-red-200'
         };
       default:

@@ -114,13 +114,14 @@ export default function AdminDelivery() {
       const endTime = `${(hour + 1).toString().padStart(2, '0')}:00`;
       windows.push(`${startTime}-${endTime}`);
     }
-    windows.push('due-now');
+    windows.push('due-now', 'overdue');
     return windows;
   }, []);
 
   // Filter ready orders by delivery window (for Delivery Orders tab)
   const readyFilteredOrders = useMemo(() => {
     if (deliveryWindowFilter === 'all') return readyOrders;
+    
     if (deliveryWindowFilter === 'due-now') {
       const now = new Date();
       
@@ -138,6 +139,23 @@ export default function AdminDelivery() {
           const bufferStart = addMinutes(startTime, -30);
           
           return (isAfter(now, bufferStart) && isBefore(now, endTime)) || isAfter(now, startTime);
+        } catch {
+          return false;
+        }
+      });
+    }
+    
+    if (deliveryWindowFilter === 'overdue') {
+      const now = new Date();
+      
+      return readyOrders.filter(order => {
+        const schedule = deliverySchedules[order.id];
+        if (!schedule?.delivery_time_end) return false;
+        
+        try {
+          const today = format(selectedDate, 'yyyy-MM-dd');
+          const endTime = parseISO(`${today}T${schedule.delivery_time_end}:00`);
+          return isAfter(now, endTime) && ['confirmed', 'preparing', 'ready'].includes(order.status);
         } catch {
           return false;
         }
@@ -424,6 +442,7 @@ export default function AdminDelivery() {
                     <SelectItem key={window} value={window}>
                       {window === 'all' ? 'All Time Windows' : 
                        window === 'due-now' ? 'Due Now' : 
+                       window === 'overdue' ? 'Overdue Deliveries' :
                        window.replace('-', ':00 - ') + ':00'}
                     </SelectItem>
                   ))}

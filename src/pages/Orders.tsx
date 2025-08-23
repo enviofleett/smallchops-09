@@ -19,7 +19,7 @@ import { runPaystackBatchVerify } from '@/utils/paystackBatchVerify';
 import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
 
 const Orders = () => {
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all'>('all');
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all' | 'overdue'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [startDate, setStartDate] = useState<Date>();
@@ -72,7 +72,7 @@ const Orders = () => {
     queryFn: () => getOrders({ 
       page: currentPage, 
       pageSize: PAGE_SIZE, 
-      status: statusFilter,
+      status: statusFilter === 'overdue' ? 'all' : statusFilter,
       searchQuery,
       startDate: startDate?.toISOString().split('T')[0],
       endDate: endDate?.toISOString().split('T')[0]
@@ -84,40 +84,62 @@ const Orders = () => {
   const totalCount = data?.count ?? 0;
   const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
 
-  // Fetch delivery schedules for confirmed orders to enable priority sorting
-  const confirmedOrderIds = React.useMemo(() => 
-    orders.filter(order => order.status === 'confirmed').map(order => order.id),
-    [orders]
-  );
+  // Fetch delivery schedules for relevant orders (confirmed and overdue filter)
+  const relevantOrderIds = React.useMemo(() => {
+    if (statusFilter === 'confirmed') {
+      return orders.filter(order => order.status === 'confirmed').map(order => order.id);
+    }
+    if (statusFilter === 'overdue') {
+      return orders.map(order => order.id); // Need all orders to check schedules
+    }
+    return [];
+  }, [orders, statusFilter]);
 
   const { data: deliverySchedules = {} } = useQuery({
-    queryKey: ['delivery-schedules-priority', confirmedOrderIds],
-    queryFn: () => getSchedulesByOrderIds(confirmedOrderIds),
-    enabled: confirmedOrderIds.length > 0 && statusFilter === 'confirmed',
+    queryKey: ['delivery-schedules-priority', relevantOrderIds],
+    queryFn: () => getSchedulesByOrderIds(relevantOrderIds),
+    enabled: relevantOrderIds.length > 0 && (statusFilter === 'confirmed' || statusFilter === 'overdue'),
   });
 
-  // Priority sort confirmed orders by delivery schedule
+  // Priority sort and filter orders
   const prioritySortedOrders = React.useMemo(() => {
-    if (statusFilter !== 'confirmed') return orders;
+    let filteredOrders = [...orders];
     
-    return [...orders].sort((a, b) => {
-      const scheduleA = deliverySchedules[a.id];
-      const scheduleB = deliverySchedules[b.id];
-      
-      // Orders with schedules come first, sorted by delivery time
-      if (scheduleA && scheduleB) {
-        const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
-        const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
-        return dateTimeA.getTime() - dateTimeB.getTime();
-      }
-      
-      if (scheduleA && !scheduleB) return -1;
-      if (!scheduleA && scheduleB) return 1;
-      
-      // Fallback to order time
-      return new Date(a.order_time || a.created_at).getTime() - 
-             new Date(b.order_time || b.created_at).getTime();
-    });
+    // Filter for overdue orders
+    if (statusFilter === 'overdue') {
+      const now = new Date();
+      filteredOrders = orders.filter(order => {
+        const schedule = deliverySchedules[order.id];
+        if (!schedule) return false;
+        
+        const deliveryEnd = new Date(`${schedule.delivery_date}T${schedule.delivery_time_end}`);
+        return now > deliveryEnd && ['confirmed', 'preparing', 'ready'].includes(order.status);
+      });
+    }
+    
+    // Sort confirmed orders by delivery schedule
+    if (statusFilter === 'confirmed') {
+      filteredOrders.sort((a, b) => {
+        const scheduleA = deliverySchedules[a.id];
+        const scheduleB = deliverySchedules[b.id];
+        
+        // Orders with schedules come first, sorted by delivery time
+        if (scheduleA && scheduleB) {
+          const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
+          const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
+          return dateTimeA.getTime() - dateTimeB.getTime();
+        }
+        
+        if (scheduleA && !scheduleB) return -1;
+        if (!scheduleA && scheduleB) return 1;
+        
+        // Fallback to order time
+        return new Date(a.order_time || a.created_at).getTime() - 
+               new Date(b.order_time || b.created_at).getTime();
+      });
+    }
+    
+    return filteredOrders;
   }, [orders, deliverySchedules, statusFilter]);
 
   // Derive "paid" display from payment_transactions for currently loaded orders
@@ -225,7 +247,7 @@ const Orders = () => {
   });
 
   const handleStatusChange = (status: string) => {
-    setStatusFilter(status as OrderStatus | 'all');
+    setStatusFilter(status as OrderStatus | 'all' | 'overdue');
     setCurrentPage(1);
   };
 

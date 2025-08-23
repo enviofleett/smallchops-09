@@ -15,9 +15,11 @@ interface OrdersFilterProps {
   startDate?: Date;
   endDate?: Date;
   onDateRangeChange: (startDate?: Date, endDate?: Date) => void;
+  overdueFilter?: boolean;
+  onOverdueChange?: (overdue: boolean) => void;
 }
 
-const statusOptions: { value: OrderStatus | 'all'; label: string }[] = [
+const statusOptions: { value: OrderStatus | 'all' | 'overdue'; label: string }[] = [
     { value: 'all', label: 'All Statuses' },
     { value: 'confirmed', label: 'Confirmed' },
     { value: 'preparing', label: 'Preparing' },
@@ -25,10 +27,11 @@ const statusOptions: { value: OrderStatus | 'all'; label: string }[] = [
     { value: 'out_for_delivery', label: 'Out for Delivery' },
     { value: 'delivered', label: 'Delivered' },
     { value: 'cancelled', label: 'Cancelled' },
+    { value: 'overdue', label: 'Overdue Deliveries' },
 ];
 
 
-const OrdersFilter = ({ statusFilter, onStatusChange, onSearch, startDate, endDate, onDateRangeChange }: OrdersFilterProps) => {
+const OrdersFilter = ({ statusFilter, onStatusChange, onSearch, startDate, endDate, onDateRangeChange, overdueFilter, onOverdueChange }: OrdersFilterProps) => {
   const [showFilters, setShowFilters] = useState(false);
   const [startDateOpen, setStartDateOpen] = useState(false);
   const [endDateOpen, setEndDateOpen] = useState(false);

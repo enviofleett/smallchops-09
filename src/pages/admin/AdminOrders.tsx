@@ -27,7 +27,7 @@ export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | OrderStatus | 'overdue'>('all');
   const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'due_today' | 'upcoming'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
@@ -43,7 +43,7 @@ export default function AdminOrders() {
     queryFn: () => getOrders({
       page: currentPage,
       pageSize: 20,
-      status: statusFilter === 'all' ? undefined : statusFilter,
+      status: statusFilter === 'all' || statusFilter === 'overdue' ? undefined : statusFilter,
       searchQuery: searchQuery || undefined
     }),
     refetchInterval: 30000 // Refresh every 30 seconds
@@ -64,12 +64,25 @@ export default function AdminOrders() {
     return scheduleMap;
   }, [orders]);
 
-  // Priority sort confirmed orders by delivery/pickup schedule
+  // Priority sort and filter orders
   const prioritySortedOrders = useMemo(() => {
-    const ordersCopy = [...orders];
+    let ordersCopy = [...orders];
     
+    // Filter for overdue orders
+    if (statusFilter === 'overdue') {
+      const now = new Date();
+      ordersCopy = orders.filter(order => {
+        const schedule = deliverySchedules[order.id];
+        if (!schedule) return false;
+        
+        const deliveryEnd = new Date(`${schedule.delivery_date}T${schedule.delivery_time_end}`);
+        return now > deliveryEnd && ['confirmed', 'preparing', 'ready'].includes(order.status);
+      });
+    }
+    
+    // Sort confirmed orders by delivery/pickup schedule
     if (statusFilter === 'confirmed') {
-      return ordersCopy.sort((a, b) => {
+      ordersCopy.sort((a, b) => {
         const scheduleA = deliverySchedules[a.id];
         const scheduleB = deliverySchedules[b.id];
         
@@ -145,7 +158,7 @@ export default function AdminOrders() {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    setStatusFilter(value as 'all' | OrderStatus);
+    setStatusFilter(value as 'all' | OrderStatus | 'overdue');
     setCurrentPage(1);
   };
 
@@ -302,7 +315,7 @@ export default function AdminOrders() {
 
         {/* Orders Tabs */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-1">
             <TabsTrigger value="all" className="text-xs sm:text-sm">
               <span className="hidden sm:inline">All Orders</span>
               <span className="sm:hidden">All</span>
@@ -332,6 +345,10 @@ export default function AdminOrders() {
               <span className="hidden sm:inline">Delivered</span>
               <span className="sm:hidden">Del</span>
               <span className="ml-1">({orderCounts.delivered})</span>
+            </TabsTrigger>
+            <TabsTrigger value="overdue" className="text-xs sm:text-sm text-red-600">
+              <span className="hidden sm:inline">Overdue</span>
+              <span className="sm:hidden">Over</span>
             </TabsTrigger>
           </TabsList>
 

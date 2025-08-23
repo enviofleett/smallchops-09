@@ -338,17 +338,7 @@ serve(async (req) => {
       emailData.html = `<p>${emailData.text.replace(/\n/g, '<br>')}</p>`;
     }
 
-    // Get active email provider
-    const { data: provider } = await supabase.rpc('get_active_email_provider');
-    
-    if (!provider || provider.length === 0) {
-      throw new Error('No active email provider configured');
-    }
-
-    const emailProvider = provider[0];
-    console.log('📡 Using email provider:', emailProvider.provider_name);
-
-    // Get SMTP settings from communication_settings (backward compatibility)
+    // Get SMTP settings for email delivery
     const { data: smtpSettings, error: settingsError } = await supabase
       .from('communication_settings')
       .select('*')

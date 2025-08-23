@@ -233,9 +233,9 @@ function generateRecommendations(checks: any): string[] {
   }
 
   if (checks.email.status === 'error') {
-    recommendations.push('Configure MailerSend API token in Supabase secrets');
+    recommendations.push('Configure SMTP settings in communication settings');
   } else if (checks.email.status === 'warning') {
-    recommendations.push('Verify your email domain in MailerSend dashboard');
+    recommendations.push('Verify SMTP configuration and test email delivery');
   }
 
   if (checks.payments.status !== 'healthy') {

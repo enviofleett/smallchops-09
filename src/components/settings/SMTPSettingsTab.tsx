@@ -60,20 +60,6 @@ const commonProviders: SMTPProvider[] = [
     description: 'Yahoo Mail SMTP'
   },
   {
-    name: 'SendGrid',
-    host: 'smtp.sendgrid.net',
-    port: 587,
-    secure: true,
-    description: 'SendGrid SMTP API'
-  },
-  {
-    name: 'Mailgun',
-    host: 'smtp.mailgun.org',
-    port: 587,
-    secure: true,
-    description: 'Mailgun SMTP'
-  },
-  {
     name: 'Custom',
     host: '',
     port: 587,

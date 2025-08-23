@@ -123,8 +123,7 @@ async function performSecurityAudit(supabase: any) {
   const requiredEnvVars = [
     'SUPABASE_URL',
     'SUPABASE_SERVICE_ROLE_KEY',
-    'SUPABASE_ANON_KEY',
-    'MAILERSEND_API_TOKEN'
+    'SUPABASE_ANON_KEY'
   ]
 
   for (const envVar of requiredEnvVars) {
@@ -186,17 +185,17 @@ async function performSecurityAudit(supabase: any) {
   try {
     const { data: commSettings } = await supabase
       .from('communication_settings')
-      .select('sender_email, mailersend_domain_verified')
+      .select('sender_email, smtp_host, smtp_user')
       .single()
 
-    if (!commSettings?.mailersend_domain_verified) {
-      warnings.push('MailerSend domain not verified')
-      recommendations.push('Verify your sending domain in MailerSend dashboard')
+    if (!commSettings?.smtp_host || !commSettings?.smtp_user) {
+      warnings.push('SMTP configuration incomplete')
+      recommendations.push('Configure SMTP settings for email delivery')
       securityScore -= 5
     }
   } catch (error) {
     warnings.push('No communication settings configured')
-    recommendations.push('Configure email settings for production')
+    recommendations.push('Configure SMTP email settings for production')
     securityScore -= 10
   }
 

@@ -1,5 +1,7 @@
 # Production Email System Setup Guide
 
+**⚠️ SMTP-Only Configuration**: This system uses only SMTP for email delivery. All third-party email providers (MailerSend, SendGrid, Mailgun, Twilio, Resend) have been removed.
+
 ## 🎯 Environment Variables Required
 
 Set these in your Supabase Dashboard > Settings > Edge Functions:

@@ -99,7 +99,7 @@ const ProductsFilters = ({
             />
           </div>
           
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 relative">
             <div className="relative">
               <select
                 value={categoryFilter}
@@ -115,26 +115,46 @@ const ProductsFilters = ({
               <ChevronDown className="absolute right-2 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400 pointer-events-none" />
             </div>
 
+            <div className="relative">{/* Filter dropdown container */}
+              {/* Quick hint for users */}
+              {!hasActiveFilters && (
+                <div className="absolute -top-8 right-0 text-xs text-gray-500 hidden sm:block">
+                  Filter by price & promotions →
+                </div>
+              )}
+
             <Collapsible open={showAdvancedFilters} onOpenChange={setShowAdvancedFilters}>
               <CollapsibleTrigger asChild>
                 <Button 
-                  variant="outline" 
+                  variant={hasActiveFilters ? "default" : "outline"}
                   size="sm" 
-                  className="flex items-center gap-2 whitespace-nowrap"
+                  className={`flex items-center gap-2 whitespace-nowrap relative ${
+                    hasActiveFilters ? "bg-primary text-primary-foreground" : ""
+                  }`}
                 >
                   <Filter className="h-4 w-4" />
-                  Filters
+                  <span className="hidden sm:inline">
+                    {hasActiveFilters ? "Filters Applied" : "Price & Promos"}
+                  </span>
+                  <span className="sm:hidden">Filter</span>
                   {activeFiltersCount > 0 && (
-                    <span className="bg-primary text-primary-foreground rounded-full text-xs px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center">
+                    <span className="bg-white text-primary rounded-full text-xs px-1.5 py-0.5 min-w-[18px] h-[18px] flex items-center justify-center font-semibold">
                       {activeFiltersCount}
                     </span>
                   )}
-                  <ChevronDown className="h-4 w-4" />
+                  <ChevronDown className={`h-4 w-4 transition-transform duration-200 ${showAdvancedFilters ? 'rotate-180' : ''}`} />
                 </Button>
               </CollapsibleTrigger>
               
               {/* Advanced Filters Content */}
-              <CollapsibleContent className="absolute z-50 mt-2 right-0 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-xl shadow-lg p-4">
+              <CollapsibleContent className="absolute mt-2 right-0 w-80 max-w-[calc(100vw-2rem)] bg-white border border-gray-200 rounded-xl shadow-xl p-4"
+                style={{
+                  position: 'absolute',
+                  top: '100%',
+                  right: 0,
+                  zIndex: 50
+                }}
+              >
                 <div className="space-y-6">
                   {/* Filter Header */}
                   <div className="flex items-center justify-between">
@@ -210,6 +230,7 @@ const ProductsFilters = ({
                 </div>
               </CollapsibleContent>
             </Collapsible>
+            </div>
           </div>
         </div>
 

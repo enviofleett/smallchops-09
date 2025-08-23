@@ -7,7 +7,7 @@ import { ProductWithCategory, Category } from '@/types/database';
 import { ProductFormData } from '@/lib/validations/product';
 
 import ProductsHeader from '@/components/products/ProductsHeader';
-import ProductsFilters from '@/components/products/ProductsFilters';
+import SimpleProductsFilters from '@/components/products/SimpleProductsFilters';
 import ProductsTable from '@/components/products/ProductsTable';
 import { ProductDialog } from '@/components/products/ProductDialog';
 import { DeleteProductDialog } from '@/components/products/DeleteProductDialog';
@@ -138,7 +138,7 @@ const Products = () => {
     <div className="space-y-6">
       <ProductsHeader onAddProduct={handleAddProduct} />
       
-      <ProductsFilters 
+      <SimpleProductsFilters 
         categoryFilter={categoryFilter}
         onCategoryChange={setCategoryFilter}
         searchQuery={searchQuery}

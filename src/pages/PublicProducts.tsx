@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { Star, Search } from 'lucide-react';
@@ -20,12 +20,18 @@ import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import { useCustomerFavorites, useFavoritesByProducts } from '@/hooks/useCustomerFavorites';
 import { useProductRatingSummary } from '@/hooks/useProductReviews';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
+import ProductsFilters, { FilterState } from '@/components/products/ProductsFilters';
 
 const PublicProducts = () => {
   const navigate = useNavigate();
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [filters, setFilters] = useState<FilterState>({
+    priceRange: [0, 50000],
+    onlyPromotions: false,
+    minRating: 0
+  });
   const itemsPerPage = 12;
 
   const { addItem } = useCart();
@@ -68,11 +74,40 @@ const PublicProducts = () => {
     refetchOnWindowFocus: false,
   });
 
-  // Filter products based on search
-  const filteredProducts = products.filter(product => 
-    product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    product.description?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Calculate price range from products
+  const priceRange: [number, number] = useMemo(() => {
+    if (!products.length) return [0, 50000];
+    const prices = products.map(p => p.discounted_price || p.price);
+    return [Math.floor(Math.min(...prices) / 1000) * 1000, Math.ceil(Math.max(...prices) / 1000) * 1000];
+  }, [products]);
+
+  // Update filters when products change
+  useMemo(() => {
+    if (products.length && filters.priceRange[0] === 0 && filters.priceRange[1] === 50000) {
+      setFilters(prev => ({ ...prev, priceRange: priceRange }));
+    }
+  }, [products.length, priceRange, filters.priceRange]);
+
+  // Filter products based on all criteria
+  const filteredProducts = useMemo(() => {
+    return products.filter(product => {
+      // Search filter
+      const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        product.description?.toLowerCase().includes(searchTerm.toLowerCase());
+      
+      // Price filter
+      const productPrice = product.discounted_price || product.price;
+      const matchesPrice = productPrice >= filters.priceRange[0] && productPrice <= filters.priceRange[1];
+      
+      // Promotion filter
+      const matchesPromotion = !filters.onlyPromotions || (product.discount_percentage && product.discount_percentage > 0);
+      
+      // Rating filter (you'll need to implement this based on your rating system)
+      const matchesRating = filters.minRating === 0; // For now, assuming all products match
+      
+      return matchesSearch && matchesPrice && matchesPromotion && matchesRating;
+    });
+  }, [products, searchTerm, filters]);
 
   // Pagination
   const totalPages = Math.ceil(filteredProducts.length / itemsPerPage);
@@ -240,27 +275,21 @@ const PublicProducts = () => {
 
             {/* Right Side - Products */}
             <div className="col-span-full lg:col-span-3">
-              {/* Search Bar */}
+              {/* Advanced Filters */}
               <div className="mb-6">
-                <div className="relative max-w-md mx-auto lg:mx-0">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <Input
-                    placeholder="Search products..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 py-3 text-base"
-                  />
-                </div>
-              </div>
-
-              {/* Results Count */}
-              <div className="mb-4">
-                <p className="text-gray-600">
-                  {filteredProducts.length} product{filteredProducts.length !== 1 ? 's' : ''} found
-                  {activeCategory !== 'all' && categories.find(c => c.id === activeCategory) && 
-                    ` in ${categories.find(c => c.id === activeCategory)?.name}`
-                  }
-                </p>
+                <ProductsFilters
+                  categoryFilter={activeCategory}
+                  onCategoryChange={setActiveCategory}
+                  searchQuery={searchTerm}
+                  onSearchChange={setSearchTerm}
+                  categories={categories}
+                  isLoadingCategories={false}
+                  filters={filters}
+                  onFiltersChange={setFilters}
+                  priceRange={priceRange}
+                  totalProducts={products.length}
+                  filteredProducts={filteredProducts.length}
+                />
               </div>
 
               {/* Loading State & Error Handling */}

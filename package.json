@@ -5,16 +5,23 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "vite build --minify=false",
-    "build:prod": "vite build --minify=false",
+    "build": "vite build",
+    "build:prod": "vite build --mode production",
     "build:dev": "vite build --mode development",
-    "lint": "eslint .",
-    "lint:fix": "eslint . --fix",
+    "build:analyze": "vite build && npx vite-bundle-analyzer",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
     "preview": "vite preview",
     "preview:prod": "vite preview --port 4173",
     "type-check": "tsc --noEmit",
+    "type-check:watch": "tsc --noEmit --watch",
     "clean": "rm -rf dist node_modules/.vite",
-    "analyze": "npx vite-bundle-analyzer"
+    "clean:all": "rm -rf dist node_modules/.vite node_modules",
+    "analyze": "npx vite-bundle-analyzer",
+    "test:production": "npm run type-check && npm run lint && npm run build:prod",
+    "postinstall": "npm run type-check",
+    "audit:security": "npm audit --audit-level moderate",
+    "audit:fix": "npm audit fix"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",

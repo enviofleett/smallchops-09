@@ -24,29 +24,54 @@ export default defineConfig(({ mode }) => ({
   build: {
     outDir: "dist",
     minify: mode === 'production' ? 'esbuild' : false,
-    sourcemap: mode === 'development',
+    sourcemap: mode === 'development' ? true : 'hidden',
+    // Enable production optimizations
+    cssCodeSplit: true,
+    target: 'es2022',
     rollupOptions: {
       output: {
         manualChunks: {
           // Vendor chunk for stable libraries
           vendor: ['react', 'react-dom', 'react-router-dom'],
           // UI chunk for component libraries
-          ui: ['@radix-ui/react-dialog', '@radix-ui/react-select', '@radix-ui/react-dropdown-menu'],
+          ui: [
+            '@radix-ui/react-dialog', 
+            '@radix-ui/react-select', 
+            '@radix-ui/react-dropdown-menu',
+            '@radix-ui/react-toast',
+            '@radix-ui/react-popover'
+          ],
           // Utils chunk for utilities
-          utils: ['@tanstack/react-query', 'zod', 'date-fns'],
+          utils: ['@tanstack/react-query', 'zod', 'date-fns', 'clsx', 'tailwind-merge'],
           // Supabase chunk
           supabase: ['@supabase/supabase-js'],
+          // Charts and heavy libraries
+          charts: ['recharts'],
+          // Form handling
+          forms: ['react-hook-form', '@hookform/resolvers'],
         },
-        // Optimize chunk naming
-        chunkFileNames: 'assets/[name]-[hash].js',
+        // Optimize chunk naming with better cache busting
+        chunkFileNames: (chunkInfo) => {
+          return `assets/${chunkInfo.name}-[hash].js`;
+        },
         entryFileNames: 'assets/[name]-[hash].js',
-        assetFileNames: 'assets/[name]-[hash].[ext]'
+        assetFileNames: (assetInfo) => {
+          const info = assetInfo.name!.split('.');
+          const ext = info[info.length - 1];
+          if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext)) {
+            return `assets/images/[name]-[hash].[ext]`;
+          }
+          if (/css/i.test(ext)) {
+            return `assets/styles/[name]-[hash].[ext]`;
+          }
+          return `assets/[name]-[hash].[ext]`;
+        }
       },
     },
-    // Increase chunk size warning limit
+    // Increase chunk size warning limit for production builds
     chunkSizeWarningLimit: 1000,
-    // Enable compression
-    reportCompressedSize: true,
+    // Enable compression reporting
+    reportCompressedSize: mode === 'production',
   },
   // Optimize dependencies
   optimizeDeps: {

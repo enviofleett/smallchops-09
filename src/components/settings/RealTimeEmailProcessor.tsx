@@ -45,9 +45,9 @@ export const RealTimeEmailProcessor: React.FC = () => {
     try {
       setIsProcessing(true);
       
-      // Call the instant email processor
-      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
-        body: { immediate: true }
+      // Call the SMTP email queue processor
+      const { data, error } = await supabase.functions.invoke('email-queue-processor', {
+        body: { action: 'process_all_priorities' }
       });
 
       if (error) throw error;
@@ -56,8 +56,8 @@ export const RealTimeEmailProcessor: React.FC = () => {
       await fetchEmailStats();
       
       toast({
-        title: 'Email Queue Processed',
-        description: `Processed ${data.processed || 0} emails successfully`,
+        title: 'SMTP Email Queue Processed',
+        description: `Processed ${data.total?.processed || 0} emails successfully via SMTP`,
       });
     } catch (error: any) {
       toast({

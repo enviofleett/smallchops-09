@@ -333,7 +333,7 @@ export const EmailSystemAuditDashboard = () => {
       // Step 4: Process email
       updateUserJourneyStep(journeyName, 4, { action: 'Processing email queue' });
       
-      const { data: processResult, error: processError } = await supabase.functions.invoke('enhanced-email-processor');
+      const { data: processResult, error: processError } = await supabase.functions.invoke('email-queue-processor', { body: { action: 'process_all_priorities' } });
       
       if (processError) throw processError;
 
@@ -422,7 +422,7 @@ export const EmailSystemAuditDashboard = () => {
       // Step 5: Process emails
       updateUserJourneyStep(journeyName, 5, { action: 'Processing email queue' });
       
-      const { data: processResult, error: processError } = await supabase.functions.invoke('enhanced-email-processor');
+      const { data: processResult, error: processError } = await supabase.functions.invoke('email-queue-processor', { body: { action: 'process_all_priorities' } });
       
       if (processError) throw processError;
 

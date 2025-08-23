@@ -127,7 +127,7 @@ export const WelcomeEmailMonitor = () => {
   const triggerInstantProcessing = async () => {
     setIsProcessing(true);
     try {
-      const { data, error } = await supabase.functions.invoke('instant-welcome-processor');
+      const { data, error } = await supabase.functions.invoke('email-queue-processor', { body: { action: 'process_queue', priority: 'normal' } });
       
       if (error) throw error;
 

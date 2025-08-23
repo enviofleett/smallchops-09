@@ -313,8 +313,10 @@ export const ComprehensiveEmailTestDashboard = () => {
         return false;
       }
 
-      // Test processing queue
-      const { data: processResult, error: processError } = await supabase.functions.invoke('instant-email-processor');
+      // Test processing queue via SMTP
+      const { data: processResult, error: processError } = await supabase.functions.invoke('email-queue-processor', {
+        body: { action: 'process_queue', priority: 'normal' }
+      });
       
       if (processError) {
         updateTestResult('Queue Management', 'error', `Queue processing error: ${processError.message}`);

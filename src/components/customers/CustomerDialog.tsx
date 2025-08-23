@@ -135,13 +135,15 @@ export const CustomerDialog = ({
           description: `Customer has been created successfully. ${emailStatus}`,
         });
         
-        // Trigger instant email processing for welcome emails
+        // Trigger SMTP email processing for welcome emails
         if (result.welcomeEmailQueued) {
           try {
-            await supabase.functions.invoke('instant-email-processor');
-            console.log('Instant email processing triggered');
+            await supabase.functions.invoke('email-queue-processor', {
+              body: { action: 'process_queue', priority: 'normal' }
+            });
+            console.log('SMTP email processing triggered');
           } catch (emailError) {
-            console.warn('Failed to trigger instant email processing:', emailError);
+            console.warn('Failed to trigger SMTP email processing:', emailError);
           }
         }
       }

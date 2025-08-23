@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Minus, Plus, Trash2 } from 'lucide-react';
 import { CartItem } from '@/hooks/useCart';
 import { PriceDisplay } from '@/components/ui/price-display';
+import { MOQBadge } from '@/components/ui/moq-badge';
 import { formatCurrency } from '@/lib/discountCalculations';
 
 interface CartItemRowProps {
@@ -16,6 +17,8 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
   const lineTotal = item.price * item.quantity;
   const originalLineTotal = item.original_price ? item.original_price * item.quantity : lineTotal;
   const savings = originalLineTotal - lineTotal;
+  const moq = item.minimum_order_quantity || 1;
+  const isMOQViolated = item.quantity < moq;
 
   return (
     <div className="flex items-start gap-4">
@@ -42,10 +45,20 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
           />
         </div>
 
-        {/* Stock Status */}
-        <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
-          In Stock
-        </Badge>
+        {/* Stock Status and MOQ */}
+        <div className="flex flex-wrap gap-2">
+          <Badge variant="secondary" className="bg-green-100 text-green-800 text-xs">
+            In Stock
+          </Badge>
+          {moq > 1 && (
+            <MOQBadge 
+              minimumQuantity={moq}
+              currentQuantity={item.quantity}
+              variant={isMOQViolated ? 'warning' : 'success'}
+              className="text-xs"
+            />
+          )}
+        </div>
         
         {/* Customizations */}
         {item.customizations && Object.keys(item.customizations).length > 0 && (
@@ -96,7 +109,7 @@ export function CartItemRow({ item, onUpdateQuantity, onRemove }: CartItemRowPro
               size="sm"
               className="h-8 w-8 p-0"
               onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
-              disabled={item.quantity <= 1}
+              disabled={item.quantity <= moq}
             >
               <Minus className="h-3 w-3" />
             </Button>

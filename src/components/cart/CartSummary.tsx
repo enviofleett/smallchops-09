@@ -6,8 +6,9 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { CheckoutFlow } from '@/components/checkout/CheckoutFlow';
 import { useCart, Cart } from '@/hooks/useCart';
+import { useMOQValidation } from '@/hooks/useMOQValidation';
 import { formatCurrency } from '@/lib/discountCalculations';
-import { Tag, X, Gift, Loader2 } from 'lucide-react';
+import { Tag, X, Gift, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface CartSummaryProps {
@@ -16,9 +17,14 @@ interface CartSummaryProps {
 
 export function CartSummary({ cart }: CartSummaryProps) {
   const { applyPromotionCode, removePromotionCode } = useCart();
+  const { validateMOQ } = useMOQValidation();
   const [showCheckout, setShowCheckout] = useState(false);
   const [promotionCode, setPromotionCode] = useState('');
   const [isApplyingPromotion, setIsApplyingPromotion] = useState(false);
+
+  // Check for MOQ violations
+  const moqValidation = validateMOQ(cart.items, cart.items);
+  const hasMOQViolations = !moqValidation.isValid;
 
   const handleApplyPromotionCode = async () => {
     if (!promotionCode.trim()) {
@@ -177,17 +183,43 @@ export function CartSummary({ cart }: CartSummaryProps) {
             </div>
           )}
 
+          {/* MOQ Violation Warning */}
+          {hasMOQViolations && (
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+              <div className="flex items-start gap-2">
+                <AlertTriangle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
+                <div className="text-sm">
+                  <p className="font-medium text-orange-800 mb-1">
+                    Minimum Order Requirements Not Met
+                  </p>
+                  <div className="space-y-1 text-orange-700">
+                    {moqValidation.violations.map((violation) => (
+                      <p key={violation.productId} className="text-xs">
+                        • {violation.productName}: {violation.currentQuantity}/{violation.minimumRequired} 
+                        (need {violation.shortfall} more)
+                      </p>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Checkout Button */}
           <Button 
             onClick={() => {
+              if (hasMOQViolations) {
+                toast.error('Please meet minimum order requirements before checkout');
+                return;
+              }
               console.log('Checkout button clicked, opening checkout flow');
               setShowCheckout(true);
             }} 
             className="w-full"
             size="lg"
-            disabled={cart.items.length === 0}
+            disabled={cart.items.length === 0 || hasMOQViolations}
           >
-            Proceed to Checkout {formatCurrency(cart.summary.total_amount)}
+            {hasMOQViolations ? 'MOQ Requirements Not Met' : `Proceed to Checkout ${formatCurrency(cart.summary.total_amount)}`}
           </Button>
         </CardContent>
       </Card>

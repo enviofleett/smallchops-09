@@ -36,6 +36,7 @@ import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { formatAddress } from '@/utils/formatAddress';
 import { cn } from '@/lib/utils';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
+import { isOrderOverdue } from '@/utils/scheduleTime';
 
 export default function AdminDelivery() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
@@ -155,7 +156,8 @@ export default function AdminDelivery() {
         try {
           const today = format(selectedDate, 'yyyy-MM-dd');
           const endTime = parseISO(`${today}T${schedule.delivery_time_end}:00`);
-          return isAfter(now, endTime) && ['confirmed', 'preparing', 'ready'].includes(order.status);
+          return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
+                 ['confirmed', 'preparing', 'ready'].includes(order.status);
         } catch {
           return false;
         }

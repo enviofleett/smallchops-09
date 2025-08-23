@@ -17,6 +17,7 @@ import OrdersErrorBoundary from '@/components/orders/OrdersErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
 import { runPaystackBatchVerify } from '@/utils/paystackBatchVerify';
 import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
+import { isOrderOverdue } from '@/utils/scheduleTime';
 
 const Orders = () => {
   const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all' | 'overdue'>('all');
@@ -107,13 +108,12 @@ const Orders = () => {
     
     // Filter for overdue orders
     if (statusFilter === 'overdue') {
-      const now = new Date();
       filteredOrders = orders.filter(order => {
         const schedule = deliverySchedules[order.id];
         if (!schedule) return false;
         
-        const deliveryEnd = new Date(`${schedule.delivery_date}T${schedule.delivery_time_end}`);
-        return now > deliveryEnd && ['confirmed', 'preparing', 'ready'].includes(order.status);
+        return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
+               ['confirmed', 'preparing', 'ready'].includes(order.status);
       });
     }
     
@@ -122,6 +122,13 @@ const Orders = () => {
       filteredOrders.sort((a, b) => {
         const scheduleA = deliverySchedules[a.id];
         const scheduleB = deliverySchedules[b.id];
+        
+        // Overdue orders get highest priority
+        const aOverdue = scheduleA && isOrderOverdue(scheduleA.delivery_date, scheduleA.delivery_time_end);
+        const bOverdue = scheduleB && isOrderOverdue(scheduleB.delivery_date, scheduleB.delivery_time_end);
+        
+        if (aOverdue && !bOverdue) return -1;
+        if (!aOverdue && bOverdue) return 1;
         
         // Orders with schedules come first, sorted by delivery time
         if (scheduleA && scheduleB) {

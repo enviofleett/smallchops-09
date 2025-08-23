@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Clock, Calendar, CheckCircle, Truck } from 'lucide-react';
-import { format } from 'date-fns';
+import { calculateDeliveryTime } from '@/utils/scheduleTime';
 
 interface MiniCountdownTimerProps {
   deliveryDate: string;
@@ -15,6 +15,7 @@ interface TimeRemaining {
   hours: number;
   minutes: number;
   status: 'upcoming' | 'today' | 'active' | 'passed' | 'within_two_hours';
+  isOverdue: boolean;
 }
 
 export const MiniCountdownTimer: React.FC<MiniCountdownTimerProps> = ({
@@ -28,49 +29,12 @@ export const MiniCountdownTimer: React.FC<MiniCountdownTimerProps> = ({
     days: 0,
     hours: 0,
     minutes: 0,
-    status: 'upcoming'
+    status: 'upcoming',
+    isOverdue: false
   });
 
   const calculateTimeRemaining = (): TimeRemaining => {
-    const now = new Date();
-    const deliveryStart = new Date(`${deliveryDate}T${deliveryTimeStart}`);
-    const deliveryEnd = new Date(`${deliveryDate}T${deliveryTimeEnd}`);
-    
-    const diffMs = deliveryStart.getTime() - now.getTime();
-    
-    if (now >= deliveryStart && now <= deliveryEnd) {
-      return { days: 0, hours: 0, minutes: 0, status: 'active' };
-    }
-    
-    if (now > deliveryEnd) {
-      // Calculate overdue time
-      const overdueMs = now.getTime() - deliveryEnd.getTime();
-      const overdueDays = Math.floor(overdueMs / (1000 * 60 * 60 * 24));
-      const overdueHours = Math.floor((overdueMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-      const overdueMinutes = Math.floor((overdueMs % (1000 * 60 * 60)) / (1000 * 60));
-      
-      return { 
-        days: overdueDays, 
-        hours: overdueHours, 
-        minutes: overdueMinutes, 
-        status: 'passed' 
-      };
-    }
-    
-    const days = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
-    const isToday = format(deliveryStart, 'yyyy-MM-dd') === format(now, 'yyyy-MM-dd');
-    const totalMinutesUntil = Math.floor(diffMs / (1000 * 60));
-    const isWithinTwoHours = totalMinutesUntil <= 120 && totalMinutesUntil > 0;
-    
-    return {
-      days: Math.max(0, days),
-      hours: Math.max(0, hours),
-      minutes: Math.max(0, minutes),
-      status: isWithinTwoHours ? 'within_two_hours' : (isToday ? 'today' : 'upcoming')
-    };
+    return calculateDeliveryTime(deliveryDate, deliveryTimeStart, deliveryTimeEnd);
   };
 
   useEffect(() => {
@@ -135,9 +99,9 @@ export const MiniCountdownTimer: React.FC<MiniCountdownTimerProps> = ({
         };
       case 'passed':
         const overdueText = timeRemaining.days > 0 
-          ? `${timeRemaining.days}d ${timeRemaining.hours}h overdue`
+          ? `${timeRemaining.days}d overdue`
           : timeRemaining.hours > 0
-          ? `${timeRemaining.hours}h ${timeRemaining.minutes}m overdue`
+          ? `${timeRemaining.hours}h overdue`
           : `${timeRemaining.minutes}m overdue`;
         
         return {

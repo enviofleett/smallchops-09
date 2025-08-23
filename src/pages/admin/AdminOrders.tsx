@@ -22,6 +22,7 @@ import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { PickupPointDisplay } from '@/components/admin/PickupPointDisplay';
 import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
+import { isOrderOverdue } from '@/utils/scheduleTime';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -70,13 +71,12 @@ export default function AdminOrders() {
     
     // Filter for overdue orders
     if (statusFilter === 'overdue') {
-      const now = new Date();
       ordersCopy = orders.filter(order => {
         const schedule = deliverySchedules[order.id];
         if (!schedule) return false;
         
-        const deliveryEnd = new Date(`${schedule.delivery_date}T${schedule.delivery_time_end}`);
-        return now > deliveryEnd && ['confirmed', 'preparing', 'ready'].includes(order.status);
+        return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
+               ['confirmed', 'preparing', 'ready'].includes(order.status);
       });
     }
     
@@ -85,6 +85,13 @@ export default function AdminOrders() {
       ordersCopy.sort((a, b) => {
         const scheduleA = deliverySchedules[a.id];
         const scheduleB = deliverySchedules[b.id];
+        
+        // Overdue orders get highest priority
+        const aOverdue = scheduleA && isOrderOverdue(scheduleA.delivery_date, scheduleA.delivery_time_end);
+        const bOverdue = scheduleB && isOrderOverdue(scheduleB.delivery_date, scheduleB.delivery_time_end);
+        
+        if (aOverdue && !bOverdue) return -1;
+        if (!aOverdue && bOverdue) return 1;
         
         // If both have schedules, sort by delivery date + time
         if (scheduleA && scheduleB) {

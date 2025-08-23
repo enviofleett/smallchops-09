@@ -230,13 +230,14 @@ export default function PaymentCallback() {
     const payload = verificationResult.data || verificationResult;
     
     console.log('✅ Payment verification successful!', payload);
+    console.log('💰 Amount received from verification:', payload?.amount);
     
     setStatus('success');
     setResult({
       success: true,
       order_id: payload?.order_id,
       order_number: payload?.order_number,
-      amount: payload?.amount,
+      amount: payload?.amount || payload?.total_amount,
       message: 'Payment verified successfully! Your order has been confirmed.'
     });
 
@@ -373,12 +374,14 @@ export default function PaymentCallback() {
     }
   };
 
-  // UI helpers
+  // UI helpers - Fixed currency formatting
   const formatCurrency = (amount?: number | null) => {
-    if (typeof amount !== 'number' || isNaN(amount)) return 'N/A';
+    if (typeof amount !== 'number' || isNaN(amount) || amount <= 0) return null;
     return new Intl.NumberFormat('en-NG', { 
       style: 'currency', 
-      currency: 'NGN' 
+      currency: 'NGN',
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
     }).format(amount);
   };
 
@@ -479,10 +482,10 @@ export default function PaymentCallback() {
                   </div>
                 )}
                 
-                {typeof result.amount === 'number' && (
+                {(typeof result.amount === 'number' && result.amount > 0) && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Amount:</span>
-                    <span className="font-medium">{formatCurrency(result.amount)}</span>
+                    <span className="text-muted-foreground">Total Amount:</span>
+                    <span className="font-medium text-lg text-green-600">{formatCurrency(result.amount)}</span>
                   </div>
                 )}
 

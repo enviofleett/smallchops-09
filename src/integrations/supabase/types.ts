@@ -8523,6 +8523,10 @@ export type Database = {
           updated_by: string
         }[]
       }
+      get_payment_config_secure: {
+        Args: { p_provider: string }
+        Returns: Json
+      }
       get_payment_flow_health: {
         Args: Record<PropertyKey, never>
         Returns: {

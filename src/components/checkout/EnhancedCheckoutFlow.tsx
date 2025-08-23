@@ -18,6 +18,7 @@ import { DeliveryScheduler } from "./DeliveryScheduler";
 import { OrderSummaryCard } from "./OrderSummaryCard";
 import { PaystackPaymentHandler } from "@/components/payments/PaystackPaymentHandler";
 import { storeRedirectUrl } from "@/utils/redirect";
+import { SafeHtml } from "@/components/ui/safe-html";
 import { useOrderProcessing } from "@/hooks/useOrderProcessing";
 import '@/components/payments/payment-styles.css';
 import { validatePaymentInitializationData, normalizePaymentData, generateUserFriendlyErrorMessage } from "@/utils/paymentDataValidator";
@@ -1003,7 +1004,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </DialogHeader>
             <div className="prose prose-sm max-w-none">
               {termsContent ? (
-                <div dangerouslySetInnerHTML={{ __html: termsContent }} />
+                <SafeHtml className="prose prose-sm max-w-none">
+                  {termsContent}
+                </SafeHtml>
               ) : (
                 <p>Terms and conditions content is being loaded...</p>
               )}

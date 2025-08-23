@@ -7982,6 +7982,15 @@ export type Database = {
         }
         Returns: boolean
       }
+      check_customer_rate_limit_secure: {
+        Args: {
+          p_customer_id: string
+          p_endpoint: string
+          p_max_requests?: number
+          p_window_minutes?: number
+        }
+        Returns: Json
+      }
       check_email_rate_limit: {
         Args:
           | { email_address: string; time_window_minutes?: number }
@@ -8462,6 +8471,10 @@ export type Database = {
           payment_status: string
           total_amount: number
         }[]
+      }
+      get_order_tracking_secure: {
+        Args: { p_order_number: string; p_tracking_token?: string }
+        Returns: Json
       }
       get_orders_with_payment: {
         Args: { p_customer_email?: string; p_order_id?: string }

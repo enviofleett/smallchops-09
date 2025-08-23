@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { FileText, Save, AlertCircle, CheckCircle, Shield } from 'lucide-react';
+import { SafeHtml } from "@/components/ui/safe-html";
 
 export const LegalTermsManager = () => {
   const [termsContent, setTermsContent] = useState('');
@@ -210,10 +211,9 @@ export const LegalTermsManager = () => {
           </CardHeader>
           <CardContent>
             <div className="border rounded-lg p-4 bg-muted/50 max-h-60 overflow-y-auto">
-              <div 
-                className="prose prose-sm max-w-none"
-                dangerouslySetInnerHTML={{ __html: termsContent }}
-              />
+              <SafeHtml className="prose prose-sm max-w-none">
+                {termsContent}
+              </SafeHtml>
             </div>
           </CardContent>
         </Card>

@@ -53,22 +53,22 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.paystack-secure]
-verify_jwt = false
+verify_jwt = true
 
 [functions.process-checkout]
-verify_jwt = false
+verify_jwt = true
 
 [functions.paystack-webhook-secure]
 verify_jwt = false
 
 [functions.payment-health-check]
-verify_jwt = false
+verify_jwt = true
 
 [functions.unsubscribe-email]
 verify_jwt = false
 
 [functions.paystack-health]
-verify_jwt = false
+verify_jwt = true
 
 [functions.paystack-batch-verify]
 verify_jwt = true

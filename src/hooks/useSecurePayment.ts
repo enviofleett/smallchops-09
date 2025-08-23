@@ -155,7 +155,7 @@ export const useSecurePayment = () => {
     }
   }, [updateState, validatePaymentData]);
 
-  const verifySecurePayment = useCallback(async (reference: string, orderId?: string) => {
+  const verifySecurePayment = useCallback(async (reference: string, orderId?: string, options?: { suppressToasts?: boolean }) => {
     updateState({ isProcessing: true, error: null });
 
     try {
@@ -167,7 +167,9 @@ export const useSecurePayment = () => {
       updateState({ isProcessing: false });
 
       if (result.success) {
-        toast.success('Payment verified successfully!');
+        if (!options?.suppressToasts) {
+          toast.success('Payment verified successfully!');
+        }
         console.log('✅ Payment verification successful:', {
           reference: result.reference,
           orderId: result.order_id,
@@ -184,7 +186,9 @@ export const useSecurePayment = () => {
                           (error.message || 'Payment verification failed');
       updateState({ isProcessing: false, error: errorMessage });
       
-      toast.error(errorMessage);
+      if (!options?.suppressToasts) {
+        toast.error(errorMessage);
+      }
       
       return {
         success: false,

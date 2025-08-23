@@ -67,7 +67,7 @@ export const PaymentCallbackPage: React.FC = () => {
         
         // Run verification in background to confirm and get details
         try {
-          const result = await verifySecurePayment(reference, orderId || undefined);
+          const result = await verifySecurePayment(reference, orderId || undefined, { suppressToasts: true });
           if (result.success) {
             console.log('✅ Background verification confirmed success');
             setOrderDetails(prev => ({
@@ -159,7 +159,7 @@ export const PaymentCallbackPage: React.FC = () => {
       
       try {
         // Verify the payment
-        const result = await verifySecurePayment(fallbackReference, fallbackOrderId || undefined);
+        const result = await verifySecurePayment(fallbackReference, fallbackOrderId || undefined, { suppressToasts: true });
         
         if (result.success) {
           console.log('✅ Payment verification successful');
@@ -297,7 +297,9 @@ export const PaymentCallbackPage: React.FC = () => {
               <p className="text-3xl font-bold">
                 {typeof orderDetails?.amount === 'number' 
                   ? `₦${orderDetails.amount.toLocaleString()}` 
-                  : orderDetails?.amount || '₦0'}
+                  : orderDetails?.amount === 'Pending confirmation' 
+                    ? 'Pending confirmation' 
+                    : 'Processing...'}
               </p>
             </Card>
 

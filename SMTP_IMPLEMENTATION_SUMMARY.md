@@ -3,6 +3,8 @@
 ## Overview
 Migration `20250823140729_ee967801-0352-4ca9-bedd-0d5efb94ec84.sql` successfully implements Phase 1 requirements for SMTP system hardening.
 
+**UPDATE (2025-08-23)**: System has been fully migrated to SMTP-only email delivery. All third-party email providers (MailerSend, SendGrid, Mailgun, Twilio, Resend) have been removed in favor of direct SMTP integration.
+
 ## Requirements Mapping
 
 ### 1. Tables ✅

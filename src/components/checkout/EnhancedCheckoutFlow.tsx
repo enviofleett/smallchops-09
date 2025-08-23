@@ -288,6 +288,17 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   // Remove the processOrder hook usage since it doesn't exist
 
   const handleFormSubmit = async () => {
+    // 🔐 ENFORCE AUTHENTICATION: Block if not authenticated
+    if (!isAuthenticated) {
+      toast({
+        title: "Authentication Required",
+        description: "Please log in to continue with checkout.",
+        variant: "destructive",
+      });
+      navigate('/auth');
+      return;
+    }
+
     // 🔧 CIRCUIT BREAKER: Block after 3 failures within 5 minutes
     if (circuitBreakerActive) {
       toast({
@@ -353,9 +364,12 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
       console.log('📦 Submitting checkout data:', sanitizedData);
 
-      // Call Supabase edge function
+      // Call Supabase edge function with authentication
       const { data, error } = await supabase.functions.invoke('process-checkout', {
-        body: sanitizedData
+        body: sanitizedData,
+        headers: {
+          Authorization: `Bearer ${session?.access_token}`,
+        },
       });
 
       // 🚨 CRITICAL: Stop flow immediately on order creation failure
@@ -973,14 +987,17 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
                 <Button
                   onClick={handleFormSubmit}
-                  disabled={!canProceedToDetails || isSubmitting}
+                  disabled={!canProceedToDetails || isSubmitting || !isAuthenticated}
                   className="w-full h-12 md:h-14 text-base md:text-lg font-medium"
                   size="lg"
                 >
                   {isSubmitting ? (
                     <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  ) : null}
-                  Proceed to Payment • ₦{total.toLocaleString()}
+                  ) : !isAuthenticated ? (
+                    "Please log in to continue"
+                  ) : (
+                    `Proceed to Payment • ₦${total.toLocaleString()}`
+                  )}
                 </Button>
                 
                 {lastPaymentError && (

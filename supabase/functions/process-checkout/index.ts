@@ -26,6 +26,24 @@ serve(async (req) => {
   }
 
   try {
+    // Extract and validate Authorization header
+    const authHeader = req.headers.get("Authorization");
+    console.log("🔐 Authorization header present:", !!authHeader);
+    
+    if (!authHeader) {
+      console.log("❌ No JWT provided - checkout requires authentication");
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "Authentication required for checkout",
+          code: "REQUIRES_AUTH"
+        }),
+        {
+          status: 401,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
     
     console.log("🛒 Processing checkout request...");
 
@@ -219,9 +237,12 @@ serve(async (req) => {
     const callbackUrl = `${SUPABASE_URL}/functions/v1/payment-callback?order_id=${order.id}`;
     console.log("🔗 Payment callback URL:", callbackUrl);
 
-    // ✅ Initialize payment
+    // ✅ Initialize payment with forwarded Authorization header
     console.log("💳 Initializing payment via paystack-secure...");
     const { data: paymentData, error: paymentError } = await supabaseAdmin.functions.invoke("paystack-secure", {
+      headers: {
+        Authorization: authHeader,
+      },
       body: {
         action: "initialize",
         email: order.customer_email,

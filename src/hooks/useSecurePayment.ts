@@ -119,20 +119,14 @@ export const useSecurePayment = () => {
         email: customerEmail.substring(0, 3) + '***'
       });
 
-      // Use enhanced payment flow
-      const paymentRequest = {
-        customer: {
-          email: customerEmail,
-          name: metadata?.customer_name || 'Customer',
-          phone: metadata?.customer_phone
-        },
-        items: metadata?.items || [],
-        fulfillment: metadata?.fulfillment || { type: 'delivery' }
-      };
+      console.log('🔄 Using secure payment processor for authenticated fallback');
 
-      // Call the process-checkout function directly
-      const { data, error } = await supabase.functions.invoke('process-checkout', {
-        body: paymentRequest
+      // For fallback payments, use the secure-payment-processor with existing order
+      const { data, error } = await supabase.functions.invoke('secure-payment-processor', {
+        body: {
+          order_id: orderId,
+          customer_email: customerEmail,
+        }
       });
 
       if (error) throw new Error(error.message);

@@ -23,7 +23,7 @@ export interface CustomerAddress {
   address_line_2?: string;
   city: string;
   state: string;
-  postal_code: string;
+  postal_code?: string;
   country: string;
   is_default: boolean;
   delivery_instructions?: string;
@@ -161,7 +161,8 @@ export const addCustomerAddress = async (address: Omit<CustomerAddress, 'id' | '
     .from('customer_addresses')
     .insert({
       ...address,
-      customer_id: profile.id
+      customer_id: profile.id,
+      postal_code: address.postal_code || '' // Provide empty string if not provided
     })
     .select()
     .single();
@@ -195,7 +196,10 @@ export const updateCustomerAddress = async (addressId: string, updates: Partial<
 
   const { data, error } = await supabase
     .from('customer_addresses')
-    .update(updates)
+    .update({
+      ...updates,
+      postal_code: updates.postal_code || '' // Ensure postal_code is always a string
+    })
     .eq('id', addressId)
     .eq('customer_id', profile.id)
     .select()

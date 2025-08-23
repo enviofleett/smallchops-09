@@ -19,15 +19,15 @@ import type { CustomerAddress } from '@/api/customerProfile';
 
 const addressSchema = z.object({
   address_type: z.enum(['delivery', 'billing', 'other']),
-  address_line_1: z.string().min(5, 'Address is required'),
+  address_line_1: z.string().min(5, 'Address is required').max(200, 'Address too long'),
   address_line_2: z.string().optional(),
-  city: z.string().min(2, 'City is required'),
-  state: z.string().min(2, 'State is required'),
-  postal_code: z.string().min(3, 'Postal code is required'),
+  city: z.string().min(2, 'City is required').max(50, 'City name too long'),
+  state: z.string().min(2, 'State is required').max(50, 'State name too long'),
+  postal_code: z.string().optional(),
   country: z.string().default('Nigeria'),
   is_default: z.boolean().default(false),
-  delivery_instructions: z.string().optional(),
-  landmark: z.string().optional(),
+  delivery_instructions: z.string().max(160, 'Instructions limited to 160 characters').optional(),
+  landmark: z.string().max(100, 'Landmark too long').optional(),
   phone_number: z.string().optional(),
 });
 
@@ -47,15 +47,33 @@ export function AddressManager() {
     },
   });
 
-  const onSubmit = (data: AddressFormData) => {
-    if (editingAddress) {
-      updateAddress({ id: editingAddress.id, updates: data });
-    } else {
-      addAddress(data as any);
+  const onSubmit = async (data: AddressFormData) => {
+    try {
+      // Sanitize data before submission
+      const sanitizedData = {
+        ...data,
+        address_line_1: data.address_line_1.trim(),
+        address_line_2: data.address_line_2?.trim() || undefined,
+        city: data.city.trim(),
+        state: data.state.trim(),
+        postal_code: data.postal_code?.trim() || undefined,
+        delivery_instructions: data.delivery_instructions?.trim() || undefined,
+        landmark: data.landmark?.trim() || undefined,
+        phone_number: data.phone_number?.trim() || undefined,
+      };
+
+      if (editingAddress) {
+        updateAddress({ id: editingAddress.id, updates: sanitizedData });
+      } else {
+        addAddress(sanitizedData as any);
+      }
+      
+      setIsDialogOpen(false);
+      setEditingAddress(null);
+      form.reset();
+    } catch (error) {
+      console.error('Form submission error:', error);
     }
-    setIsDialogOpen(false);
-    setEditingAddress(null);
-    form.reset();
   };
 
   const handleEdit = (address: CustomerAddress) => {
@@ -124,15 +142,15 @@ export function AddressManager() {
               Add Address
             </Button>
           </DialogTrigger>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>
                 {editingAddress ? 'Edit Address' : 'Add New Address'}
               </DialogTitle>
             </DialogHeader>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 pb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
                   <Label htmlFor="address_type">Address Type</Label>
                   <Select
                     value={form.watch('address_type')}
@@ -149,13 +167,15 @@ export function AddressManager() {
                   </Select>
                 </div>
 
-                <div className="flex items-center space-x-2 pt-6">
+                <div className="flex items-center space-x-2 pt-6 sm:pt-6">
                   <Switch
                     id="is_default"
                     checked={form.watch('is_default')}
                     onCheckedChange={(checked) => form.setValue('is_default', checked)}
                   />
-                  <Label htmlFor="is_default">Set as default address</Label>
+                  <Label htmlFor="is_default" className="text-sm font-medium">
+                    Set as default address
+                  </Label>
                 </div>
               </div>
 
@@ -184,13 +204,14 @@ export function AddressManager() {
                 />
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="space-y-1">
                   <Label htmlFor="city">City *</Label>
                   <Input
                     id="city"
                     {...form.register('city')}
                     className="mt-1"
+                    placeholder="Enter city"
                   />
                   {form.formState.errors.city && (
                     <p className="text-sm text-destructive mt-1">
@@ -199,12 +220,13 @@ export function AddressManager() {
                   )}
                 </div>
 
-                <div>
+                <div className="space-y-1">
                   <Label htmlFor="state">State *</Label>
                   <Input
                     id="state"
                     {...form.register('state')}
                     className="mt-1"
+                    placeholder="Enter state"
                   />
                   {form.formState.errors.state && (
                     <p className="text-sm text-destructive mt-1">
@@ -213,12 +235,13 @@ export function AddressManager() {
                   )}
                 </div>
 
-                <div>
-                  <Label htmlFor="postal_code">Postal Code *</Label>
+                <div className="space-y-1">
+                  <Label htmlFor="postal_code">Postal Code</Label>
                   <Input
                     id="postal_code"
                     {...form.register('postal_code')}
                     className="mt-1"
+                    placeholder="Optional"
                   />
                   {form.formState.errors.postal_code && (
                     <p className="text-sm text-destructive mt-1">
@@ -228,48 +251,76 @@ export function AddressManager() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="space-y-1">
                   <Label htmlFor="landmark">Landmark</Label>
                   <Input
                     id="landmark"
                     {...form.register('landmark')}
                     className="mt-1"
                     placeholder="Nearby landmark"
+                    maxLength={100}
                   />
+                  {form.formState.errors.landmark && (
+                    <p className="text-sm text-destructive mt-1">
+                      {form.formState.errors.landmark.message}
+                    </p>
+                  )}
                 </div>
 
-                <div>
+                <div className="space-y-1">
                   <Label htmlFor="phone_number">Contact Phone</Label>
                   <Input
                     id="phone_number"
                     {...form.register('phone_number')}
                     className="mt-1"
                     placeholder="Phone number for delivery"
+                    type="tel"
                   />
                 </div>
               </div>
 
-              <div>
-                <Label htmlFor="delivery_instructions">Delivery Instructions</Label>
+              <div className="space-y-1">
+                <Label htmlFor="delivery_instructions">
+                  Delivery Instructions
+                  <span className="text-xs text-muted-foreground ml-1">
+                    ({160 - (form.watch('delivery_instructions')?.length || 0)}/160 chars)
+                  </span>
+                </Label>
                 <Textarea
                   id="delivery_instructions"
                   {...form.register('delivery_instructions')}
                   className="mt-1 resize-none"
                   rows={3}
                   placeholder="Special instructions for delivery..."
+                  maxLength={160}
                 />
+                {form.formState.errors.delivery_instructions && (
+                  <p className="text-sm text-destructive mt-1">
+                    {form.formState.errors.delivery_instructions.message}
+                  </p>
+                )}
               </div>
 
-              <div className="flex justify-end gap-3 pt-4">
+              <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
                 <Button
                   type="button"
                   variant="outline"
-                  onClick={() => setIsDialogOpen(false)}
+                  onClick={() => {
+                    setIsDialogOpen(false);
+                    setEditingAddress(null);
+                    form.reset();
+                  }}
+                  className="w-full sm:w-auto"
+                  disabled={isAdding || isUpdating}
                 >
                   Cancel
                 </Button>
-                <Button type="submit" disabled={isAdding || isUpdating}>
+                <Button 
+                  type="submit" 
+                  disabled={isAdding || isUpdating || !form.formState.isValid}
+                  className="w-full sm:w-auto"
+                >
                   {(isAdding || isUpdating) ? (
                     <>
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
@@ -286,7 +337,7 @@ export function AddressManager() {
       </div>
 
       {/* Addresses List */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {addresses.map((address) => (
           <Card key={address.id} className={address.is_default ? 'ring-2 ring-primary' : ''}>
             <CardHeader className="pb-3">
@@ -340,14 +391,15 @@ export function AddressManager() {
             </CardHeader>
             <CardContent className="space-y-2">
               <div className="space-y-1">
-                <p className="font-medium">{address.address_line_1}</p>
+                <p className="font-medium text-sm">{address.address_line_1}</p>
                 {address.address_line_2 && (
-                  <p className="text-muted-foreground">{address.address_line_2}</p>
+                  <p className="text-muted-foreground text-sm">{address.address_line_2}</p>
                 )}
-                <p className="text-muted-foreground">
-                  {address.city}, {address.state} {address.postal_code}
+                <p className="text-muted-foreground text-sm">
+                  {address.city}, {address.state}
+                  {address.postal_code && ` ${address.postal_code}`}
                 </p>
-                <p className="text-muted-foreground">{address.country}</p>
+                <p className="text-muted-foreground text-xs">{address.country}</p>
               </div>
 
               {(address.landmark || address.delivery_instructions || address.phone_number) && (

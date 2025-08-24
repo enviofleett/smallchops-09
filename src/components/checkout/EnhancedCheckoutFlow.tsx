@@ -643,45 +643,41 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         {/* Customer Information */}
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base flex items-center gap-2">
-              <Mail className="w-4 h-4" />
-              Contact Information
-            </CardTitle>
+            <CardTitle className="text-base">Customer Information</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="grid grid-cols-1 gap-4">
-              <div>
-                <Label htmlFor="customer_name">Full Name *</Label>
-                <Input
-                  id="customer_name"
-                  type="text"
-                  value={formData.customer_name}
-                  onChange={(e) => handleFormChange('customer_name', e.target.value)}
-                  placeholder="Enter your full name"
-                  required
-                />
-              </div>
-              <div>
-                <Label htmlFor="customer_email">Email Address *</Label>
-                <Input
-                  id="customer_email"
-                  type="email"
-                  value={formData.customer_email}
-                  onChange={(e) => handleFormChange('customer_email', e.target.value)}
-                  placeholder="Enter your email"
-                  required
-                />
-              </div>
+          <CardContent className="space-y-3">
+            <div>
+              <Label htmlFor="customer_name">Full Name *</Label>
+              <Input
+                id="customer_name"
+                value={formData.customer_name}
+                onChange={(e) => handleFormChange('customer_name', e.target.value)}
+                placeholder="Enter your full name"
+                required
+                className="h-10"
+              />
             </div>
             <div>
-              <Label htmlFor="customer_phone">Phone Number *</Label>
+              <Label htmlFor="customer_email">Email *</Label>
+              <Input
+                id="customer_email"
+                type="email"
+                value={formData.customer_email}
+                onChange={(e) => handleFormChange('customer_email', e.target.value)}
+                placeholder="Enter your email"
+                required
+                className="h-10"
+              />
+            </div>
+            <div>
+              <Label htmlFor="customer_phone">Phone Number</Label>
               <Input
                 id="customer_phone"
                 type="tel"
                 value={formData.customer_phone}
                 onChange={(e) => handleFormChange('customer_phone', e.target.value)}
                 placeholder="Enter your phone number"
-                required
+                className="h-10"
               />
             </div>
           </CardContent>
@@ -749,7 +745,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                 Delivery Address
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               <div>
                 <Label htmlFor="address_line_1">Street Address *</Label>
                 <Input
@@ -758,6 +754,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                   onChange={(e) => handleFormChange('delivery_address.address_line_1', e.target.value)}
                   placeholder="Enter street address"
                   required
+                  className="h-10"
                 />
               </div>
               <div>
@@ -767,9 +764,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                   value={formData.delivery_address.address_line_2}
                   onChange={(e) => handleFormChange('delivery_address.address_line_2', e.target.value)}
                   placeholder="Apartment, suite, etc."
+                  className="h-10"
                 />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-3">
                 <div>
                   <Label htmlFor="city">City</Label>
                   <Input
@@ -777,6 +775,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                     value={formData.delivery_address.city}
                     onChange={(e) => handleFormChange('delivery_address.city', e.target.value)}
                     placeholder="City"
+                    className="h-10"
                   />
                 </div>
                 <div>
@@ -787,15 +786,17 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                     onChange={(e) => handleFormChange('delivery_address.state', e.target.value)}
                     placeholder="State"
                     required
+                    className="h-10"
                   />
                 </div>
-                <div className="sm:col-span-2 lg:col-span-1">
+                <div>
                   <Label htmlFor="postal_code">Postal Code</Label>
                   <Input
                     id="postal_code"
                     value={formData.delivery_address.postal_code}
                     onChange={(e) => handleFormChange('delivery_address.postal_code', e.target.value)}
                     placeholder="Postal code"
+                    className="h-10"
                   />
                 </div>
               </div>
@@ -806,6 +807,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                   value={formData.delivery_address.landmark}
                   onChange={(e) => handleFormChange('delivery_address.landmark', e.target.value)}
                   placeholder="Nearby landmark"
+                  className="h-10"
                 />
               </div>
               <div>
@@ -820,6 +822,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                     }}
                     placeholder="Gate code, building entrance, floor, special handling notes..."
                     maxLength={160}
+                    className="h-10"
                   />
                   <div className="flex justify-between mt-1">
                     <span className="text-xs text-muted-foreground">
@@ -910,8 +913,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
     <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden overscroll-contain p-0">
         {/* Mobile Header */}
-        <div className="flex md:hidden items-center justify-between p-4 border-b bg-background flex-shrink-0">
-          <div className="flex items-center gap-3">
+        <div className="flex md:hidden items-center justify-between p-3 border-b bg-background flex-shrink-0">
+          <div className="flex items-center gap-2">
             <Button
               variant="ghost"
               size="sm"
@@ -920,7 +923,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             >
               <X className="h-4 w-4" />
             </Button>
-            <h2 className="text-lg font-semibold">
+            <h2 className="text-base font-semibold">
               {checkoutStep === 'auth' && 'Complete Order'}
               {checkoutStep === 'details' && 'Checkout'}
               {checkoutStep === 'payment' && 'Payment'}
@@ -986,7 +989,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
               </DialogHeader>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6">
+            <div className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-6">
               {isLoading ? (
                 <div className="flex items-center justify-center py-12">
                   <div className="space-y-4 text-center">
@@ -1005,10 +1008,10 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
 
             {/* Sticky Bottom Action */}
             {checkoutStep === 'details' && (
-              <div className="flex-shrink-0 p-4 md:p-6 border-t bg-background/80 backdrop-blur-sm">
+              <div className="flex-shrink-0 p-3 md:p-6 border-t bg-background/80 backdrop-blur-sm">
                 {/* Terms and Conditions */}
                 {termsRequired && (
-                  <div className="mb-4 flex items-start gap-2">
+                  <div className="mb-3 flex items-start gap-2">
                     <input
                       type="checkbox"
                       id="terms-checkbox"
@@ -1032,7 +1035,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                 <Button
                   onClick={handleFormSubmit}
                   disabled={!canProceedToDetails || isSubmitting || !isAuthenticated}
-                  className="w-full h-12 md:h-14 text-base md:text-lg font-medium"
+                  className="w-full h-11 md:h-14 text-sm md:text-lg font-medium"
                   size="lg"
                 >
                   {isSubmitting ? (

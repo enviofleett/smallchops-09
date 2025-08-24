@@ -242,70 +242,50 @@ export const PaymentCallbackPage: React.FC = () => {
 
   if (isProcessing || verificationStatus === 'loading') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex flex-col">
-        {/* Header with Logo */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-center">
-            <img src={startersLogo} alt="Starters" className="h-12 object-contain" />
-          </div>
-        </div>
-
-        {/* Main Content */}
-        <div className="flex-1 flex items-center justify-center p-4">
-          <Card className="w-full max-w-xs p-6 text-center bg-white">
-            <Loader2 className="h-12 w-12 animate-spin text-orange-500 mx-auto mb-4" />
-            <p className="text-foreground text-base">Hold on, we are confirming your payment</p>
-          </Card>
-        </div>
+      <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-3">
+        <Card className="w-full max-w-xs p-4 text-center bg-white shadow-lg">
+          <Loader2 className="h-10 w-10 animate-spin text-orange-500 mx-auto mb-3" />
+          <p className="text-foreground text-sm">Hold on, we are confirming your payment</p>
+        </Card>
       </div>
     );
   }
 
   if (verificationStatus === 'success') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex flex-col relative overflow-hidden">
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex items-center justify-center p-3 relative overflow-hidden">
         {/* Decorative background elements */}
         <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-32 h-32 bg-red-100/30 rounded-full blur-xl"></div>
-          <div className="absolute bottom-20 right-10 w-40 h-40 bg-orange-100/20 rounded-full blur-2xl"></div>
-        </div>
-
-        {/* Header with Prominent Logo */}
-        <div className="bg-white shadow-lg border-b-2 border-red-100 relative z-10">
-          <div className="container mx-auto px-4 py-6 flex items-center justify-center">
-            <div className="text-center">
-              <img src={startersLogo} alt="Starters" className="h-16 object-contain mx-auto mb-2" />
-              <p className="text-red-600 font-medium text-sm">Order Management System</p>
-            </div>
-          </div>
+          <div className="absolute top-10 left-5 w-20 h-20 bg-red-100/30 rounded-full blur-xl"></div>
+          <div className="absolute bottom-10 right-5 w-24 h-24 bg-orange-100/20 rounded-full blur-2xl"></div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex items-center justify-center p-3 relative z-10">
-          <div className="w-full max-w-sm space-y-4">
+        <div className="w-full max-w-sm relative z-10">
+          <div className="space-y-3">
             {/* Success Icon with Animation */}
             <div className="text-center">
               <div className="relative inline-block">
-                <div className="w-24 h-24 bg-gradient-to-br from-red-100 to-red-200 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg ring-4 ring-red-50">
-                  <img src={startersLogo} alt="Starters" className="h-12 w-12 object-contain" />
+                <div className="w-20 h-20 bg-gradient-to-br from-red-100 to-red-200 rounded-full flex items-center justify-center mx-auto mb-2 shadow-lg ring-4 ring-red-50">
+                  <img src={startersLogo} alt="Starters" className="h-10 w-10 object-contain" />
                 </div>
-                <div className="absolute -top-2 -right-2">
-                  <PartyPopper className="h-6 w-6 text-orange-500 animate-bounce" />
+                <div className="absolute -top-1 -right-1">
+                  <PartyPopper className="h-5 w-5 text-orange-500 animate-bounce" />
                 </div>
               </div>
               
-              <h1 className="text-2xl font-bold text-red-600 mb-2">
+              <h1 className="text-xl font-bold text-red-600 mb-1">
                 Payment Successful!
               </h1>
-              <p className="text-gray-600 text-sm px-2 leading-relaxed">
+              <p className="text-gray-600 text-xs px-2 leading-relaxed">
                 Your order has been confirmed and is being processed
               </p>
             </div>
 
             {/* Amount Display with Enhanced Design */}
-            <Card className="p-6 bg-gradient-to-r from-red-500 to-red-600 text-white text-center shadow-xl border-0">
-              <p className="text-red-100 text-sm mb-2 font-medium">Total Amount</p>
-              <p className="text-3xl font-bold tracking-wide">
+            <Card className="p-4 bg-gradient-to-r from-red-500 to-red-600 text-white text-center shadow-xl border-0">
+              <p className="text-red-100 text-xs mb-1 font-medium">Total Amount</p>
+              <p className="text-2xl font-bold tracking-wide">
                 {typeof orderDetails?.amount === 'number' 
                   ? `₦${orderDetails.amount.toLocaleString()}` 
                   : orderDetails?.amount === 'Pending confirmation' 
@@ -315,38 +295,38 @@ export const PaymentCallbackPage: React.FC = () => {
             </Card>
 
             {/* Enhanced Status */}
-            <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4 text-center shadow-sm">
+            <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-lg p-3 text-center shadow-sm">
               <div className="flex items-center justify-center gap-2 text-red-700">
                 <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
-                <span className="text-sm font-semibold">Order Confirmed & Processing</span>
+                <span className="text-xs font-semibold">Order Confirmed & Processing</span>
               </div>
             </div>
 
             {/* Action Buttons with Better Styling */}
-            <div className="space-y-3">
+            <div className="space-y-2">
               <Button 
                 onClick={() => navigate('/customer-profile')} 
-                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white h-12 text-base font-semibold shadow-lg transform hover:scale-[1.02] transition-all duration-200"
+                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white h-10 text-sm font-semibold shadow-lg transform hover:scale-[1.02] transition-all duration-200"
               >
                 Track Your Order
               </Button>
               <Button 
                 onClick={() => navigate('/')} 
                 variant="outline" 
-                className="w-full h-12 text-base border-2 border-red-200 text-red-600 hover:bg-red-50 font-semibold transform hover:scale-[1.02] transition-all duration-200"
+                className="w-full h-10 text-sm border-2 border-red-200 text-red-600 hover:bg-red-50 font-semibold transform hover:scale-[1.02] transition-all duration-200"
               >
                 Continue Shopping
               </Button>
             </div>
 
             {/* Order Complete Section with Better Design */}
-            <Card className="p-4 bg-white border-2 border-gray-100 shadow-lg rounded-xl">
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-                  <CheckCircle className="h-4 w-4 text-white" />
+            <Card className="p-3 bg-white border-2 border-gray-100 shadow-lg rounded-lg">
+              <div className="flex items-start gap-2">
+                <div className="w-5 h-5 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                  <CheckCircle className="h-3 w-3 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-800 mb-1 text-base">Order Complete!</h3>
+                  <h3 className="font-bold text-gray-800 mb-1 text-sm">Order Complete!</h3>
                   <p className="text-gray-600 text-xs leading-relaxed">
                     Order {orderDetails?.orderNumber || 'Processing...'} is being processed. You can track it in your order history.
                   </p>
@@ -360,46 +340,36 @@ export const PaymentCallbackPage: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex flex-col">
-      {/* Header with Logo */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="container mx-auto px-4 py-4 flex items-center justify-center">
-          <img src={startersLogo} alt="Starters" className="h-12 object-contain" />
-        </div>
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 flex items-center justify-center p-4">
-        <Card className="w-full max-w-sm p-8 text-center bg-white">
-          <XCircle className="h-16 w-16 text-red-500 mx-auto mb-6" />
-          <h2 className="text-2xl font-bold text-foreground mb-2">Payment Failed</h2>
-          <p className="text-muted-foreground mb-6 text-sm">
-            {errorMessage || 'There was an issue processing your payment. Please try again.'}
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-red-50 to-pink-50 flex items-center justify-center p-3">
+      <Card className="w-full max-w-sm p-6 text-center bg-white shadow-lg">
+        <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+        <h2 className="text-xl font-bold text-foreground mb-2">Payment Failed</h2>
+        <p className="text-muted-foreground mb-4 text-sm">
+          {errorMessage || 'There was an issue processing your payment. Please try again.'}
+        </p>
+        
+          <div className="space-y-2">
+            <Button 
+              onClick={() => navigate('/')} 
+              className="w-full bg-red-500 hover:bg-red-600 h-10 text-sm"
+            >
+              Try Again
+            </Button>
+            <Button 
+              onClick={() => navigate('/customer-profile')} 
+              variant="outline" 
+              className="w-full h-10 text-sm"
+            >
+              View Orders
+            </Button>
+          </div>
           
-            <div className="space-y-3">
-              <Button 
-                onClick={() => navigate('/')} 
-                className="w-full bg-red-500 hover:bg-red-600 h-12 text-base"
-              >
-                Try Again
-              </Button>
-              <Button 
-                onClick={() => navigate('/customer-profile')} 
-                variant="outline" 
-                className="w-full h-12 text-base"
-              >
-                View Orders
-              </Button>
-            </div>
-            
-            <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded-lg">
-              <p className="text-sm text-orange-700">
-                <strong>Need help?</strong> Your items are still in your cart. You can try paying again or contact support.
-              </p>
-            </div>
-        </Card>
-      </div>
+          <div className="mt-3 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+            <p className="text-xs text-orange-700">
+              <strong>Need help?</strong> Your items are still in your cart. You can try paying again or contact support.
+            </p>
+          </div>
+      </Card>
     </div>
   );
 };

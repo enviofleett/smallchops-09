@@ -313,7 +313,7 @@ const Orders = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-3 md:space-y-6 px-2 md:px-4">
         <OrdersHeader />
         <OrdersFilter 
           statusFilter={statusFilter}
@@ -323,11 +323,11 @@ const Orders = () => {
           endDate={endDate}
           onDateRangeChange={handleDateRangeChange}
         />
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 space-y-4">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-12 w-full" />
+        <div className="bg-background rounded-lg md:rounded-2xl shadow-sm border border-border p-3 md:p-6 space-y-3 md:space-y-4">
+          <Skeleton className="h-8 md:h-12 w-full" />
+          <Skeleton className="h-8 md:h-12 w-full" />
+          <Skeleton className="h-8 md:h-12 w-full" />
+          <Skeleton className="h-8 md:h-12 w-full" />
         </div>
       </div>
     );
@@ -335,7 +335,7 @@ const Orders = () => {
 
   if (isError) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-3 md:space-y-6 px-2 md:px-4">
         <OrdersHeader />
         <OrdersFilter 
           statusFilter={statusFilter}
@@ -345,9 +345,9 @@ const Orders = () => {
           endDate={endDate}
           onDateRangeChange={handleDateRangeChange}
         />
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 text-center">
-          <p className="text-red-600 font-medium">Failed to load orders.</p>
-          <p className="text-gray-500 text-sm mt-1">{(error as Error).message}</p>
+        <div className="bg-background rounded-lg md:rounded-2xl shadow-sm border border-border p-3 md:p-6 text-center">
+          <p className="text-destructive font-medium">Failed to load orders.</p>
+          <p className="text-muted-foreground text-sm mt-1">{(error as Error).message}</p>
         </div>
       </div>
     );
@@ -355,19 +355,19 @@ const Orders = () => {
 
   return (
     <OrdersErrorBoundary>
-      <div className="space-y-6">
+      <div className="space-y-3 md:space-y-6 px-2 md:px-4 pb-4">
         <OrdersHeader 
           selectedCount={selectedOrders.length}
           onBulkDelete={handleBulkDelete}
         />
         
         <Tabs defaultValue="orders" className="w-full">
-          <TabsList>
-            <TabsTrigger value="orders">Active Orders</TabsTrigger>
-            <TabsTrigger value="abandoned">Abandoned Carts</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-none md:flex">
+            <TabsTrigger value="orders" className="text-xs md:text-sm">Active Orders</TabsTrigger>
+            <TabsTrigger value="abandoned" className="text-xs md:text-sm">Abandoned Carts</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="orders" className="space-y-6">
+          <TabsContent value="orders" className="space-y-3 md:space-y-6">
             <OrdersFilter 
               statusFilter={statusFilter}
               onStatusChange={handleStatusChange}
@@ -376,17 +376,28 @@ const Orders = () => {
               endDate={endDate}
               onDateRangeChange={handleDateRangeChange}
             />
-            <div className="flex justify-end">
-              <Button onClick={handleReconcilePayments} variant="secondary">Reconcile Payments</Button>
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+              <div className="text-sm text-muted-foreground">
+                Showing {prioritySortedOrders.length} of {totalCount} orders
+                {statusFilter === 'pending' && (
+                  <span className="ml-2 text-orange-600 font-medium">• Pending Payment Review</span>
+                )}
+                {statusFilter === 'overdue' && (
+                  <span className="ml-2 text-red-600 font-medium">• Requires Immediate Attention</span>
+                )}
+              </div>
+              <Button onClick={handleReconcilePayments} variant="secondary" size="sm" className="w-full sm:w-auto">
+                Reconcile Payments
+              </Button>
             </div>
-<OrdersTable 
-  orders={adjustedOrders} 
-  onViewOrder={handleViewOrder}
-  onDeleteOrder={handleDeleteOrder}
-  selectedOrders={selectedOrders}
-  onSelectOrder={handleSelectOrder}
-  onSelectAll={handleSelectAll}
-/>
+            <OrdersTable 
+              orders={adjustedOrders} 
+              onViewOrder={handleViewOrder}
+              onDeleteOrder={handleDeleteOrder}
+              selectedOrders={selectedOrders}
+              onSelectOrder={handleSelectOrder}
+              onSelectAll={handleSelectAll}
+            />
             <OrdersPagination 
               currentPage={currentPage}
               totalPages={totalPages}

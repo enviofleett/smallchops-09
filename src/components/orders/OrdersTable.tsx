@@ -77,18 +77,18 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
   };
 
   const mobileComponent = (
-    <div className="space-y-3">
+    <div className="space-y-2 md:space-y-3">
       {selectedOrders.length > 0 && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-3">
           <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-blue-800">
+            <span className="text-xs md:text-sm font-medium text-primary">
               {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected
             </span>
             <Button
               variant="outline"
               size="sm"
               onClick={() => onSelectAll(false)}
-              className="text-blue-600 border-blue-200 hover:bg-blue-50"
+              className="text-primary border-primary/20 hover:bg-primary/5 h-6 px-2 text-xs"
             >
               Clear
             </Button>
@@ -97,100 +97,106 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
       )}
       
       {orders.map((order) => (
-        <MobileCard key={order.id}>
-          <MobileCardHeader>
-            <div className="flex items-center gap-3">
+        <MobileCard key={order.id} className="p-3">
+          <MobileCardHeader className="pb-2">
+            <div className="flex items-start gap-2">
               <Checkbox
                 checked={selectedOrders.includes(order.id)}
                 onCheckedChange={(checked) => onSelectOrder(order.id, checked as boolean)}
+                className="mt-1"
               />
-              <div>
-                <p className="font-medium text-blue-600">Order ID: {order.order_number}</p>
-                <p className="text-sm text-gray-600">{order.customer_name}</p>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium text-primary text-sm truncate">#{order.order_number}</p>
+                <p className="text-xs text-muted-foreground truncate">{order.customer_name}</p>
               </div>
             </div>
-            <span className={`inline-block px-3 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
-              {getStatusBadge(order.status).label}
-            </span>
+            <div className="flex flex-col gap-1 items-end">
+              <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
+                {getStatusBadge(order.status).label}
+              </span>
+              <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
+                order.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 
+                order.payment_status === 'failed' ? 'bg-red-100 text-red-800' : 
+                'bg-yellow-100 text-yellow-800'
+              }`}>
+                {order.payment_status === 'paid' ? 'Paid' : 
+                 order.payment_status === 'failed' ? 'Failed' : 
+                 'Pending'}
+              </span>
+            </div>
           </MobileCardHeader>
           
-          <MobileCardContent>
+          <MobileCardContent className="space-y-1">
             <MobileCardRow 
-              label="Customer Phone" 
-              value={order.customer_phone} 
+              label="Phone" 
+              value={<span className="text-xs">{order.customer_phone}</span>}
+              className="text-xs"
             />
             <MobileCardRow 
-              label="Order Time" 
-              value={format(new Date(order.order_time), 'MMM d, yyyy h:mm a')} 
+              label="Time" 
+              value={<span className="text-xs">{format(new Date(order.order_time), 'MMM d, h:mm a')}</span>}
+              className="text-xs" 
             />
             <MobileCardRow 
               label="Amount" 
-              value={<span className="font-semibold">{formatCurrency(order.total_amount)}</span>} 
+              value={<span className="font-semibold text-sm">{formatCurrency(order.total_amount)}</span>}
+              className="text-xs" 
             />
             <MobileCardRow 
               label="Type" 
               value={
                 <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1">
                     {order.order_type === 'delivery' ? (
-                      <Truck className="h-4 w-4 text-gray-500" />
+                      <Truck className="h-3 w-3 text-muted-foreground" />
                     ) : (
-                      <Package className="h-4 w-4 text-gray-500" />
+                      <Package className="h-3 w-3 text-muted-foreground" />
                     )}
-                    <span className="capitalize">{order.order_type}</span>
+                    <span className="capitalize text-xs">{order.order_type}</span>
                   </div>
                   {order.order_type === 'delivery' && (order as any).delivery_zones && (
-                    <span className="text-xs text-gray-500 ml-6">
+                    <span className="text-xs text-muted-foreground">
                       {(order as any).delivery_zones.name}
-                    </span>
-                  )}
-                  {getDeliveryInstructionsFromAddress((order as any).delivery_address) && (
-                    <span className="text-xs text-blue-600 ml-6" title={getDeliveryInstructionsFromAddress((order as any).delivery_address) || ''}>
-                      📝 {formatDeliveryInstructionsForDisplay(getDeliveryInstructionsFromAddress((order as any).delivery_address), 25)}
                     </span>
                   )}
                 </div>
               } 
+              className="text-xs"
             />
-            {order.order_type === 'delivery' && (order as any).delivery_zones && (
-              <MobileCardRow 
-                label="Delivery Zone" 
-                value={(order as any).delivery_zones.name} 
-              />
-            )}
             <MobileCardRow 
-              label="Delivery Schedule" 
-              value={renderDeliverySchedule(order.id, order.status)} 
+              label="Schedule" 
+              value={renderDeliverySchedule(order.id, order.status)}
+              className="text-xs" 
             />
           </MobileCardContent>
           
-          <MobileCardActions>
+          <MobileCardActions className="pt-2 gap-1">
             <Button
               variant="outline"
               size="sm"
               onClick={() => onViewOrder(order)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-1 h-7 px-2 text-xs"
             >
-              <Eye className="h-4 w-4" />
-              View
+              <Eye className="h-3 w-3" />
+              <span className="hidden xs:inline">View</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => console.log('Print order:', order.id)}
-              className="flex items-center gap-2"
+              className="flex items-center gap-1 h-7 px-2 text-xs"
             >
-              <Printer className="h-4 w-4" />
-              Print
+              <Printer className="h-3 w-3" />
+              <span className="hidden xs:inline">Print</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => onDeleteOrder(order)}
-              className="flex items-center gap-2 text-red-600 border-red-200 hover:bg-red-50"
+              className="flex items-center gap-1 h-7 px-2 text-xs text-destructive border-destructive/20 hover:bg-destructive/5"
             >
-              <Trash2 className="h-4 w-4" />
-              Delete
+              <Trash2 className="h-3 w-3" />
+              <span className="hidden xs:inline">Delete</span>
             </Button>
           </MobileCardActions>
         </MobileCard>

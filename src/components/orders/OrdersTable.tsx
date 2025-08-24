@@ -77,12 +77,12 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
   };
 
   const mobileComponent = (
-    <div className="space-y-2 md:space-y-3">
+    <div className="space-y-2">
       {selectedOrders.length > 0 && (
-        <div className="bg-primary/10 border border-primary/20 rounded-lg p-3 mb-3">
+        <div className="bg-primary/10 border border-primary/20 rounded-lg p-2 mb-2">
           <div className="flex items-center justify-between">
-            <span className="text-xs md:text-sm font-medium text-primary">
-              {selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected
+            <span className="text-xs font-medium text-primary">
+              {selectedOrders.length} selected
             </span>
             <Button
               variant="outline"
@@ -97,77 +97,65 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
       )}
       
       {orders.map((order) => (
-        <MobileCard key={order.id} className="p-3">
+        <MobileCard key={order.id} className="p-2 md:p-3">
           <MobileCardHeader className="pb-2">
             <div className="flex items-start gap-2">
               <Checkbox
                 checked={selectedOrders.includes(order.id)}
                 onCheckedChange={(checked) => onSelectOrder(order.id, checked as boolean)}
-                className="mt-1"
+                className="mt-0.5 h-3 w-3 md:h-4 md:w-4"
               />
               <div className="min-w-0 flex-1">
-                <p className="font-medium text-primary text-sm truncate">#{order.order_number}</p>
+                <p className="font-medium text-primary text-xs md:text-sm truncate">#{order.order_number}</p>
                 <p className="text-xs text-muted-foreground truncate">{order.customer_name}</p>
+                <p className="text-xs text-muted-foreground">{order.customer_phone}</p>
               </div>
             </div>
             <div className="flex flex-col gap-1 items-end">
-              <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
+              <span className={`inline-block px-1.5 py-0.5 text-xs font-medium rounded-full ${getStatusBadge(order.status).className}`}>
                 {getStatusBadge(order.status).label}
               </span>
-              <span className={`inline-block px-2 py-1 text-xs font-medium rounded-full ${
+              <span className={`inline-block px-1.5 py-0.5 text-xs font-medium rounded-full ${
                 order.payment_status === 'paid' ? 'bg-green-100 text-green-800' : 
                 order.payment_status === 'failed' ? 'bg-red-100 text-red-800' : 
                 'bg-yellow-100 text-yellow-800'
               }`}>
-                {order.payment_status === 'paid' ? 'Paid' : 
-                 order.payment_status === 'failed' ? 'Failed' : 
-                 'Pending'}
+                {order.payment_status === 'paid' ? 'paid' : 
+                 order.payment_status === 'failed' ? 'failed' : 
+                 'pending'}
               </span>
             </div>
           </MobileCardHeader>
           
           <MobileCardContent className="space-y-1">
-            <MobileCardRow 
-              label="Phone" 
-              value={<span className="text-xs">{order.customer_phone}</span>}
-              className="text-xs"
-            />
-            <MobileCardRow 
-              label="Time" 
-              value={<span className="text-xs">{format(new Date(order.order_time), 'MMM d, h:mm a')}</span>}
-              className="text-xs" 
-            />
-            <MobileCardRow 
-              label="Amount" 
-              value={<span className="font-semibold text-sm">{formatCurrency(order.total_amount)}</span>}
-              className="text-xs" 
-            />
-            <MobileCardRow 
-              label="Type" 
-              value={
-                <div className="flex flex-col gap-1">
-                  <div className="flex items-center gap-1">
-                    {order.order_type === 'delivery' ? (
-                      <Truck className="h-3 w-3 text-muted-foreground" />
-                    ) : (
-                      <Package className="h-3 w-3 text-muted-foreground" />
-                    )}
-                    <span className="capitalize text-xs">{order.order_type}</span>
-                  </div>
-                  {order.order_type === 'delivery' && (order as any).delivery_zones && (
-                    <span className="text-xs text-muted-foreground">
-                      {(order as any).delivery_zones.name}
-                    </span>
-                  )}
-                </div>
-              } 
-              className="text-xs"
-            />
-            <MobileCardRow 
-              label="Schedule" 
-              value={renderDeliverySchedule(order.id, order.status)}
-              className="text-xs" 
-            />
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-muted-foreground">Amount</span>
+              <span className="font-semibold text-sm">{formatCurrency(order.total_amount)}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-muted-foreground">Time</span>
+              <span className="text-xs">{format(new Date(order.order_time), 'MMM d, h:mm a')}</span>
+            </div>
+            <div className="flex justify-between items-center">
+              <span className="text-xs text-muted-foreground">Type</span>
+              <div className="flex items-center gap-1">
+                {order.order_type === 'delivery' ? (
+                  <Truck className="h-3 w-3 text-muted-foreground" />
+                ) : (
+                  <Package className="h-3 w-3 text-muted-foreground" />
+                )}
+                <span className="capitalize text-xs">{order.order_type}</span>
+              </div>
+            </div>
+            {order.order_type === 'delivery' && (order as any).delivery_zones && (
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-muted-foreground">Zone</span>
+                <span className="text-xs">{(order as any).delivery_zones.name}</span>
+              </div>
+            )}
+            <div className="border-t pt-1 mt-1">
+              {renderDeliverySchedule(order.id, order.status)}
+            </div>
           </MobileCardContent>
           
           <MobileCardActions className="pt-2 gap-1">
@@ -175,28 +163,27 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
               variant="outline"
               size="sm"
               onClick={() => onViewOrder(order)}
-              className="flex items-center gap-1 h-7 px-2 text-xs"
+              className="flex items-center gap-1 h-6 px-2 text-xs"
             >
               <Eye className="h-3 w-3" />
-              <span className="hidden xs:inline">View</span>
+              View
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => console.log('Print order:', order.id)}
-              className="flex items-center gap-1 h-7 px-2 text-xs"
+              className="flex items-center gap-1 h-6 px-2 text-xs"
             >
               <Printer className="h-3 w-3" />
-              <span className="hidden xs:inline">Print</span>
+              Print
             </Button>
             <Button
               variant="outline"
               size="sm"
               onClick={() => onDeleteOrder(order)}
-              className="flex items-center gap-1 h-7 px-2 text-xs text-destructive border-destructive/20 hover:bg-destructive/5"
+              className="flex items-center gap-1 h-6 px-2 text-xs text-destructive border-destructive/20 hover:bg-destructive/5"
             >
               <Trash2 className="h-3 w-3" />
-              <span className="hidden xs:inline">Delete</span>
             </Button>
           </MobileCardActions>
         </MobileCard>
@@ -206,7 +193,7 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
 
   return (
     <ResponsiveTable
-      className="bg-background rounded-2xl shadow-sm border border-border overflow-hidden"
+      className="bg-background rounded-lg shadow-sm border border-border overflow-hidden"
       mobileComponent={mobileComponent}
     >
       <div className="overflow-x-auto">

@@ -18,9 +18,11 @@ import { supabase } from '@/integrations/supabase/client';
 import { runPaystackBatchVerify } from '@/utils/paystackBatchVerify';
 import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
 import { isOrderOverdue } from '@/utils/scheduleTime';
+import { usePendingOrdersLogic } from '@/hooks/usePendingOrdersLogic';
+import { useOverdueOrdersLogic } from '@/hooks/useOverdueOrdersLogic';
 
 const Orders = () => {
-  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all' | 'overdue'>('all');
+  const [statusFilter, setStatusFilter] = useState<OrderStatus | 'all' | 'overdue' | 'pending'>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const [startDate, setStartDate] = useState<Date>();
@@ -35,6 +37,37 @@ const Orders = () => {
 
   const { toast } = useToast();
   const queryClient = useQueryClient();
+
+  // Pending orders logic
+  const {
+    pendingStats,
+    pendingOrders,
+    criticalOrders,
+    paymentPendingOrders,
+    resolvePaymentMutation,
+    bulkProcessMutation,
+    markNeedsAttentionMutation,
+    autoRefreshEnabled: pendingAutoRefresh,
+    setAutoRefreshEnabled: setPendingAutoRefresh,
+    isProcessing: isPendingProcessing
+  } = usePendingOrdersLogic();
+
+  // Overdue orders logic
+  const {
+    overdueOrders,
+    overdueStats,
+    escalateOrderMutation,
+    notifyCustomerMutation,
+    bulkUpdateStatusMutation,
+    autoRefreshEnabled: overdueAutoRefresh,
+    setAutoRefreshEnabled: setOverdueAutoRefresh,
+    alertsEnabled,
+    setAlertsEnabled,
+    isProcessing: isOverdueProcessing,
+    getCriticalOrders,
+    getModerateOrders,
+    getRecentOverdueOrders
+  } = useOverdueOrdersLogic();
 
   // Realtime: auto-refresh when orders change
   React.useEffect(() => {
@@ -254,7 +287,7 @@ const Orders = () => {
   });
 
   const handleStatusChange = (status: string) => {
-    setStatusFilter(status as OrderStatus | 'all' | 'overdue');
+    setStatusFilter(status as OrderStatus | 'all' | 'overdue' | 'pending');
     setCurrentPage(1);
   };
 
@@ -313,7 +346,7 @@ const Orders = () => {
 
   if (isLoading) {
     return (
-      <div className="space-y-3 md:space-y-6 px-2 md:px-4">
+      <div className="space-y-2 md:space-y-4 px-2 md:px-4 max-w-7xl mx-auto">
         <OrdersHeader />
         <OrdersFilter 
           statusFilter={statusFilter}
@@ -323,11 +356,11 @@ const Orders = () => {
           endDate={endDate}
           onDateRangeChange={handleDateRangeChange}
         />
-        <div className="bg-background rounded-lg md:rounded-2xl shadow-sm border border-border p-3 md:p-6 space-y-3 md:space-y-4">
-          <Skeleton className="h-8 md:h-12 w-full" />
-          <Skeleton className="h-8 md:h-12 w-full" />
-          <Skeleton className="h-8 md:h-12 w-full" />
-          <Skeleton className="h-8 md:h-12 w-full" />
+        <div className="bg-background rounded-lg shadow-sm border border-border p-3 md:p-4 space-y-2 md:space-y-3">
+          <Skeleton className="h-6 md:h-8 w-full" />
+          <Skeleton className="h-6 md:h-8 w-full" />
+          <Skeleton className="h-6 md:h-8 w-full" />
+          <Skeleton className="h-6 md:h-8 w-full" />
         </div>
       </div>
     );
@@ -335,7 +368,7 @@ const Orders = () => {
 
   if (isError) {
     return (
-      <div className="space-y-3 md:space-y-6 px-2 md:px-4">
+      <div className="space-y-2 md:space-y-4 px-2 md:px-4 max-w-7xl mx-auto">
         <OrdersHeader />
         <OrdersFilter 
           statusFilter={statusFilter}
@@ -345,29 +378,42 @@ const Orders = () => {
           endDate={endDate}
           onDateRangeChange={handleDateRangeChange}
         />
-        <div className="bg-background rounded-lg md:rounded-2xl shadow-sm border border-border p-3 md:p-6 text-center">
-          <p className="text-destructive font-medium">Failed to load orders.</p>
-          <p className="text-muted-foreground text-sm mt-1">{(error as Error).message}</p>
+        <div className="bg-background rounded-lg shadow-sm border border-border p-3 md:p-4 text-center">
+          <p className="text-destructive font-medium text-sm md:text-base">Failed to load orders.</p>
+          <p className="text-muted-foreground text-xs md:text-sm mt-1">{(error as Error).message}</p>
         </div>
       </div>
     );
   }
 
+  // Get display data based on filter
+  const getDisplayOrders = (): OrderWithItems[] => {
+    if (statusFilter === 'pending') return (pendingOrders || []) as OrderWithItems[];
+    if (statusFilter === 'overdue') return (overdueOrders || []) as OrderWithItems[];
+    return adjustedOrders;
+  };
+
+  const getDisplayStats = () => {
+    if (statusFilter === 'pending') return pendingStats;
+    if (statusFilter === 'overdue') return overdueStats;
+    return null;
+  };
+
   return (
     <OrdersErrorBoundary>
-      <div className="space-y-3 md:space-y-6 px-2 md:px-4 pb-4">
+      <div className="space-y-2 md:space-y-4 px-2 md:px-4 pb-4 max-w-7xl mx-auto">
         <OrdersHeader 
           selectedCount={selectedOrders.length}
           onBulkDelete={handleBulkDelete}
         />
         
         <Tabs defaultValue="orders" className="w-full">
-          <TabsList className="grid w-full grid-cols-2 md:w-auto md:grid-cols-none md:flex">
-            <TabsTrigger value="orders" className="text-xs md:text-sm">Active Orders</TabsTrigger>
-            <TabsTrigger value="abandoned" className="text-xs md:text-sm">Abandoned Carts</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 h-8 md:h-10 text-xs md:text-sm">
+            <TabsTrigger value="orders" className="text-xs md:text-sm py-1">Orders</TabsTrigger>
+            <TabsTrigger value="abandoned" className="text-xs md:text-sm py-1">Carts</TabsTrigger>
           </TabsList>
           
-          <TabsContent value="orders" className="space-y-3 md:space-y-6">
+          <TabsContent value="orders" className="space-y-2 md:space-y-4 mt-2 md:mt-4">
             <OrdersFilter 
               statusFilter={statusFilter}
               onStatusChange={handleStatusChange}
@@ -376,35 +422,116 @@ const Orders = () => {
               endDate={endDate}
               onDateRangeChange={handleDateRangeChange}
             />
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
-              <div className="text-sm text-muted-foreground">
-                Showing {prioritySortedOrders.length} of {totalCount} orders
-                {statusFilter === 'pending' && (
-                  <span className="ml-2 text-orange-600 font-medium">• Pending Payment Review</span>
+            
+            {/* Status-specific stats */}
+            {getDisplayStats() && (
+              <div className="bg-muted/30 rounded-lg p-2 md:p-3 border border-border/50">
+                {statusFilter === 'pending' && pendingStats && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 text-center">
+                    <div className="bg-background rounded p-2 border">
+                      <div className="text-lg md:text-2xl font-bold text-primary">{pendingStats.total}</div>
+                      <div className="text-xs md:text-sm text-muted-foreground">Total Pending</div>
+                    </div>
+                    <div className="bg-background rounded p-2 border">
+                      <div className="text-lg md:text-2xl font-bold text-destructive">{pendingStats.needsAttention}</div>
+                      <div className="text-xs md:text-sm text-muted-foreground">Needs Attention</div>
+                    </div>
+                    <div className="bg-background rounded p-2 border">
+                      <div className="text-lg md:text-2xl font-bold text-yellow-600">{pendingStats.awaitingPayment}</div>
+                      <div className="text-xs md:text-sm text-muted-foreground">Awaiting Payment</div>
+                    </div>
+                    <div className="bg-background rounded p-2 border">
+                      <div className="text-lg md:text-2xl font-bold text-blue-600">{pendingStats.processingTime}m</div>
+                      <div className="text-xs md:text-sm text-muted-foreground">Avg Processing</div>
+                    </div>
+                  </div>
                 )}
-                {statusFilter === 'overdue' && (
-                  <span className="ml-2 text-red-600 font-medium">• Requires Immediate Attention</span>
+                
+                {statusFilter === 'overdue' && overdueStats && (
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 md:gap-4 text-center">
+                    <div className="bg-background rounded p-2 border">
+                      <div className="text-lg md:text-2xl font-bold text-destructive">{overdueStats.total}</div>
+                      <div className="text-xs md:text-sm text-muted-foreground">Total Overdue</div>
+                    </div>
+                    <div className="bg-background rounded p-2 border">
+                      <div className="text-lg md:text-2xl font-bold text-red-700">{overdueStats.critical}</div>
+                      <div className="text-xs md:text-sm text-muted-foreground">Critical (2h+)</div>
+                    </div>
+                    <div className="bg-background rounded p-2 border">
+                      <div className="text-lg md:text-2xl font-bold text-orange-600">{overdueStats.moderate}</div>
+                      <div className="text-xs md:text-sm text-muted-foreground">Moderate (30m-2h)</div>
+                    </div>
+                    <div className="bg-background rounded p-2 border">
+                      <div className="text-lg md:text-2xl font-bold text-yellow-600">{overdueStats.recent}</div>
+                      <div className="text-xs md:text-sm text-muted-foreground">Recent (0-30m)</div>
+                    </div>
+                  </div>
                 )}
               </div>
-              <Button onClick={handleReconcilePayments} variant="secondary" size="sm" className="w-full sm:w-auto">
-                Reconcile Payments
-              </Button>
+            )}
+
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 md:gap-3">
+              <div className="text-xs md:text-sm text-muted-foreground">
+                Showing {getDisplayOrders().length} of {statusFilter === 'pending' ? pendingOrders?.length || 0 : statusFilter === 'overdue' ? overdueOrders?.length || 0 : totalCount} orders
+                {statusFilter === 'pending' && (
+                  <span className="ml-1 md:ml-2 text-orange-600 font-medium text-xs">• Pending Review</span>
+                )}
+                {statusFilter === 'overdue' && (
+                  <span className="ml-1 md:ml-2 text-red-600 font-medium text-xs">• Immediate Action</span>
+                )}
+              </div>
+              <div className="flex flex-col sm:flex-row gap-1 md:gap-2 w-full sm:w-auto">
+                {statusFilter === 'pending' && (
+                  <Button 
+                    onClick={() => bulkProcessMutation.mutate(pendingOrders?.map(o => o.id) || [])}
+                    disabled={!pendingOrders?.length || isPendingProcessing}
+                    variant="secondary" 
+                    size="sm" 
+                    className="text-xs md:text-sm h-7 md:h-8"
+                  >
+                    Process All Pending
+                  </Button>
+                )}
+                {statusFilter === 'overdue' && (
+                  <Button 
+                    onClick={() => bulkUpdateStatusMutation.mutate(getCriticalOrders().map(o => o.id))}
+                    disabled={!getCriticalOrders().length || isOverdueProcessing}
+                    variant="secondary" 
+                    size="sm" 
+                    className="text-xs md:text-sm h-7 md:h-8"
+                  >
+                    Escalate Critical
+                  </Button>
+                )}
+                <Button 
+                  onClick={handleReconcilePayments} 
+                  variant="secondary" 
+                  size="sm" 
+                  className="text-xs md:text-sm h-7 md:h-8"
+                >
+                  Reconcile
+                </Button>
+              </div>
             </div>
+            
             <OrdersTable 
-              orders={adjustedOrders} 
+              orders={getDisplayOrders()} 
               onViewOrder={handleViewOrder}
               onDeleteOrder={handleDeleteOrder}
               selectedOrders={selectedOrders}
               onSelectOrder={handleSelectOrder}
               onSelectAll={handleSelectAll}
             />
-            <OrdersPagination 
-              currentPage={currentPage}
-              totalPages={totalPages}
-              onPageChange={setCurrentPage}
-              totalResults={totalCount}
-              pageSize={PAGE_SIZE}
-            />
+            
+            {statusFilter === 'all' && (
+              <OrdersPagination 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                totalResults={totalCount}
+                pageSize={PAGE_SIZE}
+              />
+            )}
           </TabsContent>
           
           <TabsContent value="abandoned">

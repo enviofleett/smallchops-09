@@ -252,10 +252,9 @@ export const PaymentCallbackPage: React.FC = () => {
 
         {/* Main Content */}
         <div className="flex-1 flex items-center justify-center p-4">
-          <Card className="w-full max-w-sm p-8 text-center bg-white">
-            <Loader2 className="h-16 w-16 animate-spin text-orange-500 mx-auto mb-6" />
-            <h2 className="text-xl font-semibold text-foreground mb-2">Verifying Payment</h2>
-            <p className="text-muted-foreground">Please wait while we confirm your payment...</p>
+          <Card className="w-full max-w-xs p-6 text-center bg-white">
+            <Loader2 className="h-12 w-12 animate-spin text-orange-500 mx-auto mb-4" />
+            <p className="text-foreground text-base">Hold on, we are confirming your payment</p>
           </Card>
         </div>
       </div>
@@ -282,31 +281,31 @@ export const PaymentCallbackPage: React.FC = () => {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex items-center justify-center p-4 relative z-10">
-          <div className="w-full max-w-md space-y-6">
+        <div className="flex-1 flex items-center justify-center p-3 relative z-10">
+          <div className="w-full max-w-sm space-y-4">
             {/* Success Icon with Animation */}
             <div className="text-center">
               <div className="relative inline-block">
-                <div className="w-28 h-28 bg-gradient-to-br from-red-100 to-red-200 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg ring-4 ring-red-50">
-                  <CheckCircle className="h-14 w-14 text-red-600" />
+                <div className="w-24 h-24 bg-gradient-to-br from-red-100 to-red-200 rounded-full flex items-center justify-center mx-auto mb-3 shadow-lg ring-4 ring-red-50">
+                  <img src={startersLogo} alt="Starters" className="h-12 w-12 object-contain" />
                 </div>
                 <div className="absolute -top-2 -right-2">
-                  <PartyPopper className="h-8 w-8 text-orange-500 animate-bounce" />
+                  <PartyPopper className="h-6 w-6 text-orange-500 animate-bounce" />
                 </div>
               </div>
               
-              <h1 className="text-3xl font-bold text-red-600 mb-3">
+              <h1 className="text-2xl font-bold text-red-600 mb-2">
                 Payment Successful!
               </h1>
-              <p className="text-gray-600 text-base px-4 leading-relaxed">
+              <p className="text-gray-600 text-sm px-2 leading-relaxed">
                 Your order has been confirmed and is being processed
               </p>
             </div>
 
             {/* Amount Display with Enhanced Design */}
-            <Card className="p-8 bg-gradient-to-r from-red-500 to-red-600 text-white text-center shadow-xl border-0">
-              <p className="text-red-100 text-base mb-3 font-medium">Total Amount</p>
-              <p className="text-4xl font-bold tracking-wide">
+            <Card className="p-6 bg-gradient-to-r from-red-500 to-red-600 text-white text-center shadow-xl border-0">
+              <p className="text-red-100 text-sm mb-2 font-medium">Total Amount</p>
+              <p className="text-3xl font-bold tracking-wide">
                 {typeof orderDetails?.amount === 'number' 
                   ? `₦${orderDetails.amount.toLocaleString()}` 
                   : orderDetails?.amount === 'Pending confirmation' 
@@ -316,39 +315,39 @@ export const PaymentCallbackPage: React.FC = () => {
             </Card>
 
             {/* Enhanced Status */}
-            <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-5 text-center shadow-sm">
-              <div className="flex items-center justify-center gap-3 text-red-700">
-                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                <span className="text-base font-semibold">Order Confirmed & Processing</span>
+            <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4 text-center shadow-sm">
+              <div className="flex items-center justify-center gap-2 text-red-700">
+                <div className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-sm font-semibold">Order Confirmed & Processing</span>
               </div>
             </div>
 
             {/* Action Buttons with Better Styling */}
-            <div className="space-y-4">
+            <div className="space-y-3">
               <Button 
                 onClick={() => navigate('/customer-profile')} 
-                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white h-14 text-lg font-semibold shadow-lg transform hover:scale-[1.02] transition-all duration-200"
+                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white h-12 text-base font-semibold shadow-lg transform hover:scale-[1.02] transition-all duration-200"
               >
                 Track Your Order
               </Button>
               <Button 
                 onClick={() => navigate('/')} 
                 variant="outline" 
-                className="w-full h-14 text-lg border-2 border-red-200 text-red-600 hover:bg-red-50 font-semibold transform hover:scale-[1.02] transition-all duration-200"
+                className="w-full h-12 text-base border-2 border-red-200 text-red-600 hover:bg-red-50 font-semibold transform hover:scale-[1.02] transition-all duration-200"
               >
                 Continue Shopping
               </Button>
             </div>
 
             {/* Order Complete Section with Better Design */}
-            <Card className="p-6 bg-white border-2 border-gray-100 shadow-lg rounded-xl">
-              <div className="flex items-start gap-4">
-                <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
-                  <CheckCircle className="h-5 w-5 text-white" />
+            <Card className="p-4 bg-white border-2 border-gray-100 shadow-lg rounded-xl">
+              <div className="flex items-start gap-3">
+                <div className="w-6 h-6 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                  <CheckCircle className="h-4 w-4 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-bold text-gray-800 mb-2 text-lg">Order Complete!</h3>
-                  <p className="text-gray-600 text-sm leading-relaxed">
+                  <h3 className="font-bold text-gray-800 mb-1 text-base">Order Complete!</h3>
+                  <p className="text-gray-600 text-xs leading-relaxed">
                     Order {orderDetails?.orderNumber || 'Processing...'} is being processed. You can track it in your order history.
                   </p>
                 </div>

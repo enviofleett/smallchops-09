@@ -7813,6 +7813,17 @@ export type Database = {
         }
         Relationships: []
       }
+      email_delivery_analytics: {
+        Row: {
+          bounced_emails: number | null
+          date: string | null
+          failed_emails: number | null
+          sent_emails: number | null
+          success_rate_percent: number | null
+          total_emails: number | null
+        }
+        Relationships: []
+      }
       payment_flow_health: {
         Row: {
           completed_orders: number | null

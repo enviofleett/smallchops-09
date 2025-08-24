@@ -90,134 +90,53 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseAdmin = createClient(
+    const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      { auth: { persistSession: false } }
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { templateId, to, variables = {}, emailType = 'transactional' }: EmailRequest = await req.json();
+    const { to, templateId, templateKey, variables = {}, subject, html, text } = await req.json();
 
-    console.log('Auth email sender processing:', { templateId, to, emailType });
+    console.log('Auth Email Sender - routing to native SMTP:', {
+      to,
+      templateId: templateId || templateKey,
+      hasCustomContent: !!(subject || html || text)
+    });
 
-    if (!templateId || !to) {
-      throw new Error('Missing required fields: templateId, to');
-    }
-
-    // Try to get template from database first
-    let templateData = null;
-    try {
-      const { data } = await supabaseAdmin
-        .from('enhanced_email_templates')
-        .select('*')
-        .eq('template_key', templateId)
-        .eq('is_active', true)
-        .maybeSingle();
-      
-      templateData = data;
-    } catch (dbError) {
-      console.warn('Database template fetch failed, using default:', dbError.message);
-    }
-
-    // Use database template or fallback to default
-    const template = templateData || getDefaultTemplate(templateId);
-    
-    // Get business settings for default variables
-    let businessSettings = null;
-    try {
-      const { data } = await supabaseAdmin
-        .from('business_settings')
-        .select('name, email, website_url')
-        .limit(1)
-        .maybeSingle();
-      businessSettings = data;
-    } catch (error) {
-      console.warn('Could not fetch business settings:', error.message);
-    }
-
-    // Merge variables with defaults
-    const allVariables = {
-      business_name: businessSettings?.name || 'Starters Small Chops',
-      support_email: businessSettings?.email || 'support@startersmallchops.com',
-      store_url: businessSettings?.website_url || 'https://startersmallchops.com',
-      ...variables
+    // Route all auth emails through native SMTP system
+    const emailData = {
+      to,
+      templateKey: templateId || templateKey,
+      variables,
+      emailType: 'transactional'
     };
 
-    // Process template
-    const subject = replaceVariables(
-      templateData ? templateData.subject_template : template.subject, 
-      allVariables
-    );
-    const html = replaceVariables(
-      templateData ? templateData.html_template : template.html, 
-      allVariables
-    );
-    const text = replaceVariables(
-      templateData ? templateData.text_template : template.text, 
-      allVariables
-    );
+    // Add custom content if provided
+    if (subject) emailData.subject = subject;
+    if (html) emailData.html = html;
+    if (text) emailData.text = text;
 
-    console.log('Template processed, invoking SMTP sender...');
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+      body: emailData
+    });
 
-    // Send via SMTP sender with fallback
-    try {
-      const { data: smtpResult, error: smtpError } = await supabaseAdmin.functions.invoke('smtp-email-sender', {
-        body: {
-          templateId,
-          recipient: { email: to, name: allVariables.customerName || 'Customer' },
-          variables: allVariables,
-          emailType,
-          to,
-          subject,
-          html,
-          text
-        }
-      });
-
-      if (smtpError) {
-        console.warn('Primary SMTP failed, trying fallback:', smtpError);
-        
-        // Fallback to production SMTP sender
-        const { data: fallbackResult, error: fallbackError } = await supabaseAdmin.functions.invoke('production-smtp-sender', {
-          body: {
-            to,
-            subject,
-            html,
-            text,
-            templateId,
-            variables: allVariables
-          }
-        });
-
-        if (fallbackError) {
-          throw new Error(`Both SMTP senders failed: ${smtpError.message}, ${fallbackError.message}`);
-        }
-
-        console.log('Email sent via fallback SMTP');
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: 'Email sent via fallback SMTP',
-            method: 'production-smtp-sender'
-          }),
-          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-
-      console.log('Email sent via primary SMTP');
-      return new Response(
-        JSON.stringify({ 
-          success: true, 
-          message: 'Email sent successfully',
-          method: 'smtp-email-sender'
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-
-    } catch (smtpError) {
-      console.error('All SMTP methods failed:', smtpError);
-      throw smtpError;
+    if (error) {
+      throw error;
     }
+
+    console.log('Auth email successfully routed to native SMTP');
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        message: 'Email sent via native SMTP',
+        data
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
 
   } catch (error) {
     console.error('Auth email sender error:', error);

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { EmailSystemStatus } from './EmailSystemStatus';
 import { Mail, Send, TestTube, Activity, CheckCircle, AlertTriangle, Zap } from 'lucide-react';
 
 export const UnifiedEmailControls = () => {
@@ -95,15 +96,18 @@ export const UnifiedEmailControls = () => {
 
   return (
     <div className="space-y-6">
+      {/* Native SMTP System Status */}
+      <EmailSystemStatus />
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-xl font-semibold flex items-center gap-2">
             <Mail className="h-5 w-5 text-primary" />
-            Unified Email System
+            Native SMTP Email System
           </h3>
           <p className="text-sm text-muted-foreground">
-            Production-ready SMTP system with queue processing and monitoring
+            All email communications use your configured SMTP settings
           </p>
         </div>
         <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">

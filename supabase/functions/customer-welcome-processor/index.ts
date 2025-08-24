@@ -22,46 +22,21 @@ serve(async (req) => {
 
     console.log('Processing welcome email for:', customer_email);
 
-    // Send welcome email using Auth system with SMTP fallback
-    try {
-      await supabaseAdmin.functions.invoke('supabase-auth-email-sender', {
-        body: {
-          templateId: 'customer_welcome',
-          to: customer_email,
-          variables: {
-            customerName: customer_name,
-            customer_email: customer_email,
-            business_name: 'Starters Small Chops',
-            store_url: 'https://your-store.com',
-            support_email: 'support@your-store.com',
-            welcome_date: new Date().toLocaleDateString()
-          },
-          emailType: 'transactional'
-        }
-      });
-      console.log('Welcome email sent via Auth system to:', customer_email);
-    } catch (authError) {
-      console.warn('Auth email failed, trying SMTP fallback:', authError);
-      
-      // Fallback to SMTP if Auth system fails
-      await supabaseAdmin.functions.invoke('smtp-email-sender', {
-        headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
-        body: {
-          templateId: 'customer_welcome',
-          to: customer_email,
-          variables: {
-            customerName: customer_name,
-            customer_email: customer_email,
-            business_name: 'Starters Small Chops',
-            store_url: 'https://your-store.com',
-            support_email: 'support@your-store.com',
-            welcome_date: new Date().toLocaleDateString()
-          },
-          emailType: 'transactional'
-        }
-      });
-      console.log('Welcome email sent via SMTP fallback to:', customer_email);
-    }
+    // Send welcome email using native SMTP system only
+    await supabaseAdmin.functions.invoke('unified-smtp-sender', {
+      body: {
+        to: customer_email,
+        templateKey: 'customer_welcome',
+        variables: {
+          customerName: customer_name || split_part(customer_email, '@', 1),
+          customerEmail: customer_email,
+          welcomeDate: new Date().toLocaleDateString()
+        },
+        emailType: 'transactional'
+      }
+    });
+    
+    console.log('Welcome email sent via Native SMTP to:', customer_email);
 
     console.log('Welcome email sent to:', customer_email);
 

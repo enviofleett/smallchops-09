@@ -19,11 +19,14 @@ enable_email_autoconfirm = false
 enable_phone_confirmations = false
 enable_phone_autoconfirm = false
 
-# UNIFIED EMAIL SYSTEM - Production Ready
+# NATIVE SMTP EMAIL SYSTEM - Single Source of Truth
 [functions.unified-smtp-sender]
 verify_jwt = false
 
 [functions.unified-email-queue-processor]
+verify_jwt = false
+
+[functions.supabase-auth-email-sender]
 verify_jwt = false
 
 [functions.payment-callback]

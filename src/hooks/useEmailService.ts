@@ -56,7 +56,7 @@ export const useEmailService = () => {
       console.log('Sending email via Production Email Processor:', emailRequest);
       
       try {
-        const { data, error } = await supabase.functions.invoke('production-email-processor', {
+        const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
           body: emailRequest
         });
 

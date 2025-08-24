@@ -11,6 +11,7 @@ import { EmailTemplateManager } from '@/components/admin/EmailTemplateManager';
 import { SMTPSettingsTab } from './SMTPSettingsTab';
 import { RealTimeEmailProcessor } from './RealTimeEmailProcessor';
 import { EmailDeliveryMonitor } from './EmailDeliveryMonitor';
+import { UnifiedEmailControls } from './UnifiedEmailControls';
 import { useEmailService } from '@/hooks/useEmailService';
 import { useSMTPSettings } from '@/hooks/useSMTPSettings';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,7 +81,7 @@ export const CommunicationsTab = () => {
       const {
         data,
         error
-      } = await supabase.functions.invoke('smtp-email-sender', {
+      } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: testEmail,
           subject: 'SMTP Connection Test - ' + new Date().toISOString(),
@@ -112,7 +113,9 @@ export const CommunicationsTab = () => {
       const {
         data,
         error
-      } = await supabase.functions.invoke('process-communication-events');
+      } = await supabase.functions.invoke('unified-email-queue-processor', {
+        body: { batchSize: 50, priority: 'all' }
+      });
       if (error) {
         throw error;
       }
@@ -177,8 +180,12 @@ export const CommunicationsTab = () => {
           <StatCard title="Delivery Rate" value={`${emailStats.deliveryRate}%`} icon={BarChart3} color={emailStats.deliveryRate >= 95 ? 'success' : emailStats.deliveryRate >= 85 ? 'warning' : 'error'} trend="Today" />
         </div>}
 
-      <Tabs defaultValue="settings" className="space-y-4">
+      <Tabs defaultValue="unified" className="space-y-4">
         <TabsList className="grid w-full grid-cols-7">
+          <TabsTrigger value="unified" className="flex items-center gap-2">
+            <Zap className="h-4 w-4" />
+            Unified System
+          </TabsTrigger>
           <TabsTrigger value="settings" className="flex items-center gap-2">
             <Settings className="h-4 w-4" />
             SMTP Settings
@@ -186,10 +193,6 @@ export const CommunicationsTab = () => {
           <TabsTrigger value="templates" className="flex items-center gap-2">
             <FileText className="h-4 w-4" />
             Email Templates
-          </TabsTrigger>
-          <TabsTrigger value="processing" className="flex items-center gap-2">
-            <Zap className="h-4 w-4" />
-            Email Processing
           </TabsTrigger>
           <TabsTrigger value="testing" className="flex items-center gap-2">
             <TestTube className="h-4 w-4" />
@@ -209,9 +212,12 @@ export const CommunicationsTab = () => {
           </TabsTrigger>
         </TabsList>
 
+        <TabsContent value="unified" className="space-y-4">
+          <UnifiedEmailControls />
+        </TabsContent>
+
         <TabsContent value="settings" className="space-y-4">
           <Card>
-            
             <CardContent>
               <SMTPSettingsTab />
             </CardContent>

@@ -1,8 +1,8 @@
-// Production Email Processor - Consolidated & Secure
+// Unified Production SMTP Sender - Single Source of Truth
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.0';
 
-// Environment-aware CORS headers
+// Production CORS configuration
 const getAllowedOrigins = () => {
   const envType = Deno.env.get('DENO_ENV') || 'development';
   const allowedOrigins = Deno.env.get('ALLOWED_ORIGINS') || '*';
@@ -11,7 +11,7 @@ const getAllowedOrigins = () => {
     return allowedOrigins.split(',').map(origin => origin.trim());
   }
   
-  return ['*']; // Allow all in development
+  return ['*'];
 };
 
 const getCorsHeaders = (origin?: string | null) => {
@@ -43,7 +43,7 @@ interface EmailRequest {
   priority?: 'high' | 'normal' | 'low';
 }
 
-// Template variable replacement function
+// Template variable replacement
 function replaceVariables(template: string, variables: Record<string, string>): string {
   let result = template;
   Object.entries(variables).forEach(([key, value]) => {
@@ -53,7 +53,7 @@ function replaceVariables(template: string, variables: Record<string, string>): 
   return result;
 }
 
-// Native SMTP implementation with enhanced security
+// Production-ready SMTP implementation
 async function sendViaSMTP(config: any, emailData: any) {
   const { host, port, auth, secure } = config;
   const { from, to, subject, html, text } = emailData;
@@ -63,7 +63,7 @@ async function sendViaSMTP(config: any, emailData: any) {
   let conn: Deno.TlsConn | Deno.Conn | null = null;
 
   try {
-    // Enhanced connection with timeout
+    // Enhanced connection with proper timeout
     const connectPromise = secure || port === 465
       ? Deno.connectTls({ hostname: host, port: port })
       : Deno.connect({ hostname: host, port: port });
@@ -77,7 +77,7 @@ async function sendViaSMTP(config: any, emailData: any) {
     const encoder = new TextEncoder();
     const decoder = new TextDecoder();
 
-    // Helper to send SMTP commands
+    // SMTP command helper
     async function sendCommand(command: string): Promise<string> {
       if (!conn) throw new Error('No connection available');
       
@@ -121,7 +121,7 @@ async function sendViaSMTP(config: any, emailData: any) {
       throw new Error(`EHLO failed: ${response}`);
     }
 
-    // STARTTLS for non-secure connections
+    // STARTTLS for port 587
     if (!secure && port === 587) {
       console.log('🔐 Initiating STARTTLS...');
       response = await sendCommand('STARTTLS');
@@ -143,7 +143,7 @@ async function sendViaSMTP(config: any, emailData: any) {
       console.log('✅ TLS upgrade successful');
     }
 
-    // Authentication using AUTH PLAIN
+    // Authentication
     const authString = btoa(`\0${auth.user}\0${auth.pass}`);
     response = await sendCommand(`AUTH PLAIN ${authString}`);
     
@@ -169,7 +169,7 @@ async function sendViaSMTP(config: any, emailData: any) {
     }
 
     // Construct email with proper headers
-    const messageId = `prod-email-${Date.now()}@${host}`;
+    const messageId = `unified-smtp-${Date.now()}@${host}`;
     const emailContent = [
       `Message-ID: <${messageId}>`,
       `Date: ${new Date().toUTCString()}`,
@@ -200,7 +200,7 @@ async function sendViaSMTP(config: any, emailData: any) {
     conn.close();
     conn = null;
 
-    console.log('✅ Email sent successfully via SMTP');
+    console.log('✅ Email sent successfully via Unified SMTP');
     
     return {
       messageId,
@@ -246,7 +246,7 @@ serve(async (req) => {
 
     const requestBody: EmailRequest = await req.json();
     
-    console.log('📨 Production Email Processor Request:', {
+    console.log('📨 Unified SMTP Request:', {
       to: requestBody.to || requestBody.recipient?.email,
       templateId: requestBody.templateId || requestBody.templateKey,
       subject: requestBody.subject
@@ -267,7 +267,7 @@ serve(async (req) => {
       throw new Error('Recipient email is required');
     }
 
-    // Check rate limits using new secure function
+    // Check rate limits
     const { data: rateLimitResult } = await supabase.rpc('check_email_rate_limit', {
       p_recipient_email: emailData.to
     });
@@ -338,17 +338,7 @@ serve(async (req) => {
       emailData.html = `<p>${emailData.text.replace(/\n/g, '<br>')}</p>`;
     }
 
-    // Get active email provider
-    const { data: provider } = await supabase.rpc('get_active_email_provider');
-    
-    if (!provider || provider.length === 0) {
-      throw new Error('No active email provider configured');
-    }
-
-    const emailProvider = provider[0];
-    console.log('📡 Using email provider:', emailProvider.provider_name);
-
-    // Get SMTP settings from communication_settings (backward compatibility)
+    // Get SMTP settings
     const { data: smtpSettings, error: settingsError } = await supabase
       .from('communication_settings')
       .select('*')
@@ -377,7 +367,7 @@ serve(async (req) => {
     const smtpConfig = {
       host: smtpSettings.smtp_host,
       port: smtpSettings.smtp_port || 587,
-      secure: smtpSettings.smtp_secure !== false,
+      secure: smtpSettings.smtp_secure === true,
       auth: {
         user: smtpSettings.smtp_user,
         pass: smtpSettings.smtp_pass,
@@ -395,19 +385,19 @@ serve(async (req) => {
       text: emailData.text || (emailData.html ? emailData.html.replace(/<[^>]*>/g, '') : ''),
     };
 
-    console.log('📤 Sending email...');
+    console.log('📤 Sending email via Unified SMTP...');
     const startTime = Date.now();
     
     // Send email via SMTP
     const result = await sendViaSMTP(smtpConfig, finalEmailData);
     const deliveryTime = Date.now() - startTime;
 
-    // Log email delivery using new secure function
+    // Log email delivery
     await supabase.rpc('log_email_delivery', {
       p_message_id: result.messageId,
       p_recipient_email: emailData.to,
       p_subject: emailData.subject,
-      p_provider: 'production_smtp',
+      p_provider: 'unified_smtp',
       p_status: 'sent',
       p_template_key: emailData.templateKey,
       p_variables: emailData.variables,
@@ -421,7 +411,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         messageId: result.messageId,
-        provider: 'production_smtp',
+        provider: 'unified_smtp',
         deliveryTime,
         templateUsed: emailData.templateKey || null,
         rateLimitInfo: rateLimitResult
@@ -433,7 +423,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('❌ Production Email Processor Error:', error);
+    console.error('❌ Unified SMTP Error:', error);
     
     // Log failed delivery
     try {
@@ -448,7 +438,7 @@ serve(async (req) => {
         p_message_id: `failed-${Date.now()}`,
         p_recipient_email: requestData.to || requestData.recipient?.email || 'unknown',
         p_subject: requestData.subject || 'Failed Email',
-        p_provider: 'production_smtp',
+        p_provider: 'unified_smtp',
         p_status: 'failed',
         p_template_key: requestData.templateId || requestData.templateKey,
         p_variables: requestData.variables || {},
@@ -462,7 +452,7 @@ serve(async (req) => {
       JSON.stringify({
         success: false,
         error: error.message,
-        provider: 'production_smtp',
+        provider: 'unified_smtp',
         timestamp: new Date().toISOString()
       }),
       {

@@ -68,7 +68,7 @@ export const getCustomerEmailStatuses = async (customerEmails: string[]): Promis
 // Resend welcome email for a customer
 export const resendWelcomeEmail = async (customerEmail: string): Promise<boolean> => {
   try {
-    const { error } = await supabase.functions.invoke('production-email-processor', {
+    const { error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
         to: customerEmail,
         templateKey: 'customer_welcome',

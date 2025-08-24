@@ -109,14 +109,14 @@ export const useSMTPSettings = () => {
       try {
         console.log('Testing email with Production Email Processor...');
         
-        const { data, error } = await supabase.functions.invoke('production-email-processor', {
+        const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
           body: {
             to: testEmail,
             subject: 'SMTP Test - Connection Successful',
             templateKey: 'smtp_test',
             variables: {
               test_time: new Date().toLocaleString(),
-              smtp_host: 'Production SMTP System',
+              smtp_host: 'Unified SMTP System',
               business_name: 'Starters Small Chops'
             },
             emailType: 'transactional'

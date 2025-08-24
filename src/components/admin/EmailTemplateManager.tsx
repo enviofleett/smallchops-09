@@ -185,7 +185,7 @@ export const EmailTemplateManager: React.FC = () => {
 
   const testTemplate = async (template: EmailTemplate) => {
     try {
-      const { data, error } = await supabase.functions.invoke('production-email-processor', {
+      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: 'test@example.com',
           template_key: template.template_key,

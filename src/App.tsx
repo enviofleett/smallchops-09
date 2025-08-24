@@ -8,7 +8,7 @@ import { HelmetProvider } from 'react-helmet-async';
 import Index from "./pages/Index";
 import Products from "./pages/Products";
 import Categories from "./pages/Categories";
-import EmailProductionTest from "./pages/EmailProductionTest";
+import { EmailProductionTest } from "./pages/EmailProductionTest";
 import AdminEmailTemplates from "./pages/admin/EmailTemplates";
 import { AdminRouteGuard } from "./components/admin/AdminRouteGuard";
 

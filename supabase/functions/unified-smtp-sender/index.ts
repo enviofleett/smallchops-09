@@ -59,11 +59,30 @@ function sanitizeEmailAddress(email: string): string {
 }
 
 function sanitizeSubject(subject: string): string {
-  return subject.replace(/[\r\n]/g, ' ').replace(/[^\x20-\x7E]/g, '').trim();
+  if (!subject) return 'No Subject';
+  
+  // Remove control characters and ensure single line
+  return subject
+    .replace(/[\r\n\t]/g, ' ')        // Replace line breaks with spaces
+    .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, '') // Keep printable ASCII + Unicode
+    .trim()
+    .substring(0, 255);               // RFC 5321 limit
 }
 
 function sanitizeContent(content: string): string {
-  return content.replace(/\r\n\./g, '\r\n..'); // Dot-stuffing for SMTP
+  if (!content) return '';
+  
+  // Ensure UTF-8 encoding
+  const encoder = new TextEncoder();
+  const decoder = new TextDecoder('utf-8', { fatal: false });
+  const encodedContent = encoder.encode(content);
+  const validUtf8Content = decoder.decode(encodedContent);
+  
+  // SMTP dot-stuffing and line ending normalization
+  return validUtf8Content
+    .replace(/\r?\n/g, '\r\n')        // Normalize line endings
+    .replace(/^\./gm, '..')           // Dot-stuffing for SMTP
+    .replace(/\r\n\./g, '\r\n..');    // Additional dot-stuffing
 }
 
 function buildMimeMessage(from: string, to: string, subject: string, html?: string, text?: string): string {
@@ -79,11 +98,13 @@ function buildMimeMessage(from: string, to: string, subject: string, html?: stri
     'MIME-Version: 1.0'
   ];
 
+  let body = '';
+
   // Determine content structure
   if (html && text) {
     // Multipart alternative (HTML + text)
-    headers.push(
-      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+    headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
+    body = [
       '',
       'This is a multi-part message in MIME format.',
       '',
@@ -100,26 +121,24 @@ function buildMimeMessage(from: string, to: string, subject: string, html?: stri
       sanitizeContent(html),
       '',
       `--${boundary}--`
-    );
+    ].join('\r\n');
   } else if (html) {
     // HTML only
     headers.push(
       'Content-Type: text/html; charset=UTF-8',
-      'Content-Transfer-Encoding: 8bit',
-      '',
-      sanitizeContent(html)
+      'Content-Transfer-Encoding: 8bit'
     );
+    body = '\r\n' + sanitizeContent(html);
   } else {
     // Plain text only
     headers.push(
       'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: 8bit',
-      '',
-      sanitizeContent(text || '')
+      'Content-Transfer-Encoding: 8bit'
     );
+    body = '\r\n' + sanitizeContent(text || '');
   }
 
-  return headers.join('\r\n');
+  return headers.join('\r\n') + body;
 }
 
 // Enhanced SMTP implementation with resilience
@@ -276,10 +295,34 @@ async function sendViaSMTP(config: any, emailData: any) {
       // Build RFC-compliant message
       const emailContent = buildMimeMessage(from, sanitizedTo, subject, html, text);
       
-      // Send data with proper termination
-      await conn.write(encoder.encode(emailContent + '\r\n.\r\n'));
+      console.log('📧 Sending email content...');
       
-      const dataResponse = await sendCommand('', 15000); // Wait for server response
+      // Send the email content
+      await conn.write(encoder.encode(emailContent));
+      
+      // Send the termination sequence (CRLF.CRLF)
+      await conn.write(encoder.encode('\r\n.\r\n'));
+      
+      // Wait for server response with timeout
+      const dataResponsePromise = async () => {
+        const buffer = new Uint8Array(1024);
+        const bytesRead = await conn.read(buffer);
+        if (bytesRead === null) {
+          throw new Error('Connection closed during data response');
+        }
+        return decoder.decode(buffer.slice(0, bytesRead)).trim();
+      };
+      
+      const dataTimeoutPromise = new Promise<never>((_, reject) => {
+        setTimeout(() => reject(new Error('Data response timeout')), 15000);
+      });
+      
+      const dataResponse = await Promise.race([
+        dataResponsePromise(),
+        dataTimeoutPromise
+      ]);
+      
+      console.log(`SMTP < ${dataResponse}`);
       
       if (!dataResponse.startsWith('250')) {
         throw new Error(`Email sending failed: ${dataResponse}`);
@@ -358,6 +401,46 @@ serve(async (req) => {
       templateId: requestBody.templateId || requestBody.templateKey,
       subject: requestBody.subject
     });
+
+    // Validation function
+    function validateEmailData(emailData: any) {
+      const { from, to, subject, html, text } = emailData;
+      
+      // Validate required fields
+      if (!to || !to.trim()) {
+        throw new Error('Recipient email is required');
+      }
+      
+      if (!from || !from.trim()) {
+        throw new Error('Sender email is required');
+      }
+      
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      const toEmail = to.includes('<') ? to.match(/<([^>]+)>/)?.[1] || to : to;
+      const fromEmail = from.includes('<') ? from.match(/<([^>]+)>/)?.[1] || from : from;
+      
+      if (!emailRegex.test(toEmail)) {
+        throw new Error(`Invalid recipient email format: ${toEmail}`);
+      }
+      
+      if (!emailRegex.test(fromEmail)) {
+        throw new Error(`Invalid sender email format: ${fromEmail}`);
+      }
+      
+      // Ensure we have some content
+      if (!html && !text) {
+        throw new Error('Email must have either HTML or text content');
+      }
+      
+      // Validate content length (prevent oversized emails)
+      const totalSize = (html || '').length + (text || '').length + (subject || '').length;
+      if (totalSize > 10 * 1024 * 1024) { // 10MB limit
+        throw new Error('Email content exceeds size limit');
+      }
+      
+      return true;
+    }
 
     // Normalize email data
     let emailData = {
@@ -500,6 +583,9 @@ serve(async (req) => {
       html: emailData.html,
       text: emailData.text || (emailData.html ? emailData.html.replace(/<[^>]*>/g, '') : ''),
     };
+
+    console.log('🔍 Validating email data...');
+    validateEmailData(finalEmailData);
 
     console.log('📤 Sending email via Unified SMTP...');
     const startTime = Date.now();

@@ -225,15 +225,28 @@ export const FullDeliveryInformation: React.FC<FullDeliveryInformationProps> = (
                         <div className="font-medium text-sm">
                           {typeof pickupPoint.operating_hours === 'object' ? (
                             <div className="space-y-1">
-                              {Object.entries(pickupPoint.operating_hours).map(([day, hours]) => (
-                                <div key={day} className="flex justify-between">
-                                  <span className="capitalize">{day}:</span>
-                                  <span>{hours as string}</span>
-                                </div>
-                              ))}
+                              {Object.entries(pickupPoint.operating_hours).map(([day, hours]) => {
+                                let display: string = '';
+                                if (!hours) {
+                                  display = 'Closed';
+                                } else if (typeof hours === 'string') {
+                                  display = hours;
+                                } else if (typeof hours === 'object') {
+                                  const h: any = hours;
+                                  const isClosed = h.closed === true || h.is_open === false;
+                                  if (isClosed) display = 'Closed';
+                                  else display = [h.open, h.close].filter(Boolean).join(' - ');
+                                }
+                                return (
+                                  <div key={day} className="flex justify-between">
+                                    <span className="capitalize">{day}:</span>
+                                    <span>{display || 'N/A'}</span>
+                                  </div>
+                                );
+                              })}
                             </div>
                           ) : (
-                            <p>{pickupPoint.operating_hours}</p>
+                            <p>{String(pickupPoint.operating_hours)}</p>
                           )}
                         </div>
                       </div>

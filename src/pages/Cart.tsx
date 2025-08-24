@@ -39,11 +39,11 @@ export default function Cart() {
 
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-background flex flex-col">
       {/* Public Header */}
       <PublicHeader />
       
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="flex-1 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-24 lg:pb-6">
         {/* Header */}
         <div className="flex items-center gap-4 mb-6">
           <Button 
@@ -88,7 +88,6 @@ export default function Cart() {
                   ))}
                 </div>
               </div>
-
             </div>
 
             {/* Cart Summary - Right Side */}
@@ -99,13 +98,19 @@ export default function Cart() {
         )}
       </div>
 
-      {/* Floating Checkout Button - Always visible */}
-      <div className="lg:hidden">
-        <CheckoutButton />
-      </div>
+      {/* Fixed Bottom Checkout Button - Mobile Only */}
+      {cart.items.length > 0 && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4 safe-area-inset-bottom z-50">
+          <div className="max-w-md mx-auto">
+            <CheckoutButton />
+          </div>
+        </div>
+      )}
 
-      {/* Public Footer */}
-      <PublicFooter />
+      {/* Public Footer - Hidden on mobile when cart has items to avoid overlap */}
+      <div className={cart.items.length > 0 ? "hidden lg:block" : ""}>
+        <PublicFooter />
+      </div>
     </div>
   );
 }

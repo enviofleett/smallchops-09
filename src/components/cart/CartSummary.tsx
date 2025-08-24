@@ -205,7 +205,7 @@ export function CartSummary({ cart }: CartSummaryProps) {
             </div>
           )}
 
-          {/* Checkout Button */}
+          {/* Checkout Button - Hidden on mobile (fixed button used instead) */}
           <Button 
             onClick={() => {
               if (hasMOQViolations) {
@@ -215,7 +215,7 @@ export function CartSummary({ cart }: CartSummaryProps) {
               console.log('Checkout button clicked, opening checkout flow');
               setShowCheckout(true);
             }} 
-            className="w-full"
+            className="w-full hidden lg:block"
             size="lg"
             disabled={cart.items.length === 0 || hasMOQViolations}
           >

@@ -7998,6 +7998,11 @@ export type Database = {
         Args:
           | { email_address: string; time_window_minutes?: number }
           | { p_email_type?: string; p_identifier: string }
+          | {
+              p_max_emails?: number
+              p_recipient_email: string
+              p_window_minutes?: number
+            }
         Returns: Json
       }
       check_enhanced_rate_limit: {
@@ -8112,6 +8117,10 @@ export type Database = {
         Returns: undefined
       }
       cleanup_old_email_events: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      cleanup_old_email_logs: {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
@@ -8297,6 +8306,14 @@ export type Database = {
       generate_secure_payment_reference: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_active_email_provider: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          health_score: number
+          is_active: boolean
+          provider_name: string
+        }[]
       }
       get_active_paystack_config: {
         Args: Record<PropertyKey, never>
@@ -8771,6 +8788,19 @@ export type Database = {
           p_ip_address?: unknown
           p_operation: string
           p_user_agent?: string
+        }
+        Returns: undefined
+      }
+      log_email_delivery: {
+        Args: {
+          p_message_id: string
+          p_provider: string
+          p_recipient_email: string
+          p_smtp_response?: string
+          p_status: string
+          p_subject: string
+          p_template_key?: string
+          p_variables?: Json
         }
         Returns: undefined
       }

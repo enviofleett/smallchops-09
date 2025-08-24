@@ -264,37 +264,49 @@ export const PaymentCallbackPage: React.FC = () => {
 
   if (verificationStatus === 'success') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-green-50 to-emerald-50 flex flex-col">
-        {/* Header with Logo */}
-        <div className="bg-white shadow-sm border-b">
-          <div className="container mx-auto px-4 py-4 flex items-center justify-center">
-            <img src={startersLogo} alt="Starters" className="h-12 object-contain" />
+      <div className="min-h-screen bg-gradient-to-br from-red-50 to-orange-50 flex flex-col relative overflow-hidden">
+        {/* Decorative background elements */}
+        <div className="absolute inset-0">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-red-100/30 rounded-full blur-xl"></div>
+          <div className="absolute bottom-20 right-10 w-40 h-40 bg-orange-100/20 rounded-full blur-2xl"></div>
+        </div>
+
+        {/* Header with Prominent Logo */}
+        <div className="bg-white shadow-lg border-b-2 border-red-100 relative z-10">
+          <div className="container mx-auto px-4 py-6 flex items-center justify-center">
+            <div className="text-center">
+              <img src={startersLogo} alt="Starters" className="h-16 object-contain mx-auto mb-2" />
+              <p className="text-red-600 font-medium text-sm">Order Management System</p>
+            </div>
           </div>
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex items-center justify-center p-4">
-          <div className="w-full max-w-sm space-y-6">
-            {/* Success Icon */}
+        <div className="flex-1 flex items-center justify-center p-4 relative z-10">
+          <div className="w-full max-w-md space-y-6">
+            {/* Success Icon with Animation */}
             <div className="text-center">
               <div className="relative inline-block">
-                <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <CheckCircle className="h-12 w-12 text-green-500" />
+                <div className="w-28 h-28 bg-gradient-to-br from-red-100 to-red-200 rounded-full flex items-center justify-center mx-auto mb-4 shadow-lg ring-4 ring-red-50">
+                  <CheckCircle className="h-14 w-14 text-red-600" />
+                </div>
+                <div className="absolute -top-2 -right-2">
+                  <PartyPopper className="h-8 w-8 text-orange-500 animate-bounce" />
                 </div>
               </div>
               
-              <h1 className="text-2xl font-bold text-green-600 mb-2 flex items-center justify-center gap-2">
-                Payment Successful! <PartyPopper className="h-6 w-6" />
+              <h1 className="text-3xl font-bold text-red-600 mb-3">
+                Payment Successful!
               </h1>
-              <p className="text-muted-foreground text-sm px-4">
+              <p className="text-gray-600 text-base px-4 leading-relaxed">
                 Your order has been confirmed and is being processed
               </p>
             </div>
 
-            {/* Amount Display */}
-            <Card className="p-6 bg-green-500 text-white text-center">
-              <p className="text-green-100 text-sm mb-2">Total Amount</p>
-              <p className="text-3xl font-bold">
+            {/* Amount Display with Enhanced Design */}
+            <Card className="p-8 bg-gradient-to-r from-red-500 to-red-600 text-white text-center shadow-xl border-0">
+              <p className="text-red-100 text-base mb-3 font-medium">Total Amount</p>
+              <p className="text-4xl font-bold tracking-wide">
                 {typeof orderDetails?.amount === 'number' 
                   ? `₦${orderDetails.amount.toLocaleString()}` 
                   : orderDetails?.amount === 'Pending confirmation' 
@@ -303,41 +315,41 @@ export const PaymentCallbackPage: React.FC = () => {
               </p>
             </Card>
 
-            {/* Status */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
-              <div className="flex items-center justify-center gap-2 text-green-700">
-                <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                <span className="text-sm font-medium">Order Confirmed & Processing</span>
+            {/* Enhanced Status */}
+            <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-5 text-center shadow-sm">
+              <div className="flex items-center justify-center gap-3 text-red-700">
+                <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
+                <span className="text-base font-semibold">Order Confirmed & Processing</span>
               </div>
             </div>
 
-            {/* Action Buttons */}
-            <div className="space-y-3">
+            {/* Action Buttons with Better Styling */}
+            <div className="space-y-4">
               <Button 
                 onClick={() => navigate('/customer-profile')} 
-                className="w-full bg-green-500 hover:bg-green-600 text-white h-12 text-base font-medium"
+                className="w-full bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white h-14 text-lg font-semibold shadow-lg transform hover:scale-[1.02] transition-all duration-200"
               >
                 Track Your Order
               </Button>
               <Button 
                 onClick={() => navigate('/')} 
                 variant="outline" 
-                className="w-full h-12 text-base border-green-200 text-green-600 hover:bg-green-50"
+                className="w-full h-14 text-lg border-2 border-red-200 text-red-600 hover:bg-red-50 font-semibold transform hover:scale-[1.02] transition-all duration-200"
               >
                 Continue Shopping
               </Button>
             </div>
 
-            {/* Order Complete Section */}
-            <Card className="p-4 bg-white border border-gray-200">
-              <div className="flex items-start gap-3">
-                <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <CheckCircle className="h-4 w-4 text-white" />
+            {/* Order Complete Section with Better Design */}
+            <Card className="p-6 bg-white border-2 border-gray-100 shadow-lg rounded-xl">
+              <div className="flex items-start gap-4">
+                <div className="w-8 h-8 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center flex-shrink-0 shadow-md">
+                  <CheckCircle className="h-5 w-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="font-medium text-foreground mb-1">Order Complete!</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Your order is being processed. Check your order history for updates.
+                  <h3 className="font-bold text-gray-800 mb-2 text-lg">Order Complete!</h3>
+                  <p className="text-gray-600 text-sm leading-relaxed">
+                    Order {orderDetails?.orderNumber || 'Processing...'} is being processed. You can track it in your order history.
                   </p>
                 </div>
               </div>

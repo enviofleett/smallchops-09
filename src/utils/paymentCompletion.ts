@@ -56,13 +56,9 @@ class PaymentCompletionCoordinator {
       detail: { reference, success: true }
     }));
 
-    // Show immediate success message
-    toast.success("Payment Verified!", {
-      description: orderNumber 
-        ? `Order ${orderNumber} confirmed. Finalizing your order...`
-        : "Payment successful. Finalizing your order...",
-      duration: 4000
-    });
+    // Suppress immediate success message to avoid popup conflicts
+    // The PaymentCallbackPage will handle all success messaging
+    console.log("✅ Payment verified - success messaging handled by PaymentCallbackPage");
 
     // Set 15-second coordinated completion
     const completionTimeout = setTimeout(() => {
@@ -72,13 +68,9 @@ class PaymentCompletionCoordinator {
         // Execute all completion actions simultaneously
         callbacks.onClearCart();
         
-        // Show final success message
-        toast.success("Order Complete!", {
-          description: orderNumber 
-            ? `Order ${orderNumber} is being processed. You can track it in your order history.`
-            : "Your order is being processed. Check your order history for updates.",
-          duration: 5000
-        });
+        // Suppress final success message to avoid popup conflicts
+        // The PaymentCallbackPage provides all necessary feedback
+        console.log("✅ Order completion handled by PaymentCallbackPage");
 
         // Clean up storage
         this.cleanupPaymentStorage(reference);

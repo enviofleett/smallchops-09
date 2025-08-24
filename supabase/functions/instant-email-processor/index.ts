@@ -1,12 +1,11 @@
 // Real-time Email Processing Engine
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-}
+import { getCorsHeaders } from '../_shared/cors.ts'
 
 Deno.serve(async (req) => {
+  const origin = req.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
@@ -34,7 +33,9 @@ Deno.serve(async (req) => {
       throw fetchError
     }
 
-    if (!highPriorityEmails || highPriorityEmails.length === 0) {
+    let emailsToProcess = highPriorityEmails || []
+    
+    if (emailsToProcess.length === 0) {
       console.log('✅ No high priority emails to process')
       
       // Also process normal priority emails if queue is empty
@@ -52,44 +53,40 @@ Deno.serve(async (req) => {
         throw normalError
       }
 
-      if (!normalEmails || normalEmails.length === 0) {
+      emailsToProcess = normalEmails || []
+      
+      if (emailsToProcess.length === 0) {
+        console.log('✅ No emails to process')
         return new Response(
           JSON.stringify({ 
-            message: 'No queued emails to process', 
+            success: true, 
+            message: 'No emails to process',
             processed: 0,
-            status: 'success'
+            failed: 0
           }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         )
       }
-
-      // Process normal priority emails
-      const result = await processEmails(supabase, normalEmails, 'normal')
-      return new Response(
-        JSON.stringify(result),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
     }
 
-    console.log(`📧 Found ${highPriorityEmails.length} high priority emails to process`)
-
-    // Process high priority emails
-    const result = await processEmails(supabase, highPriorityEmails, 'high')
-
+    console.log(`📧 Processing ${emailsToProcess.length} emails`)
+    
+    const result = await processEmails(supabase, emailsToProcess, 'instant')
+    
     return new Response(
       JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
 
   } catch (error) {
-    console.error('=== Instant Email Processor Error ===')
-    console.error('Error:', error.message)
+    console.error('❌ Instant email processor error:', error)
     
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
+        success: false,
         error: error.message,
-        status: 'error',
-        timestamp: new Date().toISOString()
+        processed: 0,
+        failed: 0
       }),
       { 
         status: 500,
@@ -100,164 +97,173 @@ Deno.serve(async (req) => {
 })
 
 async function processEmails(supabase: any, emails: any[], priority: string) {
-  let successCount = 0
-  let failureCount = 0
-  const results = []
+  let processed = 0
+  let failed = 0
 
-  for (const event of emails) {
+  for (const email of emails) {
     try {
-      console.log(`🔄 Processing ${priority} priority email ${event.id} for ${event.recipient_email}`)
-      
+      console.log(`🔄 Processing email ${email.id} to ${email.recipient_email}`)
+
       // Mark as processing
       await supabase
         .from('communication_events')
         .update({ 
           status: 'processing',
-          processed_at: new Date().toISOString(),
           updated_at: new Date().toISOString()
         })
-        .eq('id', event.id)
+        .eq('id', email.id)
 
-      // Determine which email sender to use
-      const emailSender = priority === 'high' ? 'enhanced-smtp-sender' : 'smtp-email-sender'
-      
-      // Call email sender with enhanced error handling
-      const { data: emailResult, error: emailError } = await supabase.functions.invoke(emailSender, {
-        body: {
-          templateId: event.template_key || 'welcome_customer',
-          recipient: {
-            email: event.recipient_email,
-            name: event.variables?.customerName || 'Valued Customer'
-          },
-          variables: {
-            ...event.variables,
-            companyName: 'Starters',
-            supportEmail: 'support@starters.com',
-            websiteUrl: 'https://starters.com',
-            isWelcomeEmail: true,
-            priority: priority,
-            processingTime: new Date().toISOString()
-          },
-          emailType: 'transactional'
-        }
-      })
+      // Check email suppression
+      const { data: suppressionCheck } = await supabase
+        .rpc('is_email_suppressed', { email_address: email.recipient_email })
 
-      if (emailError) {
-        console.error(`❌ Failed to send ${priority} priority email ${event.id}:`, emailError)
-        
-        // Update status to failed with intelligent retry logic
-        const newRetryCount = (event.retry_count || 0) + 1
-        const shouldRetry = newRetryCount < 3
+      if (suppressionCheck === true) {
+        console.log(`🚫 Email ${email.recipient_email} is suppressed, skipping`)
         
         await supabase
           .from('communication_events')
           .update({ 
-            status: shouldRetry ? 'queued' : 'failed',
-            error_message: emailError.message,
-            last_error: emailError.message,
-            retry_count: newRetryCount,
-            updated_at: new Date().toISOString(),
-            // Exponential backoff for retries
-            created_at: shouldRetry ? 
-              new Date(Date.now() + (Math.pow(2, newRetryCount) * 60000)).toISOString() :
-              event.created_at
+            status: 'failed',
+            error_message: 'Email address is suppressed',
+            updated_at: new Date().toISOString()
           })
-          .eq('id', event.id)
-
-        failureCount++
-        results.push({
-          eventId: event.id,
-          recipient: event.recipient_email,
-          priority: priority,
-          status: shouldRetry ? 'retry_scheduled' : 'failed',
-          error: emailError.message,
-          retryCount: newRetryCount
-        })
+          .eq('id', email.id)
         
+        failed++
         continue
       }
 
-      // Update status to sent on success
+      // Attempt to send via unified-smtp-sender
+      let emailResult
+      
+      try {
+        emailResult = await supabase.functions.invoke('unified-smtp-sender', {
+          body: {
+            to: email.recipient_email,
+            subject: email.variables?.subject || 'Notification from Starters Small Chops',
+            htmlContent: email.variables?.html_content,
+            textContent: email.variables?.text_content,
+            templateKey: email.template_key,
+            variables: email.variables
+          }
+        })
+      } catch (sendError) {
+        console.error('Error calling unified-smtp-sender:', sendError)
+        emailResult = { error: sendError }
+      }
+
+      if (emailResult.error || !emailResult.data?.success) {
+        const errorMessage = emailResult.error?.message || emailResult.data?.error || 'Unknown sending error'
+        console.log(`❌ Failed to send email ${email.id}: ${errorMessage}`)
+
+        // Handle bounces and complaints by adding to suppression list
+        if (errorMessage.toLowerCase().includes('bounce') || 
+            errorMessage.toLowerCase().includes('rejected') || 
+            errorMessage.toLowerCase().includes('invalid')) {
+          
+          await supabase
+            .from('email_suppression_list')
+            .upsert({
+              email: email.recipient_email.toLowerCase(),
+              suppression_type: 'bounce',
+              reason: errorMessage,
+              is_active: true,
+              created_at: new Date().toISOString()
+            })
+          
+          console.log(`📝 Added ${email.recipient_email} to suppression list`)
+        }
+
+        // Retry logic with exponential backoff
+        const newRetryCount = (email.retry_count || 0) + 1
+        const maxRetries = 3
+        
+        if (newRetryCount < maxRetries) {
+          const backoffMinutes = Math.pow(2, newRetryCount) * 5 // 5, 10, 20 minutes
+          const scheduledAt = new Date(Date.now() + backoffMinutes * 60000).toISOString()
+          
+          await supabase
+            .from('communication_events')
+            .update({
+              status: 'queued',
+              retry_count: newRetryCount,
+              scheduled_at: scheduledAt,
+              error_message: errorMessage,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', email.id)
+            
+          console.log(`🔄 Scheduled retry ${newRetryCount}/${maxRetries} for email ${email.id}`)
+        } else {
+          await supabase
+            .from('communication_events')
+            .update({
+              status: 'failed',
+              retry_count: newRetryCount,
+              error_message: errorMessage,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', email.id)
+            
+          console.log(`⏹️ Max retries reached for email ${email.id}, marking as failed`)
+        }
+        
+        failed++
+      } else {
+        console.log(`✅ Successfully sent email ${email.id}`)
+
+        await supabase
+          .from('communication_events')
+          .update({
+            status: 'sent',
+            sent_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            provider_message_id: emailResult.data?.messageId
+          })
+          .eq('id', email.id)
+        
+        processed++
+      }
+
+    } catch (error) {
+      console.error(`❌ Error processing email ${email.id}:`, error)
+      
       await supabase
         .from('communication_events')
-        .update({ 
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-          external_id: emailResult?.messageId,
+        .update({
+          status: 'failed',
+          error_message: error.message,
+          retry_count: (email.retry_count || 0) + 1,
           updated_at: new Date().toISOString()
         })
-        .eq('id', event.id)
-
-      console.log(`✅ ${priority} priority email sent successfully: ${event.id} -> ${event.recipient_email}`)
+        .eq('id', email.id)
       
-      successCount++
-      results.push({
-        eventId: event.id,
-        recipient: event.recipient_email,
-        priority: priority,
-        status: 'sent',
-        messageId: emailResult?.messageId,
-        method: emailResult?.method || 'smtp'
-      })
-
-      // Small delay between emails to respect rate limits
-      await new Promise(resolve => setTimeout(resolve, 100))
-
-    } catch (eventError) {
-      console.error(`❌ Error processing ${priority} priority email ${event.id}:`, eventError)
-      
-      // Update with error
-      const newRetryCount = (event.retry_count || 0) + 1
-      await supabase
-        .from('communication_events')
-        .update({ 
-          status: newRetryCount >= 3 ? 'failed' : 'queued',
-          error_message: eventError.message,
-          last_error: eventError.message,
-          retry_count: newRetryCount,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', event.id)
-
-      failureCount++
-      results.push({
-        eventId: event.id,
-        recipient: event.recipient_email,
-        priority: priority,
-        status: 'error',
-        error: eventError.message,
-        retryCount: newRetryCount
-      })
+      failed++
     }
   }
 
-  // Log comprehensive results
-  console.log(`=== ${priority.toUpperCase()} Priority Email Processing Complete ===`)
-  console.log(`✅ Successful: ${successCount}`)
-  console.log(`❌ Failed: ${failureCount}`)
+  // Log processing results
+  await supabase
+    .from('audit_logs')
+    .insert({
+      action: 'instant_email_processing_completed',
+      category: 'Email Processing',
+      message: `Instant email processing completed: ${processed} sent, ${failed} failed`,
+      new_values: {
+        processed,
+        failed,
+        priority,
+        batch_size: emails.length,
+        timestamp: new Date().toISOString()
+      }
+    })
 
-  // Log to audit for monitoring
-  await supabase.from('audit_logs').insert({
-    action: 'instant_email_processing',
-    category: 'Email Processing',
-    message: `Processed ${emails.length} ${priority} priority emails: ${successCount} sent, ${failureCount} failed`,
-    new_values: {
-      total_processed: emails.length,
-      successful: successCount,
-      failed: failureCount,
-      priority: priority,
-      processing_time: new Date().toISOString()
-    }
-  })
+  console.log(`📊 Processing complete: ${processed} sent, ${failed} failed`)
 
   return {
-    message: `${priority} priority email processing completed`,
-    total_events: emails.length,
-    successful: successCount,
-    failed: failureCount,
-    failure_rate: failureCount / emails.length,
-    priority: priority,
-    status: 'completed',
-    results: results
+    success: true,
+    processed,
+    failed,
+    message: `Processing completed: ${processed} sent, ${failed} failed`
   }
 }

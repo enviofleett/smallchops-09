@@ -1,12 +1,11 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.0';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+import { getCorsHeaders } from '../_shared/cors.ts';
 
 serve(async (req: Request) => {
+  const origin = req.headers.get('origin')
+  const corsHeaders = getCorsHeaders(origin)
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -48,24 +47,28 @@ serve(async (req: Request) => {
     }
 
     if (!queuedEmails || queuedEmails.length === 0) {
+      console.log('No emails to process');
       return new Response(
         JSON.stringify({ 
           success: true, 
-          message: 'No queued emails to process',
-          processed: 0 
+          message: 'No emails to process',
+          processed: 0,
+          failed: 0 
         }),
-        { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders }}
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders }}
       );
     }
 
-    console.log(`Processing ${queuedEmails.length} queued emails`);
-
-    let successCount = 0;
-    let failureCount = 0;
+    console.log(`Processing ${queuedEmails.length} emails`);
+    
+    let processed = 0;
+    let failed = 0;
 
     // Process each email
     for (const email of queuedEmails) {
       try {
+        console.log(`Processing email ${email.id} to ${email.recipient_email}`);
+
         // Mark as processing
         await supabase
           .from('communication_events')
@@ -75,254 +78,232 @@ serve(async (req: Request) => {
           })
           .eq('id', email.id);
 
-        // Check if email is suppressed first
+        // Check if email is suppressed
         const { data: suppressionCheck } = await supabase
           .rpc('is_email_suppressed', { email_address: email.recipient_email });
 
-        if (suppressionCheck) {
+        if (suppressionCheck === true) {
           console.log(`Email ${email.recipient_email} is suppressed, skipping`);
           
           await supabase
             .from('communication_events')
             .update({ 
-              status: 'cancelled',
+              status: 'failed',
               error_message: 'Email address is suppressed',
               updated_at: new Date().toISOString()
             })
             .eq('id', email.id);
           
-          continue; // Skip to next email
+          failed++;
+          continue;
         }
 
         // Check rate limits
-        const rateLimitResponse = await supabase.functions.invoke('enhanced-email-rate-limiter', {
-          body: {
-            identifier: email.recipient_email.split('@')[1],
-            identifier_type: 'domain',
-            limit_type: 'hourly',
-            action: 'check'
-          }
-        });
+        const { data: rateLimitCheck } = await supabase
+          .functions.invoke('enhanced-email-rate-limiter', {
+            body: { 
+              recipient_email: email.recipient_email,
+              sender_domain: 'startersmallchops.com'
+            }
+          });
 
-        if (rateLimitResponse.data && !rateLimitResponse.data.allowed) {
-          console.log(`Rate limit exceeded for ${email.recipient_email}, scheduling for later`);
+        if (!rateLimitCheck?.success || !rateLimitCheck?.data?.allowed) {
+          console.log(`Rate limit exceeded for ${email.recipient_email}`);
           
-          // Schedule for later retry
-          const retryAfter = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+          // Don't increment retry count for rate limits, just delay
           await supabase
             .from('communication_events')
             .update({ 
               status: 'queued',
-              error_message: 'Rate limit exceeded, scheduled for retry',
-              created_at: retryAfter.toISOString(),
+              scheduled_at: new Date(Date.now() + (rateLimitCheck?.data?.retry_after || 300) * 1000).toISOString(),
               updated_at: new Date().toISOString()
             })
             .eq('id', email.id);
           
-          continue; // Skip to next email
+          continue;
         }
 
-        // Enhanced email processing with template support
-        let sendResult, sendError;
+        // Attempt to send email using unified-smtp-sender
+        let emailResult;
         
-        // First try using template-based approach with smtp-email-sender
-        console.log(`Attempting template-based email for ${email.recipient_email} with template: ${email.template_key || email.event_type}`);
-        
-        ({ data: sendResult, error: sendError } = await supabase.functions.invoke(
-          'smtp-email-sender',
-          {
+        try {
+          emailResult = await supabase.functions.invoke('unified-smtp-sender', {
             body: {
-              templateId: email.template_key || email.event_type,
-              recipient: {
-                email: email.recipient_email,
-                name: email.template_variables?.customerName || email.variables?.customerName || 'Valued Customer'
-              },
-              variables: {
-                ...email.template_variables,
-                ...email.variables,
-                // Ensure standard variables are always available
-                companyName: 'Starters',
-                supportEmail: 'support@starters.com',
-                websiteUrl: 'https://starters.com'
-              },
-              emailType: 'transactional'
-            }
-          }
-        ));
-
-        // If template-based fails, try production SMTP sender as fallback
-        if (sendError || !sendResult?.success) {
-          console.log(`Template sender failed, trying production SMTP for ${email.recipient_email}`);
-          
-          ({ data: sendResult, error: sendError } = await supabase.functions.invoke(
-            'production-smtp-sender',
-            {
-              body: {
-                to: email.recipient_email,
-                subject: email.payload?.subject || `Update from ${email.template_variables?.companyName || 'Starters'}`,
-                html: email.payload?.html || email.payload?.content || `
-                  <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-                    <h2>Hello ${email.template_variables?.customerName || 'Valued Customer'}!</h2>
-                    <p>Thank you for your interest in our services.</p>
-                    <p>Best regards,<br>${email.template_variables?.companyName || 'Starters'} Team</p>
-                  </div>
-                `,
-                template_variables: email.template_variables || email.variables || {},
-                event_id: email.id,
-                priority: email.priority || 'normal'
-              }
-            }
-          ));
-        }
-
-        // Update rate limit counter if successful
-        if (!sendError && sendResult?.success) {
-          await supabase.functions.invoke('enhanced-email-rate-limiter', {
-            body: {
-              identifier: email.recipient_email.split('@')[1],
-              identifier_type: 'domain',
-              limit_type: 'hourly',
-              action: 'increment'
+              to: email.recipient_email,
+              subject: email.variables?.subject || 'Notification',
+              htmlContent: email.variables?.html_content,
+              textContent: email.variables?.text_content,
+              templateKey: email.template_key,
+              variables: email.variables
             }
           });
+        } catch (sendError) {
+          console.error('Error calling unified-smtp-sender:', sendError);
+          emailResult = { error: sendError };
         }
 
-        if (sendError || !sendResult?.success) {
-          throw new Error(sendError?.message || sendResult?.error || 'Email sending failed');
-        }
+        if (emailResult.error || !emailResult.data?.success) {
+          const errorMessage = emailResult.error?.message || emailResult.data?.error || 'Unknown sending error';
+          console.log(`Failed to send email ${email.id}: ${errorMessage}`);
 
-        // Mark as sent
-        await supabase
-          .from('communication_events')
-          .update({ 
-            status: 'sent',
-            sent_at: new Date().toISOString(),
-            external_id: sendResult.message_id,
-            processed_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', email.id);
-
-        successCount++;
-        console.log(`Successfully sent email to ${email.recipient_email}`);
-
-      } catch (error: any) {
-        console.error(`Failed to send email to ${email.recipient_email}:`, error.message);
-
-        // Check if this is a bounce/complaint that should trigger suppression
-        const errorMsg = error.message || '';
-        const isBounce = errorMsg.includes('550') || errorMsg.includes('bounce') || errorMsg.includes('invalid') || errorMsg.includes('Authentication failed');
-        const isComplaint = errorMsg.includes('complaint') || errorMsg.includes('spam');
-
-        if (isBounce || isComplaint) {
-          console.log(`Adding ${email.recipient_email} to suppression list due to ${isBounce ? 'bounce' : 'complaint'}`);
-          
-          // Add to suppression list
+          // Increment rate limit counter on failure
           try {
+            await supabase.functions.invoke('enhanced-email-rate-limiter', {
+              body: { 
+                increment_for: email.recipient_email,
+                sender_domain: 'startersmallchops.com'
+              }
+            });
+          } catch (rateLimitError) {
+            console.error('Error incrementing rate limit:', rateLimitError);
+          }
+
+          // Handle bounces and complaints
+          if (errorMessage.includes('bounce') || errorMessage.includes('rejected')) {
             await supabase
               .from('email_suppression_list')
               .upsert({
-                email_address: email.recipient_email,
-                suppression_reason: isBounce ? 'hard_bounce' : 'complaint',
-                bounce_count: 1,
-                last_bounce_at: new Date().toISOString(),
-                metadata: { error_message: errorMsg, event_id: email.id }
-              }, { onConflict: 'email_address' });
-
-            // Record bounce tracking
-            await supabase
-              .from('email_bounce_tracking')
-              .upsert({
-                email_address: email.recipient_email,
-                bounce_type: isBounce ? 'hard' : 'complaint',
-                bounce_reason: errorMsg,
-                provider_response: { error: errorMsg, timestamp: new Date().toISOString() }
-              }, { onConflict: 'email_address,bounce_type' });
-          } catch (suppressionError) {
-            console.error('Failed to add to suppression list:', suppressionError);
+                email: email.recipient_email.toLowerCase(),
+                suppression_type: 'bounce',
+                reason: errorMessage,
+                is_active: true
+              });
           }
+
+          // Retry logic with exponential backoff
+          const newRetryCount = (email.retry_count || 0) + 1;
+          const shouldRetry = newRetryCount < maxRetries;
+          
+          if (shouldRetry) {
+            const backoffMinutes = Math.pow(2, newRetryCount) * 5; // 5, 10, 20 minutes
+            const scheduledAt = new Date(Date.now() + backoffMinutes * 60000).toISOString();
+            
+            await supabase
+              .from('communication_events')
+              .update({
+                status: 'queued',
+                retry_count: newRetryCount,
+                scheduled_at: scheduledAt,
+                error_message: errorMessage,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', email.id);
+              
+            console.log(`Scheduled retry ${newRetryCount}/${maxRetries} for email ${email.id} at ${scheduledAt}`);
+          } else {
+            await supabase
+              .from('communication_events')
+              .update({
+                status: 'failed',
+                retry_count: newRetryCount,
+                error_message: errorMessage,
+                updated_at: new Date().toISOString()
+              })
+              .eq('id', email.id);
+              
+            console.log(`Max retries reached for email ${email.id}, marking as failed`);
+          }
+          
+          failed++;
+        } else {
+          console.log(`Successfully sent email ${email.id}`);
+
+          // Increment rate limit counter on success
+          try {
+            await supabase.functions.invoke('enhanced-email-rate-limiter', {
+              body: { 
+                increment_for: email.recipient_email,
+                sender_domain: 'startersmallchops.com'
+              }
+            });
+          } catch (rateLimitError) {
+            console.error('Error incrementing rate limit:', rateLimitError);
+          }
+
+          await supabase
+            .from('communication_events')
+            .update({
+              status: 'sent',
+              sent_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              provider_message_id: emailResult.data?.messageId
+            })
+            .eq('id', email.id);
+          
+          processed++;
         }
 
-        // Update failure status with retry logic (don't retry bounces/complaints)
-        const newRetryCount = email.retry_count + 1;
-        const shouldRetry = newRetryCount < maxRetries && !isBounce && !isComplaint;
-        const status = shouldRetry ? 'queued' : 'failed';
-
+      } catch (error) {
+        console.error(`Error processing email ${email.id}:`, error);
+        
         await supabase
           .from('communication_events')
-          .update({ 
-            status: status,
-            retry_count: newRetryCount,
-            last_error: error.message,
+          .update({
+            status: 'failed',
             error_message: error.message,
-            updated_at: new Date().toISOString(),
-            // Schedule retry for later if not max retries and not a bounce/complaint
-            ...(status === 'queued' && {
-              // Exponential backoff: 5min, 15min, 45min
-              created_at: new Date(Date.now() + (Math.pow(3, newRetryCount) * 5 * 60 * 1000)).toISOString()
-            })
+            retry_count: (email.retry_count || 0) + 1,
+            updated_at: new Date().toISOString()
           })
           .eq('id', email.id);
-
-        failureCount++;
+        
+        failed++;
       }
-
-      // Small delay between emails to avoid overwhelming the SMTP server
-      await new Promise(resolve => setTimeout(resolve, 100));
     }
 
-    console.log(`Email processing completed: ${successCount} sent, ${failureCount} failed`);
-
-    // Log processing result
+    // Log processing results
     await supabase
       .from('audit_logs')
       .insert({
-        action: 'email_batch_processed',
+        action: 'enhanced_email_processing_completed',
         category: 'Email Processing',
-        message: `Processed ${queuedEmails.length} emails: ${successCount} sent, ${failureCount} failed`,
+        message: `Enhanced email processing completed: ${processed} sent, ${failed} failed`,
         new_values: {
+          processed,
+          failed,
           batch_size: queuedEmails.length,
-          success_count: successCount,
-          failure_count: failureCount,
-          failure_rate: failureCount / queuedEmails.length
+          timestamp: new Date().toISOString()
         }
       });
 
-    // Alert if high failure rate
-    const failureRate = failureCount / queuedEmails.length;
-    if (failureRate > 0.2 && queuedEmails.length > 5) {
-      console.warn(`HIGH FAILURE RATE DETECTED: ${(failureRate * 100).toFixed(1)}%`);
+    // Alert on high failure rate (>50%)
+    const total = processed + failed;
+    if (total > 0 && (failed / total) > 0.5) {
+      console.error(`🚨 HIGH FAILURE RATE: ${failed}/${total} emails failed (${Math.round(failed/total*100)}%)`);
       
-      await supabase
-        .from('audit_logs')
-        .insert({
-          action: 'high_email_failure_rate',
-          category: 'Email Processing',
-          message: `CRITICAL: Email failure rate is ${(failureRate * 100).toFixed(1)}%`,
-          new_values: {
-            failure_rate: failureRate,
-            total_emails: queuedEmails.length,
-            failed_emails: failureCount
-          }
-        });
+      await supabase.functions.invoke('email-production-monitor', {
+        body: {
+          alert_type: 'high_failure_rate',
+          failure_rate: Math.round(failed/total*100),
+          total_processed: total,
+          failed_count: failed
+        }
+      });
     }
 
+    console.log(`Enhanced email processing completed: ${processed} sent, ${failed} failed`);
+
     return new Response(
-      JSON.stringify({ 
+      JSON.stringify({
         success: true,
-        processed: queuedEmails.length,
-        sent: successCount,
-        failed: failureCount,
-        failure_rate: failureRate
+        processed,
+        failed,
+        message: `Enhanced email processing completed: ${processed} sent, ${failed} failed`
       }),
-      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders }}
+      { headers: { 'Content-Type': 'application/json', ...corsHeaders }}
     );
 
-  } catch (error: any) {
-    console.error('Error in enhanced email processor:', error);
+  } catch (error) {
+    console.error('Enhanced email processor error:', error);
+    
     return new Response(
-      JSON.stringify({ success: false, error: error.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders }}
+      JSON.stringify({
+        success: false,
+        error: error.message
+      }),
+      { 
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders }
+      }
     );
   }
 });

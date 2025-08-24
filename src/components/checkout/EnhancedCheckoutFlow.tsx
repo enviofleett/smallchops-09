@@ -613,11 +613,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       
       <GuestOrLoginChoice
         onContinueAsGuest={() => setCheckoutStep('details')}
-        onLogin={() => {
-          storeRedirectUrl('/checkout');
-          onClose();
-          navigate('/auth');
-        }}
+         onLogin={() => {
+           storeRedirectUrl('/cart');
+           onClose();
+           navigate('/auth');
+         }}
         totalAmount={total}
       />
     </div>

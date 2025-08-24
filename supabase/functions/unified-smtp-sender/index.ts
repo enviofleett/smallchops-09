@@ -53,36 +53,103 @@ function replaceVariables(template: string, variables: Record<string, string>): 
   return result;
 }
 
-// Input sanitization and validation
-function sanitizeEmailAddress(email: string): string {
-  return email.trim().toLowerCase().replace(/[^\w@.-]/g, '');
-}
-
-function sanitizeSubject(subject: string): string {
-  if (!subject) return 'No Subject';
+// RFC-compliant helper functions
+function qpEncode(str: string): string {
+  if (!str) return '';
   
-  // Remove control characters and ensure single line
-  return subject
-    .replace(/[\r\n\t]/g, ' ')        // Replace line breaks with spaces
-    .replace(/[^\x20-\x7E\u00A0-\uFFFF]/g, '') // Keep printable ASCII + Unicode
-    .trim()
-    .substring(0, 255);               // RFC 5321 limit
-}
-
-function sanitizeContent(content: string): string {
-  if (!content) return '';
-  
-  // Ensure UTF-8 encoding
+  // Ensure UTF-8 and normalize line endings first
   const encoder = new TextEncoder();
   const decoder = new TextDecoder('utf-8', { fatal: false });
-  const encodedContent = encoder.encode(content);
-  const validUtf8Content = decoder.decode(encodedContent);
+  const encodedStr = encoder.encode(str);
+  const validUtf8Str = decoder.decode(encodedStr);
+  const normalized = validUtf8Str.replace(/\r?\n/g, '\r\n');
   
-  // SMTP dot-stuffing and line ending normalization
-  return validUtf8Content
-    .replace(/\r?\n/g, '\r\n')        // Normalize line endings
-    .replace(/^\./gm, '..')           // Dot-stuffing for SMTP
-    .replace(/\r\n\./g, '\r\n..');    // Additional dot-stuffing
+  let result = '';
+  let lineLength = 0;
+  
+  for (let i = 0; i < normalized.length; i++) {
+    const char = normalized[i];
+    const code = char.charCodeAt(0);
+    
+    // Handle CRLF
+    if (char === '\r' && normalized[i + 1] === '\n') {
+      result += '\r\n';
+      i++; // Skip the \n
+      lineLength = 0;
+      continue;
+    }
+    
+    // Check if character needs encoding
+    if (code === 61 || code < 32 || code > 126) {
+      // Encode as =XX
+      const hex = code.toString(16).toUpperCase().padStart(2, '0');
+      const encoded = `=${hex}`;
+      
+      // Check line length (soft line break at 76 chars)
+      if (lineLength + encoded.length > 76) {
+        result += '=\r\n';
+        lineLength = 0;
+      }
+      
+      result += encoded;
+      lineLength += encoded.length;
+    } else {
+      // Safe character
+      if (lineLength + 1 > 76) {
+        result += '=\r\n';
+        lineLength = 0;
+      }
+      
+      result += char;
+      lineLength++;
+    }
+  }
+  
+  return result;
+}
+
+function encodeHeaderIfNeeded(headerValue: string): string {
+  if (!headerValue) return '';
+  
+  // Check if encoding is needed (contains non-ASCII)
+  const needsEncoding = /[^\x00-\x7F]/.test(headerValue);
+  
+  if (!needsEncoding) {
+    return headerValue;
+  }
+  
+  // RFC 2047 Q-encoding
+  const encoder = new TextEncoder();
+  const bytes = encoder.encode(headerValue);
+  let encoded = '';
+  
+  for (const byte of bytes) {
+    if (byte === 32) {
+      encoded += '_'; // Space becomes underscore in Q-encoding
+    } else if ((byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57)) {
+      encoded += String.fromCharCode(byte); // Safe characters
+    } else {
+      encoded += `=${byte.toString(16).toUpperCase().padStart(2, '0')}`;
+    }
+  }
+  
+  return `=?UTF-8?Q?${encoded}?=`;
+}
+
+function sanitizeEnvelopeAddress(address: string): string {
+  if (!address) return '';
+  
+  // Extract email from angle brackets if present
+  const match = address.match(/<([^>]+)>/);
+  const email = match ? match[1] : address;
+  
+  // Clean and validate - allow standard email characters including +
+  return email.trim().toLowerCase().replace(/[^a-zA-Z0-9._%+-@]/g, '');
+}
+
+function dotStuff(data: string): string {
+  // Apply dot-stuffing to entire DATA payload
+  return data.replace(/(^|\r\n)\./g, '$1..');
 }
 
 function buildMimeMessage(from: string, to: string, subject: string, html?: string, text?: string): string {
@@ -94,51 +161,56 @@ function buildMimeMessage(from: string, to: string, subject: string, html?: stri
     `Date: ${new Date().toUTCString()}`,
     `From: ${from}`,
     `To: ${to}`,
-    `Subject: ${sanitizeSubject(subject)}`,
+    `Subject: ${encodeHeaderIfNeeded(subject || 'No Subject')}`,
     'MIME-Version: 1.0'
   ];
 
   let body = '';
+  const CRLF = '\r\n';
 
   // Determine content structure
   if (html && text) {
     // Multipart alternative (HTML + text)
     headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
-    body = [
-      '',
+    
+    const parts = [
+      '',  // Empty line after headers
       'This is a multi-part message in MIME format.',
       '',
       `--${boundary}`,
       'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: 8bit',
+      'Content-Transfer-Encoding: quoted-printable',
       '',
-      sanitizeContent(text),
+      qpEncode(text),
       '',
       `--${boundary}`,
-      'Content-Type: text/html; charset=UTF-8',
-      'Content-Transfer-Encoding: 8bit',
+      'Content-Type: text/html; charset=UTF-8', 
+      'Content-Transfer-Encoding: quoted-printable',
       '',
-      sanitizeContent(html),
+      qpEncode(html),
       '',
       `--${boundary}--`
-    ].join('\r\n');
+    ];
+    
+    body = parts.join(CRLF);
   } else if (html) {
     // HTML only
     headers.push(
       'Content-Type: text/html; charset=UTF-8',
-      'Content-Transfer-Encoding: 8bit'
+      'Content-Transfer-Encoding: quoted-printable'
     );
-    body = '\r\n' + sanitizeContent(html);
+    body = CRLF + CRLF + qpEncode(html);
   } else {
     // Plain text only
     headers.push(
       'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: 8bit'
+      'Content-Transfer-Encoding: quoted-printable'
     );
-    body = '\r\n' + sanitizeContent(text || '');
+    body = CRLF + CRLF + qpEncode(text || '');
   }
 
-  return headers.join('\r\n') + body;
+  // RFC-compliant: headers + CRLF + CRLF + body
+  return headers.join(CRLF) + body;
 }
 
 // Enhanced SMTP implementation with resilience
@@ -146,16 +218,16 @@ async function sendViaSMTP(config: any, emailData: any) {
   const { host, port, auth, secure } = config;
   const { from, to, subject, html, text } = emailData;
 
-  // Input validation
-  if (!to || !sanitizeEmailAddress(to).includes('@')) {
+  // Input validation using proper envelope address sanitization
+  const envelopeToAddress = sanitizeEnvelopeAddress(to);
+  const envelopeFromAddress = sanitizeEnvelopeAddress(from);
+  
+  if (!envelopeToAddress || !envelopeToAddress.includes('@')) {
     throw new Error('Invalid recipient email address');
   }
-  if (!from || !sanitizeEmailAddress(from).includes('@')) {
+  if (!envelopeFromAddress || !envelopeFromAddress.includes('@')) {
     throw new Error('Invalid sender email address');
   }
-
-  const sanitizedTo = sanitizeEmailAddress(to);
-  const sanitizedFrom = sanitizeEmailAddress(from);
 
   console.log(`📧 SMTP Connection: ${host}:${port} (${secure ? 'SSL/TLS' : 'STARTTLS'})`);
 
@@ -239,6 +311,12 @@ async function sendViaSMTP(config: any, emailData: any) {
 
       const capabilities = response.split('\r\n').map(line => line.substring(4));
       const supportsStartTLS = capabilities.some(cap => cap.toUpperCase().includes('STARTTLS'));
+      const supports8BitMime = capabilities.some(cap => cap.toUpperCase().includes('8BITMIME'));
+      
+      console.log('🔍 SMTP Capabilities detected:', {
+        STARTTLS: supportsStartTLS,
+        '8BITMIME': supports8BitMime
+      });
 
       // Enhanced STARTTLS handling
       if (!secure && port === 587 && supportsStartTLS) {
@@ -275,14 +353,13 @@ async function sendViaSMTP(config: any, emailData: any) {
         throw new Error(`Authentication failed: ${response}`);
       }
 
-      // Mail transaction
-      const fromEmail = sanitizedFrom.includes('<') ? sanitizedFrom.match(/<([^>]+)>/)?.[1] || sanitizedFrom : sanitizedFrom;
-      response = await sendCommand(`MAIL FROM:<${fromEmail}>`);
+      // Mail transaction with proper envelope addresses
+      response = await sendCommand(`MAIL FROM:<${envelopeFromAddress}>`);
       if (!response.startsWith('250')) {
         throw new Error(`MAIL FROM failed: ${response}`);
       }
 
-      response = await sendCommand(`RCPT TO:<${sanitizedTo}>`);
+      response = await sendCommand(`RCPT TO:<${envelopeToAddress}>`);
       if (!response.startsWith('250')) {
         throw new Error(`RCPT TO failed: ${response}`);
       }
@@ -293,12 +370,24 @@ async function sendViaSMTP(config: any, emailData: any) {
       }
 
       // Build RFC-compliant message
-      const emailContent = buildMimeMessage(from, sanitizedTo, subject, html, text);
+      let emailContent = buildMimeMessage(from, to, subject, html, text);
+      
+      // Log first few header lines for diagnosis
+      const headerLines = emailContent.split('\r\n').slice(0, 6);
+      console.log('📋 Message Headers:', headerLines.join(' | '));
+      
+      // Ensure content ends with CRLF
+      if (!emailContent.endsWith('\r\n')) {
+        emailContent += '\r\n';
+      }
+      
+      // Apply dot-stuffing to entire payload
+      const stuffedContent = dotStuff(emailContent);
       
       console.log('📧 Sending email content...');
       
       // Send the email content
-      await conn.write(encoder.encode(emailContent));
+      await conn.write(encoder.encode(stuffedContent));
       
       // Send the termination sequence (CRLF.CRLF)
       await conn.write(encoder.encode('\r\n.\r\n'));
@@ -336,7 +425,7 @@ async function sendViaSMTP(config: any, emailData: any) {
       
       return {
         messageId: emailContent.match(/Message-ID: <([^>]+)>/)?.[1] || `unified-${Date.now()}`,
-        accepted: [sanitizedTo],
+        accepted: [envelopeToAddress],
         rejected: [],
         response: dataResponse
       };

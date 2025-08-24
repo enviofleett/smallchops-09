@@ -40,12 +40,17 @@ export const EmailTemplateVersionHistory: React.FC<EmailTemplateVersionHistoryPr
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const versionsQuery = useQuery<TemplateVersion[]>({
+  const versionsQuery = useQuery({
     queryKey: ['email-template-versions', templateId],
     queryFn: async () => {
-      // Temporarily return empty array since table doesn't exist yet
-      console.log('Version history table not available yet');
-      return [] as TemplateVersion[];
+      const { data, error } = await supabase
+        .from('enhanced_email_template_versions')
+        .select('*')
+        .eq('template_id', templateId)
+        .order('version_number', { ascending: false });
+
+      if (error) throw error;
+      return data as TemplateVersion[];
     },
     enabled: !!templateId
   });

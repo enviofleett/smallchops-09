@@ -53,103 +53,17 @@ function replaceVariables(template: string, variables: Record<string, string>): 
   return result;
 }
 
-// RFC-compliant helper functions
-function qpEncode(str: string): string {
-  if (!str) return '';
-  
-  // Ensure UTF-8 and normalize line endings first
-  const encoder = new TextEncoder();
-  const decoder = new TextDecoder('utf-8', { fatal: false });
-  const encodedStr = encoder.encode(str);
-  const validUtf8Str = decoder.decode(encodedStr);
-  const normalized = validUtf8Str.replace(/\r?\n/g, '\r\n');
-  
-  let result = '';
-  let lineLength = 0;
-  
-  for (let i = 0; i < normalized.length; i++) {
-    const char = normalized[i];
-    const code = char.charCodeAt(0);
-    
-    // Handle CRLF
-    if (char === '\r' && normalized[i + 1] === '\n') {
-      result += '\r\n';
-      i++; // Skip the \n
-      lineLength = 0;
-      continue;
-    }
-    
-    // Check if character needs encoding
-    if (code === 61 || code < 32 || code > 126) {
-      // Encode as =XX
-      const hex = code.toString(16).toUpperCase().padStart(2, '0');
-      const encoded = `=${hex}`;
-      
-      // Check line length (soft line break at 76 chars)
-      if (lineLength + encoded.length > 76) {
-        result += '=\r\n';
-        lineLength = 0;
-      }
-      
-      result += encoded;
-      lineLength += encoded.length;
-    } else {
-      // Safe character
-      if (lineLength + 1 > 76) {
-        result += '=\r\n';
-        lineLength = 0;
-      }
-      
-      result += char;
-      lineLength++;
-    }
-  }
-  
-  return result;
+// Input sanitization and validation
+function sanitizeEmailAddress(email: string): string {
+  return email.trim().toLowerCase().replace(/[^\w@.-]/g, '');
 }
 
-function encodeHeaderIfNeeded(headerValue: string): string {
-  if (!headerValue) return '';
-  
-  // Check if encoding is needed (contains non-ASCII)
-  const needsEncoding = /[^\x00-\x7F]/.test(headerValue);
-  
-  if (!needsEncoding) {
-    return headerValue;
-  }
-  
-  // RFC 2047 Q-encoding
-  const encoder = new TextEncoder();
-  const bytes = encoder.encode(headerValue);
-  let encoded = '';
-  
-  for (const byte of bytes) {
-    if (byte === 32) {
-      encoded += '_'; // Space becomes underscore in Q-encoding
-    } else if ((byte >= 65 && byte <= 90) || (byte >= 97 && byte <= 122) || (byte >= 48 && byte <= 57)) {
-      encoded += String.fromCharCode(byte); // Safe characters
-    } else {
-      encoded += `=${byte.toString(16).toUpperCase().padStart(2, '0')}`;
-    }
-  }
-  
-  return `=?UTF-8?Q?${encoded}?=`;
+function sanitizeSubject(subject: string): string {
+  return subject.replace(/[\r\n]/g, ' ').replace(/[^\x20-\x7E]/g, '').trim();
 }
 
-function sanitizeEnvelopeAddress(address: string): string {
-  if (!address) return '';
-  
-  // Extract email from angle brackets if present
-  const match = address.match(/<([^>]+)>/);
-  const email = match ? match[1] : address;
-  
-  // Clean and validate - allow standard email characters including +
-  return email.trim().toLowerCase().replace(/[^a-zA-Z0-9._%+-@]/g, '');
-}
-
-function dotStuff(data: string): string {
-  // Apply dot-stuffing to entire DATA payload
-  return data.replace(/(^|\r\n)\./g, '$1..');
+function sanitizeContent(content: string): string {
+  return content.replace(/\r\n\./g, '\r\n..'); // Dot-stuffing for SMTP
 }
 
 function buildMimeMessage(from: string, to: string, subject: string, html?: string, text?: string): string {
@@ -161,56 +75,51 @@ function buildMimeMessage(from: string, to: string, subject: string, html?: stri
     `Date: ${new Date().toUTCString()}`,
     `From: ${from}`,
     `To: ${to}`,
-    `Subject: ${encodeHeaderIfNeeded(subject || 'No Subject')}`,
+    `Subject: ${sanitizeSubject(subject)}`,
     'MIME-Version: 1.0'
   ];
-
-  let body = '';
-  const CRLF = '\r\n';
 
   // Determine content structure
   if (html && text) {
     // Multipart alternative (HTML + text)
-    headers.push(`Content-Type: multipart/alternative; boundary="${boundary}"`);
-    
-    const parts = [
-      '',  // Empty line after headers
+    headers.push(
+      `Content-Type: multipart/alternative; boundary="${boundary}"`,
+      '',
       'This is a multi-part message in MIME format.',
       '',
       `--${boundary}`,
       'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: quoted-printable',
+      'Content-Transfer-Encoding: 8bit',
       '',
-      qpEncode(text),
+      sanitizeContent(text),
       '',
       `--${boundary}`,
-      'Content-Type: text/html; charset=UTF-8', 
-      'Content-Transfer-Encoding: quoted-printable',
+      'Content-Type: text/html; charset=UTF-8',
+      'Content-Transfer-Encoding: 8bit',
       '',
-      qpEncode(html),
+      sanitizeContent(html),
       '',
       `--${boundary}--`
-    ];
-    
-    body = parts.join(CRLF);
+    );
   } else if (html) {
     // HTML only
     headers.push(
       'Content-Type: text/html; charset=UTF-8',
-      'Content-Transfer-Encoding: quoted-printable'
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      sanitizeContent(html)
     );
-    body = CRLF + CRLF + qpEncode(html);
   } else {
     // Plain text only
     headers.push(
       'Content-Type: text/plain; charset=UTF-8',
-      'Content-Transfer-Encoding: quoted-printable'
+      'Content-Transfer-Encoding: 8bit',
+      '',
+      sanitizeContent(text || '')
     );
-    body = CRLF + CRLF + qpEncode(text || '');
   }
 
-  // RFC-compliant: headers + CRLF + CRLF + body
-  return headers.join(CRLF) + body;
+  return headers.join('\r\n');
 }
 
 // Enhanced SMTP implementation with resilience
@@ -218,16 +127,16 @@ async function sendViaSMTP(config: any, emailData: any) {
   const { host, port, auth, secure } = config;
   const { from, to, subject, html, text } = emailData;
 
-  // Input validation using proper envelope address sanitization
-  const envelopeToAddress = sanitizeEnvelopeAddress(to);
-  const envelopeFromAddress = sanitizeEnvelopeAddress(from);
-  
-  if (!envelopeToAddress || !envelopeToAddress.includes('@')) {
+  // Input validation
+  if (!to || !sanitizeEmailAddress(to).includes('@')) {
     throw new Error('Invalid recipient email address');
   }
-  if (!envelopeFromAddress || !envelopeFromAddress.includes('@')) {
+  if (!from || !sanitizeEmailAddress(from).includes('@')) {
     throw new Error('Invalid sender email address');
   }
+
+  const sanitizedTo = sanitizeEmailAddress(to);
+  const sanitizedFrom = sanitizeEmailAddress(from);
 
   console.log(`📧 SMTP Connection: ${host}:${port} (${secure ? 'SSL/TLS' : 'STARTTLS'})`);
 
@@ -311,12 +220,6 @@ async function sendViaSMTP(config: any, emailData: any) {
 
       const capabilities = response.split('\r\n').map(line => line.substring(4));
       const supportsStartTLS = capabilities.some(cap => cap.toUpperCase().includes('STARTTLS'));
-      const supports8BitMime = capabilities.some(cap => cap.toUpperCase().includes('8BITMIME'));
-      
-      console.log('🔍 SMTP Capabilities detected:', {
-        STARTTLS: supportsStartTLS,
-        '8BITMIME': supports8BitMime
-      });
 
       // Enhanced STARTTLS handling
       if (!secure && port === 587 && supportsStartTLS) {
@@ -353,13 +256,14 @@ async function sendViaSMTP(config: any, emailData: any) {
         throw new Error(`Authentication failed: ${response}`);
       }
 
-      // Mail transaction with proper envelope addresses
-      response = await sendCommand(`MAIL FROM:<${envelopeFromAddress}>`);
+      // Mail transaction
+      const fromEmail = sanitizedFrom.includes('<') ? sanitizedFrom.match(/<([^>]+)>/)?.[1] || sanitizedFrom : sanitizedFrom;
+      response = await sendCommand(`MAIL FROM:<${fromEmail}>`);
       if (!response.startsWith('250')) {
         throw new Error(`MAIL FROM failed: ${response}`);
       }
 
-      response = await sendCommand(`RCPT TO:<${envelopeToAddress}>`);
+      response = await sendCommand(`RCPT TO:<${sanitizedTo}>`);
       if (!response.startsWith('250')) {
         throw new Error(`RCPT TO failed: ${response}`);
       }
@@ -370,48 +274,12 @@ async function sendViaSMTP(config: any, emailData: any) {
       }
 
       // Build RFC-compliant message
-      let emailContent = buildMimeMessage(from, to, subject, html, text);
+      const emailContent = buildMimeMessage(from, sanitizedTo, subject, html, text);
       
-      // Log first few header lines for diagnosis
-      const headerLines = emailContent.split('\r\n').slice(0, 6);
-      console.log('📋 Message Headers:', headerLines.join(' | '));
+      // Send data with proper termination
+      await conn.write(encoder.encode(emailContent + '\r\n.\r\n'));
       
-      // Ensure content ends with CRLF
-      if (!emailContent.endsWith('\r\n')) {
-        emailContent += '\r\n';
-      }
-      
-      // Apply dot-stuffing to entire payload
-      const stuffedContent = dotStuff(emailContent);
-      
-      console.log('📧 Sending email content...');
-      
-      // Send the email content
-      await conn.write(encoder.encode(stuffedContent));
-      
-      // Send the termination sequence (CRLF.CRLF)
-      await conn.write(encoder.encode('\r\n.\r\n'));
-      
-      // Wait for server response with timeout
-      const dataResponsePromise = async () => {
-        const buffer = new Uint8Array(1024);
-        const bytesRead = await conn.read(buffer);
-        if (bytesRead === null) {
-          throw new Error('Connection closed during data response');
-        }
-        return decoder.decode(buffer.slice(0, bytesRead)).trim();
-      };
-      
-      const dataTimeoutPromise = new Promise<never>((_, reject) => {
-        setTimeout(() => reject(new Error('Data response timeout')), 15000);
-      });
-      
-      const dataResponse = await Promise.race([
-        dataResponsePromise(),
-        dataTimeoutPromise
-      ]);
-      
-      console.log(`SMTP < ${dataResponse}`);
+      const dataResponse = await sendCommand('', 15000); // Wait for server response
       
       if (!dataResponse.startsWith('250')) {
         throw new Error(`Email sending failed: ${dataResponse}`);
@@ -425,7 +293,7 @@ async function sendViaSMTP(config: any, emailData: any) {
       
       return {
         messageId: emailContent.match(/Message-ID: <([^>]+)>/)?.[1] || `unified-${Date.now()}`,
-        accepted: [envelopeToAddress],
+        accepted: [sanitizedTo],
         rejected: [],
         response: dataResponse
       };
@@ -490,46 +358,6 @@ serve(async (req) => {
       templateId: requestBody.templateId || requestBody.templateKey,
       subject: requestBody.subject
     });
-
-    // Validation function
-    function validateEmailData(emailData: any) {
-      const { from, to, subject, html, text } = emailData;
-      
-      // Validate required fields
-      if (!to || !to.trim()) {
-        throw new Error('Recipient email is required');
-      }
-      
-      if (!from || !from.trim()) {
-        throw new Error('Sender email is required');
-      }
-      
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      const toEmail = to.includes('<') ? to.match(/<([^>]+)>/)?.[1] || to : to;
-      const fromEmail = from.includes('<') ? from.match(/<([^>]+)>/)?.[1] || from : from;
-      
-      if (!emailRegex.test(toEmail)) {
-        throw new Error(`Invalid recipient email format: ${toEmail}`);
-      }
-      
-      if (!emailRegex.test(fromEmail)) {
-        throw new Error(`Invalid sender email format: ${fromEmail}`);
-      }
-      
-      // Ensure we have some content
-      if (!html && !text) {
-        throw new Error('Email must have either HTML or text content');
-      }
-      
-      // Validate content length (prevent oversized emails)
-      const totalSize = (html || '').length + (text || '').length + (subject || '').length;
-      if (totalSize > 10 * 1024 * 1024) { // 10MB limit
-        throw new Error('Email content exceeds size limit');
-      }
-      
-      return true;
-    }
 
     // Normalize email data
     let emailData = {
@@ -672,9 +500,6 @@ serve(async (req) => {
       html: emailData.html,
       text: emailData.text || (emailData.html ? emailData.html.replace(/<[^>]*>/g, '') : ''),
     };
-
-    console.log('🔍 Validating email data...');
-    validateEmailData(finalEmailData);
 
     console.log('📤 Sending email via Unified SMTP...');
     const startTime = Date.now();

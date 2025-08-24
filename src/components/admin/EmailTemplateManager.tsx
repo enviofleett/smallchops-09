@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -7,18 +8,23 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { EmailTemplateVersionHistory } from './EmailTemplateVersionHistory';
+import { sanitizeHtml } from '@/utils/htmlSanitizer';
 import { 
   Plus, 
   Edit, 
   Trash2, 
-  Eye, 
   Save, 
   X,
   Mail,
-  Code,
-  TestTube
+  TestTube,
+  History,
+  AlertTriangle,
+  CheckCircle
 } from 'lucide-react';
 
 interface EmailTemplate {
@@ -35,6 +41,8 @@ interface EmailTemplate {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  created_by?: string;
+  updated_by?: string;
 }
 
 export const EmailTemplateManager: React.FC = () => {
@@ -43,7 +51,12 @@ export const EmailTemplateManager: React.FC = () => {
   const [editingTemplate, setEditingTemplate] = useState<EmailTemplate | null>(null);
   const [isCreateMode, setIsCreateMode] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [showVersionHistory, setShowVersionHistory] = useState<string | null>(null);
+  const [testEmail, setTestEmail] = useState('test@example.com');
+  const [concurrencyConflict, setConcurrencyConflict] = useState(false);
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const defaultTemplate: Partial<EmailTemplate> = {
     template_key: '',
@@ -58,177 +71,224 @@ export const EmailTemplateManager: React.FC = () => {
     is_active: true
   };
 
-  const fetchTemplates = async () => {
-    try {
+  const templatesQuery = useQuery({
+    queryKey: ['email-templates'],
+    queryFn: async () => {
       const { data, error } = await supabase
         .from('enhanced_email_templates')
         .select('*')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setTemplates(data || []);
-    } catch (error: any) {
-      console.error('Error fetching templates:', error);
-      toast({
-        title: "Error",
-        description: "Failed to fetch email templates",
-        variant: "destructive",
-      });
-    } finally {
+      return data as EmailTemplate[];
+    },
+    refetchOnWindowFocus: false
+  });
+
+  useEffect(() => {
+    if (templatesQuery.data) {
+      setTemplates(templatesQuery.data);
       setIsLoading(false);
     }
-  };
+  }, [templatesQuery.data]);
 
-  const saveTemplate = async (template: Partial<EmailTemplate>) => {
-    setIsSaving(true);
-    try {
+  const saveMutation = useMutation({
+    mutationFn: async (template: Partial<EmailTemplate> & { originalUpdatedAt?: string }) => {
       // Basic validation
       if (!template.template_key || !template.template_name || !template.subject_template || !template.html_template) {
-        toast({
-          title: "Validation Failed",
-          description: "Please fill in all required fields",
-          variant: "destructive",
-        });
-        return;
+        throw new Error('Please fill in all required fields');
       }
+
+      // Sanitize HTML content
+      const sanitizedHtml = sanitizeHtml(template.html_template);
+      
+      const templateData = {
+        template_key: template.template_key!,
+        template_name: template.template_name!,
+        subject_template: template.subject_template!,
+        html_template: sanitizedHtml,
+        text_template: template.text_template || '',
+        variables: template.variables || [],
+        template_type: template.template_type!,
+        category: template.category!,
+        style: template.style!,
+        is_active: template.is_active ?? true
+      };
 
       if (editingTemplate?.id) {
-        // Update existing template
-        const { error } = await supabase
+        // Optimistic concurrency control
+        let query = supabase
           .from('enhanced_email_templates')
-          .update({
-            template_key: template.template_key!,
-            template_name: template.template_name!,
-            subject_template: template.subject_template!,
-            html_template: template.html_template!,
-            text_template: template.text_template,
-            variables: template.variables || [],
-            template_type: template.template_type!,
-            category: template.category!,
-            style: template.style!,
-            is_active: template.is_active ?? true
-          })
+          .update(templateData)
           .eq('id', editingTemplate.id);
 
-        if (error) throw error;
+        if (template.originalUpdatedAt) {
+          query = query.eq('updated_at', template.originalUpdatedAt);
+        }
 
-        toast({
-          title: "Template Updated",
-          description: "Email template updated successfully",
-        });
+        const { error, count } = await query;
+
+        if (error) throw error;
+        if (count === 0) {
+          throw new Error('CONCURRENCY_CONFLICT');
+        }
+
+        return { ...templateData, id: editingTemplate.id };
       } else {
-        // Create new template
-        const { error } = await supabase
+        const { data, error } = await supabase
           .from('enhanced_email_templates')
-          .insert({
-            template_key: template.template_key!,
-            template_name: template.template_name!,
-            subject_template: template.subject_template!,
-            html_template: template.html_template!,
-            text_template: template.text_template,
-            variables: template.variables || [],
-            template_type: template.template_type!,
-            category: template.category!,
-            style: template.style!,
-            is_active: template.is_active ?? true
-          });
+          .insert(templateData)
+          .select()
+          .single();
 
         if (error) throw error;
-
-        toast({
-          title: "Template Created",
-          description: "Email template created successfully",
-        });
+        return data;
       }
-
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-templates'] });
       setEditingTemplate(null);
       setIsCreateMode(false);
-      await fetchTemplates();
-    } catch (error: any) {
-      console.error('Error saving template:', error);
+      setConcurrencyConflict(false);
       toast({
-        title: "Save Failed",
-        description: error.message || "Failed to save email template",
-        variant: "destructive",
+        title: "Template Saved",
+        description: "Email template saved successfully",
       });
-    } finally {
-      setIsSaving(false);
+    },
+    onError: (error: any) => {
+      if (error.message === 'CONCURRENCY_CONFLICT') {
+        setConcurrencyConflict(true);
+        toast({
+          title: "Conflict Detected",
+          description: "This template was updated by someone else. Please refresh and try again.",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Save Failed",
+          description: error.message || "Failed to save email template",
+          variant: "destructive",
+        });
+      }
     }
-  };
+  });
 
-  const deleteTemplate = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this template?')) return;
-
-    try {
+  const deleteMutation = useMutation({
+    mutationFn: async (id: string) => {
       const { error } = await supabase
         .from('enhanced_email_templates')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
-
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['email-templates'] });
       toast({
         title: "Template Deleted",
         description: "Email template deleted successfully",
       });
-
-      await fetchTemplates();
-    } catch (error: any) {
-      console.error('Error deleting template:', error);
+    },
+    onError: (error: any) => {
       toast({
         title: "Delete Failed",
         description: error.message || "Failed to delete email template",
         variant: "destructive",
       });
     }
-  };
+  });
 
-  const testTemplate = async (template: EmailTemplate) => {
-    try {
+  const testMutation = useMutation({
+    mutationFn: async (template: EmailTemplate) => {
       const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
-          to: 'test@example.com',
+          to: testEmail,
           template_key: template.template_key,
           variables: {
             customerName: 'Test User',
             orderNumber: 'TEST-001',
-            amount: '100.00'
+            amount: '100.00',
+            companyName: 'Test Company',
+            websiteUrl: 'https://example.com',
+            supportEmail: 'support@example.com'
           }
         }
       });
 
       if (error) throw error;
-
+      return data;
+    },
+    onSuccess: () => {
       toast({
         title: "Test Email Sent",
-        description: "Template test email sent successfully",
+        description: `Template test email sent successfully to ${testEmail}`,
       });
-    } catch (error: any) {
+    },
+    onError: (error: any) => {
       toast({
         title: "Test Failed",
         description: error.message || "Failed to send test email",
         variant: "destructive",
       });
     }
+  });
+
+  const saveTemplate = (template: Partial<EmailTemplate>) => {
+    const templateWithConcurrency = {
+      ...template,
+      originalUpdatedAt: editingTemplate?.updated_at
+    };
+    saveMutation.mutate(templateWithConcurrency);
   };
 
-  useEffect(() => {
-    fetchTemplates();
-  }, []);
+  const deleteTemplate = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this template?')) return;
+    deleteMutation.mutate(id);
+  };
+
+  const testTemplate = (template: EmailTemplate) => {
+    if (!testEmail || !testEmail.includes('@')) {
+      toast({
+        title: "Invalid Email",
+        description: "Please enter a valid test email address",
+        variant: "destructive",
+      });
+      return;
+    }
+    testMutation.mutate(template);
+  };
 
   const startCreate = () => {
     setEditingTemplate(defaultTemplate as EmailTemplate);
     setIsCreateMode(true);
+    setConcurrencyConflict(false);
   };
 
   const startEdit = (template: EmailTemplate) => {
     setEditingTemplate({ ...template });
     setIsCreateMode(false);
+    setConcurrencyConflict(false);
   };
 
   const cancelEdit = () => {
     setEditingTemplate(null);
     setIsCreateMode(false);
+    setConcurrencyConflict(false);
+  };
+
+  const refreshTemplate = async () => {
+    if (editingTemplate?.id) {
+      const { data, error } = await supabase
+        .from('enhanced_email_templates')
+        .select('*')
+        .eq('id', editingTemplate.id)
+        .single();
+
+      if (!error && data) {
+        setEditingTemplate(data);
+        setConcurrencyConflict(false);
+      }
+    }
   };
 
   if (isLoading) {
@@ -255,6 +315,18 @@ export const EmailTemplateManager: React.FC = () => {
         </Button>
       </div>
 
+      {concurrencyConflict && (
+        <Alert variant="destructive">
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription className="flex items-center justify-between">
+            <span>This template was updated by someone else. Your changes may conflict.</span>
+            <Button variant="outline" size="sm" onClick={refreshTemplate}>
+              Refresh
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
       {editingTemplate && (
         <Card>
           <CardHeader>
@@ -268,19 +340,20 @@ export const EmailTemplateManager: React.FC = () => {
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
-                <Label htmlFor="template_key">Template Key</Label>
+                <Label htmlFor="template_key">Template Key *</Label>
                 <Input
                   id="template_key"
                   value={editingTemplate.template_key}
                   onChange={(e) => setEditingTemplate({
                     ...editingTemplate,
-                    template_key: e.target.value
+                    template_key: e.target.value.toLowerCase().replace(/[^a-z0-9_.-]/g, '')
                   })}
                   placeholder="e.g., order_confirmation"
+                  pattern="^[a-z0-9_.-]+$"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="template_name">Template Name</Label>
+                <Label htmlFor="template_name">Template Name *</Label>
                 <Input
                   id="template_name"
                   value={editingTemplate.template_name}
@@ -310,6 +383,7 @@ export const EmailTemplateManager: React.FC = () => {
                     <SelectItem value="transactional">Transactional</SelectItem>
                     <SelectItem value="marketing">Marketing</SelectItem>
                     <SelectItem value="notification">Notification</SelectItem>
+                    <SelectItem value="system">System</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -355,7 +429,7 @@ export const EmailTemplateManager: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="subject_template">Subject Template</Label>
+              <Label htmlFor="subject_template">Subject Template *</Label>
               <Input
                 id="subject_template"
                 value={editingTemplate.subject_template}
@@ -368,7 +442,7 @@ export const EmailTemplateManager: React.FC = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="html_template">HTML Template</Label>
+              <Label htmlFor="html_template">HTML Template *</Label>
               <Textarea
                 id="html_template"
                 value={editingTemplate.html_template}
@@ -408,6 +482,30 @@ export const EmailTemplateManager: React.FC = () => {
               />
             </div>
 
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="test_email">Test Email Address</Label>
+                <Input
+                  id="test_email"
+                  type="email"
+                  value={testEmail}
+                  onChange={(e) => setTestEmail(e.target.value)}
+                  placeholder="test@example.com"
+                />
+              </div>
+              <div className="flex items-end">
+                <Button
+                  variant="outline"
+                  onClick={() => editingTemplate && testTemplate(editingTemplate as EmailTemplate)}
+                  disabled={testMutation.isPending || !editingTemplate.template_key}
+                  className="w-full"
+                >
+                  <TestTube className="h-4 w-4 mr-2" />
+                  {testMutation.isPending ? 'Testing...' : 'Test Email'}
+                </Button>
+              </div>
+            </div>
+
             <div className="flex items-center justify-between pt-4">
               <div className="flex items-center space-x-2">
                 <input
@@ -431,10 +529,10 @@ export const EmailTemplateManager: React.FC = () => {
                 </Button>
                 <Button
                   onClick={() => saveTemplate(editingTemplate)}
-                  disabled={isSaving}
+                  disabled={saveMutation.isPending}
                 >
                   <Save className="h-4 w-4 mr-2" />
-                  {isSaving ? 'Saving...' : 'Save'}
+                  {saveMutation.isPending ? 'Saving...' : 'Save'}
                 </Button>
               </div>
             </div>
@@ -462,10 +560,35 @@ export const EmailTemplateManager: React.FC = () => {
                   </CardDescription>
                 </div>
                 <div className="flex gap-2">
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                      >
+                        <History className="h-4 w-4" />
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent className="max-w-4xl max-h-[80vh] overflow-auto">
+                      <DialogHeader>
+                        <DialogTitle>Version History - {template.template_name}</DialogTitle>
+                        <DialogDescription>
+                          View and manage previous versions of this template
+                        </DialogDescription>
+                      </DialogHeader>
+                      <EmailTemplateVersionHistory 
+                        templateId={template.id}
+                        onRestore={() => {
+                          queryClient.invalidateQueries({ queryKey: ['email-templates'] });
+                        }}
+                      />
+                    </DialogContent>
+                  </Dialog>
                   <Button
                     variant="outline"
                     size="sm"
                     onClick={() => testTemplate(template)}
+                    disabled={testMutation.isPending}
                   >
                     <TestTube className="h-4 w-4" />
                   </Button>
@@ -480,6 +603,7 @@ export const EmailTemplateManager: React.FC = () => {
                     variant="outline"
                     size="sm"
                     onClick={() => deleteTemplate(template.id)}
+                    disabled={deleteMutation.isPending}
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>

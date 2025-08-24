@@ -388,8 +388,8 @@ const Orders = () => {
 
   // Get display data based on filter
   const getDisplayOrders = (): OrderWithItems[] => {
-    if (statusFilter === 'pending') return (pendingOrders || []) as OrderWithItems[];
-    if (statusFilter === 'overdue') return (overdueOrders || []) as OrderWithItems[];
+    if (statusFilter === 'pending') return pendingOrders || [];
+    if (statusFilter === 'overdue') return overdueOrders || [];
     return adjustedOrders;
   };
 

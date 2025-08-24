@@ -2,24 +2,13 @@ import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { OrderWithItems } from '@/api/orders';
 
 interface PendingOrderStats {
   total: number;
   needsAttention: number;
   awaitingPayment: number;
   processingTime: number;
-}
-
-interface PendingOrder {
-  id: string;
-  order_number: string;
-  customer_name: string;
-  customer_email: string;
-  total_amount: number;
-  created_at: string;
-  payment_reference?: string;
-  payment_status: string;
-  status: string;
 }
 
 export const usePendingOrdersLogic = () => {
@@ -71,26 +60,20 @@ export const usePendingOrdersLogic = () => {
   // Fetch detailed pending orders
   const { data: pendingOrders = [], isLoading: ordersLoading } = useQuery({
     queryKey: ['pending-orders-detailed'],
-    queryFn: async (): Promise<PendingOrder[]> => {
+    queryFn: async (): Promise<OrderWithItems[]> => {
       const { data, error } = await supabase
         .from('orders')
         .select(`
-          id,
-          order_number,
-          customer_name,
-          customer_email,
-          total_amount,
-          created_at,
-          payment_reference,
-          payment_status,
-          status
+          *,
+          order_items(*),
+          delivery_zones(*)
         `)
         .eq('status', 'pending')
         .order('created_at', { ascending: false })
         .limit(50);
 
       if (error) throw error;
-      return data;
+      return data as OrderWithItems[];
     },
     refetchInterval: autoRefreshEnabled ? 30000 : false,
     staleTime: 15000

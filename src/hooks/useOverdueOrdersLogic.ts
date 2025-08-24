@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 import { toast } from 'sonner';
+import { OrderWithItems } from '@/api/orders';
 
 interface OverdueOrderStats {
   total: number;
@@ -13,20 +14,7 @@ interface OverdueOrderStats {
   averageDelayMinutes: number;
 }
 
-interface OverdueOrder {
-  id: string;
-  order_number: string;
-  customer_name: string;
-  customer_phone: string;
-  order_type: string;
-  status: string;
-  total_amount: number;
-  delivery_schedule?: {
-    delivery_date: string;
-    delivery_time_start: string;
-    delivery_time_end: string;
-    special_instructions?: string;
-  };
+interface OverdueOrder extends OrderWithItems {
   overdue_severity: 'critical' | 'moderate' | 'recent';
   minutes_overdue: number;
 }
@@ -39,24 +27,19 @@ export const useOverdueOrdersLogic = () => {
   // Fetch orders that could potentially be overdue
   const { data: potentialOverdueOrders = [] } = useQuery({
     queryKey: ['potential-overdue-orders'],
-    queryFn: async () => {
+    queryFn: async (): Promise<OrderWithItems[]> => {
       const { data, error } = await supabase
         .from('orders')
         .select(`
-          id,
-          order_number,
-          customer_name,
-          customer_phone,
-          order_type,
-          status,
-          total_amount,
-          created_at
+          *,
+          order_items(*),
+          delivery_zones(*)
         `)
         .in('status', ['confirmed', 'preparing', 'ready', 'out_for_delivery'])
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      return data;
+      return data as OrderWithItems[];
     },
     refetchInterval: autoRefreshEnabled ? 60000 : false, // Check every minute
     staleTime: 30000
@@ -103,7 +86,6 @@ export const useOverdueOrdersLogic = () => {
 
         overdueOrders.push({
           ...order,
-          delivery_schedule: schedule,
           overdue_severity: severity,
           minutes_overdue: minutesOverdue
         });

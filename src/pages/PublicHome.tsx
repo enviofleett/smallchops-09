@@ -350,8 +350,6 @@ const PublicHome = () => {
             <div className="flex justify-center order-1 lg:order-2">
               <HeroCarousel 
                 className="w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96"
-                fallbackImage="/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png"
-                fallbackAlt="Delicious snacks and treats"
               />
             </div>
             

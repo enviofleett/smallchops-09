@@ -18,8 +18,8 @@ interface HeroCarouselProps {
 
 export const HeroCarousel = ({ 
   className = "w-64 h-64 sm:w-80 sm:h-80 lg:w-96 lg:h-96",
-  fallbackImage = "/lovable-uploads/6ce07f82-8658-4534-a584-2c507d3ff58c.png",
-  fallbackAlt = "Delicious snacks and treats"
+  fallbackImage,
+  fallbackAlt = "Product showcase"
 }: HeroCarouselProps) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isVisible, setIsVisible] = useState(true);
@@ -42,16 +42,8 @@ export const HeroCarousel = ({
     },
   });
 
-  // Use fallback if no hero images available
-  const imagesToShow = heroImages.length > 0 ? heroImages : [
-    { 
-      id: 'fallback', 
-      image_url: fallbackImage, 
-      alt_text: fallbackAlt, 
-      display_order: 0, 
-      is_active: true 
-    }
-  ];
+  // Only show uploaded images - no hardcoded fallbacks
+  const imagesToShow = heroImages.length > 0 ? heroImages : [];
 
   // Auto-rotate images every 20 seconds with fade effect
   useEffect(() => {
@@ -79,24 +71,35 @@ export const HeroCarousel = ({
     setCurrentIndex(0);
   }, [imagesToShow]);
 
+  // Don't render anything if no uploaded images available
+  if (imagesToShow.length === 0) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-gray-100 rounded-2xl`}>
+        <div className="text-center p-6">
+          <div className="text-gray-400 text-sm font-medium">
+            Upload images to showcase your products
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   const currentImage = imagesToShow[currentIndex];
 
   return (
     <div className={className}>
       <img 
         src={currentImage.image_url} 
-        alt={currentImage.alt_text || 'Hero image'} 
+        alt={currentImage.alt_text || 'Uploaded product image'} 
         className={`w-full h-full object-cover rounded-2xl transition-opacity duration-500 ease-in-out ${
           isVisible ? 'opacity-100' : 'opacity-0'
         }`}
         loading="eager"
         onError={(e) => {
-          // Fallback to default image if current image fails to load
+          console.error('Failed to load hero image:', currentImage.image_url);
+          // Don't fallback to any hardcoded image
           const target = e.target as HTMLImageElement;
-          if (target.src !== fallbackImage) {
-            target.src = fallbackImage;
-            target.alt = fallbackAlt;
-          }
+          target.style.display = 'none';
         }}
       />
     </div>

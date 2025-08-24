@@ -19,6 +19,13 @@ enable_email_autoconfirm = false
 enable_phone_confirmations = false
 enable_phone_autoconfirm = false
 
+# UNIFIED EMAIL SYSTEM - Production Ready
+[functions.unified-smtp-sender]
+verify_jwt = false
+
+[functions.unified-email-queue-processor]
+verify_jwt = false
+
 [functions.payment-callback]
 verify_jwt = false
 
@@ -29,27 +36,6 @@ verify_jwt = true
 verify_jwt = false
 
 [functions.paystack-verify]
-verify_jwt = false
-
-[functions.enhanced-smtp-sender]
-verify_jwt = false
-
-[functions.instant-email-processor]
-verify_jwt = false
-
-[functions.instant-welcome-processor]
-verify_jwt = false
-
-[functions.smtp-email-sender]
-verify_jwt = true
-
-[functions.supabase-auth-email-sender]
-verify_jwt = false
-
-[functions.smtp-health-monitor]
-verify_jwt = false
-
-[functions.production-email-processor]
 verify_jwt = false
 
 [functions.paystack-secure]

@@ -119,8 +119,8 @@ class EmailTemplateService {
 
       const processed = this.processTemplate(template, variables);
 
-      // Use the enhanced SMTP sender function
-      const { error } = await supabase.functions.invoke('production-smtp-sender', {
+      // Use the unified SMTP sender function
+      const { error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: recipient,
           subject: processed.subject,

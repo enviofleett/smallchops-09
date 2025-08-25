@@ -1,12 +1,13 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Package, MapPin, User, Clock, AlertTriangle, CheckCircle, Truck } from 'lucide-react';
 import { OrderWithItems } from '@/api/orders';
 import { format } from 'date-fns';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
+import { AdminOrderStatusBadge } from './AdminOrderStatusBadge';
 
 interface AdminOrderCardProps {
   order: OrderWithItems;
@@ -14,18 +15,6 @@ interface AdminOrderCardProps {
 }
 
 export const AdminOrderCard = ({ order, deliverySchedule }: AdminOrderCardProps) => {
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'delivered': return 'bg-green-100 text-green-800';
-      case 'out_for_delivery': return 'bg-blue-100 text-blue-800';
-      case 'preparing': return 'bg-orange-100 text-orange-800';
-      case 'confirmed': return 'bg-yellow-100 text-yellow-800';
-      case 'pending': return 'bg-gray-100 text-gray-800';
-      case 'cancelled': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'delivered': return <CheckCircle className="w-4 h-4" />;
@@ -48,10 +37,10 @@ export const AdminOrderCard = ({ order, deliverySchedule }: AdminOrderCardProps)
               {getStatusIcon(order.status)}
               <h3 className="font-semibold text-lg">#{order.order_number}</h3>
               {isOverdue && (
-                <Badge variant="destructive" className="text-xs">
+                <AdminOrderStatusBadge status="overdue" className="bg-red-100 text-red-800 border-red-200">
                   <AlertTriangle className="w-3 h-3 mr-1" />
                   Overdue
-                </Badge>
+                </AdminOrderStatusBadge>
               )}
             </div>
             <p className="text-sm text-muted-foreground">
@@ -59,15 +48,15 @@ export const AdminOrderCard = ({ order, deliverySchedule }: AdminOrderCardProps)
             </p>
           </div>
           <div className="flex flex-col gap-2 items-end">
-            <Badge className={getStatusColor(order.status)} variant="secondary">
-              {order.status.replace('_', ' ')}
-            </Badge>
-            <Badge variant={order.order_type === 'delivery' ? 'default' : 'outline'}>
-              {order.order_type}
-            </Badge>
-            <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
-              {order.payment_status}
-            </Badge>
+            <AdminOrderStatusBadge status={order.status} />
+            <AdminOrderStatusBadge 
+              status={order.order_type} 
+              className={order.order_type === 'delivery' ? 'bg-blue-100 text-blue-800 border-blue-200' : 'bg-gray-100 text-gray-800 border-gray-200'}
+            />
+            <AdminOrderStatusBadge 
+              status={order.payment_status} 
+              className={order.payment_status === 'paid' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-yellow-100 text-yellow-800 border-yellow-200'}
+            />
           </div>
         </div>
       </CardHeader>

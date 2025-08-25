@@ -297,7 +297,7 @@ async function sendViaSMTP(
   }
 }
 
-// Server-side template processing
+// Server-side template processing with fallback handling
 async function processTemplate(templateKey: string, variables: Record<string, any>, supabaseUrl: string, supabaseKey: string): Promise<{
   subject: string;
   html: string;
@@ -306,7 +306,11 @@ async function processTemplate(templateKey: string, variables: Record<string, an
   try {
     console.log(`🎨 Processing template: ${templateKey}`)
     
-    const templateResponse = await fetch(`${supabaseUrl}/rest/v1/enhanced_email_templates?template_key=eq.${templateKey}&is_active=eq.true&select=*`, {
+    // Template key normalization - handle common variations
+    const normalizedTemplateKey = normalizeTemplateKey(templateKey)
+    console.log(`🔄 Normalized template key: ${normalizedTemplateKey}`)
+    
+    const templateResponse = await fetch(`${supabaseUrl}/rest/v1/enhanced_email_templates?template_key=eq.${normalizedTemplateKey}&is_active=eq.true&select=*`, {
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
         'apikey': supabaseKey
@@ -314,17 +318,18 @@ async function processTemplate(templateKey: string, variables: Record<string, an
     })
     
     if (!templateResponse.ok) {
-      console.warn(`Template fetch failed: ${templateResponse.status}`)
-      return null
+      console.warn(`❌ Template fetch failed: ${templateResponse.status}`)
+      return getFallbackTemplate(templateKey, variables)
     }
     
     const templates = await templateResponse.json()
     if (!templates || templates.length === 0) {
-      console.warn(`Template not found: ${templateKey}`)
-      return null
+      console.warn(`❌ Template not found: ${normalizedTemplateKey}, trying fallback template`)
+      return getFallbackTemplate(templateKey, variables)
     }
     
     const template = templates[0]
+    console.log(`✅ Template found: ${template.template_name}`)
     
     // Process template variables
     const processText = (text: string): string => {
@@ -340,9 +345,107 @@ async function processTemplate(templateKey: string, variables: Record<string, an
       text: processText(template.text_template)
     }
   } catch (error) {
-    console.error('Template processing error:', error)
-    return null
+    console.error('❌ Template processing error:', error)
+    return getFallbackTemplate(templateKey, variables)
   }
+}
+
+// Normalize template keys to handle common variations
+function normalizeTemplateKey(templateKey: string): string {
+  const mappings: Record<string, string> = {
+    'order_confirmed': 'order_confirmation',  // Common mapping
+    'order_confirm': 'order_confirmation',
+    'confirm_order': 'order_confirmation',
+    'payment_confirmed': 'payment_confirmation',
+    'user_welcome': 'customer_welcome',
+    'welcome_user': 'customer_welcome'
+  }
+  
+  return mappings[templateKey] || templateKey
+}
+
+// Provide fallback templates when database templates are not found
+function getFallbackTemplate(templateKey: string, variables: Record<string, any>): {
+  subject: string;
+  html: string;
+  text: string;
+} {
+  console.log(`🔄 Generating fallback template for: ${templateKey}`)
+  
+  const fallbacks: Record<string, any> = {
+    order_confirmed: {
+      subject: `Order Confirmation - ${variables.order_number || variables.orderNumber || 'Your Order'}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #2c3e50;">Order Confirmed!</h2>
+          <p>Dear ${variables.customer_name || variables.customerName || 'Valued Customer'},</p>
+          <p>Thank you for your order! We're excited to confirm that your order <strong>${variables.order_number || variables.orderNumber || ''}</strong> has been received and confirmed.</p>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Order Details:</h3>
+            <p><strong>Order Number:</strong> ${variables.order_number || variables.orderNumber || 'N/A'}</p>
+            <p><strong>Total Amount:</strong> ₦${variables.total_amount || variables.totalAmount || 'N/A'}</p>
+            <p><strong>Order Type:</strong> ${variables.order_type || variables.orderType || 'Standard'}</p>
+          </div>
+          <p>We'll keep you updated on your order status. Thank you for choosing us!</p>
+          <p>Best regards,<br>The Starter Small Chops Team</p>
+        </div>
+      `,
+      text: `Order Confirmed!\n\nDear ${variables.customer_name || variables.customerName || 'Valued Customer'},\n\nYour order ${variables.order_number || variables.orderNumber || ''} has been confirmed.\n\nTotal Amount: ₦${variables.total_amount || variables.totalAmount || 'N/A'}\n\nThank you for choosing us!\n\nBest regards,\nThe Starter Small Chops Team`
+    },
+    order_confirmation: {
+      subject: `Order Confirmation - ${variables.order_number || variables.orderNumber || 'Your Order'}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #2c3e50;">Order Confirmation</h2>
+          <p>Dear ${variables.customer_name || variables.customerName || 'Valued Customer'},</p>
+          <p>We've received your order and it's being processed!</p>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Order Summary:</h3>
+            <p><strong>Order #:</strong> ${variables.order_number || variables.orderNumber || 'N/A'}</p>
+            <p><strong>Amount:</strong> ₦${variables.total_amount || variables.totalAmount || 'N/A'}</p>
+          </div>
+          <p>We'll notify you when your order is ready!</p>
+          <p>Best regards,<br>Starter Small Chops</p>
+        </div>
+      `,
+      text: `Order Confirmation\n\nDear ${variables.customer_name || variables.customerName || 'Valued Customer'},\n\nOrder #: ${variables.order_number || variables.orderNumber || 'N/A'}\nAmount: ₦${variables.total_amount || variables.totalAmount || 'N/A'}\n\nWe'll notify you when ready!\n\nBest regards,\nStarter Small Chops`
+    },
+    payment_confirmation: {
+      subject: `Payment Received - ${variables.order_number || 'Thank You'}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+          <h2 style="color: #27ae60;">Payment Confirmed!</h2>
+          <p>Dear ${variables.customer_name || 'Valued Customer'},</p>
+          <p>We've received your payment successfully.</p>
+          <div style="background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">Payment Details:</h3>
+            <p><strong>Order:</strong> ${variables.order_number || 'N/A'}</p>
+            <p><strong>Amount:</strong> ₦${variables.amount || variables.total_amount || 'N/A'}</p>
+          </div>
+          <p>Your order is now being prepared!</p>
+        </div>
+      `,
+      text: `Payment Confirmed!\n\nOrder: ${variables.order_number || 'N/A'}\nAmount: ₦${variables.amount || variables.total_amount || 'N/A'}\n\nYour order is being prepared!`
+    }
+  }
+  
+  // Default fallback if specific template not found
+  const defaultFallback = {
+    subject: `Notification from Starter Small Chops`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+        <h2 style="color: #2c3e50;">Hello!</h2>
+        <p>Dear ${variables.customer_name || variables.customerName || 'Valued Customer'},</p>
+        <p>Thank you for using our service. We'll be in touch soon!</p>
+        <p>Best regards,<br>The Starter Small Chops Team</p>
+      </div>
+    `,
+    text: `Hello ${variables.customer_name || variables.customerName || 'Valued Customer'},\n\nThank you for using our service!\n\nBest regards,\nStarter Small Chops`
+  }
+  
+  const template = fallbacks[templateKey] || fallbacks[normalizeTemplateKey(templateKey)] || defaultFallback
+  console.log(`✅ Fallback template generated for: ${templateKey}`)
+  return template
 }
 
 // Email validation and rate limiting

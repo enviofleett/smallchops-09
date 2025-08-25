@@ -12,6 +12,8 @@ import { OrderStatus } from '@/types/orders';
 import OrderDetailsDialog from '@/components/orders/OrderDetailsDialog';
 import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
+import { MobileOrderTabs } from '@/components/admin/orders/MobileOrderTabs';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck } from 'lucide-react';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +34,7 @@ export default function AdminOrders() {
   const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'due_today' | 'upcoming'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
+  const isMobile = useIsMobile();
 
   // Fetch orders with pagination and filters
   const {
@@ -320,46 +323,78 @@ export default function AdminOrders() {
           </CardContent>
         </Card>
 
-        {/* Orders Tabs */}
+        {/* Orders Tabs - Mobile Responsive */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-1">
-            <TabsTrigger value="all" className="text-xs sm:text-sm">
-              <span className="hidden sm:inline">All Orders</span>
-              <span className="sm:hidden">All</span>
-              <span className="ml-1">({orderCounts.all})</span>
-            </TabsTrigger>
-            <TabsTrigger value="pending" className="text-xs sm:text-sm">
-              <span className="hidden sm:inline">Pending</span>
-              <span className="sm:hidden">Pend</span>
-              <span className="ml-1">({orderCounts.pending})</span>
-            </TabsTrigger>
-            <TabsTrigger value="confirmed" className="text-xs sm:text-sm">
-              <span className="hidden sm:inline">Confirmed</span>
-              <span className="sm:hidden">Conf</span>
-              <span className="ml-1">({orderCounts.confirmed})</span>
-            </TabsTrigger>
-            <TabsTrigger value="preparing" className="text-xs sm:text-sm">
-              <span className="hidden sm:inline">Preparing</span>
-              <span className="sm:hidden">Prep</span>
-              <span className="ml-1">({orderCounts.preparing})</span>
-            </TabsTrigger>
-            <TabsTrigger value="out_for_delivery" className="text-xs sm:text-sm">
-              <span className="hidden sm:inline">Out for Delivery</span>
-              <span className="sm:hidden">Out</span>
-              <span className="ml-1">({orderCounts.out_for_delivery})</span>
-            </TabsTrigger>
-            <TabsTrigger value="delivered" className="text-xs sm:text-sm">
-              <span className="hidden sm:inline">Delivered</span>
-              <span className="sm:hidden">Del</span>
-              <span className="ml-1">({orderCounts.delivered})</span>
-            </TabsTrigger>
-            <TabsTrigger value="overdue" className="text-xs sm:text-sm text-red-600">
-              <span className="hidden sm:inline">Overdue</span>
-              <span className="sm:hidden">Over</span>
-            </TabsTrigger>
-          </TabsList>
+          <div className="relative">
+            {/* Mobile: Scrollable horizontal tabs */}
+            <div className="sm:hidden">
+              <div className="overflow-x-auto pb-2 scrollbar-hide">
+                <TabsList className="flex w-max min-w-full gap-1 p-1 bg-muted rounded-lg">
+                  <TabsTrigger value="all" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                    All ({orderCounts.all})
+                  </TabsTrigger>
+                  <TabsTrigger value="pending" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                    Pend ({orderCounts.pending})
+                  </TabsTrigger>
+                  <TabsTrigger value="confirmed" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                    Conf ({orderCounts.confirmed})
+                  </TabsTrigger>
+                  <TabsTrigger value="preparing" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                    Prep ({orderCounts.preparing})
+                  </TabsTrigger>
+                  <TabsTrigger value="out_for_delivery" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                    Out ({orderCounts.out_for_delivery})
+                  </TabsTrigger>
+                  <TabsTrigger value="delivered" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                    Del ({orderCounts.delivered})
+                  </TabsTrigger>
+                  <TabsTrigger value="overdue" className="text-xs whitespace-nowrap px-3 py-2 text-destructive data-[state=active]:bg-background">
+                    Over
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+            </div>
+            
+            {/* Desktop: Grid layout */}
+            <div className="hidden sm:block">
+              <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
+                <TabsTrigger value="all" className="text-sm px-2 py-2 data-[state=active]:bg-background">
+                  All Orders ({orderCounts.all})
+                </TabsTrigger>
+                <TabsTrigger value="pending" className="text-sm px-2 py-2 data-[state=active]:bg-background">
+                  Pending ({orderCounts.pending})
+                </TabsTrigger>
+                <TabsTrigger value="confirmed" className="text-sm px-2 py-2 data-[state=active]:bg-background">
+                  Confirmed ({orderCounts.confirmed})
+                </TabsTrigger>
+                <TabsTrigger value="preparing" className="text-sm px-2 py-2 data-[state=active]:bg-background">
+                  Preparing ({orderCounts.preparing})
+                </TabsTrigger>
+                <TabsTrigger value="out_for_delivery" className="text-sm px-2 py-2 data-[state=active]:bg-background">
+                  Out for Delivery ({orderCounts.out_for_delivery})
+                </TabsTrigger>
+                <TabsTrigger value="delivered" className="text-sm px-2 py-2 data-[state=active]:bg-background">
+                  Delivered ({orderCounts.delivered})
+                </TabsTrigger>
+                <TabsTrigger value="overdue" className="text-sm px-2 py-2 text-destructive data-[state=active]:bg-background">
+                  Overdue
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
 
-          <TabsContent value={activeTab} className="space-y-4">
+          {/* Mobile and Desktop Content */}
+          {isMobile ? (
+            <MobileOrderTabs
+              orders={filteredOrders}
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              onOrderSelect={handleOrderClick}
+              deliverySchedules={deliverySchedules}
+              orderCounts={orderCounts}
+            />
+          ) : (
+            <TabsContent value={activeTab} className="space-y-4">
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (
@@ -433,7 +468,8 @@ export default function AdminOrders() {
                 )}
               </>
             )}
-          </TabsContent>
+            </TabsContent>
+          )}
         </Tabs>
 
         {/* Order Details Dialog */}

@@ -20,6 +20,8 @@ import { AdminDriversTab } from '@/components/admin/delivery/AdminDriversTab';
 import { DeliveryZonesManager } from '@/components/delivery/DeliveryZonesManager';
 import { EnhancedDeliveryManagement } from '@/components/admin/delivery/EnhancedDeliveryManagement';
 import { DriverPerformanceDashboard } from '@/components/admin/delivery/DriverPerformanceDashboard';
+import { MobileDeliveryTabs } from '@/components/admin/delivery/MobileDeliveryTabs';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { 
   MapPin, 
   Truck, 
@@ -48,6 +50,7 @@ export default function AdminDelivery() {
   const [isRegisterDriverOpen, setIsRegisterDriverOpen] = useState(false);
   const [deliveryWindowFilter, setDeliveryWindowFilter] = useState<string>('all');
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const isMobile = useIsMobile();
 
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
   const isSelectedDateToday = isToday(selectedDate);
@@ -341,16 +344,59 @@ export default function AdminDelivery() {
           </Card>
         </div>
 
-        {/* Main Tabs */}
+        {/* Main Tabs - Mobile Responsive */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Overview</TabsTrigger>
-            <TabsTrigger value="ready-orders" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Ready</TabsTrigger>
-            <TabsTrigger value="orders" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">All</TabsTrigger>
-            <TabsTrigger value="drivers" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Drivers</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Analytics</TabsTrigger>
-            <TabsTrigger value="overdue" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">Overdue</TabsTrigger>
-          </TabsList>
+          <div className="relative">
+            {/* Mobile: Scrollable horizontal tabs */}
+            <div className="sm:hidden">
+              <div className="overflow-x-auto pb-2 scrollbar-hide">
+                <TabsList className="flex w-max min-w-full gap-1 p-1 bg-muted rounded-lg">
+                  <TabsTrigger value="overview" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    Overview
+                  </TabsTrigger>
+                  <TabsTrigger value="ready-orders" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    Ready
+                  </TabsTrigger>
+                  <TabsTrigger value="orders" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    Orders
+                  </TabsTrigger>
+                  <TabsTrigger value="drivers" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    Drivers
+                  </TabsTrigger>
+                  <TabsTrigger value="analytics" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    Analytics
+                  </TabsTrigger>
+                  <TabsTrigger value="overdue" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
+                    Overdue
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+            </div>
+            
+            {/* Desktop: Grid layout */}
+            <div className="hidden sm:block">
+              <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-1 p-1 bg-muted rounded-lg">
+                <TabsTrigger value="overview" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="ready-orders" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  Ready
+                </TabsTrigger>
+                <TabsTrigger value="orders" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  All Orders
+                </TabsTrigger>
+                <TabsTrigger value="drivers" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  Drivers
+                </TabsTrigger>
+                <TabsTrigger value="analytics" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  Analytics
+                </TabsTrigger>
+                <TabsTrigger value="overdue" className="text-sm px-2 py-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
+                  Overdue
+                </TabsTrigger>
+              </TabsList>
+            </div>
+          </div>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">

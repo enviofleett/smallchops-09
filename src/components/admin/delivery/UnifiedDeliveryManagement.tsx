@@ -6,7 +6,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { useQuery } from '@tanstack/react-query';
 import { getOrders, updateOrder } from '@/api/orders';
-import { getStatusColor } from '@/utils/statusColors';
 import { AdminOrderStatusBadge } from '@/components/admin/AdminOrderStatusBadge';
 import { OrderReceiptModal } from '@/components/customer/OrderReceiptModal';
 import { DeliveryAssignmentDialog } from './DeliveryAssignmentDialog';

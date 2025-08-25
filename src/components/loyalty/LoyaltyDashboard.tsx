@@ -24,7 +24,7 @@ interface LoyaltyDashboardProps {
 }
 
 export const LoyaltyDashboard = ({ customerEmail = 'demo@example.com' }: LoyaltyDashboardProps) => {
-  const { loyaltyData, transactions, loading, redeemPoints, generateReferralCode } = useLoyaltyProgram(customerEmail);
+  const { loyaltyData, transactions, loading, redeemPoints, generateReferralCode, error } = useLoyaltyProgram(customerEmail);
   const { referrals, fetchReferrals } = useReferralProgram();
   const [redeemAmount, setRedeemAmount] = useState('');
   const [redeemReason, setRedeemReason] = useState('');
@@ -79,7 +79,22 @@ export const LoyaltyDashboard = ({ customerEmail = 'demo@example.com' }: Loyalty
     return (
       <Card>
         <CardContent className="pt-6">
-          <div className="text-center">Loading loyalty data...</div>
+          <div className="flex items-center justify-center space-x-2">
+            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
+            <span>Loading loyalty data...</span>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error) {
+    return (
+      <Card>
+        <CardContent className="pt-6">
+          <div className="text-center text-destructive">
+            Error loading loyalty data. Please try again later.
+          </div>
         </CardContent>
       </Card>
     );

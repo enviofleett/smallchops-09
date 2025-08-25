@@ -1,6 +1,7 @@
 import React, { useState } from "react";
 import { Trophy, PlusCircle, Edit, Trash } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -18,18 +19,26 @@ import { useQuery } from "@tanstack/react-query"; // For the usage counts
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
 
 
-// --- Add helper for status colors ---
-const statusColors: Record<string, string> = {
-  active: "bg-green-100 text-green-700",
-  paused: "bg-yellow-100 text-yellow-700",
-  expired: "bg-gray-200 text-gray-600",
-};
-
+// --- Status badge component with semantic tokens ---
 function StatusBadge({ status }: { status: string }) {
+  const getStatusVariant = (status: string) => {
+    switch (status) {
+      case "active":
+        return "default";
+      case "paused":
+      case "inactive":
+        return "secondary";
+      case "expired":
+        return "outline";
+      default:
+        return "outline";
+    }
+  };
+
   return (
-    <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[status] || "bg-gray-200 text-gray-600"}`}>
+    <Badge variant={getStatusVariant(status)}>
       {status.charAt(0).toUpperCase() + status.slice(1)}
-    </span>
+    </Badge>
   );
 }
 
@@ -66,12 +75,13 @@ export default function PromotionsPage() {
     queryFn: getPromotionUsage,
   });
 
-  function handleStatusChange(promo: Promotion, newStatus: PromotionStatus) {
+function handleStatusChange(promo: Promotion, newStatus: PromotionStatus) {
     const confirmLabel = newStatus === 'expired'
       ? "Are you sure you want to expire this promotion? This cannot be undone."
       : undefined;
 
     if (confirmLabel && !window.confirm(confirmLabel)) return;
+    
     updateMutation.mutate(
       { id: promo.id, fields: { status: newStatus } },
       {
@@ -79,11 +89,11 @@ export default function PromotionsPage() {
           toast({
             title: "Promotion updated",
             description: `Promotion status set to "${newStatus.charAt(0).toUpperCase() + newStatus.slice(1)}"`,
-            variant: "default"
           });
           refetchUsage();
         },
-        onError: () => {
+        onError: (error) => {
+          console.error('Promotion update error:', error);
           toast({
             title: "Failed to update promotion",
             description: "Promotion status change failed.",
@@ -150,20 +160,20 @@ export default function PromotionsPage() {
                         label="Applicable Days" 
                         value={
                           (!promo.applicable_days || promo.applicable_days.length === 0) ? (
-                            <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">All Days</span>
+                            <Badge variant="secondary" className="text-xs">All Days</Badge>
                           ) : (
                             <div className="flex flex-wrap gap-1">
                               {promo.applicable_days.slice(0, 4).map((day) => (
-                                <span key={day} className="text-xs bg-muted text-muted-foreground px-1 py-0.5 rounded capitalize">
+                                <Badge key={day} variant="outline" className="text-xs capitalize">
                                   {day.slice(0, 3)}
-                                </span>
+                                </Badge>
                               ))}
                               {promo.applicable_days.length > 4 && (
                                 <span className="text-xs text-muted-foreground">+{promo.applicable_days.length - 4}</span>
                               )}
                             </div>
                           )
-                        } 
+                        }
                       />
                       <MobileCardRow 
                         label="Valid From" 
@@ -253,15 +263,15 @@ export default function PromotionsPage() {
                     {promo.type === "buy_one_get_one" && "BOGO"}
                     {promo.type === "free_delivery" && "Free"}
                   </td>
-                  <td className="p-3">
+                   <td className="p-3">
                     {(!promo.applicable_days || promo.applicable_days.length === 0) ? (
-                      <span className="text-xs bg-primary/10 text-primary px-2 py-1 rounded-full">All</span>
+                      <Badge variant="secondary" className="text-xs">All</Badge>
                     ) : (
                       <div className="flex flex-wrap gap-1">
                         {promo.applicable_days.slice(0, 2).map((day) => (
-                          <span key={day} className="text-xs bg-muted text-muted-foreground px-1 py-0.5 rounded capitalize">
+                          <Badge key={day} variant="outline" className="text-xs capitalize">
                             {day.slice(0, 3)}
-                          </span>
+                          </Badge>
                         ))}
                         {promo.applicable_days.length > 2 && (
                           <span className="text-xs text-muted-foreground">+{promo.applicable_days.length - 2}</span>

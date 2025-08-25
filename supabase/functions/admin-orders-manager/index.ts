@@ -213,13 +213,37 @@ const handler = async (req: Request): Promise<Response> => {
         let augmented = orders;
         if (orders.length > 0) {
           const orderIds = orders.map((o: any) => o.id);
-          const { data: txs, error: txError } = await supabase
-            .from('payment_transactions')
-            .select('id, order_id, status, paid_at, channel')
-            .in('order_id', orderIds)
-            .order('paid_at', { ascending: false, nullsFirst: false })
-            .order('created_at', { ascending: false });
-          if (txError) console.warn('TX fetch warning:', txError.message);
+          
+          // Try to fetch payment transactions with graceful fallback for missing created_at column
+          let txs = null;
+          try {
+            const { data, error } = await supabase
+              .from('payment_transactions')
+              .select('id, order_id, status, paid_at, channel')
+              .in('order_id', orderIds)
+              .order('paid_at', { ascending: false, nullsFirst: false })
+              .order('created_at', { ascending: false });
+            
+            if (error && error.message.includes('created_at')) {
+              // Fallback query without created_at ordering if column doesn't exist
+              console.warn('created_at column not found in list query, using fallback:', error.message);
+              const { data: fallbackData } = await supabase
+                .from('payment_transactions')
+                .select('id, order_id, status, paid_at, channel')
+                .in('order_id', orderIds)
+                .order('paid_at', { ascending: false, nullsFirst: false });
+              txs = fallbackData;
+            } else if (error) {
+              console.warn('TX fetch warning:', error.message);
+              txs = null;
+            } else {
+              txs = data;
+            }
+          } catch (err) {
+            console.warn('Payment transactions list query failed:', err);
+            txs = null;
+          }
+          
           const latestByOrder = new Map<string, any>();
           (txs || []).forEach((t: any) => {
             if (!latestByOrder.has(t.order_id) && (t.status === 'success' || t.status === 'paid')) {
@@ -318,12 +342,36 @@ const handler = async (req: Request): Promise<Response> => {
         // Compute final payment fields for single order
         let orderWithPayment = orderData;
         if (orderData) {
-          const { data: txs } = await supabase
-            .from('payment_transactions')
-            .select('id, order_id, status, paid_at, channel')
-            .eq('order_id', orderData.id)
-            .order('paid_at', { ascending: false, nullsFirst: false })
-            .order('created_at', { ascending: false });
+          // Try to fetch payment transactions with graceful fallback for missing created_at column
+          let txs = null;
+          try {
+            const { data, error } = await supabase
+              .from('payment_transactions')
+              .select('id, order_id, status, paid_at, channel')
+              .eq('order_id', orderData.id)
+              .order('paid_at', { ascending: false, nullsFirst: false })
+              .order('created_at', { ascending: false });
+            
+            if (error && error.message.includes('created_at')) {
+              // Fallback query without created_at ordering if column doesn't exist
+              console.warn('created_at column not found, using fallback query:', error.message);
+              const { data: fallbackData } = await supabase
+                .from('payment_transactions')
+                .select('id, order_id, status, paid_at, channel')
+                .eq('order_id', orderData.id)
+                .order('paid_at', { ascending: false, nullsFirst: false });
+              txs = fallbackData;
+            } else if (error) {
+              console.warn('Payment transactions query error:', error.message);
+              txs = null;
+            } else {
+              txs = data;
+            }
+          } catch (err) {
+            console.warn('Payment transactions query failed:', err);
+            txs = null;
+          }
+          
           const tx = (txs || []).find((t: any) => t.status === 'success' || t.status === 'paid') || null;
           const final_paid = orderData.payment_status === 'paid' || !!tx;
           const final_paid_at = orderData.paid_at || (tx ? tx.paid_at : null);

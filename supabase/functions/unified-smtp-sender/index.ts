@@ -392,29 +392,31 @@ async function validateEmailRequest(to: string, supabaseUrl: string, supabaseKey
 }
 
 serve(async (req) => {
-  // CORS preflight
-  const origin = req.headers.get('origin')
-  const corsHeaders = getCorsHeaders(origin)
-  
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
-  }
-  
-  let requestBody: any
+  // Initialize variables for proper error handling
+  let requestBody: any = undefined
+  let corsHeaders: Record<string, string>
   
   try {
+    // CORS preflight
+    const origin = req.headers.get('origin')
+    corsHeaders = getCorsHeaders(origin)
+    
+    if (req.method === 'OPTIONS') {
+      return new Response(null, { headers: corsHeaders, status: 200 })
+    }
+
     console.log('📧 Processing SMTP email request...')
     
     // Robust JSON parsing
     try {
       requestBody = await req.json()
     } catch (parseError) {
-      console.error('JSON parsing failed:', parseError)
+      console.error('❌ JSON parsing failed:', parseError)
       return new Response(
         JSON.stringify({ 
           success: false, 
           error: 'Invalid JSON payload',
-          details: parseError.message 
+          details: parseError?.message || 'Request body is not valid JSON'
         }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
@@ -459,9 +461,22 @@ serve(async (req) => {
     
     console.log('🔄 Normalized payload:', JSON.stringify(normalizedPayload, null, 2))
     
-    // Get Supabase credentials
+    // Get Supabase credentials and validate them
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    
+    // Validate environment variables first
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('❌ Missing required environment variables')
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Server configuration error',
+          details: 'Missing required environment variables'
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
     
     // Validate email request
     console.log('🔒 Validating email request...')
@@ -518,12 +533,28 @@ serve(async (req) => {
     })
     
     if (!settingsResponse.ok) {
-      throw new Error(`Failed to fetch SMTP settings: ${settingsResponse.status}`)
+      console.error(`❌ Failed to fetch SMTP settings: ${settingsResponse.status}`)
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Failed to fetch SMTP configuration',
+          details: `HTTP ${settingsResponse.status}: ${settingsResponse.statusText}`
+        }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
     
     const settings = await settingsResponse.json()
     if (!settings || settings.length === 0) {
-      throw new Error('No active SMTP configuration found')
+      console.error('❌ No active SMTP configuration found')
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'No active SMTP configuration found',
+          details: 'Please configure SMTP settings in the communication_settings table'
+        }),
+        { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
     
     const config = settings[0]

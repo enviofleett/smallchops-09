@@ -9091,6 +9091,10 @@ export type Database = {
         Args: { p_order_id?: string; p_slot_id: string }
         Returns: Json
       }
+      reset_email_system_health: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       safe_delete_product: {
         Args: { product_id: string }
         Returns: Json

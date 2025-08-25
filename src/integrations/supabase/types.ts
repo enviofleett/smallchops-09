@@ -4603,6 +4603,7 @@ export type Database = {
           old_status: string | null
           order_id: string | null
           previous_status: string | null
+          reason: string | null
         }
         Insert: {
           changed_at?: string | null
@@ -4612,6 +4613,7 @@ export type Database = {
           old_status?: string | null
           order_id?: string | null
           previous_status?: string | null
+          reason?: string | null
         }
         Update: {
           changed_at?: string | null
@@ -4621,6 +4623,7 @@ export type Database = {
           old_status?: string | null
           order_id?: string | null
           previous_status?: string | null
+          reason?: string | null
         }
         Relationships: [
           {
@@ -4641,6 +4644,7 @@ export type Database = {
           old_status: string | null
           order_id: string | null
           previous_status: string | null
+          reason: string | null
         }
         Insert: {
           changed_at?: string | null
@@ -4650,6 +4654,7 @@ export type Database = {
           old_status?: string | null
           order_id?: string | null
           previous_status?: string | null
+          reason?: string | null
         }
         Update: {
           changed_at?: string | null
@@ -4659,6 +4664,7 @@ export type Database = {
           old_status?: string | null
           order_id?: string | null
           previous_status?: string | null
+          reason?: string | null
         }
         Relationships: []
       }

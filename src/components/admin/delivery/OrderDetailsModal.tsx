@@ -1,22 +1,30 @@
-import React, { useState } from 'react';
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import React, { useState, useEffect } from 'react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { format } from 'date-fns';
-import { Package, User, MapPin, Clock, Phone, Mail, Printer, Loader2 } from 'lucide-react';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
 import { OrderReceiptModal } from '@/components/customer/OrderReceiptModal';
-import { AdminOrderStatusBadge } from '@/components/admin/AdminOrderStatusBadge';
-import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { 
+  MapPin, 
+  Clock, 
+  User, 
+  Phone, 
+  Mail, 
+  Package, 
+  Printer,
+  X,
+  Loader2,
+  AlertCircle,
+  RefreshCw
+} from 'lucide-react';
+import { toast } from 'sonner';
 
 interface OrderDetailsModalProps {
   order: any;
@@ -25,233 +33,394 @@ interface OrderDetailsModalProps {
 }
 
 export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
-  const [showPrintModal, setShowPrintModal] = useState(false);
-  const { toast } = useToast();
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   
-  // Fetch detailed order data with product information
-  const { data: detailedOrder, isLoading, error } = useDetailedOrderData(order?.id);
+  // Fetch detailed order data including product details
+  const { data: detailedOrder, isLoading, error, refetch } = useDetailedOrderData(order?.id);
   const { data: businessSettings } = useBusinessSettings();
 
+  // Local currency formatter
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-NG', {
+      style: 'currency',
+      currency: 'NGN'
+    }).format(amount);
+  };
+
+  // Show toast for errors
+  useEffect(() => {
+    if (error) {
+      toast.error('Failed to load order details');
+    }
+  }, [error]);
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'confirmed': return 'bg-blue-500/10 text-blue-700 border-blue-200';
+      case 'preparing': return 'bg-orange-500/10 text-orange-700 border-orange-200';
+      case 'ready': return 'bg-green-500/10 text-green-700 border-green-200';
+      case 'out_for_delivery': return 'bg-purple-500/10 text-purple-700 border-purple-200';
+      case 'delivered': return 'bg-green-600/10 text-green-800 border-green-300';
+      case 'cancelled': return 'bg-red-500/10 text-red-700 border-red-200';
+      default: return 'bg-gray-500/10 text-gray-700 border-gray-200';
+    }
+  };
+
   const formatAddress = (address: any) => {
-    if (!address) return 'No address provided';
+    if (!address || typeof address !== 'object') return 'N/A';
     
     const parts = [
       address.address_line_1,
       address.address_line_2,
       address.city,
-      address.state,
-      address.postal_code,
+      address.state
     ].filter(Boolean);
     
-    return parts.join(', ');
+    return parts.join(', ') || 'N/A';
   };
 
   const handlePrint = () => {
-    setShowPrintModal(true);
+    setIsReceiptModalOpen(true);
   };
-
-  // Use the detailed order data if available, fallback to the original order
-  const displayOrder = detailedOrder?.order || order;
-  const orderItems = detailedOrder?.items || order?.order_items || [];
-
-  if (error) {
-    toast({
-      title: "Error loading order details",
-      description: "Failed to load complete order information",
-      variant: "destructive",
-    });
-  }
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="pb-6">
-            {/* Branded Header */}
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                {businessSettings?.logo_url && (
-                  <img 
-                    src={businessSettings.logo_url} 
-                    alt={businessSettings.logo_alt_text || businessSettings.name || 'Logo'}
-                    className="h-12 w-auto object-contain"
-                  />
-                )}
-                <div>
-                  <DialogTitle className="text-2xl font-bold">
-                    {businessSettings?.name || 'Starters'} - Order Details
-                  </DialogTitle>
-                  <DialogDescription className="text-lg">
-                    Order #{displayOrder.order_number}
-                  </DialogDescription>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+          {/* Header with branding */}
+          <DialogHeader className="flex flex-row items-center justify-between p-4 sm:p-6 pb-2 border-b shrink-0">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
+              {businessSettings?.logo_url ? (
+                <img 
+                  src={businessSettings.logo_url} 
+                  alt={businessSettings.logo_alt_text || businessSettings.name || 'Starters'}
+                  className="h-8 sm:h-10 w-auto object-contain shrink-0"
+                />
+              ) : (
+                <div className="text-lg sm:text-xl font-bold text-primary shrink-0">
+                  {businessSettings?.name || 'Starters'}
                 </div>
+              )}
+              <div className="min-w-0 flex-1">
+                <DialogTitle className="text-lg sm:text-xl font-semibold truncate">
+                  Order Details
+                </DialogTitle>
+                <p className="text-sm text-muted-foreground truncate">
+                  {order?.order_number}
+                </p>
               </div>
+            </div>
+            
+            <div className="flex items-center gap-2 shrink-0">
               <Button
-                onClick={handlePrint}
                 variant="outline"
-                className="flex items-center gap-2"
+                size="sm"
+                onClick={handlePrint}
+                disabled={isLoading}
+                className="hidden sm:flex"
               >
-                <Printer className="w-4 h-4" />
-                Print Order
+                <Printer className="w-4 h-4 mr-2" />
+                Print
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
               </Button>
             </div>
           </DialogHeader>
 
-          {isLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin" />
-              <span className="ml-2 text-muted-foreground">Loading order details...</span>
-            </div>
-          ) : (
-            <div className="space-y-8">
-              {/* Order Status and Type */}
-              <div className="flex items-center gap-4 p-4 bg-muted/30 rounded-lg">
-                <AdminOrderStatusBadge status={displayOrder.status} />
-                <Badge 
-                  variant={displayOrder.order_type === 'delivery' ? 'outline' : 'secondary'}
-                  className="text-sm"
-                >
-                  {displayOrder.order_type?.toUpperCase()}
-                </Badge>
-                <span className="text-sm text-muted-foreground">
-                  Placed on {format(new Date(displayOrder.created_at), 'MMM dd, yyyy HH:mm')}
-                </span>
-                {displayOrder.paid_at && (
-                  <Badge variant="default" className="bg-green-100 text-green-800">
-                    PAID
-                  </Badge>
-                )}
-              </div>
-
-              {/* Customer Information */}
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold flex items-center gap-2 text-primary">
-                  <User className="w-5 h-5" />
-                  Customer Information
-                </h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-6 bg-muted/30 rounded-lg">
-                  <div>
-                    <p className="font-semibold text-lg">{displayOrder.customer_name}</p>
-                    <p className="text-muted-foreground flex items-center gap-2 mt-2">
-                      <Mail className="w-4 h-4" />
-                      {displayOrder.customer_email}
-                    </p>  
-                    {displayOrder.customer_phone && (
-                      <p className="text-muted-foreground flex items-center gap-2 mt-1">
-                        <Phone className="w-4 h-4" />
-                        {displayOrder.customer_phone}
-                      </p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Delivery Information */}
-              {displayOrder.order_type === 'delivery' && (
+          <ScrollArea className="flex-1 px-4 sm:px-6">
+            <div className="space-y-4 sm:space-y-6 py-4">
+              {/* Loading State */}
+              {isLoading && (
                 <div className="space-y-4">
-                  <h3 className="text-xl font-semibold flex items-center gap-2 text-primary">
-                    <MapPin className="w-5 h-5" />
-                    Delivery Information
-                  </h3>
-                  <div className="p-6 bg-muted/30 rounded-lg space-y-4">
-                    <div>
-                      <p className="font-semibold mb-2">Delivery Address:</p>
-                      <p>{formatAddress(displayOrder.delivery_address)}</p>
-                    </div>
-                    
-                    {detailedOrder?.delivery_schedule && (
-                      <div>
-                        <p className="font-semibold mb-2 flex items-center gap-2">
-                          <Clock className="w-4 h-4" />
-                          Delivery Window:
-                        </p>
-                        <p>
-                          {format(new Date(detailedOrder.delivery_schedule.delivery_date), 'MMM dd, yyyy')} - {' '}
-                          {detailedOrder.delivery_schedule.delivery_time_start} to {detailedOrder.delivery_schedule.delivery_time_end}
-                        </p>
-                        {detailedOrder.delivery_schedule.is_flexible && (
-                          <p className="text-sm text-muted-foreground mt-1">
-                            ✓ Flexible delivery time
-                          </p>
-                        )}
-                      </div>
-                    )}
-                    
-                    {detailedOrder?.delivery_schedule?.special_instructions && (
-                      <div>
-                        <p className="font-semibold mb-2">Special Instructions:</p>
-                        <p className="bg-background p-3 rounded border">
-                          {detailedOrder.delivery_schedule.special_instructions}
-                        </p>
-                      </div>
-                    )}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <Card>
+                      <CardHeader>
+                        <Skeleton className="h-5 w-32" />
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-3/4" />
+                      </CardContent>
+                    </Card>
+                    <Card>
+                      <CardHeader>
+                        <Skeleton className="h-5 w-32" />
+                      </CardHeader>
+                      <CardContent className="space-y-2">
+                        <Skeleton className="h-4 w-full" />
+                        <Skeleton className="h-4 w-2/3" />
+                      </CardContent>
+                    </Card>
                   </div>
+                  <Card>
+                    <CardHeader>
+                      <Skeleton className="h-5 w-24" />
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {[1, 2, 3].map((i) => (
+                          <div key={i} className="flex gap-3">
+                            <Skeleton className="h-16 w-16 rounded" />
+                            <div className="flex-1 space-y-2">
+                              <Skeleton className="h-4 w-3/4" />
+                              <Skeleton className="h-3 w-1/2" />
+                              <Skeleton className="h-3 w-1/4" />
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               )}
 
-              {/* Order Items with Full Product Details */}
-              <div className="space-y-4">
-                <h3 className="text-xl font-semibold flex items-center gap-2 text-primary">
-                  <Package className="w-5 h-5" />
-                  Order Items ({orderItems.length})
-                </h3>
-                <div className="space-y-3">
-                  {orderItems.map((item: any, index: number) => (
-                    <ProductDetailCard
-                      key={item.id || index}
-                      item={item}
-                      showReorderButton={false}
-                    />
-                  ))}
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Order Summary */}
-              <div className="space-y-4 p-6 bg-muted/30 rounded-lg">
-                <h3 className="text-xl font-semibold">Order Summary</h3>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span>Subtotal:</span>
-                    <span>₦{displayOrder.total_amount?.toLocaleString()}</span>
-                  </div>
-                  {displayOrder.delivery_fee > 0 && (
-                    <div className="flex justify-between items-center">
-                      <span>Delivery Fee:</span>
-                      <span>₦{displayOrder.delivery_fee?.toLocaleString()}</span>
+              {/* Error State */}
+              {error && !isLoading && (
+                <Card className="border-destructive/20 bg-destructive/5">
+                  <CardContent className="flex items-center gap-3 p-6">
+                    <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium text-destructive">
+                        Failed to load order details
+                      </p>
+                      <p className="text-sm text-destructive/80 mt-1">
+                        {error instanceof Error ? error.message : 'An error occurred while loading the order details.'}
+                      </p>
                     </div>
-                  )}
-                  <Separator />
-                  <div className="flex justify-between items-center text-xl font-bold">
-                    <span>Total Amount:</span>
-                    <span>₦{displayOrder.total_amount?.toLocaleString()}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => refetch()}
+                      className="border-destructive/20 hover:bg-destructive/10"
+                    >
+                      <RefreshCw className="w-4 h-4 mr-2" />
+                      Retry
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Success State */}
+              {!isLoading && !error && (detailedOrder || order) && (
+                <>
+                  {/* Order Status and Basic Info */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 bg-muted/50 rounded-lg">
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-3 flex-wrap">
+                        <Badge className={getStatusColor(order.status)}>
+                          {order.status.replace('_', ' ').toUpperCase()}
+                        </Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {format(new Date(order.created_at), 'PPp')}
+                        </span>
+                      </div>
+                      <p className="font-semibold text-lg">
+                        {formatCurrency(order.total_amount)}
+                      </p>
+                    </div>
+                    
+                    {/* Mobile Print Button */}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={handlePrint}
+                      className="sm:hidden w-full"
+                    >
+                      <Printer className="w-4 h-4 mr-2" />
+                      Print Receipt
+                    </Button>
                   </div>
-                </div>
-                <div className="pt-2">
-                  <p className="text-muted-foreground">
-                    Payment Status: <span className="font-medium">{displayOrder.payment_status || 'Pending'}</span>
-                  </p>
-                  {displayOrder.payment_method && (
-                    <p className="text-muted-foreground">
-                      Payment Method: <span className="font-medium">{displayOrder.payment_method}</span>
-                    </p>
-                  )}
-                </div>
-              </div>
+
+                  {/* Two Column Layout - Mobile Responsive */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+                    {/* Customer Information */}
+                    <Card>
+                      <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                          <User className="w-4 h-4" />
+                          Customer Information
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-3">
+                        <div className="flex items-start gap-2">
+                          <User className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium break-words">{order.customer_name}</p>
+                            <p className="text-sm text-muted-foreground">Customer</p>
+                          </div>
+                        </div>
+                        
+                        {order.customer_email && (
+                          <div className="flex items-start gap-2">
+                            <Mail className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm break-all">{order.customer_email}</p>
+                              <p className="text-xs text-muted-foreground">Email</p>
+                            </div>
+                          </div>
+                        )}
+                        
+                        {order.customer_phone && (
+                          <div className="flex items-start gap-2">
+                            <Phone className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm">{order.customer_phone}</p>
+                              <p className="text-xs text-muted-foreground">Phone</p>
+                            </div>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+
+                    {/* Delivery Information */}
+                    {order.order_type === 'delivery' && (
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="flex items-center gap-2 text-base">
+                            <MapPin className="w-4 h-4" />
+                            Delivery Information
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                          <div className="flex items-start gap-2">
+                            <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm leading-relaxed break-words">{formatAddress(order.delivery_address)}</p>
+                              <p className="text-xs text-muted-foreground">Delivery Address</p>
+                            </div>
+                          </div>
+                          
+                          {detailedOrder?.delivery_schedule && (
+                            <div className="flex items-start gap-2">
+                              <Clock className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm">
+                                  {format(new Date(detailedOrder.delivery_schedule.delivery_date), 'PPP')}
+                                  {detailedOrder.delivery_schedule.delivery_time_start && 
+                                   detailedOrder.delivery_schedule.delivery_time_end && (
+                                    <span className="block sm:inline sm:ml-2">
+                                      {detailedOrder.delivery_schedule.delivery_time_start} - {detailedOrder.delivery_schedule.delivery_time_end}
+                                    </span>
+                                  )}
+                                </p>
+                                <p className="text-xs text-muted-foreground">Scheduled Delivery</p>
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+
+                  {/* Order Items */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Package className="w-4 h-4" />
+                        Order Items ({detailedOrder?.items?.length || order?.order_items?.length || 0})
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      {(detailedOrder?.items || order?.order_items || []).length > 0 ? (
+                        <div className="space-y-4">
+                          {(detailedOrder?.items || order?.order_items || []).map((item: any, index: number) => {
+                            // Transform item data for ProductDetailCard
+                            const transformedItem = {
+                              id: item.id || `item-${index}`,
+                              product_id: item.product_id,
+                              product_name: item.product_name || item.name,
+                              quantity: item.quantity,
+                              unit_price: item.unit_price,
+                              total_price: item.total_price,
+                              discount_amount: item.discount_amount || 0,
+                              vat_amount: item.vat_amount || 0,
+                              special_instructions: item.special_instructions,
+                              customizations: item.customizations,
+                              product: item.products || item.product || {
+                                id: item.product_id,
+                                name: item.product_name || item.name,
+                                description: item.description || 'Product details not available',
+                                images: item.images || [],
+                                price: item.unit_price,
+                                is_available: true
+                              }
+                            };
+
+                            return (
+                              <div key={transformedItem.id} className="border rounded-lg p-3 sm:p-4 bg-muted/20">
+                                <ProductDetailCard 
+                                  item={transformedItem}
+                                  showReorderButton={false}
+                                />
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-center py-8 text-muted-foreground">
+                          <Package className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                          <p>No items found for this order</p>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+
+                  {/* Order Summary */}
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Order Summary</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        <div className="flex justify-between text-sm">
+                          <span>Payment Status:</span>
+                          <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
+                            {order.payment_status?.toUpperCase() || 'PENDING'}
+                          </Badge>
+                        </div>
+                        
+                        {order.payment_method && (
+                          <div className="flex justify-between text-sm">
+                            <span>Payment Method:</span>
+                            <span className="capitalize">{order.payment_method}</span>
+                          </div>
+                        )}
+                        
+                        {order.delivery_fee && order.delivery_fee > 0 && (
+                          <div className="flex justify-between text-sm">
+                            <span>Delivery Fee:</span>
+                            <span>{formatCurrency(order.delivery_fee)}</span>
+                          </div>
+                        )}
+                        
+                        <Separator className="my-3" />
+                        
+                        <div className="flex justify-between font-semibold">
+                          <span>Total Amount:</span>
+                          <span>{formatCurrency(order.total_amount)}</span>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
-          )}
+          </ScrollArea>
         </DialogContent>
       </Dialog>
 
-      {/* Print Modal */}
-      {showPrintModal && (
-        <OrderReceiptModal
-          isOpen={showPrintModal}
-          onClose={() => setShowPrintModal(false)}
-          order={displayOrder}
-        />
-      )}
+      {/* Receipt Modal */}
+      <OrderReceiptModal
+        isOpen={isReceiptModalOpen}
+        onClose={() => setIsReceiptModalOpen(false)}
+        order={order}
+      />
     </>
   );
 }

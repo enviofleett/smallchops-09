@@ -10,7 +10,7 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useQuery } from '@tanstack/react-query';
 import { getOrders } from '@/api/orders';
-import { useDeliveryZones } from '@/hooks/useDeliveryTracking';
+import { useDeliveryZones } from '@/hooks/useDeliveryZones';
 import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
 import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
 import { DriverAssignDialog } from '@/components/admin/delivery/DriverAssignDialog';

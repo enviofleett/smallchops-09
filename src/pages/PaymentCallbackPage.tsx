@@ -245,7 +245,7 @@ export const PaymentCallbackPage: React.FC = () => {
       <div className="min-h-screen bg-gradient-to-br from-orange-50 to-red-50 flex items-center justify-center p-3">
         <Card className="w-full max-w-xs p-4 text-center bg-white shadow-lg">
           <Loader2 className="h-10 w-10 animate-spin text-orange-500 mx-auto mb-3" />
-          <p className="text-foreground text-sm">Hold on, we are confirming your payment</p>
+          <p className="text-foreground text-sm">Wait while we confirm your payment</p>
         </Card>
       </div>
     );

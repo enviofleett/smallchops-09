@@ -441,13 +441,22 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         // Save state before redirecting  
         savePrePaymentState(sanitizedData, checkoutStep, deliveryFee, 'direct_redirect');
         
-        // Clear cart and redirect
+        // Close dialog immediately and redirect to payment
+        onClose();
         clearCart();
         window.location.href = paymentUrl;
         return;
       }
 
       // Note: Delivery schedule is now saved atomically in the backend during order creation
+      
+      // Close dialog and redirect directly to payment callback page with processing state
+      onClose();
+      clearCart();
+      
+      // Store payment reference for callback page
+      sessionStorage.setItem('paystack_payment_reference', data?.reference || parsedData?.reference || '');
+      sessionStorage.setItem('payment_order_id', parsedData?.order_id || data?.order?.id || '');
       
       // Set payment data for PaystackPaymentHandler to initialize securely
       setPaymentData({
@@ -458,7 +467,9 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
         successUrl: `${window.location.origin}/payment-callback`,
         cancelUrl: window.location.href
       });
-      setCheckoutStep('payment');
+      
+      // Navigate to callback page immediately to show clean processing state
+      navigate('/payment-callback?status=processing');
       setIsSubmitting(false);
       
       logPaymentAttempt(sanitizedData, 'success');

@@ -348,7 +348,8 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                                 description: item.description || 'Product details not available',
                                 images: item.images || [],
                                 price: item.unit_price,
-                                is_available: true
+                                is_available: true,
+                                features: item.features || (item.products?.features) || (item.product?.features) || []
                               }
                             };
 

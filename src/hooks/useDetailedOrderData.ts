@@ -37,7 +37,7 @@ export const useDetailedOrderData = (orderId: string) => {
       } catch (rpcError) {
         console.warn('RPC failed, trying fallback query:', rpcError);
         
-        // Fallback: Direct query with joins
+        // Fallback: Separate queries to avoid foreign key issues
         const { data: orderData, error: orderError } = await supabase
           .from('orders')
           .select(`
@@ -53,11 +53,10 @@ export const useDetailedOrderData = (orderId: string) => {
                 category_id,
                 is_available
               )
-            ),
-            delivery_schedule:delivery_schedules (*)
+            )
           `)
           .eq('id', orderId)
-          .single();
+          .maybeSingle();
 
         if (orderError) {
           console.error('Fallback query error:', orderError);
@@ -68,11 +67,26 @@ export const useDetailedOrderData = (orderId: string) => {
           throw new Error('No data returned from fallback query');
         }
 
+        // Separate query for delivery schedule
+        let deliverySchedule = null;
+        try {
+          const { data: scheduleData } = await supabase
+            .from('order_delivery_schedule')
+            .select('*')
+            .eq('order_id', orderId)
+            .maybeSingle();
+          
+          deliverySchedule = scheduleData;
+        } catch (scheduleError) {
+          console.warn('Could not fetch delivery schedule:', scheduleError);
+          // Continue without schedule - not critical
+        }
+
         // Transform to expected format
         return {
           order: orderData,
           items: orderData.order_items || [],
-          delivery_schedule: orderData.delivery_schedule?.[0] || null
+          delivery_schedule: deliverySchedule
         } as DetailedOrderData;
       }
 

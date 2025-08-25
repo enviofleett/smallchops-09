@@ -43,6 +43,7 @@ export function DeliveryAssignmentDialog({
     
     setIsAssigning(true);
     try {
+      // Pass profile_id (which is now the id from getDispatchRiders)
       await onAssign(selectedOrderIds, selectedDriverId);
       onClose();
       setSelectedDriverId('');

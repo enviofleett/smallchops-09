@@ -7,6 +7,8 @@ export const getStatusColor = (status: string): string => {
       return 'bg-red-100 text-red-800 border-red-200';
     case 'confirmed': 
       return 'bg-yellow-100 text-yellow-800 border-yellow-200';
+    case 'preparing':
+      return 'bg-blue-100 text-blue-800 border-blue-200';
     case 'ready': 
       return 'bg-green-100 text-green-800 border-green-200';
     case 'out_for_delivery':
@@ -27,6 +29,7 @@ export const getStatusTextColor = (status: string): string => {
   switch (status?.toLowerCase()) {
     case 'pending': return 'text-red-800';
     case 'confirmed': return 'text-yellow-800';
+    case 'preparing': return 'text-blue-800';
     case 'ready': return 'text-green-800';
     case 'out_for_delivery':
     case 'out-for-delivery': return 'text-purple-800';

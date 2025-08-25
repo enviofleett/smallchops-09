@@ -9,7 +9,7 @@ interface AdminOrderStatusBadgeProps {
 }
 
 export const AdminOrderStatusBadge = ({ status, className = '' }: AdminOrderStatusBadgeProps) => {
-  const statusDisplay = status?.replace('_', ' ') || 'Unknown';
+  const statusDisplay = status?.replace(/_/g, ' ') || 'Unknown'; // Replace all underscores
   const colorClasses = getStatusColor(status);
   
   return (

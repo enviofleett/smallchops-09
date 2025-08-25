@@ -40,11 +40,11 @@ export const DriverAssignDialog: React.FC<DriverAssignDialogProps> = ({
     setIsAssigning(true);
 
     try {
-      // Assign driver to each selected order
+      // Assign driver to each selected order using profile_id
       const assignmentPromises = selectedOrders.map(order => 
         supabase.rpc('assign_rider_to_order', {
           p_order_id: order.id,
-          p_rider_id: selectedDriverId
+          p_rider_id: selectedDriverId // This is now profile_id from the updated getDispatchRiders
         })
       );
 

@@ -341,9 +341,57 @@ const handler = async (req: Request): Promise<Response> => {
         const { orderId, updates } = requestBody;
         if (!orderId || !updates) throw new Error('Order ID and updates required');
 
+        // Enhanced update with rider assignment validation
+        let updateData = { ...updates };
+        
+        // If assigning a rider, validate the rider exists and get their profile_id
+        if (updates.assigned_rider_id) {
+          const { data: driver, error: driverError } = await supabase
+            .from('drivers')
+            .select('id, profile_id, is_active')
+            .eq('id', updates.assigned_rider_id)
+            .eq('is_active', true)
+            .single();
+
+          if (driverError || !driver) {
+            // Try to find by profile_id instead (new mapping approach)
+            const { data: profileCheck, error: profileCheckError } = await supabase
+              .from('drivers')
+              .select('id, profile_id, is_active')
+              .eq('profile_id', updates.assigned_rider_id)
+              .eq('is_active', true)
+              .single();
+
+            if (profileCheckError || !profileCheck) {
+              throw new Error('Driver not found or inactive');
+            }
+            
+            // Use the profile_id for assignment
+            updateData.assigned_rider_id = profileCheck.profile_id;
+          } else {
+            // Use the profile_id from driver record
+            updateData.assigned_rider_id = driver.profile_id || driver.id;
+          }
+        }
+
+        // Validate status transitions
+        if (updates.status === 'out_for_delivery') {
+          const { data: currentOrder, error: orderError } = await supabase
+            .from('orders')
+            .select('assigned_rider_id, status')
+            .eq('id', orderId)
+            .single();
+
+          if (orderError) throw orderError;
+
+          if (!currentOrder.assigned_rider_id && !updateData.assigned_rider_id) {
+            throw new Error('A dispatch rider must be assigned before moving to out_for_delivery');
+          }
+        }
+
         const { data, error } = await supabase
           .from('orders')
-          .update(updates)
+          .update(updateData)
           .eq('id', orderId)
           .select(`*, 
             order_items (*),
@@ -359,7 +407,7 @@ const handler = async (req: Request): Promise<Response> => {
           
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('orders')
-            .update(updates)
+            .update(updateData)
             .eq('id', orderId)
             .select(`*, order_items (*)`)
             .single();

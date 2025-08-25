@@ -214,7 +214,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                     <div className="space-y-1">
                       <div className="flex items-center gap-3 flex-wrap">
                         <Badge className={getStatusColor(order.status)}>
-                          {order.status.replace('_', ' ').toUpperCase()}
+                          {order.status.replace(/_/g, ' ').toUpperCase()}
                         </Badge>
                         <span className="text-sm text-muted-foreground">
                           {format(new Date(order.created_at), 'PPp')}

@@ -41,6 +41,7 @@ export function UnifiedDeliveryManagement({
   typeFilter = 'all',
   statusFilter = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery']
 }: UnifiedDeliveryManagementProps) {
+  const [localStatusFilter, setLocalStatusFilter] = useState<string[]>(statusFilter);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
   const [isDetailsModalOpen, setIsDetailsModalOpen] = useState(false);
@@ -89,18 +90,26 @@ export function UnifiedDeliveryManagement({
 
     // Apply status filter for 'all' mode
     if (mode === 'all') {
-      orders = orders.filter(order => statusFilter.includes(order.status));
+      orders = orders.filter(order => localStatusFilter.includes(order.status));
     }
 
     // Only show paid orders
     orders = orders.filter(order => order.payment_status === 'paid');
 
     return orders;
-  }, [ordersData?.orders, typeFilter, statusFilter, mode]);
+  }, [ordersData?.orders, typeFilter, localStatusFilter, mode]);
 
-  // Handle status change
+  // Handle status change with validation
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
+      const order = filteredOrders.find(o => o.id === orderId);
+      
+      // Validate status transitions
+      if (newStatus === 'out_for_delivery' && !order?.assigned_rider_id) {
+        toast.error('Cannot move to "Out for Delivery" without assigning a driver. Please assign a driver first.');
+        return;
+      }
+      
       await updateOrder(orderId, { status: newStatus as any });
       toast.success('Order status updated successfully');
       refetch();
@@ -113,8 +122,9 @@ export function UnifiedDeliveryManagement({
   // Handle driver assignment
   const handleAssignDriver = async (orderIds: string[], driverId: string) => {
     try {
+      // Use the updated assignment method that handles profile_id mapping
       const promises = orderIds.map(orderId => 
-        updateOrder(orderId, { assigned_rider_id: driverId })
+        updateOrder(orderId, { assigned_rider_id: driverId }) // driverId is now profile_id
       );
       
       await Promise.all(promises);
@@ -220,6 +230,30 @@ export function UnifiedDeliveryManagement({
             {filteredOrders.length} orders {mode === 'ready' ? 'ready for dispatch' : 'found'}
           </p>
         </div>
+
+        {/* Status Filter for All Orders mode */}
+        {mode === 'all' && (
+          <div className="flex flex-wrap gap-2">
+            <p className="text-sm font-medium text-muted-foreground">Status Filters:</p>
+            {['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'].map((status) => (
+              <label key={status} className="flex items-center gap-1 text-xs">
+                <input
+                  type="checkbox"
+                  checked={localStatusFilter.includes(status)}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setLocalStatusFilter(prev => [...prev, status]);
+                    } else {
+                      setLocalStatusFilter(prev => prev.filter(s => s !== status));
+                    }
+                  }}
+                  className="w-3 h-3"
+                />
+                <span className="capitalize">{status.replace('_', ' ')}</span>
+              </label>
+            ))}
+          </div>
+        )}
         
         {selectedOrders.length > 0 && (
           <div className="flex gap-2">

@@ -37,10 +37,10 @@ export const AdminOrderCard = ({ order, deliverySchedule }: AdminOrderCardProps)
               {getStatusIcon(order.status)}
               <h3 className="font-semibold text-lg">#{order.order_number}</h3>
               {isOverdue && (
-                <AdminOrderStatusBadge status="overdue" className="bg-red-100 text-red-800 border-red-200">
+                <div className="flex items-center bg-red-100 text-red-800 border border-red-200 rounded-md px-2 py-1 text-xs">
                   <AlertTriangle className="w-3 h-3 mr-1" />
                   Overdue
-                </AdminOrderStatusBadge>
+                </div>
               )}
             </div>
             <p className="text-sm text-muted-foreground">

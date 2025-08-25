@@ -18,7 +18,7 @@ import { ShippingFeesReport } from '@/components/admin/delivery/ShippingFeesRepo
 import { DriverDialog } from '@/components/delivery/DriverDialog';
 import { AdminDriversTab } from '@/components/admin/delivery/AdminDriversTab';
 import { DeliveryZonesManager } from '@/components/delivery/DeliveryZonesManager';
-import { EnhancedDeliveryManagement } from '@/components/admin/delivery/EnhancedDeliveryManagement';
+import { UnifiedDeliveryManagement } from '@/components/admin/delivery/UnifiedDeliveryManagement';
 import { DriverPerformanceDashboard } from '@/components/admin/delivery/DriverPerformanceDashboard';
 import { MobileDeliveryTabs } from '@/components/admin/delivery/MobileDeliveryTabs';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -451,7 +451,7 @@ export default function AdminDelivery() {
 
           {/* Ready Orders Tab - New Enhanced Management */}
           <TabsContent value="ready-orders" className="space-y-6">
-            <EnhancedDeliveryManagement />
+            <UnifiedDeliveryManagement mode="ready" />
           </TabsContent>
 
           {/* Delivery Orders Tab */}

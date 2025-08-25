@@ -3928,6 +3928,47 @@ export type Database = {
           },
         ]
       }
+      moq_audit_log: {
+        Row: {
+          action_taken: string | null
+          created_at: string | null
+          customer_id: string | null
+          id: string
+          notes: string | null
+          order_id: string | null
+          resolved_at: string | null
+          violation_details: Json
+        }
+        Insert: {
+          action_taken?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          resolved_at?: string | null
+          violation_details: Json
+        }
+        Update: {
+          action_taken?: string | null
+          created_at?: string | null
+          customer_id?: string | null
+          id?: string
+          notes?: string | null
+          order_id?: string | null
+          resolved_at?: string | null
+          violation_details?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "moq_audit_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_delivery_log: {
         Row: {
           channel: string
@@ -7927,6 +7968,10 @@ export type Database = {
         Args: { p_user_id: string }
         Returns: Json
       }
+      adjust_quantities_for_moq: {
+        Args: { order_items: Json }
+        Returns: Json
+      }
       assign_rider_to_order: {
         Args: { p_assigned_by?: string; p_order_id: string; p_rider_id: string }
         Returns: string
@@ -7958,6 +8003,10 @@ export type Database = {
       calculate_delivery_metrics: {
         Args: { p_date: string }
         Returns: undefined
+      }
+      calculate_moq_pricing_impact: {
+        Args: { order_items: Json }
+        Returns: Json
       }
       calculate_profile_completion: {
         Args: { customer_uuid: string }
@@ -8815,6 +8864,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      log_moq_violation: {
+        Args: {
+          p_action_taken?: string
+          p_customer_id: string
+          p_order_id: string
+          p_violations: Json
+        }
+        Returns: string
+      }
       log_payment_error: {
         Args: {
           p_error_code: string
@@ -9218,6 +9276,10 @@ export type Database = {
           p_order_items: Json
           p_total_amount: number
         }
+        Returns: Json
+      }
+      validate_order_moq: {
+        Args: { order_items: Json }
         Returns: Json
       }
       validate_otp_code: {

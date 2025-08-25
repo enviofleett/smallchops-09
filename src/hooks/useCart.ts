@@ -6,6 +6,7 @@ import { validatePromotionCode } from '@/api/productsWithDiscounts';
 import { usePromotions } from './usePromotions';
 import { useGuestSession } from './useGuestSession';
 import { useCustomerAuth } from './useCustomerAuth';
+import { useToast } from '@/hooks/use-toast';
 
 export interface CartItem {
   id: string;
@@ -53,6 +54,7 @@ export const useCart = () => {
   const { data: promotions = [] } = usePromotions();
   const { guestSession, generateGuestSession } = useGuestSession();
   const { customerAccount } = useCustomerAuth();
+  const { toast } = useToast();
   const [cart, setCart] = useState<Cart>({
     items: [],
     summary: {
@@ -223,6 +225,13 @@ export const useCart = () => {
               ? { ...item, quantity: moq }
               : item
           );
+          
+          // Show MOQ notification
+          toast({
+            title: "Quantity Adjusted",
+            description: `${product.name} quantity adjusted to meet minimum order requirement (${moq} items)`,
+            variant: "default",
+          });
         } else {
           updatedItems = cart.items.map((item, index) => 
             index === existingItemIndex 

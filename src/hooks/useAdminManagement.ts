@@ -1,7 +1,6 @@
-import { useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface AdminUser {
   id: string;
@@ -9,8 +8,8 @@ export interface AdminUser {
   email: string;
   role: string;
   status: string;
-  created_at: string;
   is_active: boolean;
+  created_at: string;
 }
 
 export interface AdminInvitation {
@@ -21,174 +20,292 @@ export interface AdminInvitation {
   expires_at: string;
   created_at: string;
   invited_by: string;
-  profiles?: { name: string };
+  profiles?: {
+    name: string;
+  };
+}
+
+interface SendInvitationData {
+  email: string;
+  role: string;
+}
+
+interface UpdateAdminData {
+  userId: string;
+  action: 'activate' | 'deactivate' | 'update_role';
+  role?: string;
 }
 
 export const useAdminManagement = () => {
+  const [admins, setAdmins] = useState<AdminUser[]>([]);
+  const [invitations, setInvitations] = useState<AdminInvitation[]>([]);
+  const [isLoadingAdmins, setIsLoadingAdmins] = useState(true);
+  const [isLoadingInvitations, setIsLoadingInvitations] = useState(true);
+  const [isSendingInvitation, setIsSendingInvitation] = useState(false);
+  const [isUpdatingAdmin, setIsUpdatingAdmin] = useState(false);
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   // Fetch admin users
-  const adminsQuery = useQuery({
-    queryKey: ['admin-users'],
-    queryFn: async (): Promise<AdminUser[]> => {
+  const fetchAdmins = async () => {
+    try {
+      setIsLoadingAdmins(true);
       const { data, error } = await supabase.functions.invoke('admin-management?action=get_admins', {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
+          'Content-Type': 'application/json'
+        }
       });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to fetch admin users');
+      if (error) throw error;
+
+      if (data?.success) {
+        setAdmins(data.data || []);
+      } else {
+        throw new Error(data?.error || 'Failed to fetch admins');
       }
+    } catch (error: any) {
+      console.error('Error fetching admins:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load admin users',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsLoadingAdmins(false);
+    }
+  };
 
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch admin users');
-      }
-
-      return data.data;
-    },
-    refetchOnWindowFocus: false,
-  });
-
-  // Fetch admin invitations  
-  const invitationsQuery = useQuery({
-    queryKey: ['admin-invitations'],
-    queryFn: async (): Promise<AdminInvitation[]> => {
+  // Fetch invitations
+  const fetchInvitations = async () => {
+    try {
+      setIsLoadingInvitations(true);
       const { data, error } = await supabase.functions.invoke('admin-management?action=get_invitations', {
         method: 'GET',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
+          'Content-Type': 'application/json'
+        }
       });
 
-      if (error) {
-        throw new Error(error.message || 'Failed to fetch invitations');
+      if (error) throw error;
+
+      if (data?.success) {
+        setInvitations(data.data || []);
+      } else {
+        throw new Error(data?.error || 'Failed to fetch invitations');
       }
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to fetch invitations');
-      }
-
-      return data.data;
-    },
-    refetchOnWindowFocus: false,
-  });
-
-  // Send invitation mutation
-  const sendInvitationMutation = useMutation({
-    mutationFn: async ({ email, role }: { email: string; role: string }) => {
-      const { data, error } = await supabase.functions.invoke('admin-management', {
-        method: 'POST',
-        body: { email, role },
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to send invitation');
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to send invitation');
-      }
-
-      return data;
-    },
-    onSuccess: () => {
+    } catch (error: any) {
+      console.error('Error fetching invitations:', error);
       toast({
-        title: 'Invitation Sent',
-        description: 'Admin invitation has been sent successfully',
+        title: 'Error',
+        description: 'Failed to load invitations',
+        variant: 'destructive'
       });
-      queryClient.invalidateQueries({ queryKey: ['admin-invitations'] });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: 'Invitation Failed',
-        description: error.message,
-        variant: 'destructive',
-      });
-    },
-  });
+    } finally {
+      setIsLoadingInvitations(false);
+    }
+  };
 
-  // Update admin user mutation
-  const updateAdminMutation = useMutation({
-    mutationFn: async ({ 
-      userId, 
-      action, 
-      role 
-    }: { 
-      userId: string; 
-      action: 'activate' | 'deactivate' | 'update_role'; 
-      role?: string;
-    }) => {
-      const { data, error } = await supabase.functions.invoke('admin-management', {
-        method: 'PUT',
-        body: { userId, action, role },
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
-        },
-      });
-
-      if (error) {
-        throw new Error(error.message || 'Failed to update admin user');
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || 'Failed to update admin user');
-      }
-
-      return data;
-    },
-    onSuccess: (data, variables) => {
-      const actionText = variables.action === 'activate' ? 'activated' : 
-                        variables.action === 'deactivate' ? 'deactivated' : 
-                        'updated';
+  // Send invitation (legacy support)
+  const sendInvitation = async (data: SendInvitationData) => {
+    try {
+      setIsSendingInvitation(true);
       
-      toast({
-        title: 'Admin Updated',
-        description: `Admin user ${actionText} successfully`,
+      const { data: response, error } = await supabase.functions.invoke('admin-management', {
+        body: {
+          action: 'create_invitation',
+          email: data.email,
+          role: data.role
+        }
       });
-      queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-    },
-    onError: (error: Error) => {
+
+      if (error) throw error;
+
+      if (response?.success) {
+        toast({
+          title: 'Success',
+          description: 'Admin invitation sent successfully',
+        });
+        
+        // Refresh invitations
+        await fetchInvitations();
+      } else {
+        throw new Error(response?.error || 'Failed to send invitation');
+      }
+    } catch (error: any) {
+      console.error('Error sending invitation:', error);
       toast({
-        title: 'Update Failed',
-        description: error.message,
-        variant: 'destructive',
+        title: 'Error',
+        description: error.message || 'Failed to send invitation',
+        variant: 'destructive'
       });
-    },
-  });
+    } finally {
+      setIsSendingInvitation(false);
+    }
+  };
+
+  // Create admin with immediate access
+  const createAdminUser = async (data: {
+    email: string;
+    role: string;
+    immediate_password?: string;
+    send_email?: boolean;
+    admin_created?: boolean;
+  }) => {
+    try {
+      setIsSendingInvitation(true);
+      
+      const { data: response, error } = await supabase.functions.invoke('admin-user-creator', {
+        body: data
+      });
+
+      if (error) throw error;
+
+      if (response?.success) {
+        toast({
+          title: 'Success',
+          description: response.message || 'Admin user created successfully',
+        });
+        
+        // Refresh both admins and invitations
+        await Promise.all([fetchAdmins(), fetchInvitations()]);
+        
+        return response;
+      } else {
+        throw new Error(response?.error || 'Failed to create admin user');
+      }
+    } catch (error: any) {
+      console.error('Error creating admin user:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to create admin user',
+        variant: 'destructive'
+      });
+      throw error;
+    } finally {
+      setIsSendingInvitation(false);
+    }
+  };
+
+  // Update admin user
+  const updateAdmin = async (data: UpdateAdminData) => {
+    try {
+      setIsUpdatingAdmin(true);
+      
+      const { data: response, error } = await supabase.functions.invoke('admin-management', {
+        method: 'PUT',
+        body: data
+      });
+
+      if (error) throw error;
+
+      if (response?.success) {
+        toast({
+          title: 'Success',
+          description: response.message || 'Admin user updated successfully',
+        });
+        
+        // Refresh admins
+        await fetchAdmins();
+      } else {
+        throw new Error(response?.error || 'Failed to update admin user');
+      }
+    } catch (error: any) {
+      console.error('Error updating admin:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to update admin user',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsUpdatingAdmin(false);
+    }
+  };
+
+  // Delete invitation
+  const deleteInvitation = async (invitationId: string) => {
+    try {
+      const { data: response, error } = await supabase.functions.invoke('admin-management', {
+        body: {
+          action: 'delete_invitation',
+          invitationId
+        }
+      });
+
+      if (error) throw error;
+
+      if (response?.success) {
+        toast({
+          title: 'Success',
+          description: 'Invitation deleted successfully',
+        });
+        
+        // Refresh invitations
+        await fetchInvitations();
+      } else {
+        throw new Error(response?.error || 'Failed to delete invitation');
+      }
+    } catch (error: any) {
+      console.error('Error deleting invitation:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete invitation',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Resend invitation
+  const resendInvitation = async (invitationId: string) => {
+    try {
+      const { data: response, error } = await supabase.functions.invoke('admin-management', {
+        body: {
+          action: 'resend_invitation',
+          invitationId
+        }
+      });
+
+      if (error) throw error;
+
+      if (response?.success) {
+        toast({
+          title: 'Success',
+          description: 'Invitation resent successfully',
+        });
+        
+        // Refresh invitations
+        await fetchInvitations();
+      } else {
+        throw new Error(response?.error || 'Failed to resend invitation');
+      }
+    } catch (error: any) {
+      console.error('Error resending invitation:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to resend invitation',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  // Load data on mount
+  useEffect(() => {
+    fetchAdmins();
+    fetchInvitations();
+  }, []);
 
   return {
-    // Data
-    admins: adminsQuery.data || [],
-    invitations: invitationsQuery.data || [],
-    
-    // Loading states
-    isLoadingAdmins: adminsQuery.isLoading,
-    isLoadingInvitations: invitationsQuery.isLoading,
-    
-    // Error states
-    adminsError: adminsQuery.error,
-    invitationsError: invitationsQuery.error,
-    
-    // Actions
-    sendInvitation: sendInvitationMutation.mutate,
-    updateAdmin: updateAdminMutation.mutate,
-    
-    // Action states
-    isSendingInvitation: sendInvitationMutation.isPending,
-    isUpdatingAdmin: updateAdminMutation.isPending,
-    
-    // Refetch functions
-    refetchAdmins: adminsQuery.refetch,
-    refetchInvitations: invitationsQuery.refetch,
+    admins,
+    invitations,
+    isLoadingAdmins,
+    isLoadingInvitations,
+    isSendingInvitation,
+    isUpdatingAdmin,
+    sendInvitation, // Legacy method
+    createAdminUser, // New method with immediate access
+    updateAdmin,
+    deleteInvitation,
+    resendInvitation,
+    fetchAdmins,
+    fetchInvitations
   };
 };

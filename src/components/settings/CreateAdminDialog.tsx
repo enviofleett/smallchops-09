@@ -4,77 +4,237 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { useAdminManagement } from '@/hooks/useAdminManagement';
+import { Switch } from '@/components/ui/switch';
+import { Separator } from '@/components/ui/separator';
+import { Shield, Mail, Key, Users } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface CreateAdminDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onSuccess?: () => void;
 }
 
-export const CreateAdminDialog = ({ open, onOpenChange }: CreateAdminDialogProps) => {
+export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdminDialogProps) => {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState('admin');
-  
-  const { sendInvitation, isSendingInvitation } = useAdminManagement();
+  const [immediatePassword, setImmediatePassword] = useState('');
+  const [useImmediateAccess, setUseImmediateAccess] = useState(false);
+  const [sendEmail, setSendEmail] = useState(true);
+  const [isCreating, setIsCreating] = useState(false);
+  const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const generatePassword = () => {
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
+    let password = '';
+    
+    // Ensure we have at least one of each type
+    password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // Uppercase
+    password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // Lowercase
+    password += '0123456789'[Math.floor(Math.random() * 10)]; // Number
+    password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // Special
+    
+    // Fill the rest randomly
+    for (let i = 4; i < 14; i++) {
+      password += chars[Math.floor(Math.random() * chars.length)];
+    }
+    
+    // Shuffle the password
+    return password.split('').sort(() => Math.random() - 0.5).join('');
+  };
+
+  const handleGeneratePassword = () => {
+    const newPassword = generatePassword();
+    setImmediatePassword(newPassword);
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!email || !role) return;
-    
-    sendInvitation({ email, role });
-    
-    // Reset form and close dialog
-    setEmail('');
-    setRole('admin');
-    onOpenChange(false);
+    if (!email || !role) {
+      toast({
+        title: 'Validation Error',
+        description: 'Email and role are required',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (useImmediateAccess && !immediatePassword) {
+      toast({
+        title: 'Validation Error', 
+        description: 'Password is required for immediate access',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setIsCreating(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('admin-user-creator', {
+        body: {
+          email,
+          role,
+          immediate_password: useImmediateAccess ? immediatePassword : undefined,
+          send_email: sendEmail,
+          admin_created: true
+        }
+      });
+
+      if (error) throw error;
+
+      if (data?.success) {
+        toast({
+          title: 'Admin Created Successfully',
+          description: useImmediateAccess 
+            ? `Admin user created with immediate access. Password: ${data.data?.password || immediatePassword}`
+            : 'Admin user created and invitation email sent',
+        });
+
+        // Reset form and close dialog
+        setEmail('');
+        setRole('admin');
+        setImmediatePassword('');
+        setUseImmediateAccess(false);
+        setSendEmail(true);
+        onOpenChange(false);
+        onSuccess?.();
+      } else {
+        throw new Error(data?.error || 'Failed to create admin user');
+      }
+    } catch (error: any) {
+      console.error('Admin creation error:', error);
+      toast({
+        title: 'Creation Failed',
+        description: error.message || 'Failed to create admin user. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsCreating(false);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[425px]">
+      <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Create Admin User</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            Create Admin User
+          </DialogTitle>
         </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="email">Email Address</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="admin@example.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              required
-            />
+
+        <form onSubmit={handleSubmit} className="space-y-6">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="email" className="flex items-center gap-2">
+                <Mail className="h-4 w-4" />
+                Email Address
+              </Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="admin@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="role" className="flex items-center gap-2">
+                <Users className="h-4 w-4" />
+                Role
+              </Label>
+              <Select value={role} onValueChange={setRole}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select a role" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="admin">Admin</SelectItem>
+                  <SelectItem value="user">User</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="role">Role</Label>
-            <Select value={role} onValueChange={setRole}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select a role" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="admin">Admin</SelectItem>
-                <SelectItem value="user">User</SelectItem>
-              </SelectContent>
-            </Select>
+
+          <Separator />
+
+          {/* Access Options */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base font-medium">Immediate Access</Label>
+                <p className="text-sm text-muted-foreground">
+                  Create user with password for immediate login
+                </p>
+              </div>
+              <Switch
+                checked={useImmediateAccess}
+                onCheckedChange={setUseImmediateAccess}
+              />
+            </div>
+
+            {useImmediateAccess && (
+              <div className="space-y-2">
+                <Label htmlFor="password" className="flex items-center gap-2">
+                  <Key className="h-4 w-4" />
+                  Password
+                </Label>
+                <div className="flex gap-2">
+                  <Input
+                    id="password"
+                    type="text"
+                    placeholder="Enter or generate password"
+                    value={immediatePassword}
+                    onChange={(e) => setImmediatePassword(e.target.value)}
+                    className="font-mono"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handleGeneratePassword}
+                  >
+                    Generate
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  User should change this password after first login
+                </p>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label className="text-base font-medium">Send Welcome Email</Label>
+                <p className="text-sm text-muted-foreground">
+                  Send credentials and instructions via email
+                </p>
+              </div>
+              <Switch
+                checked={sendEmail}
+                onCheckedChange={setSendEmail}
+              />
+            </div>
           </div>
-          
+
           <DialogFooter>
             <Button 
               type="button" 
               variant="outline" 
               onClick={() => onOpenChange(false)}
+              disabled={isCreating}
             >
               Cancel
             </Button>
             <Button 
               type="submit" 
-              disabled={!email || !role || isSendingInvitation}
+              disabled={!email || !role || isCreating}
             >
-              {isSendingInvitation ? 'Sending Invitation...' : 'Send Invitation'}
+              {isCreating ? 'Creating Admin...' : 'Create Admin User'}
             </Button>
           </DialogFooter>
         </form>

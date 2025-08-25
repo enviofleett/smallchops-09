@@ -297,6 +297,100 @@ async function sendViaSMTP(
   }
 }
 
+// Server-side template processing
+async function processTemplate(templateKey: string, variables: Record<string, any>, supabaseUrl: string, supabaseKey: string): Promise<{
+  subject: string;
+  html: string;
+  text: string;
+} | null> {
+  try {
+    console.log(`🎨 Processing template: ${templateKey}`)
+    
+    const templateResponse = await fetch(`${supabaseUrl}/rest/v1/enhanced_email_templates?template_key=eq.${templateKey}&is_active=eq.true&select=*`, {
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'apikey': supabaseKey
+      }
+    })
+    
+    if (!templateResponse.ok) {
+      console.warn(`Template fetch failed: ${templateResponse.status}`)
+      return null
+    }
+    
+    const templates = await templateResponse.json()
+    if (!templates || templates.length === 0) {
+      console.warn(`Template not found: ${templateKey}`)
+      return null
+    }
+    
+    const template = templates[0]
+    
+    // Process template variables
+    const processText = (text: string): string => {
+      if (!text) return ''
+      return text.replace(/\{\{(\w+)\}\}/g, (match, variable) => {
+        return variables[variable] || match
+      })
+    }
+    
+    return {
+      subject: processText(template.subject_template),
+      html: processText(template.html_template),
+      text: processText(template.text_template)
+    }
+  } catch (error) {
+    console.error('Template processing error:', error)
+    return null
+  }
+}
+
+// Email validation and rate limiting
+async function validateEmailRequest(to: string, supabaseUrl: string, supabaseKey: string): Promise<{ allowed: boolean; reason?: string }> {
+  try {
+    // Check suppression list
+    const suppressionResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/is_email_suppressed`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'apikey': supabaseKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ email_address: to })
+    })
+    
+    if (suppressionResponse.ok) {
+      const { data: isSuppressed } = await suppressionResponse.json()
+      if (isSuppressed) {
+        return { allowed: false, reason: 'email_suppressed' }
+      }
+    }
+    
+    // Check rate limit
+    const rateLimitResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/check_email_rate_limit`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabaseKey}`,
+        'apikey': supabaseKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ p_recipient_email: to })
+    })
+    
+    if (rateLimitResponse.ok) {
+      const rateLimitResult = await rateLimitResponse.json()
+      if (!rateLimitResult.allowed) {
+        return { allowed: false, reason: 'rate_limited' }
+      }
+    }
+    
+    return { allowed: true }
+  } catch (error) {
+    console.warn('Validation check failed:', error)
+    return { allowed: true } // Allow on validation failure
+  }
+}
+
 serve(async (req) => {
   // CORS preflight
   const origin = req.headers.get('origin')
@@ -306,21 +400,115 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders })
   }
   
+  let requestBody: any
+  
   try {
     console.log('📧 Processing SMTP email request...')
-    const { to, subject, textContent, htmlContent, templateKey, variables } = await req.json()
     
-    if (!to || !subject || (!textContent && !htmlContent)) {
+    // Robust JSON parsing
+    try {
+      requestBody = await req.json()
+    } catch (parseError) {
+      console.error('JSON parsing failed:', parseError)
       return new Response(
-        JSON.stringify({ error: 'Missing required fields: to, subject, and content' }),
+        JSON.stringify({ 
+          success: false, 
+          error: 'Invalid JSON payload',
+          details: parseError.message 
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    console.log('📦 Raw request payload:', JSON.stringify(requestBody, null, 2))
+    
+    // Normalize payload - handle different input shapes
+    let normalizedPayload: {
+      to: string;
+      subject?: string;
+      textContent?: string;
+      htmlContent?: string;
+      templateKey?: string;
+      templateId?: string;
+      variables?: Record<string, any>;
+      emailType?: string;
+    }
+    
+    // Handle different payload structures
+    if (requestBody.to || requestBody.recipient?.email) {
+      normalizedPayload = {
+        to: requestBody.to || requestBody.recipient?.email,
+        subject: requestBody.subject,
+        textContent: requestBody.textContent || requestBody.text,
+        htmlContent: requestBody.htmlContent || requestBody.html,
+        templateKey: requestBody.templateKey || requestBody.templateId,
+        variables: requestBody.variables || {},
+        emailType: requestBody.emailType || 'transactional'
+      }
+    } else {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Missing required fields',
+          details: 'Either "to" or "recipient.email" must be provided',
+          received_keys: Object.keys(requestBody)
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    console.log('🔄 Normalized payload:', JSON.stringify(normalizedPayload, null, 2))
+    
+    // Get Supabase credentials
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    
+    // Validate email request
+    console.log('🔒 Validating email request...')
+    const validation = await validateEmailRequest(normalizedPayload.to, supabaseUrl, supabaseKey)
+    if (!validation.allowed) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Email request blocked',
+          reason: validation.reason 
+        }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+    
+    // Process template if templateKey provided
+    let finalSubject = normalizedPayload.subject
+    let finalTextContent = normalizedPayload.textContent
+    let finalHtmlContent = normalizedPayload.htmlContent
+    
+    if (normalizedPayload.templateKey) {
+      console.log(`🎨 Processing template: ${normalizedPayload.templateKey}`)
+      const processed = await processTemplate(normalizedPayload.templateKey, normalizedPayload.variables || {}, supabaseUrl, supabaseKey)
+      
+      if (processed) {
+        finalSubject = processed.subject
+        finalTextContent = processed.text
+        finalHtmlContent = processed.html
+        console.log('✅ Template processed successfully')
+      } else {
+        console.warn('⚠️ Template processing failed, using provided content')
+      }
+    }
+    
+    // Final validation
+    if (!finalSubject || (!finalTextContent && !finalHtmlContent)) {
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'Missing content after processing',
+          details: 'Subject and at least one content type (text or HTML) required'
+        }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
     
     // Get SMTP settings from Supabase
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-    
     console.log('🔧 Fetching SMTP configuration...')
     const settingsResponse = await fetch(`${supabaseUrl}/rest/v1/communication_settings?use_smtp=eq.true&select=*`, {
       headers: {
@@ -342,6 +530,7 @@ serve(async (req) => {
     console.log(`📡 Using SMTP config: ${config.smtp_host}:${config.smtp_port}`)
     
     // Send email
+    console.log('📤 Sending email via SMTP...')
     const result = await sendViaSMTP(
       config.smtp_host,
       config.smtp_port,
@@ -349,10 +538,10 @@ serve(async (req) => {
       config.smtp_user,
       config.smtp_pass,
       config.sender_email,
-      to,
-      subject,
-      textContent,
-      htmlContent
+      normalizedPayload.to,
+      finalSubject,
+      finalTextContent,
+      finalHtmlContent
     )
     
     // Log delivery attempt - Fixed parameter order to match database function
@@ -367,12 +556,12 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           p_message_id: result.messageId || `unified-${Date.now()}`,
-          p_recipient_email: to,
-          p_subject: subject,
+          p_recipient_email: normalizedPayload.to,
+          p_subject: finalSubject,
           p_provider: 'unified-smtp',
           p_status: result.success ? 'sent' : 'failed',
-          p_template_key: templateKey || null,
-          p_variables: variables || {},
+          p_template_key: normalizedPayload.templateKey || null,
+          p_variables: normalizedPayload.variables || {},
           p_smtp_response: result.error || 'Success'
         })
       })
@@ -408,10 +597,21 @@ serve(async (req) => {
   } catch (error) {
     console.error('❌ SMTP Function error:', error)
     
+    // Enhanced error logging
+    const errorDetails = {
+      message: error.message,
+      stack: error.stack,
+      requestBody: requestBody ? JSON.stringify(requestBody, null, 2) : 'undefined',
+      timestamp: new Date().toISOString()
+    }
+    
+    console.error('💥 Full error context:', JSON.stringify(errorDetails, null, 2))
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
-        error: error.message 
+        error: error.message,
+        timestamp: new Date().toISOString()
       }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

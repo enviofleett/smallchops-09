@@ -50,24 +50,43 @@ interface EmailDeliveryLog {
 export const useEmailService = () => {
   const { toast } = useToast();
 
-  // Send email mutation with Auth system priority
+  // Send email mutation with standardized payload
   const sendEmailMutation = useMutation({
     mutationFn: async (emailRequest: EmailRequest) => {
-      console.log('Sending email via Production Email Processor:', emailRequest);
+      console.log('🚀 Sending email via unified SMTP sender:', emailRequest);
       
       try {
+        // Normalize payload for consistent API
+        const normalizedPayload = {
+          to: emailRequest.to,
+          subject: emailRequest.subject,
+          textContent: emailRequest.text,
+          htmlContent: emailRequest.html,
+          templateKey: emailRequest.templateId,
+          variables: emailRequest.variables || {},
+          emailType: emailRequest.emailType || 'transactional'
+        };
+
+        console.log('📤 Normalized payload:', normalizedPayload);
+
         const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
-          body: emailRequest
+          body: normalizedPayload
         });
 
         if (error) {
+          console.error('❌ Supabase function error:', error);
           throw new Error(`Email sending failed: ${error.message}`);
         }
 
-        console.log('Email sent successfully via Production Email Processor:', data);
+        // Handle both success/error response formats
+        if (data && !data.success && data.error) {
+          throw new Error(`SMTP Error: ${data.error}`);
+        }
+
+        console.log('✅ Email sent successfully:', data);
         return data;
       } catch (error) {
-        console.error('Email sending failed:', error);
+        console.error('💥 Email sending failed:', error);
         throw error;
       }
     },

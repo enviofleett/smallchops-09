@@ -103,34 +103,60 @@ export const useSMTPSettings = () => {
     },
   });
 
-  // Test email connection using production email processor
+  // Test email connection using unified SMTP sender with standardized payload
   const testConnectionMutation = useMutation({
     mutationFn: async (testEmail: string) => {
       try {
-        console.log('Testing email with Production Email Processor...');
+        console.log('🧪 Testing email with unified SMTP sender...');
         
+        // Use standardized payload format
+        const payload = {
+          to: testEmail,
+          subject: 'SMTP Connection Test - Success!',
+          templateKey: 'smtp_test', // Try template first
+          variables: {
+            test_time: new Date().toLocaleString(),
+            smtp_host: 'Unified SMTP System',
+            business_name: 'Starters Small Chops'
+          },
+          emailType: 'transactional',
+          // Fallback content if template doesn't exist
+          textContent: `SMTP Connection Test\n\nTest Time: ${new Date().toLocaleString()}\nSMTP Host: Unified SMTP System\nBusiness: Starters Small Chops\n\nIf you receive this email, your SMTP configuration is working correctly!`,
+          htmlContent: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
+              <h2 style="color: #2563eb;">SMTP Connection Test</h2>
+              <p>Congratulations! Your SMTP configuration is working correctly.</p>
+              <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="margin-top: 0;">Test Details:</h3>
+                <p><strong>Test Time:</strong> ${new Date().toLocaleString()}</p>
+                <p><strong>SMTP System:</strong> Unified SMTP System</p>
+                <p><strong>Business:</strong> Starters Small Chops</p>
+              </div>
+              <p>This email confirms that your email settings are properly configured and emails can be sent successfully.</p>
+            </div>`
+        };
+
+        console.log('📤 Sending test email payload:', payload);
+
         const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
-          body: {
-            to: testEmail,
-            subject: 'SMTP Test - Connection Successful',
-            templateKey: 'smtp_test',
-            variables: {
-              test_time: new Date().toLocaleString(),
-              smtp_host: 'Unified SMTP System',
-              business_name: 'Starters Small Chops'
-            },
-            emailType: 'transactional'
-          }
+          body: payload
         });
 
         if (error) {
+          console.error('❌ Supabase function error:', error);
           throw new Error(error.message || 'Failed to send test email');
         }
 
-        console.log('Test email sent successfully via Production Email Processor');
+        // Handle both success/error response formats
+        if (data && !data.success && data.error) {
+          console.error('❌ SMTP test error:', data.error);
+          throw new Error(`SMTP test failed: ${data.error}`);
+        }
+
+        console.log('✅ Test email sent successfully via unified SMTP sender:', data);
         return data;
       } catch (error) {
-        console.error('Production email test failed:', error);
+        console.error('💥 SMTP test failed:', error);
         throw new Error(`Email test failed: ${error.message}`);
       }
     },

@@ -111,36 +111,39 @@ class EmailTemplateService {
     } = {}
   ): Promise<boolean> {
     try {
-      const template = await this.getTemplate(templateKey);
-      if (!template) {
-        console.error(`Template not found: ${templateKey}`);
-        return false;
-      }
+      console.log(`🎨 Sending templated email: ${templateKey} to ${recipient}`);
 
-      const processed = this.processTemplate(template, variables);
+      // Send standardized payload to unified SMTP sender
+      // Let the edge function handle template processing server-side
+      const payload = {
+        to: recipient,
+        templateKey: templateKey,
+        variables: variables || {},
+        emailType: 'transactional',
+        priority: options.priority || 'normal'
+      };
 
-      // Use the unified SMTP sender function
-      const { error } = await supabase.functions.invoke('unified-smtp-sender', {
-        body: {
-          to: recipient,
-          subject: processed.subject,
-          html: processed.html,
-          text: processed.text,
-          template_key: templateKey,
-          variables: variables,
-          priority: options.priority || 'normal'
-        }
+      console.log('📤 Sending payload:', payload);
+
+      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+        body: payload
       });
 
       if (error) {
-        console.error('Error sending templated email:', error);
+        console.error('❌ Supabase function error:', error);
         return false;
       }
 
-      console.log(`Templated email sent: ${templateKey} to ${recipient}`);
+      // Handle both success/error response formats
+      if (data && !data.success && data.error) {
+        console.error('❌ SMTP Error:', data.error);
+        return false;
+      }
+
+      console.log(`✅ Templated email sent: ${templateKey} to ${recipient}`);
       return true;
     } catch (error) {
-      console.error('Error in sendTemplatedEmail:', error);
+      console.error('💥 Error in sendTemplatedEmail:', error);
       return false;
     }
   }

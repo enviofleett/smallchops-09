@@ -46,6 +46,13 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   special_instructions?: string | null;
+  product_id?: string | null;
+  product?: {
+    id: string;
+    name: string;
+    description?: string;
+    features?: string[];
+  } | null;
 }
 
 interface PaymentTx {
@@ -185,18 +192,28 @@ const loadData = React.useCallback(async () => {
 
     setOrder(orderData as OrderDetailsData);
 
-    // Fetch order items
+    // Fetch order items with product details including features
     try {
       const { data: itemsData, error: itemsErr } = await supabase
         .from('order_items')
-        .select('id, product_name, quantity, unit_price, total_price, special_instructions')
+        .select(`
+          id, product_name, quantity, unit_price, total_price, special_instructions, product_id,
+          products:product_id (
+            id, name, description, features
+          )
+        `)
         .eq('order_id', id)
         .order('created_at', { ascending: true });
       
       if (itemsErr) {
         console.warn('Order items fetch error:', itemsErr);
       } else {
-        setOrderItems(itemsData || []);
+        // Transform the data to match our interface
+        const transformedItems = (itemsData || []).map(item => ({
+          ...item,
+          product: item.products || null
+        }));
+        setOrderItems(transformedItems);
       }
     } catch (itemsError) {
       console.warn('Failed to load order items:', itemsError);
@@ -489,8 +506,20 @@ const reconcileNow = async () => {
                         Note: {item.special_instructions}
                       </p>
                     )}
+                    
+                    {/* Product Features */}
+                    {item.product?.features && item.product.features.length > 0 && (
+                      <div className="mt-2">
+                        <h4 className="text-sm font-medium mb-1 text-muted-foreground">What's included:</h4>
+                        <ul className="list-disc list-inside space-y-1 text-xs sm:text-sm text-muted-foreground pl-2">
+                          {item.product.features.map((feature, featureIndex) => (
+                            <li key={featureIndex} className="break-words">{feature}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
                   </div>
-                  <div className="text-right">
+                  <div className="text-right ml-4 flex-shrink-0">
                     <p className="font-medium">{formatMoney(item.total_price || item.unit_price * item.quantity)}</p>
                     <p className="text-sm text-muted-foreground">{formatMoney(item.unit_price)} each</p>
                   </div>

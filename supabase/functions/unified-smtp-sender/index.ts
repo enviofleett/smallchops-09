@@ -140,6 +140,8 @@ async function sendViaSMTP(
   let conn: Deno.TcpConn | Deno.TlsConn
   
   try {
+    console.log(`🔗 Connecting to SMTP server ${host}:${port} (secure: ${secure})`)
+    
     // Connect
     if (secure && port === 465) {
       conn = await Deno.connectTls({ hostname: host, port })
@@ -220,6 +222,8 @@ async function sendViaSMTP(
       throw new Error(`AUTH password failed: ${response}`)
     }
     
+    console.log('✅ SMTP authentication successful')
+    
     // MAIL FROM (envelope address only)
     const envelopeFrom = sanitizeEnvelopeAddress(from)
     await writeCommand(`MAIL FROM:<${envelopeFrom}>`)
@@ -269,6 +273,8 @@ async function sendViaSMTP(
       throw new Error(`DATA send failed: ${response}`)
     }
     
+    console.log('✅ Email sent successfully:', response)
+    
     // Extract message ID from response if available
     const messageIdMatch = response.match(/250[- ][\d\w.@-]+/)
     const messageId = messageIdMatch ? messageIdMatch[0].substring(4) : undefined
@@ -280,7 +286,7 @@ async function sendViaSMTP(
     return { success: true, messageId }
     
   } catch (error) {
-    console.error('SMTP Error:', error)
+    console.error('❌ SMTP Error:', error)
     return { success: false, error: error.message }
   } finally {
     try {
@@ -301,6 +307,7 @@ serve(async (req) => {
   }
   
   try {
+    console.log('📧 Processing SMTP email request...')
     const { to, subject, textContent, htmlContent, templateKey, variables } = await req.json()
     
     if (!to || !subject || (!textContent && !htmlContent)) {
@@ -314,6 +321,7 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     
+    console.log('🔧 Fetching SMTP configuration...')
     const settingsResponse = await fetch(`${supabaseUrl}/rest/v1/communication_settings?use_smtp=eq.true&select=*`, {
       headers: {
         'Authorization': `Bearer ${supabaseKey}`,
@@ -321,12 +329,17 @@ serve(async (req) => {
       }
     })
     
+    if (!settingsResponse.ok) {
+      throw new Error(`Failed to fetch SMTP settings: ${settingsResponse.status}`)
+    }
+    
     const settings = await settingsResponse.json()
     if (!settings || settings.length === 0) {
       throw new Error('No active SMTP configuration found')
     }
     
     const config = settings[0]
+    console.log(`📡 Using SMTP config: ${config.smtp_host}:${config.smtp_port}`)
     
     // Send email
     const result = await sendViaSMTP(
@@ -342,9 +355,10 @@ serve(async (req) => {
       htmlContent
     )
     
-    // Log delivery attempt
+    // Log delivery attempt - Fixed parameter order to match database function
     try {
-      await fetch(`${supabaseUrl}/rest/v1/rpc/log_email_delivery`, {
+      console.log('📝 Logging email delivery attempt...')
+      const logResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/log_email_delivery`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${supabaseKey}`,
@@ -357,9 +371,17 @@ serve(async (req) => {
           p_subject: subject,
           p_provider: 'unified-smtp',
           p_status: result.success ? 'sent' : 'failed',
+          p_template_key: templateKey || null,
+          p_variables: variables || {},
           p_smtp_response: result.error || 'Success'
         })
       })
+      
+      if (!logResponse.ok) {
+        console.error('Failed to log delivery:', await logResponse.text())
+      } else {
+        console.log('✅ Delivery logged successfully')
+      }
     } catch (logError) {
       console.error('Failed to log delivery:', logError)
     }
@@ -384,7 +406,7 @@ serve(async (req) => {
     }
     
   } catch (error) {
-    console.error('Function error:', error)
+    console.error('❌ SMTP Function error:', error)
     
     return new Response(
       JSON.stringify({ 

@@ -46,12 +46,13 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   special_instructions?: string | null;
+  // Added for product features display functionality
   product_id?: string | null;
   product?: {
     id: string;
     name: string;
     description?: string;
-    features?: string[];
+    features?: string[]; // Array of feature strings displayed as bulleted list
   } | null;
 }
 
@@ -208,10 +209,12 @@ const loadData = React.useCallback(async () => {
       if (itemsErr) {
         console.warn('Order items fetch error:', itemsErr);
       } else {
-        // Transform the data to match our interface
+        // Transform the data to match our interface with null safety
         const transformedItems = (itemsData || []).map(item => ({
           ...item,
-          product: item.products || null
+          product: Array.isArray(item.products) && item.products.length > 0 
+            ? item.products[0] 
+            : item.products || null
         }));
         setOrderItems(transformedItems);
       }
@@ -507,7 +510,7 @@ const reconcileNow = async () => {
                       </p>
                     )}
                     
-                    {/* Product Features */}
+                    {/* Product Features - Display product features similar to ProductDetail.tsx */}
                     {item.product?.features && item.product.features.length > 0 && (
                       <div className="mt-2">
                         <h4 className="text-sm font-medium mb-1 text-muted-foreground">What's included:</h4>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
@@ -56,7 +56,7 @@ export const useOverdueOrdersLogic = () => {
   });
 
   // Process overdue orders and calculate statistics
-  const overdueData = useState(() => {
+  const overdueData = useMemo(() => {
     const now = new Date();
     const overdueOrders: OverdueOrder[] = [];
     let totalDelayMinutes = 0;
@@ -101,7 +101,7 @@ export const useOverdueOrdersLogic = () => {
     };
 
     return { overdueOrders: overdueOrders.sort((a, b) => b.minutes_overdue - a.minutes_overdue), stats };
-  })[0];
+  }, [potentialOverdueOrders, deliverySchedules]);
 
   // Auto-escalate critical orders
   const escalateOrderMutation = useMutation({

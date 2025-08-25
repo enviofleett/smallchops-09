@@ -37,49 +37,70 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
-    const deliveryDateTime = new Date(deliveryDate);
-    const [startHours, startMinutes] = deliveryTimeStart.split(':').map(Number);
-    const [endHours, endMinutes] = deliveryTimeEnd.split(':').map(Number);
-    
-    const deliveryStart = new Date(deliveryDate);
-    deliveryStart.setHours(startHours, startMinutes, 0, 0);
-    
-    const deliveryEnd = new Date(deliveryDate);
-    deliveryEnd.setHours(endHours, endMinutes, 0, 0);
-    
-    const diffToStart = deliveryStart.getTime() - now.getTime();
-    const diffToEnd = deliveryEnd.getTime() - now.getTime();
-    
-    let status: TimeRemaining['status'] = 'upcoming';
-    let targetTime = diffToStart;
-    
-    // Determine status
-    if (diffToEnd < 0) {
-      status = 'passed';
-      targetTime = 0;
-    } else if (diffToStart <= 0 && diffToEnd > 0) {
-      status = 'active';
-      targetTime = diffToEnd;
-    } else if (deliveryDateTime.toDateString() === today.toDateString()) {
-      status = 'today';
-      targetTime = diffToStart;
-    } else {
-      status = 'upcoming';
-      targetTime = diffToStart;
+    try {
+      const deliveryDateTime = new Date(deliveryDate);
+      const [startHours, startMinutes] = deliveryTimeStart.split(':').map(Number);
+      const [endHours, endMinutes] = deliveryTimeEnd.split(':').map(Number);
+      
+      // Validate parsed time values
+      if (isNaN(startHours) || isNaN(startMinutes) || isNaN(endHours) || isNaN(endMinutes)) {
+        throw new Error('Invalid time format');
+      }
+      
+      const deliveryStart = new Date(deliveryDate);
+      deliveryStart.setHours(startHours, startMinutes, 0, 0);
+      
+      const deliveryEnd = new Date(deliveryDate);
+      deliveryEnd.setHours(endHours, endMinutes, 0, 0);
+      
+      // Validate constructed dates
+      if (isNaN(deliveryStart.getTime()) || isNaN(deliveryEnd.getTime())) {
+        throw new Error('Invalid delivery date/time');
+      }
+      
+      const diffToStart = deliveryStart.getTime() - now.getTime();
+      const diffToEnd = deliveryEnd.getTime() - now.getTime();
+      
+      let status: TimeRemaining['status'] = 'upcoming';
+      let targetTime = diffToStart;
+      
+      // Determine status
+      if (diffToEnd < 0) {
+        status = 'passed';
+        targetTime = Math.abs(diffToEnd); // Show how long it's been overdue
+      } else if (diffToStart <= 0 && diffToEnd > 0) {
+        status = 'active';
+        targetTime = diffToEnd;
+      } else if (deliveryDateTime.toDateString() === today.toDateString()) {
+        status = 'today';
+        targetTime = diffToStart;
+      } else {
+        status = 'upcoming';
+        targetTime = diffToStart;
+      }
+      
+      const days = Math.floor(Math.abs(targetTime) / (1000 * 60 * 60 * 24));
+      const hours = Math.floor((Math.abs(targetTime) % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+      const minutes = Math.floor((Math.abs(targetTime) % (1000 * 60 * 60)) / (1000 * 60));
+      const seconds = Math.floor((Math.abs(targetTime) % (1000 * 60)) / 1000);
+      
+      return {
+        days: Math.max(0, days),
+        hours: Math.max(0, hours),
+        minutes: Math.max(0, minutes),
+        seconds: Math.max(0, seconds),
+        status
+      };
+    } catch (error) {
+      console.error('Error calculating countdown time:', error);
+      return {
+        days: 0,
+        hours: 0,
+        minutes: 0,
+        seconds: 0,
+        status: 'upcoming' as const
+      };
     }
-    
-    const days = Math.floor(targetTime / (1000 * 60 * 60 * 24));
-    const hours = Math.floor((targetTime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-    const minutes = Math.floor((targetTime % (1000 * 60 * 60)) / (1000 * 60));
-    const seconds = Math.floor((targetTime % (1000 * 60)) / 1000);
-    
-    return {
-      days: Math.max(0, days),
-      hours: Math.max(0, hours),
-      minutes: Math.max(0, minutes),
-      seconds: Math.max(0, seconds),
-      status
-    };
   };
 
   useEffect(() => {
@@ -128,13 +149,13 @@ export const CountdownTimer: React.FC<CountdownTimerProps> = ({
         };
       case 'passed':
         return {
-          title: 'Delivery Window Completed',
+          title: 'OVERDUE - Delivery Window Passed',
           subtitle: `Was scheduled for ${formatTime(deliveryTimeStart)} - ${formatTime(deliveryTimeEnd)}`,
-          bgColor: 'bg-gray-50 border-gray-200',
-          textColor: 'text-gray-800',
-          iconColor: 'text-gray-600',
-          showCountdown: false,
-          countdownLabel: ''
+          bgColor: 'bg-red-50 border-red-200',
+          textColor: 'text-red-800',
+          iconColor: 'text-red-600',
+          showCountdown: true,
+          countdownLabel: 'Time overdue:'
         };
       default:
         return {

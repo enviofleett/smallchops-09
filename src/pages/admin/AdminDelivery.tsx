@@ -343,12 +343,13 @@ export default function AdminDelivery() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5">
-            <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-            <TabsTrigger value="ready-orders" className="text-xs sm:text-sm">Ready Orders</TabsTrigger>
-            <TabsTrigger value="orders" className="text-xs sm:text-sm">All Orders</TabsTrigger>
-            <TabsTrigger value="drivers" className="text-xs sm:text-sm">Drivers</TabsTrigger>
-            <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-1">
+            <TabsTrigger value="overview" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Overview</TabsTrigger>
+            <TabsTrigger value="ready-orders" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Ready</TabsTrigger>
+            <TabsTrigger value="orders" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">All</TabsTrigger>
+            <TabsTrigger value="drivers" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Drivers</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Analytics</TabsTrigger>
+            <TabsTrigger value="overdue" className="text-xs sm:text-sm px-2 py-1.5 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">Overdue</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}

@@ -18,6 +18,8 @@ import { ShippingFeesReport } from '@/components/admin/delivery/ShippingFeesRepo
 import { DriverDialog } from '@/components/delivery/DriverDialog';
 import { AdminDriversTab } from '@/components/admin/delivery/AdminDriversTab';
 import { DeliveryZonesManager } from '@/components/delivery/DeliveryZonesManager';
+import { EnhancedDeliveryManagement } from '@/components/admin/delivery/EnhancedDeliveryManagement';
+import { DriverPerformanceDashboard } from '@/components/admin/delivery/DriverPerformanceDashboard';
 import { 
   MapPin, 
   Truck, 
@@ -341,11 +343,12 @@ export default function AdminDelivery() {
 
         {/* Main Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-5">
             <TabsTrigger value="overview" className="text-xs sm:text-sm">Overview</TabsTrigger>
-            <TabsTrigger value="orders" className="text-xs sm:text-sm">Delivery Orders</TabsTrigger>
+            <TabsTrigger value="ready-orders" className="text-xs sm:text-sm">Ready Orders</TabsTrigger>
+            <TabsTrigger value="orders" className="text-xs sm:text-sm">All Orders</TabsTrigger>
             <TabsTrigger value="drivers" className="text-xs sm:text-sm">Drivers</TabsTrigger>
-            <TabsTrigger value="zones" className="text-xs sm:text-sm">Zones</TabsTrigger>
+            <TabsTrigger value="analytics" className="text-xs sm:text-sm">Analytics</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -397,6 +400,11 @@ export default function AdminDelivery() {
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Ready Orders Tab - New Enhanced Management */}
+          <TabsContent value="ready-orders" className="space-y-6">
+            <EnhancedDeliveryManagement />
           </TabsContent>
 
           {/* Delivery Orders Tab */}

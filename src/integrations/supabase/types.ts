@@ -2367,6 +2367,81 @@ export type Database = {
           },
         ]
       }
+      delivery_assignments: {
+        Row: {
+          accepted_at: string | null
+          actual_delivery_time: string | null
+          assigned_at: string
+          assigned_by: string | null
+          completed_at: string | null
+          created_at: string
+          customer_rating: number | null
+          delivery_notes: string | null
+          driver_id: string
+          estimated_delivery_time: string | null
+          failed_at: string | null
+          failure_reason: string | null
+          id: string
+          order_id: string
+          started_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          actual_delivery_time?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          customer_rating?: number | null
+          delivery_notes?: string | null
+          driver_id: string
+          estimated_delivery_time?: string | null
+          failed_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          order_id: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          actual_delivery_time?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          completed_at?: string | null
+          created_at?: string
+          customer_rating?: number | null
+          delivery_notes?: string | null
+          driver_id?: string
+          estimated_delivery_time?: string | null
+          failed_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          order_id?: string
+          started_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_assignments_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       delivery_fees: {
         Row: {
           base_fee: number
@@ -2894,6 +2969,62 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "driver_location_tracking_driver_id_fkey"
+            columns: ["driver_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      driver_performance_analytics: {
+        Row: {
+          average_delivery_time_minutes: number
+          created_at: string
+          customer_ratings_average: number | null
+          driver_id: string
+          id: string
+          orders_completed: number
+          orders_failed: number
+          total_customer_ratings: number
+          total_delivery_fees: number
+          total_distance_km: number
+          updated_at: string
+          week_end_date: string
+          week_start_date: string
+        }
+        Insert: {
+          average_delivery_time_minutes?: number
+          created_at?: string
+          customer_ratings_average?: number | null
+          driver_id: string
+          id?: string
+          orders_completed?: number
+          orders_failed?: number
+          total_customer_ratings?: number
+          total_delivery_fees?: number
+          total_distance_km?: number
+          updated_at?: string
+          week_end_date: string
+          week_start_date: string
+        }
+        Update: {
+          average_delivery_time_minutes?: number
+          created_at?: string
+          customer_ratings_average?: number | null
+          driver_id?: string
+          id?: string
+          orders_completed?: number
+          orders_failed?: number
+          total_customer_ratings?: number
+          total_delivery_fees?: number
+          total_distance_km?: number
+          updated_at?: string
+          week_end_date?: string
+          week_start_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "driver_performance_analytics_driver_id_fkey"
             columns: ["driver_id"]
             isOneToOne: false
             referencedRelation: "drivers"
@@ -7972,6 +8103,14 @@ export type Database = {
         Args: { order_items: Json }
         Returns: Json
       }
+      assign_driver_to_order: {
+        Args: {
+          p_driver_id: string
+          p_estimated_delivery_time?: string
+          p_order_id: string
+        }
+        Returns: Json
+      }
       assign_rider_to_order: {
         Args: { p_assigned_by?: string; p_order_id: string; p_rider_id: string }
         Returns: string
@@ -8003,6 +8142,16 @@ export type Database = {
       calculate_delivery_metrics: {
         Args: { p_date: string }
         Returns: undefined
+      }
+      calculate_driver_weekly_performance: {
+        Args: { p_driver_id: string; p_week_start: string }
+        Returns: {
+          avg_delivery_time: number
+          avg_rating: number
+          orders_completed: number
+          orders_failed: number
+          total_fees: number
+        }[]
       }
       calculate_moq_pricing_impact: {
         Args: { order_items: Json }
@@ -9211,6 +9360,10 @@ export type Database = {
           p_phone?: string
           p_user_agent?: string
         }
+        Returns: Json
+      }
+      update_delivery_status: {
+        Args: { p_assignment_id: string; p_notes?: string; p_status: string }
         Returns: Json
       }
       update_order_payment_status: {

@@ -20,6 +20,7 @@ interface ProductDetail {
     images?: string[];
     is_available: boolean;
     price: number;
+    features?: string[];
   };
 }
 
@@ -114,6 +115,18 @@ export function ProductDetailCard({ item, onReorder, showReorderButton = false }
               <div className="mt-2 p-2 bg-muted/50 rounded text-xs">
                 <span className="font-medium">Instructions: </span>
                 {item.special_instructions}
+              </div>
+            )}
+
+            {/* What's included (Features) */}
+            {item.product?.features && Array.isArray(item.product.features) && item.product.features.length > 0 && (
+              <div className="mt-2 p-2 bg-muted/30 rounded text-xs">
+                <span className="font-medium text-primary">What's included:</span>
+                <ul className="mt-1 space-y-0.5">
+                  {item.product.features.map((feature, index) => (
+                    <li key={index} className="text-muted-foreground">• {feature}</li>
+                  ))}
+                </ul>
               </div>
             )}
 

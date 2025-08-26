@@ -159,9 +159,13 @@ async function sendViaSMTP(
       return decoder.decode(buffer.subarray(0, n || 0))
     }
     
-    // Write command helper
-    const writeCommand = async (command: string): Promise<void> => {
-      console.log(`SMTP CMD: ${command}`)
+    // Write command helper with sanitized logging
+    const writeCommand = async (command: string, sensitive: boolean = false): Promise<void> => {
+      if (sensitive) {
+        console.log(`SMTP CMD: [REDACTED]`)
+      } else {
+        console.log(`SMTP CMD: ${command}`)
+      }
       await conn.write(encoder.encode(command + CRLF))
     }
     
@@ -208,7 +212,7 @@ async function sendViaSMTP(
     
     // Username
     const encodedUsername = btoa(username)
-    await writeCommand(encodedUsername)
+    await writeCommand(encodedUsername, true) // Mark as sensitive
     response = await readResponse()
     if (!response.startsWith('334')) {
       throw new Error(`AUTH username failed: ${response}`)
@@ -216,7 +220,7 @@ async function sendViaSMTP(
     
     // Password
     const encodedPassword = btoa(password)
-    await writeCommand(encodedPassword)
+    await writeCommand(encodedPassword, true) // Mark as sensitive
     response = await readResponse()
     if (!response.startsWith('235')) {
       throw new Error(`AUTH password failed: ${response}`)
@@ -654,7 +658,7 @@ serve(async (req) => {
       smtp_port: (config?.smtp_port) || parseInt(Deno.env.get('SMTP_PORT') || '587'),
       smtp_secure: config?.smtp_secure !== undefined ? config.smtp_secure : false, // Always use STARTTLS for port 587
       smtp_user: (config?.smtp_user) || Deno.env.get('SMTP_USER') || 'store@startersmallchops.com',
-      smtp_pass: (config?.smtp_pass) || Deno.env.get('SMTP_PASS') || '@Octopus100%',
+      smtp_pass: (config?.smtp_pass) || Deno.env.get('SMTP_PASS') || '',
       sender_email: (config?.sender_email) || Deno.env.get('SENDER_EMAIL') || 'store@startersmallchops.com',
       sender_name: (config?.sender_name) || Deno.env.get('SENDER_NAME') || 'Starters Small Chops'
     }
@@ -701,7 +705,7 @@ serve(async (req) => {
         email_id: result.messageId || `unified-${Date.now()}`,
         recipient_email: normalizedPayload.to,
         subject: finalSubject,
-        status: result.success ? 'sent' : 'failed',
+        delivery_status: result.success ? 'sent' : 'failed',
         provider: 'unified-smtp',
         template_key: normalizedPayload.templateKey || null,
         variables: normalizedPayload.variables || {},

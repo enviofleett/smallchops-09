@@ -7,18 +7,82 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
+# Runtime and build artifacts
 node_modules
 dist
 dist-ssr
 *.local
+.vite
+.rollup.cache
+.cache
+.parcel-cache
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Testing
+coverage
+*.lcov
+.nyc_output
+test-results
+playwright-report
+
+# Temporary files
+*.tmp
+*.temp
+.tmp
+.temp
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*.swp
+*.swo
+*~
 
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
 .idea
-.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# TypeScript
+*.tsbuildinfo
+
+# Production monitoring and debugging
+error-reports/
+*.error.log
+.debug/
+
+# Package manager files
+package-lock.json.bak
+yarn.lock.bak
+.pnpm-store
+
+# Security and sensitive files
+.env.backup
+*.key
+*.pem
+*.crt
+*.p12
+secrets/
+
+# Build analysis
+bundle-analyzer-report.html
+stats.json

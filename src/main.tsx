@@ -5,6 +5,10 @@ import App from "./App.tsx";
 import "./index.css";
 import { initWebVitals } from "./utils/webVitals";
 import { productionMonitoring } from "./utils/productionMonitoring";
+import { setupGlobalErrorHandling, errorLogger } from "./lib/error-handling";
+
+// Initialize global error handling first
+setupGlobalErrorHandling();
 
 // Initialize performance monitoring
 initWebVitals();
@@ -12,6 +16,21 @@ initWebVitals();
 // Initialize production monitoring
 if (import.meta.env.PROD) {
   console.log('🔍 Production monitoring enabled');
+  
+  // Log startup information for monitoring
+  errorLogger.log({
+    name: 'Application Startup',
+    message: 'Application initialized successfully in production mode',
+    code: 'APP_STARTUP',
+    severity: 'low',
+    category: 'system',
+    timestamp: new Date().toISOString(),
+    context: {
+      environment: import.meta.env.MODE,
+      version: '1.1.0',
+      userAgent: navigator.userAgent
+    }
+  } as any);
 }
 
 // PRODUCTION-SAFE: Minimal cache management for stability
@@ -36,6 +55,19 @@ function safeCacheCleanup() {
     console.info('✅ Cache cleanup completed safely');
   } catch (error) {
     console.warn('Cache cleanup failed:', error);
+    
+    // Log cache cleanup errors in production
+    if (import.meta.env.PROD) {
+      errorLogger.log({
+        name: 'Cache Cleanup Error',
+        message: 'Failed to perform cache cleanup',
+        code: 'CACHE_CLEANUP_ERROR',
+        severity: 'low',
+        category: 'system',
+        timestamp: new Date().toISOString(),
+        context: { error }
+      } as any);
+    }
   }
 }
 

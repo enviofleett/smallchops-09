@@ -509,7 +509,42 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         onConflict: 'reference'
       });
       
-      log('info', '✅ Payment transaction record updated');
+    log('info', '✅ Payment transaction record updated');
+
+    // Immediately send payment confirmation email (hotfix for production)
+    try {
+      const confirmationEmailResult = await supabase.functions.invoke('unified-smtp-sender', {
+        body: {
+          to: orderData.customer_email,
+          subject: 'Payment Confirmation - Order ' + orderData.order_number,
+          templateKey: 'payment_confirmation',
+          variables: {
+            customerName: orderData.customer_name || 'Valued Customer',
+            orderNumber: orderData.order_number,
+            amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+            paymentMethod: 'Paystack',
+            orderType: orderData.order_type || 'order'
+          }
+        }
+      });
+
+      if (confirmationEmailResult.error) {
+        log('warn', '⚠️ Immediate payment confirmation email failed (non-blocking)', {
+          error: confirmationEmailResult.error.message,
+          order_id: orderData.order_id
+        });
+      } else {
+        log('info', '✅ Payment confirmation email sent immediately', {
+          order_id: orderData.order_id,
+          customer_email: orderData.customer_email
+        });
+      }
+    } catch (emailError) {
+      log('warn', '⚠️ Exception sending immediate payment confirmation (non-blocking)', {
+        error: emailError.message,
+        order_id: orderData.order_id
+      });
+    }
     } catch (txnError) {
       log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
         error: txnError.message

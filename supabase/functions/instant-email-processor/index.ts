@@ -113,9 +113,16 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
         })
         .eq('id', email.id)
 
-      // Check email suppression
-      const { data: suppressionCheck } = await supabase
-        .rpc('is_email_suppressed', { email_address: email.recipient_email })
+      // Check email suppression with error handling
+      let suppressionCheck = false;
+      try {
+        const { data } = await supabase
+          .rpc('is_email_suppressed', { email_address: email.recipient_email });
+        suppressionCheck = data === true;
+      } catch (suppressionError) {
+        console.warn(`⚠️ Suppression check failed for ${email.recipient_email}, allowing email:`, suppressionError.message);
+        // Continue processing if suppression check fails
+      }
 
       if (suppressionCheck === true) {
         console.log(`🚫 Email ${email.recipient_email} is suppressed, skipping`)
@@ -137,13 +144,19 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
       let emailResult
       
       try {
+        // Normalize template key for backwards compatibility
+        let normalizedTemplateKey = email.template_key;
+        if (email.template_key === 'order_confirmed') {
+          normalizedTemplateKey = 'order_confirmation';
+        }
+
         emailResult = await supabase.functions.invoke('unified-smtp-sender', {
           body: {
             to: email.recipient_email,
             subject: email.variables?.subject || 'Notification from Starters Small Chops',
             htmlContent: email.variables?.html_content,
             textContent: email.variables?.text_content,
-            templateKey: email.template_key,
+            templateKey: normalizedTemplateKey,
             variables: email.variables
           }
         })

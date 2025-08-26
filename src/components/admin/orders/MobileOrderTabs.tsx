@@ -24,6 +24,7 @@ interface MobileOrderTabsProps {
     preparing: number;
     out_for_delivery: number;
     delivered: number;
+    overdue: number;
   };
 }
 
@@ -54,9 +55,15 @@ export const MobileOrderTabs = ({
     if (status === 'overdue') {
       return orders.filter(order => {
         const schedule = deliverySchedules[order.id];
-        if (!schedule) return false;
-        return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
-               ['confirmed', 'preparing', 'ready'].includes(order.status);
+        if (!schedule || !schedule.delivery_date || !schedule.delivery_time_end) return false;
+        
+        try {
+          return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
+                 ['confirmed', 'preparing', 'ready'].includes(order.status);
+        } catch (error) {
+          console.warn('Error checking overdue status in mobile tabs:', order.id, error);
+          return false;
+        }
       });
     }
     return orders.filter(o => o.status === status);
@@ -226,7 +233,7 @@ export const MobileOrderTabs = ({
             Del ({orderCounts.delivered})
           </TabsTrigger>
           <TabsTrigger value="overdue" className="text-xs whitespace-nowrap px-3 py-2 text-destructive">
-            Over
+            Over ({orderCounts.overdue})
           </TabsTrigger>
         </TabsList>
       </div>

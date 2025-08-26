@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +27,7 @@ import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useDebounce } from '@/hooks/useDebounce';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -41,6 +42,14 @@ export default function AdminOrders() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
+  // Debounce search query to avoid excessive API calls
+  const debouncedSearchQuery = useDebounce(searchQuery, 500);
+
+  // Reset pagination when filters change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [statusFilter, debouncedSearchQuery, deliveryFilter]);
+
   // Fetch orders with pagination and filters
   const {
     data: ordersData,
@@ -48,14 +57,15 @@ export default function AdminOrders() {
     error,
     refetch
   } = useQuery({
-    queryKey: ['admin-orders', currentPage, statusFilter, searchQuery],
+    queryKey: ['admin-orders', currentPage, statusFilter, debouncedSearchQuery],
     queryFn: () => getOrders({
       page: currentPage,
       pageSize: 20,
       status: statusFilter === 'all' || statusFilter === 'overdue' ? undefined : statusFilter,
-      searchQuery: searchQuery || undefined
+      searchQuery: debouncedSearchQuery || undefined
     }),
-    refetchInterval: 30000 // Refresh every 30 seconds
+    refetchInterval: 30000, // Refresh every 30 seconds
+    placeholderData: (previousData) => previousData // Keep previous data while loading new data
   });
   
   const orders = ordersData?.orders || [];
@@ -121,7 +131,7 @@ export default function AdminOrders() {
     return ordersCopy;
   }, [orders, deliverySchedules, statusFilter]);
 
-  // Filter orders by delivery schedule
+  // Filter orders by delivery schedule with defensive date handling
   const filteredOrders = useMemo(() => {
     if (deliveryFilter === 'all') return prioritySortedOrders;
     
@@ -129,21 +139,28 @@ export default function AdminOrders() {
     today.setHours(0, 0, 0, 0);
     
     return prioritySortedOrders.filter(order => {
-      // Only apply delivery filter to paid delivery orders
+      // Only apply delivery schedule filter to paid delivery orders
       if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
-        return true; // Show non-delivery or unpaid orders when filtering for all
+        return false; // Exclude non-delivery/unpaid orders when applying delivery filters
       }
       
       const schedule = deliverySchedules[order.id];
-      if (!schedule) return false;
+      if (!schedule || !schedule.delivery_date) return false;
       
-      const deliveryDate = new Date(schedule.delivery_date);
-      deliveryDate.setHours(0, 0, 0, 0);
-      
-      if (deliveryFilter === 'due_today') {
-        return deliveryDate.getTime() === today.getTime();
-      } else if (deliveryFilter === 'upcoming') {
-        return deliveryDate.getTime() > today.getTime();
+      try {
+        const deliveryDate = new Date(schedule.delivery_date);
+        if (isNaN(deliveryDate.getTime())) return false;
+        
+        deliveryDate.setHours(0, 0, 0, 0);
+        
+        if (deliveryFilter === 'due_today') {
+          return deliveryDate.getTime() === today.getTime();
+        } else if (deliveryFilter === 'upcoming') {
+          return deliveryDate.getTime() > today.getTime();
+        }
+      } catch (error) {
+        console.warn('Error parsing delivery date:', schedule.delivery_date, error);
+        return false;
       }
       
       return false;
@@ -151,14 +168,31 @@ export default function AdminOrders() {
   }, [prioritySortedOrders, deliverySchedules, deliveryFilter]);
 
   // Get order counts by status for tab badges
-  const orderCounts = useMemo(() => ({
-    all: totalCount,
-    pending: orders.filter(o => o.status === 'pending').length,
-    confirmed: orders.filter(o => o.status === 'confirmed').length,
-    preparing: orders.filter(o => o.status === 'preparing').length,
-    out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
-    delivered: orders.filter(o => o.status === 'delivered').length
-  }), [orders, totalCount]);
+  const orderCounts = useMemo(() => {
+    // Calculate overdue count with defensive date handling
+    const overdueCount = orders.filter(order => {
+      const schedule = deliverySchedules[order.id];
+      if (!schedule || !schedule.delivery_date || !schedule.delivery_time_end) return false;
+      
+      try {
+        return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
+               ['confirmed', 'preparing', 'ready'].includes(order.status);
+      } catch (error) {
+        console.warn('Error checking overdue status for order:', order.id, error);
+        return false;
+      }
+    }).length;
+
+    return {
+      all: totalCount,
+      pending: orders.filter(o => o.status === 'pending').length,
+      confirmed: orders.filter(o => o.status === 'confirmed').length,
+      preparing: orders.filter(o => o.status === 'preparing').length,
+      out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
+      delivered: orders.filter(o => o.status === 'delivered').length,
+      overdue: overdueCount
+    };
+  }, [orders, totalCount, deliverySchedules]);
 
   const handleOrderClick = (order: OrderWithItems) => {
     setSelectedOrder(order);
@@ -167,14 +201,13 @@ export default function AdminOrders() {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    setCurrentPage(1);
-    refetch();
+    // No need to manually trigger refetch - debounced query will handle it
   };
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
     setStatusFilter(value as 'all' | OrderStatus | 'overdue');
-    setCurrentPage(1);
+    // currentPage reset is handled by useEffect above
   };
 
   const getStatusBadgeColor = (status: string) => {
@@ -408,7 +441,7 @@ export default function AdminOrders() {
                     Del ({orderCounts.delivered})
                   </TabsTrigger>
                   <TabsTrigger value="overdue" className="text-xs whitespace-nowrap px-3 py-2 text-destructive data-[state=active]:bg-background">
-                    Over
+                    Over ({orderCounts.overdue})
                   </TabsTrigger>
                 </TabsList>
               </div>
@@ -436,7 +469,7 @@ export default function AdminOrders() {
                   Delivered ({orderCounts.delivered})
                 </TabsTrigger>
                 <TabsTrigger value="overdue" className="text-sm px-2 py-2 text-destructive data-[state=active]:bg-background">
-                  Overdue
+                  Overdue ({orderCounts.overdue})
                 </TabsTrigger>
               </TabsList>
             </div>

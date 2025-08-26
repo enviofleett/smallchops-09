@@ -9593,6 +9593,7 @@ export type Database = {
         | "cancelled"
         | "refunded"
         | "completed"
+        | "returned"
       order_type: "delivery" | "pickup" | "dine_in"
       payment_status:
         | "pending"
@@ -9772,6 +9773,7 @@ export const Constants = {
         "cancelled",
         "refunded",
         "completed",
+        "returned",
       ],
       order_type: ["delivery", "pickup", "dine_in"],
       payment_status: [

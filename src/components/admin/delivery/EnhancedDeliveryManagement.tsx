@@ -15,15 +15,20 @@ import {
   AlertCircle,
   CheckCircle2,
   PlayCircle,
-  XCircle
+  XCircle,
+  BarChart3,
+  Calendar
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, differenceInMinutes } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useDriverManagement } from '@/hooks/useDriverManagement';
+import { useEmailService } from '@/hooks/useEmailService';
 import { toast } from 'sonner';
 import { OrderDetailsModal } from './OrderDetailsModal';
 import { DeliveryAssignmentDialog } from './DeliveryAssignmentDialog';
 import { DeliveryStatusDialog } from './DeliveryStatusDialog';
+import { buildOutForDeliveryEmailContent } from '@/utils/orderEmailTemplates';
+import { OrderStatus } from '@/types/orders';
 
 interface ReadyOrder {
   id: string;
@@ -74,6 +79,7 @@ export function EnhancedDeliveryManagement() {
   const [selectedAssignment, setSelectedAssignment] = useState<DeliveryAssignment | null>(null);
 
   const { drivers } = useDriverManagement();
+  const { sendCustomEmail } = useEmailService();
 
   // Fetch ready orders
   const { data: readyOrders = [], isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
@@ -136,13 +142,25 @@ export function EnhancedDeliveryManagement() {
     enabled: readyOrders.length > 0,
   });
 
-  // Merge orders with their schedules and assignments
+  // Merge orders with their schedules and assignments, then sort by imminent delivery date
   const enhancedOrders = useMemo(() => {
-    return readyOrders.map(order => ({
+    const merged = readyOrders.map(order => ({
       ...order,
       delivery_schedule: deliverySchedules[order.id],
       assignment: assignments.find(a => a.order_id === order.id),
     }));
+
+    // Sort by imminent delivery date/time (soonest first)
+    return merged.sort((a, b) => {
+      const aDeliveryTime = a.delivery_schedule?.delivery_time_start 
+        ? new Date(`${a.delivery_schedule.delivery_date} ${a.delivery_schedule.delivery_time_start}`)
+        : new Date(a.created_at);
+      const bDeliveryTime = b.delivery_schedule?.delivery_time_start 
+        ? new Date(`${b.delivery_schedule.delivery_date} ${b.delivery_schedule.delivery_time_start}`)
+        : new Date(b.created_at);
+      
+      return aDeliveryTime.getTime() - bDeliveryTime.getTime();
+    });
   }, [readyOrders, deliverySchedules, assignments]);
 
   // Handle driver assignment
@@ -232,6 +250,66 @@ export function EnhancedDeliveryManagement() {
     return drivers.find(d => d.id === driverId);
   };
 
+  // Handle order status updates
+  const handleOrderStatusUpdate = async (orderId: string, newStatus: OrderStatus, previousStatus: string) => {
+    try {
+      const { error } = await supabase
+        .from('orders')
+        .update({ status: newStatus })
+        .eq('id', orderId);
+
+      if (error) throw error;
+
+      // If transitioning to "out_for_delivery", send email to customer
+      if (newStatus === 'out_for_delivery' && previousStatus !== 'out_for_delivery') {
+        const order = enhancedOrders.find(o => o.id === orderId);
+        if (order) {
+          try {
+            const driver = order.assigned_rider_id ? getDriverInfo(order.assigned_rider_id) : undefined;
+            const emailContent = buildOutForDeliveryEmailContent(order, driver);
+            
+            await sendCustomEmail({
+              to: order.customer_email,
+              subject: emailContent.subject,
+              html: emailContent.html,
+              emailType: 'transactional'
+            });
+
+            toast.success(`Order status updated to ${newStatus} and customer notified`);
+          } catch (emailError) {
+            console.error('Failed to send email:', emailError);
+            toast.warning(`Order status updated but email notification failed`);
+          }
+        }
+      } else {
+        toast.success(`Order status updated to ${newStatus}`);
+      }
+
+      refetchOrders();
+    } catch (error) {
+      console.error('Status update error:', error);
+      toast.error('Failed to update order status');
+    }
+  };
+
+  // Calculate delivery statistics
+  const getDeliveryStats = (order: any) => {
+    const createdAt = new Date(order.created_at);
+    const deliveryTime = order.delivery_schedule?.delivery_time_start 
+      ? new Date(`${order.delivery_schedule.delivery_date} ${order.delivery_schedule.delivery_time_start}`)
+      : null;
+    
+    const timeToDelivery = deliveryTime 
+      ? differenceInMinutes(deliveryTime, createdAt)
+      : null;
+
+    return {
+      createdAt: format(createdAt, 'MMM dd, yyyy HH:mm'),
+      timeToDelivery: timeToDelivery ? `${Math.floor(timeToDelivery / 60)}h ${timeToDelivery % 60}m` : 'N/A',
+      driverAssigned: !!order.assignment || !!order.assigned_rider_id,
+    };
+  };
+
   if (ordersLoading) {
     return (
       <div className="space-y-4">
@@ -299,6 +377,7 @@ export function EnhancedDeliveryManagement() {
           const driver = order.assigned_rider_id ? getDriverInfo(order.assigned_rider_id) : null;
           const schedule = order.delivery_schedule;
           const assignment = order.assignment;
+          const deliveryStats = getDeliveryStats(order);
 
           return (
             <Card key={order.id} className="border-l-4 border-l-orange-500">
@@ -328,6 +407,9 @@ export function EnhancedDeliveryManagement() {
                       {order.order_type}
                     </Badge>
                     {assignment && getStatusBadge(assignment.status)}
+                    <Badge variant="outline" className="text-xs">
+                      {order.status}
+                    </Badge>
                   </div>
                 </div>
 
@@ -402,8 +484,52 @@ export function EnhancedDeliveryManagement() {
                   </div>
                 )}
 
+                {/* Delivery Report Section */}
+                <div className="mt-4 p-4 bg-muted/30 rounded-lg">
+                  <h4 className="font-medium flex items-center gap-2 mb-3">
+                    <BarChart3 className="w-4 h-4" />
+                    Delivery Report
+                  </h4>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div>
+                      <p className="text-muted-foreground">Created:</p>
+                      <p className="font-medium">{deliveryStats.createdAt}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Time to Delivery:</p>
+                      <p className="font-medium">{deliveryStats.timeToDelivery}</p>
+                    </div>
+                    <div>
+                      <p className="text-muted-foreground">Driver Status:</p>
+                      <p className="font-medium">{deliveryStats.driverAssigned ? 'Assigned' : 'Not Assigned'}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Order Status Update */}
+                  <div className="mt-3 pt-3 border-t border-muted">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">Update Status:</span>
+                      <Select 
+                        value={order.status} 
+                        onValueChange={(newStatus: OrderStatus) => handleOrderStatusUpdate(order.id, newStatus, order.status)}
+                      >
+                        <SelectTrigger className="w-40">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ready">Ready</SelectItem>
+                          <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                          <SelectItem value="delivered">Delivered</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="returned">Returned</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
                 {/* Action buttons */}
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 mt-4">
                   <Button
                     variant="outline"
                     size="sm"

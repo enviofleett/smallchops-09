@@ -35,6 +35,7 @@ const statusConfig: Record<OrderStatus, { label: string; className: string }> = 
   completed: { label: 'Completed', className: 'bg-green-100 text-green-800' },
   cancelled: { label: 'Cancelled', className: 'bg-red-100 text-red-800' },
   refunded: { label: 'Refunded', className: 'bg-gray-100 text-gray-800' },
+  returned: { label: 'Returned', className: 'bg-orange-100 text-orange-800' },
 };
 
 const getStatusBadge = (status: OrderStatus) => {

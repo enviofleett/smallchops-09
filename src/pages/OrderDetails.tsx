@@ -46,6 +46,12 @@ interface OrderItem {
   unit_price: number;
   total_price: number;
   special_instructions?: string | null;
+  product_id?: string;
+  product?: {
+    id: string;
+    name: string;
+    features?: any; // Json type from database
+  };
 }
 
 interface PaymentTx {
@@ -185,11 +191,14 @@ const loadData = React.useCallback(async () => {
 
     setOrder(orderData as OrderDetailsData);
 
-    // Fetch order items
+    // Fetch order items with product details including features
     try {
       const { data: itemsData, error: itemsErr } = await supabase
         .from('order_items')
-        .select('id, product_name, quantity, unit_price, total_price, special_instructions')
+        .select(`
+          id, product_name, quantity, unit_price, total_price, special_instructions, product_id,
+          product:products(id, name, features)
+        `)
         .eq('order_id', id)
         .order('created_at', { ascending: true });
       
@@ -488,6 +497,17 @@ const reconcileNow = async () => {
                       <p className="text-sm text-blue-600 mt-1">
                         Note: {item.special_instructions}
                       </p>
+                    )}
+                    {/* Product Features */}
+                    {item.product?.features && Array.isArray(item.product.features) && item.product.features.length > 0 && (
+                      <div className="mt-2 p-2 bg-muted/30 rounded text-xs">
+                        <span className="font-medium text-primary">What's included:</span>
+                        <ul className="mt-1 space-y-0.5">
+                          {(item.product.features as string[]).map((feature, featureIndex) => (
+                            <li key={featureIndex} className="text-muted-foreground">• {feature}</li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </div>
                   <div className="text-right">

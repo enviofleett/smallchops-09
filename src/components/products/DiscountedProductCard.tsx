@@ -7,6 +7,7 @@ import { DiscountBadge } from '@/components/ui/discount-badge';
 import { StarRating } from '@/components/ui/star-rating';
 import { useProductRatingSummary } from '@/hooks/useProductReviews';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
+import { toImagesArray } from '@/lib/imageUtils';
 
 interface DiscountedProductCardProps {
   product: ProductWithDiscount;
@@ -51,7 +52,7 @@ export function DiscountedProductCard({
         {/* Product Image */}
         <div className="relative">
           <ProductImageGallery
-            images={((((product as any).images?.length ? (product as any).images : [product.image_url]) as string[]).filter(Boolean))}
+            images={toImagesArray(product)}
             alt={product.name}
             containerClassName="aspect-[4/3] sm:aspect-square"
           />

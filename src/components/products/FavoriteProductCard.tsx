@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { ShoppingCart, Trash2 } from 'lucide-react';
 import { FavoriteProduct } from '@/api/favorites';
 import { ProductImageGallery } from '@/components/products/ProductImageGallery';
+import { toImagesArray } from '@/lib/imageUtils';
 
 interface FavoriteProductCardProps {
   product: FavoriteProduct;
@@ -31,7 +32,7 @@ export const FavoriteProductCard = ({
         {/* Product Image */}
         <div className="mb-3">
           <ProductImageGallery
-            images={(((product as any)?.images && (product as any).images.length ? (product as any).images : [product.image_url]).filter(Boolean)) as string[]}
+            images={toImagesArray(product)}
             alt={product.name}
             containerClassName="aspect-square rounded-lg"
           />

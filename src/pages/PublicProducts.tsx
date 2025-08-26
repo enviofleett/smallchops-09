@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Star, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { toImagesArray } from '@/lib/imageUtils';
 import { Input } from '@/components/ui/input';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
@@ -339,7 +340,7 @@ const PublicProducts = () => {
                       >
                         <div className="relative">
                           <ProductImageGallery
-                            images={(((product as any)?.images && (product as any).images.length ? (product as any).images : [product.image_url]).filter(Boolean))}
+                            images={toImagesArray(product)}
                             alt={product.name}
                             containerClassName="aspect-[4/3] sm:aspect-square"
                             sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"

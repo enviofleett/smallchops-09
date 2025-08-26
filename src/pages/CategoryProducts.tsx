@@ -5,6 +5,7 @@ import { ChevronRight, Search, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
+import { toImagesArray } from '@/lib/imageUtils';
 import { PublicHeader } from '@/components/layout/PublicHeader';
 import { PublicFooter } from '@/components/layout/PublicFooter';
 import { useCart } from '@/hooks/useCart';
@@ -272,7 +273,7 @@ const CategoryProductsContent = () => {
                     >
                       <div className={`${isCustomizationCategory ? 'aspect-[3/2]' : 'aspect-square'} relative`}>
                          <ProductImageGallery
-                           images={(((product as any)?.images && (product as any).images.length ? (product as any).images : [product.image_url]).filter(Boolean))}
+                           images={toImagesArray(product)}
                            alt={product.name}
                            containerClassName={`${isCustomizationCategory ? 'aspect-[3/2]' : 'aspect-square'}`}
                            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 33vw"

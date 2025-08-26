@@ -1,4 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { getFirstImage } from '@/lib/imageUtils';
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Image, Package, ShoppingCart } from "lucide-react";
@@ -39,7 +40,7 @@ export function ProductDetailCard({ item, onReorder, showReorderButton = false }
     }).format(amount);
   };
 
-  const productImage = item.product?.images?.[0] || '/placeholder.svg';
+  const productImage = getFirstImage(item.product);
   const productName = item.product?.name || item.product_name;
   const productDescription = item.product?.description;
 

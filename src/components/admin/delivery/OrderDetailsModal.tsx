@@ -7,6 +7,7 @@ import { Separator } from '@/components/ui/separator';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
+import { toImagesArray } from '@/lib/imageUtils';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
 import { OrderReceiptModal } from '@/components/customer/OrderReceiptModal';
@@ -346,22 +347,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                                 id: item.product_id || `product-${index}`,
                                 name: item.product_name || item.name || 'Unknown Product',
                                 description: item.description || 'Product details not available',
-                                images: (() => {
-                                  // Handle multiple possible image data structures
-                                  if (item.products?.images && Array.isArray(item.products.images)) {
-                                    return item.products.images;
-                                  }
-                                  if (item.products?.image_url) {
-                                    return [item.products.image_url];
-                                  }
-                                  if (item.product?.images && Array.isArray(item.product.images)) {
-                                    return item.product.images;
-                                  }
-                                  if (item.product?.image_url) {
-                                    return [item.product.image_url];
-                                  }
-                                  return [];  // Fallback to empty array
-                                })(),
+                                images: toImagesArray(item.products || item.product),
                                 price: item.unit_price || 0,
                                 is_available: item.products?.is_available ?? item.product?.is_available ?? true,
                                 features: item.products?.features || item.product?.features || []

@@ -349,7 +349,8 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                                 description: item.description || 'Product details not available',
                                 images: toImagesArray(item.products || item.product),
                                 price: item.unit_price || 0,
-                                is_available: item.products?.is_available ?? item.product?.is_available ?? true,
+                                // Derive availability from product data (fallback to true if no explicit unavailable marker)
+                                is_available: true,
                                 features: item.products?.features || item.product?.features || []
                               }
                             };

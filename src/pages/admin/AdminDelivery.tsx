@@ -452,7 +452,42 @@ export default function AdminDelivery() {
 
           {/* Ready Orders Tab - New Enhanced Management */}
           <TabsContent value="ready-orders" className="space-y-6">
-            <UnifiedDeliveryManagement mode="ready" />
+            {/* Delivery Window Filter */}
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Clock className="w-5 h-5" />
+                    Delivery Window Filter
+                  </CardTitle>
+                  <Badge variant="outline">
+                    {readyFilteredOrders.length} of {readyOrders.length} orders
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <Select value={deliveryWindowFilter} onValueChange={setDeliveryWindowFilter}>
+                  <SelectTrigger className="w-full max-w-xs">
+                    <SelectValue placeholder="Filter by delivery window" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {deliveryWindows.map((window) => (
+                      <SelectItem key={window} value={window}>
+                        {window === 'all' ? 'All Times' :
+                         window === 'due-now' ? '🔥 Due Now (Next 30min)' :
+                         window === 'overdue' ? '⚠️ Overdue' :
+                         window}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+
+            <UnifiedDeliveryManagement 
+              mode="ready" 
+              ordersOverride={readyFilteredOrders}
+            />
           </TabsContent>
 
           {/* All Orders Tab */}

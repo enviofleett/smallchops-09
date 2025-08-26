@@ -33,13 +33,15 @@ interface UnifiedDeliveryManagementProps {
   selectedDate?: Date;
   typeFilter?: 'all' | 'delivery' | 'pickup';
   statusFilter?: string[];
+  ordersOverride?: any[]; // For passing pre-filtered orders (e.g., delivery window filtered)
 }
 
 export function UnifiedDeliveryManagement({ 
   mode, 
   selectedDate, 
   typeFilter = 'all',
-  statusFilter = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery']
+  statusFilter = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'],
+  ordersOverride
 }: UnifiedDeliveryManagementProps) {
   const [localStatusFilter, setLocalStatusFilter] = useState<string[]>(statusFilter);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
@@ -81,6 +83,11 @@ export function UnifiedDeliveryManagement({
 
   // Filter orders based on mode and filters
   const filteredOrders = useMemo(() => {
+    // Use override if provided (for pre-filtered orders like delivery window filter)
+    if (ordersOverride) {
+      return ordersOverride;
+    }
+
     let orders = ordersData?.orders || [];
 
     // Apply type filter
@@ -97,7 +104,7 @@ export function UnifiedDeliveryManagement({
     orders = orders.filter(order => order.payment_status === 'paid');
 
     return orders;
-  }, [ordersData?.orders, typeFilter, localStatusFilter, mode]);
+  }, [ordersData?.orders, typeFilter, localStatusFilter, mode, ordersOverride]);
 
   // Handle status change with validation
   const handleStatusChange = async (orderId: string, newStatus: string) => {

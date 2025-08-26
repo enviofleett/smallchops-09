@@ -7205,6 +7205,7 @@ export type Database = {
           created_at: string
           delivery_status: string
           delivery_timestamp: string | null
+          email_id: string | null
           error_message: string | null
           id: string
           message_id: string | null
@@ -7219,6 +7220,7 @@ export type Database = {
           created_at?: string
           delivery_status?: string
           delivery_timestamp?: string | null
+          email_id?: string | null
           error_message?: string | null
           id?: string
           message_id?: string | null
@@ -7233,6 +7235,7 @@ export type Database = {
           created_at?: string
           delivery_status?: string
           delivery_timestamp?: string | null
+          email_id?: string | null
           error_message?: string | null
           id?: string
           message_id?: string | null

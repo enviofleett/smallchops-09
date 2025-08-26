@@ -23,20 +23,78 @@ export const useSupabaseAuthRegistration = () => {
   const [registrationEmail, setRegistrationEmail] = useState<string>('');
   const { toast } = useToast();
 
-  const initiateRegistration = async (data: RegistrationData) => {
+  const initiateRegistration = async (data: RegistrationData): Promise<{
+    success: boolean;
+    requiresOtpVerification?: boolean;
+    email?: string;
+    correlation_id?: string;
+    error?: string;
+  }> => {
     try {
       setIsLoading(true);
+      
+      // Client-side validation
+      if (!data.name?.trim()) {
+        const error = 'Full name is required';
+        toast({
+          title: "Registration failed",
+          description: error,
+          variant: "destructive"
+        });
+        return { success: false, error };
+      }
+
+      if (!data.email?.trim()) {
+        const error = 'Email address is required';
+        toast({
+          title: "Registration failed",
+          description: error,
+          variant: "destructive"
+        });
+        return { success: false, error };
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email)) {
+        const error = 'Please enter a valid email address';
+        toast({
+          title: "Registration failed",
+          description: error,
+          variant: "destructive"
+        });
+        return { success: false, error };
+      }
+
+      if (!data.password?.trim()) {
+        const error = 'Password is required';
+        toast({
+          title: "Registration failed",
+          description: error,
+          variant: "destructive"
+        });
+        return { success: false, error };
+      }
+
+      if (data.password.length < 8) {
+        const error = 'Password must be at least 8 characters long';
+        toast({
+          title: "Registration failed",
+          description: error,
+          variant: "destructive"
+        });
+        return { success: false, error };
+      }
       
       // Use the secure edge function endpoint with enhanced validation
       const { data: response, error } = await supabase.functions.invoke('auth-register', {
         body: {
-          fullName: data.name,
-          email: data.email.toLowerCase(),
-          phoneNumber: data.phone || '+1000000000' // Default for validation
+          fullName: data.name.trim(),
+          email: data.email.toLowerCase().trim(),
+          phoneNumber: data.phone?.trim() || '+1000000000' // Default for validation
         }
       });
 
       if (error) {
+        console.error('Registration function error:', error);
         const friendly = (response as any)?.error || error.message || "Failed to initiate registration";
         toast({
           title: "Registration failed",
@@ -47,7 +105,7 @@ export const useSupabaseAuthRegistration = () => {
       }
 
       if (response?.success) {
-        setRegistrationEmail(data.email.toLowerCase());
+        setRegistrationEmail(data.email.toLowerCase().trim());
         setRegistrationStep('otp_verification');
         
         toast({
@@ -58,37 +116,84 @@ export const useSupabaseAuthRegistration = () => {
         return { 
           success: true, 
           requiresOtpVerification: true,
-          email: data.email.toLowerCase(),
+          email: data.email.toLowerCase().trim(),
           correlation_id: response.correlation_id
         };
       }
 
-      return { success: false, error: response?.error || "Registration failed" };
-    } catch (error: any) {
+      const errorMessage = response?.error || "Registration failed";
       toast({
         title: "Registration failed",
-        description: error.message || "An unexpected error occurred.",
+        description: errorMessage,
         variant: "destructive"
       });
-      return { success: false, error: error.message };
+      return { success: false, error: errorMessage };
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      const errorMessage = error.message || "An unexpected error occurred.";
+      toast({
+        title: "Registration failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+      return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
   };
 
-  const verifyOTPAndCompleteRegistration = async (data: OTPVerificationData) => {
+  const verifyOTPAndCompleteRegistration = async (data: OTPVerificationData): Promise<{
+    success: boolean;
+    auth_user_id?: string;
+    customer_id?: string;
+    welcome_email_sent?: boolean;
+    correlation_id?: string;
+    error?: string;
+  }> => {
     try {
       setIsLoading(true);
+
+      // Client-side validation
+      if (!data.email?.trim()) {
+        const error = 'Email address is required';
+        toast({
+          title: "Verification failed",
+          description: error,
+          variant: "destructive"
+        });
+        return { success: false, error };
+      }
+
+      if (!data.token?.trim()) {
+        const error = 'Verification code is required';
+        toast({
+          title: "Verification failed",
+          description: error,
+          variant: "destructive"
+        });
+        return { success: false, error };
+      }
+
+      if (data.token.length !== 6) {
+        const error = 'Verification code must be 6 characters';
+        toast({
+          title: "Verification failed",
+          description: error,
+          variant: "destructive"
+        });
+        return { success: false, error };
+      }
       
       // Use the secure edge function endpoint for OTP verification
       const { data: response, error } = await supabase.functions.invoke('auth-verify-otp', {
         body: {
-          email: data.email.toLowerCase(),
-          token: data.token
+          email: data.email.toLowerCase().trim(),
+          token: data.token.trim()
         }
       });
 
       if (error) {
+        console.error('OTP verification function error:', error);
         const friendly = (response as any)?.error || error.message || "Failed to verify OTP";
         toast({
           title: "Verification failed",
@@ -115,38 +220,73 @@ export const useSupabaseAuthRegistration = () => {
         };
       }
 
-      return { success: false, error: response?.error || "OTP verification failed" };
-    } catch (error: any) {
+      const errorMessage = response?.error || "OTP verification failed";
       toast({
         title: "Verification failed",
-        description: error.message || "An unexpected error occurred.",
+        description: errorMessage,
         variant: "destructive"
       });
-      return { success: false, error: error.message };
+      return { success: false, error: errorMessage };
+    } catch (error: any) {
+      console.error('OTP verification error:', error);
+      const errorMessage = error.message || "An unexpected error occurred.";
+      toast({
+        title: "Verification failed",
+        description: errorMessage,
+        variant: "destructive"
+      });
+      return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }
   };
 
-  const resendOTP = async (email: string) => {
+  const resendOTP = async (email: string): Promise<{
+    success: boolean;
+    error?: string;
+    retry_after_seconds?: number;
+  }> => {
     try {
       setIsLoading(true);
+
+      // Client-side validation
+      if (!email?.trim()) {
+        const error = 'Email address is required';
+        toast({
+          title: "Resend failed",
+          description: error,
+          variant: "destructive"
+        });
+        return { success: false, error };
+      }
+
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        const error = 'Please enter a valid email address';
+        toast({
+          title: "Resend failed",
+          description: error,
+          variant: "destructive"
+        });
+        return { success: false, error };
+      }
       
       // Use the secure rate-limited resend function
       const { data: response, error } = await supabase.functions.invoke('check-otp-rate-limit', {
         body: {
-          email: email.toLowerCase(),
+          email: email.toLowerCase().trim(),
           type: 'registration'
         }
       });
 
       if (error) {
+        console.error('Resend OTP error:', error);
+        const errorMessage = error.message || "Failed to resend verification code";
         toast({
           title: "Resend failed",
-          description: error.message || "Failed to resend verification code",
+          description: errorMessage,
           variant: "destructive"
         });
-        return { success: false, error: error.message };
+        return { success: false, error: errorMessage };
       }
 
       if (response?.allowed) {
@@ -156,21 +296,28 @@ export const useSupabaseAuthRegistration = () => {
         });
         return { success: true };
       } else {
-        const message = `Please wait ${Math.ceil((response?.retry_after_seconds || 300) / 60)} minutes before requesting another code.`;
+        const retryAfterSeconds = response?.retry_after_seconds || 300;
+        const message = `Please wait ${Math.ceil(retryAfterSeconds / 60)} minutes before requesting another code.`;
         toast({
           title: "Rate limit exceeded",
           description: message,
           variant: "destructive"
         });
-        return { success: false, error: message };
+        return { 
+          success: false, 
+          error: message,
+          retry_after_seconds: retryAfterSeconds
+        };
       }
     } catch (error: any) {
+      console.error('Resend OTP error:', error);
+      const errorMessage = error.message || "An unexpected error occurred.";
       toast({
         title: "Resend failed",
-        description: error.message || "An unexpected error occurred.",
+        description: errorMessage,
         variant: "destructive"
       });
-      return { success: false, error: error.message };
+      return { success: false, error: errorMessage };
     } finally {
       setIsLoading(false);
     }

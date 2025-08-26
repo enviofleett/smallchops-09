@@ -189,30 +189,30 @@ const App = () => {
             <BrowserRouter>
             <Routes>
               {/* Customer store at root */}
-              <Route path="/" element={<PublicHome />} />
+              <Route path="/" element={<ErrorBoundaryWrapper context="Public Home"><PublicHome /></ErrorBoundaryWrapper>} />
               
               {/* Redirect legacy /home to root */}
               <Route path="/home" element={<Navigate to="/" replace />} />
-              <Route path="/products" element={<PublicProducts />} />
-              <Route path="/cart" element={<Cart />} />
-              <Route path="/booking" element={<Booking />} />
-              <Route path="/about" element={<About />} />
-              <Route path="/contact" element={<Contact />} />
+              <Route path="/products" element={<ErrorBoundaryWrapper context="Public Products"><PublicProducts /></ErrorBoundaryWrapper>} />
+              <Route path="/cart" element={<ErrorBoundaryWrapper context="Shopping Cart"><Cart /></ErrorBoundaryWrapper>} />
+              <Route path="/booking" element={<ErrorBoundaryWrapper context="Booking"><Booking /></ErrorBoundaryWrapper>} />
+              <Route path="/about" element={<ErrorBoundaryWrapper context="About Page"><About /></ErrorBoundaryWrapper>} />
+              <Route path="/contact" element={<ErrorBoundaryWrapper context="Contact Page"><Contact /></ErrorBoundaryWrapper>} />
               <Route path="/paystack-test" element={<PaystackTest />} />
               <Route path="/paystack-testing" element={<PaystackTestingDashboard />} />
               <Route path="/emergency-fix" element={<EmergencyPaymentFix />} />
-              <Route path="/product/:id" element={<ProductDetail />} />
-              <Route path="/category/:categoryId" element={<CategoryProducts />} />
+              <Route path="/product/:id" element={<ErrorBoundaryWrapper context="Product Detail"><ProductDetail /></ErrorBoundaryWrapper>} />
+              <Route path="/category/:categoryId" element={<ErrorBoundaryWrapper context="Category Products"><CategoryProducts /></ErrorBoundaryWrapper>} />
               
               {/* Authentication routes */}
               <Route path="/auth" element={<ErrorBoundaryWrapper context="Auth Page"><AuthPage /></ErrorBoundaryWrapper>} />
-              <Route path="/auth/callback" element={<AuthCallback />} />
-              <Route path="/auth-callback" element={<AuthCallback />} /> {/* Legacy support */}
-              <Route path="/auth/verify" element={<EmailVerificationPage />} />
-              <Route path="/auth/reset" element={<PasswordResetPage />} />
+              <Route path="/auth/callback" element={<ErrorBoundaryWrapper context="Auth Callback"><AuthCallback /></ErrorBoundaryWrapper>} />
+              <Route path="/auth-callback" element={<ErrorBoundaryWrapper context="Auth Callback"><AuthCallback /></ErrorBoundaryWrapper>} /> {/* Legacy support */}
+              <Route path="/auth/verify" element={<ErrorBoundaryWrapper context="Email Verification"><EmailVerificationPage /></ErrorBoundaryWrapper>} />
+              <Route path="/auth/reset" element={<ErrorBoundaryWrapper context="Password Reset"><PasswordResetPage /></ErrorBoundaryWrapper>} />
               
               {/* Admin authentication */}
-              <Route path="/admin/auth" element={<AdminAuth />} />
+              <Route path="/admin/auth" element={<ErrorBoundaryWrapper context="Admin Auth"><AdminAuth /></ErrorBoundaryWrapper>} />
               
               {/* Legacy redirects */}
               <Route path="/login" element={<Navigate to="/auth" replace />} />
@@ -220,29 +220,29 @@ const App = () => {
               
               {/* Customer routes */}
               <Route path="/customer-portal" element={<Navigate to="/" replace />} />
-              <Route path="/customer-profile" element={<CustomerProfile />} />
-              <Route path="/customer-favorites" element={<CustomerFavorites />} />
-              <Route path="/purchase-history" element={<PurchaseHistory />} />
-              <Route path="/purchase-history/:customerEmail" element={<PurchaseHistory />} />
-              <Route path="/orders/:id" element={<OrderDetails />} />
-              <Route path="/track-order" element={<TrackOrder />} />
-              <Route path="/track/:orderNumber" element={<TrackOrder />} />
+              <Route path="/customer-profile" element={<ErrorBoundaryWrapper context="Customer Profile"><CustomerProfile /></ErrorBoundaryWrapper>} />
+              <Route path="/customer-favorites" element={<ErrorBoundaryWrapper context="Customer Favorites"><CustomerFavorites /></ErrorBoundaryWrapper>} />
+              <Route path="/purchase-history" element={<ErrorBoundaryWrapper context="Purchase History"><PurchaseHistory /></ErrorBoundaryWrapper>} />
+              <Route path="/purchase-history/:customerEmail" element={<ErrorBoundaryWrapper context="Purchase History"><PurchaseHistory /></ErrorBoundaryWrapper>} />
+              <Route path="/orders/:id" element={<ErrorBoundaryWrapper context="Order Details"><OrderDetails /></ErrorBoundaryWrapper>} />
+              <Route path="/track-order" element={<ErrorBoundaryWrapper context="Track Order"><TrackOrder /></ErrorBoundaryWrapper>} />
+              <Route path="/track/:orderNumber" element={<ErrorBoundaryWrapper context="Track Order"><TrackOrder /></ErrorBoundaryWrapper>} />
               
               {/* Payment routes */}
-              <Route path="/payment/callback" element={<PaymentCallback />} />
-              <Route path="/payment/success" element={<PaymentCallback />} />
-              <Route path="/payment/failed" element={<PaymentCallback />} />
-              <Route path="/payment-callback" element={<PaymentCallbackRedirect />} />
+              <Route path="/payment/callback" element={<ErrorBoundaryWrapper context="Payment Callback"><PaymentCallback /></ErrorBoundaryWrapper>} />
+              <Route path="/payment/success" element={<ErrorBoundaryWrapper context="Payment Success"><PaymentCallback /></ErrorBoundaryWrapper>} />
+              <Route path="/payment/failed" element={<ErrorBoundaryWrapper context="Payment Failed"><PaymentCallback /></ErrorBoundaryWrapper>} />
+              <Route path="/payment-callback" element={<ErrorBoundaryWrapper context="Payment Redirect"><PaymentCallbackRedirect /></ErrorBoundaryWrapper>} />
               
               {/* Misc routes */}
-              <Route path="/unsubscribe" element={<Unsubscribe />} />
-              <Route path="/admin-setup/:token" element={<AdminSetup />} />
+              <Route path="/unsubscribe" element={<ErrorBoundaryWrapper context="Unsubscribe"><Unsubscribe /></ErrorBoundaryWrapper>} />
+              <Route path="/admin-setup/:token" element={<ErrorBoundaryWrapper context="Admin Setup"><AdminSetup /></ErrorBoundaryWrapper>} />
               
               {/* Simple registration routes - removed to discourage OTP flow */}
               {/* <Route path="/simple-register" element={<SimpleRegisterPage />} /> */}
               
               {/* Legacy customer registration route */}
-              <Route path="/customer-register" element={<CustomerRegister />} />
+              <Route path="/customer-register" element={<ErrorBoundaryWrapper context="Customer Register"><CustomerRegister /></ErrorBoundaryWrapper>} />
               
               {/* Legacy admin redirects for seamless transition */}
               <Route path="/orders" element={<Navigate to="/admin/orders" replace />} />

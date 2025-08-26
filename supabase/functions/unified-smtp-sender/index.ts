@@ -626,82 +626,102 @@ serve(async (req) => {
       )
     }
     
-    // Get SMTP settings from Supabase
+    // Get SMTP settings from Supabase with environment variable fallback
     console.log('🔧 Fetching SMTP configuration...')
-    const settingsResponse = await fetch(`${supabaseUrl}/rest/v1/communication_settings?use_smtp=eq.true&select=*`, {
-      headers: {
-        'Authorization': `Bearer ${supabaseKey}`,
-        'apikey': supabaseKey
-      }
-    })
+    let config: any = null
     
-    if (!settingsResponse.ok) {
-      console.error(`❌ Failed to fetch SMTP settings: ${settingsResponse.status}`)
-      return new Response(
-        JSON.stringify({ 
-          success: false, 
-          error: 'Failed to fetch SMTP configuration',
-          details: `HTTP ${settingsResponse.status}: ${settingsResponse.statusText}`
-        }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      )
+    try {
+      const settingsResponse = await fetch(`${supabaseUrl}/rest/v1/communication_settings?select=*&order=created_at.desc&limit=1`, {
+        headers: {
+          'Authorization': `Bearer ${supabaseKey}`,
+          'apikey': supabaseKey
+        }
+      })
+      
+      if (settingsResponse.ok) {
+        const settings = await settingsResponse.json()
+        if (settings && settings.length > 0) {
+          config = settings[0]
+        }
+      }
+    } catch (dbError) {
+      console.warn('⚠️ Database SMTP config fetch failed, using environment variables:', dbError.message)
     }
     
-    const settings = await settingsResponse.json()
-    if (!settings || settings.length === 0) {
-      console.error('❌ No active SMTP configuration found')
+    // Build SMTP configuration with environment variable fallbacks
+    const smtpConfig = {
+      smtp_host: (config?.smtp_host) || Deno.env.get('SMTP_HOST') || 'smtp.yournotify.com',
+      smtp_port: (config?.smtp_port) || parseInt(Deno.env.get('SMTP_PORT') || '587'),
+      smtp_secure: config?.smtp_secure !== undefined ? config.smtp_secure : false, // Always use STARTTLS for port 587
+      smtp_user: (config?.smtp_user) || Deno.env.get('SMTP_USER') || 'store@startersmallchops.com',
+      smtp_pass: (config?.smtp_pass) || Deno.env.get('SMTP_PASS') || '@Octopus100%',
+      sender_email: (config?.sender_email) || Deno.env.get('SENDER_EMAIL') || 'store@startersmallchops.com',
+      sender_name: (config?.sender_name) || Deno.env.get('SENDER_NAME') || 'Starters Small Chops'
+    }
+    
+    // Force STARTTLS for port 587 (never use direct SSL)
+    if (smtpConfig.smtp_port === 587) {
+      smtpConfig.smtp_secure = false
+    }
+    
+    // Validate essential configuration
+    if (!smtpConfig.smtp_host || !smtpConfig.smtp_user || !smtpConfig.smtp_pass) {
+      console.error('❌ Incomplete SMTP configuration')
       return new Response(
         JSON.stringify({ 
           success: false, 
-          error: 'No active SMTP configuration found',
-          details: 'Please configure SMTP settings in the communication_settings table'
+          error: 'Incomplete SMTP configuration',
+          details: 'Missing required SMTP settings (host, user, or password)'
         }),
         { status: 503, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
     
-    const config = settings[0]
-    console.log(`📡 Using SMTP config: ${config.smtp_host}:${config.smtp_port}`)
+    console.log(`📡 Using SMTP config: ${smtpConfig.smtp_host}:${smtpConfig.smtp_port}`)
     
     // Send email
     console.log('📤 Sending email via SMTP...')
     const result = await sendViaSMTP(
-      config.smtp_host,
-      config.smtp_port,
-      config.smtp_secure,
-      config.smtp_user,
-      config.smtp_pass,
-      config.sender_email,
+      smtpConfig.smtp_host,
+      smtpConfig.smtp_port,
+      smtpConfig.smtp_secure,
+      smtpConfig.smtp_user,
+      smtpConfig.smtp_pass,
+      smtpConfig.sender_email,
       normalizedPayload.to,
       finalSubject,
       finalTextContent,
       finalHtmlContent
     )
     
-    // Log delivery attempt - Fixed parameter order to match database function
+    // Log delivery attempt to smtp_delivery_logs table
     try {
       console.log('📝 Logging email delivery attempt...')
-      const logResponse = await fetch(`${supabaseUrl}/rest/v1/rpc/log_email_delivery`, {
+      const logData = {
+        email_id: result.messageId || `unified-${Date.now()}`,
+        recipient_email: normalizedPayload.to,
+        subject: finalSubject,
+        status: result.success ? 'sent' : 'failed',
+        provider: 'unified-smtp',
+        template_key: normalizedPayload.templateKey || null,
+        variables: normalizedPayload.variables || {},
+        smtp_response: result.error || 'Success',
+        created_at: new Date().toISOString()
+      }
+      
+      const logResponse = await fetch(`${supabaseUrl}/rest/v1/smtp_delivery_logs`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${supabaseKey}`,
           'apikey': supabaseKey,
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({
-          p_message_id: result.messageId || `unified-${Date.now()}`,
-          p_recipient_email: normalizedPayload.to,
-          p_subject: finalSubject,
-          p_provider: 'unified-smtp',
-          p_status: result.success ? 'sent' : 'failed',
-          p_template_key: normalizedPayload.templateKey || null,
-          p_variables: normalizedPayload.variables || {},
-          p_smtp_response: result.error || 'Success'
-        })
+        body: JSON.stringify(logData)
       })
       
       if (!logResponse.ok) {
-        console.error('Failed to log delivery:', await logResponse.text())
+        const errorText = await logResponse.text()
+        console.error('Failed to log delivery:', errorText)
       } else {
         console.log('✅ Delivery logged successfully')
       }

@@ -330,25 +330,41 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                       {(detailedOrder?.items || order?.order_items || []).length > 0 ? (
                         <div className="space-y-4">
                           {(detailedOrder?.items || order?.order_items || []).map((item: any, index: number) => {
-                            // Transform item data for ProductDetailCard
+                            // Transform item data for ProductDetailCard with defensive checks
                             const transformedItem = {
                               id: item.id || `item-${index}`,
                               product_id: item.product_id,
-                              product_name: item.product_name || item.name,
-                              quantity: item.quantity,
-                              unit_price: item.unit_price,
-                              total_price: item.total_price,
+                              product_name: item.product_name || item.name || 'Unknown Product',
+                              quantity: item.quantity || 1,
+                              unit_price: item.unit_price || 0,
+                              total_price: item.total_price || 0,
                               discount_amount: item.discount_amount || 0,
                               vat_amount: item.vat_amount || 0,
                               special_instructions: item.special_instructions,
                               customizations: item.customizations,
                               product: item.products || item.product || {
-                                id: item.product_id,
-                                name: item.product_name || item.name,
+                                id: item.product_id || `product-${index}`,
+                                name: item.product_name || item.name || 'Unknown Product',
                                 description: item.description || 'Product details not available',
-                                images: item.images || [],
-                                price: item.unit_price,
-                                is_available: true
+                                images: (() => {
+                                  // Handle multiple possible image data structures
+                                  if (item.products?.images && Array.isArray(item.products.images)) {
+                                    return item.products.images;
+                                  }
+                                  if (item.products?.image_url) {
+                                    return [item.products.image_url];
+                                  }
+                                  if (item.product?.images && Array.isArray(item.product.images)) {
+                                    return item.product.images;
+                                  }
+                                  if (item.product?.image_url) {
+                                    return [item.product.image_url];
+                                  }
+                                  return [];  // Fallback to empty array
+                                })(),
+                                price: item.unit_price || 0,
+                                is_available: item.products?.is_available ?? item.product?.is_available ?? true,
+                                features: item.products?.features || item.product?.features || []
                               }
                             };
 

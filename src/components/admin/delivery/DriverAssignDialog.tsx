@@ -6,11 +6,12 @@ import { useDriverManagement } from '@/hooks/useDriverManagement';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, Truck } from 'lucide-react';
+import { OrderWithItems } from '@/api/orders';
 
 interface DriverAssignDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedOrders: any[];
+  selectedOrders: OrderWithItems[];
   onSuccess: () => void;
 }
 

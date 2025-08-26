@@ -5,11 +5,10 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useQuery } from '@tanstack/react-query';
-import { getOrders } from '@/api/orders';
+import { getOrders, OrderWithItems } from '@/api/orders';
 import { useDeliveryZones } from '@/hooks/useDeliveryZones';
 import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
 import { getSchedulesByOrderIds } from '@/api/deliveryScheduleApi';
@@ -20,18 +19,14 @@ import { AdminDriversTab } from '@/components/admin/delivery/AdminDriversTab';
 import { DeliveryZonesManager } from '@/components/delivery/DeliveryZonesManager';
 import { UnifiedDeliveryManagement } from '@/components/admin/delivery/UnifiedDeliveryManagement';
 import { DriverPerformanceDashboard } from '@/components/admin/delivery/DriverPerformanceDashboard';
-import { MobileDeliveryTabs } from '@/components/admin/delivery/MobileDeliveryTabs';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { 
-  MapPin, 
   Truck, 
   Clock,
   Users,
   Package,
   TrendingUp,
   CalendarIcon,
-  CheckSquare,
-  Square,
   AlertTriangle,
   RefreshCw
 } from 'lucide-react';
@@ -45,7 +40,7 @@ import { isOrderOverdue } from '@/utils/scheduleTime';
 export default function AdminDelivery() {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState('overview');
-  const [selectedOrders, setSelectedOrders] = useState<any[]>([]);
+  const [selectedOrders, setSelectedOrders] = useState<OrderWithItems[]>([]);
   const [isDriverDialogOpen, setIsDriverDialogOpen] = useState(false);
   const [isRegisterDriverOpen, setIsRegisterDriverOpen] = useState(false);
   const [deliveryWindowFilter, setDeliveryWindowFilter] = useState<string>('all');
@@ -358,7 +353,7 @@ export default function AdminDelivery() {
                     Ready
                   </TabsTrigger>
                   <TabsTrigger value="orders" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Orders
+                    All Orders
                   </TabsTrigger>
                   <TabsTrigger value="drivers" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     Drivers
@@ -369,13 +364,16 @@ export default function AdminDelivery() {
                   <TabsTrigger value="overdue" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
                     Overdue
                   </TabsTrigger>
+                  <TabsTrigger value="zones" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    Delivery Zones
+                  </TabsTrigger>
                 </TabsList>
               </div>
             </div>
             
             {/* Desktop: Grid layout */}
             <div className="hidden sm:block">
-              <TabsList className="grid w-full grid-cols-3 lg:grid-cols-6 gap-1 p-1 bg-muted rounded-lg">
+              <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
                 <TabsTrigger value="overview" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   Overview
                 </TabsTrigger>
@@ -393,6 +391,9 @@ export default function AdminDelivery() {
                 </TabsTrigger>
                 <TabsTrigger value="overdue" className="text-sm px-2 py-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
                   Overdue
+                </TabsTrigger>
+                <TabsTrigger value="zones" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  Delivery Zones
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -497,7 +498,7 @@ export default function AdminDelivery() {
 }
 
 // Helper components
-function DeliveryOrderItem({ order }: { order: any }) {
+function DeliveryOrderItem({ order }: { order: OrderWithItems }) {
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg">
       <div>
@@ -508,7 +509,7 @@ function DeliveryOrderItem({ order }: { order: any }) {
         order.status === 'confirmed' ? 'default' :
         order.status === 'preparing' ? 'secondary' :
         order.status === 'ready' ? 'outline' :
-        order.status === 'out_for_delivery' ? 'default' : 'outline'
+        order.status === 'out_for_delivery' ? 'destructive' : 'outline'
       }>
         {order.status?.replace(/_/g, ' ') || 'Unknown'}
       </Badge>
@@ -516,130 +517,3 @@ function DeliveryOrderItem({ order }: { order: any }) {
   );
 }
 
-function DeliveryOrderCard({ 
-  order, 
-  schedule, 
-  onSelect, 
-  isSelected, 
-  onAssignDriver 
-}: { 
-  order: any; 
-  schedule: any; 
-  onSelect: (selected: boolean) => void;
-  isSelected: boolean;
-  onAssignDriver: () => void;
-}) {
-  return (
-    <Card className="relative overflow-hidden">
-      <CardHeader className="pb-2 sm:pb-3">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 min-w-0 flex-1">
-            <Checkbox
-              checked={isSelected}
-              onCheckedChange={(checked) => onSelect(checked === true)}
-              className="flex-shrink-0 mt-1"
-            />
-            <div className="min-w-0 flex-1">
-              <p className="font-semibold text-sm sm:text-base truncate">{order.order_number}</p>
-              <p className="text-xs sm:text-sm text-muted-foreground truncate">{order.customer_name}</p>
-            </div>
-          </div>
-          <div className="flex flex-col sm:flex-row items-end sm:items-center gap-1 sm:gap-2 flex-shrink-0">
-            {order.assigned_rider_id ? (
-              <Button 
-                size="sm" 
-                variant="outline"
-                onClick={onAssignDriver}
-                className="text-xs h-7 px-2"
-              >
-                <span className="hidden sm:inline">Reassign</span>
-                <span className="sm:hidden">Re</span>
-              </Button>
-            ) : (
-              <Button 
-                size="sm"
-                onClick={onAssignDriver}
-                className="text-xs h-7 px-2"
-              >
-                <span className="hidden sm:inline">Assign</span>
-                <span className="sm:hidden">As</span>
-              </Button>
-            )}
-            <Badge variant="outline" className="text-xs px-1">Ready</Badge>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="pt-0 pb-3 sm:pb-4">
-        <div className="space-y-2 sm:space-y-3">
-          {/* Delivery Schedule */}
-          {schedule && (
-            <div className="bg-muted/30 rounded-md p-2 sm:p-3 space-y-2">
-              <DeliveryScheduleDisplay 
-                schedule={schedule}
-                orderType="delivery"
-                orderStatus={order.status}
-              />
-              {/* Countdown Timer for Ready Orders */}
-              {order.status === 'ready' && (
-                <div className="flex items-center gap-2">
-                  <Clock className="w-3 h-3 text-muted-foreground" />
-                  <MiniCountdownTimer
-                    deliveryDate={schedule.delivery_date}
-                    deliveryTimeStart={schedule.delivery_time_start}
-                    deliveryTimeEnd={schedule.delivery_time_end}
-                    orderStatus={order.status}
-                    className="text-xs"
-                  />
-                </div>
-              )}
-            </div>
-          )}
-          
-          {/* Order Details */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Total:</span>
-            <span className="font-medium text-sm sm:text-base">₦{order.total_amount?.toLocaleString()}</span>
-          </div>
-          
-          {/* Delivery Address */}
-          {order.delivery_address && (
-            <div className="flex items-start gap-2 text-xs sm:text-sm">
-              <MapPin className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-muted-foreground text-xs">Address:</p>
-                <p className="text-xs sm:text-sm break-words leading-relaxed">
-                  {formatAddress(order.delivery_address)}
-                </p>
-              </div>
-            </div>
-          )}
-          
-          {/* Special Instructions Fallback */}
-          {!schedule?.special_instructions && (order.special_instructions || order.items?.some((item: any) => item.special_instructions)) && (
-            <div className="flex items-start gap-2 text-xs sm:text-sm">
-              <div className="w-3 h-3 sm:w-4 sm:h-4 text-blue-600 mt-0.5 flex-shrink-0 border border-blue-600 rounded-sm flex items-center justify-center">
-                <span className="text-[8px] font-bold">!</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-muted-foreground text-xs">Special Instructions:</p>
-                <p className="text-xs sm:text-sm break-words leading-relaxed">
-                  {order.special_instructions || 
-                   order.items?.find((item: any) => item.special_instructions)?.special_instructions ||
-                   'See order details'}
-                </p>
-              </div>
-            </div>
-          )}
-          
-          {/* Delivery Fee */}
-          {order.delivery_fee && order.delivery_fee > 0 && (
-            <div className="flex items-center justify-between text-sm">
-              <span className="text-muted-foreground">Delivery Fee:</span>
-              <span className="text-xs sm:text-sm">₦{order.delivery_fee?.toLocaleString()}</span>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
-  );
-}

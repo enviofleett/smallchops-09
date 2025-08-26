@@ -28,6 +28,37 @@ export const safeStringIncludes = (str: unknown, searchTerm: string): boolean =>
 };
 
 /**
+ * Enhanced error handler for database-specific errors
+ */
+export const handleDatabaseError = (error: unknown, onError?: (message: string) => void) => {
+  const message = safeErrorMessage(error);
+  
+  // Check for common database column errors
+  if (safeStringIncludes(message, 'created_at') && safeStringIncludes(message, 'does not exist')) {
+    const dbMessage = 'Database schema issue detected. Please contact support if this persists.';
+    onError?.(dbMessage);
+    return dbMessage;
+  }
+  
+  if (safeStringIncludes(message, 'column') && safeStringIncludes(message, 'does not exist')) {
+    const schemaMessage = 'Database column missing. The system is attempting to recover automatically.';
+    onError?.(schemaMessage);
+    return schemaMessage;
+  }
+  
+  if (safeStringIncludes(message, 'relation') && safeStringIncludes(message, 'does not exist')) {
+    const tableMessage = 'Database table not found. Please refresh the page and try again.';
+    onError?.(tableMessage);
+    return tableMessage;
+  }
+  
+  // Default to generic database error
+  const genericMessage = 'Database connection issue. Please try again in a moment.';
+  onError?.(genericMessage);
+  return genericMessage;
+};
+
+/**
  * Enhanced error handler for payment-specific errors
  */
 export const handlePaymentError = (error: unknown, onError?: (message: string) => void) => {

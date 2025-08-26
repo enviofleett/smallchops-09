@@ -17,6 +17,7 @@ import { FullDeliveryInformation } from '@/components/customer/FullDeliveryInfor
 import { getDeliveryScheduleByOrderId, DeliverySchedule } from '@/api/deliveryScheduleApi';
 import { usePickupPoints } from '@/hooks/usePickupPoints';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
+import { handleDatabaseError, safeStringIncludes } from '@/utils/errorHandling';
 interface OrderDetailsData {
   id: string;
   order_number: string;
@@ -211,18 +212,45 @@ const loadData = React.useCallback(async () => {
       console.warn('Failed to load order items:', itemsError);
     }
 
-    // Fetch payment transaction
-    const { data: txData, error: txErr } = await supabase
-      .from('payment_transactions')
-      .select('provider_reference,status,amount,channel,gateway_response,created_at,updated_at,paid_at')
-      .eq('order_id', id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (txErr) {
-      console.warn('Payment transaction fetch error:', txErr);
+    // Fetch payment transaction with graceful fallback for missing created_at column
+    try {
+      let txData = null;
+      let txErr = null;
+      
+      // First try with created_at ordering
+      const { data, error } = await supabase
+        .from('payment_transactions')
+        .select('provider_reference,status,amount,channel,gateway_response,created_at,updated_at,paid_at')
+        .eq('order_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (error && error.message.includes('created_at')) {
+        // Fallback query without created_at ordering if column doesn't exist
+        console.warn('created_at column not found in frontend, using fallback query:', error.message);
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from('payment_transactions')
+          .select('provider_reference,status,amount,channel,gateway_response,updated_at,paid_at')
+          .eq('order_id', id)
+          .order('paid_at', { ascending: false, nullsFirst: false })
+          .limit(1)
+          .maybeSingle();
+        txData = fallbackData;
+        txErr = fallbackError;
+      } else {
+        txData = data;
+        txErr = error;
+      }
+      
+      if (txErr) {
+        console.warn('Payment transaction fetch error:', txErr);
+      }
+      setTx((txData || null) as PaymentTx | null);
+    } catch (paymentErr) {
+      console.warn('Payment transaction query failed:', paymentErr);
+      setTx(null);
     }
-    setTx((txData || null) as PaymentTx | null);
 
     // Load delivery schedule with error handling
     try {
@@ -233,13 +261,20 @@ const loadData = React.useCallback(async () => {
     }
   } catch (e: any) {
     console.error('Order details loading error:', e);
-    setError(e.message || 'Failed to load order details');
+    
+    // Use enhanced error handling for better user messaging
+    let errorMessage = e.message || 'Failed to load order details';
+    if (safeStringIncludes(errorMessage, 'created_at') || safeStringIncludes(errorMessage, 'column')) {
+      errorMessage = handleDatabaseError(e);
+    }
+    
+    setError(errorMessage);
     
     // Show error toast only on critical failures
     if (retryCount === 0) {
       toast({
         title: "Loading Error",
-        description: "Failed to load order details. Retrying...",
+        description: errorMessage,
         variant: "destructive",
       });
     }

@@ -64,8 +64,8 @@ export default function AdminOrders() {
 
   // Extract delivery schedules from orders (now included in admin function)
   const deliverySchedules = useMemo(() => {
-    const scheduleMap: Record<string, any> = {};
-    orders.forEach((order: any) => {
+    const scheduleMap: Record<string, NonNullable<OrderWithItems['delivery_schedule']>> = {};
+    orders.forEach((order: OrderWithItems) => {
       if (order.delivery_schedule) {
         scheduleMap[order.id] = order.delivery_schedule;
       }
@@ -88,35 +88,51 @@ export default function AdminOrders() {
       });
     }
     
-    // Sort confirmed orders by delivery/pickup schedule
-    if (statusFilter === 'confirmed') {
-      ordersCopy.sort((a, b) => {
-        const scheduleA = deliverySchedules[a.id];
-        const scheduleB = deliverySchedules[b.id];
-        
-        // Overdue orders get highest priority
-        const aOverdue = scheduleA && isOrderOverdue(scheduleA.delivery_date, scheduleA.delivery_time_end);
-        const bOverdue = scheduleB && isOrderOverdue(scheduleB.delivery_date, scheduleB.delivery_time_end);
-        
-        if (aOverdue && !bOverdue) return -1;
-        if (!aOverdue && bOverdue) return 1;
-        
-        // If both have schedules, sort by delivery date + time
-        if (scheduleA && scheduleB) {
-          const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
-          const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
-          return dateTimeA.getTime() - dateTimeB.getTime();
-        }
-        
-        // Orders with schedules come first
-        if (scheduleA && !scheduleB) return -1;
-        if (!scheduleA && scheduleB) return 1;
-        
-        // Fallback to order time
-        return new Date(a.order_time || a.created_at).getTime() - 
-               new Date(b.order_time || b.created_at).getTime();
-      });
-    }
+    // Enhanced priority sorting: Overdue → Due Today → Pending → Created Date
+    // Apply comprehensive sorting to all orders, not just confirmed ones
+    ordersCopy.sort((a, b) => {
+      const scheduleA = deliverySchedules[a.id];
+      const scheduleB = deliverySchedules[b.id];
+      
+      // Overdue orders get highest priority
+      const aOverdue = scheduleA && isOrderOverdue(scheduleA.delivery_date, scheduleA.delivery_time_end);
+      const bOverdue = scheduleB && isOrderOverdue(scheduleB.delivery_date, scheduleB.delivery_time_end);
+      
+      if (aOverdue && !bOverdue) return -1;
+      if (!aOverdue && bOverdue) return 1;
+      
+      // Due today orders get second priority
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      const aDueToday = scheduleA && new Date(scheduleA.delivery_date).setHours(0, 0, 0, 0) === today.getTime();
+      const bDueToday = scheduleB && new Date(scheduleB.delivery_date).setHours(0, 0, 0, 0) === today.getTime();
+      
+      if (aDueToday && !bDueToday) return -1;
+      if (!aDueToday && bDueToday) return 1;
+      
+      // Pending orders get third priority
+      const aPending = a.status === 'pending';
+      const bPending = b.status === 'pending';
+      
+      if (aPending && !bPending) return -1;
+      if (!aPending && bPending) return 1;
+      
+      // If both have schedules, sort by delivery date + time
+      if (scheduleA && scheduleB) {
+        const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
+        const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
+        return dateTimeA.getTime() - dateTimeB.getTime();
+      }
+      
+      // Orders with schedules come before those without
+      if (scheduleA && !scheduleB) return -1;
+      if (!scheduleA && scheduleB) return 1;
+      
+      // Fallback to created date (most recent first)
+      return new Date(b.order_time || b.created_at).getTime() - 
+             new Date(a.order_time || a.created_at).getTime();
+    });
     
     return ordersCopy;
   }, [orders, deliverySchedules, statusFilter]);
@@ -129,12 +145,9 @@ export default function AdminOrders() {
     today.setHours(0, 0, 0, 0);
     
     return prioritySortedOrders.filter(order => {
-      // Only apply delivery filter to paid delivery orders
-      if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
-        return true; // Show non-delivery or unpaid orders when filtering for all
-      }
-      
       const schedule = deliverySchedules[order.id];
+      
+      // For delivery filter, only include orders with delivery schedules
       if (!schedule) return false;
       
       const deliveryDate = new Date(schedule.delivery_date);
@@ -471,7 +484,16 @@ export default function AdminOrders() {
                 <div className="text-center">
                   <AlertCircle className="w-8 h-8 mx-auto text-red-500 mb-2" />
                   <p className="text-red-600 font-medium">Error loading orders</p>
-                  <p className="text-sm text-muted-foreground">Please try again later</p>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {error instanceof Error ? error.message : 'An unexpected error occurred while loading orders'}
+                  </p>
+                  <Button 
+                    onClick={() => refetch()} 
+                    variant="outline" 
+                    className="mx-auto"
+                  >
+                    Try Again
+                  </Button>
                 </div>
               </Card>
             ) : filteredOrders.length === 0 ? (
@@ -554,7 +576,7 @@ function AdminOrderCard({
   deliverySchedule
 }: {
   order: OrderWithItems;
-  deliverySchedule?: any;
+  deliverySchedule?: NonNullable<OrderWithItems['delivery_schedule']>;
 }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();

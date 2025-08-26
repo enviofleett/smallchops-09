@@ -14,7 +14,7 @@ import { EnhancedOrderCard } from '@/components/orders/EnhancedOrderCard';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { MobileOrderTabs } from '@/components/admin/orders/MobileOrderTabs';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck } from 'lucide-react';
+import { Search, Filter, Download, Package, TrendingUp, Clock, CheckCircle, AlertCircle, Plus, Activity, ChevronDown, MapPin, Truck, BarChart3, Send, RefreshCw } from 'lucide-react';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { supabase } from '@/integrations/supabase/client';
 import { ProductDetailCard } from '@/components/orders/ProductDetailCard';
@@ -25,6 +25,8 @@ import { PickupPointDisplay } from '@/components/admin/PickupPointDisplay';
 import { DeliveryScheduleDisplay } from '@/components/orders/DeliveryScheduleDisplay';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
+import { useToast } from '@/hooks/use-toast';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -34,7 +36,10 @@ export default function AdminOrders() {
   const [deliveryFilter, setDeliveryFilter] = useState<'all' | 'due_today' | 'upcoming'>('all');
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
+  const [showDeliveryReport, setShowDeliveryReport] = useState(false);
   const isMobile = useIsMobile();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   // Fetch orders with pagination and filters
   const {
@@ -210,10 +215,20 @@ export default function AdminOrders() {
               Monitor and manage all customer orders and deliveries
             </p>
           </div>
-          <Button className="w-full sm:w-auto">
-            <Plus className="w-4 h-4 mr-2" />
-            Create Order
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2">
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto"
+              onClick={() => setShowDeliveryReport(!showDeliveryReport)}
+            >
+              <BarChart3 className="w-4 h-4 mr-2" />
+              Delivery Report
+            </Button>
+            <Button className="w-full sm:w-auto">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Order
+            </Button>
+          </div>
         </div>
 
         {/* Quick Stats */}
@@ -276,6 +291,50 @@ export default function AdminOrders() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Delivery Report Section */}
+        {showDeliveryReport && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Daily Delivery Summary
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="text-center p-4 bg-blue-50 rounded-lg">
+                  <p className="text-2xl font-bold text-blue-600">
+                    {filteredOrders.filter(o => o.status === 'out_for_delivery').length}
+                  </p>
+                  <p className="text-sm text-blue-600">Out for Delivery</p>
+                </div>
+                <div className="text-center p-4 bg-green-50 rounded-lg">
+                  <p className="text-2xl font-bold text-green-600">
+                    {filteredOrders.filter(o => o.status === 'delivered').length}
+                  </p>
+                  <p className="text-sm text-green-600">Delivered Today</p>
+                </div>
+                <div className="text-center p-4 bg-orange-50 rounded-lg">
+                  <p className="text-2xl font-bold text-orange-600">
+                    {filteredOrders.filter(o => {
+                      const schedule = deliverySchedules[o.id];
+                      return schedule && isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end);
+                    }).length}
+                  </p>
+                  <p className="text-sm text-orange-600">Overdue Deliveries</p>
+                </div>
+              </div>
+              <div className="mt-4 p-4 bg-muted rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  <strong>Upcoming deliveries:</strong> {filteredOrders.filter(o => 
+                    o.status === 'confirmed' || o.status === 'preparing'
+                  ).length} orders ready for dispatch
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Filters - Mobile Responsive */}
         <Card>
@@ -497,6 +556,71 @@ function AdminOrderCard({
   order: OrderWithItems;
   deliverySchedule?: any;
 }) {
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  // Status update mutation
+  const updateStatusMutation = useMutation({
+    mutationFn: async ({ orderId, newStatus }: { orderId: string; newStatus: OrderStatus }) => {
+      const { data, error } = await supabase
+        .from('orders')
+        .update({ status: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', orderId)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+      toast({
+        title: "Status Updated",
+        description: "Order status has been updated successfully.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Update Failed",
+        description: error.message || "Failed to update order status.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  // Out-for-delivery email mutation
+  const sendDeliveryEmailMutation = useMutation({
+    mutationFn: async (orderId: string) => {
+      const { data, error } = await supabase.functions.invoke('send-out-for-delivery-email', {
+        body: { order_id: orderId }
+      });
+      
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+      toast({
+        title: "Email Sent",
+        description: "Out-for-delivery notification sent to customer.",
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Email Failed",
+        description: error.message || "Failed to send delivery notification.",
+        variant: "destructive",
+      });
+    }
+  });
+
+  const handleStatusUpdate = (newStatus: OrderStatus) => {
+    updateStatusMutation.mutate({ orderId: order.id, newStatus });
+  };
+
+  const handleSendDeliveryEmail = () => {
+    sendDeliveryEmailMutation.mutate(order.id);
+  };
   // Fetch delivery zone information if we have a delivery address
   const { data: deliveryZone } = useQuery({
     queryKey: ['delivery-zone', order.delivery_zone_id],
@@ -556,9 +680,93 @@ function AdminOrderCard({
               {format(new Date(order.order_time), 'PPp')}
             </p>
           </div>
-          <Badge className={getStatusBadgeColor(order.status)}>
-            {order.status.replace('_', ' ').toUpperCase()}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge className={getStatusBadgeColor(order.status)}>
+              {order.status.replace('_', ' ').toUpperCase()}
+            </Badge>
+            {/* Status update buttons */}
+            {order.status === 'confirmed' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStatusUpdate('preparing');
+                }}
+                disabled={updateStatusMutation.isPending}
+              >
+                {updateStatusMutation.isPending ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  'Start Preparing'
+                )}
+              </Button>
+            )}
+            {order.status === 'preparing' && (
+              <div className="flex gap-1">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStatusUpdate('ready');
+                  }}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  Mark Ready
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleSendDeliveryEmail();
+                  }}
+                  disabled={sendDeliveryEmailMutation.isPending}
+                  title="Send out-for-delivery email"
+                >
+                  {sendDeliveryEmailMutation.isPending ? (
+                    <RefreshCw className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                </Button>
+              </div>
+            )}
+            {order.status === 'ready' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleSendDeliveryEmail();
+                }}
+                disabled={sendDeliveryEmailMutation.isPending}
+              >
+                {sendDeliveryEmailMutation.isPending ? (
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-1" />
+                    Out for Delivery
+                  </>
+                )}
+              </Button>
+            )}
+            {order.status === 'out_for_delivery' && (
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleStatusUpdate('delivered');
+                }}
+                disabled={updateStatusMutation.isPending}
+              >
+                Mark Delivered
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">

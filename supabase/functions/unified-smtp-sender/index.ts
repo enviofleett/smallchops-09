@@ -654,13 +654,13 @@ serve(async (req) => {
     
     // Build SMTP configuration with environment variable fallbacks
     const smtpConfig = {
-      smtp_host: (config?.smtp_host) || Deno.env.get('SMTP_HOST') || 'smtp.yournotify.com',
+      smtp_host: (config?.smtp_host) || Deno.env.get('SMTP_HOST') || 'mail.startersmallchops.com',
       smtp_port: (config?.smtp_port) || parseInt(Deno.env.get('SMTP_PORT') || '587'),
       smtp_secure: config?.smtp_secure !== undefined ? config.smtp_secure : false, // Always use STARTTLS for port 587
-      smtp_user: (config?.smtp_user) || Deno.env.get('SMTP_USER') || 'store@startersmallchops.com',
-      smtp_pass: (config?.smtp_pass) || Deno.env.get('SMTP_PASS') || '',
+      smtp_user: (config?.smtp_user) || Deno.env.get('SMTP_USERNAME') || 'store@startersmallchops.com',
+      smtp_pass: (config?.smtp_pass) || Deno.env.get('SMTP_PASSWORD') || '',
       sender_email: (config?.sender_email) || Deno.env.get('SENDER_EMAIL') || 'store@startersmallchops.com',
-      sender_name: (config?.sender_name) || Deno.env.get('SENDER_NAME') || 'Starters Small Chops'
+      sender_name: (config?.sender_name) || Deno.env.get('SENDER_NAME') || 'Starter Small Chops'
     }
     
     // Force STARTTLS for port 587 (never use direct SSL)

@@ -145,54 +145,19 @@ export function UnifiedDeliveryManagement({
   // Admin can assign driver for any order
   const handleAssignDriver = async (orderIds: string[], driverId: string) => {
     try {
-      // Double check driver exists and is active
       const driver = drivers.find(d => d.id === driverId && d.is_active);
       if (!driver) {
-        toast.error("Driver not found or inactive. Please select a valid, active driver.");
+        toast.error("Driver not found or inactive");
         return;
       }
-
-      // Bulk assign orders; handle errors individually
-      const results = await Promise.allSettled(orderIds.map(orderId =>
+      await Promise.all(orderIds.map(orderId =>
         updateOrder(orderId, { assigned_rider_id: driverId })
       ));
-      let successCount = 0;
-      let foreignKeyErrors: string[] = [];
-      let otherErrors: string[] = [];
-
-      results.forEach((result, idx) => {
-        if (result.status === "fulfilled") {
-          successCount++;
-        } else {
-          const errorObj = result.reason;
-          // Supabase returns 409 for constraint violation
-          if (errorObj?.status === 409 || errorObj?.message?.includes("foreign key constraint")) {
-            foreignKeyErrors.push(orderIds[idx]);
-          } else {
-            otherErrors.push(orderIds[idx]);
-          }
-        }
-      });
-
-      if (successCount > 0) {
-        toast.success(`${successCount} order(s) assigned successfully`);
-      }
-      if (foreignKeyErrors.length > 0) {
-        toast.error(`Failed to assign driver for ${foreignKeyErrors.length} order(s): invalid or missing driver (foreign key constraint).`);
-      }
-      if (otherErrors.length > 0) {
-        toast.error(`Failed to assign driver for ${otherErrors.length} order(s): unexpected error.`);
-      }
-
+      toast.success(`${orderIds.length} order(s) assigned successfully`);
       refetch();
       setSelectedOrders([]);
     } catch (error: any) {
-      // General catch
-      if (error?.status === 409 || error?.message?.includes("foreign key constraint")) {
-        toast.error('Failed to assign driver due to invalid driver (foreign key constraint).');
-      } else {
-        toast.error(error.message || 'Failed to assign driver');
-      }
+      toast.error(error.message || 'Failed to assign driver');
     }
   };
 

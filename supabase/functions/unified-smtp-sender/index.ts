@@ -273,12 +273,25 @@ class ProductionSMTPClient {
     this.log(`Capabilities: ${Array.from(this.capabilities).join(', ')}`);
   }
 
+  private safeBase64Encode(str: string): string {
+    // Ensure proper UTF-8 encoding before base64
+    const encoder = new TextEncoder();
+    const bytes = encoder.encode(str);
+    return btoa(String.fromCharCode(...bytes)).replace(/\n/g, '');
+  }
+
   private async authenticateLogin(): Promise<void> {
     this.log('Authenticating with AUTH LOGIN...');
     
     await this.sendCommand('AUTH LOGIN', [334]);
-    await this.sendCommand(btoa(this.username), [334]);
-    await this.sendCommand(btoa(this.password), [235]);
+    
+    const encodedUsername = this.safeBase64Encode(this.username);
+    this.log(`Sending username (${this.username.length} chars, encoded ${encodedUsername.length} chars)`);
+    await this.sendCommand(encodedUsername, [334]);
+    
+    const encodedPassword = this.safeBase64Encode(this.password);
+    this.log(`Sending password (${this.password.length} chars, encoded ${encodedPassword.length} chars)`);
+    await this.sendCommand(encodedPassword, [235]);
     
     this.log('AUTH LOGIN successful');
   }
@@ -286,19 +299,25 @@ class ProductionSMTPClient {
   private async authenticatePlain(): Promise<void> {
     this.log('Authenticating with AUTH PLAIN...');
     
+    // AUTH PLAIN format: \0username\0password
     const authString = `\0${this.username}\0${this.password}`;
-    await this.sendCommand(`AUTH PLAIN ${btoa(authString)}`, [235]);
+    const encoded = this.safeBase64Encode(authString);
+    this.log(`AUTH PLAIN string length: ${authString.length}, encoded: ${encoded.length} chars`);
+    
+    await this.sendCommand(`AUTH PLAIN ${encoded}`, [235]);
     
     this.log('AUTH PLAIN successful');
   }
 
   private async authenticate(): Promise<string> {
-    if (this.authMethods.includes('LOGIN') || this.authMethods.length === 0) {
-      await this.authenticateLogin();
-      return 'LOGIN';
-    } else if (this.authMethods.includes('PLAIN')) {
+    // Try AUTH PLAIN first as it's more reliable for many providers
+    if (this.authMethods.includes('PLAIN')) {
       await this.authenticatePlain();
       return 'PLAIN';
+    } else if (this.authMethods.includes('LOGIN') || this.authMethods.length === 0) {
+      // Fallback to LOGIN if PLAIN not available
+      await this.authenticateLogin();
+      return 'LOGIN';
     } else {
       throw new Error(`No supported AUTH methods. Server supports: ${this.authMethods.join(', ')}`);
     }

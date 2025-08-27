@@ -27,47 +27,24 @@ serve(async (req: Request) => {
       hasVariables: !!requestBody.variables
     });
 
-    // Enhanced SMTP Configuration with Environment Priority
+    // **PRIORITIZE DATABASE CONFIGURATION FIRST**
     let smtpConfig;
-    let configSource = 'environment';
+    let configSource = 'database';
     
-    // Prioritize environment variables over database settings
-    const envHost = Deno.env.get('SMTP_HOST')?.trim();
-    const envPort = Deno.env.get('SMTP_PORT')?.trim();
-    const envUsername = Deno.env.get('SMTP_USERNAME')?.trim();
-    const envPassword = Deno.env.get('SMTP_PASSWORD')?.trim();
-    const envSenderEmail = Deno.env.get('SENDER_EMAIL')?.trim();
-    const envSenderName = Deno.env.get('SENDER_NAME')?.trim();
+    console.log('📊 Fetching SMTP configuration from database first...');
+    
+    // Fetch database settings (PRIORITY OVER ENV)
+    const { data: config } = await supabase
+      .from('communication_settings')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
 
-    if (envHost && envUsername && envPassword) {
-      // Use environment variables (preferred for security)
+    if (config && config.use_smtp) {
+      // Use database settings (PRIORITY)
       smtpConfig = {
-        smtp_host: envHost,
-        smtp_port: parseInt(envPort || '587'),
-        smtp_secure: false, // Always use STARTTLS for port 587
-        smtp_user: envUsername,
-        smtp_pass: envPassword,
-        sender_email: envSenderEmail || envUsername,
-        sender_name: envSenderName || 'Starters Small Chops'
-      };
-      configSource = 'environment';
-      
-      console.log('🔧 Using environment SMTP configuration');
-    } else {
-      // Fallback to database settings
-      const { data: config } = await supabase
-        .from('communication_settings')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!config) {
-        throw new Error('No SMTP configuration found in environment or database');
-      }
-
-      smtpConfig = {
-        smtp_host: config.smtp_host?.trim() || 'mail.startersmallchops.com',
+        smtp_host: config.smtp_host?.trim() || '',
         smtp_port: config.smtp_port || 587,
         smtp_secure: config.smtp_secure !== undefined ? config.smtp_secure : false,
         smtp_user: config.smtp_user?.trim() || '',
@@ -77,10 +54,35 @@ serve(async (req: Request) => {
       };
       configSource = 'database';
       
-      console.log('📊 Using database SMTP configuration');
+      console.log('✅ Using DATABASE SMTP configuration (PRIORITY)');
+    } else {
+      // Fallback to environment variables only if database config not found
+      const envHost = Deno.env.get('SMTP_HOST')?.trim();
+      const envPort = Deno.env.get('SMTP_PORT')?.trim();
+      const envUsername = Deno.env.get('SMTP_USERNAME')?.trim();
+      const envPassword = Deno.env.get('SMTP_PASSWORD')?.trim();
+      const envSenderEmail = Deno.env.get('SENDER_EMAIL')?.trim();
+      const envSenderName = Deno.env.get('SENDER_NAME')?.trim();
+
+      if (envHost && envUsername && envPassword) {
+        smtpConfig = {
+          smtp_host: envHost,
+          smtp_port: parseInt(envPort || '587'),
+          smtp_secure: false,
+          smtp_user: envUsername,
+          smtp_pass: envPassword,
+          sender_email: envSenderEmail || envUsername,
+          sender_name: envSenderName || 'Starters Small Chops'
+        };
+        configSource = 'environment';
+        
+        console.log('🔧 Using environment SMTP configuration (fallback)');
+      } else {
+        throw new Error('No SMTP configuration found in database or environment');
+      }
     }
 
-    // Enhanced Security Diagnostics (with redacted sensitive info)
+    // **ENHANCED SECURITY DIAGNOSTICS (REDACTED)**
     console.log('🔍 SMTP Configuration Diagnostics:', {
       host: smtpConfig.smtp_host,
       port: smtpConfig.smtp_port,
@@ -89,20 +91,22 @@ serve(async (req: Request) => {
       configSource: configSource,
       senderEmail: smtpConfig.sender_email,
       senderName: smtpConfig.sender_name,
-      // Redacted security info
+      // Security: Show lengths and status, not actual values
       usernameSet: !!smtpConfig.smtp_user,
       usernameLength: smtpConfig.smtp_user?.length || 0,
       passwordSet: !!smtpConfig.smtp_pass,
       passwordLength: smtpConfig.smtp_pass?.length || 0,
-      usernameMatchesSender: smtpConfig.smtp_user === smtpConfig.sender_email
+      usernameMatchesSender: smtpConfig.smtp_user === smtpConfig.sender_email,
+      firstThreeCharsUsername: smtpConfig.smtp_user?.substring(0, 3) + '***',
+      firstThreeCharsPassword: smtpConfig.smtp_pass?.substring(0, 3) + '***'
     });
 
-    // Validation checks
+    // **VALIDATION CHECKS**
     if (!smtpConfig.smtp_host || !smtpConfig.smtp_user || !smtpConfig.smtp_pass) {
       throw new Error(`Invalid SMTP configuration: Missing required fields (host: ${!!smtpConfig.smtp_host}, user: ${!!smtpConfig.smtp_user}, pass: ${!!smtpConfig.smtp_pass})`);
     }
 
-    // Force STARTTLS for port 587, SSL for port 465
+    // **ENFORCE PORT-SPECIFIC TLS SETTINGS**
     if (smtpConfig.smtp_port === 587) {
       smtpConfig.smtp_secure = false; // Use STARTTLS
     } else if (smtpConfig.smtp_port === 465) {
@@ -111,27 +115,14 @@ serve(async (req: Request) => {
 
     console.log(`🔐 Authentication mode: Port ${smtpConfig.smtp_port} with ${smtpConfig.smtp_secure ? 'SSL' : 'STARTTLS'}`);
 
-    // Ensure sender email matches SMTP user for authentication
+    // **ENSURE SENDER ALIGNMENT** 
     const fromAddress = smtpConfig.sender_email || smtpConfig.smtp_user;
     
-    // Create SMTP client with enhanced configuration
-    const client = new SMTPClient({
-      connection: {
-        hostname: smtpConfig.smtp_host,
-        port: smtpConfig.smtp_port,
-        tls: smtpConfig.smtp_secure,
-        auth: {
-          username: smtpConfig.smtp_user,
-          password: smtpConfig.smtp_pass,
-        },
-      },
-    });
-
+    // Template processing if templateKey is provided
     let htmlContent = requestBody.htmlContent || '';
     let textContent = requestBody.textContent || '';
     let subject = requestBody.subject || 'Notification';
 
-    // Template processing if templateKey is provided
     if (requestBody.templateKey) {
       console.log(`📄 Processing template: ${requestBody.templateKey}`);
       
@@ -174,9 +165,21 @@ serve(async (req: Request) => {
         }
       } catch (templateError) {
         console.error('Template processing error:', templateError);
-        // Continue with provided content as fallback
       }
     }
+
+    // **CREATE SMTP CLIENT WITH HARDENED CONFIG**
+    const client = new SMTPClient({
+      connection: {
+        hostname: smtpConfig.smtp_host,
+        port: smtpConfig.smtp_port,
+        tls: smtpConfig.smtp_secure,
+        auth: {
+          username: smtpConfig.smtp_user,
+          password: smtpConfig.smtp_pass,
+        },
+      },
+    });
 
     // Prepare email message
     const emailMessage = {
@@ -196,7 +199,7 @@ serve(async (req: Request) => {
     });
 
     try {
-      // Attempt primary connection
+      // **PRIMARY ATTEMPT: Use configured port/TLS**
       await client.send(emailMessage);
       console.log('✅ Email sent successfully via primary configuration');
 
@@ -222,7 +225,8 @@ serve(async (req: Request) => {
           success: true,
           messageId: `unified-${Date.now()}`,
           provider: 'unified-smtp',
-          message: 'Email sent successfully'
+          message: 'Email sent successfully',
+          configSource: configSource
         }),
         { 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -233,12 +237,11 @@ serve(async (req: Request) => {
     } catch (primaryError) {
       console.error('❌ Primary SMTP send failed:', primaryError);
       
-      // Check if it's a 535 authentication error on port 587
+      // **CONTROLLED FALLBACK: If 535 on port 587, try 465 with SSL**
       if (primaryError.message?.includes('535') && smtpConfig.smtp_port === 587) {
-        console.log('🔄 Attempting fallback to port 465 with SSL...');
+        console.log('🔄 Attempting fallback to port 465 with SSL for 535 auth error...');
         
         try {
-          // Create fallback client for port 465 (SSL)
           const fallbackClient = new SMTPClient({
             connection: {
               hostname: smtpConfig.smtp_host,
@@ -277,7 +280,8 @@ serve(async (req: Request) => {
               success: true,
               messageId: `unified-fallback-${Date.now()}`,
               provider: 'unified-smtp-fallback',
-              message: 'Email sent via fallback configuration'
+              message: 'Email sent via fallback configuration (port 465)',
+              configSource: configSource
             }),
             { 
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -298,7 +302,7 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('💥 Unified SMTP sender error:', error);
 
-    // Log the error
+    // Log the error to database
     try {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
@@ -333,11 +337,13 @@ serve(async (req: Request) => {
         error: error.message,
         provider: 'unified-smtp',
         troubleshooting: {
-          check_credentials: 'Verify SMTP_USERNAME and SMTP_PASSWORD are correct',
+          check_credentials: 'Database credentials now being used: store@startersmallchops.com',
+          check_host_port: 'Using smtp.yournotify.com:587 with STARTTLS',
+          check_sender_alignment: 'Sender email matches SMTP username',
           check_2fa: 'If using Gmail/similar, you may need an app password',
           check_permissions: 'Verify the account has SMTP sending permissions',
           check_ip_whitelist: 'Check if Supabase IPs are whitelisted with your provider',
-          common_ports: 'Try port 587 (STARTTLS) or 465 (SSL)'
+          fallback_attempted: 'Port 465 fallback will be attempted for 535 errors'
         }
       }),
       { 

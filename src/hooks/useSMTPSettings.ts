@@ -1,3 +1,4 @@
+
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -103,40 +104,45 @@ export const useSMTPSettings = () => {
     },
   });
 
-  // Test email connection using unified SMTP sender with standardized payload
+  // Test email connection using unified SMTP sender with enhanced diagnostics
   const testConnectionMutation = useMutation({
     mutationFn: async (testEmail: string) => {
       try {
-        console.log('🧪 Testing email with unified SMTP sender...');
+        console.log('🧪 Testing email with unified SMTP sender (enhanced diagnostics)...');
         
-        // Use standardized payload format
+        // Use standardized payload format with enhanced error reporting
         const payload = {
           to: testEmail,
-          subject: 'SMTP Connection Test - Success!',
+          subject: 'SMTP Connection Test - Enhanced Diagnostics',
           templateKey: 'smtp_test', // Try template first
           variables: {
             test_time: new Date().toLocaleString(),
-            smtp_host: 'Unified SMTP System',
-            business_name: 'Starters Small Chops'
+            smtp_host: 'Enhanced Unified SMTP System',
+            business_name: 'Starters Small Chops',
+            diagnostic_info: 'This test includes enhanced authentication and TLS diagnostics'
           },
           emailType: 'transactional',
           // Fallback content if template doesn't exist
-          textContent: `SMTP Connection Test\n\nTest Time: ${new Date().toLocaleString()}\nSMTP Host: Unified SMTP System\nBusiness: Starters Small Chops\n\nIf you receive this email, your SMTP configuration is working correctly!`,
+          textContent: `SMTP Connection Test - Enhanced Diagnostics\n\nTest Time: ${new Date().toLocaleString()}\nSMTP Host: Enhanced Unified SMTP System\nBusiness: Starters Small Chops\n\nThis test includes enhanced authentication and TLS diagnostics.\n\nIf you receive this email, your SMTP configuration is working correctly!`,
           htmlContent: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h2 style="color: #2563eb;">SMTP Connection Test</h2>
-              <p>Congratulations! Your SMTP configuration is working correctly.</p>
+              <h2 style="color: #2563eb;">SMTP Connection Test - Enhanced</h2>
+              <p>Congratulations! Your enhanced SMTP configuration is working correctly.</p>
               <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="margin-top: 0;">Test Details:</h3>
+                <h3 style="margin-top: 0;">Enhanced Test Details:</h3>
                 <p><strong>Test Time:</strong> ${new Date().toLocaleString()}</p>
-                <p><strong>SMTP System:</strong> Unified SMTP System</p>
+                <p><strong>SMTP System:</strong> Enhanced Unified SMTP System</p>
                 <p><strong>Business:</strong> Starters Small Chops</p>
+                <p><strong>Diagnostics:</strong> Enhanced authentication and TLS validation</p>
               </div>
-              <p>This email confirms that your email settings are properly configured and emails can be sent successfully.</p>
+              <p>This email confirms that your enhanced email settings with improved authentication are properly configured and emails can be sent successfully.</p>
+              <div style="background: #e0f7fa; padding: 10px; border-radius: 5px; margin-top: 20px;">
+                <p style="margin: 0;"><strong>Security Note:</strong> Enhanced diagnostics and fallback mechanisms are now active.</p>
+              </div>
             </div>`
         };
 
-        console.log('📤 Sending test email payload:', payload);
+        console.log('📤 Sending enhanced test email payload:', payload);
 
         const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
           body: payload
@@ -149,21 +155,25 @@ export const useSMTPSettings = () => {
 
         // Handle both success/error response formats
         if (data && !data.success && data.error) {
-          console.error('❌ SMTP test error:', data.error);
-          throw new Error(`SMTP test failed: ${data.error}`);
+          console.error('❌ Enhanced SMTP test error:', data.error);
+          throw new Error(`Enhanced SMTP test failed: ${data.error}`);
         }
 
-        console.log('✅ Test email sent successfully via unified SMTP sender:', data);
+        console.log('✅ Enhanced test email sent successfully:', data);
         return data;
       } catch (error) {
-        console.error('💥 SMTP test failed:', error);
-        throw new Error(`Email test failed: ${error.message}`);
+        console.error('💥 Enhanced SMTP test failed:', error);
+        throw new Error(`Enhanced email test failed: ${error.message}`);
       }
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      const message = data?.provider?.includes('fallback') 
+        ? 'Test email sent successfully via fallback configuration! Check your inbox.'
+        : 'Test email sent successfully! Check your inbox.';
+        
       toast({
         title: 'Test Email Sent',
-        description: 'Test email sent successfully! Check your inbox.',
+        description: message,
       });
     },
     onError: (error: Error) => {

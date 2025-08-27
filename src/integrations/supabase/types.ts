@@ -7215,6 +7215,7 @@ export type Database = {
           sender_email: string | null
           smtp_response: string | null
           subject: string | null
+          template_key: string | null
         }
         Insert: {
           created_at?: string
@@ -7230,6 +7231,7 @@ export type Database = {
           sender_email?: string | null
           smtp_response?: string | null
           subject?: string | null
+          template_key?: string | null
         }
         Update: {
           created_at?: string
@@ -7245,6 +7247,7 @@ export type Database = {
           sender_email?: string | null
           smtp_response?: string | null
           subject?: string | null
+          template_key?: string | null
         }
         Relationships: []
       }

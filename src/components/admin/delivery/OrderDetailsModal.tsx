@@ -34,7 +34,7 @@ interface OrderDetailsModalProps {
   onClose: () => void;
 }
 
-const STARTERS_LOGO = '/logo-starters.svg'; // change if needed
+const STARTERS_LOGO = '/logo-starters.svg'; // Update this path to your actual logo!
 
 const getStatusColor = (status: string) => {
   switch (status) {
@@ -138,6 +138,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
       try {
         return JSON.parse(product.features);
       } catch {
+        // fallback: try to split by lines
         return null;
       }
     }
@@ -326,63 +327,79 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </div>
             ) : (
               <ScrollArea className="max-h-[320px] w-full rounded-lg border p-2 bg-muted/10">
-                {order?.order_items?.map((item: any, idx: number) => (
-                  <div
-                    key={item.id || idx}
-                    className="flex flex-col md:flex-row items-start md:items-center justify-between border-b last:border-b-0 py-3 gap-3"
-                  >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium">{item.product_name}</div>
-                      {item.product?.description && (
-                        <div className="text-xs text-muted-foreground">
-                          {item.product.description}
-                        </div>
-                      )}
-                      {/* Features/details */}
-                      {item.product && getProductFeatures(item.product) && (
-                        <div className="mt-1 text-xs text-muted-foreground">
-                          <span className="font-semibold">What's included:</span>
-                          <ul className="list-disc ml-4">
-                            {Object.entries(getProductFeatures(item.product)).map(
-                              ([key, value]: [string, any], i) =>
-                                value ? (
-                                  <li key={i}>
-                                    <span className="font-semibold">{key}:</span> {String(value)}
-                                  </li>
-                                ) : null
+                {order?.order_items?.map((item: any, idx: number) => {
+                  // Try to extract features (object, array, string, or simple text)
+                  let features = getProductFeatures(item.product);
+                  if (!features && item?.features) {
+                    features = item.features;
+                  }
+                  return (
+                    <div
+                      key={item.id || idx}
+                      className="flex flex-col md:flex-row items-start md:items-center justify-between border-b last:border-b-0 py-3 gap-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium">{item.product_name}</div>
+                        {item.product?.description && (
+                          <div className="text-xs text-muted-foreground">
+                            {item.product.description}
+                          </div>
+                        )}
+                        {/* Features/details */}
+                        {features && (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            <span className="font-semibold">What's included:</span>
+                            {typeof features === 'object' && !Array.isArray(features) ? (
+                              <ul className="list-disc ml-4">
+                                {Object.entries(features).map(([key, value], i) =>
+                                  value ? (
+                                    <li key={i}>
+                                      <span className="font-semibold">{key}:</span> {String(value)}
+                                    </li>
+                                  ) : null
+                                )}
+                              </ul>
+                            ) : Array.isArray(features) ? (
+                              <ul className="list-disc ml-4">
+                                {features.map((f, i) =>
+                                  f ? <li key={i}>{String(f)}</li> : null
+                                )}
+                              </ul>
+                            ) : (
+                              <span className="ml-2">{String(features)}</span>
                             )}
-                          </ul>
+                          </div>
+                        )}
+                        {item.special_instructions && (
+                          <div className="text-xs mt-1 text-orange-700">
+                            <span className="font-semibold">Note:</span> {item.special_instructions}
+                          </div>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3 text-right md:text-left">
+                        <div>
+                          <span className="font-semibold">Qty:</span> {item.quantity}
                         </div>
-                      )}
-                      {item.special_instructions && (
-                        <div className="text-xs mt-1 text-orange-700">
-                          <span className="font-semibold">Note:</span> {item.special_instructions}
+                        <div>
+                          <span className="font-semibold">Unit Price:</span>{' '}
+                          {formatCurrency(item.unit_price)}
                         </div>
-                      )}
+                        <div>
+                          <span className="font-semibold">Total:</span>{' '}
+                          {formatCurrency(item.total_price)}
+                        </div>
+                        {item.status && (
+                          <Badge
+                            variant="outline"
+                            className={`capitalize ml-2 text-xs ${getStatusColor(item.status)}`}
+                          >
+                            {item.status}
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-3 text-right md:text-left">
-                      <div>
-                        <span className="font-semibold">Qty:</span> {item.quantity}
-                      </div>
-                      <div>
-                        <span className="font-semibold">Unit Price:</span>{' '}
-                        {formatCurrency(item.unit_price)}
-                      </div>
-                      <div>
-                        <span className="font-semibold">Total:</span>{' '}
-                        {formatCurrency(item.total_price)}
-                      </div>
-                      {item.status && (
-                        <Badge
-                          variant="outline"
-                          className={`capitalize ml-2 text-xs ${getStatusColor(item.status)}`}
-                        >
-                          {item.status}
-                        </Badge>
-                      )}
-                    </div>
-                  </div>
-                ))}
+                  );
+                })}
                 {(!order?.order_items || order?.order_items.length === 0) && (
                   <div className="py-4 text-center text-muted-foreground">No order items found.</div>
                 )}

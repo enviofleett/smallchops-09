@@ -247,85 +247,136 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                     </Button>
                   </div>
 
-                  {/* Two Column Layout - Mobile Responsive */}
+                  {/* Customer & Delivery Information - Enhanced Layout */}
                   <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-                    {/* Customer Information */}
-                    <Card>
-                      <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                          <User className="w-4 h-4" />
+                    {/* Customer Information Card */}
+                    <Card className="border-primary/20 bg-gradient-to-br from-primary/5 to-transparent">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base text-primary">
+                          <User className="w-5 h-5" />
                           Customer Information
                         </CardTitle>
                       </CardHeader>
-                      <CardContent className="space-y-3">
-                        <div className="flex items-start gap-2">
-                          <User className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                          <div className="min-w-0 flex-1">
-                            <p className="font-medium break-words">{order.customer_name}</p>
-                            <p className="text-sm text-muted-foreground">Customer</p>
-                          </div>
-                        </div>
-                        
-                        {order.customer_email && (
-                          <div className="flex items-start gap-2">
-                            <Mail className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm break-all">{order.customer_email}</p>
-                              <p className="text-xs text-muted-foreground">Email</p>
+                      <CardContent className="space-y-4">
+                        <div className="bg-background/80 rounded-lg p-3 space-y-3">
+                          <div className="flex items-center gap-3">
+                            <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center">
+                              <User className="w-5 h-5 text-primary" />
                             </div>
-                          </div>
-                        )}
-                        
-                        {order.customer_phone && (
-                          <div className="flex items-start gap-2">
-                            <Phone className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
                             <div className="min-w-0 flex-1">
-                              <p className="text-sm">{order.customer_phone}</p>
-                              <p className="text-xs text-muted-foreground">Phone</p>
-                            </div>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-
-                    {/* Delivery Information */}
-                    {order.order_type === 'delivery' && (
-                      <Card>
-                        <CardHeader>
-                          <CardTitle className="flex items-center gap-2 text-base">
-                            <MapPin className="w-4 h-4" />
-                            Delivery Information
-                          </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-3">
-                          <div className="flex items-start gap-2">
-                            <MapPin className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
-                            <div className="min-w-0 flex-1">
-                              <p className="text-sm leading-relaxed break-words">{formatAddress(order.delivery_address)}</p>
-                              <p className="text-xs text-muted-foreground">Delivery Address</p>
+                              <p className="font-semibold text-foreground">{order.customer_name}</p>
+                              <p className="text-sm text-muted-foreground">Customer</p>
                             </div>
                           </div>
                           
-                          {detailedOrder?.delivery_schedule && (
-                            <div className="flex items-start gap-2">
-                              <Clock className="w-4 h-4 mt-0.5 text-muted-foreground flex-shrink-0" />
+                          {order.customer_email && (
+                            <div className="flex items-center gap-3 pl-2">
+                              <Mail className="w-4 h-4 text-muted-foreground flex-shrink-0" />
                               <div className="min-w-0 flex-1">
-                                <p className="text-sm">
-                                  {format(new Date(detailedOrder.delivery_schedule.delivery_date), 'PPP')}
-                                  {detailedOrder.delivery_schedule.delivery_time_start && 
-                                   detailedOrder.delivery_schedule.delivery_time_end && (
-                                    <span className="block sm:inline sm:ml-2">
-                                      {detailedOrder.delivery_schedule.delivery_time_start} - {detailedOrder.delivery_schedule.delivery_time_end}
-                                    </span>
-                                  )}
-                                </p>
-                                <p className="text-xs text-muted-foreground">Scheduled Delivery</p>
+                                <p className="text-sm font-medium break-all">{order.customer_email}</p>
+                                <p className="text-xs text-muted-foreground">Email Address</p>
                               </div>
                             </div>
                           )}
-                        </CardContent>
-                      </Card>
-                    )}
+                          
+                          {order.customer_phone && (
+                            <div className="flex items-center gap-3 pl-2">
+                              <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                              <div className="min-w-0 flex-1">
+                                <p className="text-sm font-medium">{order.customer_phone}</p>
+                                <p className="text-xs text-muted-foreground">Phone Number</p>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    {/* Delivery/Pickup Information Card */}
+                    <Card className="border-secondary/20 bg-gradient-to-br from-secondary/5 to-transparent">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="flex items-center gap-2 text-base text-secondary-foreground">
+                          <MapPin className="w-5 h-5" />
+                          {order.order_type === 'delivery' ? 'Delivery Information' : 'Pickup Information'}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <div className="bg-background/80 rounded-lg p-3 space-y-3">
+                          {order.order_type === 'delivery' ? (
+                            <>
+                              <div className="flex items-start gap-3">
+                                <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center mt-1">
+                                  <MapPin className="w-5 h-5 text-secondary-foreground" />
+                                </div>
+                                <div className="min-w-0 flex-1">
+                                  <p className="text-sm font-medium leading-relaxed break-words">{formatAddress(order.delivery_address)}</p>
+                                  <p className="text-xs text-muted-foreground">Delivery Address</p>
+                                </div>
+                              </div>
+                              
+                              {detailedOrder?.delivery_schedule && (
+                                <div className="flex items-start gap-3 pl-2">
+                                  <Clock className="w-4 h-4 text-muted-foreground flex-shrink-0 mt-1" />
+                                  <div className="min-w-0 flex-1">
+                                    <p className="text-sm font-medium">
+                                      {format(new Date(detailedOrder.delivery_schedule.delivery_date), 'EEEE, MMMM do, yyyy')}
+                                    </p>
+                                    {detailedOrder.delivery_schedule.delivery_time_start && 
+                                     detailedOrder.delivery_schedule.delivery_time_end && (
+                                      <p className="text-sm text-muted-foreground mt-1">
+                                        <span className="font-medium text-foreground">
+                                          {detailedOrder.delivery_schedule.delivery_time_start} - {detailedOrder.delivery_schedule.delivery_time_end}
+                                        </span>
+                                        <span className="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full">
+                                          Delivery Window
+                                        </span>
+                                      </p>
+                                    )}
+                                    <p className="text-xs text-muted-foreground">Scheduled Delivery</p>
+                                    
+                                    {detailedOrder.delivery_schedule.special_instructions && (
+                                      <div className="mt-2 p-2 bg-amber-50 border-l-4 border-amber-200 rounded-r">
+                                        <p className="text-xs font-medium text-amber-800">Special Instructions:</p>
+                                        <p className="text-xs text-amber-700">{detailedOrder.delivery_schedule.special_instructions}</p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </div>
+                              )}
+
+                              {shippingFee > 0 && (
+                                <div className="flex items-center gap-3 pl-2 pt-2 border-t">
+                                  <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
+                                    <span className="text-xs font-bold text-green-700">₦</span>
+                                  </div>
+                                  <div className="flex-1">
+                                    <p className="text-sm font-medium text-green-700">{formatCurrency(shippingFee)}</p>
+                                    <p className="text-xs text-muted-foreground">Delivery Fee</p>
+                                  </div>
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-full bg-secondary/10 flex items-center justify-center">
+                                <Package className="w-5 h-5 text-secondary-foreground" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="font-semibold">Store Pickup</p>
+                                <p className="text-sm text-muted-foreground">Pick up from our store location</p>
+                                {detailedOrder?.delivery_schedule && (
+                                  <p className="text-xs text-muted-foreground mt-1">
+                                    {format(new Date(detailedOrder.delivery_schedule.delivery_date), 'PPP')}
+                                    {detailedOrder.delivery_schedule.delivery_time_start && 
+                                     ` at ${detailedOrder.delivery_schedule.delivery_time_start}`}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
                   </div>
 
                   {/* Order Items */}
@@ -383,42 +434,77 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                     </CardContent>
                   </Card>
 
-                  {/* Order Summary */}
-                  <Card>
-                    <CardHeader>
-                      <CardTitle className="text-base">Order Summary</CardTitle>
+                  {/* Order Summary - Enhanced */}
+                  <Card className="border-accent/20 bg-gradient-to-br from-accent/5 to-transparent">
+                    <CardHeader className="pb-3">
+                      <CardTitle className="text-base flex items-center gap-2 text-accent-foreground">
+                        <Package className="w-5 h-5" />
+                        Order Summary
+                      </CardTitle>
                     </CardHeader>
                     <CardContent>
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm">
-                          <span>Payment Status:</span>
-                          <Badge variant={order.payment_status === 'paid' ? 'default' : 'secondary'}>
+                      <div className="bg-background/80 rounded-lg p-4 space-y-3">
+                        {/* Payment Status */}
+                        <div className="flex items-center justify-between p-3 bg-muted/50 rounded-lg">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-3 h-3 rounded-full ${
+                              order.payment_status === 'paid' ? 'bg-green-500' : 'bg-yellow-500'
+                            }`} />
+                            <span className="font-medium">Payment Status</span>
+                          </div>
+                          <Badge 
+                            variant={order.payment_status === 'paid' ? 'default' : 'secondary'}
+                            className={order.payment_status === 'paid' ? 'bg-green-600' : 'bg-yellow-600'}
+                          >
                             {order.payment_status?.toUpperCase() || 'PENDING'}
                           </Badge>
                         </div>
                         
                         {order.payment_method && (
-                          <div className="flex justify-between text-sm">
-                            <span>Payment Method:</span>
-                            <span className="capitalize">{order.payment_method}</span>
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="text-muted-foreground">Payment Method:</span>
+                            <span className="font-medium capitalize">{order.payment_method}</span>
                           </div>
                         )}
 
-                        <div className="flex justify-between text-sm">
-                          <span>Shipping Fee (Delivery Fee):</span>
-                          <span>{formatCurrency(shippingFee)}</span>
+                        <Separator className="my-4" />
+
+                        {/* Financial Breakdown */}
+                        <div className="space-y-2">
+                          <div className="flex justify-between text-sm">
+                            <span className="text-muted-foreground">Subtotal (Items):</span>
+                            <span className="font-medium">{formatCurrency(subtotal)}</span>
+                          </div>
+
+                          {shippingFee > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">
+                                {order.order_type === 'delivery' ? 'Delivery Fee:' : 'Service Fee:'}
+                              </span>
+                              <span className="font-medium text-orange-600">{formatCurrency(shippingFee)}</span>
+                            </div>
+                          )}
+
+                          {order.vat_amount && Number(order.vat_amount) > 0 && (
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">VAT (7.5%):</span>
+                              <span className="font-medium">{formatCurrency(Number(order.vat_amount))}</span>
+                            </div>
+                          )}
+
+                          <Separator className="my-3" />
+
+                          <div className="flex justify-between items-center p-3 bg-primary/10 rounded-lg">
+                            <span className="font-semibold text-lg">Total Amount:</span>
+                            <span className="font-bold text-xl text-primary">{formatCurrency(order.total_amount)}</span>
+                          </div>
                         </div>
 
-                        <div className="flex justify-between text-sm">
-                          <span>Subtotal:</span>
-                          <span>{formatCurrency(subtotal)}</span>
-                        </div>
-
-                        <Separator className="my-3" />
-
-                        <div className="flex justify-between font-semibold">
-                          <span>Total Amount:</span>
-                          <span>{formatCurrency(order.total_amount)}</span>
+                        {/* Order Type Badge */}
+                        <div className="pt-2 flex justify-center">
+                          <Badge variant="outline" className="px-3 py-1">
+                            {order.order_type === 'delivery' ? '🚚 Delivery Order' : '📦 Pickup Order'}
+                          </Badge>
                         </div>
                       </div>
                     </CardContent>

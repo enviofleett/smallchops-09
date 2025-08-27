@@ -8,6 +8,7 @@ import {
   Mail, 
   Building2, 
   Calendar,
+  Clock,
   Hash,
   User,
   Phone,
@@ -72,60 +73,137 @@ export function OrderReceiptCard({
   return (
     <Card className="w-full max-w-2xl mx-auto">
       <CardContent className="p-6">
-        {/* Receipt Header */}
-        <div className="text-center mb-6">
+        {/* Receipt Header with Logo */}
+        <div className="text-center mb-6 border-b pb-6">
+          {/* Logo and Business Name */}
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center">
+              <span className="text-2xl font-bold text-primary">S</span>
+            </div>
+            <div className="text-left">
+              <h1 className="text-2xl font-bold text-primary">Starters</h1>
+              <p className="text-sm text-muted-foreground">Small Chops & Catering</p>
+            </div>
+          </div>
+
           <div className="flex items-center justify-center gap-2 mb-4">
-            <Receipt className="w-8 h-8 text-primary" />
-            <h2 className="text-2xl font-bold">Order Receipt</h2>
+            <Receipt className="w-6 h-6 text-primary" />
+            <h2 className="text-xl font-bold">Official Receipt</h2>
           </div>
           
           {/* Business Information */}
           {businessInfo && (
-            <div className="text-sm text-muted-foreground space-y-1 mb-4">
-              <p className="font-semibold text-foreground">{businessInfo.name}</p>
-              <p>{businessInfo.address}</p>
-              <p>Phone: {businessInfo.phone} | Email: {businessInfo.email}</p>
+            <div className="bg-muted/30 rounded-lg p-4 text-sm space-y-2 mb-4">
+              <p className="font-semibold text-foreground text-lg">{businessInfo.name}</p>
+              <div className="flex items-center justify-center gap-2">
+                <MapPin className="w-4 h-4 text-muted-foreground" />
+                <span className="text-muted-foreground">{businessInfo.address}</span>
+              </div>
+              <div className="flex items-center justify-center gap-4 text-xs">
+                <div className="flex items-center gap-1">
+                  <Phone className="w-3 h-3" />
+                  <span>{businessInfo.phone}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Mail className="w-3 h-3" />
+                  <span>{businessInfo.email}</span>
+                </div>
+              </div>
             </div>
           )}
           
-          {/* Order ID and Date */}
-          <div className="bg-primary/10 rounded-lg p-4 mb-4">
-            <div className="flex items-center justify-center gap-2 mb-2">
+          {/* Order ID and Date - Enhanced */}
+          <div className="bg-gradient-to-r from-primary/10 via-primary/5 to-primary/10 rounded-lg p-4 border border-primary/20">
+            <div className="flex items-center justify-center gap-2 mb-3">
               <Hash className="w-5 h-5 text-primary" />
               <span className="text-lg font-bold text-primary">
-                Order ID: {order.order_number}
+                Receipt #{order.order_number}
               </span>
             </div>
-            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-              <Calendar className="w-4 h-4" />
-              <span>{format(new Date(order.order_time), 'PPP p')}</span>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
+              <div className="flex items-center justify-center gap-2">
+                <Calendar className="w-4 h-4 text-muted-foreground" />
+                <span className="font-medium">{format(new Date(order.order_time), 'PPP')}</span>
+              </div>
+              <div className="flex items-center justify-center gap-2">
+                <Clock className="w-4 h-4 text-muted-foreground" />
+                <span className="font-medium">{format(new Date(order.order_time), 'p')}</span>
+              </div>
             </div>
           </div>
         </div>
 
-        {/* Customer Information */}
+        {/* Enhanced Customer & Delivery Information */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-          <div>
-            <h3 className="font-semibold mb-3 flex items-center gap-2">
-              <User className="w-4 h-4" />
+          <div className="bg-muted/20 rounded-lg p-4 border">
+            <h3 className="font-semibold mb-3 flex items-center gap-2 text-primary">
+              <User className="w-5 h-5" />
               Customer Details
             </h3>
-            <div className="space-y-2 text-sm">
-              <p><span className="font-medium">Name:</span> {order.customer_name}</p>
-              <p><span className="font-medium">Email:</span> {order.customer_email}</p>
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
+                  <User className="w-4 h-4 text-primary" />
+                </div>
+                <div>
+                  <p className="font-semibold">{order.customer_name}</p>
+                  <p className="text-xs text-muted-foreground">Customer</p>
+                </div>
+              </div>
+              
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <Mail className="w-4 h-4 text-blue-600" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium break-all">{order.customer_email}</p>
+                  <p className="text-xs text-muted-foreground">Email Address</p>
+                </div>
+              </div>
+
               {order.customer_phone && (
-                <p><span className="font-medium">Phone:</span> {order.customer_phone}</p>
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                    <Phone className="w-4 h-4 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium">{order.customer_phone}</p>
+                    <p className="text-xs text-muted-foreground">Phone Number</p>
+                  </div>
+                </div>
               )}
             </div>
           </div>
           
           {order.delivery_address && (
-            <div>
-              <h3 className="font-semibold mb-3 flex items-center gap-2">
-                <MapPin className="w-4 h-4" />
-                Delivery Address
+            <div className="bg-muted/20 rounded-lg p-4 border">
+              <h3 className="font-semibold mb-3 flex items-center gap-2 text-secondary-foreground">
+                <MapPin className="w-5 h-5" />
+                Delivery Information
               </h3>
-              <p className="text-sm">{formatAddress(order.delivery_address)}</p>
+              <div className="space-y-3">
+                <div className="flex items-start gap-2">
+                  <div className="w-8 h-8 bg-secondary/10 rounded-full flex items-center justify-center mt-1">
+                    <MapPin className="w-4 h-4 text-secondary-foreground" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-sm font-medium leading-relaxed">{formatAddress(order.delivery_address)}</p>
+                    <p className="text-xs text-muted-foreground">Delivery Address</p>
+                  </div>
+                </div>
+                
+                {deliveryFee > 0 && (
+                  <div className="flex items-center gap-2 pt-2 border-t">
+                    <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
+                      <span className="text-xs font-bold text-orange-700">₦</span>
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold text-orange-700">{formatCurrency(deliveryFee)}</p>
+                      <p className="text-xs text-muted-foreground">Delivery Fee</p>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>
@@ -157,42 +235,68 @@ export function OrderReceiptCard({
 
         <Separator className="my-6" />
 
-        {/* Order Summary */}
-        <div className="space-y-3">
-          <div className="flex justify-between">
-            <span>Subtotal:</span>
-            <span>{formatCurrency(subtotal)}</span>
-          </div>
-          
-          {deliveryFee > 0 && (
-            <div className="flex justify-between">
-              <span>Delivery Fee:</span>
-              <span>{formatCurrency(deliveryFee)}</span>
+        {/* Enhanced Order Summary */}
+        <div className="bg-gradient-to-br from-primary/5 to-secondary/5 rounded-lg p-4 border">
+          <div className="space-y-3">
+            <div className="flex justify-between items-center py-2">
+              <span className="text-muted-foreground">Subtotal (Items):</span>
+              <span className="font-semibold">{formatCurrency(subtotal)}</span>
             </div>
-          )}
-          
-          {vatAmount > 0 && (
-            <div className="flex justify-between">
-              <span>VAT (7.5%):</span>
-              <span>{formatCurrency(vatAmount)}</span>
+            
+            {deliveryFee > 0 && (
+              <div className="flex justify-between items-center py-2">
+                <span className="text-muted-foreground">Delivery Fee:</span>
+                <span className="font-semibold text-orange-600">{formatCurrency(deliveryFee)}</span>
+              </div>
+            )}
+            
+            {vatAmount > 0 && (
+              <div className="flex justify-between items-center py-2">
+                <span className="text-muted-foreground">VAT (7.5%):</span>
+                <span className="font-semibold">{formatCurrency(vatAmount)}</span>
+              </div>
+            )}
+            
+            <Separator className="my-3" />
+            
+            <div className="bg-primary/10 rounded-lg p-4 border border-primary/20">
+              <div className="flex justify-between items-center">
+                <span className="text-lg font-bold text-primary">Total Amount:</span>
+                <span className="text-xl font-bold text-primary">{formatCurrency(order.total_amount)}</span>
+              </div>
             </div>
-          )}
-          
-          <Separator />
-          
-          <div className="flex justify-between text-lg font-bold">
-            <span>Total Amount:</span>
-            <span>{formatCurrency(order.total_amount)}</span>
-          </div>
-          
-          {/* Payment Information */}
-          <div className="bg-green-50 dark:bg-green-950/30 rounded-lg p-3 mt-4">
-            <p className="text-sm font-medium text-green-800 dark:text-green-200">
-              Payment Status: {order.payment_status === 'paid' ? 'Paid' : 'Pending'}
-            </p>
-            <p className="text-sm text-green-700 dark:text-green-300">
-              Payment Method: {order.payment_status === 'paid' ? 'Paystack' : (order.payment_method || 'Online Payment')}
-            </p>
+            
+            {/* Enhanced Payment Information */}
+            <div className={`rounded-lg p-4 mt-4 border ${
+              order.payment_status === 'paid' 
+                ? 'bg-green-50 border-green-200 dark:bg-green-950/30 dark:border-green-800' 
+                : 'bg-yellow-50 border-yellow-200 dark:bg-yellow-950/30 dark:border-yellow-800'
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <div className={`w-3 h-3 rounded-full ${
+                  order.payment_status === 'paid' ? 'bg-green-500' : 'bg-yellow-500'
+                }`} />
+                <p className={`font-semibold ${
+                  order.payment_status === 'paid' 
+                    ? 'text-green-800 dark:text-green-200' 
+                    : 'text-yellow-800 dark:text-yellow-200'
+                }`}>
+                  Payment Status: {order.payment_status === 'paid' ? 'PAID ✓' : 'PENDING'}
+                </p>
+              </div>
+              <p className={`text-sm ${
+                order.payment_status === 'paid' 
+                  ? 'text-green-700 dark:text-green-300' 
+                  : 'text-yellow-700 dark:text-yellow-300'
+              }`}>
+                Payment Method: {order.payment_status === 'paid' ? 'Paystack (Online)' : (order.payment_method || 'Online Payment')}
+              </p>
+              {order.payment_status === 'paid' && (
+                <p className="text-xs text-green-600 mt-1">
+                  ✓ Transaction completed successfully
+                </p>
+              )}
+            </div>
           </div>
         </div>
 

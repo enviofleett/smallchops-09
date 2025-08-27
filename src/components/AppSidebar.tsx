@@ -63,6 +63,11 @@ const management = [
     path: '/bookings'
   },
   {
+    icon: Truck,
+    label: 'Delivery Management',
+    path: '/admin/delivery'
+  },
+  {
     icon: Trophy,
     label: 'Promotions & Loyalty',
     path: '/promotions'

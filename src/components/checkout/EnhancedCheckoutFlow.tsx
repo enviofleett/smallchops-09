@@ -11,6 +11,8 @@ import { Label } from "@/components/ui/label";
 import { useCustomerProfile, useCustomerAddresses } from "@/hooks/useCustomerProfile";
 import { useNavigate } from "react-router-dom";
 import { Mail, Phone, MapPin, Truck, X, RefreshCw, AlertTriangle, ShoppingBag, Clock, ExternalLink, FileText, ChevronLeft } from "lucide-react";
+import { DeliveryZoneDropdown } from "@/components/delivery/DeliveryZoneDropdown";
+import { PickupPointSelector } from "@/components/delivery/PickupPointSelector";
 import { GuestOrLoginChoice } from "./GuestOrLoginChoice";
 import { DeliveryScheduler } from "./DeliveryScheduler";
 import { OrderSummaryCard } from "./OrderSummaryCard";
@@ -844,7 +846,14 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                 </div>
               </div>
               
-              {/* Delivery zone selection has been removed */}
+              <DeliveryZoneDropdown
+                selectedZoneId={deliveryZone?.id}
+                onZoneSelect={(zoneId, fee) => {
+                  const zone = { id: zoneId, base_fee: fee };
+                  setDeliveryZone(zone);
+                }}
+                orderSubtotal={subtotal}
+              />
             </CardContent>
           </Card>
         )}
@@ -859,7 +868,13 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className="text-muted-foreground">Pickup point selection functionality has been removed.</p>
+              <PickupPointSelector
+                selectedPointId={pickupPoint?.id}
+                onSelect={(point) => {
+                  setPickupPoint(point);
+                  handleFormChange('pickup_point_id', point?.id);
+                }}
+              />
             </CardContent>
           </Card>
         )}

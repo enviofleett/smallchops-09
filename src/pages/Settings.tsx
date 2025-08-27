@@ -14,6 +14,7 @@ import { EmailHealthDashboard } from "@/components/admin/EmailHealthDashboard";
 import { Settings as SettingsIcon } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { DeliveryZoneDevTools } from "@/components/settings/DeliveryZoneDevTools";
 import { AuthenticationEndpointsTab } from "@/components/settings/AuthenticationEndpointsTab";
 import { BuyingLogicEndpointsTab } from "@/components/settings/BuyingLogicEndpointsTab";
 import { PickupPointsManager } from "@/components/admin/PickupPointsManager";
@@ -1442,7 +1443,8 @@ DELETE /customers/customer-uuid/favorites/product-uuid`}</pre>
 
                   <Separator className="my-8" />
                   
-                  {/* Delivery zone development tools have been removed */}
+                  {/* Delivery Zone Development Tools */}
+                  <DeliveryZoneDevTools />
 
                 </div>
                   </CardContent>

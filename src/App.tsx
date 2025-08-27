@@ -30,6 +30,7 @@ import PublicHome from "./pages/PublicHome";
 // Lazy load admin components
 const Orders = withLazyLoading(() => import("./pages/Orders"));
 const AdminOrders = withLazyLoading(() => import("./pages/admin/AdminOrders"));
+const AdminDelivery = withLazyLoading(() => import("./pages/admin/AdminDelivery"));
 const Products = withLazyLoading(() => import("./pages/Products"));
 const Customers = withLazyLoading(() => import("./pages/Customers"));
 const Reports = withLazyLoading(() => import("./pages/Reports"));
@@ -39,6 +40,7 @@ const ProductDetail = withLazyLoading(() => import("./pages/ProductDetail"));
 const CategoryProducts = withLazyLoading(() => import("./pages/CategoryProducts"));
 const Promotions = withLazyLoading(() => import("./pages/Promotions"));
 const BookingManagement = withLazyLoading(() => import("./pages/BookingManagement"));
+const DeliveryPickup = withLazyLoading(() => import("./pages/DeliveryPickup"));
 const AuditLogs = withLazyLoading(() => import("./pages/AuditLogs"));
 const Settings = withLazyLoading(() => import("./pages/Settings"));
 const Categories = withLazyLoading(() => import("./pages/Categories"));
@@ -66,6 +68,7 @@ const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"));
 const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"));
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"));
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
+const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"));
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
 
 // Hardened QueryClient with comprehensive error handling and performance optimizations
@@ -222,6 +225,8 @@ const App = () => {
               <Route path="/purchase-history" element={<PurchaseHistory />} />
               <Route path="/purchase-history/:customerEmail" element={<PurchaseHistory />} />
               <Route path="/orders/:id" element={<OrderDetails />} />
+              <Route path="/track-order" element={<TrackOrder />} />
+              <Route path="/track/:orderNumber" element={<TrackOrder />} />
               
               {/* Payment routes */}
               <Route path="/payment/callback" element={<PaymentCallback />} />
@@ -241,12 +246,14 @@ const App = () => {
               
               {/* Legacy admin redirects for seamless transition */}
               <Route path="/orders" element={<Navigate to="/admin/orders" replace />} />
+              <Route path="/delivery-pickup" element={<Navigate to="/admin/delivery" replace />} />
 
               {/* Protected admin routes */}
               <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
                 <Route path="/admin" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
                 <Route path="/dashboard" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/orders" element={<ErrorBoundaryWrapper context="Admin Orders"><AdminOrders /></ErrorBoundaryWrapper>} />
+                <Route path="/admin/delivery" element={<ErrorBoundaryWrapper context="Admin Delivery"><AdminDelivery /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/products" element={<ErrorBoundaryWrapper context="Products"><Products /></ErrorBoundaryWrapper>} />
                 <Route path="/categories" element={<ErrorBoundaryWrapper context="Categories"><Categories /></ErrorBoundaryWrapper>} />
                 <Route path="/customers" element={<ErrorBoundaryWrapper context="Customers"><Customers /></ErrorBoundaryWrapper>} />

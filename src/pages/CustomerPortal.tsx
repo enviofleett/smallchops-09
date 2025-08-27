@@ -5,6 +5,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { Package, Star, TrendingUp, User, LogOut, Loader2, Heart } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import { DeliveryTracker } from '@/components/delivery/DeliveryTracker';
 import { LoyaltyDashboard } from '@/components/loyalty/LoyaltyDashboard';
 import { FavoritesSection } from '@/components/customers/FavoritesSection';
 import { ProductCatalog } from '@/components/products/ProductCatalog';
@@ -382,15 +383,7 @@ export default function CustomerPortal() {
           </TabsContent>
 
           <TabsContent value="tracking">
-            <Card>
-              <CardHeader>
-                <CardTitle>Order Tracking</CardTitle>
-                <CardDescription>Delivery tracking has been temporarily removed</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <p className="text-muted-foreground">Order tracking functionality has been removed. Please contact support for order updates.</p>
-              </CardContent>
-            </Card>
+            <DeliveryTracker />
           </TabsContent>
 
           <TabsContent value="loyalty">

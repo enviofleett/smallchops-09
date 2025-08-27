@@ -21,7 +21,6 @@ export const getDeliveryZonesWithFees = async (): Promise<DeliveryZoneWithFee[]>
   const { data, error } = await supabase
     .from('delivery_zones')
     .select('*')
-    .eq('is_active', true)
     .order('name');
 
   if (error) throw error;
@@ -29,7 +28,7 @@ export const getDeliveryZonesWithFees = async (): Promise<DeliveryZoneWithFee[]>
   return (data?.map(zone => ({
       id: zone.id,
       name: zone.name,
-      base_fee: zone.base_fee,
+      base_fee: zone.base_fee || 0, // Ensure base_fee is always a number
       is_active: zone.is_active,
       created_at: zone.created_at,
       updated_at: zone.updated_at,

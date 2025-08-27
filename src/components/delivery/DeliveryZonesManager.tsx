@@ -57,14 +57,14 @@ export const DeliveryZonesManager: React.FC = () => {
     try {
       const zoneData = {
         id: editingZone?.id,
-        name: formData.name,
-        base_fee: formData.base_fee,
+        name: formData.name.trim(),
+        base_fee: Number(formData.base_fee), // Ensure numeric value
         is_active: true
       };
 
       const feeData = {
         id: editingZone?.id,
-        base_fee: formData.base_fee
+        base_fee: Number(formData.base_fee)
       };
 
       await upsertDeliveryZoneWithFee({ zone: zoneData, fee: feeData });
@@ -75,7 +75,8 @@ export const DeliveryZonesManager: React.FC = () => {
       fetchZones();
     } catch (error) {
       console.error('Error saving zone:', error);
-      toast.error('Failed to save zone');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to save zone';
+      toast.error(errorMessage);
     }
   };
 

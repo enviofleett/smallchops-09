@@ -19,6 +19,9 @@ import { AdminDriversTab } from '@/components/admin/delivery/AdminDriversTab';
 import { DeliveryZonesManager } from '@/components/delivery/DeliveryZonesManager';
 import { UnifiedDeliveryManagement } from '@/components/admin/delivery/UnifiedDeliveryManagement';
 import { DriverPerformanceDashboard } from '@/components/admin/delivery/DriverPerformanceDashboard';
+import { usePaidOrders } from '@/hooks/usePaidOrders';
+import { useOrderFilters } from '@/hooks/useOrderFilters';
+import { DeliveryRouteManager } from '@/components/delivery/DeliveryRouteManager';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { 
   Truck, 
@@ -50,27 +53,30 @@ export default function AdminDelivery() {
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
   const isSelectedDateToday = isToday(selectedDate);
 
-  // Fetch delivery orders - all orders for the selected date
-  const { data: deliveryOrdersData, isLoading: ordersLoading, error: ordersError, refetch: refetchOrders } = useQuery({
-    queryKey: ['delivery-orders', selectedDateString],
-    queryFn: () => getOrders({
-      page: 1,
-      pageSize: 1000, // Get all orders for the date
-      status: undefined,
-      startDate: selectedDateString,
-      endDate: selectedDateString,
-    }),
-    // Removed automatic polling - use manual refresh instead
+  // Use enhanced hooks for better data management
+  const { 
+    orders: paidOrders, 
+    isLoading: ordersLoading, 
+    error: ordersError, 
+    refresh: refreshOrders 
+  } = usePaidOrders({ 
+    selectedDate, 
+    orderType: 'delivery',
+    autoRefresh: isSelectedDateToday 
   });
 
-  // Filter for paid delivery orders only (all statuses for metrics)
-  const deliveryOrders = deliveryOrdersData?.orders?.filter(order => 
-    order.order_type === 'delivery' && 
-    order.payment_status === 'paid' &&
-    ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
-  ) || [];
+  // Apply filters to orders with immutable operations
+  const { 
+    filteredOrders: deliveryOrders,
+    metrics: deliveryMetrics 
+  } = useOrderFilters({
+    orders: paidOrders,
+    selectedDate,
+    orderType: 'delivery',
+    paymentStatus: 'paid'
+  });
 
-  // Get ready orders first
+  // Get ready orders from filtered delivery orders
   const readyOrdersBasic = deliveryOrders.filter(order => order.status === 'ready');
   
   // Fetch delivery schedules in bulk for ready orders only
@@ -81,9 +87,9 @@ export default function AdminDelivery() {
     enabled: readyOrderIds.length > 0,
   });
 
-  // Sort ready orders by delivery priority
+  // Sort ready orders by delivery priority - use immutable sort
   const readyOrders = useMemo(() => 
-    readyOrdersBasic.sort((a, b) => {
+    [...readyOrdersBasic].sort((a, b) => {
       const scheduleA = deliverySchedules[a.id];
       const scheduleB = deliverySchedules[b.id];
       
@@ -119,9 +125,9 @@ export default function AdminDelivery() {
     return windows;
   }, []);
 
-  // Filter ready orders by delivery window (for Delivery Orders tab)
+  // Filter ready orders by delivery window (for Delivery Orders tab) - immutable filter
   const readyFilteredOrders = useMemo(() => {
-    if (deliveryWindowFilter === 'all') return readyOrders;
+    if (deliveryWindowFilter === 'all') return [...readyOrders];
     
     if (deliveryWindowFilter === 'due-now') {
       const now = new Date();
@@ -165,7 +171,7 @@ export default function AdminDelivery() {
     }
     
     const [startHour] = deliveryWindowFilter.split('-');
-    return readyOrders.filter(order => {
+    return [...readyOrders].filter(order => {
       const schedule = deliverySchedules[order.id];
       if (!schedule?.delivery_time_start) return false;
       return schedule.delivery_time_start.startsWith(startHour);
@@ -179,9 +185,9 @@ export default function AdminDelivery() {
     ));
   }, [deliveryWindowFilter, readyFilteredOrders]);
 
-  // Calculate delivery metrics
-  const deliveryMetrics = {
-    totalDeliveries: deliveryOrders.length,
+  // Calculate delivery metrics - remove duplicated logic
+  const finalDeliveryMetrics = {
+    ...deliveryMetrics,
     inProgress: deliveryOrders.filter(o => ['preparing', 'ready'].includes(o.status)).length,
     outForDelivery: deliveryOrders.filter(o => o.status === 'out_for_delivery').length,
     assigned: deliveryOrders.filter(o => o.assigned_rider_id).length,
@@ -263,14 +269,13 @@ export default function AdminDelivery() {
         )}
 
         {/* Server Cap Warning */}
-        {(deliveryOrdersData?.count === 1000 || 
-          deliveryOrdersData?.orders?.length === 1000) && (
+        {(deliveryOrders.length >= 1000) && (
           <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 sm:p-4 mx-2 sm:mx-0">
             <div className="flex items-start gap-2">
               <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-orange-600 font-medium">
-                  Maximum data limit reached ({deliveryOrdersData?.orders?.length || 1000} orders)
+                  Maximum data limit reached ({deliveryOrders.length} orders)
                 </p>
                 <p className="text-xs text-orange-600/80 mt-1 break-words">
                   Some orders may not be displayed. Consider narrowing your date range.
@@ -288,10 +293,10 @@ export default function AdminDelivery() {
                 <div className="p-1.5 sm:p-2 bg-primary/10 text-primary rounded-lg flex-shrink-0">
                   <Package className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Total</p>
-                  <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{deliveryMetrics.totalDeliveries}</p>
-                </div>
+                 <div className="min-w-0 flex-1">
+                   <p className="text-xs sm:text-sm text-muted-foreground truncate">Total</p>
+                   <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{finalDeliveryMetrics.totalOrders}</p>
+                 </div>
               </div>
             </CardContent>
           </Card>
@@ -302,10 +307,10 @@ export default function AdminDelivery() {
                 <div className="p-1.5 sm:p-2 bg-orange-500/10 text-orange-600 rounded-lg flex-shrink-0">
                   <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Progress</p>
-                  <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{deliveryMetrics.inProgress}</p>
-                </div>
+                 <div className="min-w-0 flex-1">
+                   <p className="text-xs sm:text-sm text-muted-foreground truncate">Progress</p>
+                   <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{finalDeliveryMetrics.inProgress}</p>
+                 </div>
               </div>
             </CardContent>
           </Card>
@@ -316,10 +321,10 @@ export default function AdminDelivery() {
                 <div className="p-1.5 sm:p-2 bg-purple-500/10 text-purple-600 rounded-lg flex-shrink-0">
                   <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Delivery</p>
-                  <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{deliveryMetrics.outForDelivery}</p>
-                </div>
+                 <div className="min-w-0 flex-1">
+                   <p className="text-xs sm:text-sm text-muted-foreground truncate">Delivery</p>
+                   <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{finalDeliveryMetrics.outForDelivery}</p>
+                 </div>
               </div>
             </CardContent>
           </Card>
@@ -330,10 +335,10 @@ export default function AdminDelivery() {
                 <div className="p-1.5 sm:p-2 bg-green-500/10 text-green-600 rounded-lg flex-shrink-0">
                   <Users className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div className="min-w-0 flex-1">
-                  <p className="text-xs sm:text-sm text-muted-foreground truncate">Assigned</p>
-                  <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{deliveryMetrics.assigned}</p>
-                </div>
+                 <div className="min-w-0 flex-1">
+                   <p className="text-xs sm:text-sm text-muted-foreground truncate">Assigned</p>
+                   <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{finalDeliveryMetrics.assigned}</p>
+                 </div>
               </div>
             </CardContent>
           </Card>
@@ -367,13 +372,16 @@ export default function AdminDelivery() {
                   <TabsTrigger value="zones" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     Delivery Zones
                   </TabsTrigger>
+                  <TabsTrigger value="routes" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                    Routes
+                  </TabsTrigger>
                 </TabsList>
               </div>
             </div>
             
             {/* Desktop: Grid layout */}
             <div className="hidden sm:block">
-              <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
+              <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-1 p-1 bg-muted rounded-lg">
                 <TabsTrigger value="overview" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   Overview
                 </TabsTrigger>
@@ -393,7 +401,10 @@ export default function AdminDelivery() {
                   Overdue
                 </TabsTrigger>
                 <TabsTrigger value="zones" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Delivery Zones
+                  Zones
+                </TabsTrigger>
+                <TabsTrigger value="routes" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+                  Routes
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -500,6 +511,11 @@ export default function AdminDelivery() {
             <AdminDriversTab />
           </TabsContent>
 
+          {/* Routes Tab */}
+          <TabsContent value="routes">
+            <DeliveryRouteManager selectedDate={selectedDate} />
+          </TabsContent>
+
           {/* Delivery Zones Tab */}
           <TabsContent value="zones">
             <DeliveryZonesManager />
@@ -524,7 +540,7 @@ export default function AdminDelivery() {
           onSuccess={() => {
             setSelectedOrders([]);
             setIsDriverDialogOpen(false);
-            refetchOrders();
+            refreshOrders();
           }}
         />
       </div>

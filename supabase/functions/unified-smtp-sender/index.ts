@@ -2,42 +2,79 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
 
-// Native SMTP implementation without external libraries
+// Hardened Native SMTP implementation with enhanced error handling
 class NativeSMTPClient {
   private hostname: string;
   private port: number;
   private username: string;
   private password: string;
   private conn: Deno.TcpConn | Deno.TlsConn | null = null;
+  private debug: boolean;
+  private authMethods: string[] = [];
 
   constructor(config: {
     hostname: string;
     port: number;
     username: string;
     password: string;
+    debug?: boolean;
   }) {
     this.hostname = config.hostname;
     this.port = config.port;
     this.username = config.username;
     this.password = config.password;
+    this.debug = config.debug || false;
+  }
+
+  private log(message: string): void {
+    if (this.debug) {
+      console.log(`[SMTP Debug] ${message}`);
+    }
   }
 
   private async readResponse(): Promise<string> {
     if (!this.conn) throw new Error('No connection');
     
-    const buffer = new Uint8Array(4096);
-    const n = await this.conn.read(buffer);
-    if (n === null) throw new Error('Connection closed');
+    let fullResponse = '';
+    let buffer = new Uint8Array(4096);
     
-    const response = new TextDecoder().decode(buffer.subarray(0, n));
-    console.log('SMTP Response:', response.trim());
-    return response;
+    while (true) {
+      const n = await this.conn.read(buffer);
+      if (n === null) throw new Error('Connection closed unexpectedly');
+      
+      const chunk = new TextDecoder().decode(buffer.subarray(0, n));
+      fullResponse += chunk;
+      
+      // Check if we have complete lines ending with \r\n
+      const lines = fullResponse.split('\r\n');
+      
+      // Multi-line responses: continue reading if last complete line has format "250-..." 
+      const lastCompleteLine = lines[lines.length - 2]; // -2 because last element is empty after split
+      if (lastCompleteLine && /^\d{3}-/.test(lastCompleteLine)) {
+        continue; // Multi-line response, keep reading
+      }
+      
+      // Single line or final line of multi-line response
+      if (lastCompleteLine && /^\d{3}\s/.test(lastCompleteLine)) {
+        break; // Complete response received
+      }
+      
+      // If response doesn't end properly, continue reading
+      if (!fullResponse.endsWith('\r\n')) {
+        continue;
+      }
+      
+      break;
+    }
+    
+    this.log(`SMTP Response: ${fullResponse.trim()}`);
+    return fullResponse;
   }
 
   private async sendCommand(command: string): Promise<string> {
     if (!this.conn) throw new Error('No connection');
     
-    console.log('SMTP Command:', command.trim());
+    this.log(`SMTP Command: ${command.trim()}`);
     const encoder = new TextEncoder();
     await this.conn.write(encoder.encode(command + '\r\n'));
     return await this.readResponse();
@@ -47,79 +84,148 @@ class NativeSMTPClient {
     return btoa(str);
   }
 
-  async connect(): Promise<void> {
-    console.log(`🔌 Connecting to ${this.hostname}:${this.port}`);
+  private parseEhloCapabilities(ehloResponse: string): void {
+    const lines = ehloResponse.split('\r\n');
+    this.authMethods = [];
     
-    // Connect via TCP
-    this.conn = await Deno.connect({
-      hostname: this.hostname,
-      port: this.port,
-    });
-
-    // Read initial greeting
-    const greeting = await this.readResponse();
-    if (!greeting.startsWith('220')) {
-      throw new Error(`SMTP server rejected connection: ${greeting}`);
-    }
-
-    // Send EHLO
-    const ehloResponse = await this.sendCommand(`EHLO ${this.hostname}`);
-    if (!ehloResponse.startsWith('250')) {
-      throw new Error(`EHLO failed: ${ehloResponse}`);
-    }
-
-    // Start TLS if on port 587
-    if (this.port === 587) {
-      console.log('🔐 Starting TLS...');
-      const startTlsResponse = await this.sendCommand('STARTTLS');
-      if (!startTlsResponse.startsWith('220')) {
-        throw new Error(`STARTTLS failed: ${startTlsResponse}`);
-      }
-
-      // Upgrade connection to TLS
-      this.conn = await Deno.startTls(this.conn, {
-        hostname: this.hostname,
-      });
-
-      // Send EHLO again after TLS
-      const ehloTlsResponse = await this.sendCommand(`EHLO ${this.hostname}`);
-      if (!ehloTlsResponse.startsWith('250')) {
-        throw new Error(`EHLO after TLS failed: ${ehloTlsResponse}`);
-      }
-    } else if (this.port === 465) {
-      // For port 465, upgrade to TLS immediately
-      console.log('🔐 Upgrading to TLS for port 465...');
-      this.conn = await Deno.startTls(this.conn, {
-        hostname: this.hostname,
-      });
-
-      // Send EHLO after TLS
-      const ehloTlsResponse = await this.sendCommand(`EHLO ${this.hostname}`);
-      if (!ehloTlsResponse.startsWith('250')) {
-        throw new Error(`EHLO after TLS failed: ${ehloTlsResponse}`);
+    for (const line of lines) {
+      if (line.includes('AUTH')) {
+        const authLine = line.replace(/^250[-\s]/, '');
+        if (authLine.startsWith('AUTH')) {
+          this.authMethods = authLine.substring(4).trim().split(/\s+/);
+          this.log(`AUTH methods supported: ${this.authMethods.join(', ')}`);
+        }
       }
     }
+  }
 
-    // Authenticate
-    console.log('🔑 Authenticating...');
+  private async authenticateWithBestMethod(): Promise<void> {
+    // Try LOGIN first (most common), then PLAIN as fallback
+    if (this.authMethods.includes('LOGIN') || this.authMethods.length === 0) {
+      await this.authenticateLogin();
+    } else if (this.authMethods.includes('PLAIN')) {
+      await this.authenticatePlain();
+    } else {
+      throw new Error(`No supported AUTH methods. Server supports: ${this.authMethods.join(', ')}`);
+    }
+  }
+
+  private async authenticateLogin(): Promise<void> {
+    this.log('Trying AUTH LOGIN...');
+    
     const authResponse = await this.sendCommand('AUTH LOGIN');
     if (!authResponse.startsWith('334')) {
-      throw new Error(`AUTH LOGIN failed: ${authResponse}`);
+      throw new Error(`AUTH LOGIN not accepted: ${authResponse}`);
     }
 
     // Send base64 encoded username
     const usernameResponse = await this.sendCommand(this.base64Encode(this.username));
     if (!usernameResponse.startsWith('334')) {
-      throw new Error(`Username authentication failed: ${usernameResponse}`);
+      throw new Error(`Username rejected: ${usernameResponse}`);
     }
 
     // Send base64 encoded password
     const passwordResponse = await this.sendCommand(this.base64Encode(this.password));
     if (!passwordResponse.startsWith('235')) {
-      throw new Error(`Password authentication failed: ${passwordResponse}`);
+      throw new Error(`Authentication failed: ${passwordResponse}`);
     }
 
-    console.log('✅ SMTP authentication successful');
+    this.log('AUTH LOGIN successful');
+  }
+
+  private async authenticatePlain(): Promise<void> {
+    this.log('Trying AUTH PLAIN...');
+    
+    const authString = `\0${this.username}\0${this.password}`;
+    const authResponse = await this.sendCommand(`AUTH PLAIN ${this.base64Encode(authString)}`);
+    
+    if (!authResponse.startsWith('235')) {
+      throw new Error(`AUTH PLAIN failed: ${authResponse}`);
+    }
+
+    this.log('AUTH PLAIN successful');
+  }
+
+  async connect(): Promise<void> {
+    console.log(`🔌 Connecting to ${this.hostname}:${this.port}${this.debug ? ' (debug mode)' : ''}`);
+    
+    try {
+      // Connect via TCP
+      this.conn = await Deno.connect({
+        hostname: this.hostname,
+        port: this.port,
+      });
+
+      // Read initial greeting
+      const greeting = await this.readResponse();
+      if (!greeting.startsWith('220')) {
+        throw new Error(`SMTP server rejected connection: ${greeting}`);
+      }
+
+      // Send EHLO and parse capabilities
+      const ehloResponse = await this.sendCommand(`EHLO ${this.hostname}`);
+      if (!ehloResponse.startsWith('250')) {
+        throw new Error(`EHLO failed: ${ehloResponse}`);
+      }
+      
+      this.parseEhloCapabilities(ehloResponse);
+
+      // Handle TLS based on port
+      if (this.port === 587) {
+        console.log('🔐 Starting TLS on port 587...');
+        await this.startTLS();
+      } else if (this.port === 465) {
+        console.log('🔐 Upgrading to TLS on port 465...');
+        await this.upgradeTo465TLS();
+      }
+
+      // Authenticate using best available method
+      console.log('🔑 Authenticating...');
+      await this.authenticateWithBestMethod();
+      console.log('✅ SMTP connection and authentication successful');
+
+    } catch (error) {
+      if (this.conn) {
+        this.conn.close();
+        this.conn = null;
+      }
+      throw new Error(`SMTP connection failed: ${error.message}`);
+    }
+  }
+
+  private async startTLS(): Promise<void> {
+    const startTlsResponse = await this.sendCommand('STARTTLS');
+    if (!startTlsResponse.startsWith('220')) {
+      throw new Error(`STARTTLS failed: ${startTlsResponse}`);
+    }
+
+    // Upgrade connection to TLS
+    this.conn = await Deno.startTls(this.conn, {
+      hostname: this.hostname,
+    });
+
+    // Send EHLO again after TLS and re-parse capabilities
+    const ehloTlsResponse = await this.sendCommand(`EHLO ${this.hostname}`);
+    if (!ehloTlsResponse.startsWith('250')) {
+      throw new Error(`EHLO after TLS failed: ${ehloTlsResponse}`);
+    }
+    
+    this.parseEhloCapabilities(ehloTlsResponse);
+  }
+
+  private async upgradeTo465TLS(): Promise<void> {
+    // For port 465, upgrade to TLS immediately
+    this.conn = await Deno.startTls(this.conn, {
+      hostname: this.hostname,
+    });
+
+    // Send EHLO after TLS and parse capabilities
+    const ehloTlsResponse = await this.sendCommand(`EHLO ${this.hostname}`);
+    if (!ehloTlsResponse.startsWith('250')) {
+      throw new Error(`EHLO after TLS failed: ${ehloTlsResponse}`);
+    }
+    
+    this.parseEhloCapabilities(ehloTlsResponse);
   }
 
   async sendEmail(message: {
@@ -219,13 +325,33 @@ serve(async (req: Request) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Simple health check endpoint
+  if (req.method === 'GET') {
+    return new Response(
+      JSON.stringify({
+        status: 'healthy',
+        service: 'unified-smtp-sender',
+        implementation: 'native-deno',
+        features: ['multi-line_responses', 'auth_detection', 'tls_fallback'],
+        timestamp: new Date().toISOString()
+      }),
+      { 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200 
+      }
+    );
+  }
+
+  // Store request body for error handling (avoids clone() issues)
+  let requestBody: any = {};
+  
   try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const requestBody = await req.json();
+    requestBody = await req.json();
     console.log('📧 Native SMTP sender request received:', {
       to: requestBody.to,
       templateKey: requestBody.templateKey,
@@ -324,12 +450,16 @@ serve(async (req: Request) => {
       }
     }
 
-    // Create native SMTP client
+    // Enable debug mode for better diagnostics
+    const debugMode = requestBody.debug === true;
+    
+    // Create native SMTP client with debug mode
     const client = new NativeSMTPClient({
       hostname: smtpConfig.smtp_host,
       port: smtpConfig.smtp_port,
       username: smtpConfig.smtp_user,
-      password: smtpConfig.smtp_pass
+      password: smtpConfig.smtp_pass,
+      debug: debugMode
     });
 
     const fromAddress = smtpConfig.sender_email || smtpConfig.smtp_user;
@@ -388,16 +518,22 @@ serve(async (req: Request) => {
     } catch (smtpError) {
       console.error('❌ Native SMTP error:', smtpError);
       
-      // Try fallback to port 465 if 587 failed
-      if (smtpConfig.smtp_port === 587 && smtpError.message?.includes('auth')) {
-        console.log('🔄 Trying fallback to port 465 with SSL...');
+      // Enhanced fallback logic for TLS/connection errors
+      const isTlsError = smtpError.message?.includes('BadResource') || 
+                        smtpError.message?.includes('startTls') ||
+                        smtpError.message?.includes('invalid cmd') ||
+                        smtpError.message?.includes('auth');
+      
+      if (smtpConfig.smtp_port === 587 && isTlsError) {
+        console.log('🔄 TLS/Auth error detected. Trying fallback to port 465 with SSL...');
         
         try {
           const fallbackClient = new NativeSMTPClient({
             hostname: smtpConfig.smtp_host,
             port: 465,
             username: smtpConfig.smtp_user,
-            password: smtpConfig.smtp_pass
+            password: smtpConfig.smtp_pass,
+            debug: debugMode
           });
 
           await fallbackClient.connect();
@@ -446,14 +582,12 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('💥 Native SMTP sender error:', error);
 
-    // Log error to database
+    // Log error to database using stored requestBody
     try {
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
-
-      const requestBody = await req.clone().json().catch(() => ({}));
       
       await supabase.from('smtp_delivery_logs').insert({
         recipient_email: requestBody.to || 'unknown',

@@ -278,20 +278,22 @@ export function UnifiedDeliveryManagement({
 
         {/* Filter Toolbar for All Orders mode */}
         {mode === 'all' && (
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center p-4 bg-muted/30 rounded-lg">
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-1">
-              <div className="relative flex-1 sm:max-w-xs">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-                <Input
-                  placeholder="Search orders, customer, phone..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="h-9 pl-9"
-                />
-              </div>
-              
+          <div className="bg-muted/30 rounded-lg p-3 sm:p-4 space-y-3">
+            {/* Search - Full width on mobile */}
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+              <Input
+                placeholder="Search orders, customer, phone..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-9 pl-9 w-full"
+              />
+            </div>
+            
+            {/* Filters Row */}
+            <div className="flex flex-col xs:flex-row gap-2 xs:gap-3">
               <Select value={typeLocal} onValueChange={(v: 'all'|'delivery'|'pickup') => setTypeLocal(v)}>
-                <SelectTrigger className="h-9 w-full sm:w-32">
+                <SelectTrigger className="h-9 w-full xs:w-36">
                   <SelectValue placeholder="Type" />
                 </SelectTrigger>
                 <SelectContent>
@@ -303,10 +305,15 @@ export function UnifiedDeliveryManagement({
 
               <Popover open={isStatusOpen} onOpenChange={setIsStatusOpen}>
                 <PopoverTrigger asChild>
-                  <Button variant="outline" className="h-9 w-full sm:w-auto justify-between">
+                  <Button variant="outline" className="h-9 w-full xs:w-auto justify-between">
                     <div className="flex items-center gap-2">
                       <Filter className="w-4 h-4" />
-                      <span>Status</span>
+                      <span className="hidden xs:inline">Status</span>
+                      <span className="xs:hidden">
+                        {localStatusFilter.length === statusOptions.length ? 'All Status' : 
+                         localStatusFilter.length === 0 ? 'No Status' :
+                         `${localStatusFilter.length} Selected`}
+                      </span>
                       {localStatusFilter.length > 0 && localStatusFilter.length < statusOptions.length && (
                         <span className="inline-flex items-center justify-center text-xs bg-primary text-primary-foreground rounded-full w-5 h-5">
                           {localStatusFilter.length}
@@ -360,29 +367,38 @@ export function UnifiedDeliveryManagement({
         )}
         
         {selectedOrders.length > 0 && (
-          <div className="flex gap-2">
-            <Button
-              variant="outline"
-              onClick={handleBulkPrint}
-              className="flex items-center gap-2"
-            >
-              <Printer className="w-4 h-4" />
-              Print Selected ({selectedOrders.length})
-            </Button>
-            <Button
-              onClick={() => setIsAssignDialogOpen(true)}
-              className="flex items-center gap-2"
-            >
-              <Truck className="w-4 h-4" />
-              Assign Driver ({selectedOrders.length})
-            </Button>
+          <div className="flex flex-col xs:flex-row gap-2 bg-primary/5 p-3 rounded-lg border border-primary/20">
+            <div className="flex items-center gap-2 text-sm text-primary font-medium mb-2 xs:mb-0">
+              <span>{selectedOrders.length} order{selectedOrders.length > 1 ? 's' : ''} selected</span>
+            </div>
+            <div className="flex flex-col xs:flex-row gap-2 xs:ml-auto">
+              <Button
+                variant="outline"
+                onClick={handleBulkPrint}
+                size="sm"
+                className="flex items-center gap-2 h-8"
+              >
+                <Printer className="w-4 h-4" />
+                <span className="hidden xs:inline">Print Selected</span>
+                <span className="xs:hidden">Print ({selectedOrders.length})</span>
+              </Button>
+              <Button
+                onClick={() => setIsAssignDialogOpen(true)}
+                size="sm"
+                className="flex items-center gap-2 h-8"
+              >
+                <Truck className="w-4 h-4" />
+                <span className="hidden xs:inline">Assign Driver</span>
+                <span className="xs:hidden">Assign ({selectedOrders.length})</span>
+              </Button>
+            </div>
           </div>
         )}
       </div>
 
       {/* Select all checkbox */}
       {filteredOrders.length > 0 && (
-        <div className="flex items-center gap-2 p-4 bg-muted/30 rounded-lg">
+        <div className="flex items-center gap-2 p-3 bg-muted/30 rounded-lg">
           <Checkbox
             checked={selectedOrders.length === filteredOrders.length}
             onCheckedChange={(checked) => {
@@ -410,9 +426,10 @@ export function UnifiedDeliveryManagement({
               "transition-all duration-200 hover:shadow-md",
               mode === 'ready' && "border-l-4 border-l-orange-500"
             )}>
-              <CardContent className="p-6">
-                <div className="flex items-start justify-between mb-4">
-                  <div className="flex items-center gap-3">
+              <CardContent className="p-4 sm:p-6">
+                {/* Mobile-first header */}
+                <div className="flex flex-col xs:flex-row xs:items-start xs:justify-between gap-3 mb-4">
+                  <div className="flex items-start gap-3 flex-1">
                     <Checkbox
                       checked={selectedOrders.includes(order.id)}
                       onCheckedChange={(checked) => {
@@ -422,62 +439,64 @@ export function UnifiedDeliveryManagement({
                           setSelectedOrders(prev => prev.filter(id => id !== order.id));
                         }
                       }}
+                      className="mt-1"
                     />
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-1">
                       {getStatusIcon(order.status)}
-                      <div>
-                        <h3 className="font-semibold text-lg">#{order.order_number}</h3>
-                        <p className="text-sm text-muted-foreground">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-semibold text-base sm:text-lg truncate">#{order.order_number}</h3>
+                        <p className="text-xs sm:text-sm text-muted-foreground">
                           {format(new Date(order.created_at), 'MMM dd, yyyy HH:mm')}
                         </p>
                       </div>
                     </div>
                   </div>
                   
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-row xs:flex-col gap-2 xs:items-end">
                     <AdminOrderStatusBadge status={order.status} />
-                    <Badge variant={order.order_type === 'delivery' ? 'default' : 'secondary'}>
+                    <Badge variant={order.order_type === 'delivery' ? 'default' : 'secondary'} className="text-xs">
                       {order.order_type}
                     </Badge>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-4">
+                {/* Mobile-optimized content grid */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 mb-4">
                   {/* Customer Info */}
-                  <div className="space-y-2">
-                    <h4 className="font-medium flex items-center gap-2">
+                  <div className="bg-muted/20 rounded-lg p-3 space-y-2">
+                    <h4 className="font-medium flex items-center gap-2 text-sm">
                       <User className="w-4 h-4" />
                       Customer
                     </h4>
                     <div className="text-sm space-y-1">
-                      <p className="font-medium">{order.customer_name}</p>
-                      <p className="text-muted-foreground">{order.customer_email}</p>
+                      <p className="font-medium truncate">{order.customer_name}</p>
+                      <p className="text-muted-foreground truncate text-xs">{order.customer_email}</p>
                       {order.customer_phone && (
-                        <p className="text-muted-foreground flex items-center gap-1">
-                          <Phone className="w-3 h-3" />
-                          {order.customer_phone}
+                        <p className="text-muted-foreground flex items-center gap-1 text-xs">
+                          <Phone className="w-3 h-3 flex-shrink-0" />
+                          <span className="truncate">{order.customer_phone}</span>
                         </p>
                       )}
                     </div>
                   </div>
 
                   {/* Order Details */}
-                  <div className="space-y-2">
-                    <h4 className="font-medium flex items-center gap-2">
+                  <div className="bg-muted/20 rounded-lg p-3 space-y-2">
+                    <h4 className="font-medium flex items-center gap-2 text-sm">
                       <Package className="w-4 h-4" />
                       Order Details
                     </h4>
                     <div className="text-sm space-y-1">
-                      <p>{order.order_items?.length || 0} items</p>
-                      <p className="font-medium">₦{order.total_amount.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">{order.order_items?.length || 0} items</p>
+                      <p className="font-medium text-primary">₦{order.total_amount.toLocaleString()}</p>
                       {mode === 'all' && (
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs">Status:</span>
+                        <div className="flex flex-col xs:flex-row xs:items-center gap-1 xs:gap-2 mt-2">
+                          <span className="text-xs text-muted-foreground whitespace-nowrap">Status:</span>
                           <Select
                             value={order.status}
                             onValueChange={(value) => handleStatusChange(order.id, value)}
                           >
-                            <SelectTrigger className="w-32 h-7 text-xs">
+                            <SelectTrigger className="w-full xs:w-32 h-7 text-xs">
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -496,16 +515,16 @@ export function UnifiedDeliveryManagement({
                   </div>
 
                   {/* Assignment/Driver Info */}
-                  <div className="space-y-2">
-                    <h4 className="font-medium flex items-center gap-2">
+                  <div className="bg-muted/20 rounded-lg p-3 space-y-2 sm:col-span-2 lg:col-span-1">
+                    <h4 className="font-medium flex items-center gap-2 text-sm">
                       <Truck className="w-4 h-4" />
                       Assignment
                     </h4>
                     {driver ? (
                       <div className="text-sm space-y-1">
                         <p className="font-medium">{driver.name}</p>
-                        <p className="text-muted-foreground">{driver.phone}</p>
-                        <p className="text-muted-foreground capitalize">{driver.vehicle_type}</p>
+                        <p className="text-muted-foreground text-xs">{driver.phone}</p>
+                        <p className="text-muted-foreground capitalize text-xs">{driver.vehicle_type}</p>
                       </div>
                     ) : (
                       <p className="text-sm text-muted-foreground">Not assigned</p>
@@ -515,12 +534,12 @@ export function UnifiedDeliveryManagement({
 
                 {/* Delivery Address */}
                 {order.order_type === 'delivery' && order.delivery_address && (
-                  <div className="mb-4 p-3 bg-muted/30 rounded-lg">
-                    <h4 className="font-medium flex items-center gap-2 mb-2">
+                  <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                    <h4 className="font-medium flex items-center gap-2 mb-2 text-sm text-amber-800">
                       <MapPin className="w-4 h-4" />
                       Delivery Address
                     </h4>
-                    <p className="text-sm">
+                    <p className="text-sm text-amber-700 leading-relaxed">
                       {typeof order.delivery_address === 'object' && !Array.isArray(order.delivery_address)
                         ? `${(order.delivery_address as any).address_line_1 || ''}, ${(order.delivery_address as any).city || ''}`.trim()
                         : typeof order.delivery_address === 'string' 
@@ -532,27 +551,31 @@ export function UnifiedDeliveryManagement({
                 )}
 
                 {/* Action buttons */}
-                <div className="flex flex-wrap gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSelectedOrder(order);
-                      setIsDetailsModalOpen(true);
-                    }}
-                  >
-                    <Eye className="w-4 h-4 mr-1" />
-                    Details
-                  </Button>
-                  
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handlePrint(order)}
-                  >
-                    <Printer className="w-4 h-4 mr-1" />
-                    Print
-                  </Button>
+                <div className="flex flex-col xs:flex-row gap-2 xs:gap-3">
+                  <div className="flex gap-2 flex-1">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setIsDetailsModalOpen(true);
+                      }}
+                      className="flex-1 xs:flex-none h-8"
+                    >
+                      <Eye className="w-4 h-4 xs:mr-1" />
+                      <span className="hidden xs:inline">Details</span>
+                    </Button>
+                    
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handlePrint(order)}
+                      className="flex-1 xs:flex-none h-8"
+                    >
+                      <Printer className="w-4 h-4 xs:mr-1" />
+                      <span className="hidden xs:inline">Print</span>
+                    </Button>
+                  </div>
                   
                   {!driver && (
                     <Button
@@ -561,9 +584,11 @@ export function UnifiedDeliveryManagement({
                         setSelectedOrders([order.id]);
                         setIsAssignDialogOpen(true);
                       }}
+                      className="w-full xs:w-auto h-8"
                     >
-                      <Truck className="w-4 h-4 mr-1" />
-                      Assign Driver
+                      <Truck className="w-4 h-4 xs:mr-1" />
+                      <span className="xs:hidden">Assign Driver</span>
+                      <span className="hidden xs:inline">Assign Driver</span>
                     </Button>
                   )}
                 </div>

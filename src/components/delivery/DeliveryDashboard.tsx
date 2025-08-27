@@ -2,8 +2,10 @@ import React, { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Calendar as CalendarIcon, 
   Package, 
@@ -14,7 +16,9 @@ import {
   ChevronDown,
   Phone,
   Mail,
-  DollarSign
+  DollarSign,
+  Search,
+  Filter
 } from "lucide-react";
 import { format, isToday, parseISO } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -31,6 +35,9 @@ interface DeliveryDashboardProps {
 export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [expandedOrder, setExpandedOrder] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [orderTypeFilter, setOrderTypeFilter] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
 
   // Format date for API
   const formattedDate = format(selectedDate, 'yyyy-MM-dd');
@@ -49,18 +56,42 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
     staleTime: 1000 * 60 * 2, // 2 minutes
   });
 
-  // Get basic delivery orders first
-  const basicDeliveryOrders = useMemo(() => 
-    ordersData?.orders?.filter(order => 
-      order.order_type === 'delivery' && 
-      ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status)
-    ) || [],
-    [ordersData]
-  );
+  // Filter orders based on dropdown selections
+  const filteredOrders = useMemo(() => {
+    if (!ordersData?.orders) return [];
+    
+    let filtered = ordersData.orders.filter(order => {
+      // Only show relevant delivery statuses (removed 'ready')
+      return ['confirmed', 'preparing', 'out_for_delivery', 'delivered'].includes(order.status);
+    });
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(order => order.status === statusFilter);
+    }
+
+    // Apply order type filter  
+    if (orderTypeFilter !== 'all') {
+      filtered = filtered.filter(order => order.order_type === orderTypeFilter);
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(order =>
+        order.order_number?.toLowerCase().includes(query) ||
+        order.customer_name?.toLowerCase().includes(query) ||
+        order.customer_email?.toLowerCase().includes(query) ||
+        order.customer_phone?.toLowerCase().includes(query)
+      );
+    }
+
+    return filtered;
+  }, [ordersData?.orders, statusFilter, orderTypeFilter, searchQuery]);
 
   const orderIds = useMemo(() => 
-    basicDeliveryOrders.map(order => order.id),
-    [basicDeliveryOrders]
+    filteredOrders.map(order => order.id),
+    [filteredOrders]
   );
 
   // Fetch delivery schedules
@@ -68,7 +99,7 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
 
   // Priority sort orders by delivery schedule for confirmed orders
   const deliveryOrders = useMemo(() => {
-    return basicDeliveryOrders.sort((a, b) => {
+    return filteredOrders.sort((a, b) => {
       // Priority sort for confirmed orders by delivery schedule
       if (a.status === 'confirmed' && b.status === 'confirmed') {
         const scheduleA = schedules[a.id];
@@ -88,17 +119,16 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
       return new Date(a.order_time || a.created_at).getTime() - 
              new Date(b.order_time || b.created_at).getTime();
     });
-  }, [basicDeliveryOrders, schedules]);
+  }, [filteredOrders, schedules]);
 
-  // Calculate metrics
+  // Calculate metrics (removed ready orders)
   const metrics = useMemo(() => {
-    const ready = deliveryOrders.filter(order => order.status === 'ready').length;
     const outForDelivery = deliveryOrders.filter(order => order.status === 'out_for_delivery').length;
     const totalValue = deliveryOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
     
     return {
       totalOrders: deliveryOrders.length,
-      readyOrders: ready,
+      preparingOrders: deliveryOrders.filter(order => order.status === 'preparing').length,
       outForDelivery,
       totalValue
     };
@@ -108,8 +138,8 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
     switch (status) {
       case 'confirmed': return 'bg-blue-100 text-blue-800 border-blue-200';
       case 'preparing': return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'ready': return 'bg-green-100 text-green-800 border-green-200';
       case 'out_for_delivery': return 'bg-purple-100 text-purple-800 border-purple-200';
+      case 'delivered': return 'bg-green-100 text-green-800 border-green-200';
       default: return 'bg-gray-100 text-gray-800 border-gray-200';
     }
   };
@@ -130,35 +160,82 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
 
   return (
     <div className={cn("space-y-6", className)}>
-      {/* Header with Date Picker */}
+      {/* Header with Date Picker and Filters */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-bold">Delivery Dashboard</h2>
+          <h2 className="text-2xl font-bold">All Orders</h2>
           <p className="text-muted-foreground">
             {isToday(selectedDate) ? "Today's orders" : `Orders for ${format(selectedDate, 'PPP')}`}
           </p>
         </div>
         
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="w-full sm:w-auto justify-start text-left font-normal">
-              <CalendarIcon className="mr-2 h-4 w-4" />
-              {format(selectedDate, 'PPP')}
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent className="w-auto p-0" align="end">
-            <Calendar
-              mode="single"
-              selected={selectedDate}
-              onSelect={(date) => date && setSelectedDate(date)}
-              initialFocus
-              className="pointer-events-auto"
-            />
-          </PopoverContent>
-        </Popover>
+        <div className="flex items-center gap-2 flex-wrap">
+          {/* Date Picker */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="justify-start text-left font-normal">
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {format(selectedDate, 'MMM dd, yyyy')}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0" align="end">
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={(date) => date && setSelectedDate(date)}
+                initialFocus
+                className="pointer-events-auto"
+              />
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
-      {/* Metrics Cards */}
+      {/* Filter Controls */}
+      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+        <div className="flex items-center gap-2 flex-wrap">
+          <Filter className="h-4 w-4 text-muted-foreground" />
+          
+          {/* Status Filter */}
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-40">
+              <SelectValue placeholder="All Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="confirmed">Confirmed</SelectItem>
+              <SelectItem value="preparing">Preparing</SelectItem>
+              <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+              <SelectItem value="delivered">Delivered</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {/* Order Type Filter */}
+          <Select value={orderTypeFilter} onValueChange={setOrderTypeFilter}>
+            <SelectTrigger className="w-36">
+              <SelectValue placeholder="All Types" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Types</SelectItem>
+              <SelectItem value="delivery">Delivery</SelectItem>
+              <SelectItem value="pickup">Pickup</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        {/* Search */}
+        <div className="relative flex-1 max-w-md">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+          <Input
+            placeholder="Search orders, customers..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+      </div>
+
+      {/* Metrics Cards - Updated to remove ready orders */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
@@ -167,18 +244,18 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{metrics.totalOrders}</div>
-            <p className="text-xs text-muted-foreground">delivery orders</p>
+            <p className="text-xs text-muted-foreground">orders today</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Ready</CardTitle>
+            <CardTitle className="text-sm font-medium">Preparing</CardTitle>
             <Clock className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics.readyOrders}</div>
-            <p className="text-xs text-muted-foreground">ready for pickup</p>
+            <div className="text-2xl font-bold">{metrics.preparingOrders}</div>
+            <p className="text-xs text-muted-foreground">being prepared</p>
           </CardContent>
         </Card>
 
@@ -208,9 +285,9 @@ export function DeliveryDashboard({ className }: DeliveryDashboardProps) {
       {/* Orders List */}
       <Card>
         <CardHeader>
-          <CardTitle>Delivery Orders</CardTitle>
+          <CardTitle>Orders</CardTitle>
           <p className="text-sm text-muted-foreground">
-            {deliveryOrders.length} orders scheduled for delivery
+            {deliveryOrders.length} orders {statusFilter !== 'all' ? `with status: ${statusFilter}` : 'found'}
           </p>
         </CardHeader>
         <CardContent className="p-0">

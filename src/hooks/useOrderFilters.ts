@@ -18,7 +18,6 @@ interface FilteredOrdersResult {
     totalOrders: number;
     confirmedOrders: number;
     preparingOrders: number;
-    readyOrders: number;
     completedOrders: number;
     assignedOrders: number;
   };
@@ -73,12 +72,11 @@ export const useOrderFilters = ({
       );
     }
 
-    // Calculate metrics
+    // Calculate metrics - removed ready status
     const metrics = {
       totalOrders: filtered.length,
       confirmedOrders: filtered.filter(o => o.status === 'confirmed').length,
       preparingOrders: filtered.filter(o => o.status === 'preparing').length,
-      readyOrders: filtered.filter(o => o.status === 'ready').length,
       completedOrders: filtered.filter(o => ['delivered', 'completed'].includes(o.status)).length,
       assignedOrders: filtered.filter(o => o.assigned_rider_id).length,
     };

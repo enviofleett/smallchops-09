@@ -48,6 +48,15 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
     }).format(amount);
   };
 
+  // Calculate shipping fee with fallback
+  const getShippingFee = () => {
+    const fee = Number(order?.delivery_fee ?? detailedOrder?.delivery_schedule?.delivery_fee ?? 0);
+    return Number.isFinite(fee) ? fee : 0;
+  };
+
+  const shippingFee = getShippingFee();
+  const subtotal = Math.max(0, Number(order?.total_amount || 0) - shippingFee);
+
   // Show toast for errors
   useEffect(() => {
     if (error) {
@@ -394,16 +403,19 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                             <span className="capitalize">{order.payment_method}</span>
                           </div>
                         )}
-                        
-                        {order.delivery_fee && order.delivery_fee > 0 && (
-                          <div className="flex justify-between text-sm">
-                            <span>Delivery Fee:</span>
-                            <span>{formatCurrency(order.delivery_fee)}</span>
-                          </div>
-                        )}
-                        
+
+                        <div className="flex justify-between text-sm">
+                          <span>Shipping Fee (Delivery Fee):</span>
+                          <span>{formatCurrency(shippingFee)}</span>
+                        </div>
+
+                        <div className="flex justify-between text-sm">
+                          <span>Subtotal:</span>
+                          <span>{formatCurrency(subtotal)}</span>
+                        </div>
+
                         <Separator className="my-3" />
-                        
+
                         <div className="flex justify-between font-semibold">
                           <span>Total Amount:</span>
                           <span>{formatCurrency(order.total_amount)}</span>

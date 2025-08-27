@@ -1,9 +1,11 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Input } from '@/components/ui/input';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useQuery } from '@tanstack/react-query';
 import { getOrders, updateOrder } from '@/api/orders';
 import { AdminOrderStatusBadge } from '@/components/admin/AdminOrderStatusBadge';
@@ -22,7 +24,10 @@ import {
   CheckCircle2,
   Printer,
   Eye,
-  Settings
+  Settings,
+  Filter,
+  ChevronDown,
+  Search
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { toast } from 'sonner';
@@ -50,8 +55,29 @@ export function UnifiedDeliveryManagement({
   const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false);
   const [isAssignDialogOpen, setIsAssignDialogOpen] = useState(false);
   const [printingOrder, setPrintingOrder] = useState<any>(null);
+  const [isStatusOpen, setIsStatusOpen] = useState(false);
+  const [typeLocal, setTypeLocal] = useState<'all' | 'delivery' | 'pickup'>(typeFilter);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedQuery, setDebouncedQuery] = useState('');
 
   const { drivers } = useDriverManagement();
+
+  // Debounce search query
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedQuery(searchQuery.trim().toLowerCase());
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  const statusOptions = [
+    { value: 'pending', label: 'Pending' },
+    { value: 'confirmed', label: 'Confirmed' },
+    { value: 'preparing', label: 'Preparing' },
+    { value: 'ready', label: 'Ready' },
+    { value: 'out_for_delivery', label: 'Out for delivery' },
+    { value: 'delivered', label: 'Delivered' },
+  ];
 
   // Build query parameters based on mode
   const queryParams = useMemo(() => {
@@ -91,8 +117,8 @@ export function UnifiedDeliveryManagement({
     let orders = ordersData?.orders || [];
 
     // Apply type filter
-    if (typeFilter !== 'all') {
-      orders = orders.filter(order => order.order_type === typeFilter);
+    if (typeLocal !== 'all') {
+      orders = orders.filter(order => order.order_type === typeLocal);
     }
 
     // Apply status filter for 'all' mode
@@ -103,8 +129,18 @@ export function UnifiedDeliveryManagement({
     // Only show paid orders
     orders = orders.filter(order => order.payment_status === 'paid');
 
+    // Apply search filter
+    if (debouncedQuery) {
+      orders = orders.filter(order => 
+        (order.order_number || '').toLowerCase().includes(debouncedQuery) ||
+        (order.customer_name || '').toLowerCase().includes(debouncedQuery) ||
+        (order.customer_email || '').toLowerCase().includes(debouncedQuery) ||
+        (order.customer_phone || '').toLowerCase().includes(debouncedQuery)
+      );
+    }
+
     return orders;
-  }, [ordersData?.orders, typeFilter, localStatusFilter, mode, ordersOverride]);
+  }, [ordersData?.orders, typeLocal, localStatusFilter, mode, ordersOverride, debouncedQuery]);
 
   // Handle status change with validation
   const handleStatusChange = async (orderId: string, newStatus: string) => {
@@ -228,37 +264,98 @@ export function UnifiedDeliveryManagement({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-        <div>
-          <h2 className="text-2xl font-bold">
-            {mode === 'ready' ? 'Ready Orders' : 'All Orders'}
-          </h2>
-          <p className="text-muted-foreground">
-            {filteredOrders.length} orders {mode === 'ready' ? 'ready for dispatch' : 'found'}
-          </p>
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h2 className="text-2xl font-bold">
+              {mode === 'ready' ? 'Ready Orders' : 'All Orders'}
+            </h2>
+            <p className="text-muted-foreground">
+              {filteredOrders.length} orders {mode === 'ready' ? 'ready for dispatch' : 'found'}
+            </p>
+          </div>
         </div>
 
-        {/* Status Filter for All Orders mode */}
+        {/* Filter Toolbar for All Orders mode */}
         {mode === 'all' && (
-          <div className="flex flex-wrap gap-2">
-            <p className="text-sm font-medium text-muted-foreground">Status Filters:</p>
-            {['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered'].map((status) => (
-              <label key={status} className="flex items-center gap-1 text-xs">
-                <input
-                  type="checkbox"
-                  checked={localStatusFilter.includes(status)}
-                  onChange={(e) => {
-                    if (e.target.checked) {
-                      setLocalStatusFilter(prev => [...prev, status]);
-                    } else {
-                      setLocalStatusFilter(prev => prev.filter(s => s !== status));
-                    }
-                  }}
-                  className="w-3 h-3"
+          <div className="flex flex-col sm:flex-row gap-3 sm:items-center p-4 bg-muted/30 rounded-lg">
+            <div className="flex flex-col sm:flex-row gap-3 sm:items-center flex-1">
+              <div className="relative flex-1 sm:max-w-xs">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                <Input
+                  placeholder="Search orders, customer, phone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="h-9 pl-9"
                 />
-                <span className="capitalize">{status.replace('_', ' ')}</span>
-              </label>
-            ))}
+              </div>
+              
+              <Select value={typeLocal} onValueChange={(v: 'all'|'delivery'|'pickup') => setTypeLocal(v)}>
+                <SelectTrigger className="h-9 w-full sm:w-32">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="delivery">Delivery</SelectItem>
+                  <SelectItem value="pickup">Pickup</SelectItem>
+                </SelectContent>
+              </Select>
+
+              <Popover open={isStatusOpen} onOpenChange={setIsStatusOpen}>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" className="h-9 w-full sm:w-auto justify-between">
+                    <div className="flex items-center gap-2">
+                      <Filter className="w-4 h-4" />
+                      <span>Status</span>
+                      {localStatusFilter.length > 0 && localStatusFilter.length < statusOptions.length && (
+                        <span className="inline-flex items-center justify-center text-xs bg-primary text-primary-foreground rounded-full w-5 h-5">
+                          {localStatusFilter.length}
+                        </span>
+                      )}
+                    </div>
+                    <ChevronDown className="w-4 h-4 opacity-70" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-3 bg-background border shadow-md z-50" align="start">
+                  <div className="flex items-center justify-between mb-3">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLocalStatusFilter(statusOptions.map(s => s.value))}
+                      className="text-xs h-7"
+                    >
+                      Select all
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setLocalStatusFilter([])}
+                      className="text-xs h-7"
+                    >
+                      Clear
+                    </Button>
+                  </div>
+                  <div className="space-y-2">
+                    {statusOptions.map(status => {
+                      const checked = localStatusFilter.includes(status.value);
+                      return (
+                        <label key={status.value} className="flex items-center gap-2 text-sm cursor-pointer">
+                          <Checkbox
+                            checked={checked}
+                            onCheckedChange={(c) =>
+                              c
+                                ? setLocalStatusFilter(prev => [...prev, status.value])
+                                : setLocalStatusFilter(prev => prev.filter(v => v !== status.value))
+                            }
+                          />
+                          <span className="capitalize">{status.label}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
           </div>
         )}
         

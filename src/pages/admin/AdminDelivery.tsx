@@ -31,7 +31,8 @@ import {
   TrendingUp,
   CalendarIcon,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  BarChartHorizontal
 } from 'lucide-react';
 import { format, isToday, parseISO, isAfter, isBefore, addMinutes } from 'date-fns';
 import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
@@ -53,7 +54,6 @@ export default function AdminDelivery() {
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
   const isSelectedDateToday = isToday(selectedDate);
 
-  // Use enhanced hooks for better data management
   const { 
     orders: paidOrders, 
     isLoading: ordersLoading, 
@@ -65,7 +65,6 @@ export default function AdminDelivery() {
     autoRefresh: isSelectedDateToday 
   });
 
-  // Apply filters to orders with immutable operations
   const { 
     filteredOrders: deliveryOrders,
     metrics: deliveryMetrics 
@@ -87,30 +86,24 @@ export default function AdminDelivery() {
     enabled: readyOrderIds.length > 0,
   });
 
-  // Sort ready orders by delivery priority - use immutable sort
+  // Sort ready orders by delivery priority
   const readyOrders = useMemo(() => 
     [...readyOrdersBasic].sort((a, b) => {
       const scheduleA = deliverySchedules[a.id];
       const scheduleB = deliverySchedules[b.id];
-      
-      // Priority: orders with schedules first, then by earliest delivery time
       if (scheduleA && scheduleB) {
         const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
         const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
         return dateTimeA.getTime() - dateTimeB.getTime();
       }
-      
       if (scheduleA && !scheduleB) return -1;
       if (!scheduleA && scheduleB) return 1;
-      
-      // Fallback to order time
       return new Date(a.order_time || a.created_at).getTime() - 
              new Date(b.order_time || b.created_at).getTime();
     }),
     [readyOrdersBasic, deliverySchedules]
   );
 
-  // Fetch delivery zones
   const { zones, loading: zonesLoading } = useDeliveryZones();
 
   // Generate hourly delivery windows
@@ -125,40 +118,30 @@ export default function AdminDelivery() {
     return windows;
   }, []);
 
-  // Filter ready orders by delivery window (for Delivery Orders tab) - immutable filter
-  const readyFilteredOrders = useMemo(() => {
-    if (deliveryWindowFilter === 'all') return [...readyOrders];
-    
+  // Filter orders by delivery window (for All Orders tab)
+  const filteredOrdersByWindow = useMemo(() => {
+    if (deliveryWindowFilter === 'all') return [...deliveryOrders];
     if (deliveryWindowFilter === 'due-now') {
       const now = new Date();
-      
-      return readyOrders.filter(order => {
+      return deliveryOrders.filter(order => {
         const schedule = deliverySchedules[order.id];
         if (!schedule?.delivery_time_start || !schedule?.delivery_time_end) return false;
-        
         try {
-          // Create timezone-safe date comparisons
           const today = format(selectedDate, 'yyyy-MM-dd');
           const startTime = parseISO(`${today}T${schedule.delivery_time_start}:00`);
           const endTime = parseISO(`${today}T${schedule.delivery_time_end}:00`);
-          
-          // Add some buffer for "due now" (within 30 minutes)
           const bufferStart = addMinutes(startTime, -30);
-          
           return (isAfter(now, bufferStart) && isBefore(now, endTime)) || isAfter(now, startTime);
         } catch {
           return false;
         }
       });
     }
-    
     if (deliveryWindowFilter === 'overdue') {
       const now = new Date();
-      
-      return readyOrders.filter(order => {
+      return deliveryOrders.filter(order => {
         const schedule = deliverySchedules[order.id];
         if (!schedule?.delivery_time_end) return false;
-        
         try {
           const today = format(selectedDate, 'yyyy-MM-dd');
           const endTime = parseISO(`${today}T${schedule.delivery_time_end}:00`);
@@ -169,28 +152,44 @@ export default function AdminDelivery() {
         }
       });
     }
-    
     const [startHour] = deliveryWindowFilter.split('-');
-    return [...readyOrders].filter(order => {
+    return [...deliveryOrders].filter(order => {
       const schedule = deliverySchedules[order.id];
       if (!schedule?.delivery_time_start) return false;
       return schedule.delivery_time_start.startsWith(startHour);
     });
-  }, [readyOrders, deliveryWindowFilter, deliverySchedules, selectedDate]);
+  }, [deliveryOrders, deliveryWindowFilter, deliverySchedules, selectedDate]);
 
   // Reset selection when window filter changes
   React.useEffect(() => {
     setSelectedOrders(prev => prev.filter(order => 
-      readyFilteredOrders.some(filtered => filtered.id === order.id)
+      filteredOrdersByWindow.some(filtered => filtered.id === order.id)
     ));
-  }, [deliveryWindowFilter, readyFilteredOrders]);
+  }, [deliveryWindowFilter, filteredOrdersByWindow]);
 
-  // Calculate delivery metrics - remove duplicated logic
   const finalDeliveryMetrics = {
     ...deliveryMetrics,
     inProgress: deliveryOrders.filter(o => ['preparing', 'ready'].includes(o.status)).length,
     outForDelivery: deliveryOrders.filter(o => o.status === 'out_for_delivery').length,
     assigned: deliveryOrders.filter(o => o.assigned_rider_id).length,
+  };
+
+  // Analytics data: Number of trips by driver
+  const driverTripCounts = useMemo(() => {
+    const tripMap: Record<string, number> = {};
+    deliveryOrders.forEach(order => {
+      if (order.assigned_rider_id && order.status === 'out_for_delivery') {
+        tripMap[order.assigned_rider_id] = (tripMap[order.assigned_rider_id] || 0) + 1;
+      }
+    });
+    return tripMap;
+  }, [deliveryOrders]);
+
+  // For demonstration: mapping driver ID to name
+  // A real implementation should use driver name lookup from driver list
+  const getDriverName = (driverId: string) => {
+    // This should reference a driver list, here we fallback to ID
+    return `Driver ${driverId.substring(0, 6)}`;
   };
 
   return (
@@ -354,9 +353,6 @@ export default function AdminDelivery() {
                   <TabsTrigger value="overview" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     Overview
                   </TabsTrigger>
-                  <TabsTrigger value="ready-orders" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Ready
-                  </TabsTrigger>
                   <TabsTrigger value="orders" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                     All Orders
                   </TabsTrigger>
@@ -381,12 +377,9 @@ export default function AdminDelivery() {
             
             {/* Desktop: Grid layout */}
             <div className="hidden sm:block">
-              <TabsList className="grid w-full grid-cols-4 lg:grid-cols-8 gap-1 p-1 bg-muted rounded-lg">
+              <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
                 <TabsTrigger value="overview" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   Overview
-                </TabsTrigger>
-                <TabsTrigger value="ready-orders" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Ready
                 </TabsTrigger>
                 <TabsTrigger value="orders" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
                   All Orders
@@ -461,8 +454,8 @@ export default function AdminDelivery() {
             </div>
           </TabsContent>
 
-          {/* Ready Orders Tab - New Enhanced Management */}
-          <TabsContent value="ready-orders" className="space-y-6">
+          {/* All Orders Tab - with Delivery Window Filter */}
+          <TabsContent value="orders" className="space-y-6">
             {/* Delivery Window Filter */}
             <Card>
               <CardHeader>
@@ -472,7 +465,7 @@ export default function AdminDelivery() {
                     Delivery Window Filter
                   </CardTitle>
                   <Badge variant="outline">
-                    {readyFilteredOrders.length} of {readyOrders.length} orders
+                    {filteredOrdersByWindow.length} of {deliveryOrders.length} orders
                   </Badge>
                 </div>
               </CardHeader>
@@ -496,14 +489,10 @@ export default function AdminDelivery() {
             </Card>
 
             <UnifiedDeliveryManagement 
-              mode="ready" 
-              ordersOverride={readyFilteredOrders}
+              mode="all" 
+              selectedDate={selectedDate}
+              ordersOverride={filteredOrdersByWindow}
             />
-          </TabsContent>
-
-          {/* All Orders Tab */}
-          <TabsContent value="orders" className="space-y-6">
-            <UnifiedDeliveryManagement mode="all" selectedDate={selectedDate} />
           </TabsContent>
 
           {/* Drivers Tab */}
@@ -511,14 +500,55 @@ export default function AdminDelivery() {
             <AdminDriversTab />
           </TabsContent>
 
-          {/* Routes Tab */}
-          <TabsContent value="routes">
-            <DeliveryRouteManager selectedDate={selectedDate} />
+          {/* Analytics Tab - Number of trips by driver */}
+          <TabsContent value="analytics" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <BarChartHorizontal className="w-5 h-5" />
+                  Driver Trip Analytics
+                </CardTitle>
+                <p className="text-sm text-muted-foreground">
+                  Number of trips covered by each driver (out for delivery)
+                </p>
+              </CardHeader>
+              <CardContent>
+                {Object.keys(driverTripCounts).length === 0 ? (
+                  <p className="text-muted-foreground py-2">No trips found for the selected date.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {Object.entries(driverTripCounts).map(([driverId, count]) => (
+                      <div key={driverId} className="flex items-center gap-3 border-b py-2">
+                        <Users className="w-4 h-4 text-primary" />
+                        <span className="font-medium">{getDriverName(driverId)}</span>
+                        <Badge variant="outline">{count} trips</Badge>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Overdue Tab */}
+          <TabsContent value="overdue" className="space-y-6">
+            <UnifiedDeliveryManagement 
+              mode="overdue" 
+              ordersOverride={deliveryOrders.filter(order => isOrderOverdue(
+                deliverySchedules[order.id]?.delivery_date,
+                deliverySchedules[order.id]?.delivery_time_end
+              ))}
+            />
           </TabsContent>
 
           {/* Delivery Zones Tab */}
           <TabsContent value="zones">
             <DeliveryZonesManager />
+          </TabsContent>
+
+          {/* Routes Tab */}
+          <TabsContent value="routes">
+            <DeliveryRouteManager selectedDate={selectedDate} />
           </TabsContent>
         </Tabs>
 
@@ -567,4 +597,3 @@ function DeliveryOrderItem({ order }: { order: OrderWithItems }) {
     </div>
   );
 }
-

@@ -166,7 +166,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
   const deliveryWindowStart = deliverySchedule?.delivery_time_start
   const deliveryWindowEnd = deliverySchedule?.delivery_time_end
 
-  // Print handler: print modal content in a clear, full-width layout
   const handlePrint = () => {
     window.print()
   }
@@ -175,60 +174,69 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
   function FeaturesList({ product }: { product: any }) {
     if (!product) return null
     return (
-      <div className="space-y-2">
-        {product.features && (
-          <div>
-            <span className="font-semibold">Features:</span>
-            {Array.isArray(product.features) ? (
-              <ul className="list-disc ml-5 text-xs">
-                {product.features.map((f: string, i: number) => <li key={i}>{f}</li>)}
-              </ul>
-            ) : typeof product.features === "object" ? (
-              <ul className="list-disc ml-5 text-xs">
-                {Object.entries(product.features).map(([k, v], i) => v ? <li key={i}><span className="font-semibold">{k}:</span> {String(v)}</li> : null)}
-              </ul>
-            ) : (
-              <span className="ml-2 text-xs">{String(product.features)}</span>
-            )}
-          </div>
-        )}
-        {product.addOns?.length > 0 && (
-          <div>
-            <span className="font-semibold">Add-ons:</span>
-            <ul className="list-disc ml-5 text-xs">
-              {product.addOns.map((a: string, i: number) => <li key={i}>{a}</li>)}
-            </ul>
-          </div>
-        )}
-        {product.allergen_info?.length > 0 && (
-          <div>
-            <span className="font-semibold flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-orange-700" />Allergens:</span>
-            <ul className="list-disc ml-5 text-xs text-orange-700">{product.allergen_info.map((a: string, i: number) => <li key={i}>{a}</li>)}</ul>
-          </div>
-        )}
-        <div className="flex flex-wrap gap-3 mt-1">
-          {typeof product.preparation_time === "number" && (
-            <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200"><Soup className="h-3 w-3 inline" /> Prep: {product.preparation_time} min</Badge>
+      <table className="features-table print:features-table w-full mb-2">
+        <tbody>
+          {product.features && (
+            <tr>
+              <th className="text-xs text-left font-bold print:text-xs">Features</th>
+              <td className="text-xs print:text-xs">
+                {Array.isArray(product.features) ? (
+                  <ul className="list-disc ml-4 mb-0">
+                    {product.features.map((f: string, i: number) => <li key={i}>{f}</li>)}
+                  </ul>
+                ) : typeof product.features === "object" ? (
+                  <ul className="list-disc ml-4 mb-0">
+                    {Object.entries(product.features).map(([k, v], i) => v ? <li key={i}><span className="font-semibold">{k}:</span> {String(v)}</li> : null)}
+                  </ul>
+                ) : (
+                  <span>{String(product.features)}</span>
+                )}
+              </td>
+            </tr>
           )}
-          {typeof product.calories === "number" && (
-            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200"><Flame className="h-3 w-3 inline" /> {product.calories} kcal</Badge>
+          {product.addOns?.length > 0 && (
+            <tr>
+              <th className="text-xs text-left font-bold print:text-xs">Add-ons</th>
+              <td className="text-xs print:text-xs">
+                <ul className="list-disc ml-4 mb-0">{product.addOns.map((a: string, i: number) => <li key={i}>{a}</li>)}</ul>
+              </td>
+            </tr>
           )}
-          {product.isSpicy && (
-            <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300"><Flame className="h-3 w-3 inline" /> Spicy</Badge>
+          {product.allergen_info?.length > 0 && (
+            <tr>
+              <th className="text-xs text-left font-bold print:text-xs">Allergens</th>
+              <td className="text-xs text-orange-700 print:text-xs">
+                <ul className="list-disc ml-4 mb-0">{product.allergen_info.map((a: string, i: number) => <li key={i}>{a}</li>)}</ul>
+              </td>
+            </tr>
           )}
-          {product.isVegetarian && (
-            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300"><Leaf className="h-3 w-3 inline" /> Vegetarian</Badge>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-3 mt-1">
-          {typeof product.stock_quantity === "number" && (
-            <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300"><Box className="h-3 w-3 inline" /> In stock: {product.stock_quantity}</Badge>
-          )}
-          {typeof product.minimum_order_quantity === "number" && (
-            <Badge variant="outline" className="bg-indigo-100 text-indigo-700 border-indigo-300">Min order: {product.minimum_order_quantity}</Badge>
-          )}
-        </div>
-      </div>
+          <tr>
+            <th className="text-xs text-left font-bold print:text-xs">Details</th>
+            <td className="text-xs print:text-xs">
+              <div className="flex flex-wrap gap-2">
+                {typeof product.preparation_time === "number" && (
+                  <span className="badge badge-blue print:badge-blue">Prep: {product.preparation_time} min</span>
+                )}
+                {typeof product.calories === "number" && (
+                  <span className="badge badge-yellow print:badge-yellow">{product.calories} kcal</span>
+                )}
+                {product.isSpicy && (
+                  <span className="badge badge-red print:badge-red">Spicy</span>
+                )}
+                {product.isVegetarian && (
+                  <span className="badge badge-green print:badge-green">Vegetarian</span>
+                )}
+                {typeof product.stock_quantity === "number" && (
+                  <span className="badge badge-gray print:badge-gray">In stock: {product.stock_quantity}</span>
+                )}
+                {typeof product.minimum_order_quantity === "number" && (
+                  <span className="badge badge-indigo print:badge-indigo">Min order: {product.minimum_order_quantity}</span>
+                )}
+              </div>
+            </td>
+          </tr>
+        </tbody>
+      </table>
     )
   }
 
@@ -237,16 +245,16 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
           id="order-details-modal-content"
-          className="max-w-full w-full sm:max-w-[98vw] md:max-w-3xl lg:max-w-5xl h-[98vh] max-h-[98vh] overflow-y-auto rounded-2xl bg-background p-0 border shadow-2xl print:shadow-none print:border-none print:rounded-none print:p-0 print:max-w-full print:h-auto"
+          className="max-w-full w-full sm:max-w-[98vw] md:max-w-3xl lg:max-w-5xl h-[98vh] max-h-[98vh] overflow-y-auto rounded-2xl bg-background p-0 border shadow-2xl print:shadow-none print:border-none print:rounded-none print:p-0 print:max-w-full print:h-auto print:bg-white"
         >
-          {/* Header */}
-          <div className="bg-gradient-to-r from-primary/5 to-secondary/5 px-4 py-4 sm:px-8 sm:py-6 border-b border-border/50 print:bg-white print:border-b print:px-0 print:py-2">
+          {/* Print-friendly header */}
+          <div className="px-4 py-4 sm:px-8 sm:py-6 border-b border-border/50 print:pt-0 print:pb-2 print:px-0 print:border-b print:bg-white">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:flex-row print:items-center">
               <div className="flex items-center gap-4">
                 <img src={STARTERS_LOGO || "/placeholder.svg"} alt="Starters Logo" className="h-10 w-auto print:h-12" />
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-foreground print:text-black">Order Details</h2>
-                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                  <h2 className="text-xl sm:text-2xl font-bold text-foreground print:text-2xl print:text-black">Order Details</h2>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap print:mt-2">
                     <span className="font-mono text-sm text-muted-foreground print:text-black">#{order?.order_number}</span>
                     <Badge className={`capitalize text-sm px-3 py-1 ${getStatusColor(order?.status)}`} variant="outline">
                       {order?.status?.replace(/_/g, " ") ?? "Unknown"}
@@ -267,211 +275,128 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
             </div>
           </div>
 
-          {/* Order Summary Cards */}
-          <div className="px-4 py-4 sm:px-8 sm:py-6 bg-card/30 print:bg-white print:px-0 print:py-2">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 print:grid-cols-3 print:gap-2">
-              <Card className="bg-gradient-to-br from-primary/10 to-secondary/5 border-primary/20 print:bg-white print:border-none print:shadow-none">
-                <CardContent className="p-4 sm:p-6 print:p-2">
-                  <div className="flex items-center gap-3 mb-2">
-                    <CreditCard className="h-5 w-5 text-primary" />
-                    <span className="text-sm font-medium text-muted-foreground">Total Amount</span>
-                  </div>
-                  <div className="text-2xl sm:text-3xl font-bold text-primary">{formatCurrency(order?.total_amount || 0)}</div>
-                  <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
-                    <Clock className="h-4 w-4" />
-                    <span>Ordered {order?.order_time && formatDateTime(order?.order_time)}</span>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 print:bg-white print:border-none print:shadow-none">
-                <CardContent className="p-4 sm:p-6 print:p-2">
-                  <div className="flex items-center gap-3 mb-2">
-                    <Truck className="h-5 w-5 text-blue-600" />
-                    <span className="text-sm font-medium text-muted-foreground">Delivery</span>
-                  </div>
-                  {deliveryDate ? (
-                    <div className="space-y-2">
-                      <div className="text-lg font-semibold text-blue-700">{formatDate(deliveryDate)}</div>
-                      {deliveryWindowStart && deliveryWindowEnd && (
-                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">{formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}</Badge>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-lg font-semibold text-muted-foreground">Schedule TBD</div>
-                  )}
-                </CardContent>
-              </Card>
-              <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 print:bg-white print:border-none print:shadow-none">
-                <CardContent className="p-4 sm:p-6 print:p-2">
-                  <div className="flex items-center gap-3 mb-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="text-sm font-medium text-muted-foreground">Status</span>
-                  </div>
-                  <div className="text-lg font-semibold text-green-700 capitalize">{order?.status?.replace(/_/g, " ") ?? "Unknown"}</div>
-                  {shippingFee > 0 && (
-                    <div className="mt-2">
-                      <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">{formatCurrency(shippingFee)} delivery</Badge>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
+          {/* Section: Meta Summary */}
+          <div className="px-4 py-4 sm:px-8 sm:py-6 print:px-0 print:py-2">
+            <div className="print:grid print:grid-cols-3 print:gap-4 flex flex-col md:flex-row gap-4 sm:gap-6">
+              <div className="print:border-r print:pr-8">
+                <div className="font-bold text-lg text-primary print:text-lg">Total Amount</div>
+                <div className="font-bold text-2xl text-primary print:text-2xl">{formatCurrency(order?.total_amount || 0)}</div>
+                <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground print:text-xs">
+                  <Clock className="h-4 w-4" />
+                  <span>Ordered {order?.order_time && formatDateTime(order?.order_time)}</span>
+                </div>
+              </div>
+              <div className="print:border-r print:pr-8">
+                <div className="font-bold text-lg text-blue-700 print:text-lg">Delivery</div>
+                <div className="text-md font-semibold">{deliveryDate && formatDate(deliveryDate)}</div>
+                {deliveryWindowStart && deliveryWindowEnd && (
+                  <span className="badge badge-blue print:badge-blue">{formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}</span>
+                )}
+              </div>
+              <div>
+                <div className="font-bold text-lg text-green-700 print:text-lg">Status</div>
+                <div className="font-semibold capitalize">{order?.status?.replace(/_/g, " ") ?? "Unknown"}</div>
+                {shippingFee > 0 && (
+                  <span className="badge badge-green print:badge-green">{formatCurrency(shippingFee)} delivery</span>
+                )}
+              </div>
             </div>
           </div>
 
-          <Separator className="print:hidden" />
-
-          {/* Customer & Delivery Info */}
-          <div className="px-4 py-4 sm:px-8 sm:py-6 print:px-0 print:py-2">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 print:grid-cols-2 print:gap-2">
-              <Card className="border-none shadow-sm bg-card/50 print:bg-white print:shadow-none print:border-none">
-                <CardContent className="p-4 sm:p-6 print:p-2">
-                  <div className="flex items-center gap-3 mb-4">
-                    <User className="h-5 w-5 text-primary" />
-                    <h3 className="text-lg font-semibold text-foreground">Customer Information</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="text-lg font-medium text-foreground">{order?.customer_name}</div>
-                    <div className="flex items-center gap-3 text-muted-foreground">
-                      <Mail className="h-4 w-4" />
-                      <span>{order?.customer_email}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span>{order?.customer_phone}</span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-              <Card className="border-none shadow-sm bg-card/50 print:bg-white print:shadow-none print:border-none">
-                <CardContent className="p-4 sm:p-6 print:p-2">
-                  <div className="flex items-center gap-3 mb-4">
-                    <MapPin className="h-5 w-5 text-primary" />
-                    <h3 className="text-lg font-semibold text-foreground">Delivery Address</h3>
-                  </div>
-                  <div className="space-y-3">
-                    <div className="text-foreground leading-relaxed">{formatAddress(order?.delivery_address)}</div>
-                    {deliveryDate && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        <span>Scheduled for {formatDate(deliveryDate)}</span>
-                      </div>
-                    )}
-                    {deliveryWindowStart && deliveryWindowEnd && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4" />
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}</Badge>
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+          {/* Section: Customer & Delivery Info */}
+          <hr className="my-3 print:my-2 border-t border-border" />
+          <div className="px-4 py-4 sm:px-8 sm:py-6 print:px-0 print:py-2 print:grid print:grid-cols-2 print:gap-4 flex flex-col md:flex-row gap-4 sm:gap-8">
+            <div>
+              <div className="font-bold text-md mb-2 print:mb-1">Customer Information</div>
+              <div className="mb-1">{order?.customer_name}</div>
+              <div className="mb-1">{order?.customer_email}</div>
+              <div className="mb-2">{order?.customer_phone}</div>
+            </div>
+            <div>
+              <div className="font-bold text-md mb-2 print:mb-1">Delivery Address</div>
+              <div className="mb-1">{formatAddress(order?.delivery_address)}</div>
+              {deliveryDate && (
+                <div className="mb-1">
+                  <Calendar className="inline h-4 w-4" /> Scheduled for {formatDate(deliveryDate)}
+                </div>
+              )}
+              {deliveryWindowStart && deliveryWindowEnd && (
+                <div>
+                  <Clock className="inline h-4 w-4" /> <span className="badge badge-blue print:badge-blue">{formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}</span>
+                </div>
+              )}
             </div>
           </div>
 
-          <Separator className="print:hidden" />
-
-          {/* Order Items */}
+          {/* Section: Order Items */}
+          <hr className="my-3 print:my-2 border-t border-border" />
           <div className="px-4 py-4 sm:px-8 sm:py-6 print:px-0 print:py-2">
-            <div className="flex items-center gap-3 mb-6">
-              <Package className="h-6 w-6 text-primary" />
-              <h3 className="text-xl font-semibold text-foreground">Order Items ({order?.order_items?.length || 0})</h3>
-            </div>
+            <div className="font-bold text-md mb-2">Order Items ({order?.order_items?.length || 0})</div>
             {isLoading || featuresLoading ? (
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => (
-                  <Card key={i} className="border-border/50 print:shadow-none print:border-none">
-                    <CardContent className="p-4 sm:p-6 print:p-2">
-                      <Skeleton className="h-6 w-3/4 mb-2" />
-                      <Skeleton className="h-4 w-1/2 mb-4" />
-                      <div className="flex justify-between">
-                        <Skeleton className="h-4 w-16" />
-                        <Skeleton className="h-4 w-20" />
-                      </div>
-                    </CardContent>
-                  </Card>
+                  <div key={i} className="p-2 print:p-1">
+                    <Skeleton className="h-6 w-3/4 mb-2" />
+                    <Skeleton className="h-4 w-1/2 mb-4" />
+                  </div>
                 ))}
               </div>
             ) : (
-              <div className="space-y-4 max-h-[38vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent print:max-h-full print:overflow-visible print:overflow-auto">
-                {order?.order_items?.map((item: any, idx: number) => {
-                  const product = productsData[item.product_id] || item.product || {}
-                  return (
-                    <Card key={item.id || idx} className="border-border/50 hover:shadow-md transition-shadow print:shadow-none print:border-none">
-                      <CardContent className="p-4 sm:p-6 print:p-2">
-                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-                          <div className="flex-1 min-w-0">
-                            <h4 className="text-lg font-semibold text-foreground mb-2">{item.product_name}</h4>
-                            {product.description && (
-                              <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
-                            )}
-                            <FeaturesList product={product} />
-                            {item.special_instructions && (
-                              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg mt-3 print:bg-white print:border-none print:rounded-none">
-                                <div className="flex items-start gap-2">
-                                  <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
-                                  <div>
-                                    <span className="text-sm font-medium text-orange-800">Special Instructions:</span>
-                                    <p className="text-sm text-orange-700 mt-1">{item.special_instructions}</p>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6 text-sm">
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground">Qty:</span>
-                              <Badge variant="outline" className="font-semibold">
-                                {item.quantity}
-                              </Badge>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground">Unit:</span>
-                              <span className="font-semibold">{formatCurrency(item.unit_price)}</span>
-                            </div>
-                            <div className="flex items-center gap-2">
-                              <span className="text-muted-foreground">Total:</span>
-                              <span className="text-lg font-bold text-primary">{formatCurrency(item.total_price)}</span>
-                            </div>
-                            {item.status && (
-                              <Badge variant="outline" className={`capitalize ${getStatusColor(item.status)}`}>
-                                {item.status}
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  )
-                })}
-                {(!order?.order_items || order?.order_items.length === 0) && (
-                  <Card className="border-dashed border-2 border-border/50 print:shadow-none print:border-none">
-                    <CardContent className="p-12 text-center print:p-6">
-                      <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                      <p className="text-muted-foreground">No order items found.</p>
-                    </CardContent>
-                  </Card>
-                )}
+              order?.order_items?.map((item: any, idx: number) => {
+                const product = productsData[item.product_id] || item.product || {}
+                return (
+                  <div key={item.id || idx} className="mb-5 pb-2 print:mb-4 print:pb-2 border-b border-border print:border-b print:border-gray-300">
+                    <div className="flex flex-col md:flex-row md:justify-between md:items-center mb-2 print:flex-row print:justify-between print:items-center">
+                      <div>
+                        <div className="font-semibold text-lg">{item.product_name}</div>
+                        {product.description && (
+                          <div className="text-xs text-muted-foreground print:text-xs">{product.description}</div>
+                        )}
+                      </div>
+                      <div className="flex flex-row gap-4 print:gap-4 text-sm mt-2 md:mt-0">
+                        <span><b>Qty:</b> {item.quantity}</span>
+                        <span><b>Unit:</b> {formatCurrency(item.unit_price)}</span>
+                        <span><b>Total:</b> {formatCurrency(item.total_price)}</span>
+                      </div>
+                    </div>
+                    <FeaturesList product={product} />
+                    {item.special_instructions && (
+                      <div className="p-2 print:p-1 my-2 bg-orange-50 border border-orange-200 rounded-lg print:bg-white print:border-none print:rounded-none">
+                        <span className="font-medium text-orange-800">Special Instructions:</span>
+                        <span className="text-sm text-orange-700 ml-2">{item.special_instructions}</span>
+                      </div>
+                    )}
+                  </div>
+                )
+              })
+            )}
+            {(!order?.order_items || order?.order_items.length === 0) && (
+              <div className="border-dashed border-2 border-border/50 print:border-none p-6 text-center">
+                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground">No order items found.</p>
               </div>
             )}
           </div>
-          {/* Cost Summary */}
-          <div className="px-4 py-4 sm:px-8 sm:py-6 print:px-0 print:py-2">
-            <div className="flex flex-col sm:flex-row justify-end gap-6 print:gap-2 bg-white print:bg-white">
-              <div className="flex flex-col items-end gap-1">
-                <div>
-                  <span className="font-semibold">Subtotal:</span>{" "}
-                  <span className="text-md">{formatCurrency(subtotal)}</span>
-                </div>
-                <div>
-                  <span className="font-semibold">Delivery Fee:</span>{" "}
-                  <span className="text-md">{formatCurrency(shippingFee)}</span>
-                </div>
-                <div>
-                  <span className="font-semibold">Total:</span>{" "}
-                  <span className="text-lg font-bold">{formatCurrency(order?.total_amount || 0)}</span>
-                </div>
-              </div>
-            </div>
+
+          {/* Section: Summary */}
+          <hr className="my-3 print:my-2 border-t border-border" />
+          <div className="px-4 py-4 sm:px-8 sm:py-6 print:px-0 print:py-2 flex flex-col items-end">
+            <table className="summary-table print:summary-table">
+              <tbody>
+                <tr>
+                  <td className="font-semibold pr-4">Subtotal:</td>
+                  <td>{formatCurrency(subtotal)}</td>
+                </tr>
+                <tr>
+                  <td className="font-semibold pr-4">Delivery Fee:</td>
+                  <td>{formatCurrency(shippingFee)}</td>
+                </tr>
+                <tr>
+                  <td className="font-semibold pr-4">Total:</td>
+                  <td className="font-bold text-lg">{formatCurrency(order?.total_amount || 0)}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
         </DialogContent>
       </Dialog>
@@ -487,26 +412,38 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
           .py-4, .sm\\:py-6 { padding-top: 8px !important; padding-bottom: 8px !important; }
           .rounded-2xl { border-radius: 0 !important; }
         }
-        .scrollbar-thin {
-          scrollbar-width: thin;
+        .features-table th {
+          font-weight: bold;
+          min-width: 80px;
+          vertical-align: top;
+          padding-right: 8px;
         }
-        .scrollbar-thumb-primary\\/20 {
-          scrollbar-color: var(--primary) #f3f4f6;
+        .features-table td {
+          padding-bottom: 4px;
         }
-        .scrollbar-thin::-webkit-scrollbar {
-          width: 6px;
+        .summary-table td {
+          padding: 2px 8px 2px 0;
         }
-        .scrollbar-thin::-webkit-scrollbar-thumb {
-          background: var(--primary);
-          border-radius: 8px;
+        .badge {
+          display: inline-block;
+          border-radius: 4px;
+          padding: 2px 8px;
+          font-size: 11px;
+          font-weight: 500;
+          margin-right: 4px;
+          margin-bottom: 2px;
         }
-        .scrollbar-thin::-webkit-scrollbar-track {
-          background: #f3f4f6;
-        }
+        .badge-blue { background: #e0eaff; color: #2563eb; }
+        .badge-yellow { background: #fef3c7; color: #d97706; }
+        .badge-red { background: #fee2e2; color: #dc2626; }
+        .badge-green { background: #d1fae5; color: #059669; }
+        .badge-gray { background: #f3f4f6; color: #4b5563; }
+        .badge-indigo { background: #e0e7ff; color: #3730a3; }
         @media print {
           html, body {
             background: #fff !important;
             color: #222 !important;
+            font-size: 13px !important;
           }
           #order-details-modal-content {
             box-shadow: none !important;
@@ -517,24 +454,28 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
             margin: 0 !important;
             height: auto !important;
             overflow: visible !important;
+            background: #fff !important;
           }
           .no-print {
             display: none !important;
           }
-          .scrollbar-thin, .scrollbar-thumb-primary\\/20, .scrollbar-track-transparent {
-            scrollbar-width: none !important;
-            -ms-overflow-style: none !important;
-            overflow: visible !important;
+          .features-table, .summary-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px !important;
+            margin-bottom: 0 !important;
           }
-          .print\\:shadow-none, .print\\:border-none, .print\\:rounded-none, .print\\:p-0, .print\\:max-w-full {
-            box-shadow: none !important;
+          .features-table th, .features-table td, .summary-table td {
+            padding: 2px 8px 2px 0 !important;
             border: none !important;
-            border-radius: 0 !important;
-            padding: 0 !important;
-            max-width: 100vw !important;
           }
-          .print\\:bg-white {
-            background: #fff !important;
+          .badge {
+            font-size: 11px !important;
+            margin-bottom: 0 !important;
+          }
+          hr {
+            border-top: 1px solid #e5e7eb !important;
+            margin: 12px 0 !important;
           }
         }
       `}</style>

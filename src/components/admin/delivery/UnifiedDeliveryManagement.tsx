@@ -31,6 +31,7 @@ import { format } from 'date-fns';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
+// --- Types ---
 interface UnifiedDeliveryManagementProps {
   mode: 'ready' | 'all' | 'overdue';
   selectedDate?: Date;
@@ -39,6 +40,7 @@ interface UnifiedDeliveryManagementProps {
   ordersOverride?: any[];
 }
 
+// --- Main Component ---
 export function UnifiedDeliveryManagement({
   mode,
   selectedDate,
@@ -46,6 +48,7 @@ export function UnifiedDeliveryManagement({
   statusFilter = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'],
   ordersOverride
 }: UnifiedDeliveryManagementProps) {
+  // --- State ---
   const [localStatusFilter, setLocalStatusFilter] = useState<string[]>(statusFilter);
   const [selectedOrders, setSelectedOrders] = useState<string[]>([]);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -59,7 +62,7 @@ export function UnifiedDeliveryManagement({
   const [debouncedQuery, setDebouncedQuery] = useState('');
   const { drivers } = useDriverManagement();
 
-  // Debounce search query for performance
+  // --- Debounced Search Query ---
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery.trim().toLowerCase());
@@ -67,6 +70,7 @@ export function UnifiedDeliveryManagement({
     return () => clearTimeout(timer);
   }, [searchQuery]);
 
+  // --- Status Options ---
   const statusOptions = [
     { value: 'pending', label: 'Pending' },
     { value: 'confirmed', label: 'Confirmed' },
@@ -76,7 +80,7 @@ export function UnifiedDeliveryManagement({
     { value: 'delivered', label: 'Delivered' },
   ];
 
-  // Build query parameters
+  // --- Query Params ---
   const queryParams = useMemo(() => {
     const params: any = { page: 1, pageSize: 1000 };
     if (mode === 'ready') {
@@ -89,14 +93,14 @@ export function UnifiedDeliveryManagement({
     return params;
   }, [mode, selectedDate]);
 
-  // Fetch orders
+  // --- Fetch Orders ---
   const { data: ordersData, isLoading, refetch } = useQuery({
     queryKey: ['unified-orders', mode, selectedDate?.toISOString(), typeFilter, statusFilter],
     queryFn: () => getOrders(queryParams),
     refetchInterval: mode === 'ready' ? 30000 : undefined,
   });
 
-  // Filter orders for display based on type, status, payment, and search query
+  // --- Filtered Orders ---
   const filteredOrders = useMemo(() => {
     if (ordersOverride) return ordersOverride;
     let orders = ordersData?.orders || [];
@@ -118,7 +122,7 @@ export function UnifiedDeliveryManagement({
     return orders;
   }, [ordersData?.orders, typeLocal, localStatusFilter, mode, ordersOverride, debouncedQuery]);
 
-  // Safe status change handler
+  // --- Status Change Handler ---
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
       const order = filteredOrders.find(o => o.id === orderId);
@@ -135,7 +139,7 @@ export function UnifiedDeliveryManagement({
     }
   };
 
-  // Bulk driver assignment
+  // --- Bulk Driver Assignment ---
   const handleAssignDriver = async (orderIds: string[], driverId: string) => {
     try {
       const promises = orderIds.map(orderId =>
@@ -151,13 +155,13 @@ export function UnifiedDeliveryManagement({
     }
   };
 
-  // Print single receipt
+  // --- Print Single Receipt ---
   const handlePrint = (order: any) => {
     setPrintingOrder(order);
     setIsReceiptModalOpen(true);
   };
 
-  // Bulk print receipts
+  // --- Bulk Print Receipts ---
   const handleBulkPrint = () => {
     if (selectedOrders.length === 0) return;
     const ordersForPrint = filteredOrders.filter(order => selectedOrders.includes(order.id));
@@ -196,7 +200,7 @@ export function UnifiedDeliveryManagement({
     printWindow.print();
   };
 
-  // Status icon helper
+  // --- Status Icon Helper ---
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'delivered': return <CheckCircle2 className="w-4 h-4" />;
@@ -208,9 +212,10 @@ export function UnifiedDeliveryManagement({
     }
   };
 
+  // --- Loading Skeleton ---
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="space-y-4" data-testid="loading-skeleton">
         {[...Array(3)].map((_, i) => (
           <Card key={i} className="animate-pulse">
             <CardContent className="p-6">
@@ -226,6 +231,7 @@ export function UnifiedDeliveryManagement({
     );
   }
 
+  // --- Responsive Layout ---
   return (
     <div className="space-y-4 w-full max-w-screen-lg mx-auto px-2 sm:px-4">
       {/* Toolbar: Search & Filters */}
@@ -234,6 +240,7 @@ export function UnifiedDeliveryManagement({
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
             <Input
+              aria-label="Search orders"
               placeholder="Search orders by number, customer name, email, or phone..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -261,6 +268,7 @@ export function UnifiedDeliveryManagement({
                   <Button
                     variant="outline"
                     className="w-full justify-between text-sm"
+                    aria-label="Filter by status"
                   >
                     <span className="truncate">
                       {localStatusFilter.length === statusOptions.length ? 'All Statuses'
@@ -355,7 +363,8 @@ export function UnifiedDeliveryManagement({
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        // --- Responsive grid for orders ---
+        <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {filteredOrders.map((order) => {
             const driverInfo = drivers.find(d => d.profile_id === order.assigned_rider_id);
             return (
@@ -379,6 +388,7 @@ export function UnifiedDeliveryManagement({
                             setSelectedOrders(selectedOrders.filter(id => id !== order.id));
                           }
                         }}
+                        aria-label={`Select order #${order.order_number}`}
                       />
                       <div>
                         <h3 className="font-semibold text-sm sm:text-base">#{order.order_number}</h3>
@@ -447,6 +457,7 @@ export function UnifiedDeliveryManagement({
                         setIsDetailsModalOpen(true);
                       }}
                       className="flex-1 min-w-0 text-xs"
+                      aria-label={`View details for order #${order.order_number}`}
                     >
                       <Eye className="w-3 h-3 mr-1" />
                       View
@@ -456,6 +467,7 @@ export function UnifiedDeliveryManagement({
                       variant="outline"
                       onClick={() => handlePrint(order)}
                       className="flex-1 min-w-0 text-xs"
+                      aria-label={`Print order #${order.order_number}`}
                     >
                       <Printer className="w-3 h-3 mr-1" />
                       Print

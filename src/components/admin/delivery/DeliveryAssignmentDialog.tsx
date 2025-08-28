@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -24,7 +24,7 @@ interface DeliveryAssignmentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   selectedOrderIds: string[];
-  onAssign: (orderIds: string[], driverId: string) => void;
+  onAssign: (orderIds: string[], driverId: string) => Promise<void>;
   drivers: Driver[];
 }
 
@@ -35,20 +35,34 @@ export function DeliveryAssignmentDialog({
   onAssign,
   drivers
 }: DeliveryAssignmentDialogProps) {
-  const [selectedDriverId, setSelectedDriverId] = useState('');
-  const [isAssigning, setIsAssigning] = useState(false);
+  const [selectedDriverId, setSelectedDriverId] = useState<string>('');
+  const [isAssigning, setIsAssigning] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>('');
+
+  // Only show active drivers in dropdown
+  const activeDrivers = useMemo(
+    () => drivers.filter(driver => driver.is_active),
+    [drivers]
+  );
+
+  const selectedDriver = useMemo(
+    () => activeDrivers.find(d => d.id === selectedDriverId),
+    [selectedDriverId, activeDrivers]
+  );
 
   const handleAssign = async () => {
-    if (!selectedDriverId) return;
-    
+    setErrorMsg('');
+    if (!selectedDriverId) {
+      setErrorMsg('Please select a driver.');
+      return;
+    }
     setIsAssigning(true);
     try {
-      // Pass profile_id (which is now the id from getDispatchRiders)
       await onAssign(selectedOrderIds, selectedDriverId);
-      onClose();
-      setSelectedDriverId('');
+      handleClose();
     } catch (error) {
-      console.error('Assignment failed:', error);
+      setErrorMsg('Assignment failed, please try again.');
+      // Optionally log error with a monitoring service
     } finally {
       setIsAssigning(false);
     }
@@ -56,6 +70,7 @@ export function DeliveryAssignmentDialog({
 
   const handleClose = () => {
     setSelectedDriverId('');
+    setErrorMsg('');
     onClose();
   };
 
@@ -64,11 +79,11 @@ export function DeliveryAssignmentDialog({
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
-            <Truck className="w-5 h-5" />
+            <Truck className="w-5 h-5" aria-label="Assign Driver" />
             Assign Driver
           </DialogTitle>
           <DialogDescription>
-            Assign a driver to {selectedOrderIds.length} selected order(s)
+            Assign a driver to {selectedOrderIds.length} selected order{selectedOrderIds.length > 1 ? 's' : ''}
           </DialogDescription>
         </DialogHeader>
 
@@ -76,25 +91,31 @@ export function DeliveryAssignmentDialog({
           {/* Selected Orders Count */}
           <div className="p-3 bg-muted/30 rounded-lg">
             <p className="text-sm font-medium mb-2">Selected Orders:</p>
-            <Badge variant="outline">
+            <Badge variant="outline" aria-label="Selected Orders Count">
               {selectedOrderIds.length} order{selectedOrderIds.length > 1 ? 's' : ''}
             </Badge>
           </div>
 
           {/* Driver Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Select Driver:</label>
-            <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+            <label htmlFor="driver-select" className="text-sm font-medium">
+              Select Driver:
+            </label>
+            <Select
+              value={selectedDriverId}
+              onValueChange={setSelectedDriverId}
+              id="driver-select"
+            >
               <SelectTrigger>
                 <SelectValue placeholder="Choose a driver..." />
               </SelectTrigger>
               <SelectContent>
-                {drivers.length === 0 ? (
+                {activeDrivers.length === 0 ? (
                   <div className="p-2 text-sm text-muted-foreground">
                     No active drivers available
                   </div>
                 ) : (
-                  drivers.map((driver) => (
+                  activeDrivers.map((driver) => (
                     <SelectItem key={driver.id} value={driver.id}>
                       <div className="flex items-center gap-3 w-full">
                         <div className="flex-1">
@@ -118,45 +139,45 @@ export function DeliveryAssignmentDialog({
             </Select>
           </div>
 
+          {/* Error Message */}
+          {errorMsg && (
+            <div className="text-destructive text-sm" role="alert">
+              {errorMsg}
+            </div>
+          )}
+
           {/* Driver Info Preview */}
-          {selectedDriverId && (
+          {selectedDriver && (
             <div className="p-3 border rounded-lg">
-              {(() => {
-                const selectedDriver = drivers.find(d => d.id === selectedDriverId);
-                if (!selectedDriver) return null;
-                
-                return (
-                  <div>
-                    <p className="font-medium mb-2">Selected Driver:</p>
-                    <div className="space-y-1 text-sm">
-                      <p className="flex items-center gap-2">
-                        <User className="w-4 h-4" />
-                        {selectedDriver.name}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Phone className="w-4 h-4" />
-                        {selectedDriver.phone}
-                      </p>
-                      <p className="flex items-center gap-2">
-                        <Truck className="w-4 h-4" />
-                        {selectedDriver.vehicle_type}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })()}
+              <p className="font-medium mb-2">Selected Driver:</p>
+              <div className="space-y-1 text-sm">
+                <p className="flex items-center gap-2">
+                  <User className="w-4 h-4" />
+                  {selectedDriver.name}
+                </p>
+                <p className="flex items-center gap-2">
+                  <Phone className="w-4 h-4" />
+                  {selectedDriver.phone}
+                </p>
+                <p className="flex items-center gap-2">
+                  <Truck className="w-4 h-4" />
+                  {selectedDriver.vehicle_type}
+                </p>
+              </div>
             </div>
           )}
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+          <Button variant="outline" type="button" onClick={handleClose}>
             Cancel
           </Button>
-          <Button 
+          <Button
+            type="button"
             onClick={handleAssign}
-            disabled={!selectedDriverId || isAssigning || drivers.length === 0}
+            disabled={!selectedDriverId || isAssigning || activeDrivers.length === 0}
             className="min-w-[100px]"
+            aria-busy={isAssigning}
           >
             {isAssigning ? 'Assigning...' : 'Assign Driver'}
           </Button>

@@ -19,6 +19,7 @@ import { logPaystackHealthCheck } from "./utils/paystackHealthCheck";
 import { ErrorTrackerComponent } from "./components/monitoring/ErrorTracker";
 import { NetworkProvider } from "./components/network/NetworkProvider";
 import { OnlineStatusBanner } from "./components/network/OnlineStatusBanner";
+import { DeploymentInfo } from "./components/common/DeploymentInfo";
 
 // Initialize payment monitoring and cache busting
 initPaymentMonitoring();
@@ -270,6 +271,7 @@ const App = () => {
         </AuthProvider>
         </NetworkProvider>
       </TooltipProvider>
+      <DeploymentInfo />
     </QueryClientProvider>
   </ErrorBoundaryWrapper>
   );

@@ -554,6 +554,7 @@ export function UnifiedDeliveryManagement({
         onClose={() => setIsAssignDialogOpen(false)}
         selectedOrderIds={selectedOrders}
         onAssign={handleAssignDriver}
+        drivers={[]}
       />
     </div>
   );

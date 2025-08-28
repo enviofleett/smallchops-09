@@ -34,10 +34,12 @@ export const performPaystackHealthCheck = (): HealthCheckResult => {
   // Check for production domain configuration
   const currentDomain = window.location.hostname;
   const productionDomains = ['startersmallchops.com', 'www.startersmallchops.com'];
+  const vercelDomains = ['vercel.app'];
   const isProductionDomain = productionDomains.some(domain => currentDomain.includes(domain));
+  const isVercelDomain = vercelDomains.some(domain => currentDomain.includes(domain));
   
-  if (isProductionDomain) {
-    result.issues.push(`Production domain detected: ${currentDomain} - ensure live Paystack keys are configured`);
+  if (isProductionDomain || isVercelDomain) {
+    result.issues.push(`Production-like domain detected: ${currentDomain} - ensure live Paystack keys are configured`);
   }
 
   // Note: We cannot check actual secret values from frontend for security

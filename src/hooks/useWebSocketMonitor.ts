@@ -24,7 +24,11 @@ export const useWebSocketMonitor = (url?: string) => {
 
   const connect = () => {
     // Skip WebSocket connection in development or production without proper WebSocket server
-    if (!url || url.includes('localhost:8098') || window.location.hostname === 'startersmallchops.com') {
+    const hostname = window.location.hostname;
+    const skipDomains = ['startersmallchops.com', 'vercel.app'];
+    const shouldSkip = !url || url.includes('localhost:8098') || skipDomains.some(domain => hostname.includes(domain));
+    
+    if (shouldSkip) {
       console.log('Skipping WebSocket connection - no WebSocket server available');
       setStatus(prev => ({ 
         ...prev, 

@@ -26,7 +26,7 @@ function safeCacheCleanup() {
     });
 
     // Version tracking for major updates only
-    const currentVersion = '1.1.0';
+    const currentVersion = '1.1.1';
     const lastVersion = localStorage.getItem('app_version');
     
     if (!lastVersion) {

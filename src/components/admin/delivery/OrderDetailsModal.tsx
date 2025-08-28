@@ -26,9 +26,6 @@ import {
   CheckCircle,
 } from "lucide-react"
 
-// If you want to fetch full product features from API, import getProduct, and use below
-// import { getProduct } from "@/api/products"
-
 interface OrderDetailsModalProps {
   order: any
   isOpen: boolean
@@ -109,7 +106,6 @@ const formatAddress = (address: any) => {
   return parts.join(", ") || "N/A"
 }
 
-// Enhanced product features parser (array, object, string)
 const getProductFeatures = (product: any) => {
   if (!product?.features) return null
   if (typeof product.features === "string") {
@@ -123,7 +119,6 @@ const getProductFeatures = (product: any) => {
 }
 
 export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
-  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false)
   const { data: detailedOrder, isLoading, error } = useDetailedOrderData(order?.id)
   const { data: businessSettings } = useBusinessSettings()
 
@@ -144,36 +139,62 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
   const deliveryWindowEnd = deliverySchedule?.delivery_time_end
 
   const handlePrint = () => {
-    window.print()
+    // Print only modal content
+    const modal = document.getElementById("order-details-modal-content")
+    if (modal) {
+      const printContents = modal.innerHTML
+      const printWindow = window.open("", "", "height=800,width=600")
+      printWindow!.document.write(`
+        <html>
+          <head>
+            <title>Order Details</title>
+            <style>
+              body { font-family: 'Inter', sans-serif; background: #fff; color: #222; }
+              .order-details-modal-print { max-width: 100vw; }
+              @media print {
+                .order-details-modal-print { box-shadow: none !important; border: none !important; }
+                .no-print { display: none !important; }
+              }
+            </style>
+          </head>
+          <body>
+            <div class="order-details-modal-print">${printContents}</div>
+          </body>
+        </html>
+      `)
+      printWindow!.document.close()
+      printWindow!.focus()
+      printWindow!.print()
+      setTimeout(() => printWindow!.close(), 1000)
+    }
   }
 
+  // Responsive styles
   const modalContentStyles =
-    "max-w-[96vw] w-full sm:max-w-5xl max-h-[95vh] overflow-hidden rounded-2xl bg-background p-0 border shadow-2xl"
+    "max-w-full w-full sm:max-w-[98vw] md:max-w-3xl lg:max-w-5xl h-[98vh] max-h-[98vh] overflow-y-auto rounded-2xl bg-background p-0 border shadow-2xl"
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className={modalContentStyles}>
-          <div className="bg-gradient-to-r from-primary/5 to-secondary/5 px-8 py-6 border-b border-border/50">
-            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+        <DialogContent id="order-details-modal-content" className={modalContentStyles}>
+          <div className="bg-gradient-to-r from-primary/5 to-secondary/5 px-4 py-4 sm:px-8 sm:py-6 border-b border-border/50">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3">
-                  <img src={STARTERS_LOGO || "/placeholder.svg"} alt="Starters Logo" className="h-10 w-auto" />
-                  <div className="flex flex-col">
-                    <h2 className="text-2xl font-bold text-foreground">Order Details</h2>
-                    <div className="flex items-center gap-3 mt-1">
-                      <span className="font-mono text-sm text-muted-foreground">#{order?.order_number}</span>
-                      <Badge
-                        className={`capitalize text-sm px-3 py-1 ${getStatusColor(order?.status)}`}
-                        variant="outline"
-                      >
-                        {order?.status?.replace(/_/g, " ") ?? "Unknown"}
-                      </Badge>
-                    </div>
+                <img src={STARTERS_LOGO || "/placeholder.svg"} alt="Starters Logo" className="h-10 w-auto" />
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-foreground">Order Details</h2>
+                  <div className="flex items-center gap-3 mt-1 flex-wrap">
+                    <span className="font-mono text-sm text-muted-foreground">#{order?.order_number}</span>
+                    <Badge
+                      className={`capitalize text-sm px-3 py-1 ${getStatusColor(order?.status)}`}
+                      variant="outline"
+                    >
+                      {order?.status?.replace(/_/g, " ") ?? "Unknown"}
+                    </Badge>
                   </div>
                 </div>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 no-print">
                 <Button
                   variant="outline"
                   size="sm"
@@ -192,16 +213,16 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
             </div>
           </div>
 
-          <div className="px-8 py-6 bg-card/30">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="px-4 py-4 sm:px-8 sm:py-6 bg-card/30">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
               {/* Order Total Card */}
               <Card className="bg-gradient-to-br from-primary/10 to-secondary/5 border-primary/20">
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-2">
                     <CreditCard className="h-5 w-5 text-primary" />
                     <span className="text-sm font-medium text-muted-foreground">Total Amount</span>
                   </div>
-                  <div className="text-3xl font-bold text-primary">{formatCurrency(order?.total_amount || 0)}</div>
+                  <div className="text-2xl sm:text-3xl font-bold text-primary">{formatCurrency(order?.total_amount || 0)}</div>
                   <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground">
                     <Clock className="h-4 w-4" />
                     <span>Ordered {order?.order_time && formatDateTime(order?.order_time)}</span>
@@ -211,7 +232,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
 
               {/* Delivery Schedule Card */}
               <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-2">
                     <Truck className="h-5 w-5 text-blue-600" />
                     <span className="text-sm font-medium text-muted-foreground">Delivery</span>
@@ -233,7 +254,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
 
               {/* Status Card */}
               <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-2">
                     <CheckCircle className="h-5 w-5 text-green-600" />
                     <span className="text-sm font-medium text-muted-foreground">Status</span>
@@ -255,10 +276,10 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
 
           <Separator />
 
-          <div className="px-8 py-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <div className="px-4 py-4 sm:px-8 sm:py-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
               <Card className="border-none shadow-sm bg-card/50">
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <User className="h-5 w-5 text-primary" />
                     <h3 className="text-lg font-semibold text-foreground">Customer Information</h3>
@@ -278,7 +299,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </Card>
 
               <Card className="border-none shadow-sm bg-card/50">
-                <CardContent className="p-6">
+                <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-4">
                     <MapPin className="h-5 w-5 text-primary" />
                     <h3 className="text-lg font-semibold text-foreground">Delivery Address</h3>
@@ -307,7 +328,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
 
           <Separator />
 
-          <div className="px-8 py-6">
+          <div className="px-4 py-4 sm:px-8 sm:py-6">
             <div className="flex items-center gap-3 mb-6">
               <Package className="h-6 w-6 text-primary" />
               <h3 className="text-xl font-semibold text-foreground">Order Items ({order?.order_items?.length || 0})</h3>
@@ -329,7 +350,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                 ))}
               </div>
             ) : (
-              <div className="space-y-4 max-h-96 overflow-y-auto">
+              <div className="space-y-4 max-h-[38vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent print:max-h-full print:overflow-visible">
                 {order?.order_items?.map((item: any, idx: number) => {
                   let features = getProductFeatures(item.product)
                   if (!features && item?.features) {
@@ -337,7 +358,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                   }
                   return (
                     <Card key={item.id || idx} className="border-border/50 hover:shadow-md transition-shadow">
-                      <CardContent className="p-6">
+                      <CardContent className="p-4 sm:p-6">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <h4 className="text-lg font-semibold text-foreground mb-2">{item.product_name}</h4>
@@ -427,8 +448,82 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </div>
             )}
           </div>
+
+          {/* Cost Summary */}
+          <div className="px-4 py-4 sm:px-8 sm:py-6">
+            <div className="flex flex-col sm:flex-row justify-end gap-6 print:gap-2 bg-white print:bg-white">
+              <div className="flex flex-col items-end gap-1">
+                <div>
+                  <span className="font-semibold">Subtotal:</span>{" "}
+                  <span className="text-md">{formatCurrency(subtotal)}</span>
+                </div>
+                <div>
+                  <span className="font-semibold">Delivery Fee:</span>{" "}
+                  <span className="text-md">{formatCurrency(shippingFee)}</span>
+                </div>
+                <div>
+                  <span className="font-semibold">Total:</span>{" "}
+                  <span className="text-lg font-bold">{formatCurrency(order?.total_amount || 0)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
+      <style jsx global>{`
+        /* Mobile viewport styles */
+        @media (max-width: 640px) {
+          #order-details-modal-content {
+            max-width: 100vw !important;
+            padding: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
+          }
+          .px-4, .sm\\:px-8 { padding-left: 8px !important; padding-right: 8px !important; }
+          .py-4, .sm\\:py-6 { padding-top: 8px !important; padding-bottom: 8px !important; }
+          .rounded-2xl { border-radius: 0 !important; }
+        }
+        /* Custom scroll styling for modal */
+        .scrollbar-thin {
+          scrollbar-width: thin;
+        }
+        .scrollbar-thumb-primary\\/20 {
+          scrollbar-color: var(--primary) #f3f4f6;
+        }
+        .scrollbar-thin::-webkit-scrollbar {
+          width: 6px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-thumb {
+          background: var(--primary);
+          border-radius: 8px;
+        }
+        .scrollbar-thin::-webkit-scrollbar-track {
+          background: #f3f4f6;
+        }
+        /* Print styles */
+        @media print {
+          html, body {
+            background: #fff !important;
+            color: #222 !important;
+          }
+          #order-details-modal-content {
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            border: none !important;
+            max-width: 100vw !important;
+            padding: 0 !important;
+            margin: 0 !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+          .scrollbar-thin, .scrollbar-thumb-primary\\/20, .scrollbar-track-transparent {
+            scrollbar-width: none !important;
+            -ms-overflow-style: none !important;
+            overflow: visible !important;
+          }
+        }
+      `}</style>
     </>
   )
 }

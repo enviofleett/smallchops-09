@@ -26,6 +26,7 @@ import {
   CheckCircle,
   AlertTriangle,
   Box,
+  Car,
 } from "lucide-react"
 import { getProduct } from "@/api/products"
 
@@ -35,47 +36,32 @@ interface OrderDetailsModalProps {
   onClose: () => void
 }
 
+// Helper functions
 const STARTERS_LOGO = "/logo-starters.svg"
 
 const getStatusColor = (status: string) => {
   switch (status) {
-    case "confirmed":
-      return "bg-blue-50 text-blue-700 border-blue-200"
-    case "preparing":
-      return "bg-green-50 text-green-700 border-green-200"
-    case "ready":
-      return "bg-green-50 text-green-700 border-green-200"
-    case "out_for_delivery":
-      return "bg-purple-50 text-purple-700 border-purple-200"
-    case "delivered":
-      return "bg-green-50 text-green-800 border-green-300"
-    case "cancelled":
-      return "bg-red-50 text-red-700 border-red-200"
-    default:
-      return "bg-muted text-muted-foreground border-border"
+    case "confirmed": return "bg-blue-50 text-blue-700 border-blue-200"
+    case "preparing": return "bg-green-50 text-green-700 border-green-200"
+    case "ready": return "bg-green-50 text-green-700 border-green-200"
+    case "out_for_delivery": return "bg-purple-50 text-purple-700 border-purple-200"
+    case "delivered": return "bg-green-50 text-green-800 border-green-300"
+    case "cancelled": return "bg-red-50 text-red-700 border-red-200"
+    default: return "bg-muted text-muted-foreground border-border"
   }
 }
 
 const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-NG", {
-    style: "currency",
-    currency: "NGN",
-  }).format(amount)
+  new Intl.NumberFormat("en-NG", { style: "currency", currency: "NGN" }).format(amount)
 
 const formatDateTime = (dateString: string) => {
   if (!dateString) return ""
   try {
     const date = new Date(dateString)
     return date.toLocaleString("en-NG", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
+      year: "numeric", month: "short", day: "numeric", hour: "2-digit", minute: "2-digit"
     })
-  } catch {
-    return dateString
-  }
+  } catch { return dateString }
 }
 
 const formatDate = (dateString: string) => {
@@ -83,24 +69,17 @@ const formatDate = (dateString: string) => {
   try {
     const date = new Date(dateString)
     return date.toLocaleDateString("en-NG", {
-      year: "numeric",
-      month: "long",
-      day: "numeric",
+      year: "numeric", month: "long", day: "numeric"
     })
-  } catch {
-    return dateString
-  }
+  } catch { return dateString }
 }
 
 const formatTimeWindow = (start: string, end: string) => {
   if (!start || !end) return ""
   try {
-    const s = start.split(":")
-    const e = end.split(":")
+    const s = start.split(":"); const e = end.split(":")
     return `${s[0].padStart(2, "0")}:${s[1] || "00"} - ${e[0].padStart(2, "0")}:${e[1] || "00"}`
-  } catch {
-    return `${start} - ${end}`
-  }
+  } catch { return `${start} - ${end}` }
 }
 
 const formatAddress = (address: any) => {
@@ -109,10 +88,9 @@ const formatAddress = (address: any) => {
   return parts.join(", ") || "N/A"
 }
 
+// FeaturesList: All features (including add-ons, allergens, extra info) as bullet text, not tags
 function FeaturesList({ product }: { product: any }) {
   if (!product) return null
-
-  // Compose a single array of bullet points
   const bulletPoints: string[] = []
 
   // Features (array, object, string)
@@ -125,38 +103,34 @@ function FeaturesList({ product }: { product: any }) {
       bulletPoints.push(String(product.features))
     }
   }
-
-  // Add-ons (array)
+  // Add-ons
   if (product.addOns?.length > 0) {
     bulletPoints.push(...product.addOns.map(a => `Add-on: ${a}`))
   }
-
-  // Allergens (array)
+  // Allergens
   if (product.allergen_info?.length > 0) {
     bulletPoints.push(...product.allergen_info.map(a => `Allergen: ${a}`))
   }
-
   // Extra info
-  if (typeof product.preparation_time === "number") {
-    bulletPoints.push(`Prep: ${product.preparation_time} min`)
-  }
-  if (typeof product.stock_quantity === "number") {
-    bulletPoints.push(`In stock: ${product.stock_quantity}`)
-  }
-  if (typeof product.minimum_order_quantity === "number") {
-    bulletPoints.push(`Min order: ${product.minimum_order_quantity}`)
-  }
+  if (typeof product.preparation_time === "number") bulletPoints.push(`Prep: ${product.preparation_time} min`)
+  if (typeof product.stock_quantity === "number") bulletPoints.push(`In stock: ${product.stock_quantity}`)
+  if (typeof product.minimum_order_quantity === "number") bulletPoints.push(`Min order: ${product.minimum_order_quantity}`)
 
   return (
     <div className="mb-2">
       <span className="font-semibold">Product Details:</span>
       <ul className="list-disc ml-5 text-xs print:text-sm">
-        {bulletPoints.map((point, i) => (
-          <li key={i}>{point}</li>
-        ))}
+        {bulletPoints.map((point, i) => <li key={i}>{point}</li>)}
       </ul>
     </div>
   )
+}
+
+// Clean text for product description (strip any <p> tags etc)
+function getCleanDescription(desc: string) {
+  if (!desc) return ""
+  // Remove HTML tags, especially <p>...</p> and whitespace
+  return desc.replace(/<[^>]+>/g, "").replace(/\s+/g, " ").trim()
 }
 
 export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
@@ -166,13 +140,9 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
   // Product features fetching
   const [productsData, setProductsData] = useState<Record<string, any>>({})
   const [featuresLoading, setFeaturesLoading] = useState(false)
+  const [driverContact, setDriverContact] = useState<any>(null)
 
-  useEffect(() => {
-    if (error) {
-      toast.error("Failed to load order details")
-    }
-  }, [error])
-
+  // Fetch full product details for each item
   useEffect(() => {
     let isMounted = true
     async function fetchAllProducts() {
@@ -200,10 +170,25 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
       }
     }
     fetchAllProducts()
-    return () => {
-      isMounted = false
-    }
+    return () => { isMounted = false }
   }, [order?.order_items])
+
+  // Fetch driver contact if dispatch is assigned
+  useEffect(() => {
+    async function fetchDriverContact() {
+      if (order?.dispatch_id) {
+        try {
+          // Replace with your endpoint for production!
+          const resp = await fetch(`/api/dispatch/${order.dispatch_id}`)
+          if (resp.ok) {
+            const driver = await resp.json()
+            setDriverContact(driver)
+          }
+        } catch { setDriverContact(null) }
+      }
+    }
+    fetchDriverContact()
+  }, [order?.dispatch_id])
 
   const shippingFee = Number(order?.delivery_fee ?? detailedOrder?.delivery_schedule?.delivery_fee ?? 0)
   const subtotal = Math.max(0, Number(order?.total_amount || 0) - shippingFee)
@@ -213,9 +198,8 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
   const deliveryWindowStart = deliverySchedule?.delivery_time_start
   const deliveryWindowEnd = deliverySchedule?.delivery_time_end
 
-  const handlePrint = () => {
-    window.print()
-  }
+  // Print handler
+  const handlePrint = () => window.print()
 
   return (
     <>
@@ -344,6 +328,34 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                 </CardContent>
               </Card>
             </div>
+            {/* Driver info if dispatch is assigned */}
+            {driverContact && (
+              <Card className="shadow-none border border-border rounded-xl mt-4 print:bg-white print:border-none">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Car className="h-5 w-5 text-indigo-600" />
+                    <span className="font-semibold">Driver Contact</span>
+                  </div>
+                  <div className="font-medium text-base">{driverContact.name}</div>
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                    <Phone className="h-4 w-4" />
+                    <span>{driverContact.phone}</span>
+                  </div>
+                  {driverContact.email && (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                      <Mail className="h-4 w-4" />
+                      <span>{driverContact.email}</span>
+                    </div>
+                  )}
+                  {driverContact.vehicle && (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                      <Box className="h-4 w-4" />
+                      <span>{driverContact.vehicle}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* ORDER ITEMS */}
@@ -374,7 +386,9 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                           <div className="flex-1">
                             <h4 className="font-semibold text-base mb-1">{item.product_name}</h4>
                             {product.description && (
-                              <div className="text-sm text-muted-foreground mb-2">{product.description}</div>
+                              <div className="text-sm text-muted-foreground mb-2">
+                                {getCleanDescription(product.description)}
+                              </div>
                             )}
                             <FeaturesList product={product} />
                           </div>

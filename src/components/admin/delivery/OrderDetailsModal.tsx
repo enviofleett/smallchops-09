@@ -26,6 +26,8 @@ import {
   AlertTriangle,
   Box,
   Car,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react"
 import { getProduct } from "@/api/products"
 
@@ -130,7 +132,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
   const [productsData, setProductsData] = useState<Record<string, any>>({})
   const [featuresLoading, setFeaturesLoading] = useState(false)
   const [driverContact, setDriverContact] = useState<any>(null)
-  const modalPrintRef = useRef<HTMLDivElement>(null)
+  const [itemsExpanded, setItemsExpanded] = useState(true)
 
   useEffect(() => {
     if (error) toast.error("Failed to load order details")
@@ -189,14 +191,12 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
   const deliveryWindowEnd = deliverySchedule?.delivery_time_end
 
   // Print logic fitted inside modal UI
+  const modalPrintRef = useRef<HTMLDivElement>(null)
   const handlePrint = () => {
     if (modalPrintRef.current) {
-      // Save original body content
       const originalContents = document.body.innerHTML
-      // Copy modal contents to body for print
       document.body.innerHTML = modalPrintRef.current.innerHTML
       window.print()
-      // Restore original body content
       document.body.innerHTML = originalContents
       window.location.reload()
     }
@@ -335,84 +335,101 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </Card>
             )}
           </div>
+          {/* EXPANDABLE ORDER ITEMS SECTION */}
           <div className="px-3 py-4 sm:px-6 sm:py-6">
-            <div className="flex items-center gap-2 mb-4">
+            <div
+              className="flex items-center gap-2 mb-4 cursor-pointer select-none"
+              onClick={() => setItemsExpanded((prev) => !prev)}
+              style={{ userSelect: 'none' }}
+              aria-expanded={itemsExpanded}
+              aria-controls="order-items-list"
+              tabIndex={0}
+              role="button"
+            >
               <Package className="h-6 w-6 text-primary" />
               <span className="text-lg font-semibold">Order Items ({order?.order_items?.length || 0})</span>
-            </div>
-            <div className="space-y-4 max-h-[38vh] overflow-y-auto scrollbar-thin pr-1 sm:pr-2">
-              {isLoading || featuresLoading ? (
-                <div>
-                  {[...Array(2)].map((_, i) => (
-                    <Card key={i} className="border-border/50">
-                      <CardContent className="p-6">
-                        <Skeleton className="h-6 w-3/4 mb-2" />
-                        <Skeleton className="h-4 w-1/2 mb-4" />
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+              {itemsExpanded ? (
+                <ChevronUp className="h-5 w-5 text-muted-foreground" />
               ) : (
-                order?.order_items?.map((item: any, idx: number) => {
-                  const product = productsData[item.product_id] || item.product || {}
-                  return (
-                    <Card key={item.id || idx} className="shadow-none border border-border rounded-xl">
-                      <CardContent className="p-6">
-                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
-                          <div className="flex-1">
-                            <h4 className="font-semibold text-base mb-1">{item.product_name}</h4>
-                            {product.description && (
-                              <div className="text-sm text-muted-foreground mb-2">
-                                {getCleanDescription(product.description)}
-                              </div>
-                            )}
-                            <FeaturesList product={product} />
-                          </div>
-                          <div className="flex flex-col gap-1 text-right sm:min-w-[160px]">
-                            <div className="flex items-center gap-2 justify-end">
-                              <span className="text-muted-foreground text-sm">Qty:</span>
-                              <span className="font-bold">{item.quantity}</span>
-                            </div>
-                            <div className="flex items-center gap-2 justify-end">
-                              <span className="text-muted-foreground text-sm">Unit:</span>
-                              <span className="font-bold">{formatCurrency(item.unit_price)}</span>
-                            </div>
-                            <div className="flex items-center gap-2 justify-end">
-                              <span className="text-muted-foreground text-sm">Total:</span>
-                              <span className="font-bold text-primary">{formatCurrency(item.total_price)}</span>
-                            </div>
-                          </div>
-                        </div>
-                        {item.special_instructions && (
-                          <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
-                            <div className="flex items-center gap-2">
-                              <AlertCircle className="h-4 w-4 text-orange-600" />
-                              <span className="font-medium text-orange-800">Special Instructions:</span>
-                              <span className="text-sm text-orange-700">{item.special_instructions}</span>
-                            </div>
-                          </div>
-                        )}
-                        {item.status && (
-                          <div className="flex justify-end mt-2">
-                            <Badge variant="outline" className={`capitalize ${getStatusColor(item.status)}`}>
-                              {item.status}
-                            </Badge>
-                          </div>
-                        )}
-                      </CardContent>
-                    </Card>
-                  )
-                })
-              )}
-              {(!order?.order_items || order?.order_items.length === 0) && (
-                <Card className="border-dashed border-2 border-border/50 bg-muted/20">
-                  <CardContent className="p-8 text-center">
-                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                    <p className="text-muted-foreground text-lg">No order items found.</p>
-                  </CardContent>
-                </Card>
+                <ChevronDown className="h-5 w-5 text-muted-foreground" />
               )}
             </div>
+            {/* Expanded/Collapsed Order Items */}
+            {itemsExpanded && (
+              <div id="order-items-list" className="space-y-4">
+                {isLoading || featuresLoading ? (
+                  <div>
+                    {[...Array(2)].map((_, i) => (
+                      <Card key={i} className="border-border/50">
+                        <CardContent className="p-6">
+                          <Skeleton className="h-6 w-3/4 mb-2" />
+                          <Skeleton className="h-4 w-1/2 mb-4" />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                ) : (
+                  order?.order_items?.map((item: any, idx: number) => {
+                    const product = productsData[item.product_id] || item.product || {}
+                    return (
+                      <Card key={item.id || idx} className="shadow-none border border-border rounded-xl">
+                        <CardContent className="p-6">
+                          <div className="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+                            <div className="flex-1">
+                              <h4 className="font-semibold text-base mb-1">{item.product_name}</h4>
+                              {product.description && (
+                                <div className="text-sm text-muted-foreground mb-2">
+                                  {getCleanDescription(product.description)}
+                                </div>
+                              )}
+                              <FeaturesList product={product} />
+                            </div>
+                            <div className="flex flex-col gap-1 text-right sm:min-w-[160px]">
+                              <div className="flex items-center gap-2 justify-end">
+                                <span className="text-muted-foreground text-sm">Qty:</span>
+                                <span className="font-bold">{item.quantity}</span>
+                              </div>
+                              <div className="flex items-center gap-2 justify-end">
+                                <span className="text-muted-foreground text-sm">Unit:</span>
+                                <span className="font-bold">{formatCurrency(item.unit_price)}</span>
+                              </div>
+                              <div className="flex items-center gap-2 justify-end">
+                                <span className="text-muted-foreground text-sm">Total:</span>
+                                <span className="font-bold text-primary">{formatCurrency(item.total_price)}</span>
+                              </div>
+                            </div>
+                          </div>
+                          {item.special_instructions && (
+                            <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                              <div className="flex items-center gap-2">
+                                <AlertCircle className="h-4 w-4 text-orange-600" />
+                                <span className="font-medium text-orange-800">Special Instructions:</span>
+                                <span className="text-sm text-orange-700">{item.special_instructions}</span>
+                              </div>
+                            </div>
+                          )}
+                          {item.status && (
+                            <div className="flex justify-end mt-2">
+                              <Badge variant="outline" className={`capitalize ${getStatusColor(item.status)}`}>
+                                {item.status}
+                              </Badge>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )
+                  })
+                )}
+                {(!order?.order_items || order?.order_items.length === 0) && (
+                  <Card className="border-dashed border-2 border-border/50 bg-muted/20">
+                    <CardContent className="p-8 text-center">
+                      <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                      <p className="text-muted-foreground text-lg">No order items found.</p>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            )}
           </div>
           {/* FOOTER */}
           <div className="px-5 py-4 flex flex-col items-end bg-background rounded-b-2xl">

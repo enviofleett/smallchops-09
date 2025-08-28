@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -12,12 +12,7 @@ import {
   User, 
   Phone, 
   Truck,
-  AlertCircle,
-  CheckCircle2,
-  PlayCircle,
-  XCircle,
-  BarChart3,
-  Calendar
+  BarChart3
 } from 'lucide-react';
 import { format, differenceInMinutes } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
@@ -81,7 +76,7 @@ export function EnhancedDeliveryManagement() {
   const { drivers } = useDriverManagement();
   const { sendCustomEmail } = useEmailService();
 
-  // Fetch ready orders
+  // Orders fetch
   const { data: readyOrders = [], isLoading: ordersLoading, refetch: refetchOrders } = useQuery({
     queryKey: ['ready-orders'],
     queryFn: async () => {
@@ -103,22 +98,19 @@ export function EnhancedDeliveryManagement() {
       if (error) throw error;
       return data as ReadyOrder[];
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
   });
 
-  // Fetch delivery schedules for ready orders
+  // Delivery schedules
   const { data: deliverySchedules = {} } = useQuery({
     queryKey: ['delivery-schedules', readyOrders.map(o => o.id)],
     queryFn: async () => {
       if (readyOrders.length === 0) return {};
-      
       const { data, error } = await supabase
         .from('order_delivery_schedule')
         .select('*')
         .in('order_id', readyOrders.map(o => o.id));
-
       if (error) throw error;
-      
       return data.reduce((acc, schedule) => {
         acc[schedule.order_id] = schedule;
         return acc;
@@ -127,7 +119,7 @@ export function EnhancedDeliveryManagement() {
     enabled: readyOrders.length > 0,
   });
 
-  // Fetch delivery assignments
+  // Delivery assignments
   const { data: assignments = [] } = useQuery({
     queryKey: ['delivery-assignments'],
     queryFn: async () => {
@@ -135,22 +127,19 @@ export function EnhancedDeliveryManagement() {
         .from('delivery_assignments')
         .select('*')
         .in('order_id', readyOrders.map(o => o.id));
-
       if (error) throw error;
       return data as DeliveryAssignment[];
     },
     enabled: readyOrders.length > 0,
   });
 
-  // Merge orders with their schedules and assignments, then sort by imminent delivery date
+  // Merge orders with schedules and assignments, sorted by imminent delivery date
   const enhancedOrders = useMemo(() => {
     const merged = readyOrders.map(order => ({
       ...order,
       delivery_schedule: deliverySchedules[order.id],
       assignment: assignments.find(a => a.order_id === order.id),
     }));
-
-    // Sort by imminent delivery date/time (soonest first)
     return merged.sort((a, b) => {
       const aDeliveryTime = a.delivery_schedule?.delivery_time_start 
         ? new Date(`${a.delivery_schedule.delivery_date} ${a.delivery_schedule.delivery_time_start}`)
@@ -158,15 +147,14 @@ export function EnhancedDeliveryManagement() {
       const bDeliveryTime = b.delivery_schedule?.delivery_time_start 
         ? new Date(`${b.delivery_schedule.delivery_date} ${b.delivery_schedule.delivery_time_start}`)
         : new Date(b.created_at);
-      
       return aDeliveryTime.getTime() - bDeliveryTime.getTime();
     });
   }, [readyOrders, deliverySchedules, assignments]);
 
-  // Handle driver assignment
+  // Assign driver to orders
   const handleAssignDriver = async (orderIds: string[], driverId: string) => {
     try {
-        const results = await Promise.all(
+      const results = await Promise.all(
         orderIds.map(orderId => 
           supabase.rpc('assign_driver_to_order', {
             p_order_id: orderId,
@@ -174,26 +162,17 @@ export function EnhancedDeliveryManagement() {
           })
         )
       );
+      const successCount = results.filter(r => r.data?.success).length;
+      const failedResults = results.filter(r => !r.data?.success);
 
-      const successCount = results.filter(r => {
-        const data = r.data as any;
-        return data?.success;
-      }).length;
-      
       if (successCount > 0) {
         toast.success(`${successCount} order(s) assigned successfully`);
         refetchOrders();
         setSelectedOrders([]);
       }
-      
-      const failedResults = results.filter(r => {
-        const data = r.data as any;
-        return !data?.success;
-      });
       if (failedResults.length > 0) {
         failedResults.forEach(result => {
-          const data = result.data as any;
-          toast.error(data?.error || 'Assignment failed');
+          toast.error(result.data?.error || 'Assignment failed');
         });
       }
     } catch (error) {
@@ -202,7 +181,7 @@ export function EnhancedDeliveryManagement() {
     }
   };
 
-  // Handle status update
+  // Update assignment status
   const handleStatusUpdate = async (assignmentId: string, status: string, notes?: string) => {
     try {
       const { data, error } = await supabase.rpc('update_delivery_status', {
@@ -210,16 +189,13 @@ export function EnhancedDeliveryManagement() {
         p_status: status,
         p_notes: notes,
       });
-
       if (error) throw error;
-
-      const result = data as any;
-      if (result?.success) {
+      if (data?.success) {
         toast.success('Status updated successfully');
         refetchOrders();
         setIsStatusDialogOpen(false);
       } else {
-        toast.error(result?.error || 'Failed to update status');
+        toast.error(data?.error || 'Failed to update status');
       }
     } catch (error) {
       toast.error('Failed to update status');
@@ -227,6 +203,7 @@ export function EnhancedDeliveryManagement() {
     }
   };
 
+  // Status badge component
   const getStatusBadge = (status: string) => {
     const statusConfig = {
       assigned: { color: 'bg-blue-500', label: 'Assigned' },
@@ -236,9 +213,7 @@ export function EnhancedDeliveryManagement() {
       failed: { color: 'bg-red-500', label: 'Failed' },
       cancelled: { color: 'bg-gray-500', label: 'Cancelled' },
     };
-
     const config = statusConfig[status as keyof typeof statusConfig] || statusConfig.assigned;
-    
     return (
       <Badge className={`${config.color} text-white`}>
         {config.label}
@@ -246,35 +221,32 @@ export function EnhancedDeliveryManagement() {
     );
   };
 
+  // Find driver by ID
   const getDriverInfo = (driverId: string) => {
     return drivers.find(d => d.id === driverId);
   };
 
-  // Handle order status updates
+  // Update order status and notify customer if necessary
   const handleOrderStatusUpdate = async (orderId: string, newStatus: OrderStatus, previousStatus: string) => {
     try {
       const { error } = await supabase
         .from('orders')
         .update({ status: newStatus })
         .eq('id', orderId);
-
       if (error) throw error;
 
-      // If transitioning to "out_for_delivery", send email to customer
       if (newStatus === 'out_for_delivery' && previousStatus !== 'out_for_delivery') {
         const order = enhancedOrders.find(o => o.id === orderId);
         if (order) {
           try {
             const driver = order.assigned_rider_id ? getDriverInfo(order.assigned_rider_id) : undefined;
             const emailContent = buildOutForDeliveryEmailContent(order, driver);
-            
             await sendCustomEmail({
               to: order.customer_email,
               subject: emailContent.subject,
               html: emailContent.html,
               emailType: 'transactional'
             });
-
             toast.success(`Order status updated to ${newStatus} and customer notified`);
           } catch (emailError) {
             console.error('Failed to send email:', emailError);
@@ -284,7 +256,6 @@ export function EnhancedDeliveryManagement() {
       } else {
         toast.success(`Order status updated to ${newStatus}`);
       }
-
       refetchOrders();
     } catch (error) {
       console.error('Status update error:', error);
@@ -292,17 +263,15 @@ export function EnhancedDeliveryManagement() {
     }
   };
 
-  // Calculate delivery statistics
+  // Delivery statistics
   const getDeliveryStats = (order: any) => {
     const createdAt = new Date(order.created_at);
     const deliveryTime = order.delivery_schedule?.delivery_time_start 
       ? new Date(`${order.delivery_schedule.delivery_date} ${order.delivery_schedule.delivery_time_start}`)
       : null;
-    
     const timeToDelivery = deliveryTime 
       ? differenceInMinutes(deliveryTime, createdAt)
       : null;
-
     return {
       createdAt: format(createdAt, 'MMM dd, yyyy HH:mm'),
       timeToDelivery: timeToDelivery ? `${Math.floor(timeToDelivery / 60)}h ${timeToDelivery % 60}m` : 'N/A',
@@ -338,7 +307,6 @@ export function EnhancedDeliveryManagement() {
             {enhancedOrders.length} orders ready for delivery/pickup
           </p>
         </div>
-        
         {selectedOrders.length > 0 && (
           <div className="flex gap-2">
             <Button
@@ -358,11 +326,9 @@ export function EnhancedDeliveryManagement() {
           <Checkbox
             checked={selectedOrders.length === enhancedOrders.length}
             onCheckedChange={(checked) => {
-              if (checked) {
-                setSelectedOrders(enhancedOrders.map(o => o.id));
-              } else {
-                setSelectedOrders([]);
-              }
+              setSelectedOrders(
+                checked ? enhancedOrders.map(o => o.id) : []
+              );
             }}
           />
           <span className="text-sm font-medium">
@@ -387,11 +353,11 @@ export function EnhancedDeliveryManagement() {
                     <Checkbox
                       checked={selectedOrders.includes(order.id)}
                       onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedOrders(prev => [...prev, order.id]);
-                        } else {
-                          setSelectedOrders(prev => prev.filter(id => id !== order.id));
-                        }
+                        setSelectedOrders(prev =>
+                          checked
+                            ? [...prev, order.id]
+                            : prev.filter(id => id !== order.id)
+                        );
                       }}
                     />
                     <div>
@@ -401,7 +367,6 @@ export function EnhancedDeliveryManagement() {
                       </p>
                     </div>
                   </div>
-                  
                   <div className="flex items-center gap-2">
                     <Badge variant={order.order_type === 'delivery' ? 'default' : 'secondary'}>
                       {order.order_type}
@@ -429,7 +394,6 @@ export function EnhancedDeliveryManagement() {
                       </p>
                     </div>
                   </div>
-
                   {/* Order Details */}
                   <div className="space-y-2">
                     <h4 className="font-medium flex items-center gap-2">
@@ -447,7 +411,6 @@ export function EnhancedDeliveryManagement() {
                       )}
                     </div>
                   </div>
-
                   {/* Assignment/Driver Info */}
                   <div className="space-y-2">
                     <h4 className="font-medium flex items-center gap-2">
@@ -504,7 +467,6 @@ export function EnhancedDeliveryManagement() {
                       <p className="font-medium">{deliveryStats.driverAssigned ? 'Assigned' : 'Not Assigned'}</p>
                     </div>
                   </div>
-                  
                   {/* Order Status Update */}
                   <div className="mt-3 pt-3 border-t border-muted">
                     <div className="flex items-center gap-2">
@@ -527,7 +489,6 @@ export function EnhancedDeliveryManagement() {
                     </div>
                   </div>
                 </div>
-
                 {/* Action buttons */}
                 <div className="flex flex-wrap gap-2 mt-4">
                   <Button
@@ -540,7 +501,6 @@ export function EnhancedDeliveryManagement() {
                   >
                     View Details
                   </Button>
-                  
                   {!driver && (
                     <Button
                       size="sm"
@@ -552,7 +512,6 @@ export function EnhancedDeliveryManagement() {
                       Assign Driver
                     </Button>
                   )}
-                  
                   {assignment && (
                     <Button
                       variant="outline"
@@ -595,7 +554,6 @@ export function EnhancedDeliveryManagement() {
           }}
         />
       )}
-
       <DeliveryAssignmentDialog
         isOpen={isAssignDialogOpen}
         onClose={() => {
@@ -606,7 +564,6 @@ export function EnhancedDeliveryManagement() {
         onAssign={handleAssignDriver}
         drivers={drivers.filter(d => d.is_active)}
       />
-
       {selectedAssignment && (
         <DeliveryStatusDialog
           isOpen={isStatusDialogOpen}

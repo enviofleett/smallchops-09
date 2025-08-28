@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,19 +13,17 @@ import { OrderReceiptModal } from '@/components/customer/OrderReceiptModal';
 import { DeliveryAssignmentDialog } from './DeliveryAssignmentDialog';
 import { OrderDetailsModal } from './OrderDetailsModal';
 import { useDriverManagement } from '@/hooks/useDriverManagement';
-import { 
-  Package, 
-  Clock, 
-  MapPin, 
-  User, 
-  Phone, 
+import {
+  Package,
+  Clock,
+  MapPin,
+  User,
+  Phone,
   Truck,
   AlertCircle,
   CheckCircle2,
   Printer,
   Eye,
-  Settings,
-  Filter,
   ChevronDown,
   Search
 } from 'lucide-react';
@@ -38,12 +36,12 @@ interface UnifiedDeliveryManagementProps {
   selectedDate?: Date;
   typeFilter?: 'all' | 'delivery' | 'pickup';
   statusFilter?: string[];
-  ordersOverride?: any[]; // For passing pre-filtered orders (e.g., delivery window filtered)
+  ordersOverride?: any[];
 }
 
-export function UnifiedDeliveryManagement({ 
-  mode, 
-  selectedDate, 
+export function UnifiedDeliveryManagement({
+  mode,
+  selectedDate,
   typeFilter = 'all',
   statusFilter = ['pending', 'confirmed', 'preparing', 'ready', 'out_for_delivery'],
   ordersOverride
@@ -59,10 +57,9 @@ export function UnifiedDeliveryManagement({
   const [typeLocal, setTypeLocal] = useState<'all' | 'delivery' | 'pickup'>(typeFilter);
   const [searchQuery, setSearchQuery] = useState('');
   const [debouncedQuery, setDebouncedQuery] = useState('');
-
   const { drivers } = useDriverManagement();
 
-  // Debounce search query
+  // Debounce search query for performance
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedQuery(searchQuery.trim().toLowerCase());
@@ -79,24 +76,16 @@ export function UnifiedDeliveryManagement({
     { value: 'delivered', label: 'Delivered' },
   ];
 
-  // Build query parameters based on mode
+  // Build query parameters
   const queryParams = useMemo(() => {
-    const params: any = {
-      page: 1,
-      pageSize: 1000,
-    };
-
+    const params: any = { page: 1, pageSize: 1000 };
     if (mode === 'ready') {
       params.status = 'ready';
-    } else {
-      // For 'all' mode, don't set status to get multiple statuses
-      if (selectedDate) {
-        const dateString = format(selectedDate, 'yyyy-MM-dd');
-        params.startDate = dateString;
-        params.endDate = dateString;
-      }
+    } else if (selectedDate) {
+      const dateString = format(selectedDate, 'yyyy-MM-dd');
+      params.startDate = dateString;
+      params.endDate = dateString;
     }
-
     return params;
   }, [mode, selectedDate]);
 
@@ -104,55 +93,39 @@ export function UnifiedDeliveryManagement({
   const { data: ordersData, isLoading, refetch } = useQuery({
     queryKey: ['unified-orders', mode, selectedDate?.toISOString(), typeFilter, statusFilter],
     queryFn: () => getOrders(queryParams),
-    refetchInterval: mode === 'ready' ? 30000 : undefined, // Auto-refresh ready orders
+    refetchInterval: mode === 'ready' ? 30000 : undefined,
   });
 
-  // Filter orders based on mode and filters
+  // Filter orders for display based on type, status, payment, and search query
   const filteredOrders = useMemo(() => {
-    // Use override if provided (for pre-filtered orders like delivery window filter)
-    if (ordersOverride) {
-      return ordersOverride;
-    }
-
+    if (ordersOverride) return ordersOverride;
     let orders = ordersData?.orders || [];
-
-    // Apply type filter
     if (typeLocal !== 'all') {
       orders = orders.filter(order => order.order_type === typeLocal);
     }
-
-    // Apply status filter for 'all' mode
     if (mode === 'all') {
       orders = orders.filter(order => localStatusFilter.includes(order.status));
     }
-
-    // Only show paid orders
     orders = orders.filter(order => order.payment_status === 'paid');
-
-    // Apply search filter
     if (debouncedQuery) {
-      orders = orders.filter(order => 
+      orders = orders.filter(order =>
         (order.order_number || '').toLowerCase().includes(debouncedQuery) ||
         (order.customer_name || '').toLowerCase().includes(debouncedQuery) ||
         (order.customer_email || '').toLowerCase().includes(debouncedQuery) ||
         (order.customer_phone || '').toLowerCase().includes(debouncedQuery)
       );
     }
-
     return orders;
   }, [ordersData?.orders, typeLocal, localStatusFilter, mode, ordersOverride, debouncedQuery]);
 
-  // Handle status change with validation
+  // Safe status change handler
   const handleStatusChange = async (orderId: string, newStatus: string) => {
     try {
       const order = filteredOrders.find(o => o.id === orderId);
-      
-      // Validate status transitions
       if (newStatus === 'out_for_delivery' && !order?.assigned_rider_id) {
         toast.error('Cannot move to "Out for Delivery" without assigning a driver. Please assign a driver first.');
         return;
       }
-      
       await updateOrder(orderId, { status: newStatus as any });
       toast.success('Order status updated successfully');
       refetch();
@@ -162,14 +135,12 @@ export function UnifiedDeliveryManagement({
     }
   };
 
-  // Handle driver assignment
+  // Bulk driver assignment
   const handleAssignDriver = async (orderIds: string[], driverId: string) => {
     try {
-      // Use the updated assignment method that handles profile_id mapping
-      const promises = orderIds.map(orderId => 
-        updateOrder(orderId, { assigned_rider_id: driverId }) // driverId is now profile_id
+      const promises = orderIds.map(orderId =>
+        updateOrder(orderId, { assigned_rider_id: driverId })
       );
-      
       await Promise.all(promises);
       toast.success(`${orderIds.length} order(s) assigned successfully`);
       refetch();
@@ -180,24 +151,18 @@ export function UnifiedDeliveryManagement({
     }
   };
 
-  // Handle print
+  // Print single receipt
   const handlePrint = (order: any) => {
     setPrintingOrder(order);
     setIsReceiptModalOpen(true);
   };
 
-  // Handle bulk print
+  // Bulk print receipts
   const handleBulkPrint = () => {
     if (selectedOrders.length === 0) return;
-    
-    const ordersForPrint = filteredOrders.filter(order => 
-      selectedOrders.includes(order.id)
-    );
-    
-    // Create a print window with multiple receipts
+    const ordersForPrint = filteredOrders.filter(order => selectedOrders.includes(order.id));
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
-    
     printWindow.document.write(`
       <html>
         <head>
@@ -227,11 +192,11 @@ export function UnifiedDeliveryManagement({
         </body>
       </html>
     `);
-    
     printWindow.document.close();
     printWindow.print();
   };
 
+  // Status icon helper
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'delivered': return <CheckCircle2 className="w-4 h-4" />;
@@ -262,10 +227,9 @@ export function UnifiedDeliveryManagement({
   }
 
   return (
-    <div className="space-y-4">
-      {/* Mobile-responsive toolbar */}
+    <div className="space-y-4 w-full max-w-screen-lg mx-auto px-2 sm:px-4">
+      {/* Toolbar: Search & Filters */}
       <div className="space-y-4">
-        {/* Top row - Search */}
         <div className="w-full">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
@@ -277,10 +241,7 @@ export function UnifiedDeliveryManagement({
             />
           </div>
         </div>
-
-        {/* Second row - Filters (stacked on mobile) */}
         <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-          {/* Order Type Filter */}
           <div className="flex-1 min-w-0">
             <Select value={typeLocal} onValueChange={(value: any) => setTypeLocal(value)}>
               <SelectTrigger className="w-full">
@@ -293,20 +254,18 @@ export function UnifiedDeliveryManagement({
               </SelectContent>
             </Select>
           </div>
-
-          {/* Status Filter */}
           {mode === 'all' && (
             <div className="flex-1 min-w-0">
               <Popover open={isStatusOpen} onOpenChange={setIsStatusOpen}>
                 <PopoverTrigger asChild>
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full justify-between text-sm"
                   >
                     <span className="truncate">
-                      {localStatusFilter.length === statusOptions.length ? 'All Statuses' 
-                       : localStatusFilter.length === 1 ? statusOptions.find(s => s.value === localStatusFilter[0])?.label
-                       : `${localStatusFilter.length} Selected`}
+                      {localStatusFilter.length === statusOptions.length ? 'All Statuses'
+                        : localStatusFilter.length === 1 ? statusOptions.find(s => s.value === localStatusFilter[0])?.label
+                        : `${localStatusFilter.length} Selected`}
                     </span>
                     <ChevronDown className="w-4 h-4 opacity-50" />
                   </Button>
@@ -339,7 +298,7 @@ export function UnifiedDeliveryManagement({
         </div>
       </div>
 
-      {/* Selected orders section - mobile optimized */}
+      {/* Bulk actions bar */}
       {selectedOrders.length > 0 && (
         <Card className="border-blue-200 bg-blue-50/50">
           <CardContent className="p-4">
@@ -382,26 +341,25 @@ export function UnifiedDeliveryManagement({
         </Card>
       )}
 
-      {/* Orders grid - mobile responsive */}
+      {/* Orders grid */}
       {filteredOrders.length === 0 ? (
         <Card>
           <CardContent className="p-8 text-center">
             <Package className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
             <h3 className="text-lg font-medium mb-2">No orders found</h3>
             <p className="text-muted-foreground">
-              {mode === 'ready' 
-                ? 'No orders are ready for delivery/pickup at the moment.' 
+              {mode === 'ready'
+                ? 'No orders are ready for delivery/pickup at the moment.'
                 : 'Try adjusting your filters or check back later.'}
             </p>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {filteredOrders.map((order) => {
             const driverInfo = drivers.find(d => d.profile_id === order.assigned_rider_id);
-            
             return (
-              <Card 
+              <Card
                 key={order.id}
                 className={cn(
                   "transition-all duration-200 hover:shadow-md",
@@ -409,7 +367,7 @@ export function UnifiedDeliveryManagement({
                 )}
               >
                 <CardContent className="p-4">
-                  {/* Header with checkbox and order number */}
+                  {/* Header row */}
                   <div className="flex items-start justify-between mb-3">
                     <div className="flex items-center gap-3">
                       <Checkbox
@@ -440,7 +398,7 @@ export function UnifiedDeliveryManagement({
                     </div>
                   </div>
 
-                  {/* Customer info - stacked on mobile */}
+                  {/* Customer info */}
                   <div className="space-y-2 mb-3">
                     <div className="flex items-center gap-2 text-sm">
                       <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
@@ -453,15 +411,14 @@ export function UnifiedDeliveryManagement({
                       </div>
                     )}
                   </div>
-
-                  {/* Delivery address - mobile optimized */}
+                  {/* Delivery address */}
                   {order.order_type === 'delivery' && order.delivery_address && (
                     <div className="mb-3">
                       <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
                         <MapPin className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm text-amber-800 break-words">
-                            {typeof order.delivery_address === 'object' 
+                            {typeof order.delivery_address === 'object'
                               ? `${order.delivery_address.street || ''}, ${order.delivery_address.city || ''}, ${order.delivery_address.state || ''}`.replace(/^,\s*|,\s*$/g, '')
                               : order.delivery_address}
                           </p>
@@ -469,7 +426,6 @@ export function UnifiedDeliveryManagement({
                       </div>
                     </div>
                   )}
-
                   {/* Driver info */}
                   {driverInfo && (
                     <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
@@ -481,8 +437,7 @@ export function UnifiedDeliveryManagement({
                       </div>
                     </div>
                   )}
-
-                  {/* Action buttons - mobile optimized */}
+                  {/* Actions */}
                   <div className="flex flex-wrap gap-2 pt-3 border-t">
                     <Button
                       size="sm"
@@ -506,8 +461,8 @@ export function UnifiedDeliveryManagement({
                       Print
                     </Button>
                     <div className="w-full sm:w-auto flex-1 min-w-0">
-                      <Select 
-                        value={order.status} 
+                      <Select
+                        value={order.status}
                         onValueChange={(value) => handleStatusChange(order.id, value)}
                       >
                         <SelectTrigger className="h-8 text-xs">
@@ -535,26 +490,23 @@ export function UnifiedDeliveryManagement({
           })}
         </div>
       )}
-
       {/* Modals */}
       <OrderDetailsModal
         order={selectedOrder}
         isOpen={isDetailsModalOpen}
         onClose={() => setIsDetailsModalOpen(false)}
       />
-
       <OrderReceiptModal
         order={printingOrder}
         isOpen={isReceiptModalOpen}
         onClose={() => setIsReceiptModalOpen(false)}
       />
-
       <DeliveryAssignmentDialog
         isOpen={isAssignDialogOpen}
         onClose={() => setIsAssignDialogOpen(false)}
         selectedOrderIds={selectedOrders}
         onAssign={handleAssignDriver}
-        drivers={[]}
+        drivers={drivers}
       />
     </div>
   );

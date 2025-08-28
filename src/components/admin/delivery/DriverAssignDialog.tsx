@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -19,21 +19,32 @@ export const DriverAssignDialog: React.FC<DriverAssignDialogProps> = ({
   isOpen,
   onClose,
   selectedOrders,
-  onSuccess
+  onSuccess,
 }) => {
   const [selectedDriverId, setSelectedDriverId] = useState<string>('');
-  const [isAssigning, setIsAssigning] = useState(false);
+  const [isAssigning, setIsAssigning] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>('');
   const { drivers, loading: driversLoading } = useDriverManagement();
   const { toast } = useToast();
 
-  const activeDrivers = drivers.filter(driver => driver.is_active);
+  // Only use active drivers
+  const activeDrivers = useMemo(
+    () => drivers.filter(driver => driver.is_active),
+    [drivers]
+  );
+  const selectedDriver = useMemo(
+    () => activeDrivers.find(driver => driver.id === selectedDriverId),
+    [selectedDriverId, activeDrivers]
+  );
 
   const handleAssign = async () => {
+    setErrorMsg('');
     if (!selectedDriverId || selectedOrders.length === 0) {
+      setErrorMsg('Please select a driver and ensure orders are selected.');
       toast({
         title: "Assignment Failed",
         description: "Please select a driver and ensure orders are selected.",
-        variant: "destructive"
+        variant: "destructive",
       });
       return;
     }
@@ -42,15 +53,15 @@ export const DriverAssignDialog: React.FC<DriverAssignDialogProps> = ({
 
     try {
       // Assign driver to each selected order using profile_id
-      const assignmentPromises = selectedOrders.map(order => 
+      const assignmentPromises = selectedOrders.map(order =>
         supabase.rpc('assign_rider_to_order', {
           p_order_id: order.id,
-          p_rider_id: selectedDriverId // This is now profile_id from the updated getDispatchRiders
+          p_rider_id: selectedDriverId,
         })
       );
 
       const results = await Promise.allSettled(assignmentPromises);
-      
+
       const successful = results.filter(result => result.status === 'fulfilled').length;
       const failed = results.filter(result => result.status === 'rejected').length;
 
@@ -59,34 +70,36 @@ export const DriverAssignDialog: React.FC<DriverAssignDialogProps> = ({
           title: "Assignment Successful",
           description: `Successfully assigned driver to ${successful} order${successful === 1 ? '' : 's'}${failed > 0 ? `. ${failed} assignment${failed === 1 ? '' : 's'} failed.` : '.'}`,
         });
-        
         onSuccess();
-        onClose();
-        setSelectedDriverId('');
+        handleClose();
       } else {
         throw new Error('All assignments failed');
       }
     } catch (error) {
-      console.error('Assignment error:', error);
+      setErrorMsg('Failed to assign driver to orders. Please try again.');
       toast({
         title: "Assignment Failed",
         description: "Failed to assign driver to orders. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
       });
     } finally {
       setIsAssigning(false);
     }
   };
 
-  const selectedDriver = activeDrivers.find(driver => driver.id === selectedDriverId);
+  const handleClose = () => {
+    setSelectedDriverId('');
+    setErrorMsg('');
+    onClose();
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={handleClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Assign Driver to Orders</DialogTitle>
         </DialogHeader>
-        
+
         <div className="space-y-4">
           <div>
             <p className="text-sm text-muted-foreground mb-2">
@@ -102,13 +115,17 @@ export const DriverAssignDialog: React.FC<DriverAssignDialogProps> = ({
           </div>
 
           <div>
-            <label className="text-sm font-medium mb-2 block">Select Driver</label>
+            <label htmlFor="driver-select" className="text-sm font-medium mb-2 block">Select Driver</label>
             {driversLoading ? (
               <div className="flex items-center justify-center py-8">
-                <Loader2 className="w-6 h-6 animate-spin" />
+                <Loader2 className="w-6 h-6 animate-spin" aria-label="Loading drivers" />
               </div>
             ) : (
-              <Select value={selectedDriverId} onValueChange={setSelectedDriverId}>
+              <Select
+                value={selectedDriverId}
+                onValueChange={setSelectedDriverId}
+                id="driver-select"
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a driver..." />
                 </SelectTrigger>
@@ -129,13 +146,17 @@ export const DriverAssignDialog: React.FC<DriverAssignDialogProps> = ({
                 </SelectContent>
               </Select>
             )}
-            
+
             {activeDrivers.length === 0 && !driversLoading && (
               <p className="text-sm text-muted-foreground mt-2">
                 No active drivers available. Please register drivers first.
               </p>
             )}
           </div>
+
+          {errorMsg && (
+            <div className="text-destructive text-sm" role="alert">{errorMsg}</div>
+          )}
 
           {selectedDriver && (
             <div className="bg-primary/5 p-3 rounded-lg">
@@ -150,18 +171,21 @@ export const DriverAssignDialog: React.FC<DriverAssignDialogProps> = ({
           )}
 
           <div className="flex gap-2 pt-4">
-            <Button 
-              variant="outline" 
-              onClick={onClose}
+            <Button
+              variant="outline"
+              type="button"
+              onClick={handleClose}
               disabled={isAssigning}
               className="flex-1"
             >
               Cancel
             </Button>
-            <Button 
-              onClick={handleAssign} 
+            <Button
+              type="button"
+              onClick={handleAssign}
               disabled={!selectedDriverId || isAssigning || activeDrivers.length === 0}
               className="flex-1"
+              aria-busy={isAssigning}
             >
               {isAssigning ? (
                 <>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -27,38 +27,47 @@ interface DeliveryStatusDialogProps {
   isOpen: boolean;
   onClose: () => void;
   assignment: DeliveryAssignment;
-  onStatusUpdate: (assignmentId: string, status: string, notes?: string) => void;
+  onStatusUpdate: (assignmentId: string, status: DeliveryAssignment['status'], notes?: string) => Promise<void>;
 }
+
+const statusOptions = [
+  { value: 'assigned', label: 'Assigned', icon: Clock, color: 'bg-blue-500' },
+  { value: 'accepted', label: 'Accepted', icon: CheckCircle2, color: 'bg-green-500' },
+  { value: 'in_progress', label: 'In Progress', icon: PlayCircle, color: 'bg-orange-500' },
+  { value: 'completed', label: 'Completed', icon: CheckCircle2, color: 'bg-emerald-500' },
+  { value: 'failed', label: 'Failed', icon: XCircle, color: 'bg-red-500' },
+  { value: 'cancelled', label: 'Cancelled', icon: XCircle, color: 'bg-gray-500' },
+];
 
 export function DeliveryStatusDialog({
   isOpen,
   onClose,
   assignment,
-  onStatusUpdate
+  onStatusUpdate,
 }: DeliveryStatusDialogProps) {
-  const [newStatus, setNewStatus] = useState(assignment.status);
-  const [notes, setNotes] = useState(assignment.delivery_notes || '');
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [newStatus, setNewStatus] = useState<DeliveryAssignment['status']>(assignment.status);
+  const [notes, setNotes] = useState<string>(assignment.delivery_notes || '');
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
+  const [errorMsg, setErrorMsg] = useState<string>('');
 
-  const statusOptions = [
-    { value: 'assigned', label: 'Assigned', icon: Clock, color: 'bg-blue-500' },
-    { value: 'accepted', label: 'Accepted', icon: CheckCircle2, color: 'bg-green-500' },
-    { value: 'in_progress', label: 'In Progress', icon: PlayCircle, color: 'bg-orange-500' },
-    { value: 'completed', label: 'Completed', icon: CheckCircle2, color: 'bg-emerald-500' },
-    { value: 'failed', label: 'Failed', icon: XCircle, color: 'bg-red-500' },
-    { value: 'cancelled', label: 'Cancelled', icon: XCircle, color: 'bg-gray-500' },
-  ];
-
-  const currentStatusOption = statusOptions.find(option => option.value === assignment.status);
-  const newStatusOption = statusOptions.find(option => option.value === newStatus);
+  // Memoized lookup for status options
+  const currentStatusOption = useMemo(
+    () => statusOptions.find(option => option.value === assignment.status),
+    [assignment.status]
+  );
+  const newStatusOption = useMemo(
+    () => statusOptions.find(option => option.value === newStatus),
+    [newStatus]
+  );
 
   const handleUpdate = async () => {
+    setErrorMsg('');
     setIsUpdating(true);
     try {
       await onStatusUpdate(assignment.id, newStatus, notes);
-      onClose();
+      handleClose();
     } catch (error) {
-      console.error('Status update failed:', error);
+      setErrorMsg('Status update failed, please try again.');
     } finally {
       setIsUpdating(false);
     }
@@ -67,6 +76,7 @@ export function DeliveryStatusDialog({
   const handleClose = () => {
     setNewStatus(assignment.status);
     setNotes(assignment.delivery_notes || '');
+    setErrorMsg('');
     onClose();
   };
 
@@ -85,7 +95,7 @@ export function DeliveryStatusDialog({
           <div className="p-3 bg-muted/30 rounded-lg">
             <p className="text-sm font-medium mb-2">Current Status:</p>
             {currentStatusOption && (
-              <Badge className={`${currentStatusOption.color} text-white`}>
+              <Badge className={`${currentStatusOption.color} text-white`} aria-label={currentStatusOption.label}>
                 <currentStatusOption.icon className="w-3 h-3 mr-1" />
                 {currentStatusOption.label}
               </Badge>
@@ -94,10 +104,14 @@ export function DeliveryStatusDialog({
 
           {/* New Status Selection */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">New Status:</label>
-            <Select value={newStatus} onValueChange={(value) => setNewStatus(value as typeof newStatus)}>
+            <label htmlFor="new-status" className="text-sm font-medium">New Status:</label>
+            <Select
+              value={newStatus}
+              onValueChange={(value) => setNewStatus(value as DeliveryAssignment['status'])}
+              id="new-status"
+            >
               <SelectTrigger>
-                <SelectValue />
+                <SelectValue placeholder="Select status..." />
               </SelectTrigger>
               <SelectContent>
                 {statusOptions.map((option) => {
@@ -117,8 +131,9 @@ export function DeliveryStatusDialog({
 
           {/* Notes */}
           <div className="space-y-2">
-            <label className="text-sm font-medium">Notes (Optional):</label>
+            <label htmlFor="delivery-notes" className="text-sm font-medium">Notes (Optional):</label>
             <Textarea
+              id="delivery-notes"
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder="Add any delivery notes or comments..."
@@ -126,11 +141,18 @@ export function DeliveryStatusDialog({
             />
           </div>
 
+          {/* Show error message if any */}
+          {errorMsg && (
+            <div className="text-destructive text-sm" role="alert">
+              {errorMsg}
+            </div>
+          )}
+
           {/* Status Change Preview */}
           {newStatus !== assignment.status && newStatusOption && (
             <div className="p-3 border border-dashed rounded-lg">
               <p className="text-sm font-medium mb-2">Status will change to:</p>
-              <Badge className={`${newStatusOption.color} text-white`}>
+              <Badge className={`${newStatusOption.color} text-white`} aria-label={newStatusOption.label}>
                 <newStatusOption.icon className="w-3 h-3 mr-1" />
                 {newStatusOption.label}
               </Badge>
@@ -139,13 +161,15 @@ export function DeliveryStatusDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose}>
+          <Button variant="outline" type="button" onClick={handleClose}>
             Cancel
           </Button>
-          <Button 
+          <Button
+            type="button"
             onClick={handleUpdate}
             disabled={newStatus === assignment.status || isUpdating}
             className="min-w-[100px]"
+            aria-busy={isUpdating}
           >
             {isUpdating ? 'Updating...' : 'Update Status'}
           </Button>

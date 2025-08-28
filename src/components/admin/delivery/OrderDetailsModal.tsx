@@ -126,7 +126,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
     }
   }, [error])
 
-  // Fetch full product features for each item
   useEffect(() => {
     let isMounted = true
     async function fetchAllProducts() {
@@ -167,43 +166,10 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
   const deliveryWindowStart = deliverySchedule?.delivery_time_start
   const deliveryWindowEnd = deliverySchedule?.delivery_time_end
 
-  // Print handler: prints only modal content and keeps UI parity
+  // Print handler: print modal content in a clear, full-width layout
   const handlePrint = () => {
-    const modal = document.getElementById("order-details-modal-content")
-    if (modal) {
-      const printContents = modal.innerHTML
-      const printWindow = window.open("", "", "height=800,width=600")
-      printWindow!.document.write(`
-        <html>
-          <head>
-            <title>Order Details</title>
-            <meta name="viewport" content="width=device-width, initial-scale=1" />
-            <style>
-              body { font-family: 'Inter', sans-serif; background: #fff; color: #222; }
-              .order-details-modal-print { max-width: 100vw; width: 100vw; margin: 0; padding: 0; }
-              .card, .border, .shadow-2xl, .rounded-2xl { box-shadow: none !important; border-radius: 0 !important; border: none !important; }
-              .no-print { display: none !important; }
-              .scrollbar-thin { scrollbar-width: none !important; overflow: visible !important; }
-              @media print {
-                html, body { background: #fff !important; color: #222 !important; }
-                .order-details-modal-print { margin: 0; padding: 0; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="order-details-modal-print">${printContents}</div>
-          </body>
-        </html>
-      `)
-      printWindow!.document.close()
-      printWindow!.focus()
-      printWindow!.print()
-      setTimeout(() => printWindow!.close(), 1000)
-    }
+    window.print()
   }
-
-  const modalContentStyles =
-    "max-w-full w-full sm:max-w-[98vw] md:max-w-3xl lg:max-w-5xl h-[98vh] max-h-[98vh] overflow-y-auto rounded-2xl bg-background p-0 border shadow-2xl"
 
   // Features List UI block
   function FeaturesList({ product }: { product: any }) {
@@ -269,16 +235,19 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent id="order-details-modal-content" className={modalContentStyles}>
+        <DialogContent
+          id="order-details-modal-content"
+          className="max-w-full w-full sm:max-w-[98vw] md:max-w-3xl lg:max-w-5xl h-[98vh] max-h-[98vh] overflow-y-auto rounded-2xl bg-background p-0 border shadow-2xl print:shadow-none print:border-none print:rounded-none print:p-0 print:max-w-full print:h-auto"
+        >
           {/* Header */}
-          <div className="bg-gradient-to-r from-primary/5 to-secondary/5 px-4 py-4 sm:px-8 sm:py-6 border-b border-border/50">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="bg-gradient-to-r from-primary/5 to-secondary/5 px-4 py-4 sm:px-8 sm:py-6 border-b border-border/50 print:bg-white print:border-b print:px-0 print:py-2">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 print:flex-row print:items-center">
               <div className="flex items-center gap-4">
-                <img src={STARTERS_LOGO || "/placeholder.svg"} alt="Starters Logo" className="h-10 w-auto" />
+                <img src={STARTERS_LOGO || "/placeholder.svg"} alt="Starters Logo" className="h-10 w-auto print:h-12" />
                 <div>
-                  <h2 className="text-xl sm:text-2xl font-bold text-foreground">Order Details</h2>
+                  <h2 className="text-xl sm:text-2xl font-bold text-foreground print:text-black">Order Details</h2>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
-                    <span className="font-mono text-sm text-muted-foreground">#{order?.order_number}</span>
+                    <span className="font-mono text-sm text-muted-foreground print:text-black">#{order?.order_number}</span>
                     <Badge className={`capitalize text-sm px-3 py-1 ${getStatusColor(order?.status)}`} variant="outline">
                       {order?.status?.replace(/_/g, " ") ?? "Unknown"}
                     </Badge>
@@ -297,11 +266,12 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </div>
             </div>
           </div>
+
           {/* Order Summary Cards */}
-          <div className="px-4 py-4 sm:px-8 sm:py-6 bg-card/30">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-              <Card className="bg-gradient-to-br from-primary/10 to-secondary/5 border-primary/20">
-                <CardContent className="p-4 sm:p-6">
+          <div className="px-4 py-4 sm:px-8 sm:py-6 bg-card/30 print:bg-white print:px-0 print:py-2">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6 print:grid-cols-3 print:gap-2">
+              <Card className="bg-gradient-to-br from-primary/10 to-secondary/5 border-primary/20 print:bg-white print:border-none print:shadow-none">
+                <CardContent className="p-4 sm:p-6 print:p-2">
                   <div className="flex items-center gap-3 mb-2">
                     <CreditCard className="h-5 w-5 text-primary" />
                     <span className="text-sm font-medium text-muted-foreground">Total Amount</span>
@@ -313,8 +283,8 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                   </div>
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
-                <CardContent className="p-4 sm:p-6">
+              <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200 print:bg-white print:border-none print:shadow-none">
+                <CardContent className="p-4 sm:p-6 print:p-2">
                   <div className="flex items-center gap-3 mb-2">
                     <Truck className="h-5 w-5 text-blue-600" />
                     <span className="text-sm font-medium text-muted-foreground">Delivery</span>
@@ -331,8 +301,8 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                   )}
                 </CardContent>
               </Card>
-              <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
-                <CardContent className="p-4 sm:p-6">
+              <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200 print:bg-white print:border-none print:shadow-none">
+                <CardContent className="p-4 sm:p-6 print:p-2">
                   <div className="flex items-center gap-3 mb-2">
                     <CheckCircle className="h-5 w-5 text-green-600" />
                     <span className="text-sm font-medium text-muted-foreground">Status</span>
@@ -347,12 +317,14 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </Card>
             </div>
           </div>
-          <Separator />
+
+          <Separator className="print:hidden" />
+
           {/* Customer & Delivery Info */}
-          <div className="px-4 py-4 sm:px-8 sm:py-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
-              <Card className="border-none shadow-sm bg-card/50">
-                <CardContent className="p-4 sm:p-6">
+          <div className="px-4 py-4 sm:px-8 sm:py-6 print:px-0 print:py-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8 print:grid-cols-2 print:gap-2">
+              <Card className="border-none shadow-sm bg-card/50 print:bg-white print:shadow-none print:border-none">
+                <CardContent className="p-4 sm:p-6 print:p-2">
                   <div className="flex items-center gap-3 mb-4">
                     <User className="h-5 w-5 text-primary" />
                     <h3 className="text-lg font-semibold text-foreground">Customer Information</h3>
@@ -370,8 +342,8 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border-none shadow-sm bg-card/50">
-                <CardContent className="p-4 sm:p-6">
+              <Card className="border-none shadow-sm bg-card/50 print:bg-white print:shadow-none print:border-none">
+                <CardContent className="p-4 sm:p-6 print:p-2">
                   <div className="flex items-center gap-3 mb-4">
                     <MapPin className="h-5 w-5 text-primary" />
                     <h3 className="text-lg font-semibold text-foreground">Delivery Address</h3>
@@ -395,9 +367,11 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </Card>
             </div>
           </div>
-          <Separator />
+
+          <Separator className="print:hidden" />
+
           {/* Order Items */}
-          <div className="px-4 py-4 sm:px-8 sm:py-6">
+          <div className="px-4 py-4 sm:px-8 sm:py-6 print:px-0 print:py-2">
             <div className="flex items-center gap-3 mb-6">
               <Package className="h-6 w-6 text-primary" />
               <h3 className="text-xl font-semibold text-foreground">Order Items ({order?.order_items?.length || 0})</h3>
@@ -405,8 +379,8 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
             {isLoading || featuresLoading ? (
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => (
-                  <Card key={i} className="border-border/50">
-                    <CardContent className="p-4 sm:p-6">
+                  <Card key={i} className="border-border/50 print:shadow-none print:border-none">
+                    <CardContent className="p-4 sm:p-6 print:p-2">
                       <Skeleton className="h-6 w-3/4 mb-2" />
                       <Skeleton className="h-4 w-1/2 mb-4" />
                       <div className="flex justify-between">
@@ -418,12 +392,12 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                 ))}
               </div>
             ) : (
-              <div className="space-y-4 max-h-[38vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent print:max-h-full print:overflow-visible">
+              <div className="space-y-4 max-h-[38vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent print:max-h-full print:overflow-visible print:overflow-auto">
                 {order?.order_items?.map((item: any, idx: number) => {
                   const product = productsData[item.product_id] || item.product || {}
                   return (
-                    <Card key={item.id || idx} className="border-border/50 hover:shadow-md transition-shadow">
-                      <CardContent className="p-4 sm:p-6">
+                    <Card key={item.id || idx} className="border-border/50 hover:shadow-md transition-shadow print:shadow-none print:border-none">
+                      <CardContent className="p-4 sm:p-6 print:p-2">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <h4 className="text-lg font-semibold text-foreground mb-2">{item.product_name}</h4>
@@ -432,7 +406,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                             )}
                             <FeaturesList product={product} />
                             {item.special_instructions && (
-                              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg mt-3">
+                              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg mt-3 print:bg-white print:border-none print:rounded-none">
                                 <div className="flex items-start gap-2">
                                   <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
                                   <div>
@@ -470,8 +444,8 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                   )
                 })}
                 {(!order?.order_items || order?.order_items.length === 0) && (
-                  <Card className="border-dashed border-2 border-border/50">
-                    <CardContent className="p-12 text-center">
+                  <Card className="border-dashed border-2 border-border/50 print:shadow-none print:border-none">
+                    <CardContent className="p-12 text-center print:p-6">
                       <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                       <p className="text-muted-foreground">No order items found.</p>
                     </CardContent>
@@ -481,7 +455,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
             )}
           </div>
           {/* Cost Summary */}
-          <div className="px-4 py-4 sm:px-8 sm:py-6">
+          <div className="px-4 py-4 sm:px-8 sm:py-6 print:px-0 print:py-2">
             <div className="flex flex-col sm:flex-row justify-end gap-6 print:gap-2 bg-white print:bg-white">
               <div className="flex flex-col items-end gap-1">
                 <div>
@@ -541,6 +515,8 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
             max-width: 100vw !important;
             padding: 0 !important;
             margin: 0 !important;
+            height: auto !important;
+            overflow: visible !important;
           }
           .no-print {
             display: none !important;
@@ -549,6 +525,16 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
             scrollbar-width: none !important;
             -ms-overflow-style: none !important;
             overflow: visible !important;
+          }
+          .print\\:shadow-none, .print\\:border-none, .print\\:rounded-none, .print\\:p-0, .print\\:max-w-full {
+            box-shadow: none !important;
+            border: none !important;
+            border-radius: 0 !important;
+            padding: 0 !important;
+            max-width: 100vw !important;
+          }
+          .print\\:bg-white {
+            background: #fff !important;
           }
         }
       `}</style>

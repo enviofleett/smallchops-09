@@ -5,10 +5,8 @@
     { "source": "/favicon.ico", "destination": "/favicon.ico" },
     { "source": "/robots.txt", "destination": "/robots.txt" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
-    { 
-      "source": "/((?!assets|.*\\.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2|ttf|eot|json|xml|txt)$).*)",
-      "destination": "/index.html" 
-    }
+    { "source": "/assets/(.*)", "destination": "/assets/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {

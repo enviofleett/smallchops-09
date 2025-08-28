@@ -14,6 +14,8 @@ import {
   Truck,
   BarChart3
 } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow, MobileCardActions } from '@/components/ui/responsive-table';
 import { format, differenceInMinutes } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useDriverManagement } from '@/hooks/useDriverManagement';
@@ -73,6 +75,7 @@ export function EnhancedDeliveryManagement() {
   const [isStatusDialogOpen, setIsStatusDialogOpen] = useState(false);
   const [selectedAssignment, setSelectedAssignment] = useState<DeliveryAssignment | null>(null);
 
+  const isMobile = useIsMobile();
   const { drivers } = useDriverManagement();
   const { sendCustomEmail } = useEmailService();
 
@@ -345,6 +348,154 @@ export function EnhancedDeliveryManagement() {
           const assignment = order.assignment;
           const deliveryStats = getDeliveryStats(order);
 
+          // Mobile card layout
+          if (isMobile) {
+            return (
+              <MobileCard key={order.id}>
+                <MobileCardHeader>
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={selectedOrders.includes(order.id)}
+                        onCheckedChange={(checked) => {
+                          setSelectedOrders(prev =>
+                            checked
+                              ? [...prev, order.id]
+                              : prev.filter(id => id !== order.id)
+                          );
+                        }}
+                      />
+                      <div>
+                        <h3 className="font-semibold text-sm">#{order.order_number}</h3>
+                        <p className="text-xs text-muted-foreground">
+                          {format(new Date(order.created_at), 'MMM dd, HH:mm')}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-1 items-end">
+                      <Badge variant={order.order_type === 'delivery' ? 'default' : 'secondary'} className="text-xs">
+                        {order.order_type}
+                      </Badge>
+                      {assignment && getStatusBadge(assignment.status)}
+                      <Badge variant="outline" className="text-xs">
+                        {order.status}
+                      </Badge>
+                    </div>
+                  </div>
+                </MobileCardHeader>
+                
+                <MobileCardContent>
+                  <MobileCardRow 
+                    label="Customer" 
+                    value={
+                      <div className="text-right">
+                        <p className="font-medium text-sm">{order.customer_name}</p>
+                        <p className="text-xs text-muted-foreground">{order.customer_phone}</p>
+                      </div>
+                    } 
+                  />
+                  <MobileCardRow 
+                    label="Amount" 
+                    value={<span className="font-bold">₦{order.total_amount.toLocaleString()}</span>} 
+                  />
+                  <MobileCardRow 
+                    label="Items" 
+                    value={`${order.order_items.length} items`} 
+                  />
+                  {schedule && (
+                    <MobileCardRow 
+                      label="Delivery Time" 
+                      value={`${schedule.delivery_time_start} - ${schedule.delivery_time_end}`} 
+                    />
+                  )}
+                  <MobileCardRow 
+                    label="Driver" 
+                    value={
+                      driver ? (
+                        <div className="text-right">
+                          <p className="font-medium text-sm">{driver.name}</p>
+                          <p className="text-xs text-muted-foreground capitalize">{driver.vehicle_type}</p>
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">Not assigned</span>
+                      )
+                    } 
+                  />
+                  {order.order_type === 'delivery' && order.delivery_address && (
+                    <MobileCardRow 
+                      label="Address" 
+                      value={
+                        <span className="text-xs">
+                          {order.delivery_address.address_line_1}, {order.delivery_address.city}
+                        </span>
+                      } 
+                    />
+                  )}
+                  <MobileCardRow 
+                    label="Status Update" 
+                    value={
+                      <Select 
+                        value={order.status} 
+                        onValueChange={(newStatus: OrderStatus) => handleOrderStatusUpdate(order.id, newStatus, order.status)}
+                      >
+                        <SelectTrigger className="w-28 h-6 text-xs">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ready">Ready</SelectItem>
+                          <SelectItem value="out_for_delivery">Out for Delivery</SelectItem>
+                          <SelectItem value="delivered">Delivered</SelectItem>
+                          <SelectItem value="completed">Completed</SelectItem>
+                          <SelectItem value="returned">Returned</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    } 
+                  />
+                </MobileCardContent>
+
+                <MobileCardActions>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSelectedOrder(order);
+                      setIsDetailsModalOpen(true);
+                    }}
+                    className="text-xs"
+                  >
+                    View
+                  </Button>
+                  {!driver && (
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        setSelectedOrders([order.id]);
+                        setIsAssignDialogOpen(true);
+                      }}
+                      className="text-xs"
+                    >
+                      Assign
+                    </Button>
+                  )}
+                  {assignment && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedAssignment(assignment);
+                        setIsStatusDialogOpen(true);
+                      }}
+                      className="text-xs"
+                    >
+                      Update
+                    </Button>
+                  )}
+                </MobileCardActions>
+              </MobileCard>
+            );
+          }
+
+          // Desktop card layout
           return (
             <Card key={order.id} className="border-l-4 border-l-orange-500">
               <CardContent className="p-6">

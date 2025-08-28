@@ -24,11 +24,8 @@ import {
   Truck,
   CreditCard,
   CheckCircle,
-  Flame,
-  Leaf,
-  Soup,
-  Box,
   AlertTriangle,
+  Box,
 } from "lucide-react"
 import { getProduct } from "@/api/products"
 
@@ -45,7 +42,7 @@ const getStatusColor = (status: string) => {
     case "confirmed":
       return "bg-blue-50 text-blue-700 border-blue-200"
     case "preparing":
-      return "bg-orange-50 text-orange-700 border-orange-200"
+      return "bg-green-50 text-green-700 border-green-200"
     case "ready":
       return "bg-green-50 text-green-700 border-green-200"
     case "out_for_delivery":
@@ -112,6 +109,56 @@ const formatAddress = (address: any) => {
   return parts.join(", ") || "N/A"
 }
 
+function FeaturesList({ product }: { product: any }) {
+  if (!product) return null
+
+  // Compose a single array of bullet points
+  const bulletPoints: string[] = []
+
+  // Features (array, object, string)
+  if (product.features) {
+    if (Array.isArray(product.features)) {
+      bulletPoints.push(...product.features.map(f => String(f)))
+    } else if (typeof product.features === "object") {
+      bulletPoints.push(...Object.entries(product.features).map(([k, v]) => v ? `${k}: ${v}` : ""))
+    } else {
+      bulletPoints.push(String(product.features))
+    }
+  }
+
+  // Add-ons (array)
+  if (product.addOns?.length > 0) {
+    bulletPoints.push(...product.addOns.map(a => `Add-on: ${a}`))
+  }
+
+  // Allergens (array)
+  if (product.allergen_info?.length > 0) {
+    bulletPoints.push(...product.allergen_info.map(a => `Allergen: ${a}`))
+  }
+
+  // Extra info
+  if (typeof product.preparation_time === "number") {
+    bulletPoints.push(`Prep: ${product.preparation_time} min`)
+  }
+  if (typeof product.stock_quantity === "number") {
+    bulletPoints.push(`In stock: ${product.stock_quantity}`)
+  }
+  if (typeof product.minimum_order_quantity === "number") {
+    bulletPoints.push(`Min order: ${product.minimum_order_quantity}`)
+  }
+
+  return (
+    <div className="mb-2">
+      <span className="font-semibold">Product Details:</span>
+      <ul className="list-disc ml-5 text-xs print:text-sm">
+        {bulletPoints.map((point, i) => (
+          <li key={i}>{point}</li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
 export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
   const { data: detailedOrder, isLoading, error } = useDetailedOrderData(order?.id)
   const { data: businessSettings } = useBusinessSettings()
@@ -170,177 +217,81 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
     window.print()
   }
 
-  function FeaturesList({ product }: { product: any }) {
-    if (!product) return null
-    return (
-      <div className="mb-2">
-        {product.features && (
-          <div>
-            <span className="font-semibold">Features:</span>
-            {Array.isArray(product.features) ? (
-              <ul className="list-disc ml-5 text-xs">
-                {product.features.map((f: string, i: number) => <li key={i}>{f}</li>)}
-              </ul>
-            ) : typeof product.features === "object" ? (
-              <ul className="list-disc ml-5 text-xs">
-                {Object.entries(product.features).map(([k, v], i) => v ? <li key={i}><span className="font-semibold">{k}:</span> {String(v)}</li> : null)}
-              </ul>
-            ) : (
-              <span className="ml-2 text-xs">{String(product.features)}</span>
-            )}
-          </div>
-        )}
-        {product.addOns?.length > 0 && (
-          <div>
-            <span className="font-semibold">Add-ons:</span>
-            <ul className="list-disc ml-5 text-xs">
-              {product.addOns.map((a: string, i: number) => <li key={i}>{a}</li>)}
-            </ul>
-          </div>
-        )}
-        {product.allergen_info?.length > 0 && (
-          <div>
-            <span className="font-semibold flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-orange-700" />Allergens:</span>
-            <ul className="list-disc ml-5 text-xs text-orange-700">{product.allergen_info.map((a: string, i: number) => <li key={i}>{a}</li>)}</ul>
-          </div>
-        )}
-        <div className="flex flex-wrap gap-2 mt-1">
-          {typeof product.preparation_time === "number" && (
-            <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200">Prep: {product.preparation_time} min</Badge>
-          )}
-          {typeof product.calories === "number" && (
-            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200">{product.calories} kcal</Badge>
-          )}
-          {product.isSpicy && (
-            <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300">Spicy</Badge>
-          )}
-          {product.isVegetarian && (
-            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">Vegetarian</Badge>
-          )}
-          {typeof product.stock_quantity === "number" && (
-            <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300">In stock: {product.stock_quantity}</Badge>
-          )}
-          {typeof product.minimum_order_quantity === "number" && (
-            <Badge variant="outline" className="bg-indigo-100 text-indigo-700 border-indigo-300">Min order: {product.minimum_order_quantity}</Badge>
-          )}
-        </div>
-      </div>
-    )
-  }
-
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent
           id="order-details-modal-content"
-          className="max-w-full w-full sm:max-w-4xl md:max-w-5xl h-[98vh] max-h-[98vh] overflow-y-auto rounded-2xl bg-background p-0 border shadow-2xl print:shadow-none print:border-none print:rounded-none print:p-0 print:max-w-full print:h-auto print:bg-white"
+          className="max-w-full w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl h-[98vh] max-h-[98vh] overflow-y-auto rounded-2xl bg-background p-0 border shadow-2xl print:shadow-none print:border-none print:rounded-none print:p-0 print:max-w-full print:h-auto print:bg-white"
         >
           {/* HEADER */}
-          <div className="bg-gradient-to-r from-primary via-primary to-secondary px-4 sm:px-8 py-5 sm:py-8 text-white relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-br from-white/10 to-transparent" />
-            <div className="relative z-10 flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
-              <div className="flex items-start sm:items-center gap-4 flex-col sm:flex-row">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-                    <img src={STARTERS_LOGO || "/placeholder.svg"} alt="Starters Logo" className="h-6 w-auto" />
-                  </div>
-                  <div>
-                    <h2 className="text-xl sm:text-2xl font-bold text-white">Order Details</h2>
-                    <div className="flex gap-2 mt-2 flex-wrap">
-                      <span className="font-mono text-xs sm:text-sm text-white/80 bg-white/10 px-2 sm:px-3 py-1 rounded-full">
-                        #{order?.order_number}
-                      </span>
-                      <Badge className="capitalize text-xs sm:text-sm px-2 sm:px-3 py-1 bg-white/20 text-white border-white/30 backdrop-blur-sm" variant="outline">
-                        {order?.status?.replace(/_/g, " ") ?? "Unknown"}
-                      </Badge>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex gap-2 no-print">
+          <div className="bg-gradient-to-r from-slate-800 to-slate-500 px-5 py-6 flex items-center justify-between rounded-t-2xl print:bg-white print:text-black">
+            <div className="flex items-center gap-3">
+              <img src={STARTERS_LOGO || "/placeholder.svg"} alt="Starters Logo" className="h-8 w-auto rounded shadow" />
+              <h2 className="text-2xl font-bold text-white print:text-black">Order Details</h2>
+            </div>
+            <div className="flex gap-2 no-print">
+              <Button
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-2 bg-white/10 border-white/30 text-white hover:bg-white/20"
+                onClick={handlePrint}
+              >
+                <Printer className="h-4 w-4" />
+                <span className="hidden sm:inline">Print</span>
+              </Button>
+              <DialogClose asChild>
                 <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 bg-white/10 border-white/30 text-white hover:bg-white/20 backdrop-blur-sm"
-                  onClick={handlePrint}
+                  variant="ghost"
+                  size="icon"
+                  className="text-white hover:bg-white/20"
+                  aria-label="Close"
                 >
-                  <Printer className="h-4 w-4" />
-                  <span className="hidden sm:inline">Print Receipt</span>
+                  <X className="h-5 w-5" />
                 </Button>
-                <DialogClose asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="text-white hover:bg-white/20 backdrop-blur-sm"
-                    aria-label="Close"
-                  >
-                    <X className="h-5 w-5" />
-                  </Button>
-                </DialogClose>
-              </div>
+              </DialogClose>
             </div>
           </div>
 
           {/* SUMMARY GRID */}
-          <div className="px-3 sm:px-8 py-4 bg-gradient-to-b from-card/20 to-transparent">
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-6">
-              {/* ...cards as before... */}
-              <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-secondary/10 border-primary/20 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-primary/20 rounded-xl flex items-center justify-center">
-                      <CreditCard className="h-5 w-5 text-primary" />
-                    </div>
-                    <span className="text-sm font-medium text-muted-foreground">Total Amount</span>
+          <div className="px-3 py-4 sm:px-6 sm:py-6 bg-background print:bg-white">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="shadow-none border border-border rounded-xl print:border-none print:bg-white">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium">Total Amount</span>
                   </div>
-                  <div className="text-2xl sm:text-3xl font-bold text-primary mb-2">
-                    {formatCurrency(order?.total_amount || 0)}
-                  </div>
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="text-2xl font-bold text-primary">{formatCurrency(order?.total_amount || 0)}</div>
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
                     <Clock className="h-4 w-4" />
-                    <span className="text-balance">
-                      Ordered {order?.order_time && formatDateTime(order?.order_time)}
-                    </span>
+                    <span>Ordered {order?.order_time && formatDateTime(order?.order_time)}</span>
                   </div>
                 </CardContent>
               </Card>
-
-              <Card className="bg-gradient-to-br from-blue-50 via-blue-25 to-indigo-50 border-blue-200 shadow-lg hover:shadow-xl transition-all duration-300">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
-                      <Truck className="h-5 w-5 text-blue-600" />
-                    </div>
-                    <span className="text-sm font-medium text-muted-foreground">Delivery</span>
+              <Card className="shadow-none border border-border rounded-xl print:border-none print:bg-white">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Truck className="h-5 w-5 text-blue-600" />
+                    <span className="text-sm font-medium">Delivery</span>
                   </div>
-                  {deliveryDate ? (
-                    <div className="space-y-2">
-                      <div className="text-lg sm:text-xl font-semibold text-blue-700">{formatDate(deliveryDate)}</div>
-                      {deliveryWindowStart && deliveryWindowEnd && (
-                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300 text-xs">
-                          {formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}
-                        </Badge>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="text-lg font-semibold text-muted-foreground">Schedule TBD</div>
+                  <div className="text-md font-semibold text-blue-700">{deliveryDate && formatDate(deliveryDate)}</div>
+                  {deliveryWindowStart && deliveryWindowEnd && (
+                    <Badge variant="outline" className="mt-2 bg-blue-50 text-blue-700 border-blue-200">
+                      {formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}
+                    </Badge>
                   )}
                 </CardContent>
               </Card>
-
-              <Card className="bg-gradient-to-br from-green-50 via-green-25 to-emerald-50 border-green-200 shadow-lg hover:shadow-xl transition-all duration-300 md:col-span-2 lg:col-span-1">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 bg-green-100 rounded-xl flex items-center justify-center">
-                      <CheckCircle className="h-5 w-5 text-green-600" />
-                    </div>
-                    <span className="text-sm font-medium text-muted-foreground">Status</span>
+              <Card className="shadow-none border border-border rounded-xl print:border-none print:bg-white">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-sm font-medium">Status</span>
                   </div>
-                  <div className="text-lg sm:text-xl font-semibold text-green-700 capitalize mb-2">
-                    {order?.status?.replace(/_/g, " ") ?? "Unknown"}
-                  </div>
+                  <div className="font-bold text-green-700 capitalize">{order?.status?.replace(/_/g, " ") ?? "Unknown"}</div>
                   {shippingFee > 0 && (
-                    <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300 text-xs">
+                    <Badge variant="outline" className="mt-2 bg-green-100 text-green-700 border-green-300">
                       +{formatCurrency(shippingFee)} delivery
                     </Badge>
                   )}
@@ -349,73 +300,57 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
             </div>
           </div>
 
-          <Separator className="mx-8" />
-
           {/* INFO GRID */}
-          <div className="px-3 sm:px-8 py-4">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 sm:gap-8">
-              <Card className="border-border/50 shadow-md bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                      <User className="h-5 w-5 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground">Customer Information</h3>
+          <div className="px-3 py-4 sm:px-6 sm:py-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="shadow-none border border-border rounded-xl print:border-none print:bg-white">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <User className="h-5 w-5 text-primary" />
+                    <span className="font-semibold">Customer Information</span>
                   </div>
-                  <div className="space-y-4">
-                    <div className="text-xl font-medium text-foreground">{order?.customer_name}</div>
-                    <div className="flex items-center gap-3 text-muted-foreground">
-                      <Mail className="h-4 w-4 flex-shrink-0" />
-                      <span className="break-all">{order?.customer_email}</span>
-                    </div>
-                    <div className="flex items-center gap-3 text-muted-foreground">
-                      <Phone className="h-4 w-4 flex-shrink-0" />
-                      <span>{order?.customer_phone}</span>
-                    </div>
+                  <div className="font-medium text-base">{order?.customer_name}</div>
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                    <Mail className="h-4 w-4" />
+                    <span>{order?.customer_email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                    <Phone className="h-4 w-4" />
+                    <span>{order?.customer_phone}</span>
                   </div>
                 </CardContent>
               </Card>
-              <Card className="border-border/50 shadow-md bg-card/50 backdrop-blur-sm">
-                <CardContent className="p-6">
-                  <div className="flex items-center gap-3 mb-6">
-                    <div className="w-10 h-10 bg-primary/10 rounded-xl flex items-center justify-center">
-                      <MapPin className="h-5 w-5 text-primary" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-foreground">Delivery Address</h3>
+              <Card className="shadow-none border border-border rounded-xl print:border-none print:bg-white">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    <span className="font-semibold">Delivery Address</span>
                   </div>
-                  <div className="space-y-4">
-                    <div className="text-foreground leading-relaxed text-pretty">
-                      {formatAddress(order?.delivery_address)}
+                  <div className="text-base">{formatAddress(order?.delivery_address)}</div>
+                  {deliveryDate && (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>Scheduled for {formatDate(deliveryDate)}</span>
                     </div>
-                    {deliveryDate && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="h-4 w-4 flex-shrink-0" />
-                        <span>Scheduled for {formatDate(deliveryDate)}</span>
-                      </div>
-                    )}
-                    {deliveryWindowStart && deliveryWindowEnd && (
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Clock className="h-4 w-4 flex-shrink-0" />
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
-                          {formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}
-                        </Badge>
-                      </div>
-                    )}
-                  </div>
+                  )}
+                  {deliveryWindowStart && deliveryWindowEnd && (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                      <Clock className="h-4 w-4" />
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                        {formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}
+                      </Badge>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
           </div>
 
-          <Separator className="mx-8" />
-
           {/* ORDER ITEMS */}
-          <div className="px-3 sm:px-8 py-4">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-8 h-8 bg-primary/10 rounded-xl flex items-center justify-center">
-                <Package className="h-5 w-5 text-primary" />
-              </div>
-              <h3 className="text-lg sm:text-xl font-semibold text-foreground">Order Items ({order?.order_items?.length || 0})</h3>
+          <div className="px-3 py-4 sm:px-6 sm:py-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Package className="h-6 w-6 text-primary" />
+              <span className="text-lg font-semibold">Order Items ({order?.order_items?.length || 0})</span>
             </div>
             <div className="space-y-4 max-h-[38vh] overflow-y-auto scrollbar-thin pr-1 sm:pr-2">
               {isLoading || featuresLoading ? (
@@ -433,61 +368,47 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                 order?.order_items?.map((item: any, idx: number) => {
                   const product = productsData[item.product_id] || item.product || {}
                   return (
-                    <Card key={item.id || idx} className="border-border/50 hover:shadow-lg transition-all duration-300 bg-card/30 backdrop-blur-sm">
+                    <Card key={item.id || idx} className="shadow-none border border-border rounded-xl print:border-none print:bg-white">
                       <CardContent className="p-6">
-                        <div className="flex flex-col gap-4">
-                          <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <h4 className="text-lg font-semibold text-foreground mb-2 text-balance">
-                                {item.product_name}
-                              </h4>
-                              {product.description && (
-                                <p className="text-sm text-muted-foreground mb-3 text-pretty">
-                                  {product.description}
-                                </p>
-                              )}
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-base mb-1">{item.product_name}</h4>
+                            {product.description && (
+                              <div className="text-sm text-muted-foreground mb-2">{product.description}</div>
+                            )}
+                            <FeaturesList product={product} />
+                          </div>
+                          <div className="flex flex-col gap-1 text-right sm:min-w-[160px]">
+                            <div className="flex items-center gap-2 justify-end">
+                              <span className="text-muted-foreground text-sm">Qty:</span>
+                              <span className="font-bold">{item.quantity}</span>
                             </div>
-                            <div className="flex flex-row sm:flex-col gap-4 sm:gap-2 text-sm sm:text-right">
-                              <div className="flex items-center gap-2">
-                                <span className="text-muted-foreground">Qty:</span>
-                                <Badge variant="outline" className="font-semibold bg-primary/10 text-primary border-primary/30">
-                                  {item.quantity}
-                                </Badge>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-muted-foreground">Unit:</span>
-                                <span className="font-semibold">{formatCurrency(item.unit_price)}</span>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <span className="text-muted-foreground">Total:</span>
-                                <span className="text-lg font-bold text-primary">
-                                  {formatCurrency(item.total_price)}
-                                </span>
-                              </div>
+                            <div className="flex items-center gap-2 justify-end">
+                              <span className="text-muted-foreground text-sm">Unit:</span>
+                              <span className="font-bold">{formatCurrency(item.unit_price)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 justify-end">
+                              <span className="text-muted-foreground text-sm">Total:</span>
+                              <span className="font-bold text-primary">{formatCurrency(item.total_price)}</span>
                             </div>
                           </div>
-                          <FeaturesList product={product} />
-                          {item.special_instructions && (
-                            <div className="p-4 bg-gradient-to-r from-orange-50 to-amber-50 border border-orange-200 rounded-xl">
-                              <div className="flex items-start gap-3">
-                                <AlertCircle className="h-5 w-5 text-orange-600 mt-0.5 flex-shrink-0" />
-                                <div className="flex-1">
-                                  <span className="text-sm font-medium text-orange-800 block mb-1">
-                                    Special Instructions:
-                                  </span>
-                                  <p className="text-sm text-orange-700 text-pretty">{item.special_instructions}</p>
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                          {item.status && (
-                            <div className="flex justify-end">
-                              <Badge variant="outline" className={`capitalize ${getStatusColor(item.status)}`}>
-                                {item.status}
-                              </Badge>
-                            </div>
-                          )}
                         </div>
+                        {item.special_instructions && (
+                          <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4 text-orange-600" />
+                              <span className="font-medium text-orange-800">Special Instructions:</span>
+                              <span className="text-sm text-orange-700">{item.special_instructions}</span>
+                            </div>
+                          </div>
+                        )}
+                        {item.status && (
+                          <div className="flex justify-end mt-2">
+                            <Badge variant="outline" className={`capitalize ${getStatusColor(item.status)}`}>
+                              {item.status}
+                            </Badge>
+                          </div>
+                        )}
                       </CardContent>
                     </Card>
                   )
@@ -495,23 +416,41 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               )}
               {(!order?.order_items || order?.order_items.length === 0) && (
                 <Card className="border-dashed border-2 border-border/50 bg-muted/20">
-                  <CardContent className="p-12 text-center">
-                    <Package className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                  <CardContent className="p-8 text-center">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
                     <p className="text-muted-foreground text-lg">No order items found.</p>
                   </CardContent>
                 </Card>
               )}
             </div>
           </div>
+
+          {/* FOOTER (Summary) */}
+          <div className="px-5 py-4 flex flex-col items-end bg-background rounded-b-2xl print:bg-white print:rounded-none print:py-2 print:px-0">
+            <div className="flex flex-col gap-1">
+              <div>
+                <span className="font-semibold">Subtotal:</span>{" "}
+                <span className="text-md">{formatCurrency(subtotal)}</span>
+              </div>
+              <div>
+                <span className="font-semibold">Delivery Fee:</span>{" "}
+                <span className="text-md">{formatCurrency(shippingFee)}</span>
+              </div>
+              <div>
+                <span className="font-semibold">Total:</span>{" "}
+                <span className="text-lg font-bold">{formatCurrency(order?.total_amount || 0)}</span>
+              </div>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
       <style jsx global>{`
         @media (max-width: 640px) {
-          .max-w-full, .sm\\:max-w-4xl, .md\\:max-w-5xl {
+          .max-w-full, .sm\\:max-w-2xl, .md\\:max-w-3xl, .lg\\:max-w-4xl {
             max-width: 100vw !important;
           }
-          .px-3, .sm\\:px-8 { padding-left: 8px !important; padding-right: 8px !important; }
-          .py-4, .sm\\:py-8 { padding-top: 8px !important; padding-bottom: 8px !important; }
+          .px-5, .sm\\:px-6 { padding-left: 8px !important; padding-right: 8px !important; }
+          .py-4, .sm\\:py-6 { padding-top: 8px !important; padding-bottom: 8px !important; }
           .rounded-2xl { border-radius: 0 !important; }
         }
         .scrollbar-thin {
@@ -529,7 +468,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
           html, body {
             background: #fff !important;
             color: #222 !important;
-            font-size: 13px !important;
           }
           #order-details-modal-content {
             box-shadow: none !important;

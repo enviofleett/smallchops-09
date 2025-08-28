@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from "react"
 import { Dialog, DialogContent, DialogTitle, DialogDescription, DialogClose } from "@/components/ui/dialog"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { Separator } from "@/components/ui/separator"
 import { Card, CardContent } from "@/components/ui/card"
 import { Skeleton } from "@/components/ui/skeleton"
 import { useDetailedOrderData } from "@/hooks/useDetailedOrderData"
@@ -113,7 +112,7 @@ function FeaturesList({ product }: { product: any }) {
   return (
     <div className="mb-2">
       <span className="font-semibold">Product Details:</span>
-      <ul className="list-disc ml-5 text-xs print:text-sm">
+      <ul className="list-disc ml-5 text-xs">
         {bulletPoints.map((point, i) => <li key={i}>{point}</li>)}
       </ul>
     </div>
@@ -189,60 +188,17 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
   const deliveryWindowStart = deliverySchedule?.delivery_time_start
   const deliveryWindowEnd = deliverySchedule?.delivery_time_end
 
-  // Custom print handler prints only modal content
+  // Print logic fitted inside modal UI
   const handlePrint = () => {
     if (modalPrintRef.current) {
-      const printContents = modalPrintRef.current.innerHTML
-      const printWindow = window.open("", "", "height=900,width=1200")
-      printWindow!.document.write(`
-        <html>
-          <head>
-            <title>Order Details</title>
-            <style>
-              body { font-family: 'Inter', Arial, sans-serif; background: #f6f8fa; color: #222; margin: 0; }
-              .modal-print-main { max-width: 900px; margin: 0 auto; background: #fff; border-radius: 16px; box-shadow: 0 4px 32px #0002; }
-              .print-header { display: flex; align-items: center; justify-content: space-between; background: linear-gradient(90deg, #1e293b 70%, #64748b 100%); color: #fff; border-radius: 16px 16px 0 0; padding: 32px 32px 18px 32px; }
-              .print-title { font-size: 2rem; font-weight: bold; }
-              .print-logo { height: 38px; margin-right: 20px; }
-              .card-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; margin: 24px 32px; }
-              .card { background: #f8fafc; border-radius: 14px; box-shadow: 0 2px 12px #0001; padding: 18px 20px; }
-              .card .label { font-size: 1rem; font-weight: 500; color: #64748b; display: flex; align-items: center; }
-              .card .value { font-size: 1.3rem; font-weight: bold; margin: 7px 0 5px 0; }
-              .card .extra { font-size: 0.97rem; color: #475569; margin-top: 2px; }
-              .info-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin: 0 32px 24px 32px; }
-              .info-card { background: #f8fafc; border-radius: 14px; box-shadow: 0 2px 12px #0001; padding: 18px 20px; }
-              .info-title { font-weight: 600; margin-bottom: 12px; font-size: 1.07rem; }
-              .info-value { font-size: 1.08rem; font-weight: 500; margin-bottom: 6px; }
-              .info-row .icon { margin-right: 8px; }
-              .section-title { font-size: 1.15rem; font-weight: 600; margin: 28px 32px 10px 32px; letter-spacing: 0.01em; }
-              .items-list { margin: 0 32px 24px 32px; }
-              .item-card { background: #f8fafc; border-radius: 14px; box-shadow: 0 2px 12px #0001; padding: 20px 18px; margin-bottom: 14px; }
-              .item-title { font-size: 1.08rem; font-weight: 600; margin-bottom: 3px; }
-              .item-desc { font-size: 0.98rem; color: #475569; margin-bottom: 7px; }
-              .item-features { margin-bottom: 9px; }
-              .item-features ul { margin-left: 23px; font-size: 0.99rem; }
-              .item-qty-row { text-align: right; font-size: 0.99rem; margin-top: 7px; }
-              .summary-row { text-align: right; margin: 0 32px 32px 0; font-size: 1.02rem; }
-              .summary-row .summary-label { font-weight: 600; margin-right: 8px; }
-              @media print {
-                body { background: #fff !important; }
-                .modal-print-main { box-shadow: none !important; border-radius: 0 !important; margin: 0 !important; }
-                .print-header { border-radius: 0 !important; }
-                .card, .info-card, .item-card { box-shadow: none !important; }
-                .section-title, .card-row, .info-row, .items-list { page-break-inside: avoid; }
-                .item-card { page-break-inside: avoid; }
-              }
-            </style>
-          </head>
-          <body>
-            <div class="modal-print-main">${printContents}</div>
-          </body>
-        </html>
-      `)
-      printWindow!.document.close()
-      printWindow!.focus()
-      printWindow!.print()
-      setTimeout(() => printWindow!.close(), 1200)
+      // Save original body content
+      const originalContents = document.body.innerHTML
+      // Copy modal contents to body for print
+      document.body.innerHTML = modalPrintRef.current.innerHTML
+      window.print()
+      // Restore original body content
+      document.body.innerHTML = originalContents
+      window.location.reload()
     }
   }
 
@@ -254,19 +210,228 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
         className="max-w-full w-full sm:max-w-2xl md:max-w-3xl lg:max-w-4xl h-[98vh] max-h-[98vh] overflow-y-auto rounded-2xl bg-background p-0 border shadow-2xl"
       >
         <DialogTitle>
-          Order Details
+          <div className="flex items-center gap-3">
+            <img src={STARTERS_LOGO} alt="Logo" className="h-8 w-auto rounded shadow" />
+            <span className="text-2xl font-bold">Order Details</span>
+          </div>
         </DialogTitle>
         <DialogDescription id="order-details-description">
           Full information about this order, including customer, delivery, items, and status.
         </DialogDescription>
         <div ref={modalPrintRef}>
-          {/* Header */}
-          <div className="print-header">
-            <div style={{ display: "flex", alignItems: "center" }}>
-              <img src={STARTERS_LOGO} alt="Logo" className="print-logo" />
-              <span className="print-title">Order Details</span>
+          <div className="px-3 py-4 sm:px-6 sm:py-6 bg-background">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="shadow-none border border-border rounded-xl">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CreditCard className="h-5 w-5 text-primary" />
+                    <span className="text-sm font-medium">Total Amount</span>
+                  </div>
+                  <div className="text-2xl font-bold text-primary">{formatCurrency(order?.total_amount || 0)}</div>
+                  <div className="flex items-center gap-2 mt-2 text-xs text-muted-foreground">
+                    <Clock className="h-4 w-4" />
+                    <span>Ordered {order?.order_time && formatDateTime(order?.order_time)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="shadow-none border border-border rounded-xl">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Truck className="h-5 w-5 text-blue-600" />
+                    <span className="text-sm font-medium">Delivery</span>
+                  </div>
+                  <div className="text-md font-semibold text-blue-700">{deliveryDate && formatDate(deliveryDate)}</div>
+                  {deliveryWindowStart && deliveryWindowEnd && (
+                    <Badge variant="outline" className="mt-2 bg-blue-50 text-blue-700 border-blue-200">
+                      {formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}
+                    </Badge>
+                  )}
+                </CardContent>
+              </Card>
+              <Card className="shadow-none border border-border rounded-xl">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="text-sm font-medium">Status</span>
+                  </div>
+                  <div className="font-bold text-green-700 capitalize">{order?.status?.replace(/_/g, " ") ?? "Unknown"}</div>
+                  {shippingFee > 0 && (
+                    <Badge variant="outline" className="mt-2 bg-green-100 text-green-700 border-green-300">
+                      +{formatCurrency(shippingFee)} delivery
+                    </Badge>
+                  )}
+                </CardContent>
+              </Card>
             </div>
-            <div className="no-print">
+          </div>
+          <div className="px-3 py-4 sm:px-6 sm:py-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Card className="shadow-none border border-border rounded-xl">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <User className="h-5 w-5 text-primary" />
+                    <span className="font-semibold">Customer Information</span>
+                  </div>
+                  <div className="font-medium text-base">{order?.customer_name}</div>
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                    <Mail className="h-4 w-4" />
+                    <span>{order?.customer_email}</span>
+                  </div>
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                    <Phone className="h-4 w-4" />
+                    <span>{order?.customer_phone}</span>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="shadow-none border border-border rounded-xl">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    <span className="font-semibold">Delivery Address</span>
+                  </div>
+                  <div className="text-base">{formatAddress(order?.delivery_address)}</div>
+                  {deliveryDate && (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                      <Calendar className="h-4 w-4" />
+                      <span>Scheduled for {formatDate(deliveryDate)}</span>
+                    </div>
+                  )}
+                  {deliveryWindowStart && deliveryWindowEnd && (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                      <Clock className="h-4 w-4" />
+                      <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 text-xs">
+                        {formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}
+                      </Badge>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+            {driverContact && (
+              <Card className="shadow-none border border-border rounded-xl mt-4">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-2 mb-3">
+                    <Car className="h-5 w-5 text-indigo-600" />
+                    <span className="font-semibold">Driver Contact</span>
+                  </div>
+                  <div className="font-medium text-base">{driverContact.name}</div>
+                  <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                    <Phone className="h-4 w-4" />
+                    <span>{driverContact.phone}</span>
+                  </div>
+                  {driverContact.email && (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                      <Mail className="h-4 w-4" />
+                      <span>{driverContact.email}</span>
+                    </div>
+                  )}
+                  {driverContact.vehicle && (
+                    <div className="flex items-center gap-2 text-muted-foreground text-sm mt-2">
+                      <Box className="h-4 w-4" />
+                      <span>{driverContact.vehicle}</span>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+          <div className="px-3 py-4 sm:px-6 sm:py-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Package className="h-6 w-6 text-primary" />
+              <span className="text-lg font-semibold">Order Items ({order?.order_items?.length || 0})</span>
+            </div>
+            <div className="space-y-4 max-h-[38vh] overflow-y-auto scrollbar-thin pr-1 sm:pr-2">
+              {isLoading || featuresLoading ? (
+                <div>
+                  {[...Array(2)].map((_, i) => (
+                    <Card key={i} className="border-border/50">
+                      <CardContent className="p-6">
+                        <Skeleton className="h-6 w-3/4 mb-2" />
+                        <Skeleton className="h-4 w-1/2 mb-4" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              ) : (
+                order?.order_items?.map((item: any, idx: number) => {
+                  const product = productsData[item.product_id] || item.product || {}
+                  return (
+                    <Card key={item.id || idx} className="shadow-none border border-border rounded-xl">
+                      <CardContent className="p-6">
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-center justify-between">
+                          <div className="flex-1">
+                            <h4 className="font-semibold text-base mb-1">{item.product_name}</h4>
+                            {product.description && (
+                              <div className="text-sm text-muted-foreground mb-2">
+                                {getCleanDescription(product.description)}
+                              </div>
+                            )}
+                            <FeaturesList product={product} />
+                          </div>
+                          <div className="flex flex-col gap-1 text-right sm:min-w-[160px]">
+                            <div className="flex items-center gap-2 justify-end">
+                              <span className="text-muted-foreground text-sm">Qty:</span>
+                              <span className="font-bold">{item.quantity}</span>
+                            </div>
+                            <div className="flex items-center gap-2 justify-end">
+                              <span className="text-muted-foreground text-sm">Unit:</span>
+                              <span className="font-bold">{formatCurrency(item.unit_price)}</span>
+                            </div>
+                            <div className="flex items-center gap-2 justify-end">
+                              <span className="text-muted-foreground text-sm">Total:</span>
+                              <span className="font-bold text-primary">{formatCurrency(item.total_price)}</span>
+                            </div>
+                          </div>
+                        </div>
+                        {item.special_instructions && (
+                          <div className="mt-2 p-2 bg-orange-50 border border-orange-200 rounded-lg">
+                            <div className="flex items-center gap-2">
+                              <AlertCircle className="h-4 w-4 text-orange-600" />
+                              <span className="font-medium text-orange-800">Special Instructions:</span>
+                              <span className="text-sm text-orange-700">{item.special_instructions}</span>
+                            </div>
+                          </div>
+                        )}
+                        {item.status && (
+                          <div className="flex justify-end mt-2">
+                            <Badge variant="outline" className={`capitalize ${getStatusColor(item.status)}`}>
+                              {item.status}
+                            </Badge>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  )
+                })
+              )}
+              {(!order?.order_items || order?.order_items.length === 0) && (
+                <Card className="border-dashed border-2 border-border/50 bg-muted/20">
+                  <CardContent className="p-8 text-center">
+                    <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground text-lg">No order items found.</p>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+          </div>
+          {/* FOOTER */}
+          <div className="px-5 py-4 flex flex-col items-end bg-background rounded-b-2xl">
+            <div className="flex flex-col gap-1">
+              <div>
+                <span className="font-semibold">Subtotal:</span>{" "}
+                <span className="text-md">{formatCurrency(subtotal)}</span>
+              </div>
+              <div>
+                <span className="font-semibold">Delivery Fee:</span>{" "}
+                <span className="text-md">{formatCurrency(shippingFee)}</span>
+              </div>
+              <div>
+                <span className="font-semibold">Total:</span>{" "}
+                <span className="text-lg font-bold">{formatCurrency(order?.total_amount || 0)}</span>
+              </div>
+            </div>
+            {/* Print Button */}
+            <div className="mt-4 flex gap-2 no-print">
               <Button
                 variant="outline"
                 size="sm"
@@ -283,103 +448,34 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </DialogClose>
             </div>
           </div>
-
-          {/* Summary grid */}
-          <div className="card-row">
-            <div className="card">
-              <div className="label"><CreditCard className="h-5 w-5 icon" />Total Amount</div>
-              <div className="value">{formatCurrency(order?.total_amount || 0)}</div>
-              <div className="extra"><Clock className="h-4 w-4 icon" />Ordered {order?.order_time && formatDateTime(order?.order_time)}</div>
-            </div>
-            <div className="card">
-              <div className="label"><Truck className="h-5 w-5 icon" />Delivery</div>
-              <div className="value">{deliveryDate && formatDate(deliveryDate)}</div>
-              {deliveryWindowStart && deliveryWindowEnd &&
-                <div className="extra"><Clock className="h-4 w-4 icon" />{formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}</div>
-              }
-            </div>
-            <div className="card">
-              <div className="label"><CheckCircle className="h-5 w-5 icon" />Status</div>
-              <div className="value">{order?.status?.replace(/_/g, " ") ?? "Unknown"}</div>
-              {shippingFee > 0 &&
-                <div className="extra">+{formatCurrency(shippingFee)} delivery</div>
-              }
-            </div>
-          </div>
-
-          {/* Info grid */}
-          <div className="info-row">
-            <div className="info-card">
-              <div className="info-title"><User className="h-5 w-5 icon" />Customer Information</div>
-              <div className="info-value">{order?.customer_name}</div>
-              <div><Mail className="h-4 w-4 icon" />{order?.customer_email}</div>
-              <div><Phone className="h-4 w-4 icon" />{order?.customer_phone}</div>
-            </div>
-            <div className="info-card">
-              <div className="info-title"><MapPin className="h-5 w-5 icon" />Delivery Address</div>
-              <div className="info-value">{formatAddress(order?.delivery_address)}</div>
-              {deliveryDate &&
-                <div><Calendar className="h-4 w-4 icon" />Scheduled for {formatDate(deliveryDate)}</div>
-              }
-              {deliveryWindowStart && deliveryWindowEnd &&
-                <div><Clock className="h-4 w-4 icon" />{formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}</div>
-              }
-            </div>
-          </div>
-          {driverContact && (
-            <div className="info-row">
-              <div className="info-card">
-                <div className="info-title"><Car className="h-5 w-5 icon" />Driver Contact</div>
-                <div className="info-value">{driverContact.name}</div>
-                <div><Phone className="h-4 w-4 icon" />{driverContact.phone}</div>
-                {driverContact.email && <div><Mail className="h-4 w-4 icon" />{driverContact.email}</div>}
-                {driverContact.vehicle && <div><Box className="h-4 w-4 icon" />{driverContact.vehicle}</div>}
-              </div>
-            </div>
-          )}
-
-          {/* Order Items */}
-          <div className="section-title"><Package className="h-5 w-5 icon" />Order Items ({order?.order_items?.length || 0})</div>
-          <div className="items-list">
-            {isLoading || featuresLoading ? (
-              <div>Loading...</div>
-            ) : (
-              order?.order_items?.map((item: any, idx: number) => {
-                const product = productsData[item.product_id] || item.product || {}
-                return (
-                  <div key={item.id || idx} className="item-card break-inside-avoid">
-                    <div className="item-title">{item.product_name}</div>
-                    {product.description && (
-                      <div className="item-desc">{getCleanDescription(product.description)}</div>
-                    )}
-                    <div className="item-features">
-                      <FeaturesList product={product} />
-                    </div>
-                    <div className="item-qty-row">
-                      Qty: <b>{item.quantity}</b> &nbsp;
-                      Unit: <b>{formatCurrency(item.unit_price)}</b> &nbsp;
-                      Total: <b>{formatCurrency(item.total_price)}</b>
-                    </div>
-                  </div>
-                )
-              })
-            )}
-            {(!order?.order_items || order?.order_items.length === 0) && (
-              <div className="item-card break-inside-avoid" style={{ textAlign: "center" }}>
-                <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
-                <p className="text-muted-foreground text-lg">No order items found.</p>
-              </div>
-            )}
-          </div>
-
-          {/* Summary footer */}
-          <div className="summary-row print-footer">
-            <div><span className="summary-label">Subtotal:</span> {formatCurrency(subtotal)}</div>
-            <div><span className="summary-label">Delivery Fee:</span> {formatCurrency(shippingFee)}</div>
-            <div><span className="summary-label">Total:</span> <b>{formatCurrency(order?.total_amount || 0)}</b></div>
-          </div>
         </div>
       </DialogContent>
+      <style jsx global>{`
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          #order-details-modal-content, #order-details-modal-content * {
+            visibility: visible;
+          }
+          #order-details-modal-content {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100vw !important;
+            height: auto !important;
+            max-width: 100vw !important;
+            box-shadow: none !important;
+            border-radius: 0 !important;
+            background: #fff !important;
+            color: #222 !important;
+            z-index: 9999 !important;
+          }
+          .no-print {
+            display: none !important;
+          }
+        }
+      `}</style>
     </Dialog>
   )
 }

@@ -34,7 +34,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 interface UnifiedDeliveryManagementProps {
-  mode: 'ready' | 'all';
+  mode: 'ready' | 'all' | 'overdue';
   selectedDate?: Date;
   typeFilter?: 'all' | 'delivery' | 'pickup';
   statusFilter?: string[];
@@ -260,3 +260,301 @@ export function UnifiedDeliveryManagement({
       </div>
     );
   }
+
+  return (
+    <div className="space-y-4">
+      {/* Mobile-responsive toolbar */}
+      <div className="space-y-4">
+        {/* Top row - Search */}
+        <div className="w-full">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Input
+              placeholder="Search orders by number, customer name, email, or phone..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 w-full"
+            />
+          </div>
+        </div>
+
+        {/* Second row - Filters (stacked on mobile) */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          {/* Order Type Filter */}
+          <div className="flex-1 min-w-0">
+            <Select value={typeLocal} onValueChange={(value: any) => setTypeLocal(value)}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Order Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="delivery">Delivery Only</SelectItem>
+                <SelectItem value="pickup">Pickup Only</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Status Filter */}
+          {mode === 'all' && (
+            <div className="flex-1 min-w-0">
+              <Popover open={isStatusOpen} onOpenChange={setIsStatusOpen}>
+                <PopoverTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    className="w-full justify-between text-sm"
+                  >
+                    <span className="truncate">
+                      {localStatusFilter.length === statusOptions.length ? 'All Statuses' 
+                       : localStatusFilter.length === 1 ? statusOptions.find(s => s.value === localStatusFilter[0])?.label
+                       : `${localStatusFilter.length} Selected`}
+                    </span>
+                    <ChevronDown className="w-4 h-4 opacity-50" />
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-56 p-0">
+                  <div className="p-3 space-y-2">
+                    {statusOptions.map((status) => (
+                      <div key={status.value} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={status.value}
+                          checked={localStatusFilter.includes(status.value)}
+                          onCheckedChange={(checked) => {
+                            if (checked) {
+                              setLocalStatusFilter([...localStatusFilter, status.value]);
+                            } else {
+                              setLocalStatusFilter(localStatusFilter.filter(s => s !== status.value));
+                            }
+                          }}
+                        />
+                        <label htmlFor={status.value} className="text-sm font-medium">
+                          {status.label}
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </PopoverContent>
+              </Popover>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Selected orders section - mobile optimized */}
+      {selectedOrders.length > 0 && (
+        <Card className="border-blue-200 bg-blue-50/50">
+          <CardContent className="p-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-blue-700">
+                  {selectedOrders.length} order{selectedOrders.length !== 1 ? 's' : ''} selected
+                </span>
+              </div>
+              <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => setIsAssignDialogOpen(true)}
+                  className="w-full sm:w-auto text-xs sm:text-sm"
+                >
+                  <Truck className="w-3 h-3 mr-1" />
+                  Assign Driver
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={handleBulkPrint}
+                  className="w-full sm:w-auto text-xs sm:text-sm"
+                >
+                  <Printer className="w-3 h-3 mr-1" />
+                  Print All
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => setSelectedOrders([])}
+                  className="w-full sm:w-auto text-xs sm:text-sm"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Orders grid - mobile responsive */}
+      {filteredOrders.length === 0 ? (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <Package className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
+            <h3 className="text-lg font-medium mb-2">No orders found</h3>
+            <p className="text-muted-foreground">
+              {mode === 'ready' 
+                ? 'No orders are ready for delivery/pickup at the moment.' 
+                : 'Try adjusting your filters or check back later.'}
+            </p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid gap-4">
+          {filteredOrders.map((order) => {
+            const driverInfo = drivers.find(d => d.profile_id === order.assigned_rider_id);
+            
+            return (
+              <Card 
+                key={order.id}
+                className={cn(
+                  "transition-all duration-200 hover:shadow-md",
+                  selectedOrders.includes(order.id) && "ring-2 ring-blue-500 bg-blue-50/30"
+                )}
+              >
+                <CardContent className="p-4">
+                  {/* Header with checkbox and order number */}
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <Checkbox
+                        checked={selectedOrders.includes(order.id)}
+                        onCheckedChange={(checked) => {
+                          if (checked) {
+                            setSelectedOrders([...selectedOrders, order.id]);
+                          } else {
+                            setSelectedOrders(selectedOrders.filter(id => id !== order.id));
+                          }
+                        }}
+                      />
+                      <div>
+                        <h3 className="font-semibold text-sm sm:text-base">#{order.order_number}</h3>
+                        <div className="flex flex-wrap items-center gap-2 mt-1">
+                          <AdminOrderStatusBadge status={order.status} />
+                          <Badge variant="outline" className="text-xs">
+                            {order.order_type}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-semibold text-sm sm:text-base">₦{order.total_amount.toLocaleString()}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {format(new Date(order.created_at), 'MMM d, HH:mm')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Customer info - stacked on mobile */}
+                  <div className="space-y-2 mb-3">
+                    <div className="flex items-center gap-2 text-sm">
+                      <User className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                      <span className="font-medium truncate">{order.customer_name}</span>
+                    </div>
+                    {order.customer_phone && (
+                      <div className="flex items-center gap-2 text-sm">
+                        <Phone className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                        <span className="text-muted-foreground">{order.customer_phone}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Delivery address - mobile optimized */}
+                  {order.order_type === 'delivery' && order.delivery_address && (
+                    <div className="mb-3">
+                      <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+                        <MapPin className="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5" />
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm text-amber-800 break-words">
+                            {typeof order.delivery_address === 'object' 
+                              ? `${order.delivery_address.street || ''}, ${order.delivery_address.city || ''}, ${order.delivery_address.state || ''}`.replace(/^,\s*|,\s*$/g, '')
+                              : order.delivery_address}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Driver info */}
+                  {driverInfo && (
+                    <div className="mb-3 p-2 bg-green-50 rounded-lg border border-green-200">
+                      <div className="flex items-center gap-2">
+                        <Truck className="w-4 h-4 text-green-600" />
+                        <span className="text-sm font-medium text-green-800">
+                          Assigned to {driverInfo.name}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Action buttons - mobile optimized */}
+                  <div className="flex flex-wrap gap-2 pt-3 border-t">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedOrder(order);
+                        setIsDetailsModalOpen(true);
+                      }}
+                      className="flex-1 min-w-0 text-xs"
+                    >
+                      <Eye className="w-3 h-3 mr-1" />
+                      View
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePrint(order)}
+                      className="flex-1 min-w-0 text-xs"
+                    >
+                      <Printer className="w-3 h-3 mr-1" />
+                      Print
+                    </Button>
+                    <div className="w-full sm:w-auto flex-1 min-w-0">
+                      <Select 
+                        value={order.status} 
+                        onValueChange={(value) => handleStatusChange(order.id, value)}
+                      >
+                        <SelectTrigger className="h-8 text-xs">
+                          <div className="flex items-center gap-1">
+                            {getStatusIcon(order.status)}
+                            <SelectValue />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent>
+                          {statusOptions.map((status) => (
+                            <SelectItem key={status.value} value={status.value}>
+                              <div className="flex items-center gap-2">
+                                {getStatusIcon(status.value)}
+                                {status.label}
+                              </div>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Modals */}
+      <OrderDetailsModal
+        order={selectedOrder}
+        isOpen={isDetailsModalOpen}
+        onClose={() => setIsDetailsModalOpen(false)}
+      />
+
+      <OrderReceiptModal
+        order={printingOrder}
+        isOpen={isReceiptModalOpen}
+        onClose={() => setIsReceiptModalOpen(false)}
+      />
+
+      <DeliveryAssignmentDialog
+        isOpen={isAssignDialogOpen}
+        onClose={() => setIsAssignDialogOpen(false)}
+        selectedOrderIds={selectedOrders}
+        onAssign={handleAssignDriver}
+      />
+    </div>
+  );
+}

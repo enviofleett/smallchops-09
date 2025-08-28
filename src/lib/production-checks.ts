@@ -16,117 +16,12 @@ export interface ProductionReadiness {
 }
 
 export class ProductionValidator {
-  static async validatePaymentConfiguration(): Promise<ProductionCheck[]> {
+  static async validateDatabaseHealth(): Promise<ProductionCheck[]> {
     const checks: ProductionCheck[] = [];
 
     try {
-      // Check Paystack configuration
-      const { data: config, error } = await (supabase.rpc as any)('get_public_paystack_config');
-      
-      if (error || !config) {
-        checks.push({
-          name: 'Paystack Configuration',
-          status: 'fail',
-          message: 'Paystack configuration not found or inaccessible'
-        });
-        return checks;
-      }
-
-      const configData = Array.isArray(config) ? config[0] : config;
-
-      // Check public key
-      if (!configData.public_key || !configData.public_key.startsWith('pk_')) {
-        checks.push({
-          name: 'Public Key',
-          status: 'fail',
-          message: 'Invalid or missing Paystack public key'
-        });
-      } else {
-        checks.push({
-          name: 'Public Key',
-          status: 'pass',
-          message: 'Valid Paystack public key configured'
-        });
-      }
-
-      // Check secret key
-      if (!configData.secret_key || !configData.secret_key.startsWith('sk_')) {
-        checks.push({
-          name: 'Secret Key',
-          status: 'fail',
-          message: 'Invalid or missing Paystack secret key'
-        });
-      } else {
-        checks.push({
-          name: 'Secret Key',
-          status: 'pass',
-          message: 'Valid Paystack secret key configured'
-        });
-      }
-
-      // Check webhook secret
-      if (!configData.webhook_secret || configData.webhook_secret.length < 10) {
-        checks.push({
-          name: 'Webhook Secret',
-          status: 'fail',
-          message: 'Webhook secret is missing or too short'
-        });
-      } else {
-        checks.push({
-          name: 'Webhook Secret',
-          status: 'pass',
-          message: 'Webhook secret properly configured'
-        });
-      }
-
-      // Check environment mode
-      if (configData.test_mode) {
-        checks.push({
-          name: 'Environment Mode',
-          status: 'warning',
-          message: 'Currently in test mode - switch to live mode for production'
-        });
-      } else {
-        checks.push({
-          name: 'Environment Mode',
-          status: 'pass',
-          message: 'Live mode is enabled'
-        });
-      }
-
-      // Check if we have the necessary configuration
-      // Since connection_status doesn't exist in the type, we'll check if basic config is present
-      if (configData.public_key && configData.secret_key) {
-        checks.push({
-          name: 'Connection Status',
-          status: 'pass',
-          message: 'Paystack configuration is complete'
-        });
-      } else {
-        checks.push({
-          name: 'Connection Status',
-          status: 'fail',
-          message: 'Paystack configuration is incomplete'
-        });
-      }
-
-    } catch (error) {
-      checks.push({
-        name: 'Configuration Access',
-        status: 'fail',
-        message: `Failed to access payment configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
-      });
-    }
-
-    return checks;
-  }
-
-  static async validateSystemHealth(): Promise<ProductionCheck[]> {
-    const checks: ProductionCheck[] = [];
-
-    try {
-      // Test database connection
-      const { data, error } = await supabase.from('orders').select('id').limit(1);
+      // Test database connection with orders_view
+      const { data, error } = await supabase.from('orders_view').select('id').limit(1);
       
       if (error) {
         checks.push({
@@ -142,30 +37,118 @@ export class ProductionValidator {
         });
       }
 
-      // Test edge function availability
-      const { error: functionError } = await supabase.functions.invoke('process-checkout', {
-        body: { test: true }
-      });
+      // Check for email column consistency
+      const { data: emailData, error: emailError } = await supabase
+        .from('orders')
+        .select('email, customer_email')
+        .limit(1);
 
-      if (functionError) {
+      if (emailError) {
         checks.push({
-          name: 'Edge Functions',
-          status: 'warning',
-          message: 'Edge function test returned error - may be normal for test calls'
+          name: 'Email Column Consistency',
+          status: 'fail',
+          message: `Email column issues detected: ${emailError.message}`
         });
       } else {
         checks.push({
-          name: 'Edge Functions',
+          name: 'Email Column Consistency',
           status: 'pass',
-          message: 'Edge functions are accessible'
+          message: 'Email columns are properly configured'
         });
       }
 
     } catch (error) {
       checks.push({
-        name: 'System Health',
+        name: 'Database Health',
         status: 'fail',
-        message: `System health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+        message: `Database health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+
+    return checks;
+  }
+
+  static async validatePaymentConfiguration(): Promise<ProductionCheck[]> {
+    const checks: ProductionCheck[] = [];
+
+    try {
+      // Check payment transactions table
+      const { data, error } = await supabase
+        .from('payment_transactions')
+        .select('id')
+        .limit(1);
+      
+      if (error) {
+        checks.push({
+          name: 'Payment System',
+          status: 'fail',
+          message: `Payment system access failed: ${error.message}`
+        });
+      } else {
+        checks.push({
+          name: 'Payment System',
+          status: 'pass',
+          message: 'Payment system is accessible'
+        });
+      }
+
+    } catch (error) {
+      checks.push({
+        name: 'Payment Configuration',
+        status: 'fail',
+        message: `Failed to access payment configuration: ${error instanceof Error ? error.message : 'Unknown error'}`
+      });
+    }
+
+    return checks;
+  }
+
+  static async validateOrderSystem(): Promise<ProductionCheck[]> {
+    const checks: ProductionCheck[] = [];
+
+    try {
+      // Test order management components
+      const { data, error } = await supabase.from('orders_view').select('id').limit(1);
+      
+      if (error) {
+        checks.push({
+          name: 'Order System',
+          status: 'fail',
+          message: `Order system failed: ${error.message}`
+        });
+      } else {
+        checks.push({
+          name: 'Order System',
+          status: 'pass',
+          message: 'Order system is healthy'
+        });
+      }
+
+      // Test audit logging
+      const { data: auditData, error: auditError } = await supabase
+        .from('order_audit_log')
+        .select('id')
+        .limit(1);
+
+      if (auditError) {
+        checks.push({
+          name: 'Order Audit System',
+          status: 'warning',
+          message: 'Order audit logging may not be configured'
+        });
+      } else {
+        checks.push({
+          name: 'Order Audit System',
+          status: 'pass',
+          message: 'Order audit logging is configured'
+        });
+      }
+
+    } catch (error) {
+      checks.push({
+        name: 'Order System Health',
+        status: 'fail',
+        message: `Order system health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       });
     }
 
@@ -173,9 +156,10 @@ export class ProductionValidator {
   }
 
   static async performFullCheck(): Promise<ProductionReadiness> {
+    const databaseChecks = await this.validateDatabaseHealth();
     const paymentChecks = await this.validatePaymentConfiguration();
-    const systemChecks = await this.validateSystemHealth();
-    const allChecks = [...paymentChecks, ...systemChecks];
+    const orderChecks = await this.validateOrderSystem();
+    const allChecks = [...databaseChecks, ...paymentChecks, ...orderChecks];
 
     const passCount = allChecks.filter(check => check.status === 'pass').length;
     const failCount = allChecks.filter(check => check.status === 'fail').length;

@@ -73,10 +73,9 @@ export const getOrders = async ({
     const to = from + pageSize - 1;
 
     let query = supabase
-      .from('orders')
+      .from('orders_view')
       .select(`*, 
         order_items (*),
-        delivery_zones (id, name, base_fee, is_active),
         order_delivery_schedule (*)
       `, { count: 'exact' });
 
@@ -100,7 +99,7 @@ export const getOrders = async ({
       console.warn('Query with delivery zones failed, trying fallback:', fallbackError.message);
       
       let fallbackQuery = supabase
-        .from('orders')
+        .from('orders_view')
         .select(`*, order_items (*), order_delivery_schedule (*)`, { count: 'exact' });
 
       if (status !== 'all') {

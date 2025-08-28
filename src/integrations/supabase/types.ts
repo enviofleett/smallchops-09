@@ -1193,6 +1193,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "communication_events_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       communication_events_archive: {
@@ -2297,6 +2304,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "deliveries_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       delivery_analytics: {
@@ -2440,6 +2454,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "delivery_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       delivery_fees: {
@@ -2542,6 +2563,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_notifications_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
             referencedColumns: ["id"]
           },
         ]
@@ -4098,6 +4126,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "moq_audit_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       notification_delivery_log: {
@@ -4283,6 +4318,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_access_tokens_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       order_assignments: {
@@ -4334,6 +4376,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: true
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders_view"
             referencedColumns: ["id"]
           },
           {
@@ -4390,6 +4439,51 @@ export type Database = {
         }
         Relationships: []
       }
+      order_audit_log: {
+        Row: {
+          action: string
+          changed_at: string | null
+          changed_by: string | null
+          id: string
+          new_values: Json | null
+          old_values: Json | null
+          order_id: string | null
+        }
+        Insert: {
+          action: string
+          changed_at?: string | null
+          changed_by?: string | null
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          order_id?: string | null
+        }
+        Update: {
+          action?: string
+          changed_at?: string | null
+          changed_by?: string | null
+          id?: string
+          new_values?: Json | null
+          old_values?: Json | null
+          order_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "order_audit_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_audit_log_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       order_delivery_schedule: {
         Row: {
           created_at: string
@@ -4433,6 +4527,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: true
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_delivery_schedule_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders_view"
             referencedColumns: ["id"]
           },
         ]
@@ -4489,6 +4590,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
             referencedColumns: ["id"]
           },
           {
@@ -4633,6 +4741,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "order_status_changes_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       order_status_changes_archive: {
@@ -4685,6 +4800,7 @@ export type Database = {
           delivery_time_slot_id: string | null
           delivery_zone_id: string | null
           discount_amount: number | null
+          email: string | null
           estimated_delivery_date: string | null
           guest_session_id: string | null
           id: string
@@ -4731,6 +4847,7 @@ export type Database = {
           delivery_time_slot_id?: string | null
           delivery_zone_id?: string | null
           discount_amount?: number | null
+          email?: string | null
           estimated_delivery_date?: string | null
           guest_session_id?: string | null
           id?: string
@@ -4777,6 +4894,7 @@ export type Database = {
           delivery_time_slot_id?: string | null
           delivery_zone_id?: string | null
           discount_amount?: number | null
+          email?: string | null
           estimated_delivery_date?: string | null
           guest_session_id?: string | null
           id?: string
@@ -5358,6 +5476,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payment_intents_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       payment_polling_state: {
@@ -5435,6 +5560,13 @@ export type Database = {
             referencedRelation: "orders"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "payment_processing_logs_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
+            referencedColumns: ["id"]
+          },
         ]
       }
       payment_processing_status: {
@@ -5492,6 +5624,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: true
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_processing_status_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: true
+            referencedRelation: "orders_view"
             referencedColumns: ["id"]
           },
         ]
@@ -5795,6 +5934,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_transactions_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
             referencedColumns: ["id"]
           },
         ]
@@ -6167,6 +6313,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "product_reviews_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
             referencedColumns: ["id"]
           },
           {
@@ -6547,6 +6700,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "promotion_usage_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "promotion_usage_promotion_id_fkey"
             columns: ["promotion_id"]
             isOneToOne: false
@@ -6916,6 +7076,13 @@ export type Database = {
             columns: ["order_id"]
             isOneToOne: false
             referencedRelation: "orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "route_order_assignments_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "orders_view"
             referencedColumns: ["id"]
           },
           {
@@ -8013,6 +8180,94 @@ export type Database = {
           total_emails: number | null
         }
         Relationships: []
+      }
+      orders_view: {
+        Row: {
+          amount_kobo: number | null
+          assigned_rider_id: string | null
+          created_at: string | null
+          created_by: string | null
+          customer_email: string | null
+          customer_id: string | null
+          customer_name: string | null
+          customer_phone: string | null
+          delivery_address: Json | null
+          delivery_fee: number | null
+          delivery_status: string | null
+          delivery_time: string | null
+          delivery_time_slot_id: string | null
+          delivery_zone_id: string | null
+          delivery_zone_name: string | null
+          discount_amount: number | null
+          email: string | null
+          estimated_delivery_date: string | null
+          guest_session_id: string | null
+          id: string | null
+          idempotency_key: string | null
+          order_number: string | null
+          order_time: string | null
+          order_type: Database["public"]["Enums"]["order_type"] | null
+          paid_at: string | null
+          payment_method: string | null
+          payment_reference: string | null
+          payment_status: Database["public"]["Enums"]["payment_status"] | null
+          payment_verified_at: string | null
+          paystack_reference: string | null
+          pickup_point_id: string | null
+          pickup_ready: boolean | null
+          pickup_time: string | null
+          preferred_delivery_time: string | null
+          processing_lock: boolean | null
+          reference_updated_at: string | null
+          special_instructions: string | null
+          status: Database["public"]["Enums"]["order_status"] | null
+          subtotal: number | null
+          subtotal_cost: number | null
+          tax_amount: number | null
+          total_amount: number | null
+          total_vat: number | null
+          updated_at: string | null
+          updated_by: string | null
+          user_id: string | null
+          zone_delivery_fee: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "orders_assigned_rider_id_fkey"
+            columns: ["assigned_rider_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_assigned_rider_profile_fkey"
+            columns: ["assigned_rider_id"]
+            isOneToOne: false
+            referencedRelation: "drivers"
+            referencedColumns: ["profile_id"]
+          },
+          {
+            foreignKeyName: "orders_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customer_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_delivery_zone_id_fkey"
+            columns: ["delivery_zone_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_zones"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "orders_pickup_point_id_fkey"
+            columns: ["pickup_point_id"]
+            isOneToOne: false
+            referencedRelation: "pickup_points"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       payment_flow_health: {
         Row: {

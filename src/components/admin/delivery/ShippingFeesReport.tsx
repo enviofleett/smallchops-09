@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,7 +30,6 @@ interface ShippingFeesData {
 
 export const ShippingFeesReport: React.FC = () => {
   const [period, setPeriod] = useState<'weekly' | 'monthly'>('weekly');
-  
   // Calculate default date range
   const endDate = format(new Date(), 'yyyy-MM-dd');
   const startDate = format(
@@ -48,11 +47,10 @@ export const ShippingFeesReport: React.FC = () => {
           endDate
         }
       });
-
       if (error) throw error;
       return data;
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
   });
 
   const formatCurrency = (amount: number) => `₦${amount.toLocaleString()}`;
@@ -61,7 +59,7 @@ export const ShippingFeesReport: React.FC = () => {
     period: bucket.period_label,
     fees: bucket.total_shipping_fees,
     orders: bucket.order_count,
-    shortLabel: period === 'weekly' 
+    shortLabel: period === 'weekly'
       ? `Week ${format(new Date(bucket.start_date), 'MMM d')}`
       : format(new Date(bucket.start_date), 'MMM yyyy')
   })) || [];
@@ -71,7 +69,7 @@ export const ShippingFeesReport: React.FC = () => {
       <div className="text-center py-8">
         <p className="text-destructive">Failed to load shipping fees report</p>
         <p className="text-sm text-muted-foreground mt-1">
-          {error instanceof Error 
+          {error instanceof Error
             ? error.message.includes('Invalid authorization') || error.message.includes('Admin access required')
               ? 'Access denied. Admin permissions required.'
               : error.message
@@ -83,8 +81,8 @@ export const ShippingFeesReport: React.FC = () => {
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
+    <div className="space-y-4 w-full max-w-screen-lg mx-auto px-2 sm:px-4">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-semibold">Shipping Fees Report</h3>
         <Select value={period} onValueChange={(value: 'weekly' | 'monthly') => setPeriod(value)}>
           <SelectTrigger className="w-32">
@@ -99,7 +97,7 @@ export const ShippingFeesReport: React.FC = () => {
       <div>
         {isLoading ? (
           <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               {[...Array(3)].map((_, i) => (
                 <div key={i} className="animate-pulse">
                   <div className="h-4 bg-muted rounded mb-2"></div>
@@ -112,7 +110,7 @@ export const ShippingFeesReport: React.FC = () => {
         ) : reportData ? (
           <div className="space-y-6">
             {/* Summary Statistics */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
               <div className="bg-primary/5 p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <DollarSign className="w-4 h-4 text-primary" />
@@ -120,7 +118,6 @@ export const ShippingFeesReport: React.FC = () => {
                 </div>
                 <p className="text-2xl font-bold">{formatCurrency(reportData.total_fees)}</p>
               </div>
-              
               <div className="bg-blue-50 p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <Package className="w-4 h-4 text-blue-600" />
@@ -128,14 +125,13 @@ export const ShippingFeesReport: React.FC = () => {
                 </div>
                 <p className="text-2xl font-bold">{reportData.total_orders}</p>
               </div>
-              
               <div className="bg-green-50 p-4 rounded-lg">
                 <div className="flex items-center gap-2 mb-2">
                   <TrendingUp className="w-4 h-4 text-green-600" />
                   <span className="text-sm font-medium">Avg per Order</span>
                 </div>
                 <p className="text-2xl font-bold">
-                  {reportData.total_orders > 0 
+                  {reportData.total_orders > 0
                     ? formatCurrency(reportData.total_fees / reportData.total_orders)
                     : '₦0'
                   }
@@ -145,31 +141,36 @@ export const ShippingFeesReport: React.FC = () => {
 
             {/* Chart */}
             {chartData.length > 0 ? (
-              <div className="h-64">
+              <div className="h-64 w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                  <BarChart
+                    data={chartData}
+                    margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                  >
                     <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis 
-                      dataKey="shortLabel" 
+                    <XAxis
+                      dataKey="shortLabel"
                       fontSize={12}
                       tick={{ fontSize: 12 }}
                     />
-                    <YAxis 
+                    <YAxis
                       fontSize={12}
                       tick={{ fontSize: 12 }}
                       tickFormatter={(value) => `₦${value.toLocaleString()}`}
                     />
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value, name) => [
                         name === 'fees' ? formatCurrency(Number(value)) : value,
                         name === 'fees' ? 'Shipping Fees' : 'Orders'
                       ]}
                       labelFormatter={(label) => `Period: ${label}`}
                     />
-                    <Bar 
-                      dataKey="fees" 
-                      fill="hsl(var(--primary))" 
+                    <Bar
+                      dataKey="fees"
+                      fill="hsl(var(--primary))"
                       radius={[4, 4, 0, 0]}
+                      barSize={28}
+                      maxBarSize={40}
                     />
                   </BarChart>
                 </ResponsiveContainer>
@@ -187,7 +188,10 @@ export const ShippingFeesReport: React.FC = () => {
             {/* Period Details */}
             <div className="text-xs text-muted-foreground">
               <p>Period: {period === 'weekly' ? 'Last 4 weeks' : 'Last 6 months'}</p>
-              <p>Date range: {format(new Date(startDate), 'MMM d, yyyy')} - {format(new Date(endDate), 'MMM d, yyyy')}</p>
+              <p>
+                Date range: {format(new Date(startDate), 'MMM d, yyyy')} -{' '}
+                {format(new Date(endDate), 'MMM d, yyyy')}
+              </p>
               <p>Only includes paid delivery orders with delivery fees</p>
             </div>
           </div>

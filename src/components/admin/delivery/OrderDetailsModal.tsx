@@ -24,7 +24,13 @@ import {
   Truck,
   CreditCard,
   CheckCircle,
+  Flame,
+  Leaf,
+  Soup,
+  Box,
+  AlertTriangle,
 } from "lucide-react"
+import { getProduct } from "@/api/products"
 
 interface OrderDetailsModalProps {
   order: any
@@ -106,21 +112,13 @@ const formatAddress = (address: any) => {
   return parts.join(", ") || "N/A"
 }
 
-const getProductFeatures = (product: any) => {
-  if (!product?.features) return null
-  if (typeof product.features === "string") {
-    try {
-      return JSON.parse(product.features)
-    } catch {
-      return [product.features]
-    }
-  }
-  return product.features
-}
-
 export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalProps) {
   const { data: detailedOrder, isLoading, error } = useDetailedOrderData(order?.id)
   const { data: businessSettings } = useBusinessSettings()
+
+  // Product features fetching
+  const [productsData, setProductsData] = useState<Record<string, any>>({})
+  const [featuresLoading, setFeaturesLoading] = useState(false)
 
   useEffect(() => {
     if (error) {
@@ -128,18 +126,49 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
     }
   }, [error])
 
-  // Delivery fee and subtotal calculation
+  // Fetch full product features for each item
+  useEffect(() => {
+    let isMounted = true
+    async function fetchAllProducts() {
+      if (!order?.order_items?.length) return
+      setFeaturesLoading(true)
+      try {
+        const prods: Record<string, any> = {}
+        await Promise.all(
+          order.order_items.map(async (item: any) => {
+            if (item.product_id) {
+              try {
+                const fullProduct = await getProduct(item.product_id)
+                prods[item.product_id] = fullProduct
+              } catch (err) {
+                prods[item.product_id] = item.product || {}
+              }
+            } else {
+              prods[item.id] = item.product || {}
+            }
+          })
+        )
+        if (isMounted) setProductsData(prods)
+      } finally {
+        if (isMounted) setFeaturesLoading(false)
+      }
+    }
+    fetchAllProducts()
+    return () => {
+      isMounted = false
+    }
+  }, [order?.order_items])
+
   const shippingFee = Number(order?.delivery_fee ?? detailedOrder?.delivery_schedule?.delivery_fee ?? 0)
   const subtotal = Math.max(0, Number(order?.total_amount || 0) - shippingFee)
 
-  // Delivery schedule info
   const deliverySchedule = detailedOrder?.delivery_schedule || order?.delivery_schedule || null
   const deliveryDate = deliverySchedule?.delivery_date
   const deliveryWindowStart = deliverySchedule?.delivery_time_start
   const deliveryWindowEnd = deliverySchedule?.delivery_time_end
 
+  // Print handler: prints only modal content and keeps UI parity
   const handlePrint = () => {
-    // Print only modal content
     const modal = document.getElementById("order-details-modal-content")
     if (modal) {
       const printContents = modal.innerHTML
@@ -148,12 +177,16 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
         <html>
           <head>
             <title>Order Details</title>
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
             <style>
               body { font-family: 'Inter', sans-serif; background: #fff; color: #222; }
-              .order-details-modal-print { max-width: 100vw; }
+              .order-details-modal-print { max-width: 100vw; width: 100vw; margin: 0; padding: 0; }
+              .card, .border, .shadow-2xl, .rounded-2xl { box-shadow: none !important; border-radius: 0 !important; border: none !important; }
+              .no-print { display: none !important; }
+              .scrollbar-thin { scrollbar-width: none !important; overflow: visible !important; }
               @media print {
-                .order-details-modal-print { box-shadow: none !important; border: none !important; }
-                .no-print { display: none !important; }
+                html, body { background: #fff !important; color: #222 !important; }
+                .order-details-modal-print { margin: 0; padding: 0; }
               }
             </style>
           </head>
@@ -169,14 +202,75 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
     }
   }
 
-  // Responsive styles
   const modalContentStyles =
     "max-w-full w-full sm:max-w-[98vw] md:max-w-3xl lg:max-w-5xl h-[98vh] max-h-[98vh] overflow-y-auto rounded-2xl bg-background p-0 border shadow-2xl"
+
+  // Features List UI block
+  function FeaturesList({ product }: { product: any }) {
+    if (!product) return null
+    return (
+      <div className="space-y-2">
+        {product.features && (
+          <div>
+            <span className="font-semibold">Features:</span>
+            {Array.isArray(product.features) ? (
+              <ul className="list-disc ml-5 text-xs">
+                {product.features.map((f: string, i: number) => <li key={i}>{f}</li>)}
+              </ul>
+            ) : typeof product.features === "object" ? (
+              <ul className="list-disc ml-5 text-xs">
+                {Object.entries(product.features).map(([k, v], i) => v ? <li key={i}><span className="font-semibold">{k}:</span> {String(v)}</li> : null)}
+              </ul>
+            ) : (
+              <span className="ml-2 text-xs">{String(product.features)}</span>
+            )}
+          </div>
+        )}
+        {product.addOns?.length > 0 && (
+          <div>
+            <span className="font-semibold">Add-ons:</span>
+            <ul className="list-disc ml-5 text-xs">
+              {product.addOns.map((a: string, i: number) => <li key={i}>{a}</li>)}
+            </ul>
+          </div>
+        )}
+        {product.allergen_info?.length > 0 && (
+          <div>
+            <span className="font-semibold flex items-center gap-1"><AlertTriangle className="h-3 w-3 text-orange-700" />Allergens:</span>
+            <ul className="list-disc ml-5 text-xs text-orange-700">{product.allergen_info.map((a: string, i: number) => <li key={i}>{a}</li>)}</ul>
+          </div>
+        )}
+        <div className="flex flex-wrap gap-3 mt-1">
+          {typeof product.preparation_time === "number" && (
+            <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200"><Soup className="h-3 w-3 inline" /> Prep: {product.preparation_time} min</Badge>
+          )}
+          {typeof product.calories === "number" && (
+            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 border-yellow-200"><Flame className="h-3 w-3 inline" /> {product.calories} kcal</Badge>
+          )}
+          {product.isSpicy && (
+            <Badge variant="outline" className="bg-red-100 text-red-700 border-red-300"><Flame className="h-3 w-3 inline" /> Spicy</Badge>
+          )}
+          {product.isVegetarian && (
+            <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300"><Leaf className="h-3 w-3 inline" /> Vegetarian</Badge>
+          )}
+        </div>
+        <div className="flex flex-wrap gap-3 mt-1">
+          {typeof product.stock_quantity === "number" && (
+            <Badge variant="outline" className="bg-gray-100 text-gray-700 border-gray-300"><Box className="h-3 w-3 inline" /> In stock: {product.stock_quantity}</Badge>
+          )}
+          {typeof product.minimum_order_quantity === "number" && (
+            <Badge variant="outline" className="bg-indigo-100 text-indigo-700 border-indigo-300">Min order: {product.minimum_order_quantity}</Badge>
+          )}
+        </div>
+      </div>
+    )
+  }
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onClose}>
         <DialogContent id="order-details-modal-content" className={modalContentStyles}>
+          {/* Header */}
           <div className="bg-gradient-to-r from-primary/5 to-secondary/5 px-4 py-4 sm:px-8 sm:py-6 border-b border-border/50">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
@@ -185,24 +279,15 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                   <h2 className="text-xl sm:text-2xl font-bold text-foreground">Order Details</h2>
                   <div className="flex items-center gap-3 mt-1 flex-wrap">
                     <span className="font-mono text-sm text-muted-foreground">#{order?.order_number}</span>
-                    <Badge
-                      className={`capitalize text-sm px-3 py-1 ${getStatusColor(order?.status)}`}
-                      variant="outline"
-                    >
+                    <Badge className={`capitalize text-sm px-3 py-1 ${getStatusColor(order?.status)}`} variant="outline">
                       {order?.status?.replace(/_/g, " ") ?? "Unknown"}
                     </Badge>
                   </div>
                 </div>
               </div>
               <div className="flex items-center gap-3 no-print">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex items-center gap-2 hover:bg-primary/10 bg-transparent"
-                  onClick={handlePrint}
-                >
-                  <Printer className="h-4 w-4" />
-                  Print Receipt
+                <Button variant="outline" size="sm" className="flex items-center gap-2 hover:bg-primary/10 bg-transparent" onClick={handlePrint}>
+                  <Printer className="h-4 w-4" /> Print Receipt
                 </Button>
                 <DialogClose asChild>
                   <Button variant="ghost" size="icon" className="hover:bg-destructive/10" aria-label="Close">
@@ -212,10 +297,9 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </div>
             </div>
           </div>
-
+          {/* Order Summary Cards */}
           <div className="px-4 py-4 sm:px-8 sm:py-6 bg-card/30">
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 sm:gap-6">
-              {/* Order Total Card */}
               <Card className="bg-gradient-to-br from-primary/10 to-secondary/5 border-primary/20">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-2">
@@ -229,8 +313,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                   </div>
                 </CardContent>
               </Card>
-
-              {/* Delivery Schedule Card */}
               <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-200">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-2">
@@ -241,9 +323,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                     <div className="space-y-2">
                       <div className="text-lg font-semibold text-blue-700">{formatDate(deliveryDate)}</div>
                       {deliveryWindowStart && deliveryWindowEnd && (
-                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">
-                          {formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}
-                        </Badge>
+                        <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-300">{formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}</Badge>
                       )}
                     </div>
                   ) : (
@@ -251,31 +331,24 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                   )}
                 </CardContent>
               </Card>
-
-              {/* Status Card */}
               <Card className="bg-gradient-to-br from-green-50 to-emerald-50 border-green-200">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-2">
                     <CheckCircle className="h-5 w-5 text-green-600" />
                     <span className="text-sm font-medium text-muted-foreground">Status</span>
                   </div>
-                  <div className="text-lg font-semibold text-green-700 capitalize">
-                    {order?.status?.replace(/_/g, " ") ?? "Unknown"}
-                  </div>
+                  <div className="text-lg font-semibold text-green-700 capitalize">{order?.status?.replace(/_/g, " ") ?? "Unknown"}</div>
                   {shippingFee > 0 && (
                     <div className="mt-2">
-                      <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">
-                        +{formatCurrency(shippingFee)} delivery
-                      </Badge>
+                      <Badge variant="outline" className="bg-green-100 text-green-700 border-green-300">{formatCurrency(shippingFee)} delivery</Badge>
                     </div>
                   )}
                 </CardContent>
               </Card>
             </div>
           </div>
-
           <Separator />
-
+          {/* Customer & Delivery Info */}
           <div className="px-4 py-4 sm:px-8 sm:py-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-8">
               <Card className="border-none shadow-sm bg-card/50">
@@ -297,7 +370,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                   </div>
                 </CardContent>
               </Card>
-
               <Card className="border-none shadow-sm bg-card/50">
                 <CardContent className="p-4 sm:p-6">
                   <div className="flex items-center gap-3 mb-4">
@@ -315,9 +387,7 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                     {deliveryWindowStart && deliveryWindowEnd && (
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <Clock className="h-4 w-4" />
-                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">
-                          {formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}
-                        </Badge>
+                        <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">{formatTimeWindow(deliveryWindowStart, deliveryWindowEnd)}</Badge>
                       </div>
                     )}
                   </div>
@@ -325,20 +395,18 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </Card>
             </div>
           </div>
-
           <Separator />
-
+          {/* Order Items */}
           <div className="px-4 py-4 sm:px-8 sm:py-6">
             <div className="flex items-center gap-3 mb-6">
               <Package className="h-6 w-6 text-primary" />
               <h3 className="text-xl font-semibold text-foreground">Order Items ({order?.order_items?.length || 0})</h3>
             </div>
-
-            {isLoading ? (
+            {isLoading || featuresLoading ? (
               <div className="space-y-4">
                 {[...Array(3)].map((_, i) => (
                   <Card key={i} className="border-border/50">
-                    <CardContent className="p-6">
+                    <CardContent className="p-4 sm:p-6">
                       <Skeleton className="h-6 w-3/4 mb-2" />
                       <Skeleton className="h-4 w-1/2 mb-4" />
                       <div className="flex justify-between">
@@ -352,54 +420,19 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
             ) : (
               <div className="space-y-4 max-h-[38vh] overflow-y-auto scrollbar-thin scrollbar-thumb-primary/20 scrollbar-track-transparent print:max-h-full print:overflow-visible">
                 {order?.order_items?.map((item: any, idx: number) => {
-                  let features = getProductFeatures(item.product)
-                  if (!features && item?.features) {
-                    features = item.features
-                  }
+                  const product = productsData[item.product_id] || item.product || {}
                   return (
                     <Card key={item.id || idx} className="border-border/50 hover:shadow-md transition-shadow">
                       <CardContent className="p-4 sm:p-6">
                         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
                           <div className="flex-1 min-w-0">
                             <h4 className="text-lg font-semibold text-foreground mb-2">{item.product_name}</h4>
-                            {item.product?.description && (
-                              <p className="text-sm text-muted-foreground mb-3">{item.product.description}</p>
+                            {product.description && (
+                              <p className="text-sm text-muted-foreground mb-3">{product.description}</p>
                             )}
-
-                            {/* Features/details */}
-                            {features && (
-                              <div className="mb-3 p-3 bg-muted/30 rounded-lg">
-                                <span className="text-sm font-medium text-foreground block mb-2">What's included:</span>
-                                {typeof features === "object" && !Array.isArray(features) ? (
-                                  <ul className="text-sm text-muted-foreground space-y-1">
-                                    {Object.entries(features).map(([key, value], i) =>
-                                      value ? (
-                                        <li key={i} className="flex gap-2">
-                                          <span className="font-medium">{key}:</span>
-                                          <span>{String(value)}</span>
-                                        </li>
-                                      ) : null,
-                                    )}
-                                  </ul>
-                                ) : Array.isArray(features) ? (
-                                  <ul className="text-sm text-muted-foreground space-y-1">
-                                    {features.map((f, i) =>
-                                      f ? (
-                                        <li key={i} className="flex items-center gap-2">
-                                          <div className="w-1.5 h-1.5 bg-primary rounded-full" />
-                                          {String(f)}
-                                        </li>
-                                      ) : null,
-                                    )}
-                                  </ul>
-                                ) : (
-                                  <span className="text-sm text-muted-foreground">{String(features)}</span>
-                                )}
-                              </div>
-                            )}
-
+                            <FeaturesList product={product} />
                             {item.special_instructions && (
-                              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+                              <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg mt-3">
                                 <div className="flex items-start gap-2">
                                   <AlertCircle className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
                                   <div>
@@ -410,7 +443,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
                               </div>
                             )}
                           </div>
-
                           <div className="flex flex-col lg:flex-row lg:items-center gap-4 lg:gap-6 text-sm">
                             <div className="flex items-center gap-2">
                               <span className="text-muted-foreground">Qty:</span>
@@ -448,7 +480,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
               </div>
             )}
           </div>
-
           {/* Cost Summary */}
           <div className="px-4 py-4 sm:px-8 sm:py-6">
             <div className="flex flex-col sm:flex-row justify-end gap-6 print:gap-2 bg-white print:bg-white">
@@ -471,7 +502,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
         </DialogContent>
       </Dialog>
       <style jsx global>{`
-        /* Mobile viewport styles */
         @media (max-width: 640px) {
           #order-details-modal-content {
             max-width: 100vw !important;
@@ -483,7 +513,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
           .py-4, .sm\\:py-6 { padding-top: 8px !important; padding-bottom: 8px !important; }
           .rounded-2xl { border-radius: 0 !important; }
         }
-        /* Custom scroll styling for modal */
         .scrollbar-thin {
           scrollbar-width: thin;
         }
@@ -500,7 +529,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
         .scrollbar-thin::-webkit-scrollbar-track {
           background: #f3f4f6;
         }
-        /* Print styles */
         @media print {
           html, body {
             background: #fff !important;

@@ -162,8 +162,8 @@ export function EnhancedDeliveryManagement() {
           })
         )
       );
-      const successCount = results.filter(r => r.data?.success).length;
-      const failedResults = results.filter(r => !r.data?.success);
+      const successCount = results.filter(r => (r.data as any)?.success).length;
+      const failedResults = results.filter(r => !(r.data as any)?.success);
 
       if (successCount > 0) {
         toast.success(`${successCount} order(s) assigned successfully`);
@@ -172,7 +172,7 @@ export function EnhancedDeliveryManagement() {
       }
       if (failedResults.length > 0) {
         failedResults.forEach(result => {
-          toast.error(result.data?.error || 'Assignment failed');
+          toast.error((result.data as any)?.error || 'Assignment failed');
         });
       }
     } catch (error) {
@@ -190,12 +190,12 @@ export function EnhancedDeliveryManagement() {
         p_notes: notes,
       });
       if (error) throw error;
-      if (data?.success) {
+      if ((data as any)?.success) {
         toast.success('Status updated successfully');
         refetchOrders();
         setIsStatusDialogOpen(false);
       } else {
-        toast.error(data?.error || 'Failed to update status');
+        toast.error((data as any)?.error || 'Failed to update status');
       }
     } catch (error) {
       toast.error('Failed to update status');

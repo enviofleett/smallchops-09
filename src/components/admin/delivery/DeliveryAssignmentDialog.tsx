@@ -104,7 +104,6 @@ export function DeliveryAssignmentDialog({
             <Select
               value={selectedDriverId}
               onValueChange={setSelectedDriverId}
-              id="driver-select"
             >
               <SelectTrigger>
                 <SelectValue placeholder="Choose a driver..." />

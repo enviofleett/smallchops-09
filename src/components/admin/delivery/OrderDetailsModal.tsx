@@ -467,32 +467,6 @@ export function OrderDetailsModal({ order, isOpen, onClose }: OrderDetailsModalP
           </div>
         </div>
       </DialogContent>
-      <style jsx global>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-          #order-details-modal-content, #order-details-modal-content * {
-            visibility: visible;
-          }
-          #order-details-modal-content {
-            position: absolute !important;
-            left: 0 !important;
-            top: 0 !important;
-            width: 100vw !important;
-            height: auto !important;
-            max-width: 100vw !important;
-            box-shadow: none !important;
-            border-radius: 0 !important;
-            background: #fff !important;
-            color: #222 !important;
-            z-index: 9999 !important;
-          }
-          .no-print {
-            display: none !important;
-          }
-        }
-      `}</style>
     </Dialog>
   )
 }

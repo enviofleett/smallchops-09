@@ -108,7 +108,6 @@ export function DeliveryStatusDialog({
             <Select
               value={newStatus}
               onValueChange={(value) => setNewStatus(value as DeliveryAssignment['status'])}
-              id="new-status"
             >
               <SelectTrigger>
                 <SelectValue placeholder="Select status..." />

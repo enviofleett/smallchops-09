@@ -124,7 +124,6 @@ export const DriverAssignDialog: React.FC<DriverAssignDialogProps> = ({
               <Select
                 value={selectedDriverId}
                 onValueChange={setSelectedDriverId}
-                id="driver-select"
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Choose a driver..." />

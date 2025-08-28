@@ -14,7 +14,7 @@ import {
   Download,
   Users
 } from 'lucide-react';
-import { format, startOfWeek, endOfWeek, subWeeks, addWeeks } from 'date-fns';
+import { format, startOfWeek, endOfWeek, addWeeks } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useDriverManagement } from '@/hooks/useDriverManagement';
 
@@ -76,10 +76,15 @@ export function DriverPerformanceDashboard() {
 
       if (error) throw error;
 
+      // Defensive: handle if data is null or not an array
+      if (!Array.isArray(data)) return [];
+
       // Process the data to calculate performance metrics
       const driverMap = new Map<string, DriverPerformance>();
 
       data.forEach((assignment: any) => {
+        if (!assignment?.driver_id) return; // skip invalid rows
+
         const driverId = assignment.driver_id;
         const driverName = assignment.drivers?.name || 'Unknown Driver';
         
@@ -106,16 +111,20 @@ export function DriverPerformanceDashboard() {
           
           // Calculate delivery time
           if (assignment.started_at && assignment.completed_at) {
-            const deliveryTime = (new Date(assignment.completed_at).getTime() - new Date(assignment.started_at).getTime()) / (1000 * 60);
-            performance.average_delivery_time_minutes = 
-              (performance.average_delivery_time_minutes * (performance.orders_completed - 1) + deliveryTime) / performance.orders_completed;
+            const started = new Date(assignment.started_at);
+            const completed = new Date(assignment.completed_at);
+            if (!isNaN(started.getTime()) && !isNaN(completed.getTime())) {
+              const deliveryTime = (completed.getTime() - started.getTime()) / (1000 * 60);
+              performance.average_delivery_time_minutes = 
+                (performance.average_delivery_time_minutes * (performance.orders_completed - 1) + deliveryTime) / performance.orders_completed;
+            }
           }
         } else if (assignment.status === 'failed') {
           performance.orders_failed++;
         }
 
         // Handle ratings
-        if (assignment.customer_rating) {
+        if (typeof assignment.customer_rating === 'number') {
           performance.total_customer_ratings++;
           performance.customer_ratings_average = 
             (performance.customer_ratings_average * (performance.total_customer_ratings - 1) + assignment.customer_rating) / performance.total_customer_ratings;
@@ -134,13 +143,16 @@ export function DriverPerformanceDashboard() {
 
   // Calculate totals
   const totals = useMemo(() => {
+    if (!Array.isArray(filteredData) || filteredData.length === 0) {
+      return { completed: 0, failed: 0, fees: 0, avgTime: 0, avgRating: 0 };
+    }
     return filteredData.reduce(
       (acc, driver) => ({
-        completed: acc.completed + driver.orders_completed,
-        failed: acc.failed + driver.orders_failed,
-        fees: acc.fees + driver.total_delivery_fees,
-        avgTime: acc.avgTime + driver.average_delivery_time_minutes,
-        avgRating: acc.avgRating + driver.customer_ratings_average,
+        completed: acc.completed + (driver.orders_completed || 0),
+        failed: acc.failed + (driver.orders_failed || 0),
+        fees: acc.fees + (driver.total_delivery_fees || 0),
+        avgTime: acc.avgTime + (driver.average_delivery_time_minutes || 0),
+        avgRating: acc.avgRating + (driver.customer_ratings_average || 0),
       }),
       { completed: 0, failed: 0, fees: 0, avgTime: 0, avgRating: 0 }
     );
@@ -174,23 +186,9 @@ export function DriverPerformanceDashboard() {
     URL.revokeObjectURL(url);
   };
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        {[...Array(4)].map((_, i) => (
-          <Card key={i} className="animate-pulse">
-            <CardContent className="p-6">
-              <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
-              <div className="h-8 bg-muted rounded w-1/2"></div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-    );
-  }
-
+  // Top-level outline for the page
   return (
-    <div className="space-y-6">
+    <div className="border-2 border-black rounded-lg p-6 bg-white space-y-6 shadow-lg">
       {/* Header and Filters */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
@@ -298,28 +296,42 @@ export function DriverPerformanceDashboard() {
         </Card>
       </div>
 
-      {/* Driver Performance Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="w-5 h-5" />
-            Driver Performance Details
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredData.length === 0 ? (
-            <div className="text-center py-8">
-              <Truck className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
-              <h3 className="text-lg font-semibold mb-2">No Performance Data</h3>
-              <p className="text-muted-foreground">
-                No delivery data found for the selected period.
-              </p>
-            </div>
-          ) : (
+      {/* Error handling */}
+      {error && (
+        <Card className="border border-red-600 mb-6">
+          <CardContent className="p-4 text-red-700">
+            <strong>Error:</strong> Could not fetch driver performance. Please check your connection or try again.
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Loading State */}
+      {isLoading ? (
+        <div className="space-y-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i} className="animate-pulse">
+              <CardContent className="p-6">
+                <div className="h-4 bg-muted rounded w-3/4 mb-2"></div>
+                <div className="h-8 bg-muted rounded w-1/2"></div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        /* Driver Performance Table */
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Users className="w-5 h-5" />
+              Driver Performance Details
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {/* Blank table if no data */}
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="w-full border border-black">
                 <thead>
-                  <tr className="border-b">
+                  <tr className="border-b bg-black text-white">
                     <th className="text-left p-3">Driver</th>
                     <th className="text-left p-3">Completed</th>
                     <th className="text-left p-3">Failed</th>
@@ -330,65 +342,74 @@ export function DriverPerformanceDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredData.map((driver) => {
-                    const totalOrders = driver.orders_completed + driver.orders_failed;
-                    const successRate = totalOrders > 0 ? (driver.orders_completed / totalOrders) * 100 : 0;
-                    
-                    return (
-                      <tr key={driver.driver_id} className="border-b hover:bg-muted/30">
-                        <td className="p-3">
-                          <div>
-                            <p className="font-medium">{driver.driver_name}</p>
-                            <p className="text-sm text-muted-foreground">
-                              {drivers.find(d => d.id === driver.driver_id)?.vehicle_type || 'Unknown'}
-                            </p>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <Badge variant="outline" className="bg-green-50 text-green-700">
-                            {driver.orders_completed}
-                          </Badge>
-                        </td>
-                        <td className="p-3">
-                          <Badge variant="outline" className="bg-red-50 text-red-700">
-                            {driver.orders_failed}
-                          </Badge>
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div className="w-12 bg-gray-200 rounded-full h-2">
-                              <div 
-                                className="bg-green-500 h-2 rounded-full" 
-                                style={{ width: `${Math.min(successRate, 100)}%` }}
-                              />
+                  {(filteredData.length === 0) ? (
+                    // blank table row
+                    <tr>
+                      <td colSpan={7} className="text-center py-8 text-muted-foreground">
+                        No delivery data found for the selected period.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredData.map((driver) => {
+                      const totalOrders = driver.orders_completed + driver.orders_failed;
+                      const successRate = totalOrders > 0 ? (driver.orders_completed / totalOrders) * 100 : 0;
+                      
+                      return (
+                        <tr key={driver.driver_id} className="border-b hover:bg-muted/30">
+                          <td className="p-3">
+                            <div>
+                              <p className="font-medium">{driver.driver_name}</p>
+                              <p className="text-sm text-muted-foreground">
+                                {drivers.find(d => d.id === driver.driver_id)?.vehicle_type || 'Unknown'}
+                              </p>
                             </div>
-                            <span className="text-sm font-medium">{successRate.toFixed(1)}%</span>
-                          </div>
-                        </td>
-                        <td className="p-3 font-medium">
-                          ₦{driver.total_delivery_fees.toLocaleString()}
-                        </td>
-                        <td className="p-3">
-                          {driver.average_delivery_time_minutes.toFixed(1)}m
-                        </td>
-                        <td className="p-3">
-                          <div className="flex items-center gap-1">
-                            <Star className="w-4 h-4 text-yellow-500" />
-                            <span>{driver.customer_ratings_average.toFixed(1)}</span>
-                            <span className="text-xs text-muted-foreground">
-                              ({driver.total_customer_ratings})
-                            </span>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
+                          </td>
+                          <td className="p-3">
+                            <Badge variant="outline" className="bg-green-50 text-green-700">
+                              {driver.orders_completed}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            <Badge variant="outline" className="bg-red-50 text-red-700">
+                              {driver.orders_failed}
+                            </Badge>
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-2">
+                              <div className="w-12 bg-gray-200 rounded-full h-2">
+                                <div 
+                                  className="bg-green-500 h-2 rounded-full" 
+                                  style={{ width: `${Math.min(successRate, 100)}%` }}
+                                />
+                              </div>
+                              <span className="text-sm font-medium">{successRate.toFixed(1)}%</span>
+                            </div>
+                          </td>
+                          <td className="p-3 font-medium">
+                            ₦{driver.total_delivery_fees.toLocaleString()}
+                          </td>
+                          <td className="p-3">
+                            {driver.average_delivery_time_minutes.toFixed(1)}m
+                          </td>
+                          <td className="p-3">
+                            <div className="flex items-center gap-1">
+                              <Star className="w-4 h-4 text-yellow-500" />
+                              <span>{driver.customer_ratings_average.toFixed(1)}</span>
+                              <span className="text-xs text-muted-foreground">
+                                ({driver.total_customer_ratings})
+                              </span>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

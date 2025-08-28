@@ -41,7 +41,15 @@ import { cn } from '@/lib/utils';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 
+// Responsive breakpoints for grid layouts
+const GRID_BREAKPOINTS = {
+  mobile: 'grid-cols-2',
+  tablet: 'md:grid-cols-4',
+  desktop: 'lg:grid-cols-4',
+};
+
 export default function AdminDelivery() {
+  // STATE
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [activeTab, setActiveTab] = useState('overview');
   const [selectedOrders, setSelectedOrders] = useState<OrderWithItems[]>([]);
@@ -49,46 +57,40 @@ export default function AdminDelivery() {
   const [isRegisterDriverOpen, setIsRegisterDriverOpen] = useState(false);
   const [deliveryWindowFilter, setDeliveryWindowFilter] = useState<string>('all');
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-  const isMobile = useIsMobile();
 
+  const isMobile = useIsMobile();
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
   const isSelectedDateToday = isToday(selectedDate);
 
-  const { 
-    orders: paidOrders, 
-    isLoading: ordersLoading, 
-    error: ordersError, 
-    refresh: refreshOrders 
-  } = usePaidOrders({ 
+  // DATA FETCHING
+  const { orders: paidOrders, isLoading: ordersLoading, error: ordersError, refresh: refreshOrders } = usePaidOrders({ 
     selectedDate, 
     orderType: 'delivery',
     autoRefresh: isSelectedDateToday 
   });
 
-  const { 
-    filteredOrders: deliveryOrders,
-    metrics: deliveryMetrics 
-  } = useOrderFilters({
+  const { filteredOrders: deliveryOrders, metrics: deliveryMetrics } = useOrderFilters({
     orders: paidOrders,
     selectedDate,
     orderType: 'delivery',
     paymentStatus: 'paid'
   });
 
-  // Get ready orders from filtered delivery orders
-  const readyOrdersBasic = deliveryOrders.filter(order => order.status === 'ready');
-  
-  // Fetch delivery schedules in bulk for ready orders only
-  const readyOrderIds = readyOrdersBasic.map(order => order.id);
+  // Ready Orders and Schedules
+  const readyOrdersBasic = useMemo(
+    () => deliveryOrders.filter(order => order.status === 'ready'),
+    [deliveryOrders]
+  );
+  const readyOrderIds = useMemo(() => readyOrdersBasic.map(order => order.id), [readyOrdersBasic]);
   const { data: deliverySchedules = {}, error: schedulesError } = useQuery({
     queryKey: ['delivery-schedules-bulk', readyOrderIds],
     queryFn: () => getSchedulesByOrderIds(readyOrderIds),
     enabled: readyOrderIds.length > 0,
   });
 
-  // Sort ready orders by delivery priority
-  const readyOrders = useMemo(() => 
-    [...readyOrdersBasic].sort((a, b) => {
+  // SORTED READY ORDERS (by priority)
+  const readyOrders = useMemo(() => {
+    return [...readyOrdersBasic].sort((a, b) => {
       const scheduleA = deliverySchedules[a.id];
       const scheduleB = deliverySchedules[b.id];
       if (scheduleA && scheduleB) {
@@ -100,13 +102,12 @@ export default function AdminDelivery() {
       if (!scheduleA && scheduleB) return 1;
       return new Date(a.order_time || a.created_at).getTime() - 
              new Date(b.order_time || b.created_at).getTime();
-    }),
-    [readyOrdersBasic, deliverySchedules]
-  );
+    });
+  }, [readyOrdersBasic, deliverySchedules]);
 
   const { zones, loading: zonesLoading } = useDeliveryZones();
 
-  // Generate hourly delivery windows
+  // DELIVERY WINDOWS GENERATION
   const deliveryWindows = useMemo(() => {
     const windows = ['all'];
     for (let hour = 8; hour <= 20; hour++) {
@@ -118,7 +119,7 @@ export default function AdminDelivery() {
     return windows;
   }, []);
 
-  // Filter orders by delivery window (for All Orders tab)
+  // FILTER ORDERS BY WINDOW
   const filteredOrdersByWindow = useMemo(() => {
     if (deliveryWindowFilter === 'all') return [...deliveryOrders];
     if (deliveryWindowFilter === 'due-now') {
@@ -138,13 +139,10 @@ export default function AdminDelivery() {
       });
     }
     if (deliveryWindowFilter === 'overdue') {
-      const now = new Date();
       return deliveryOrders.filter(order => {
         const schedule = deliverySchedules[order.id];
         if (!schedule?.delivery_time_end) return false;
         try {
-          const today = format(selectedDate, 'yyyy-MM-dd');
-          const endTime = parseISO(`${today}T${schedule.delivery_time_end}:00`);
           return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
                  ['confirmed', 'preparing', 'ready'].includes(order.status);
         } catch {
@@ -153,28 +151,29 @@ export default function AdminDelivery() {
       });
     }
     const [startHour] = deliveryWindowFilter.split('-');
-    return [...deliveryOrders].filter(order => {
+    return deliveryOrders.filter(order => {
       const schedule = deliverySchedules[order.id];
       if (!schedule?.delivery_time_start) return false;
       return schedule.delivery_time_start.startsWith(startHour);
     });
   }, [deliveryOrders, deliveryWindowFilter, deliverySchedules, selectedDate]);
 
-  // Reset selection when window filter changes
+  // RESET SELECTION ON WINDOW FILTER CHANGE
   React.useEffect(() => {
     setSelectedOrders(prev => prev.filter(order => 
       filteredOrdersByWindow.some(filtered => filtered.id === order.id)
     ));
   }, [deliveryWindowFilter, filteredOrdersByWindow]);
 
-  const finalDeliveryMetrics = {
+  // FINAL METRICS
+  const finalDeliveryMetrics = useMemo(() => ({
     ...deliveryMetrics,
     inProgress: deliveryOrders.filter(o => ['preparing', 'ready'].includes(o.status)).length,
     outForDelivery: deliveryOrders.filter(o => o.status === 'out_for_delivery').length,
     assigned: deliveryOrders.filter(o => o.assigned_rider_id).length,
-  };
+  }), [deliveryOrders, deliveryMetrics]);
 
-  // Analytics data: Number of trips by driver
+  // DRIVER TRIP ANALYTICS
   const driverTripCounts = useMemo(() => {
     const tripMap: Record<string, number> = {};
     deliveryOrders.forEach(order => {
@@ -186,25 +185,25 @@ export default function AdminDelivery() {
   }, [deliveryOrders]);
 
   // For demonstration: mapping driver ID to name
-  // A real implementation should use driver name lookup from driver list
-  const getDriverName = (driverId: string) => {
-    // This should reference a driver list, here we fallback to ID
-    return `Driver ${driverId.substring(0, 6)}`;
-  };
+  const getDriverName = (driverId: string) => `Driver ${driverId.substring(0, 6)}`;
+
+  // Responsive grid classes
+  const gridClasses = isMobile ? 'grid-cols-2' : 'md:grid-cols-4';
 
   return (
     <>
+      {/* SEO */}
       <Helmet>
         <title>Delivery Management - Admin Dashboard</title>
         <meta name="description" content="Manage delivery operations, track routes, and monitor delivery performance." />
       </Helmet>
 
-      <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+      <div className="space-y-4 sm:space-y-6 p-2 sm:p-4 md:p-6">
         {/* System Status Check */}
         <SystemStatusChecker />
         
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold">Delivery Management</h1>
             <p className="text-sm sm:text-base text-muted-foreground">
@@ -216,8 +215,9 @@ export default function AdminDelivery() {
               <PopoverTrigger asChild>
                 <Button
                   variant="outline"
+                  aria-label="Pick a date"
                   className={cn(
-                    "w-full sm:w-[240px] justify-start text-left font-normal text-sm",
+                    "w-full sm:w-[200px] md:w-[240px] justify-start text-left font-normal text-sm",
                     !selectedDate && "text-muted-foreground"
                   )}
                 >
@@ -229,8 +229,8 @@ export default function AdminDelivery() {
               </PopoverTrigger>
               <PopoverContent 
                 className="w-auto p-0 z-50" 
-                align="start"
-                side="bottom"
+                align={isMobile ? "center" : "start"}
+                side={isMobile ? "bottom" : "bottom"}
                 sideOffset={4}
               >
                 <Calendar
@@ -252,125 +252,79 @@ export default function AdminDelivery() {
 
         {/* Error Banner */}
         {ordersError && (
-          <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-3 sm:p-4 mx-2 sm:mx-0">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-destructive font-medium">
-                  Failed to load orders data
-                </p>
-                <p className="text-xs text-destructive/80 mt-1 break-words">
-                  {ordersError instanceof Error ? ordersError.message : 'Unknown error occurred'}
-                </p>
-              </div>
-            </div>
-          </div>
+          <ErrorBanner
+            icon={<AlertTriangle className="w-4 h-4 text-destructive flex-shrink-0 mt-0.5" />}
+            title="Failed to load orders data"
+            description={ordersError instanceof Error ? ordersError.message : 'Unknown error occurred'}
+            color="destructive"
+          />
         )}
 
         {/* Server Cap Warning */}
         {(deliveryOrders.length >= 1000) && (
-          <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3 sm:p-4 mx-2 sm:mx-0">
-            <div className="flex items-start gap-2">
-              <AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />
-              <div className="flex-1 min-w-0">
-                <p className="text-sm text-orange-600 font-medium">
-                  Maximum data limit reached ({deliveryOrders.length} orders)
-                </p>
-                <p className="text-xs text-orange-600/80 mt-1 break-words">
-                  Some orders may not be displayed. Consider narrowing your date range.
-                </p>
-              </div>
-            </div>
-          </div>
+          <ErrorBanner
+            icon={<AlertTriangle className="w-4 h-4 text-orange-600 flex-shrink-0 mt-0.5" />}
+            title={`Maximum data limit reached (${deliveryOrders.length} orders)`}
+            description="Some orders may not be displayed. Consider narrowing your date range."
+            color="orange-500"
+          />
         )}
 
         {/* Delivery Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4 mx-2 sm:mx-0">
-          <Card className="overflow-hidden">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-primary/10 text-primary rounded-lg flex-shrink-0">
-                  <Package className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                 <div className="min-w-0 flex-1">
-                   <p className="text-xs sm:text-sm text-muted-foreground truncate">Total</p>
-                   <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{finalDeliveryMetrics.totalOrders}</p>
-                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-orange-500/10 text-orange-600 rounded-lg flex-shrink-0">
-                  <Clock className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                 <div className="min-w-0 flex-1">
-                   <p className="text-xs sm:text-sm text-muted-foreground truncate">Progress</p>
-                   <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{finalDeliveryMetrics.inProgress}</p>
-                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-purple-500/10 text-purple-600 rounded-lg flex-shrink-0">
-                  <Truck className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                 <div className="min-w-0 flex-1">
-                   <p className="text-xs sm:text-sm text-muted-foreground truncate">Delivery</p>
-                   <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{finalDeliveryMetrics.outForDelivery}</p>
-                 </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="overflow-hidden">
-            <CardContent className="p-3 sm:p-4">
-              <div className="flex items-center gap-2 sm:gap-3">
-                <div className="p-1.5 sm:p-2 bg-green-500/10 text-green-600 rounded-lg flex-shrink-0">
-                  <Users className="w-4 h-4 sm:w-5 sm:h-5" />
-                </div>
-                 <div className="min-w-0 flex-1">
-                   <p className="text-xs sm:text-sm text-muted-foreground truncate">Assigned</p>
-                   <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{finalDeliveryMetrics.assigned}</p>
-                 </div>
-              </div>
-            </CardContent>
-          </Card>
+        <div className={`grid ${gridClasses} gap-2 sm:gap-3 md:gap-4 mx-2 sm:mx-0`}>
+          <MetricCard
+            icon={<Package className="w-4 h-4 sm:w-5 sm:h-5" />}
+            label="Total"
+            value={finalDeliveryMetrics.totalOrders}
+            color="primary"
+          />
+          <MetricCard
+            icon={<Clock className="w-4 h-4 sm:w-5 sm:h-5" />}
+            label="Progress"
+            value={finalDeliveryMetrics.inProgress}
+            color="orange-500"
+          />
+          <MetricCard
+            icon={<Truck className="w-4 h-4 sm:w-5 sm:h-5" />}
+            label="Delivery"
+            value={finalDeliveryMetrics.outForDelivery}
+            color="purple-500"
+          />
+          <MetricCard
+            icon={<Users className="w-4 h-4 sm:w-5 sm:h-5" />}
+            label="Assigned"
+            value={finalDeliveryMetrics.assigned}
+            color="green-500"
+          />
         </div>
 
-        {/* Main Tabs - Mobile Responsive */}
+        {/* Main Tabs - Responsive */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="relative">
             {/* Mobile: Scrollable horizontal tabs */}
             <div className="sm:hidden">
-              <div className="overflow-x-auto pb-2 scrollbar-hide">
+              <div className="overflow-x-auto pb-2 scrollbar-hide -mx-2 px-2">
                 <TabsList className="flex w-max min-w-full gap-1 p-1 bg-muted rounded-lg">
-                  <TabsTrigger value="overview" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Overview
-                  </TabsTrigger>
-                  <TabsTrigger value="orders" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    All Orders
-                  </TabsTrigger>
-                  <TabsTrigger value="drivers" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Drivers
-                  </TabsTrigger>
-                  <TabsTrigger value="analytics" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Analytics
-                  </TabsTrigger>
-                  <TabsTrigger value="overdue" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
-                    Overdue
-                  </TabsTrigger>
-                  <TabsTrigger value="zones" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Delivery Zones
-                  </TabsTrigger>
-                  <TabsTrigger value="routes" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                    Routes
-                  </TabsTrigger>
+                  {[
+                    { value: 'overview', label: 'Overview' },
+                    { value: 'orders', label: 'All Orders' },
+                    { value: 'drivers', label: 'Drivers' },
+                    { value: 'analytics', label: 'Analytics' },
+                    { value: 'overdue', label: 'Overdue', className: 'data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground' },
+                    { value: 'zones', label: 'Delivery Zones' },
+                    { value: 'routes', label: 'Routes' },
+                  ].map(tab => (
+                    <TabsTrigger
+                      key={tab.value}
+                      value={tab.value}
+                      className={cn(
+                        "text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                        tab.className
+                      )}
+                    >
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
                 </TabsList>
               </div>
             </div>
@@ -378,34 +332,33 @@ export default function AdminDelivery() {
             {/* Desktop: Grid layout */}
             <div className="hidden sm:block">
               <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
-                <TabsTrigger value="overview" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Overview
-                </TabsTrigger>
-                <TabsTrigger value="orders" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  All Orders
-                </TabsTrigger>
-                <TabsTrigger value="drivers" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Drivers
-                </TabsTrigger>
-                <TabsTrigger value="analytics" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Analytics
-                </TabsTrigger>
-                <TabsTrigger value="overdue" className="text-sm px-2 py-2 data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground">
-                  Overdue
-                </TabsTrigger>
-                <TabsTrigger value="zones" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Zones
-                </TabsTrigger>
-                <TabsTrigger value="routes" className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
-                  Routes
-                </TabsTrigger>
+                {[
+                  { value: 'overview', label: 'Overview' },
+                  { value: 'orders', label: 'All Orders' },
+                  { value: 'drivers', label: 'Drivers' },
+                  { value: 'analytics', label: 'Analytics' },
+                  { value: 'overdue', label: 'Overdue', className: 'data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground' },
+                  { value: 'zones', label: 'Zones' },
+                  { value: 'routes', label: 'Routes' },
+                ].map(tab => (
+                  <TabsTrigger
+                    key={tab.value}
+                    value={tab.value}
+                    className={cn(
+                      "text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
+                      tab.className
+                    )}
+                  >
+                    {tab.label}
+                  </TabsTrigger>
+                ))}
               </TabsList>
             </div>
           </div>
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
               {/* Recent Delivery Orders */}
               <Card>
                 <CardHeader>
@@ -416,14 +369,7 @@ export default function AdminDelivery() {
                 </CardHeader>
                 <CardContent>
                   {ordersLoading ? (
-                    <div className="space-y-3">
-                      {[...Array(3)].map((_, i) => (
-                        <div key={i} className="animate-pulse space-y-2">
-                          <div className="h-4 bg-muted rounded w-3/4"></div>
-                          <div className="h-3 bg-muted rounded w-1/2"></div>
-                        </div>
-                      ))}
-                    </div>
+                    <LoadingSkeleton rows={3} />
                   ) : (
                     <div className="space-y-4">
                       {deliveryOrders.slice(0, 5).map((order) => (
@@ -578,7 +524,90 @@ export default function AdminDelivery() {
   );
 }
 
-// Helper components
+// Helper: MetricCard
+function MetricCard({
+  icon,
+  label,
+  value,
+  color = 'primary',
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: number | string;
+  color?: string;
+}) {
+  const colorClass = {
+    'primary': 'bg-primary/10 text-primary',
+    'orange-500': 'bg-orange-500/10 text-orange-600',
+    'purple-500': 'bg-purple-500/10 text-purple-600',
+    'green-500': 'bg-green-500/10 text-green-600',
+  }[color] || color;
+  return (
+    <Card className="overflow-hidden">
+      <CardContent className="p-3 sm:p-4">
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className={`p-1.5 sm:p-2 ${colorClass} rounded-lg flex-shrink-0`}>
+            {icon}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-xs sm:text-sm text-muted-foreground truncate">{label}</p>
+            <p className="text-base sm:text-xl md:text-2xl font-bold truncate">{value}</p>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Helper: LoadingSkeleton
+function LoadingSkeleton({ rows = 3 }: { rows?: number }) {
+  return (
+    <div className="space-y-3">
+      {[...Array(rows)].map((_, i) => (
+        <div key={i} className="animate-pulse space-y-2">
+          <div className="h-4 bg-muted rounded w-3/4"></div>
+          <div className="h-3 bg-muted rounded w-1/2"></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Helper: ErrorBanner
+function ErrorBanner({
+  icon,
+  title,
+  description,
+  color = 'destructive'
+}: {
+  icon: React.ReactNode;
+  title: string;
+  description: string;
+  color?: string;
+}) {
+  const colorClass = {
+    destructive: 'bg-destructive/10 border border-destructive/20',
+    'orange-500': 'bg-orange-500/10 border border-orange-500/20',
+  }[color] || color;
+  const textColor = color === 'orange-500' ? 'text-orange-600' : 'text-destructive';
+  return (
+    <div className={`${colorClass} rounded-lg p-3 sm:p-4 mx-2 sm:mx-0`}>
+      <div className="flex items-start gap-2">
+        {icon}
+        <div className="flex-1 min-w-0">
+          <p className={`text-sm ${textColor} font-medium`}>
+            {title}
+          </p>
+          <p className={`text-xs ${textColor}/80 mt-1 break-words`}>
+            {description}
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Helper: DeliveryOrderItem
 function DeliveryOrderItem({ order }: { order: OrderWithItems }) {
   return (
     <div className="flex items-center justify-between p-3 border rounded-lg">

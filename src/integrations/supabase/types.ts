@@ -8872,7 +8872,9 @@ export type Database = {
         }[]
       }
       get_available_delivery_slots: {
-        Args: { p_end_date?: string; p_start_date?: string }
+        Args:
+          | Record<PropertyKey, never>
+          | { p_end_date?: string; p_start_date?: string }
         Returns: {
           available_spots: number
           current_bookings: number

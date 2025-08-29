@@ -4,7 +4,9 @@ import { ShoppingCart } from 'lucide-react';
 import { useCart } from '@/hooks/useCart';
 import { EnhancedCheckoutFlow } from '@/components/checkout/EnhancedCheckoutFlow';
 export const CheckoutButton: React.FC = () => {
-  const { cart } = useCart();
+  const {
+    cart
+  } = useCart();
   const [showCheckout, setShowCheckout] = useState(false);
 
   // Show different button states based on cart content
@@ -14,19 +16,9 @@ export const CheckoutButton: React.FC = () => {
   if (isEmpty) {
     return null;
   }
-
-  return (
-    <>
-      <Button 
-        onClick={() => setShowCheckout(true)}
-        size="lg"
-        className="h-14 w-full font-semibold text-lg shadow-lg"
-      >
-        <ShoppingCart className="h-5 w-5 mr-2" />
-        Checkout ₦{(cart.summary?.total_amount || 0).toLocaleString()}
-      </Button>
+  return <>
+      
 
       <EnhancedCheckoutFlow isOpen={showCheckout} onClose={() => setShowCheckout(false)} />
-    </>
-  );
+    </>;
 };

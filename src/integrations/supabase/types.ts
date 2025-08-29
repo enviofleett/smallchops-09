@@ -9626,6 +9626,15 @@ export type Database = {
         }
         Returns: Json
       }
+      verify_and_update_payment_status: {
+        Args: {
+          new_status: string
+          payment_amount: number
+          payment_gateway_response: Json
+          payment_ref: string
+        }
+        Returns: Json
+      }
       verify_customer_otp: {
         Args:
           | {

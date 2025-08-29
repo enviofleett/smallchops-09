@@ -1,4 +1,4 @@
-# Production Email System Setup Guide
+# Unified SMTP Email System Setup Guide
 
 ## 🎯 Environment Variables Required
 
@@ -14,13 +14,28 @@ DENO_ENV="production"
 
 ## ✅ What Was Implemented
 
-1. **Consolidated Email System**: Single `production-email-processor` function handles all email sending
-2. **Enhanced Security**: Fixed 11+ database functions with proper search paths and security policies
-3. **Rate Limiting**: Built-in email rate limiting (10/hour, 50/day per recipient)
-4. **Standardized Logging**: Unified `email_delivery_logs` table for all email tracking
-5. **Template Support**: Full template processing with variable replacement
-6. **Production CORS**: Environment-aware CORS configuration
-7. **Error Handling**: Comprehensive error logging and retry mechanisms
+1. **Unified SMTP System**: Single `unified-smtp-sender` function handles all email sending
+2. **Enhanced Email Processing**: `enhanced-email-processor` manages the email queue efficiently  
+3. **Consolidated Event Processing**: All email types routed through streamlined processors
+4. **Rate Limiting**: Built-in email rate limiting (10/hour, 50/day per recipient)
+5. **Standardized Logging**: Unified `communication_events` table for all email tracking
+6. **Template Support**: Full template processing with variable replacement
+7. **Production CORS**: Environment-aware CORS configuration
+8. **Error Handling**: Comprehensive error logging and retry mechanisms
+
+## 🔄 Migration Complete
+
+**Legacy Components Removed:**
+- ❌ `native-smtp-sender` (replaced by unified-smtp-sender)
+- ❌ `instant-email-processor` (consolidated into enhanced-email-processor)
+- ❌ `process-communication-events` (replaced by enhanced version)
+- ❌ All `smtp-email-sender` references (updated to unified-smtp-sender)
+
+**Current Architecture:**
+- ✅ `unified-smtp-sender` - Core SMTP sending functionality
+- ✅ `enhanced-email-processor` - Queue management and processing
+- ✅ `email-core` - API interface for sending emails
+- ✅ Automated cron jobs for background processing
 
 ## 🚀 Production Setup Steps
 
@@ -45,10 +60,11 @@ DENO_ENV="production"
 
 ## 📊 Email Delivery Monitoring
 
-- **Delivery Logs**: Available in the Admin panel under Email Analytics
-- **Rate Limiting**: Automatic protection against spam/abuse
-- **Health Metrics**: Track delivery success rates and performance
+- **Delivery Logs**: Available in `communication_events` table with full event tracking
+- **Rate Limiting**: Automatic protection against spam/abuse via `enhanced-email-rate-limiter`
+- **Health Metrics**: Track delivery success rates through `smtp_health_metrics`
 - **Template Management**: Manage email templates through the admin interface
+- **Queue Management**: Real-time queue monitoring via `enhanced-email-processor`
 
 ## 🔧 Troubleshooting
 
@@ -59,17 +75,22 @@ DENO_ENV="production"
    - Check for trailing slashes in URLs
 
 2. **SMTP Authentication Failures**:
-   - Verify credentials are correct
+   - Verify credentials in `communication_settings` table
    - Check if your email provider requires app-specific passwords
    - Ensure port 587 is accessible
 
-3. **Template Not Found**:
-   - Verify template exists in `enhanced_email_templates` table
-   - Check template is marked as `is_active = true`
+3. **Email Not Sending**:
+   - Check `communication_events` table for status
+   - Review logs in `enhanced-email-processor` function
+   - Verify `unified-smtp-sender` is functioning
 
-4. **Rate Limiting**:
-   - Review rate limits in `check_email_rate_limit` function
-   - Adjust limits if needed for your use case
+4. **Template Not Found**:
+   - Verify template exists and is active
+   - Check template key matches function calls
+
+5. **Rate Limiting**:
+   - Review rate limits in `enhanced-email-rate-limiter`
+   - Check `rate_limit_counters` table for current usage
 
 ## 🔐 Security Features
 
@@ -88,6 +109,54 @@ DENO_ENV="production"
 - [ ] Rate limits configured appropriately
 - [ ] Error monitoring set up
 - [ ] Delivery tracking verified
+- [ ] Legacy functions removed (see migration section above)
+- [ ] All processors updated to use unified system
+
+## 🧪 End-to-End Testing
+
+### 1. Test SMTP Connection
+```bash
+# In Admin Panel -> Communications -> Test SMTP
+# This now uses unified-smtp-sender
+```
+
+### 2. Test Email Flow
+```typescript
+// Test order confirmation email
+const { data, error } = await supabase.functions.invoke('email-core', {
+  body: {
+    action: 'send_email',
+    recipient: 'test@example.com',
+    subject: 'Test Order Confirmation',
+    templateKey: 'order_confirmation',
+    variables: {
+      customer_name: 'Test Customer',
+      order_number: 'TEST-001',
+      order_total: '₦25.00'
+    }
+  }
+});
+```
+
+### 3. Monitor Processing
+```sql
+-- Check communication events
+SELECT * FROM communication_events 
+WHERE recipient_email = 'test@example.com' 
+ORDER BY created_at DESC;
+
+-- Check rate limiting
+SELECT * FROM rate_limit_counters 
+WHERE identifier LIKE '%test@example.com%';
+```
+
+### 4. Test Major Email Types
+- [ ] Order confirmation emails
+- [ ] Payment confirmation emails  
+- [ ] Welcome emails
+- [ ] Password reset emails
+- [ ] Admin notifications
+- [ ] Delivery tracking updates
 
 ## 🚨 Security Recommendations
 

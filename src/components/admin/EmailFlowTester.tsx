@@ -111,26 +111,68 @@ export const EmailFlowTester = () => {
       }
       addResult('Event Creation', 'success', `Event created with ID: ${event.id}`);
 
-      // Step 4: Process Email Manually
-      addResult('Email Processing', 'pending', 'Processing email through admin processor...');
+      // Step 4: Process Email Using Enhanced Processor
+      addResult('Email Processing', 'pending', 'Processing email through enhanced processor...');
       
       const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'admin-email-processor', 
+        'enhanced-email-processor', 
         {
           body: { 
-            action: 'processEmailQueue',
+            immediate_processing: true,
+            event_id: event.id,
             priority: 'high'
           }
         }
       );
 
       if (processError) {
-        addResult('Email Processing', 'error', `Processing failed: ${processError.message}`);
-        return;
+        addResult('Email Processing', 'error', `Enhanced processor failed: ${processError.message}`);
+        
+        // Fallback: Try admin processor
+        addResult('Email Processing', 'pending', 'Trying admin processor as fallback...');
+        const { data: adminResult, error: adminError } = await supabase.functions.invoke(
+          'admin-email-processor', 
+          {
+            body: { 
+              action: 'processEmailQueue',
+              priority: 'high'
+            }
+          }
+        );
+        
+        if (adminError) {
+          addResult('Email Processing', 'error', `Admin processor also failed: ${adminError.message}`);
+          return;
+        }
+        addResult('Email Processing', 'success', `Fallback processed ${adminResult.processed || 0} emails`);
+      } else {
+        addResult('Email Processing', 'success', `Enhanced processor handled ${processResult.processed || 1} emails`);
       }
-      addResult('Email Processing', 'success', `Processed ${processResult.processed || 0} emails`);
 
-      // Step 5: Verify Email Status
+      // Step 5: Test Direct SMTP Sender
+      addResult('SMTP Direct Test', 'pending', 'Testing unified SMTP sender directly...');
+      
+      const { data: smtpResult, error: smtpError } = await supabase.functions.invoke(
+        'unified-smtp-sender',
+        {
+          body: {
+            to: testEmail,
+            templateKey: 'smtp_test',
+            variables: {
+              test_message: 'Direct SMTP test successful',
+              timestamp: new Date().toISOString()
+            }
+          }
+        }
+      );
+
+      if (smtpError) {
+        addResult('SMTP Direct Test', 'warning', `Direct SMTP test failed: ${smtpError.message}`);
+      } else {
+        addResult('SMTP Direct Test', 'success', 'Direct SMTP sender working correctly');
+      }
+
+      // Step 6: Verify Email Status
       addResult('Status Verification', 'pending', 'Verifying email delivery status...');
       
       // Wait a moment for processing

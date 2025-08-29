@@ -8950,17 +8950,6 @@ export type Database = {
           webhook_url: string
         }[]
       }
-      get_hourly_email_stats: {
-        Args: { end_time: string; start_time: string }
-        Returns: {
-          bounce_rate: number
-          delivery_rate: number
-          failed_attempts: number
-          hour_bucket: string
-          successful_delivered: number
-          total_sent: number
-        }[]
-      }
       get_order_linking_stats: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -9051,30 +9040,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
-      get_production_metrics: {
-        Args: Record<PropertyKey, never>
-        Returns: {
-          total_paid_orders: number
-          total_paying_customers: number
-          total_products: number
-          total_revenue: number
-        }[]
-      }
       get_public_delivery_zones: {
         Args: Record<PropertyKey, never>
         Returns: {
           base_fee: number
           description: string
-          fee_per_km: number
           id: string
-          min_order_for_free_delivery: number
+          is_active: boolean
           name: string
         }[]
       }
       get_public_paystack_config: {
         Args: Record<PropertyKey, never>
         Returns: {
-          environment: string
           public_key: string
           test_mode: boolean
         }[]

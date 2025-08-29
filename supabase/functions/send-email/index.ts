@@ -107,9 +107,10 @@ serve(async (req: Request) => {
       port: smtpConfig.port,
       secure: smtpConfig.secure,
       auth: smtpConfig.auth,
-      // Additional security options
+      // Additional security options for better compatibility
       tls: {
-        ciphers: 'SSLv3',
+        // Use modern TLS, not SSLv3
+        minVersion: 'TLSv1.2',
         rejectUnauthorized: false
       }
     });

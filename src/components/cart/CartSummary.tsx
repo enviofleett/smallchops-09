@@ -10,19 +10,14 @@ import { useMOQValidation } from '@/hooks/useMOQValidation';
 import { formatCurrency } from '@/lib/discountCalculations';
 import { Tag, X, Gift, Loader2, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
+
 interface CartSummaryProps {
   cart: Cart;
 }
-export function CartSummary({
-  cart
-}: CartSummaryProps) {
-  const {
-    applyPromotionCode,
-    removePromotionCode
-  } = useCart();
-  const {
-    validateMOQ
-  } = useMOQValidation();
+
+export function CartSummary({ cart }: CartSummaryProps) {
+  const { applyPromotionCode, removePromotionCode } = useCart();
+  const { validateMOQ } = useMOQValidation();
   const [showCheckout, setShowCheckout] = useState(false);
   const [promotionCode, setPromotionCode] = useState('');
   const [isApplyingPromotion, setIsApplyingPromotion] = useState(false);
@@ -30,11 +25,13 @@ export function CartSummary({
   // Check for MOQ violations
   const moqValidation = validateMOQ(cart.items, cart.items);
   const hasMOQViolations = !moqValidation.isValid;
+
   const handleApplyPromotionCode = async () => {
     if (!promotionCode.trim()) {
       toast.error('Please enter a promotion code');
       return;
     }
+
     setIsApplyingPromotion(true);
     try {
       const result = await applyPromotionCode(promotionCode.trim());
@@ -50,42 +47,73 @@ export function CartSummary({
       setIsApplyingPromotion(false);
     }
   };
+
   const handleRemovePromotion = () => {
     removePromotionCode();
     toast.success('Promotion removed');
   };
-  return <>
+
+  return (
+    <>
       <Card className="sticky top-6">
         <CardHeader>
           <CardTitle>Cart Summary</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Promotion Code Section */}
-          {cart.summary.applied_promotions.length > 0 ? <div className="space-y-2">
-              {cart.summary.applied_promotions.map(promotion => <div key={promotion.id} className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
+          {cart.summary.applied_promotions.length > 0 ? (
+            <div className="space-y-2">
+              {cart.summary.applied_promotions.map((promotion) => (
+                <div key={promotion.id} className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg">
                   <div className="flex items-center gap-2">
                     <Gift className="w-4 h-4 text-green-600" />
                     <div>
                       <p className="font-medium text-green-800 text-sm">{promotion.name}</p>
-                      {promotion.code && <p className="text-xs text-green-600">Code: {promotion.code}</p>}
+                      {promotion.code && (
+                        <p className="text-xs text-green-600">Code: {promotion.code}</p>
+                      )}
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={handleRemovePromotion} className="text-red-600 hover:text-red-700 h-auto p-1">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemovePromotion}
+                    className="text-red-600 hover:text-red-700 h-auto p-1"
+                  >
                     <X className="w-3 h-3" />
                   </Button>
-                </div>)}
-            </div> : <div className="space-y-2">
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-2">
               <div className="flex items-center gap-2 text-sm font-medium">
                 <Tag className="w-4 h-4" />
                 Promo Code
               </div>
               <div className="flex gap-2">
-                <Input placeholder="Enter code" value={promotionCode} onChange={e => setPromotionCode(e.target.value.toUpperCase())} onKeyPress={e => e.key === 'Enter' && handleApplyPromotionCode()} className="text-sm" />
-                <Button onClick={handleApplyPromotionCode} disabled={isApplyingPromotion || !promotionCode.trim()} variant="outline" size="sm">
-                  {isApplyingPromotion ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
+                <Input
+                  placeholder="Enter code"
+                  value={promotionCode}
+                  onChange={(e) => setPromotionCode(e.target.value.toUpperCase())}
+                  onKeyPress={(e) => e.key === 'Enter' && handleApplyPromotionCode()}
+                  className="text-sm"
+                />
+                <Button 
+                  onClick={handleApplyPromotionCode} 
+                  disabled={isApplyingPromotion || !promotionCode.trim()}
+                  variant="outline"
+                  size="sm"
+                >
+                  {isApplyingPromotion ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    'Apply'
+                  )}
                 </Button>
               </div>
-            </div>}
+            </div>
+          )}
 
           <Separator />
 
@@ -106,10 +134,12 @@ export function CartSummary({
               <span>{formatCurrency(cart.summary.subtotal)}</span>
             </div>
 
-            {cart.summary.discount_amount > 0 && <div className="flex justify-between text-sm text-green-600">
+            {cart.summary.discount_amount > 0 && (
+              <div className="flex justify-between text-sm text-green-600">
                 <span>Discount</span>
                 <span>-{formatCurrency(cart.summary.discount_amount)}</span>
-              </div>}
+              </div>
+            )}
 
             {/* Delivery costs are calculated at checkout - removed from cart summary */}
 
@@ -121,20 +151,41 @@ export function CartSummary({
             </div>
 
             {/* Tax Summary Box */}
-            
+            <div className="mt-4 p-3 bg-muted/30 rounded-lg">
+              <h4 className="text-xs font-medium text-muted-foreground mb-1">Tax Breakdown</h4>
+              <div className="space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span>Items VAT:</span>
+                  <span>{formatCurrency(cart.summary.total_vat)}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span>Total VAT Inclusive:</span>
+                  <span className="font-medium">{formatCurrency(cart.summary.total_vat)}</span>
+                </div>
+              </div>
+            </div>
           </div>
 
           {/* BOGO Items Display */}
-          {cart.summary.applied_promotions.some(p => p.bogo_items?.length) && <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+          {cart.summary.applied_promotions.some(p => p.bogo_items?.length) && (
+            <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
               <h4 className="font-medium text-sm text-green-800 mb-2">Free Items (BOGO):</h4>
-              {cart.summary.applied_promotions.filter(p => p.bogo_items?.length).map(promotion => promotion.bogo_items?.map(item => <div key={`${promotion.id}-${item.product_id}`} className="flex justify-between text-sm text-green-700">
+              {cart.summary.applied_promotions
+                .filter(p => p.bogo_items?.length)
+                .map(promotion => 
+                  promotion.bogo_items?.map(item => (
+                    <div key={`${promotion.id}-${item.product_id}`} className="flex justify-between text-sm text-green-700">
                       <span>{item.product_name} x{item.free_quantity}</span>
                       <span className="font-medium">FREE!</span>
-                    </div>))}
-            </div>}
+                    </div>
+                  ))
+                )}
+            </div>
+          )}
 
           {/* MOQ Violation Warning */}
-          {hasMOQViolations && <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
+          {hasMOQViolations && (
+            <div className="p-3 bg-orange-50 border border-orange-200 rounded-lg">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-4 h-4 text-orange-600 mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
@@ -142,30 +193,42 @@ export function CartSummary({
                     Minimum Order Requirements Not Met
                   </p>
                   <div className="space-y-1 text-orange-700">
-                    {moqValidation.violations.map(violation => <p key={violation.productId} className="text-xs">
+                    {moqValidation.violations.map((violation) => (
+                      <p key={violation.productId} className="text-xs">
                         • {violation.productName}: {violation.currentQuantity}/{violation.minimumRequired} 
                         (need {violation.shortfall} more)
-                      </p>)}
+                      </p>
+                    ))}
                   </div>
                 </div>
               </div>
-            </div>}
+            </div>
+          )}
 
           {/* Checkout Button - Hidden on mobile (fixed button used instead) */}
-          <Button onClick={() => {
-          if (hasMOQViolations) {
-            toast.error('Please meet minimum order requirements before checkout');
-            return;
-          }
-          console.log('Checkout button clicked, opening checkout flow');
-          setShowCheckout(true);
-        }} className="w-full hidden lg:block" size="lg" disabled={cart.items.length === 0 || hasMOQViolations}>
+          <Button 
+            onClick={() => {
+              if (hasMOQViolations) {
+                toast.error('Please meet minimum order requirements before checkout');
+                return;
+              }
+              console.log('Checkout button clicked, opening checkout flow');
+              setShowCheckout(true);
+            }} 
+            className="w-full hidden lg:block"
+            size="lg"
+            disabled={cart.items.length === 0 || hasMOQViolations}
+          >
             {hasMOQViolations ? 'MOQ Requirements Not Met' : `Proceed to Checkout ${formatCurrency(cart.summary.total_amount)}`}
           </Button>
         </CardContent>
       </Card>
 
       {/* Checkout Flow */}
-      <CheckoutFlow isOpen={showCheckout} onClose={() => setShowCheckout(false)} />
-    </>;
+      <CheckoutFlow
+        isOpen={showCheckout}
+        onClose={() => setShowCheckout(false)}
+      />
+    </>
+  );
 }

@@ -118,27 +118,6 @@ export const PaymentCallbackPage: React.FC = () => {
         console.error('❌ Payment callback received error status:', errorMessage);
         setVerificationStatus('failed');
         setErrorMessage(decodeURIComponent(errorMessage || 'Payment processing failed'));
-        
-        // If we have a reference, try background verification as fallback
-        if (reference && validateStoredReference(reference)) {
-          console.log('🔄 Attempting background verification despite error status...');
-          try {
-            const result = await verifySecurePayment(reference, orderId || undefined, { suppressToasts: true });
-            if (result.success) {
-              console.log('✅ Background verification succeeded despite error status');
-              setVerificationStatus('success');
-              setOrderDetails({
-                orderNumber: (result as any).order_id,
-                amount: (result as any).amount,
-                reference: reference
-              });
-              return;
-            }
-          } catch (bgError) {
-            console.warn('⚠️ Background verification also failed:', bgError);
-          }
-        }
-        
         return;
       }
       

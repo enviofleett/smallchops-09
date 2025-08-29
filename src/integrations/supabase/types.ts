@@ -8872,7 +8872,7 @@ export type Database = {
         }[]
       }
       get_available_delivery_slots: {
-        Args: Record<PropertyKey, never>
+        Args: { p_end_date?: string; p_start_date?: string }
         Returns: {
           available_spots: number
           current_bookings: number
@@ -8948,6 +8948,17 @@ export type Database = {
           webhook_url: string
         }[]
       }
+      get_hourly_email_stats: {
+        Args: { end_time: string; start_time: string }
+        Returns: {
+          bounce_rate: number
+          delivery_rate: number
+          failed_attempts: number
+          hour_bucket: string
+          successful_delivered: number
+          total_sent: number
+        }[]
+      }
       get_order_linking_stats: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -8955,12 +8966,12 @@ export type Database = {
       get_order_payment_status: {
         Args: { p_order_id: string }
         Returns: {
-          error_message: string
+          computed_payment_status: string
           order_id: string
           order_number: string
-          overall_status: string
           payment_reference: string
-          processing_stage: string
+          payment_status: string
+          total_amount: number
         }[]
       }
       get_order_tracking_secure: {
@@ -8968,15 +8979,50 @@ export type Database = {
         Returns: Json
       }
       get_orders_with_payment: {
-        Args: { p_customer_id?: string; p_limit?: number; p_order_id?: string }
+        Args: { p_customer_email?: string; p_order_id?: string }
         Returns: {
+          assigned_rider_id: string
           created_at: string
+          created_by: string
+          customer_email: string
+          customer_id: string
           customer_name: string
-          order_id: string
+          customer_phone: string
+          delivery_address: Json
+          delivery_fee: number
+          delivery_time: string
+          delivery_time_slot_id: string
+          delivery_zone_id: string
+          discount_amount: number
+          final_paid: boolean
+          final_paid_at: string
+          guest_session_id: string
+          id: string
           order_number: string
-          order_status: string
-          payment_status: string
+          order_time: string
+          order_type: Database["public"]["Enums"]["order_type"]
+          paid_at: string
+          payment_channel: string
+          payment_method: string
+          payment_reference: string
+          payment_status: Database["public"]["Enums"]["payment_status"]
+          pickup_point_id: string
+          pickup_time: string
+          preferred_delivery_time: string
+          special_instructions: string
+          status: Database["public"]["Enums"]["order_status"]
+          subtotal: number
+          subtotal_cost: number
+          tax_amount: number
           total_amount: number
+          total_vat: number
+          tx_channel: string
+          tx_id: string
+          tx_paid_at: string
+          tx_provider_reference: string
+          tx_status: string
+          updated_at: string
+          updated_by: string
         }[]
       }
       get_payment_config_secure: {
@@ -9003,19 +9049,30 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      get_production_metrics: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          total_paid_orders: number
+          total_paying_customers: number
+          total_products: number
+          total_revenue: number
+        }[]
+      }
       get_public_delivery_zones: {
         Args: Record<PropertyKey, never>
         Returns: {
           base_fee: number
           description: string
+          fee_per_km: number
           id: string
-          is_active: boolean
+          min_order_for_free_delivery: number
           name: string
         }[]
       }
       get_public_paystack_config: {
         Args: Record<PropertyKey, never>
         Returns: {
+          environment: string
           public_key: string
           test_mode: boolean
         }[]
@@ -9402,9 +9459,44 @@ export type Database = {
         Args: { batch_size?: number; priority_filter?: string }
         Returns: Json
       }
+      process_payment_atomically: {
+        Args: {
+          p_amount_kobo: number
+          p_idempotency_key: string
+          p_payment_reference: string
+          p_status?: string
+          p_webhook_event_id?: string
+        }
+        Returns: {
+          amount_verified: boolean
+          new_status: string
+          order_id: string
+          order_number: string
+          previous_status: string
+        }[]
+      }
       process_stuck_emails: {
         Args: Record<PropertyKey, never>
         Returns: number
+      }
+      reconcile_payment_status: {
+        Args: { p_order_id?: string }
+        Returns: {
+          new_order_status: string
+          new_payment_status: string
+          old_order_status: string
+          old_payment_status: string
+          order_id: string
+          was_updated: boolean
+        }[]
+      }
+      reconcile_payment_status_batch: {
+        Args: { p_limit?: number }
+        Returns: {
+          orders_processed: number
+          orders_updated: number
+          processing_time_ms: number
+        }[]
       }
       record_health_metric: {
         Args: {
@@ -9547,6 +9639,21 @@ export type Database = {
         Args: { p_assignment_id: string; p_notes?: string; p_status: string }
         Returns: Json
       }
+      update_order_payment_status: {
+        Args: {
+          new_status?: string
+          payment_amount?: number
+          payment_gateway_response?: Json
+          payment_ref: string
+        }
+        Returns: {
+          order_id: string
+          order_number: string
+          payment_status: string
+          status: string
+          total_amount: number
+        }[]
+      }
       update_order_with_payment_reference: {
         Args: {
           new_payment_reference: string
@@ -9627,13 +9734,51 @@ export type Database = {
         Returns: Json
       }
       verify_and_update_payment_status: {
+        Args:
+          | {
+              new_status: string
+              payment_amount?: number
+              payment_gateway_response?: Json
+              payment_ref: string
+            }
+          | {
+              p_amount: number
+              p_currency: string
+              p_new_state: string
+              p_order_id: string
+              p_provider: string
+              p_provider_ref: string
+              p_raw: Json
+              p_reference: string
+            }
+        Returns: {
+          amount: number
+          customer_email: string
+          order_id: string
+          order_number: string
+          order_type: string
+          payment_reference: string
+          status: string
+          updated_at: string
+        }[]
+      }
+      verify_and_update_payment_status_secure: {
         Args: {
           new_status: string
-          payment_amount: number
-          payment_gateway_response: Json
+          payment_amount?: number
+          payment_gateway_response?: Json
           payment_ref: string
         }
-        Returns: Json
+        Returns: {
+          amount: number
+          customer_email: string
+          order_id: string
+          order_number: string
+          order_type: string
+          payment_reference: string
+          status: string
+          updated_at: string
+        }[]
       }
       verify_customer_otp: {
         Args:

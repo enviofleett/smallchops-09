@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,10 +29,55 @@ export const PaymentCallbackHandler: React.FC = () => {
           return;
         }
 
+        // If URL indicates success, show success immediately and verify in background
+        if (urlStatus === 'success') {
+          console.log('✅ URL indicates successful payment, showing success immediately');
+          setStatus('success');
+          setMessage('Payment successful! Your order has been confirmed.');
+          
+          if (orderId) {
+            setOrderDetails({ 
+              order_id: orderId, 
+              order_number: `Order #${orderId.substring(0, 8)}...`,
+              amount: null // Will be filled by background verification if successful
+            });
+          }
+          
+          toast.success('Payment Successful!', {
+            description: 'Your payment has been processed successfully.'
+          });
+          
+          // Redirect immediately on success
+          setTimeout(() => {
+            navigate(`/order-success?ref=${reference}${orderId ? `&order_id=${orderId}` : ''}`);
+          }, 2000);
+          
+          // Verify in background (don't downgrade UI on failure)
+          handlePaymentCallback(reference).then(result => {
+            if (result.success && result.data?.amount) {
+              console.log('✅ Background verification confirmed payment details');
+              setOrderDetails(prev => ({
+                ...prev,
+                ...result.data,
+                amount: result.data.amount
+              }));
+            }
+          }).catch(error => {
+            console.warn('⚠️ Background verification failed but payment already confirmed by URL:', error);
+          });
+          
+          return;
+        }
+
+        // Log if using trxref instead of reference for debugging
+        if (searchParams.get('trxref') && !searchParams.get('reference')) {
+          console.warn('🚨 Using trxref instead of reference - possible callback URL misconfiguration');
+        }
+
         console.log(`🔄 Processing payment callback for reference: ${reference} (attempt ${attemptNumber + 1})`);
         
         if (attemptNumber === 0) {
-          setMessage('We\'re verifying your payment... This usually takes just a few seconds.');
+          setMessage('We\'re verifying your payment... This can take a few seconds.');
         } else {
           setMessage(`Payment gateway is still processing... Attempt ${attemptNumber + 1}/3`);
         }
@@ -43,12 +87,11 @@ export const PaymentCallbackHandler: React.FC = () => {
         
         if (verificationResult.success) {
           setStatus('success');
-          setMessage('🎉 Payment successful! Your order has been confirmed and is being processed.');
+          setMessage('Payment successful! Your order has been confirmed.');
           setOrderDetails(verificationResult.data);
           
-          toast.success('Payment Confirmed!', {
-            description: `Your payment of ₦${verificationResult.data?.amount?.toLocaleString()} has been successfully processed.`,
-            duration: 5000
+          toast.success('Payment Successful!', {
+            description: `Your payment of ₦${verificationResult.data?.amount?.toLocaleString()} has been confirmed.`
           });
           
           // Redirect to success page after delay
@@ -94,7 +137,7 @@ export const PaymentCallbackHandler: React.FC = () => {
         setMessage('An error occurred while processing your payment');
         
         toast.error('Payment Processing Error', {
-          description: 'An unexpected error occurred. Please contact support if your payment was charged.'
+          description: 'An unexpected error occurred. Please contact support.'
         });
       }
     };
@@ -117,12 +160,8 @@ export const PaymentCallbackHandler: React.FC = () => {
             setIsRetrying(false);
             if (result.success) {
               setStatus('success');
-              setMessage('🎉 Payment successful! Your order has been confirmed.');
+              setMessage('Payment successful! Your order has been confirmed.');
               setOrderDetails(result.data);
-              
-              toast.success('Payment Confirmed!', {
-                description: `Your payment of ₦${result.data?.amount?.toLocaleString()} has been successfully processed.`
-              });
               
               setTimeout(() => {
                 if (result.data?.order_id) {
@@ -138,7 +177,7 @@ export const PaymentCallbackHandler: React.FC = () => {
           }).catch(() => {
             setIsRetrying(false);
             setStatus('error');
-            setMessage('Retry failed. Please contact support if your payment was charged.');
+            setMessage('Retry failed. Please contact support.');
           });
         }
       }, 2000);
@@ -183,21 +222,20 @@ export const PaymentCallbackHandler: React.FC = () => {
         return (
           <>
             <h2 className="text-2xl font-semibold text-center text-green-600">Payment Successful!</h2>
-            <p className="text-center text-green-700 font-medium">{message}</p>
+            <p className="text-center">{message}</p>
             {orderDetails && (
               <div className="mt-4 p-4 bg-green-50 rounded-lg border border-green-200">
-                <h3 className="font-medium text-green-800 mb-2">Order Confirmed</h3>
+                <h3 className="font-medium text-green-800">Order Details</h3>
                 {orderDetails.order_number && (
                   <p className="text-sm text-green-700">Order: {orderDetails.order_number}</p>
                 )}
                 {orderDetails.amount && (
-                  <p className="text-sm text-green-700 font-semibold">Amount: ₦{orderDetails.amount.toLocaleString()}</p>
+                  <p className="text-sm text-green-700">Amount: ₦{orderDetails.amount.toLocaleString()}</p>
                 )}
-                <p className="text-sm text-green-700 mt-2">✅ Payment confirmed and order is being processed</p>
               </div>
             )}
-            <p className="text-sm text-muted-foreground text-center mt-3">
-              Redirecting to order confirmation page...
+            <p className="text-sm text-muted-foreground text-center">
+              Redirecting to order confirmation...
             </p>
           </>
         );
@@ -206,8 +244,8 @@ export const PaymentCallbackHandler: React.FC = () => {
         return (
           <>
             <h2 className="text-2xl font-semibold text-center text-red-600">Payment Verification Failed</h2>
-            <p className="text-center text-red-700">{message}</p>
-            <div className="flex gap-2 justify-center mt-4">
+            <p className="text-center">{message}</p>
+            <div className="flex gap-2 justify-center">
               {retryCount < 3 && (
                 <Button onClick={handleRetry} variant="outline">
                   Retry Verification ({3 - retryCount} left)
@@ -224,8 +262,8 @@ export const PaymentCallbackHandler: React.FC = () => {
         return (
           <>
             <h2 className="text-2xl font-semibold text-center text-orange-600">Processing Error</h2>
-            <p className="text-center text-orange-700">{message}</p>
-            <div className="flex gap-2 justify-center mt-4">
+            <p className="text-center">{message}</p>
+            <div className="flex gap-2 justify-center">
               <Button onClick={() => navigate('/contact')} variant="outline">
                 Contact Support
               </Button>

@@ -86,7 +86,7 @@ serve(async (req: Request) => {
     
     if (!orderResult.success) {
       log('error', '❌ Order processing failed', { reference, error: orderResult.error });
-      return createErrorRedirect(`Order processing failed: ${orderResult.error}`, reference);
+      return createErrorRedirect(`Order processing failed: ${orderResult.error}`);
     }
 
     log('info', '✅ Payment callback completed successfully', {
@@ -465,35 +465,15 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       };
     }
 
-    // Handle both array and object returns from RPC
-    let orderData;
-    if (Array.isArray(orderResult)) {
-      if (!orderResult || orderResult.length === 0) {
-        log('error', '❌ No order data returned from RPC (array empty)', { reference });
-        return {
-          success: false,
-          error: 'Order not found or already processed'
-        };
-      }
-      orderData = orderResult[0];
-    } else if (orderResult && typeof orderResult === 'object') {
-      orderData = orderResult;
-    } else {
-      log('error', '❌ No order data returned from RPC (invalid format)', { reference, orderResult });
+    if (!orderResult || orderResult.length === 0) {
+      log('error', '❌ No order data returned from RPC', { reference });
       return {
         success: false,
         error: 'Order not found or already processed'
       };
     }
 
-    // Ensure we have required fields
-    if (!orderData || !orderData.order_id) {
-      log('error', '❌ Order data missing required fields', { reference, orderData });
-      return {
-        success: false,
-        error: 'Invalid order data returned'
-      };
-    }
+    const orderData = orderResult[0];
     log('info', '✅ RPC operation successful', {
       reference,
       order_id: orderData.order_id,
@@ -608,21 +588,11 @@ function createSuccessRedirect(reference: string, orderId: string) {
 }
 
 // Create error redirect
-function createErrorRedirect(message: string, reference?: string) {
+function createErrorRedirect(message: string) {
   const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com';
-  const errorParams = new URLSearchParams({
-    status: 'error',
-    message: message
-  });
+  const errorUrl = `${frontendUrl}/payment/callback?status=error&message=${encodeURIComponent(message)}`;
   
-  // Include reference if provided for better error handling
-  if (reference) {
-    errorParams.set('reference', reference);
-  }
-  
-  const errorUrl = `${frontendUrl}/payment/callback?${errorParams.toString()}`;
-  
-  log('error', '❌ Creating error redirect', { errorUrl, message, reference });
+  log('error', '❌ Creating error redirect', { errorUrl, message });
   
   const corsHeaders = getCorsHeaders(null);
   

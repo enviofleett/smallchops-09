@@ -77,8 +77,8 @@ export const PaymentCallbackPage: React.FC = () => {
             console.log('✅ Background verification confirmed success');
             setOrderDetails(prev => ({
               ...prev,
-              orderNumber: (result as any).order_id || prev.orderNumber,
-              amount: (result as any).amount || prev.amount,
+              orderNumber: (result as any).order_id || (result as any).order_number || prev.orderNumber,
+              amount: (result as any).amount || (result as any).total_amount || prev.amount,
               reference: reference
             }));
             
@@ -128,8 +128,8 @@ export const PaymentCallbackPage: React.FC = () => {
               console.log('✅ Background verification succeeded despite error status');
               setVerificationStatus('success');
               setOrderDetails({
-                orderNumber: (result as any).order_id,
-                amount: (result as any).amount,
+                orderNumber: (result as any).order_id || (result as any).order_number,
+                amount: (result as any).amount || (result as any).total_amount,
                 reference: reference
               });
               return;
@@ -191,9 +191,9 @@ export const PaymentCallbackPage: React.FC = () => {
           console.log('✅ Payment verification successful');
           setVerificationStatus('success');
           setOrderDetails({
-            orderNumber: (result as any).order_id,
-            amount: (result as any).amount,
-            reference: (result as any).reference
+            orderNumber: (result as any).order_id || (result as any).order_number,
+            amount: (result as any).amount || (result as any).total_amount,
+            reference: (result as any).reference || fallbackReference
           });
           
           // Notify parent window (if opened from checkout dialog)

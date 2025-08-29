@@ -465,8 +465,12 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       };
     }
 
-    // Handle both array and object returns from RPC
+    // Handle RPC response normalization - the function returns a JSONB object
     let orderData;
+    
+    log('info', '🔍 RPC response received', { reference, orderResult, type: typeof orderResult });
+    
+    // First check if it's an array (legacy compatibility)
     if (Array.isArray(orderResult)) {
       if (!orderResult || orderResult.length === 0) {
         log('error', '❌ No order data returned from RPC (array empty)', { reference });
@@ -477,7 +481,29 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       }
       orderData = orderResult[0];
     } else if (orderResult && typeof orderResult === 'object') {
-      orderData = orderResult;
+      // The RPC function returns a JSONB object with success, order_id, order_number, etc.
+      // Handle case where RPC returns success: false
+      if (orderResult.success === false) {
+        log('error', '❌ RPC operation failed', { reference, error: orderResult.error });
+        return {
+          success: false,
+          error: orderResult.error || 'Order processing failed'
+        };
+      }
+      
+      // Handle successful RPC response - extract the order data from the JSONB response
+      if (orderResult.success === true) {
+        orderData = {
+          order_id: orderResult.order_id,
+          order_number: orderResult.order_number,
+          payment_reference: orderResult.payment_reference,
+          amount_match: orderResult.amount_match,
+          new_order_status: orderResult.new_order_status
+        };
+      } else {
+        // Fallback: treat the entire response as order data (backward compatibility)
+        orderData = orderResult;
+      }
     } else {
       log('error', '❌ No order data returned from RPC (invalid format)', { reference, orderResult });
       return {

@@ -8872,9 +8872,7 @@ export type Database = {
         }[]
       }
       get_available_delivery_slots: {
-        Args:
-          | Record<PropertyKey, never>
-          | { p_end_date?: string; p_start_date?: string }
+        Args: Record<PropertyKey, never>
         Returns: {
           available_spots: number
           current_bookings: number
@@ -8970,9 +8968,7 @@ export type Database = {
         Returns: Json
       }
       get_orders_with_payment: {
-        Args:
-          | { p_customer_email?: string; p_order_id?: string }
-          | { p_customer_id?: string; p_limit?: number; p_order_id?: string }
+        Args: { p_customer_id?: string; p_limit?: number; p_order_id?: string }
         Returns: {
           created_at: string
           customer_name: string

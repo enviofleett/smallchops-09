@@ -486,6 +486,15 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       };
     }
 
+    // Check if RPC returned error result
+    if (orderData && orderData.success === false) {
+      log('error', '❌ RPC returned error', { reference, error: orderData.error });
+      return {
+        success: false,
+        error: orderData.error || 'Payment processing failed'
+      };
+    }
+
     // Ensure we have required fields
     if (!orderData || !orderData.order_id) {
       log('error', '❌ Order data missing required fields', { reference, orderData });

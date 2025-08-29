@@ -140,22 +140,20 @@ serve(async (req) => {
       });
     }
 
-    // Process successful payment atomically
-    const amountKobo = paystackData.data.amount;
-    const generatedIdempotencyKey = idempotency_key || 
-      `verify_${reference}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-
+    // Process successful payment with updated RPC
+    const amountNaira = paystackData.data.amount / 100; // Convert kobo to naira
+    
     try {
       const { data: processResult, error: processError } = await supabase
-        .rpc('process_payment_atomically', {
-          p_payment_reference: reference,
-          p_idempotency_key: generatedIdempotencyKey,
-          p_amount_kobo: amountKobo,
-          p_status: 'confirmed'
+        .rpc('verify_and_update_payment_status', {
+          payment_ref: reference,
+          new_status: 'confirmed',
+          payment_amount: amountNaira,
+          payment_gateway_response: paystackData.data
         });
 
       if (processError) {
-        console.error('❌ Atomic payment processing failed:', processError);
+        console.error('❌ Payment verification RPC failed:', processError);
         return new Response(JSON.stringify({
           success: false,
           error: processError.message || 'Payment processing failed'
@@ -165,16 +163,36 @@ serve(async (req) => {
         });
       }
 
-      const result = processResult?.[0];
+      // Handle RPC result (can be object or array)
+      let result;
+      if (Array.isArray(processResult)) {
+        result = processResult[0];
+      } else {
+        result = processResult;
+      }
+      
       if (!result) {
         throw new Error('No result from payment processing');
+      }
+
+      // Check if RPC returned error
+      if (result.success === false) {
+        console.error('❌ Payment processing failed:', result.error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: result.error || 'Payment processing failed'
+        }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        });
       }
 
       console.log('✅ Payment verified and processed:', {
         reference,
         orderId: result.order_id,
         orderNumber: result.order_number,
-        amountVerified: result.amount_verified
+        status: result.status,
+        payment_status: result.payment_status
       });
 
       // Trigger email confirmation
@@ -188,7 +206,7 @@ serve(async (req) => {
           variables: {
             customerName: paystackData.data.customer?.first_name || 'Customer',
             orderNumber: result.order_number,
-            amount: (amountKobo / 100).toFixed(2),
+            amount: amountNaira.toFixed(2),
             paymentMethod: paystackData.data.channel || 'Online Payment',
             paidAt: paystackData.data.paid_at
           }
@@ -201,18 +219,17 @@ serve(async (req) => {
       return new Response(JSON.stringify({
         success: true,
         status: 'success',
-        amount: amountKobo / 100, // Convert kobo to naira
+        amount: amountNaira,
         order_id: result.order_id,
         order_number: result.order_number,
         customer: paystackData.data.customer,
         channel: paystackData.data.channel,
         paid_at: paystackData.data.paid_at,
-        amount_verified: result.amount_verified,
         // Add data wrapper for compatibility
         data: {
           order_id: result.order_id,
           order_number: result.order_number,
-          amount: amountKobo / 100,
+          amount: amountNaira,
           status: 'success',
           customer: paystackData.data.customer,
           reference: reference
@@ -226,17 +243,17 @@ serve(async (req) => {
       console.error('❌ Critical verification error:', error);
       
       // Log critical error
-      await supabase.from('audit_logs').insert({
-        action: 'payment_verification_critical_error',
-        category: 'Payment Critical',
-        message: `Critical payment verification error: ${error.message}`,
-        new_values: {
-          reference,
-          amount_kobo: amountKobo,
-          error: error.message,
-          paystack_data: paystackData.data
-        }
-      });
+        await supabase.from('audit_logs').insert({
+          action: 'payment_verification_critical_error',
+          category: 'Payment Critical',
+          message: `Critical payment verification error: ${error.message}`,
+          new_values: {
+            reference,
+            amount_naira: amountNaira,
+            error: error.message,
+            paystack_data: paystackData.data
+          }
+        });
 
       return new Response(JSON.stringify({
         success: false,

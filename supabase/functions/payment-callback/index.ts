@@ -470,8 +470,18 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
     
     log('info', '🔍 RPC response received', { reference, orderResult, type: typeof orderResult });
     
-    // The RPC function returns a JSONB object with success, order_id, order_number, etc.
-    if (orderResult && typeof orderResult === 'object') {
+    // First check if it's an array (legacy compatibility)
+    if (Array.isArray(orderResult)) {
+      if (!orderResult || orderResult.length === 0) {
+        log('error', '❌ No order data returned from RPC (array empty)', { reference });
+        return {
+          success: false,
+          error: 'Order not found or already processed'
+        };
+      }
+      orderData = orderResult[0];
+    } else if (orderResult && typeof orderResult === 'object') {
+      // The RPC function returns a JSONB object with success, order_id, order_number, etc.
       // Handle case where RPC returns success: false
       if (orderResult.success === false) {
         log('error', '❌ RPC operation failed', { reference, error: orderResult.error });
@@ -494,16 +504,6 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         // Fallback: treat the entire response as order data (backward compatibility)
         orderData = orderResult;
       }
-    } else if (Array.isArray(orderResult)) {
-      // Handle array response (legacy compatibility)
-      if (!orderResult || orderResult.length === 0) {
-        log('error', '❌ No order data returned from RPC (array empty)', { reference });
-        return {
-          success: false,
-          error: 'Order not found or already processed'
-        };
-      }
-      orderData = orderResult[0];
     } else {
       log('error', '❌ No order data returned from RPC (invalid format)', { reference, orderResult });
       return {

@@ -9406,44 +9406,9 @@ export type Database = {
         Args: { batch_size?: number; priority_filter?: string }
         Returns: Json
       }
-      process_payment_atomically: {
-        Args: {
-          p_amount_kobo: number
-          p_idempotency_key: string
-          p_payment_reference: string
-          p_status?: string
-          p_webhook_event_id?: string
-        }
-        Returns: {
-          amount_verified: boolean
-          new_status: string
-          order_id: string
-          order_number: string
-          previous_status: string
-        }[]
-      }
       process_stuck_emails: {
         Args: Record<PropertyKey, never>
         Returns: number
-      }
-      reconcile_payment_status: {
-        Args: { p_order_id?: string }
-        Returns: {
-          new_order_status: string
-          new_payment_status: string
-          old_order_status: string
-          old_payment_status: string
-          order_id: string
-          was_updated: boolean
-        }[]
-      }
-      reconcile_payment_status_batch: {
-        Args: { p_limit?: number }
-        Returns: {
-          orders_processed: number
-          orders_updated: number
-          processing_time_ms: number
-        }[]
       }
       record_health_metric: {
         Args: {
@@ -9586,21 +9551,6 @@ export type Database = {
         Args: { p_assignment_id: string; p_notes?: string; p_status: string }
         Returns: Json
       }
-      update_order_payment_status: {
-        Args: {
-          new_status?: string
-          payment_amount?: number
-          payment_gateway_response?: Json
-          payment_ref: string
-        }
-        Returns: {
-          order_id: string
-          order_number: string
-          payment_status: string
-          status: string
-          total_amount: number
-        }[]
-      }
       update_order_with_payment_reference: {
         Args: {
           new_payment_reference: string
@@ -9679,53 +9629,6 @@ export type Database = {
           p_promotion_id: string
         }
         Returns: Json
-      }
-      verify_and_update_payment_status: {
-        Args:
-          | {
-              new_status: string
-              payment_amount?: number
-              payment_gateway_response?: Json
-              payment_ref: string
-            }
-          | {
-              p_amount: number
-              p_currency: string
-              p_new_state: string
-              p_order_id: string
-              p_provider: string
-              p_provider_ref: string
-              p_raw: Json
-              p_reference: string
-            }
-        Returns: {
-          amount: number
-          customer_email: string
-          order_id: string
-          order_number: string
-          order_type: string
-          payment_reference: string
-          status: string
-          updated_at: string
-        }[]
-      }
-      verify_and_update_payment_status_secure: {
-        Args: {
-          new_status: string
-          payment_amount?: number
-          payment_gateway_response?: Json
-          payment_ref: string
-        }
-        Returns: {
-          amount: number
-          customer_email: string
-          order_id: string
-          order_number: string
-          order_type: string
-          payment_reference: string
-          status: string
-          updated_at: string
-        }[]
       }
       verify_customer_otp: {
         Args:

@@ -92,8 +92,8 @@ async function processQueuedEmails(supabase: any) {
 
     console.log(`📧 Processing ${queuedEmails.length} queued emails...`)
 
-    // Trigger instant email processor
-    const { data, error } = await supabase.functions.invoke('instant-email-processor', {
+    // Trigger enhanced email processor
+    const { data, error } = await supabase.functions.invoke('enhanced-email-processor', {
       body: { automated_trigger: true }
     })
 
@@ -150,7 +150,7 @@ async function retryFailedEmails(supabase: any) {
     }
 
     // Process the retried emails
-    const { data, error } = await supabase.functions.invoke('instant-email-processor', {
+    const { data, error } = await supabase.functions.invoke('enhanced-email-processor', {
       body: { retry_trigger: true }
     })
 
@@ -278,7 +278,7 @@ async function checkCriticalIssues(supabase: any) {
 
     if (staleEmails && staleEmails.length > 0) {
       console.log(`⚠️ Found ${staleEmails.length} stale queued emails - processing immediately`)
-      await supabase.functions.invoke('instant-email-processor', {
+      await supabase.functions.invoke('enhanced-email-processor', {
         body: { stale_email_recovery: true }
       })
     }

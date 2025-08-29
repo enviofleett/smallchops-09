@@ -88,14 +88,17 @@ serve(async (req) => {
       }
     });
 
+    // Enhanced email processor handles both immediate and queued processing
     if (processorError) {
-      console.error('Error triggering email processor:', processorError);
+      console.error('Error triggering enhanced email processor:', processorError);
+      // Fallback: Trigger admin email processor for critical payment confirmations
+      await supabase.functions.invoke('admin-email-processor', {
+        body: { 
+          action: 'processEmailQueue',
+          priority: 'high' 
+        }
+      });
     }
-
-    // Also trigger instant email processor as backup
-    await supabase.functions.invoke('instant-email-processor', {
-      body: { priority: 'high' }
-    });
 
     console.log('Payment confirmation processing complete');
 

@@ -242,18 +242,12 @@ async function processOrderEmail(supabase: any, event: CommunicationEvent): Prom
       companyName: businessSettings?.name || 'Starters'
     }
 
-    // Invoke SMTP email sender
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
-      headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
+    // Invoke unified SMTP email sender
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
-        templateId: event.template_id || event.template_key || 'order_confirmation',
-        recipient: {
-          email: event.recipient_email,
-          name: enhancedVariables?.customerName || 'Valued Customer'
-        },
-        variables: enhancedVariables,
-        emailType: event.email_type,
-        priority: 'normal'
+        to: event.recipient_email,
+        templateKey: event.template_key || 'order_confirmation',
+        variables: enhancedVariables
       }
     })
 
@@ -275,19 +269,12 @@ async function processWelcomeEmail(supabase: any, event: CommunicationEvent): Pr
   try {
     console.log(`Processing welcome email for: ${event.recipient_email}`);
 
-    // Call SMTP function with CORRECT format and fields
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    // Call unified SMTP sender
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
-        // Correctly pass the `template_key` as `templateId`
-        templateId: event.template_key,
-        recipient: {
-          email: event.recipient_email,
-          // Correctly map the `customerName` from the variables
-          name: event.template_variables?.customerName || 'Valued Customer',
-        },
-        // Correctly pass the `template_variables` object directly
-        variables: event.template_variables,
-        emailType: 'transactional',
+        to: event.recipient_email,
+        templateKey: event.template_key || 'welcome_email',
+        variables: event.template_variables || event.variables || {}
       }
     });
 
@@ -325,16 +312,11 @@ async function processPasswordResetEmail(supabase: any, event: CommunicationEven
       companyName: businessSettings?.name || 'Starters'
     }
 
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
-        templateId: event.template_id || event.template_key || 'password_reset',
-        recipient: {
-          email: event.recipient_email,
-          name: enhancedVariables?.customerName || 'User'
-        },
-        variables: enhancedVariables,
-        emailType: event.email_type,
-        priority: 'high' // High priority for security emails
+        to: event.recipient_email,
+        templateKey: event.template_key || 'password_reset',
+        variables: enhancedVariables
       }
     })
 
@@ -354,16 +336,11 @@ async function processPasswordResetEmail(supabase: any, event: CommunicationEven
 
 async function processAdminNotification(supabase: any, event: CommunicationEvent): Promise<boolean> {
   try {
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
-        templateId: event.template_id || event.template_key || 'admin_notification',
-        recipient: {
-          email: event.recipient_email,
-          name: 'Admin'
-        },
-        variables: event.variables,
-        emailType: 'transactional',
-        priority: 'high'
+        to: event.recipient_email,
+        templateKey: event.template_key || 'admin_notification',
+        variables: event.variables || {}
       }
     })
 

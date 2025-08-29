@@ -80,8 +80,7 @@ serve(async (req) => {
       
       const processors = [
         'enhanced-email-processor',
-        'instant-email-processor', 
-        'production-email-processor'
+        'admin-email-processor'
       ];
 
       for (const processor of processors) {

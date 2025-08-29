@@ -309,30 +309,42 @@ async function checkSuppressionList(supabase: any, email: string): Promise<boole
 }
 
 async function processEmail(supabase: any, email: any): Promise<any> {
-  // Simplified email processing for audit fix
-  // In production, this would integrate with actual email providers
+  // Process email using unified SMTP sender
   
   try {
-    // Simulate email sending
-    const success = Math.random() > 0.1; // 90% success rate for simulation
+    // Attempt to send email using unified-smtp-sender
+    const emailResult = await supabase.functions.invoke('unified-smtp-sender', {
+      body: {
+        to: email.recipient_email,
+        subject: email.payload?.subject || email.variables?.subject || 'Notification',
+        htmlContent: email.payload?.htmlContent || email.variables?.html_content,
+        textContent: email.payload?.textContent || email.variables?.text_content,
+        templateKey: email.template_key,
+        variables: email.variables
+      }
+    });
 
-    if (success) {
-      // Mark as sent
-      await supabase
-        .from('communication_events')
-        .update({ 
-          status: 'sent',
-          sent_at: new Date().toISOString(),
-          processed_at: new Date().toISOString()
-        })
-        .eq('id', email.id);
-
-      return { id: email.id, success: true };
-    } else {
-      throw new Error('Simulated email sending failure');
+    if (emailResult.error || !emailResult.data?.success) {
+      const errorMessage = emailResult.error?.message || emailResult.data?.error || 'Unknown sending error';
+      throw new Error(errorMessage);
     }
 
+    // Mark as sent
+    await supabase
+      .from('communication_events')
+      .update({ 
+        status: 'sent',
+        sent_at: new Date().toISOString(),
+        processed_at: new Date().toISOString()
+      })
+      .eq('id', email.id);
+
+    console.log(`Email ${email.id} sent successfully via unified-smtp-sender`);
+    return { id: email.id, success: true };
+
   } catch (error) {
+    console.error(`Failed to send email ${email.id}:`, error);
+    
     // Mark as failed
     await supabase
       .from('communication_events')

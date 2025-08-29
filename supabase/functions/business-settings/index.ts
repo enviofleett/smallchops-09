@@ -267,31 +267,30 @@ serve(async (req) => {
           });
         }
 
-        // Call the smtp-email-sender function using Supabase client
+        // Call the unified-smtp-sender function for testing
         try {
-          console.log('Calling smtp-email-sender function...');
+          console.log('Calling unified-smtp-sender function...');
           
-          const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('smtp-email-sender', {
-            headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
+          const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('unified-smtp-sender', {
             body: {
               to: settings.sender_email, // Send test email to sender
               subject: 'SMTP Test Email - Connection Successful',
-              html: `
+              htmlContent: `
                 <h2>Test Email Successful!</h2>
                 <p>Your SMTP configuration is working correctly.</p>
                 <p>Sender: ${settings.smtp_user || settings.sender_email}</p>
                 <p>Host: ${settings.smtp_host || 'SMTP Server'}</p>
                 <p>Time: ${new Date().toISOString()}</p>
               `,
-              order_id: null // Optional field for test emails
+              templateKey: 'smtp_test'
             }
           });
           
           if (emailError) {
-            console.error('SMTP email sender function failed:', emailError);
+            console.error('Unified SMTP sender function failed:', emailError);
             return new Response(JSON.stringify({
               success: false,
-              error: `Email test failed: ${emailError.message || 'Unknown error from smtp-email-sender function'}`
+              error: `Email test failed: ${emailError.message || 'Unknown error from unified-smtp-sender function'}`
             }), {
               status: 400,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }

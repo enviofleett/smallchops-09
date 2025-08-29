@@ -77,7 +77,7 @@ serve(async (req) => {
     try {
       console.log('Triggering main email processors...');
       
-      // Trigger enhanced email processor
+      // Trigger enhanced email processor (covers all functionality)
       const { data: enhancedResult, error: enhancedError } = await supabase.functions.invoke('enhanced-email-processor', {
         body: { priority: 'all' }
       });
@@ -86,18 +86,9 @@ serve(async (req) => {
         console.error('Enhanced email processor error:', enhancedError);
       }
 
-      // Also trigger instant processor as backup
-      const { data: instantResult, error: instantError } = await supabase.functions.invoke('instant-email-processor', {
-        body: { priority: 'all' }
-      });
-
-      if (instantError) {
-        console.error('Instant email processor error:', instantError);
-      }
-
       results.email_processing = {
         enhanced: enhancedResult || { triggered: true },
-        instant: instantResult || { triggered: true }
+        status: enhancedError ? 'error' : 'success'
       };
 
     } catch (error) {

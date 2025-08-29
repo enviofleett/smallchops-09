@@ -261,24 +261,29 @@ serve(async (req) => {
 
           if (error) throw error;
 
-          // Send real-time notification to customer via SMTP
-          await supabase.functions.invoke('smtp-email-sender', {
-            headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
-            body: {
-              templateId: 'delivery_update',
-              recipient: {
-                email: tracking.order_id, // This should be resolved to customer email
-                name: 'Customer'
-              },
-              variables: {
-                orderNumber: tracking.order_id,
-                status,
-                estimatedArrival,
-                trackingUrl: `https://yourapp.com/track/${orderId}`
-              },
-              emailType: 'transactional'
-            }
-          });
+          // Get customer email from order
+          const { data: orderData } = await supabase
+            .from('orders')
+            .select('customer_email, customer_name')
+            .eq('id', orderId)
+            .single();
+
+          if (orderData?.customer_email) {
+            // Send real-time notification to customer via unified SMTP
+            await supabase.functions.invoke('unified-smtp-sender', {
+              body: {
+                to: orderData.customer_email,
+                templateKey: 'delivery_update',
+                variables: {
+                  customer_name: orderData.customer_name || 'Customer',
+                  order_number: tracking.order_id,
+                  status,
+                  estimated_arrival: estimatedArrival,
+                  tracking_url: `https://startersmallchops.com/track/${orderId}`
+                }
+              }
+            });
+          }
 
           return new Response(JSON.stringify(tracking), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }

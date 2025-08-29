@@ -168,9 +168,9 @@ async function checkProcessingHealth(supabase: any) {
   try {
     // Check if email processors are responding
     const processorHealthChecks = await Promise.allSettled([
-      supabase.functions.invoke('instant-email-processor', { body: { health_check: true } }),
+      supabase.functions.invoke('enhanced-email-processor', { body: { health_check: true } }),
       supabase.functions.invoke('process-communication-events-enhanced', { body: { health_check: true } }),
-      supabase.functions.invoke('smtp-email-sender', { body: { health_check: true } })
+      supabase.functions.invoke('unified-smtp-sender', { body: { health_check: true } })
     ])
 
     const healthyProcessors = processorHealthChecks.filter(result => 
@@ -251,7 +251,7 @@ async function triggerAutoRecovery(supabase: any, healthScore: number) {
   
   try {
     // 1. Process all queued emails immediately
-    await supabase.functions.invoke('instant-email-processor')
+    await supabase.functions.invoke('enhanced-email-processor')
     
     // 2. Retry failed welcome emails from last hour
     await supabase.rpc('requeue_failed_welcome_emails')
@@ -280,7 +280,7 @@ async function checkAndProcessQueuedEmails(supabase: any) {
 
     if (queuedCount && queuedCount.length > 0) {
       console.log(`📧 Found ${queuedCount.length} queued emails. Processing immediately...`)
-      await supabase.functions.invoke('instant-email-processor')
+      await supabase.functions.invoke('enhanced-email-processor')
     }
   } catch (error) {
     console.error('Error checking queued emails:', error)

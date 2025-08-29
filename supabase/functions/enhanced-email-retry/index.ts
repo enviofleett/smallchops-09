@@ -77,8 +77,11 @@ serve(async (req) => {
 
         // Trigger immediate processing
         try {
-          const { error: processError } = await supabase.functions.invoke('instant-email-processor', {
-            body: { event_id: email.id }
+          const { error: processError } = await supabase.functions.invoke('enhanced-email-processor', {
+            body: { 
+              immediate_processing: true,
+              event_id: email.id 
+            }
           });
 
           if (processError) {

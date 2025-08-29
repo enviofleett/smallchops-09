@@ -8957,12 +8957,12 @@ export type Database = {
       get_order_payment_status: {
         Args: { p_order_id: string }
         Returns: {
-          computed_payment_status: string
+          error_message: string
           order_id: string
           order_number: string
+          overall_status: string
           payment_reference: string
-          payment_status: string
-          total_amount: number
+          processing_stage: string
         }[]
       }
       get_order_tracking_secure: {
@@ -8970,50 +8970,17 @@ export type Database = {
         Returns: Json
       }
       get_orders_with_payment: {
-        Args: { p_customer_email?: string; p_order_id?: string }
+        Args:
+          | { p_customer_email?: string; p_order_id?: string }
+          | { p_customer_id?: string; p_limit?: number; p_order_id?: string }
         Returns: {
-          assigned_rider_id: string
           created_at: string
-          created_by: string
-          customer_email: string
-          customer_id: string
           customer_name: string
-          customer_phone: string
-          delivery_address: Json
-          delivery_fee: number
-          delivery_time: string
-          delivery_time_slot_id: string
-          delivery_zone_id: string
-          discount_amount: number
-          final_paid: boolean
-          final_paid_at: string
-          guest_session_id: string
-          id: string
+          order_id: string
           order_number: string
-          order_time: string
-          order_type: Database["public"]["Enums"]["order_type"]
-          paid_at: string
-          payment_channel: string
-          payment_method: string
-          payment_reference: string
-          payment_status: Database["public"]["Enums"]["payment_status"]
-          pickup_point_id: string
-          pickup_time: string
-          preferred_delivery_time: string
-          special_instructions: string
-          status: Database["public"]["Enums"]["order_status"]
-          subtotal: number
-          subtotal_cost: number
-          tax_amount: number
+          order_status: string
+          payment_status: string
           total_amount: number
-          total_vat: number
-          tx_channel: string
-          tx_id: string
-          tx_paid_at: string
-          tx_provider_reference: string
-          tx_status: string
-          updated_at: string
-          updated_by: string
         }[]
       }
       get_payment_config_secure: {

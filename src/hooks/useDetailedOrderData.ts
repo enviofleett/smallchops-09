@@ -52,7 +52,8 @@ export const useDetailedOrderData = (orderId: string) => {
                   price,
                   image_url,
                   category_id,
-                  features
+                  features,
+                  ingredients
                 )
               )
             `)

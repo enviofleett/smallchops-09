@@ -16,6 +16,16 @@ interface OrderItem {
   discount_amount?: number;
   special_instructions?: string;
   customizations?: any;
+  product?: {
+    id: string;
+    name: string;
+    description?: string;
+    features?: string[] | any;
+    ingredients?: string;
+    image_url?: string;
+    category_id?: string;
+  };
+  features?: string[] | any;
 }
 
 interface OrderItemsBreakdownProps {
@@ -62,6 +72,40 @@ export function OrderItemsBreakdown({
     return null;
   };
 
+  const renderWhatsIncluded = (item: OrderItem) => {
+    // First try to get features from the product object (from detailed query)
+    let features = item.product?.features || item.features;
+    
+    // Handle different data formats - could be array or string
+    if (!features) return null;
+    
+    // If it's a string, try to parse it or split it
+    if (typeof features === 'string') {
+      // If it looks like JSON, try to parse it
+      if (features.startsWith('[') && features.endsWith(']')) {
+        try {
+          features = JSON.parse(features);
+        } catch {
+          // If parsing fails, split by common delimiters
+          features = features.split(/[,\n]/).map(f => f.trim()).filter(f => f);
+        }
+      } else {
+        // Split by common delimiters
+        features = features.split(/[,\n]/).map(f => f.trim()).filter(f => f);
+      }
+    }
+    
+    // Ensure we have an array
+    if (!Array.isArray(features) || features.length === 0) return null;
+    
+    return features.map((feature: string, idx: number) => (
+      <div key={idx} className="flex items-center gap-2 text-xs text-muted-foreground">
+        <div className="w-1 h-1 bg-primary rounded-full flex-shrink-0" />
+        <span className="font-medium text-foreground">{feature.trim()}</span>
+      </div>
+    ));
+  };
+
   return (
     <Card className={`p-6 ${className}`}>
       <div className="space-y-4">
@@ -83,20 +127,17 @@ export function OrderItemsBreakdown({
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-foreground break-words mb-1">{item.product_name}</h4>
                       
-                      {/* Product Features */}
-                      {showDetailed && (item as any).features && Array.isArray((item as any).features) && (item as any).features.length > 0 && (
-                        <div className="mb-2">
-                          <div className="flex flex-wrap gap-1">
-                            {(item as any).features.slice(0, 3).map((feature: string, idx: number) => (
-                              <Badge key={idx} variant="outline" className="text-xs bg-secondary/50 text-secondary-foreground border-secondary">
-                                {feature}
-                              </Badge>
-                            ))}
-                            {(item as any).features.length > 3 && (
-                              <Badge variant="outline" className="text-xs bg-muted text-muted-foreground">
-                                +{(item as any).features.length - 3} more
-                              </Badge>
-                            )}
+                      {/* What's Included Details */}
+                      {showDetailed && renderWhatsIncluded(item) && (
+                        <div className="mb-3 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                          <div className="flex items-start gap-2">
+                            <Package className="h-4 w-4 text-primary mt-0.5 flex-shrink-0" />
+                            <div className="flex-1">
+                              <h5 className="text-sm font-semibold text-primary mb-2">What's Included:</h5>
+                              <div className="space-y-1">
+                                {renderWhatsIncluded(item)}
+                              </div>
+                            </div>
                           </div>
                         </div>
                       )}

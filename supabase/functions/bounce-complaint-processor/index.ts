@@ -125,15 +125,16 @@ async function processBounceEvent(supabase: any, event: BounceEvent) {
       const { data: existingSuppression } = await supabase
         .from('email_suppression_list')
         .select('id')
-        .eq('email_address', event.email)
+        .eq('email', event.email)
         .single();
       
       if (!existingSuppression) {
         await supabase.from('email_suppression_list').insert({
-          email_address: event.email,
-          reason: suppressionReason,
-          suppressed_at: new Date().toISOString(),
-          source: 'automated_bounce_processing'
+          email: event.email,
+          suppression_type: suppressionReason,
+          reason: autoSuppressionReason,
+          is_active: true,
+          created_at: new Date().toISOString()
         });
       }
     }

@@ -111,15 +111,16 @@ export const EmailFlowTester = () => {
       }
       addResult('Event Creation', 'success', `Event created with ID: ${event.id}`);
 
-      // Step 4: Process Email Manually
-      addResult('Email Processing', 'pending', 'Processing email through admin processor...');
+      // Step 4: Process Email Manually via email-core
+      addResult('Email Processing', 'pending', 'Processing email through email core...');
       
       const { data: processResult, error: processError } = await supabase.functions.invoke(
-        'admin-email-processor', 
+        'email-core', 
         {
           body: { 
-            action: 'processEmailQueue',
-            priority: 'high'
+            action: 'process_queue',
+            batch_size: 5,
+            priority_filter: 'high'
           }
         }
       );

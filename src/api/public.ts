@@ -131,8 +131,12 @@ class PublicAPIService {
     html?: string;
     text?: string;
   }) {
-    const response = await supabase.functions.invoke('smtp-email-sender', {
-      body: emailData
+    const response = await supabase.functions.invoke('unified-smtp-sender', {
+      body: {
+        ...emailData,
+        templateKey: emailData.template,
+        emailType: 'transactional'
+      }
     });
 
     if (response.error) throw new Error(response.error.message);

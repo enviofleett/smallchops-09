@@ -65,13 +65,15 @@ export const getCustomerEmailStatuses = async (customerEmails: string[]): Promis
   }
 };
 
-// Resend welcome email for a customer
+// Resend welcome email for a customer via email-core queue
 export const resendWelcomeEmail = async (customerEmail: string): Promise<boolean> => {
   try {
-    const { error } = await supabase.functions.invoke('unified-smtp-sender', {
+    const { error } = await supabase.functions.invoke('email-core', {
       body: {
-        to: customerEmail,
-        templateKey: 'customer_welcome',
+        action: 'send_email',
+        recipient: customerEmail,
+        subject: 'Welcome to Starters Small Chops!',
+        template_key: 'customer_welcome',
         variables: {
           customerName: customerEmail.split('@')[0], // Fallback name
           companyName: 'Starters Small Chops',
@@ -79,7 +81,7 @@ export const resendWelcomeEmail = async (customerEmail: string): Promise<boolean
           websiteUrl: window.location.origin,
           siteUrl: window.location.origin
         },
-        emailType: 'transactional'
+        email_type: 'transactional'
       }
     });
 

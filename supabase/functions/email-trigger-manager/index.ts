@@ -130,10 +130,10 @@ const TRIGGER_HANDLERS = {
     };
 
     // Send payment confirmation
-    await supabase.functions.invoke('supabase-auth-email-sender', {
+    await supabase.functions.invoke('unified-smtp-sender', {
       body: {
-        templateId: 'payment_confirmation',
         to: paymentData.customerEmail,
+        templateKey: 'payment_confirmation',
         variables: paymentData,
         emailType: 'transactional'
       }
@@ -217,10 +217,10 @@ const TRIGGER_HANDLERS = {
     };
 
     // Send delivery confirmation and request feedback
-    await supabase.functions.invoke('supabase-auth-email-sender', {
+    await supabase.functions.invoke('unified-smtp-sender', {
       body: {
-        templateId: 'delivery_completed',
         to: deliveryData.customerEmail,
+        templateKey: 'delivery_completed',
         variables: deliveryData,
         emailType: 'transactional'
       }
@@ -259,10 +259,10 @@ const TRIGGER_HANDLERS = {
 
     // Send to all subscribed customers
     for (const customer of customers || []) {
-      await supabase.functions.invoke('supabase-auth-email-sender', {
+      await supabase.functions.invoke('unified-smtp-sender', {
         body: {
-          templateId: 'new_menu_item',
           to: customer.email,
+          templateKey: 'new_menu_item',
           variables: {
             customerName: customer.name,
             ...menuData
@@ -303,10 +303,10 @@ const TRIGGER_HANDLERS = {
     const { data: targetCustomers } = await query;
 
     for (const customer of targetCustomers || []) {
-      await supabase.functions.invoke('supabase-auth-email-sender', {
+      await supabase.functions.invoke('unified-smtp-sender', {
         body: {
-          templateId: 'promotion_announcement',
           to: customer.email,
+          templateKey: 'promotion_announcement',
           variables: {
             customerName: customer.name,
             ...promotionData

@@ -149,10 +149,10 @@ async function processIndividualEmail(supabase: any, email: QueuedEmail): Promis
     // Select email sender based on priority and template type
     const senderFunction = selectEmailSender(email);
     
-    // Prepare email data
+    // Prepare email data in unified format
     const emailData = {
-      templateId: email.template_key,
       to: email.recipient_email,
+      templateKey: email.template_key,
       variables: email.variables || {},
       emailType: getEmailType(email.template_key),
       priority: email.priority
@@ -246,18 +246,8 @@ async function processIndividualEmail(supabase: any, email: QueuedEmail): Promis
 }
 
 function selectEmailSender(email: QueuedEmail): string {
-  // High priority emails use Auth sender with SMTP fallback
-  if (email.priority === 'high') {
-    return 'supabase-auth-email-sender';
-  }
-  
-  // Transactional emails use primary SMTP sender
-  if (isTransactionalEmail(email.template_key)) {
-    return 'smtp-email-sender';
-  }
-  
-  // Marketing emails use production SMTP sender
-  return 'production-smtp-sender';
+  // Always use unified SMTP sender for all email types
+  return 'unified-smtp-sender';
 }
 
 function isTransactionalEmail(templateKey: string): boolean {

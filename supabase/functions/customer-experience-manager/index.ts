@@ -261,15 +261,12 @@ serve(async (req) => {
 
           if (error) throw error;
 
-          // Send real-time notification to customer via SMTP
-          await supabase.functions.invoke('smtp-email-sender', {
+          // Send real-time notification to customer via unified SMTP
+          await supabase.functions.invoke('unified-smtp-sender', {
             headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
             body: {
-              templateId: 'delivery_update',
-              recipient: {
-                email: tracking.order_id, // This should be resolved to customer email
-                name: 'Customer'
-              },
+              to: tracking.order_id, // This should be resolved to customer email
+              templateKey: 'delivery_update',
               variables: {
                 orderNumber: tracking.order_id,
                 status,

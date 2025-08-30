@@ -12,15 +12,12 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, type: 'lo
     // Determine the correct template key based on the email type
     const templateKey = type === 'password_reset' ? 'password_reset_otp' : type === 'login' ? 'login_otp' : 'registration_otp';
 
-    // Directly invoke the SMTP sender function with the corrected payload
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    // Directly invoke the unified SMTP sender function with the corrected payload
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
       body: {
-        templateId: templateKey,
-        recipient: {
-          email: email,
-          name: 'Valued Customer',
-        },
+        to: email,
+        templateKey: templateKey,
         variables: {
           otpCode: otp,
           customerEmail: email,

@@ -110,16 +110,20 @@ export const CommunicationsTab = () => {
   const processEmailQueue = async () => {
     setProcessingQueue(true);
     try {
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('unified-email-queue-processor', {
-        body: { batchSize: 50, priority: 'all' }
+      const { data, error } = await supabase.functions.invoke('email-core', {
+        body: { 
+          action: 'process_queue',
+          batch_size: 50,
+          priority_filter: 'all'
+        }
       });
+      
       if (error) {
         throw error;
       }
-      toast.success(`Processed ${data.processed || 0} emails, ${data.failed || 0} failed`);
+      
+      const result = data as { processed?: number; failed?: number };
+      toast.success(`Processed ${result.processed || 0} emails, ${result.failed || 0} failed`);
     } catch (error: any) {
       console.error('Queue processing error:', error);
       toast.error(`Queue processing failed: ${error.message}`);

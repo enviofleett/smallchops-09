@@ -3654,21 +3654,27 @@ export type Database = {
           email_address: string
           event_data: Json | null
           id: string
+          is_active: boolean | null
           reason: string
+          suppression_type: string | null
         }
         Insert: {
           created_at?: string | null
           email_address: string
           event_data?: Json | null
           id?: string
+          is_active?: boolean | null
           reason: string
+          suppression_type?: string | null
         }
         Update: {
           created_at?: string | null
           email_address?: string
           event_data?: Json | null
           id?: string
+          is_active?: boolean | null
           reason?: string
+          suppression_type?: string | null
         }
         Relationships: []
       }

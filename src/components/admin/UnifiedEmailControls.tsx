@@ -56,7 +56,7 @@ export const UnifiedEmailControls = () => {
   const checkSMTPHealth = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+      const { data, error } = await supabase.functions.invoke('unified-smtp-sender?check=smtp', {
         method: 'GET',
         body: null
       });

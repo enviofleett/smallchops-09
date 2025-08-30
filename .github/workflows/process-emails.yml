@@ -10,16 +10,9 @@ jobs:
   process-emails:
     runs-on: ubuntu-latest
     steps:
-      - name: Process Enhanced Email Queue
+      - name: Process Email Queue with Instant Processor
         run: |
           curl -X POST \
             -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
             -H "Content-Type: application/json" \
-            "https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/enhanced-email-processor"
-      
-      - name: Process Legacy Communication Events (fallback)
-        run: |
-          curl -X POST \
-            -H "Authorization: Bearer ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}" \
-            -H "Content-Type: application/json" \
-            "https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/process-communication-events-enhanced"
+            "https://oknnklksdiqaifhxaccs.supabase.co/functions/v1/instant-email-processor"

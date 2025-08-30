@@ -137,15 +137,6 @@ verify_jwt = true
 [functions.customer-welcome-processor]
 verify_jwt = false
 
-[functions.enhanced-email-processor]
-verify_jwt = false
-
-[functions.production-smtp-sender]
-verify_jwt = false
-
-[functions.native-smtp-sender]
-verify_jwt = false
-
 [functions.secure-customer-auth]
 verify_jwt = false
 

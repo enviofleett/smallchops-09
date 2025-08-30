@@ -78,21 +78,11 @@ serve(async (req) => {
     if (immediate_processing && emailEvents.length > 0) {
       console.log('Triggering immediate email processing...');
       
-      const processors = [
-        'enhanced-email-processor',
-        'instant-email-processor', 
-        'production-email-processor'
-      ];
-
-      for (const processor of processors) {
-        try {
-          await supabaseAdmin.functions.invoke(processor);
-          console.log(`${processor} triggered successfully`);
-          break; // Stop after first successful trigger
-        } catch (processorError) {
-          console.warn(`${processor} failed:`, processorError.message);
-          continue;
-        }
+      try {
+        await supabaseAdmin.functions.invoke('instant-email-processor');
+        console.log('instant-email-processor triggered successfully');
+      } catch (processorError) {
+        console.error('instant-email-processor failed:', processorError.message);
       }
     }
 

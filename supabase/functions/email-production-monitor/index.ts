@@ -170,7 +170,7 @@ async function checkProcessingHealth(supabase: any) {
     const processorHealthChecks = await Promise.allSettled([
       supabase.functions.invoke('instant-email-processor', { body: { health_check: true } }),
       supabase.functions.invoke('process-communication-events-enhanced', { body: { health_check: true } }),
-      supabase.functions.invoke('smtp-email-sender', { body: { health_check: true } })
+      supabase.functions.invoke('unified-smtp-sender', { body: { health_check: true } })
     ])
 
     const healthyProcessors = processorHealthChecks.filter(result => 

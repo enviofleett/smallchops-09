@@ -164,10 +164,10 @@ serve(async (req) => {
       const order = transaction.orders;
       if (order) {
         try {
-          await supabaseAdmin.functions.invoke('production-smtp-sender', {
+          await supabaseAdmin.functions.invoke('unified-smtp-sender', {
             body: {
               to: order.customer_email,
-              template_key: 'payment_confirmation',
+              templateKey: 'payment_confirmation',
               variables: {
                 customer_name: order.customer_name,
                 customer_email: order.customer_email,
@@ -181,6 +181,7 @@ serve(async (req) => {
                 payment_amount: `₦${(data.amount / 100).toLocaleString()}`,
                 payment_method: data.channel
               },
+              emailType: 'transactional',
               priority: 'high'
             }
           });
@@ -191,10 +192,10 @@ serve(async (req) => {
 
         // Send admin notification using templates
         try {
-          await supabaseAdmin.functions.invoke('production-smtp-sender', {
+          await supabaseAdmin.functions.invoke('unified-smtp-sender', {
             body: {
               to: 'admin@your-store.com',
-              template_key: 'admin_new_order',
+              templateKey: 'admin_new_order',
               variables: {
                 customer_name: order.customer_name,
                 customer_email: order.customer_email,
@@ -209,6 +210,7 @@ serve(async (req) => {
                 payment_amount: `₦${(data.amount / 100).toLocaleString()}`,
                 payment_method: data.channel
               },
+              emailType: 'transactional',
               priority: 'high'
             }
           });

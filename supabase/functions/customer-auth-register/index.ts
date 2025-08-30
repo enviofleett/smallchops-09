@@ -54,31 +54,12 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, name: str
       throw new Error('Failed to queue OTP email');
     }
 
-    // Trigger enhanced email processor for immediate processing
-    const { data: enhancedResult, error: enhancedError } = await supabase.functions.invoke('enhanced-email-processor', {
-      body: {
-        priority: 'high',
-        event_types: ['customer_registration_otp'],
-        immediate: true
-      }
-    });
-
-    if (!enhancedError && enhancedResult?.success) {
-      console.log('✅ OTP email sent via enhanced processor');
-      return true;
-    }
-
-    console.warn('Enhanced email processor failed, trying fallback:', enhancedError);
-
-    // Fallback to direct SMTP sender
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    // Send OTP email directly via unified SMTP sender
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
       body: {
-        templateId: 'customer_registration_otp',
-        recipient: {
-          email: email,
-          name: name
-        },
+        to: email,
+        templateKey: 'customer_registration_otp',
         variables: {
           otpCode: otp,
           customerName: name,
@@ -91,11 +72,11 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, name: str
     });
 
     if (error) {
-      console.error('❌ Direct SMTP sender also failed:', error);
+      console.error('❌ Unified SMTP sender failed:', error);
       return false;
     }
 
-    console.log('✅ OTP email sent via direct SMTP sender');
+    console.log('✅ OTP email sent via unified SMTP sender');
     return true;
 
   } catch (error) {

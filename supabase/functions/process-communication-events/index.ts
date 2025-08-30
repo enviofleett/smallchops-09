@@ -213,11 +213,8 @@ async function processOrderStatusUpdate(supabase: any, event: any): Promise<bool
   }
 
   const emailPayload = {
-    templateId,
-    recipient: {
-      email: payload.customer_email,
-      name: payload.customer_name || 'Valued Customer'
-    },
+    to: payload.customer_email,
+    templateKey: templateId,
     variables: {
       customerName: payload.customer_name || 'Valued Customer',
       orderNumber: payload.order_number || 'N/A',
@@ -228,7 +225,7 @@ async function processOrderStatusUpdate(supabase: any, event: any): Promise<bool
     emailType: 'transactional'
   }
 
-  const { error } = await supabase.functions.invoke('smtp-email-sender', {
+  const { error } = await supabase.functions.invoke('unified-smtp-sender', {
     headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
@@ -245,11 +242,8 @@ async function processPriceChangeNotification(supabase: any, event: any): Promis
   }
 
   const emailPayload = {
-    templateId: 'price_change_alert',
-    recipient: {
-      email: payload.customer_email,
-      name: payload.customer_name || 'Valued Customer'
-    },
+    to: payload.customer_email,
+    templateKey: 'price_change_alert',
     variables: {
       customerName: payload.customer_name || 'Valued Customer',
       productName: payload.product_name,
@@ -261,7 +255,7 @@ async function processPriceChangeNotification(supabase: any, event: any): Promis
     emailType: 'marketing'
   }
 
-  const { error } = await supabase.functions.invoke('smtp-email-sender', {
+  const { error } = await supabase.functions.invoke('unified-smtp-sender', {
     headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
@@ -278,11 +272,8 @@ async function processPromotionAlert(supabase: any, event: any): Promise<boolean
   }
 
   const emailPayload = {
-    templateId: 'promotion_alert',
-    recipient: {
-      email: payload.customer_email,
-      name: payload.customer_name || 'Valued Customer'
-    },
+    to: payload.customer_email,
+    templateKey: 'promotion_alert',
     variables: {
       customerName: payload.customer_name || 'Valued Customer',
       promotionTitle: payload.promotion_title,
@@ -294,7 +285,7 @@ async function processPromotionAlert(supabase: any, event: any): Promise<boolean
     emailType: 'marketing'
   }
 
-  const { error } = await supabase.functions.invoke('smtp-email-sender', {
+  const { error } = await supabase.functions.invoke('unified-smtp-sender', {
     headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
@@ -311,11 +302,8 @@ async function processWelcomeEmail(supabase: any, event: any): Promise<boolean> 
   }
 
   const emailPayload = {
-    templateId: 'welcome',
-    recipient: {
-      email: payload.customer_email,
-      name: payload.customer_name || 'Valued Customer'
-    },
+    to: payload.customer_email,
+    templateKey: 'welcome',
     variables: {
       customerName: payload.customer_name || 'Valued Customer',
       welcomeMessage: 'Welcome to our platform!',
@@ -325,7 +313,7 @@ async function processWelcomeEmail(supabase: any, event: any): Promise<boolean> 
     emailType: 'transactional'
   }
 
-  const { error } = await supabase.functions.invoke('smtp-email-sender', {
+  const { error } = await supabase.functions.invoke('unified-smtp-sender', {
     headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
@@ -351,7 +339,7 @@ async function processOrderEmail(supabase: any, event: any): Promise<boolean> {
 
   const emailPayload = {
     to: event.recipient_email,
-    templateId: templateId,
+    templateKey: templateId,
     variables: {
       ...event.variables,
       ...event.template_variables
@@ -359,7 +347,7 @@ async function processOrderEmail(supabase: any, event: any): Promise<boolean> {
     emailType: 'transactional'
   }
 
-  const { error } = await supabase.functions.invoke('smtp-email-sender', {
+  const { error } = await supabase.functions.invoke('unified-smtp-sender', {
     headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })
@@ -400,12 +388,12 @@ async function processCustomerWelcomeEmail(supabase: any, event: any): Promise<b
 
   const emailPayload = {
     to: event.recipient_email,
-    templateId: 'welcome_customer',
+    templateKey: 'welcome_customer',
     variables: enhancedVariables,
     emailType: 'transactional'
   }
 
-  const { error } = await supabase.functions.invoke('smtp-email-sender', {
+  const { error } = await supabase.functions.invoke('unified-smtp-sender', {
     headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
     body: emailPayload
   })

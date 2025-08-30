@@ -298,10 +298,10 @@ async function createInvitation(supabase: any, body: any, user: any) {
 
   // Send invitation email using Auth email system (non-blocking)
   try {
-    await supabase.functions.invoke('supabase-auth-email-sender', {
+    await supabase.functions.invoke('unified-smtp-sender', {
       body: {
-        templateId: 'admin_invitation',
         to: body.email,
+        templateKey: 'admin_invitation',
         variables: {
           role: body.role,
           companyName: 'Starters Small Chops',
@@ -494,10 +494,10 @@ async function resendInvitation(supabase: any, body: any, user: any) {
 
   // Send new invitation email
   try {
-    await supabase.functions.invoke('supabase-auth-email-sender', {
+    await supabase.functions.invoke('unified-smtp-sender', {
       body: {
-        templateId: 'admin_invitation',
         to: invitation.email,
+        templateKey: 'admin_invitation',
         variables: {
           role: invitation.role,
           companyName: 'Starters Small Chops',

@@ -127,15 +127,12 @@ serve(async (req) => {
           console.error('Customer account update failed:', updateError);
         }
 
-        // Send welcome email using the email service
-        const welcomeEmailResult = await supabaseAdmin.functions.invoke('smtp-email-sender', {
+        // Send welcome email using the unified SMTP service
+        const welcomeEmailResult = await supabaseAdmin.functions.invoke('unified-smtp-sender', {
           headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
           body: {
-            templateId: 'customer_welcome',
-            recipient: {
-              email: email,
-              name: name || email.split('@')[0]
-            },
+            to: email,
+            templateKey: 'customer_welcome',
             variables: {
               customerName: name || email.split('@')[0],
               customerEmail: email,

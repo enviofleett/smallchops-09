@@ -79,8 +79,8 @@ serve(async (req) => {
 
     console.log(`Queued payment confirmation for order ${order_id}`);
 
-    // Trigger enhanced email processor for immediate processing
-    const { error: processorError } = await supabase.functions.invoke('enhanced-email-processor', {
+    // Trigger instant email processor for immediate processing
+    const { error: processorError } = await supabase.functions.invoke('instant-email-processor', {
       body: { 
         priority: 'high', 
         event_types: ['payment_confirmation'],

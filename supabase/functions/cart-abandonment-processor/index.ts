@@ -156,8 +156,8 @@ serve(async (req) => {
     if (emailsQueued > 0) {
       console.log(`Triggering email processors for ${emailsQueued} queued emails`);
       
-      // Trigger enhanced email processor
-      await supabase.functions.invoke('enhanced-email-processor', {
+      // Trigger instant email processor
+      await supabase.functions.invoke('instant-email-processor', {
         body: { priority: 'normal', event_types: ['cart_abandonment'] }
       });
     }

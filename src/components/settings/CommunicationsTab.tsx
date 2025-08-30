@@ -12,6 +12,7 @@ import { SMTPSettingsTab } from './SMTPSettingsTab';
 import { RealTimeEmailProcessor } from './RealTimeEmailProcessor';
 import { EmailDeliveryMonitor } from './EmailDeliveryMonitor';
 import { UnifiedEmailControls } from './UnifiedEmailControls';
+import { EmailStatusDashboard } from '@/components/admin/EmailStatusDashboard';
 import { useEmailService } from '@/hooks/useEmailService';
 import { useSMTPSettings } from '@/hooks/useSMTPSettings';
 import { supabase } from '@/integrations/supabase/client';
@@ -217,7 +218,14 @@ export const CommunicationsTab = () => {
         </TabsList>
 
         <TabsContent value="unified" className="space-y-4">
-          <UnifiedEmailControls />
+          <div className="grid gap-6 lg:grid-cols-2">
+            <div>
+              <UnifiedEmailControls />
+            </div>
+            <div>
+              <EmailStatusDashboard />
+            </div>
+          </div>
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">

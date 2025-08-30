@@ -540,7 +540,7 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       
     log('info', '✅ Payment transaction record updated');
 
-    // Immediately send payment confirmation email (hotfix for production)
+    // Enhanced immediate payment confirmation email with fallback queue
     try {
       const confirmationEmailResult = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
@@ -557,22 +557,99 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         }
       });
 
+      // Enhanced error logging with HTTP status and response details
       if (confirmationEmailResult.error) {
-        log('warn', '⚠️ Immediate payment confirmation email failed (non-blocking)', {
-          error: confirmationEmailResult.error.message,
-          order_id: orderData.order_id
-        });
+        const errorDetails = {
+          error: confirmationEmailResult.error.message || 'Unknown error',
+          httpStatus: confirmationEmailResult.status || 'unknown',
+          responseBody: confirmationEmailResult.data || null,
+          order_id: orderData.order_id,
+          customer_email: orderData.customer_email,
+          reference: reference
+        };
+        
+        log('warn', '⚠️ Immediate payment confirmation email failed - creating queue fallback', errorDetails);
+        
+        // Queue fallback: Create communication event for later processing
+        try {
+          await supabase.from('communication_events').insert({
+            order_id: orderData.order_id,
+            recipient_email: orderData.customer_email,
+            event_type: 'payment_confirmation',
+            template_key: 'payment_confirmation',
+            status: 'queued',
+            priority: 'high',
+            email_type: 'transactional',
+            variables: {
+              customerName: orderData.customer_name || 'Valued Customer',
+              orderNumber: orderData.order_number,
+              amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+              paymentMethod: 'Paystack',
+              orderType: orderData.order_type || 'order',
+              fallback_reason: 'immediate_send_failed'
+            }
+          });
+          
+          log('info', '✅ Payment confirmation queued for later delivery', {
+            order_id: orderData.order_id,
+            fallback_used: true
+          });
+        } catch (queueError) {
+          log('error', '❌ Failed to queue payment confirmation fallback', {
+            order_id: orderData.order_id,
+            queueError: queueError.message
+          });
+        }
       } else {
         log('info', '✅ Payment confirmation email sent immediately', {
           order_id: orderData.order_id,
-          customer_email: orderData.customer_email
+          customer_email: orderData.customer_email,
+          messageId: confirmationEmailResult.data?.messageId,
+          provider: confirmationEmailResult.data?.provider
         });
       }
     } catch (emailError) {
-      log('warn', '⚠️ Exception sending immediate payment confirmation (non-blocking)', {
+      const errorDetails = {
         error: emailError.message,
-        order_id: orderData.order_id
-      });
+        stack: emailError.stack,
+        order_id: orderData.order_id,
+        customer_email: orderData.customer_email,
+        reference: reference
+      };
+      
+      log('warn', '⚠️ Exception sending immediate payment confirmation - creating queue fallback', errorDetails);
+      
+      // Queue fallback for exceptions too
+      try {
+        await supabase.from('communication_events').insert({
+          order_id: orderData.order_id,
+          recipient_email: orderData.customer_email,
+          event_type: 'payment_confirmation',
+          template_key: 'payment_confirmation',
+          status: 'queued',
+          priority: 'high',
+          email_type: 'transactional',
+          variables: {
+            customerName: orderData.customer_name || 'Valued Customer',
+            orderNumber: orderData.order_number,
+            amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+            paymentMethod: 'Paystack',
+            orderType: orderData.order_type || 'order',
+            fallback_reason: 'exception_during_send'
+          }
+        });
+        
+        log('info', '✅ Payment confirmation queued after exception', {
+          order_id: orderData.order_id,
+          fallback_used: true
+        });
+      } catch (queueError) {
+        log('error', '❌ Critical: Failed both immediate send and queue fallback', {
+          order_id: orderData.order_id,
+          originalError: emailError.message,
+          queueError: queueError.message
+        });
+      }
     }
     } catch (txnError) {
       log('warn', '⚠️ Payment transaction update failed (non-blocking)', {

@@ -187,6 +187,58 @@ export const useEmailService = () => {
     isSending: sendEmailMutation.isPending,
     sendError: sendEmailMutation.error,
 
+  // Email health monitoring query
+  const emailHealthQuery = useQuery({
+    queryKey: ['email-health-metrics'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .rpc('get_email_delivery_metrics', { p_hours_back: 24 });
+
+      if (error) {
+        throw new Error(`Failed to fetch email health metrics: ${error.message}`);
+      }
+
+      return data;
+    },
+    refetchInterval: 5 * 60 * 1000, // Refresh every 5 minutes
+    refetchOnWindowFocus: false,
+    staleTime: 2 * 60 * 1000, // 2 minutes
+  });
+
+  // Manual failure alert trigger
+  const triggerFailureAlert = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke('email-failure-alerting');
+
+      if (error) {
+        throw new Error(`Failed to trigger failure alert: ${error.message}`);
+      }
+
+      return data;
+    },
+    onSuccess: (data) => {
+      toast({
+        title: "Alert check completed",
+        description: `${data.alertsSent || 0} alerts sent`,
+        variant: data.alertsSent > 0 ? "destructive" : "default",
+      });
+    },
+    onError: (error) => {
+      console.error('Manual alert trigger error:', error);
+      toast({
+        title: "Alert trigger failed",
+        description: error.message || "Failed to trigger failure alert",
+        variant: "destructive",
+      });
+    }
+  });
+
+  return {
+    // Email sending
+    sendEmail: sendEmailMutation.mutateAsync,
+    isSending: sendEmailMutation.isPending,
+    sendingError: sendEmailMutation.error,
+
     // Templates
     templates: templatesQuery.data || [],
     isLoadingTemplates: templatesQuery.isLoading,
@@ -196,6 +248,13 @@ export const useEmailService = () => {
     deliveryLogs: deliveryLogsQuery.data || [],
     isLoadingLogs: deliveryLogsQuery.isLoading,
     logsError: deliveryLogsQuery.error,
+
+    // Email health monitoring
+    emailHealth: emailHealthQuery.data,
+    isLoadingHealth: emailHealthQuery.isLoading,
+    healthError: emailHealthQuery.error,
+    triggerFailureAlert: triggerFailureAlert.mutateAsync,
+    isCheckingAlerts: triggerFailureAlert.isPending,
 
     // Helper functions
     sendOrderNotification,

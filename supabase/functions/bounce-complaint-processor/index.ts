@@ -47,95 +47,30 @@ async function processBounceEvent(supabase: any, event: BounceEvent) {
       return { success: true, action: 'logged_engagement' };
     }
     
-    // Check if we already have this bounce/complaint recorded
-    const { data: existingBounce } = await supabase
-      .from('email_bounce_tracking')
-      .select('*')
-      .eq('email_address', event.email)
-      .eq('bounce_type', bounceType)
-      .single();
-    
-    if (existingBounce) {
-      // Update existing record
-      await supabase
-        .from('email_bounce_tracking')
-        .update({
-          bounce_count: existingBounce.bounce_count + 1,
-          last_bounce_at: event.timestamp,
-          bounce_reason: event.reason || existingBounce.bounce_reason,
-          smtp_provider: event.provider || existingBounce.smtp_provider
-        })
-        .eq('id', existingBounce.id);
-      
-      console.log(`📈 Updated bounce count for ${event.email} (${bounceType}): ${existingBounce.bounce_count + 1}`);
-    } else {
-      // Create new bounce record
-      await supabase.from('email_bounce_tracking').insert({
-        email_address: event.email,
-        bounce_type: bounceType,
-        bounce_reason: event.reason,
-        smtp_provider: event.provider,
-        bounce_count: 1,
-        first_bounce_at: event.timestamp,
-        last_bounce_at: event.timestamp
+    // Use the new auto-suppression function
+    const { data: suppressionResult, error: suppressError } = await supabase
+      .rpc('auto_suppress_bounced_email', {
+        p_email: event.email,
+        p_bounce_type: bounceType,
+        p_reason: event.reason
       });
-      
-      console.log(`🆕 New bounce record created for ${event.email} (${bounceType})`);
-    }
-    
-    // Determine if email should be suppressed
-    let shouldSuppress = false;
-    let autoSuppressionReason = '';
-    
-    if (bounceType === 'hard') {
-      shouldSuppress = true;
-      autoSuppressionReason = 'Automatic suppression due to hard bounce';
-    } else if (bounceType === 'complaint') {
-      shouldSuppress = true;
-      autoSuppressionReason = 'Automatic suppression due to spam complaint';
-    } else if (bounceType === 'soft') {
-      // Check if this email has multiple soft bounces
-      const { data: softBounces } = await supabase
-        .from('email_bounce_tracking')
-        .select('bounce_count')
-        .eq('email_address', event.email)
-        .eq('bounce_type', 'soft')
-        .single();
-      
-      if (softBounces && softBounces.bounce_count >= 3) {
-        shouldSuppress = true;
-        autoSuppressionReason = 'Automatic suppression due to multiple soft bounces';
+
+    if (suppressError) {
+      console.warn('Auto-suppression function failed:', suppressError.message);
+      // Fallback to manual suppression logic
+      if (bounceType === 'hard' || bounceType === 'complaint') {
+        await supabase
+          .from('email_suppression_list')
+          .upsert({
+            email: event.email.toLowerCase(),
+            suppression_type: bounceType,
+            reason: `Fallback suppression: ${event.reason}`,
+            is_active: true,
+            suppressed_at: new Date().toISOString()
+          });
       }
-    }
-    
-    // Suppress email if needed
-    if (shouldSuppress) {
-      await supabase
-        .from('email_bounce_tracking')
-        .update({
-          suppressed_at: new Date().toISOString(),
-          suppression_reason: autoSuppressionReason
-        })
-        .eq('email_address', event.email)
-        .eq('bounce_type', bounceType);
-      
-      console.log(`🚫 Email ${event.email} has been automatically suppressed: ${autoSuppressionReason}`);
-      
-      // Also add to general suppression list if not already there
-      const { data: existingSuppression } = await supabase
-        .from('email_suppression_list')
-        .select('id')
-        .eq('email_address', event.email)
-        .single();
-      
-      if (!existingSuppression) {
-        await supabase.from('email_suppression_list').insert({
-          email_address: event.email,
-          reason: suppressionReason,
-          suppressed_at: new Date().toISOString(),
-          source: 'automated_bounce_processing'
-        });
-      }
+    } else {
+      console.log(`📊 Auto-suppression result for ${event.email}: ${suppressionResult ? 'SUPPRESSED' : 'TRACKED'}`);
     }
     
     // Update communication events if we can find the related event

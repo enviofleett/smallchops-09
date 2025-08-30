@@ -4,6 +4,8 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { OrderItemsBreakdown } from '@/components/orders/OrderItemsBreakdown';
+import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { 
   MapPin, 
   Clock, 
@@ -70,9 +72,16 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
   isOpen, 
   onClose 
 }) => {
+  // Try to get detailed order data with product information
+  const { data: detailedOrderData, isLoading: isLoadingDetailed } = useDetailedOrderData(order?.id);
+  
   if (!order) {
     return null;
   }
+
+  // Use detailed data if available, otherwise fall back to the passed order data
+  const orderToDisplay = detailedOrderData?.order || order;
+  const itemsToDisplay = detailedOrderData?.items || order.order_items || [];
 
   const handlePrint = () => {
     window.print();
@@ -201,59 +210,33 @@ export const OrderDetailsModal: React.FC<OrderDetailsModalProps> = ({
             </Card>
           </div>
 
-          {/* Order Items */}
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center gap-2 mb-4">
-                <Package className="h-5 w-5 text-primary" />
-                <span className="font-semibold">
-                  Order Items ({order.order_items?.length || 0})
-                </span>
-              </div>
-              <div className="space-y-3">
-                {order.order_items?.length > 0 ? (
-                  order.order_items.map((item: any, index: number) => (
-                    <div 
-                      key={item.id || index} 
-                      className="flex justify-between items-center p-3 border rounded-lg"
-                    >
-                      <div className="flex-1">
-                        <div className="font-medium">{item.product_name}</div>
-                        <div className="text-sm text-muted-foreground">
-                          {formatCurrency(item.unit_price)} × {item.quantity}
-                        </div>
-                      </div>
-                      <div className="font-bold">
-                        {formatCurrency(item.total_price || (item.unit_price * item.quantity))}
-                      </div>
-                    </div>
-                  ))
-                ) : (
-                  <div className="text-center text-muted-foreground py-4">
-                    No items found
-                  </div>
-                )}
-              </div>
-
-              {/* Order Total */}
-              <div className="border-t mt-4 pt-4 space-y-2">
-                <div className="flex justify-between text-sm">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(subtotal)}</span>
+          {/* Order Items with enhanced details */}
+          {isLoadingDetailed ? (
+            <Card>
+              <CardContent className="p-6">
+                <div className="flex items-center gap-2 mb-4">
+                  <Package className="h-5 w-5 text-primary" />
+                  <span className="font-semibold">Loading Order Items...</span>
                 </div>
-                {deliveryFee > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span>Delivery Fee:</span>
-                    <span>{formatCurrency(deliveryFee)}</span>
-                  </div>
-                )}
-                <div className="flex justify-between font-bold text-lg border-t pt-2">
-                  <span>Total:</span>
-                  <span>{formatCurrency(order.total_amount || 0)}</span>
+                <div className="space-y-3">
+                  {[1, 2, 3].map((i) => (
+                    <Skeleton key={i} className="h-16 w-full" />
+                  ))}
                 </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          ) : (
+            <OrderItemsBreakdown
+              items={itemsToDisplay}
+              subtotal={orderToDisplay.total_amount - (orderToDisplay.delivery_fee || 0)}
+              deliveryFee={orderToDisplay.delivery_fee}
+              totalVat={0}
+              totalDiscount={0}
+              grandTotal={orderToDisplay.total_amount}
+              showDetailed={true}
+              className="border-0"
+            />
+          )}
 
           {/* Payment Information */}
           {order.payment_method && (

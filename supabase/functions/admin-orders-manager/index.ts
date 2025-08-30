@@ -75,7 +75,11 @@ const handler = async (req: Request): Promise<Response> => {
         let query = supabase
           .from('orders')
           .select(`*, 
-            order_items (*),
+            order_items (*, 
+              products (
+                id, name, description, features, ingredients, image_url, category_id
+              )
+            ),
             delivery_zones (id, name, base_fee, is_active)
           `, { count: 'exact' });
 
@@ -131,7 +135,11 @@ const handler = async (req: Request): Promise<Response> => {
           
           let fallbackQuery = supabase
             .from('orders')
-            .select(`*, order_items (*)`, { count: 'exact' });
+            .select(`*, order_items (*, 
+              products (
+                id, name, description, features, ingredients, image_url, category_id
+              )
+            )`, { count: 'exact' });
 
           if (status !== 'all') {
             fallbackQuery = fallbackQuery.eq('status', status);
@@ -252,7 +260,11 @@ const handler = async (req: Request): Promise<Response> => {
         const { data, error } = await supabase
           .from('orders')
           .select(`*, 
-            order_items (*),
+            order_items (*, 
+              products (
+                id, name, description, features, ingredients, image_url, category_id
+              )
+            ),
             delivery_zones (id, name, base_fee, is_active)
           `)
           .eq('id', orderId)
@@ -277,7 +289,11 @@ const handler = async (req: Request): Promise<Response> => {
           
           const { data: fallbackData, error: fallbackError } = await supabase
             .from('orders')
-            .select(`*, order_items (*)`)
+            .select(`*, order_items (*, 
+              products (
+                id, name, description, features, ingredients, image_url, category_id
+              )
+            )`)
             .eq('id', orderId)
             .single();
 
@@ -394,7 +410,11 @@ const handler = async (req: Request): Promise<Response> => {
           .update(updateData)
           .eq('id', orderId)
           .select(`*, 
-            order_items (*),
+            order_items (*, 
+              products (
+                id, name, description, features, ingredients, image_url, category_id
+              )
+            ),
             delivery_zones (id, name, base_fee, is_active)
           `)
           .single();
@@ -409,7 +429,11 @@ const handler = async (req: Request): Promise<Response> => {
             .from('orders')
             .update(updateData)
             .eq('id', orderId)
-            .select(`*, order_items (*)`)
+            .select(`*, order_items (*, 
+              products (
+                id, name, description, features, ingredients, image_url, category_id
+              )
+            )`)
             .single();
 
           if (fallbackError) {

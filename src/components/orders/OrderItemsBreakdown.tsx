@@ -73,35 +73,72 @@ export function OrderItemsBreakdown({
         {/* Items List */}
         <div className="space-y-3">
           {items.map((item, index) => (
-            <div key={item.id || index} className="border rounded-lg p-4 bg-gray-50">
+            <div key={item.id || index} className="border border-border rounded-lg p-4 bg-card/50 hover:bg-card/80 transition-colors">
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
                   <div className="flex items-start gap-3">
-                    <div className="w-8 h-8 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0">
-                      <Package className="h-4 w-4 text-primary" />
+                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                      <Package className="h-5 w-5 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h4 className="font-medium text-gray-900 break-words">{item.product_name}</h4>
+                      <h4 className="font-semibold text-foreground break-words mb-1">{item.product_name}</h4>
                       
+                      {/* Product Features */}
+                      {showDetailed && (item as any).features && Array.isArray((item as any).features) && (item as any).features.length > 0 && (
+                        <div className="mb-2">
+                          <div className="flex flex-wrap gap-1">
+                            {(item as any).features.slice(0, 3).map((feature: string, idx: number) => (
+                              <Badge key={idx} variant="outline" className="text-xs bg-secondary/50 text-secondary-foreground border-secondary">
+                                {feature}
+                              </Badge>
+                            ))}
+                            {(item as any).features.length > 3 && (
+                              <Badge variant="outline" className="text-xs bg-muted text-muted-foreground">
+                                +{(item as any).features.length - 3} more
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                      
+                      {/* Customizations */}
                       {showDetailed && formatCustomizations(item.customizations) && (
-                        <p className="text-sm text-gray-600 mt-1">
-                          <Info className="h-3 w-3 inline mr-1" />
-                          {formatCustomizations(item.customizations)}
-                        </p>
+                        <div className="mb-2 p-2 bg-accent/30 rounded border-l-2 border-accent">
+                          <p className="text-sm text-accent-foreground flex items-start gap-1">
+                            <Info className="h-3 w-3 mt-0.5 flex-shrink-0" />
+                            <span className="font-medium">Customizations:</span>
+                            <span className="ml-1">{formatCustomizations(item.customizations)}</span>
+                          </p>
+                        </div>
                       )}
                       
+                      {/* Special Instructions */}
                       {showDetailed && item.special_instructions && (
-                        <p className="text-sm text-orange-600 mt-1 italic">
-                          Note: {item.special_instructions}
-                        </p>
+                        <div className="mb-2 p-2 bg-orange-50 border border-orange-200 rounded">
+                          <p className="text-sm text-orange-700 flex items-start gap-1">
+                            <span className="text-orange-500 text-base leading-none">📝</span>
+                            <span className="font-medium">Special Note:</span>
+                            <span className="ml-1 italic">{item.special_instructions}</span>
+                          </p>
+                        </div>
                       )}
                       
-                      <div className="flex items-center gap-4 mt-2 text-sm text-gray-600">
-                        <span>Qty: {Number(item.quantity ?? 0)}</span>
-                        <span>Unit: {formatCurrency(Number(item.unit_price ?? 0))}</span>
+                      {/* Product Details Row */}
+                      <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-foreground">Qty:</span>
+                          <span className="px-1.5 py-0.5 bg-primary/10 text-primary rounded text-xs font-medium">
+                            {Number(item.quantity ?? 0)}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-medium text-foreground">Unit:</span>
+                          <span className="text-foreground">{formatCurrency(Number(item.unit_price ?? 0))}</span>
+                        </div>
                         {showDetailed && Number(item.discount_amount ?? 0) > 0 && (
-                          <Badge variant="secondary" className="bg-green-100 text-green-800">
-                            -{formatCurrency(Number(item.discount_amount ?? 0))} discount
+                          <Badge variant="secondary" className="bg-green-50 text-green-700 border-green-200">
+                            <span className="text-green-500 mr-1">💰</span>
+                            -{formatCurrency(Number(item.discount_amount ?? 0))} saved
                           </Badge>
                         )}
                       </div>

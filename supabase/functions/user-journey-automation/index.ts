@@ -79,7 +79,7 @@ serve(async (req: Request) => {
     // Trigger immediate email processing for high-priority events
     if (['order_placement', 'password_reset'].includes(journey_type)) {
       try {
-        await supabase.functions.invoke('enhanced-email-processor');
+        await supabase.functions.invoke('instant-email-processor');
       } catch (processError) {
         console.warn('Failed to trigger immediate processing:', processError);
       }

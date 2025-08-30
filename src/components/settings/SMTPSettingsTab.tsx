@@ -292,11 +292,12 @@ const testSMTPConnection = async () => {
     // Wait a moment for settings to propagate
     await new Promise(resolve => setTimeout(resolve, 1000));
 
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
         to: formData.sender_email,
         subject: 'SMTP Connection Test - ' + new Date().toISOString(),
-        html: `
+        emailType: 'transactional',
+        htmlContent: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #22c55e;">✅ SMTP Connection Test Successful!</h2>
             <p>Congratulations! Your SMTP configuration is working correctly.</p>

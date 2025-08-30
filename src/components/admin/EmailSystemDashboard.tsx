@@ -105,11 +105,12 @@ export const EmailSystemDashboard: React.FC = () => {
 
   const testSMTP = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: 'admin@example.com',
           subject: 'SMTP Connection Test',
-          body: 'This is a test email to verify SMTP connectivity.'
+          emailType: 'transactional',
+          textContent: 'This is a test email to verify SMTP connectivity.'
         }
       });
 

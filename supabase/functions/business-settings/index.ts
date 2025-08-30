@@ -271,12 +271,13 @@ serve(async (req) => {
         try {
           console.log('Calling smtp-email-sender function...');
           
-          const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('smtp-email-sender', {
+          const { data: emailResult, error: emailError } = await supabaseClient.functions.invoke('unified-smtp-sender', {
             headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
             body: {
               to: settings.sender_email, // Send test email to sender
               subject: 'SMTP Test Email - Connection Successful',
-              html: `
+              emailType: 'transactional',
+              htmlContent: `
                 <h2>Test Email Successful!</h2>
                 <p>Your SMTP configuration is working correctly.</p>
                 <p>Sender: ${settings.smtp_user || settings.sender_email}</p>

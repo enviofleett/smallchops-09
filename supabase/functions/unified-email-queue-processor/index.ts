@@ -1,4 +1,4 @@
-// Unified Email Queue Processor - Production Ready
+// Unified Email Queue Processor - Production Ready with Circuit Breaker
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.52.0';
 
@@ -6,6 +6,20 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
+
+// Circuit breaker configuration
+const CIRCUIT_BREAKER = {
+  authFailureThreshold: 3,    // Stop after 3 consecutive auth failures
+  timeWindow: 300000,         // 5 minutes
+  recoveryTime: 600000        // 10 minutes before retry
+};
+
+let circuitBreakerState = {
+  isOpen: false,
+  consecutiveAuthFailures: 0,
+  lastAuthFailure: 0,
+  lastCheck: 0
 };
 
 serve(async (req) => {
@@ -27,7 +41,29 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const requestBody = await req.json();
+    // Check circuit breaker before processing
+    const circuitCheck = await checkCircuitBreaker(supabase);
+    if (!circuitCheck.canProcess) {
+      console.log(`🚫 Circuit breaker OPEN: ${circuitCheck.reason}`);
+      
+      return new Response(JSON.stringify({
+        success: false,
+        processed: 0,
+        failed: 0,
+        skipped: 0,
+        circuitBreaker: {
+          state: 'open',
+          reason: circuitCheck.reason,
+          nextRetry: new Date(circuitCheck.nextRetry).toISOString()
+        },
+        message: 'Email processing suspended due to authentication failures'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 503
+      });
+    }
+
+    const requestBody = await req.json().catch(() => ({}));
     const batchSize = requestBody.batchSize || 50;
     const priority = requestBody.priority || 'all';
 
@@ -72,6 +108,7 @@ serve(async (req) => {
     let successCount = 0;
     let failureCount = 0;
     const results = [];
+    let authFailureDetected = false;
 
     // Process each email
     for (const email of queuedEmails) {
@@ -88,33 +125,38 @@ serve(async (req) => {
           })
           .eq('id', email.id);
 
-        // Prepare email data for unified sender
-        const emailData = {
-          to: email.recipient_email,
-          subject: email.subject || undefined,
-          html: email.html_content || undefined,
-          text: email.text_content || undefined,
-          templateKey: email.template_key,
-          variables: email.variables || {},
-          emailType: email.email_type || 'transactional',
-          priority: email.priority || 'normal'
-        };
-
         // Send via unified SMTP sender
         const { data: emailResult, error: emailError } = await supabase.functions.invoke('unified-smtp-sender', {
-          body: emailData
+          body: {
+            to: email.recipient_email,
+            subject: email.subject || undefined,
+            html: email.html_content || undefined,
+            text: email.text_content || undefined,
+            templateKey: email.template_key,
+            variables: email.variables || {},
+            emailType: email.email_type || 'transactional',
+            priority: email.priority || 'normal'
+          }
         });
 
-        if (emailError) {
-          console.error(`❌ Failed to send email ${email.id}:`, emailError);
+        if (emailError || !emailResult?.success) {
+          const errorMessage = emailError?.message || emailResult?.error || 'Unknown error';
+          
+          // Check for authentication errors
+          if (errorMessage.includes('535') || errorMessage.includes('authentication')) {
+            authFailureDetected = true;
+            console.error(`🔒 AUTH FAILURE detected for email ${email.id}: ${errorMessage}`);
+          }
+          
+          console.error(`❌ Failed to send email ${email.id}:`, errorMessage);
           
           // Update status to failed with retry logic
           await supabase
             .from('communication_events')
             .update({ 
               status: 'failed',
-              error_message: emailError.message,
-              last_error: emailError.message,
+              error_message: errorMessage,
+              last_error: errorMessage,
               retry_count: (email.retry_count || 0) + 1,
               updated_at: new Date().toISOString()
             })
@@ -125,7 +167,7 @@ serve(async (req) => {
             eventId: email.id,
             recipient: email.recipient_email,
             status: 'failed',
-            error: emailError.message
+            error: errorMessage
           });
           
           continue;
@@ -180,6 +222,13 @@ serve(async (req) => {
           error: eventError.message
         });
       }
+    }
+
+    // Update circuit breaker state
+    if (authFailureDetected) {
+      await updateCircuitBreakerState(supabase, true);
+    } else if (successCount > 0) {
+      await updateCircuitBreakerState(supabase, false);
     }
 
     // Log comprehensive results
@@ -253,3 +302,89 @@ serve(async (req) => {
     );
   }
 });
+
+// Check circuit breaker state
+async function checkCircuitBreaker(supabase: any): Promise<{
+  canProcess: boolean;
+  reason?: string;
+  nextRetry?: number;
+}> {
+  const now = Date.now();
+  
+  // Check if circuit breaker should be reset
+  if (circuitBreakerState.isOpen && 
+      now - circuitBreakerState.lastAuthFailure > CIRCUIT_BREAKER.recoveryTime) {
+    console.log('🔄 Circuit breaker recovery time reached, resetting state');
+    circuitBreakerState.isOpen = false;
+    circuitBreakerState.consecutiveAuthFailures = 0;
+  }
+
+  // Load recent auth failures from database if needed
+  if (now - circuitBreakerState.lastCheck > 60000) { // Check every minute
+    try {
+      const { data: recentFailures } = await supabase
+        .from('smtp_delivery_logs')
+        .select('created_at, error_message')
+        .eq('delivery_status', 'failed')
+        .gte('created_at', new Date(now - CIRCUIT_BREAKER.timeWindow).toISOString())
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      let consecutiveAuthFailures = 0;
+      if (recentFailures) {
+        for (const failure of recentFailures) {
+          if (failure.error_message?.includes('535') || 
+              failure.error_message?.includes('authentication')) {
+            consecutiveAuthFailures++;
+          } else {
+            break; // Non-auth error breaks the consecutive count
+          }
+        }
+      }
+
+      circuitBreakerState.consecutiveAuthFailures = consecutiveAuthFailures;
+      circuitBreakerState.lastCheck = now;
+
+      if (consecutiveAuthFailures >= CIRCUIT_BREAKER.authFailureThreshold) {
+        circuitBreakerState.isOpen = true;
+        circuitBreakerState.lastAuthFailure = now;
+      }
+    } catch (error) {
+      console.warn('Failed to check circuit breaker state:', error.message);
+    }
+  }
+
+  if (circuitBreakerState.isOpen) {
+    return {
+      canProcess: false,
+      reason: `${circuitBreakerState.consecutiveAuthFailures} consecutive auth failures`,
+      nextRetry: circuitBreakerState.lastAuthFailure + CIRCUIT_BREAKER.recoveryTime
+    };
+  }
+
+  return { canProcess: true };
+}
+
+// Update circuit breaker state
+async function updateCircuitBreakerState(supabase: any, authFailure: boolean): Promise<void> {
+  const now = Date.now();
+  
+  if (authFailure) {
+    circuitBreakerState.consecutiveAuthFailures++;
+    circuitBreakerState.lastAuthFailure = now;
+    
+    if (circuitBreakerState.consecutiveAuthFailures >= CIRCUIT_BREAKER.authFailureThreshold) {
+      circuitBreakerState.isOpen = true;
+      console.warn(`🚫 Circuit breaker OPENED after ${circuitBreakerState.consecutiveAuthFailures} auth failures`);
+    }
+  } else {
+    // Reset on successful send
+    if (circuitBreakerState.consecutiveAuthFailures > 0) {
+      console.log(`🔄 Resetting circuit breaker after successful send`);
+      circuitBreakerState.consecutiveAuthFailures = 0;
+      circuitBreakerState.isOpen = false;
+    }
+  }
+  
+  circuitBreakerState.lastCheck = now;
+}

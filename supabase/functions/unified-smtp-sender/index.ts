@@ -47,6 +47,75 @@ function parseResponse(response: string): SMTPResponse {
   return { code, lines, message };
 }
 
+// Get production SMTP configuration prioritizing Function Secrets
+async function getProductionSMTPConfig(supabase: any): Promise<{
+  host: string;
+  port: number;
+  username: string;
+  password: string;
+  senderEmail: string;
+  senderName: string;
+  encryption?: string;
+  source: string;
+}> {
+  console.log('🔍 Loading SMTP configuration...');
+  
+  // Priority 1: Function Secrets (Production)
+  const secretHost = Deno.env.get('SMTP_HOST');
+  const secretPort = Deno.env.get('SMTP_PORT');
+  const secretUsername = Deno.env.get('SMTP_USERNAME');
+  const secretPassword = Deno.env.get('SMTP_PASSWORD');
+  const secretEncryption = Deno.env.get('SMTP_ENCRYPTION');
+  const secretFromName = Deno.env.get('SMTP_FROM_NAME');
+  const secretFromEmail = Deno.env.get('SMTP_FROM_EMAIL');
+
+  if (secretHost && secretUsername && secretPassword) {
+    console.log('✅ Using production SMTP configuration from Function Secrets');
+    return {
+      host: secretHost.trim(),
+      port: parseInt(secretPort || '587'),
+      username: secretUsername.trim(),
+      password: secretPassword.trim(),
+      senderEmail: (secretFromEmail || secretUsername).trim(),
+      senderName: (secretFromName || 'Starters Small Chops').trim(),
+      encryption: secretEncryption?.trim() || 'TLS',
+      source: 'function_secrets'
+    };
+  }
+
+  // Priority 2: Database fallback (Testing/Development)
+  console.log('⚠️ Function Secrets not configured, falling back to database');
+  const { data: config } = await supabase
+    .from('communication_settings')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!config?.use_smtp) {
+    throw new Error('SMTP not configured - neither Function Secrets nor database config available');
+  }
+
+  if (!config.smtp_host || !config.smtp_user || !config.smtp_pass) {
+    const missing = [];
+    if (!config.smtp_host) missing.push('host');
+    if (!config.smtp_user) missing.push('username');
+    if (!config.smtp_pass) missing.push('password');
+    throw new Error(`Incomplete database SMTP configuration: missing ${missing.join(', ')}`);
+  }
+
+  return {
+    host: config.smtp_host.trim(),
+    port: config.smtp_port || 587,
+    username: config.smtp_user.trim(),
+    password: config.smtp_pass.trim(),
+    senderEmail: (config.sender_email || config.smtp_user).trim(),
+    senderName: (config.sender_name || 'Starters Small Chops').trim(),
+    encryption: 'TLS',
+    source: 'database'
+  };
+}
+
 // Template processing with fallback
 async function processTemplate(
   supabase: any, 
@@ -598,6 +667,7 @@ serve(async (req: Request) => {
       service: 'unified-smtp-sender',
       implementation: 'production-native-deno',
       features: [
+        'function_secrets_priority',
         'template_resolution_with_fallback',
         'retry_with_exponential_backoff',
         'tls_negotiation_with_fallback',
@@ -615,25 +685,21 @@ serve(async (req: Request) => {
           Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
         );
 
-        const { data: config } = await supabase
-          .from('communication_settings')
-          .select('smtp_host, smtp_port, smtp_user, use_smtp')
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle();
-
-        if (config?.use_smtp) {
-          healthData.smtpCheck = {
-            configured: true,
-            host: config.smtp_host,
-            port: config.smtp_port,
-            username: config.smtp_user?.split('@')[0] + '@***'
-          };
-        } else {
-          healthData.smtpCheck = { configured: false };
-        }
+        const smtpConfig = await getProductionSMTPConfig(supabase);
+        
+        healthData.smtpCheck = {
+          configured: true,
+          source: smtpConfig.source,
+          host: smtpConfig.host,
+          port: smtpConfig.port,
+          username: smtpConfig.username?.split('@')[0] + '@***',
+          encryption: smtpConfig.encryption
+        };
       } catch (error) {
-        healthData.smtpCheck = { error: error.message };
+        healthData.smtpCheck = { 
+          configured: false, 
+          error: error.message 
+        };
       }
     }
 
@@ -712,52 +778,8 @@ serve(async (req: Request) => {
       }
     }
 
-    // Get SMTP configuration
-    const { data: config } = await supabase
-      .from('communication_settings')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-
-    if (!config?.use_smtp) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'SMTP not configured or disabled',
-        reason: 'smtp_disabled',
-        suggestion: 'Enable SMTP in communication settings'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      });
-    }
-
-    const smtpConfig = {
-      host: config.smtp_host?.trim(),
-      port: config.smtp_port || 587,
-      username: config.smtp_user?.trim(),
-      password: config.smtp_pass?.trim(),
-      senderEmail: config.sender_email?.trim() || config.smtp_user?.trim(),
-      senderName: config.sender_name?.trim() || businessName
-    };
-
-    // Validate configuration with specific error messages
-    if (!smtpConfig.host || !smtpConfig.username || !smtpConfig.password) {
-      const missing = [];
-      if (!smtpConfig.host) missing.push('SMTP host');
-      if (!smtpConfig.username) missing.push('SMTP username');
-      if (!smtpConfig.password) missing.push('SMTP password');
-      
-      return new Response(JSON.stringify({
-        success: false,
-        error: `Incomplete SMTP configuration: missing ${missing.join(', ')}`,
-        reason: 'incomplete_config',
-        suggestion: 'Complete SMTP configuration in admin settings'
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      });
-    }
+    // Get production SMTP configuration
+    const smtpConfig = await getProductionSMTPConfig(supabase);
 
     // Check sender domain mismatch warning
     const senderDomain = smtpConfig.senderEmail?.split('@')[1];
@@ -767,12 +789,14 @@ serve(async (req: Request) => {
     }
 
     // Log masked configuration
-    console.log('🔍 SMTP Configuration:', {
+    console.log('🔍 Production SMTP Configuration:', {
+      source: smtpConfig.source,
       host: smtpConfig.host,
       port: smtpConfig.port,
       username: smtpConfig.username?.split('@')[0] + '@***',
       senderEmail: smtpConfig.senderEmail?.split('@')[0] + '@***',
-      senderName: smtpConfig.senderName
+      senderName: smtpConfig.senderName,
+      encryption: smtpConfig.encryption
     });
 
     // Process template with fallback and explicit subject handling
@@ -856,6 +880,7 @@ serve(async (req: Request) => {
         implementation: 'production-native-deno',
         smtp_host: smtpConfig.host,
         smtp_port: smtpConfig.port,
+        config_source: smtpConfig.source,
         tls_mode: result.connectionInfo.tlsMode,
         auth_method: result.connectionInfo.authMethod,
         attempt_count: attemptCount,
@@ -873,6 +898,7 @@ serve(async (req: Request) => {
       provider: 'native-smtp',
       implementation: 'production-native-deno',
       metadata: {
+        configSource: smtpConfig.source,
         tlsMode: result.connectionInfo.tlsMode,
         authMethod: result.connectionInfo.authMethod,
         attempts: attemptCount,
@@ -898,7 +924,7 @@ serve(async (req: Request) => {
       
       await supabase.from('smtp_delivery_logs').insert({
         recipient_email: requestBody.to || 'unknown',
-        subject: requestBody.subject || finalSubject || 'Unknown',
+        subject: requestBody.subject || 'Unknown',
         delivery_status: 'failed',
         smtp_response: error.message,
         error_message: error.message,

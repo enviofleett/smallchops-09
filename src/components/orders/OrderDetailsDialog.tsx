@@ -13,11 +13,15 @@ import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { useEnrichedOrderItems } from '@/hooks/useEnrichedOrderItems';
+import { useLatestPaymentTransaction } from '@/hooks/useLatestPaymentTransaction';
+import { usePaymentStatus } from '@/hooks/usePaymentStatus';
+import { selectItemsToDisplay } from '@/utils/itemSelection';
 
 // Import our new components
 import { StatCard } from './details/StatCard';
 import { CustomerInfoCard } from './details/CustomerInfoCard';
 import { OrderInfoCard } from './details/OrderInfoCard';
+import { PaymentDetailsCard } from './PaymentDetailsCard';
 import { ActionsPanel } from './details/ActionsPanel';
 import { ItemsList } from './details/ItemsList';
 import { SpecialInstructions } from './details/SpecialInstructions';
@@ -43,6 +47,19 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
   
   // Enrich order items to ensure product features are available
   const { data: enrichedItems, isLoading: isLoadingEnriched } = useEnrichedOrderItems(order.order_items || []);
+
+  // Fetch latest payment transaction for this order
+  const { data: latestTransaction, isLoading: isLoadingTransaction } = useLatestPaymentTransaction(order.id);
+
+  // Use payment status hook for reconciliation
+  const { paymentStatus } = usePaymentStatus(order.id);
+
+  // Compute the best items to display using robust selection logic
+  const itemsToDisplay = selectItemsToDisplay(
+    detailedOrderData?.items,
+    enrichedItems,
+    order.order_items
+  );
 
   useEffect(() => {
     setSelectedStatus(order.status);
@@ -197,7 +214,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="max-w-full sm:max-w-6xl h-full sm:h-auto max-h-[95vh] overflow-hidden p-0"
+        className="max-w-full sm:max-w-7xl h-full sm:h-auto max-h-[95vh] overflow-hidden p-0"
         id="order-details-modal-content"
       >
         {/* Mobile Header */}
@@ -268,9 +285,19 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                   recoveryError={!!detailsError || recoveryMutation.isError}
                 />
 
+                {/* Payment Details */}
+                <PaymentDetailsCard
+                  paymentStatus={paymentStatus.isPaid ? 'paid' : order.payment_status}
+                  paymentMethod={paymentStatus.paymentMethod || order.payment_method}
+                  paymentReference={order.payment_reference}
+                  paidAt={paymentStatus.paidAt || undefined}
+                  totalAmount={order.total_amount}
+                  transaction={latestTransaction || undefined}
+                />
+
                 {/* Order Items */}
                 <ItemsList
-                  items={detailedOrderData?.items || enrichedItems || order.order_items || []}
+                  items={itemsToDisplay}
                   subtotal={order.subtotal || 0}
                   totalVat={order.total_vat || 0}
                   totalDiscount={order.discount_amount || 0}

@@ -257,11 +257,11 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                   paymentStatus={order.payment_status}
                   paymentReference={order.payment_reference}
                   totalAmount={order.total_amount}
-                  deliverySchedule={deliverySchedule}
-                  isLoadingSchedule={isLoadingSchedule}
+                  deliverySchedule={detailedOrderData?.delivery_schedule || deliverySchedule}
+                  isLoadingSchedule={isLoadingDetails || isLoadingSchedule}
                   onRecoveryAttempt={() => recoveryMutation.mutate(order.id)}
                   recoveryPending={recoveryMutation.isPending}
-                  recoveryError={recoveryMutation.isError}
+                  recoveryError={!!detailsError || recoveryMutation.isError}
                 />
 
                 {/* Order Items */}

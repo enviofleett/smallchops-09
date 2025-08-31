@@ -3,19 +3,22 @@ import { OrderWithItems, updateOrder, manuallyQueueCommunicationEvent } from '@/
 import { getDispatchRiders, DispatchRider } from '@/api/users';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { Constants } from '@/integrations/supabase/types';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
-import { User, Phone, MapPin, Calendar, Hash, X, RefreshCw, ShieldCheck, Package, Truck, Clock } from 'lucide-react';
-import { formatAddressMultiline } from '@/utils/formatAddress';
+import { X, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
-import { DeliveryScheduleDisplay } from './DeliveryScheduleDisplay';
-import { OrderItemsBreakdown } from './OrderItemsBreakdown';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
+
+// Import our new components
+import { StatCard } from './details/StatCard';
+import { CustomerInfoCard } from './details/CustomerInfoCard';
+import { OrderInfoCard } from './details/OrderInfoCard';
+import { ActionsPanel } from './details/ActionsPanel';
+import { ItemsList } from './details/ItemsList';
+import { SpecialInstructions } from './details/SpecialInstructions';
 
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -73,7 +76,6 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
           title: 'Schedule Recovered', 
           description: 'Missing delivery schedule has been recovered from order logs.' 
         });
-        // Refetch the schedule
         refetchSchedule();
       }
     },
@@ -143,10 +145,6 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
     }
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(amount);
-  };
-
   const handleVerifyWithPaystack = async () => {
     if (!order.payment_reference) {
       toast({ title: 'No payment reference', description: 'This order has no payment reference to verify.', variant: 'destructive' });
@@ -186,299 +184,141 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
     } finally {
       setVerifying(false);
     }
-
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-full sm:max-w-4xl h-full sm:h-auto max-h-[95vh] overflow-y-auto p-0 sm:p-6">
-        <DialogHeader>
-          <DialogTitle className="text-xl">Order Details</DialogTitle>
-          <DialogClose asChild>
-            <Button variant="ghost" size="icon" className="absolute top-4 right-4">
-              <X className="h-4 w-4" />
-            </Button>
-          </DialogClose>
-        </DialogHeader>
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 lg:gap-6 p-4 md:p-6">
-          <div>
-            <h3 className="font-semibold text-lg mb-4">Customer Information</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center">
-                <User className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
-                <span className="break-words">{order.customer_name}</span>
-              </div>
-              <div className="flex items-center">
-                <Phone className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
-                <span className="break-words">{order.customer_phone}</span>
-              </div>
-              
-              {/* Address/Location Information */}
-              {order.order_type === 'delivery' && order.delivery_address && (
-                <div className="flex items-start">
-                  <MapPin className="h-4 w-4 mr-3 mt-1 text-gray-500 flex-shrink-0" />
-                  <div className="break-words">
-                    <p className="text-xs text-gray-500 mb-1">Delivery Address</p>
-                    {formatAddressMultiline(order.delivery_address).split('\n').map((line, index) => (
-                      <div key={index} className="text-sm">{line}</div>
-                    ))}
-                  </div>
-                </div>
-              )}
-              
-              {/* Pickup Point Information */}
-              {order.order_type === 'pickup' && pickupPoint && (
-                <div className="flex items-start">
-                  <Package className="h-4 w-4 mr-3 mt-1 text-gray-500 flex-shrink-0" />
-                  <div className="break-words">
-                    <p className="text-xs text-gray-500 mb-1">Pickup Location</p>
-                    <div className="text-sm font-medium">{pickupPoint.name}</div>
-                    <div className="text-sm text-gray-600">{pickupPoint.address}</div>
-                    {pickupPoint.contact_phone && (
-                      <div className="text-sm text-gray-600">📞 {pickupPoint.contact_phone}</div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
-
-             <h3 className="font-semibold text-lg mb-4 mt-6">Order Information</h3>
-             <div className="space-y-3 text-sm">
-                <div className="flex items-center">
-                    <Hash className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
-                    <span>Order ID: <span className="font-medium text-blue-600 break-words">{order.order_number}</span></span>
-                </div>
-                <div className="flex items-center">
-                    <Calendar className="h-4 w-4 mr-3 text-gray-500 flex-shrink-0" />
-                    <span className="break-words">{format(new Date(order.order_time), 'MMM d, yyyy h:mm a')}</span>
-                </div>
-             </div>
-
-             {/* Schedule Section - for both delivery and pickup */}
-             <div className="mt-6">
-               <h3 className="font-semibold text-lg mb-4 flex items-center gap-2">
-                 {order.order_type === 'delivery' ? (
-                   <Truck className="h-5 w-5" />
-                 ) : (
-                   <Package className="h-5 w-5" />
-                 )}
-                 {order.order_type === 'delivery' ? 'Delivery Schedule' : 'Pickup Schedule'}
-               </h3>
-                {isLoadingSchedule || recoveryMutation.isPending ? (
-                  <div className="bg-gray-100 rounded-lg p-4 animate-pulse">
-                    <div className="h-4 bg-gray-300 rounded mb-2"></div>
-                    <div className="h-3 bg-gray-300 rounded w-2/3"></div>
-                    {recoveryMutation.isPending && (
-                      <p className="text-xs text-blue-600 mt-2">🔄 Attempting to recover schedule...</p>
-                    )}
-                  </div>
-                ) : deliverySchedule ? (
-                   <DeliveryScheduleDisplay 
-                     schedule={deliverySchedule}
-                     orderType={order.order_type as 'delivery' | 'pickup'}
-                     orderStatus={order.status}
-                    className="mb-0" 
-                  />
-                 ) : (
-                  <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                    <p className="text-sm text-yellow-800">
-                      No {order.order_type === 'delivery' ? 'delivery' : 'pickup'} schedule found for this order.
-                    </p>
-                    <p className="text-xs text-gray-600 mt-1">
-                      {recoveryMutation.isError ? 
-                        'Recovery failed. Schedule will be confirmed after payment is verified.' :
-                        'Schedule will be confirmed after payment is verified.'
-                      }
-                    </p>
-                    {recoveryMutation.isError && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-2"
-                        onClick={() => recoveryMutation.mutate(order.id)}
-                        disabled={recoveryMutation.isPending}
-                      >
-                        <RefreshCw className="h-3 w-3 mr-1" />
-                        Retry Recovery
-                      </Button>
-                    )}
-                  </div>
-                )}
-              
-               {/* Order-level Special Instructions Fallback */}
-               {!deliverySchedule?.special_instructions && order.special_instructions && (
-                 <div className="mt-4 bg-muted/30 rounded-lg p-3">
-                   <h4 className="text-sm font-medium text-muted-foreground mb-2">Special Instructions</h4>
-                   <p className="text-sm break-words">{order.special_instructions}</p>
-                 </div>
-               )}
-              </div>
+      <DialogContent 
+        className="max-w-full sm:max-w-6xl h-full sm:h-auto max-h-[95vh] overflow-hidden p-0"
+        id="order-details-modal-content"
+      >
+        {/* Mobile Header */}
+        <DialogHeader className="p-4 sm:p-6 border-b border-border flex-shrink-0">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-xl font-semibold text-foreground">
+              Order Details
+            </DialogTitle>
+            <DialogClose asChild>
+              <Button variant="ghost" size="icon" className="h-8 w-8">
+                <X className="h-4 w-4" />
+              </Button>
+            </DialogClose>
           </div>
-          <div>
-            <h3 className="font-semibold text-lg mb-4">Order Actions</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="text-sm font-medium block mb-2">Update Status</label>
-                <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value as OrderStatus)}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select status" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Constants.public.Enums.order_status.map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div>
-                <label className="text-sm font-medium block mb-2">Assign Dispatch Rider</label>
-                <Select
-                  value={assignedRider ?? 'unassigned'}
-                  onValueChange={(value) => setAssignedRider(value === 'unassigned' ? null : value)}
-                  disabled={isLoadingRiders}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder={isLoadingRiders ? "Loading riders..." : "Select a rider"} />
-                  </SelectTrigger>
-                  <SelectContent className="bg-background border shadow-lg z-50">
-                    <SelectItem value="unassigned">Unassigned</SelectItem>
-                    {riders?.length === 0 && !isLoadingRiders && (
-                      <SelectItem value="" disabled>No active riders available</SelectItem>
-                    )}
-                    {riders?.map((rider) => (
-                      <SelectItem key={rider.id} value={rider.id}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{rider.name}</span>
-                          <span className="text-xs text-muted-foreground">
-                            {rider.vehicle_brand} {rider.vehicle_model} • {rider.license_plate}
-                          </span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                {riders?.length === 0 && !isLoadingRiders && (
-                  <p className="text-xs text-muted-foreground mt-1">
-                    ⚠️ No active dispatch riders found. Contact admin to add riders.
-                  </p>
-                )}
-              </div>
-              {/* Order Timeline Panel */}
-              <div className="border rounded-lg p-4 bg-muted/30">
-                <h4 className="font-medium mb-3 flex items-center gap-2">
-                  <Clock className="h-4 w-4" />
-                  Order Timeline
-                </h4>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
-                    <span>Order Placed:</span>
-                    <span className="text-xs">{format(new Date(order.order_time), 'MMM d, h:mm a')}</span>
-                  </div>
-                  {order.payment_status === 'paid' && (
-                    <div className="flex justify-between">
-                      <span>Payment Confirmed:</span>
-                      <span className="text-xs text-green-600">
-                        {order.paid_at ? format(new Date(order.paid_at), 'MMM d, h:mm a') : format(new Date(order.order_time), 'MMM d, h:mm a')}
-                      </span>
-                    </div>
-                  )}
-                  {(order.status !== 'pending' && order.status !== 'cancelled') && (
-                    <div className="flex justify-between">
-                      <span>Order Confirmed:</span>
-                      <span className="text-xs text-blue-600">
-                        {order.status === 'preparing' ? 'Being prepared' : 
-                         order.status === 'ready' ? 'Ready' :
-                         order.status === 'out_for_delivery' ? 'Out for delivery' :
-                         order.status === 'delivered' || order.status === 'completed' ? 'Completed' : 'Confirmed'}
-                      </span>
-                    </div>
-                  )}
-                  {deliverySchedule && (
-                    <div className="flex justify-between">
-                      <span>{order.order_type === 'delivery' ? 'Delivery' : 'Pickup'} Scheduled:</span>
-                      <span className="text-xs">{format(new Date(deliverySchedule.delivery_date), 'MMM d')}</span>
-                    </div>
-                  )}
-                </div>
+
+          {/* Mobile Quick Stats */}
+          <div className="grid grid-cols-3 gap-2 mt-4 sm:hidden">
+            <StatCard
+              title="Status"
+              value={order.status.charAt(0).toUpperCase() + order.status.slice(1).replace(/_/g, ' ')}
+              icon={Clock}
+              variant={order.status === 'completed' ? 'success' : order.status === 'cancelled' ? 'destructive' : 'default'}
+            />
+            <StatCard
+              title="Type"
+              value={order.order_type.charAt(0).toUpperCase() + order.order_type.slice(1)}
+              icon={Clock}
+            />
+            <StatCard
+              title="Payment"
+              value={order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
+              icon={Clock}
+              variant={order.payment_status === 'paid' ? 'success' : order.payment_status === 'failed' ? 'destructive' : 'warning'}
+            />
+          </div>
+        </DialogHeader>
+
+        {/* Scrollable Content */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="p-4 sm:p-6">
+            {/* Desktop Layout: 2 columns */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Left Column - Order Info */}
+              <div className="lg:col-span-2 space-y-6">
+                {/* Customer Information */}
+                <CustomerInfoCard
+                  customerName={order.customer_name}
+                  customerPhone={order.customer_phone}
+                  customerEmail={order.customer_email}
+                  orderType={order.order_type as 'delivery' | 'pickup'}
+                  deliveryAddress={order.delivery_address}
+                  pickupPoint={pickupPoint}
+                />
+
+                {/* Order Information */}
+                <OrderInfoCard
+                  orderNumber={order.order_number}
+                  orderTime={order.order_time}
+                  orderType={order.order_type as 'delivery' | 'pickup'}
+                  status={order.status}
+                  paymentStatus={order.payment_status}
+                  paymentReference={order.payment_reference}
+                  totalAmount={order.total_amount}
+                  deliverySchedule={deliverySchedule}
+                  isLoadingSchedule={isLoadingSchedule}
+                  onRecoveryAttempt={() => recoveryMutation.mutate(order.id)}
+                  recoveryPending={recoveryMutation.isPending}
+                  recoveryError={recoveryMutation.isError}
+                />
+
+                {/* Order Items */}
+                <ItemsList
+                  items={order.order_items || []}
+                  subtotal={order.subtotal || 0}
+                  totalVat={order.total_vat || 0}
+                  totalDiscount={order.discount_amount || 0}
+                  deliveryFee={order.delivery_fee || 0}
+                  grandTotal={order.total_amount}
+                />
+
+                {/* Special Instructions */}
+                <SpecialInstructions
+                  instructions={order.special_instructions}
+                  deliveryInstructions={deliverySchedule?.special_instructions}
+                />
               </div>
 
-              <div>
-                <label className="text-sm font-medium block mb-2">Send Manual Notification</label>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-                  <Select value={manualStatus} onValueChange={(value) => setManualStatus(value as OrderStatus)}>
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Select notification type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Constants.public.Enums.order_status.map((status) => (
-                        <SelectItem key={status} value={status}>
-                          {status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <Button 
-                    variant="secondary" 
-                    onClick={handleManualSend}
-                    disabled={!manualStatus || manualSendMutation.isPending}
-                    className="w-full sm:w-auto min-h-[44px]"
-                  >
-                    {manualSendMutation.isPending ? 'Sending...' : 'Send'}
-                  </Button>
-                </div>
-              </div>
-              <div>
-                <label className="text-sm font-medium block mb-2">Payment Verification</label>
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 justify-between">
-                  <div className="text-xs text-muted-foreground break-all sm:flex-1">
-                    Ref: {order.payment_reference || '—'}
-                    {verifyState !== 'idle' && (
-                      <div className={`mt-1 text-[11px] ${verifyState === 'success' ? 'text-green-600' : verifyState === 'pending' ? 'text-amber-600' : 'text-red-600'}`}>
-                        {verifyState === 'pending' ? 'Verifying…' : verifyMessage}
-                      </div>
-                    )}
-                  </div>
-                  <Button 
-                    onClick={handleVerifyWithPaystack}
-                    disabled={verifying || !order.payment_reference}
-                    className="w-full sm:w-auto min-h-[44px]"
-                  >
-                    <ShieldCheck className="w-4 h-4 mr-2" />
-                    {verifying ? 'Verifying…' : 'Verify with Paystack'}
-                  </Button>
-                </div>
+              {/* Right Column - Actions */}
+              <div className="space-y-6">
+                <ActionsPanel
+                  selectedStatus={selectedStatus}
+                  onStatusChange={setSelectedStatus}
+                  assignedRider={assignedRider}
+                  onRiderChange={setAssignedRider}
+                  riders={riders}
+                  isLoadingRiders={isLoadingRiders}
+                  manualStatus={manualStatus}
+                  onManualStatusChange={setManualStatus}
+                  onManualSend={handleManualSend}
+                  onUpdate={handleUpdate}
+                  onVerifyPayment={handleVerifyWithPaystack}
+                  paymentReference={order.payment_reference}
+                  isUpdating={updateMutation.isPending}
+                  isSendingManual={manualSendMutation.isPending}
+                  isVerifying={verifying}
+                  verifyState={verifyState}
+                  verifyMessage={verifyMessage}
+                />
               </div>
             </div>
-             
-             {/* Enhanced Order Items Breakdown */}
-             {order.order_items && order.order_items.length > 0 && (
-               <div className="mt-6">
-                  <OrderItemsBreakdown 
-                    items={order.order_items}
-                    subtotal={order.subtotal || 0}
-                    totalVat={order.total_vat || 0}
-                    totalDiscount={order.discount_amount || 0}
-                    deliveryFee={order.delivery_fee || 0}
-                    grandTotal={order.total_amount}
-                    showDetailed={true}
-                  />
-               </div>
-             )}
-             
-             <div className="mt-6 pt-4 border-t">
-               <h4 className="font-semibold">Order Total</h4>
-               <p className="text-2xl font-bold">{formatCurrency(order.total_amount)}</p>
-             </div>
           </div>
         </div>
-        <DialogFooter className="flex flex-col sm:flex-row gap-3 sm:gap-0">
-          <Button variant="outline" onClick={onClose} className="w-full sm:w-auto">Cancel</Button>
-          <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="w-full sm:w-auto">
-            {updateMutation.isPending ? 'Updating...' : 'Update Order'}
-          </Button>
+
+        {/* Mobile Footer */}
+        <DialogFooter className="p-4 border-t border-border flex-shrink-0 sm:hidden">
+          <div className="flex gap-2 w-full">
+            <Button variant="outline" onClick={onClose} className="flex-1">
+              Close
+            </Button>
+            <Button onClick={handleUpdate} disabled={updateMutation.isPending} className="flex-1">
+              {updateMutation.isPending ? 'Updating...' : 'Update'}
+            </Button>
+          </div>
         </DialogFooter>
+
+        {/* Print-friendly footer (hidden on screen) */}
+        <div className="no-print hidden print:block print:mt-8 print:pt-4 print:border-t print:text-center print:text-xs print:text-gray-500">
+          <p>Generated on {format(new Date(), 'PPP')} • Order #{order.order_number}</p>
+        </div>
       </DialogContent>
     </Dialog>
   );

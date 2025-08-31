@@ -100,13 +100,18 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
       )}
       
       {orders.map((order) => (
-        <MobileCard key={order.id} className="p-2 md:p-3">
+        <MobileCard 
+          key={order.id} 
+          className="p-2 md:p-3 cursor-pointer hover:bg-muted/50 transition-colors"
+          onClick={() => navigate(`/admin/orders/${order.id}`)}
+        >
           <MobileCardHeader className="pb-2">
             <div className="flex items-start gap-2">
               <Checkbox
                 checked={selectedOrders.includes(order.id)}
                 onCheckedChange={(checked) => onSelectOrder(order.id, checked as boolean)}
                 className="mt-0.5 h-3 w-3 md:h-4 md:w-4"
+                onClick={(e) => e.stopPropagation()}
               />
               <div className="min-w-0 flex-1">
                 <p className="font-medium text-primary text-xs md:text-sm truncate">#{order.order_number}</p>
@@ -165,7 +170,10 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onViewOrder(order)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onViewOrder(order);
+              }}
               className="flex items-center gap-1 h-6 px-2 text-xs"
             >
               <Eye className="h-3 w-3" />
@@ -174,16 +182,10 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
             <Button
               variant="outline"
               size="sm"
-              onClick={() => navigate(`/admin/orders/${order.id}`)}
-              className="flex items-center gap-1 h-6 px-2 text-xs"
-            >
-              <ExternalLink className="h-3 w-3" />
-              Full
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => console.log('Print order:', order.id)}
+              onClick={(e) => {
+                e.stopPropagation();
+                console.log('Print order:', order.id);
+              }}
               className="flex items-center gap-1 h-6 px-2 text-xs"
             >
               <Printer className="h-3 w-3" />
@@ -192,7 +194,10 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
             <Button
               variant="outline"
               size="sm"
-              onClick={() => onDeleteOrder(order)}
+              onClick={(e) => {
+                e.stopPropagation();
+                onDeleteOrder(order);
+              }}
               className="flex items-center gap-1 h-6 px-2 text-xs text-destructive border-destructive/20 hover:bg-destructive/5"
             >
               <Trash2 className="h-3 w-3" />
@@ -231,11 +236,16 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
           </thead>
           <tbody>
             {orders.map((order) => (
-              <tr key={order.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+              <tr 
+                key={order.id} 
+                className="border-b border-gray-50 hover:bg-gray-50 transition-colors cursor-pointer"
+                onClick={() => navigate(`/admin/orders/${order.id}`)}
+              >
                 <td className="py-4 px-6">
                   <Checkbox
                     checked={selectedOrders.includes(order.id)}
                     onCheckedChange={(checked) => onSelectOrder(order.id, checked as boolean)}
+                    onClick={(e) => e.stopPropagation()}
                   />
                 </td>
                 <td className="py-4 px-6">
@@ -292,76 +302,69 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                      'Pending'}
                   </span>
                 </td>
-                <td className="py-4 px-6">
-                  <TooltipProvider>
-                    <div className="flex items-center space-x-1">
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => onViewOrder(order)}
-                          >
-                            <Eye className="h-4 w-4" />
-                            <span className="sr-only">View Order</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>View Details</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => navigate(`/admin/orders/${order.id}`)}
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                            <span className="sr-only">View Full Page</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>View Full Page</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8"
-                            onClick={() => console.log('Print order:', order.id)}
-                          >
-                            <Printer className="h-4 w-4" />
-                            <span className="sr-only">Print Order</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Print Order</p>
-                        </TooltipContent>
-                      </Tooltip>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
-                            onClick={() => onDeleteOrder(order)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Delete Order</span>
-                          </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Delete Order</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                  </TooltipProvider>
-                </td>
+                 <td className="py-4 px-6">
+                   <TooltipProvider>
+                     <div className="flex items-center space-x-1">
+                       <Tooltip>
+                         <TooltipTrigger asChild>
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className="h-8 w-8"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               onViewOrder(order);
+                             }}
+                           >
+                             <Eye className="h-4 w-4" />
+                             <span className="sr-only">View Order</span>
+                           </Button>
+                         </TooltipTrigger>
+                         <TooltipContent>
+                           <p>View Details</p>
+                         </TooltipContent>
+                       </Tooltip>
+                       <Tooltip>
+                         <TooltipTrigger asChild>
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className="h-8 w-8"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               console.log('Print order:', order.id);
+                             }}
+                           >
+                             <Printer className="h-4 w-4" />
+                             <span className="sr-only">Print Order</span>
+                           </Button>
+                         </TooltipTrigger>
+                         <TooltipContent>
+                           <p>Print Order</p>
+                         </TooltipContent>
+                       </Tooltip>
+                       <Tooltip>
+                         <TooltipTrigger asChild>
+                           <Button
+                             variant="ghost"
+                             size="icon"
+                             className="h-8 w-8 text-red-600 hover:text-red-700 hover:bg-red-50"
+                             onClick={(e) => {
+                               e.stopPropagation();
+                               onDeleteOrder(order);
+                             }}
+                           >
+                             <Trash2 className="h-4 w-4" />
+                             <span className="sr-only">Delete Order</span>
+                           </Button>
+                         </TooltipTrigger>
+                         <TooltipContent>
+                           <p>Delete Order</p>
+                         </TooltipContent>
+                       </Tooltip>
+                     </div>
+                   </TooltipProvider>
+                 </td>
               </tr>
             ))}
           </tbody>

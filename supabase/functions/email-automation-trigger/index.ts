@@ -79,9 +79,8 @@ serve(async (req) => {
       console.log('Triggering immediate email processing...');
       
       const processors = [
-        'enhanced-email-processor',
-        'instant-email-processor', 
-        'production-email-processor'
+        'instant-email-processor',
+        'unified-email-queue-processor'
       ];
 
       for (const processor of processors) {

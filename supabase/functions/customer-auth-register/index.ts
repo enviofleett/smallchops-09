@@ -54,8 +54,8 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, name: str
       throw new Error('Failed to queue OTP email');
     }
 
-    // Trigger enhanced email processor for immediate processing
-    const { data: enhancedResult, error: enhancedError } = await supabase.functions.invoke('enhanced-email-processor', {
+    // Trigger instant email processor for immediate processing
+    const { data: enhancedResult, error: enhancedError } = await supabase.functions.invoke('instant-email-processor', {
       body: {
         priority: 'high',
         event_types: ['customer_registration_otp'],

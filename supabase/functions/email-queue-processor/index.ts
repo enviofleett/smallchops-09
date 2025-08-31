@@ -256,8 +256,8 @@ function selectEmailSender(email: QueuedEmail): string {
     return 'smtp-email-sender';
   }
   
-  // Marketing emails use production SMTP sender
-  return 'production-smtp-sender';
+  // All emails use unified SMTP sender
+  return 'unified-smtp-sender';
 }
 
 function isTransactionalEmail(templateKey: string): boolean {

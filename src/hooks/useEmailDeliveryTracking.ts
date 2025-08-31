@@ -98,7 +98,7 @@ export const useEmailDeliveryTracking = () => {
 
   const retryFailedEmail = async (emailId: string): Promise<boolean> => {
     try {
-      const { error } = await supabase.functions.invoke('production-smtp-sender', {
+      const { error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           retry_email_id: emailId
         }

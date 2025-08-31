@@ -164,7 +164,7 @@ serve(async (req) => {
       const order = transaction.orders;
       if (order) {
         try {
-          await supabaseAdmin.functions.invoke('production-smtp-sender', {
+          await supabaseAdmin.functions.invoke('unified-smtp-sender', {
             body: {
               to: order.customer_email,
               template_key: 'payment_confirmation',
@@ -191,7 +191,7 @@ serve(async (req) => {
 
         // Send admin notification using templates
         try {
-          await supabaseAdmin.functions.invoke('production-smtp-sender', {
+          await supabaseAdmin.functions.invoke('unified-smtp-sender', {
             body: {
               to: 'admin@your-store.com',
               template_key: 'admin_new_order',

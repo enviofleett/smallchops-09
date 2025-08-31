@@ -62,7 +62,13 @@ export const useEnhancedEmailProcessing = () => {
     setIsProcessing(true);
     
     try {
-      const { data, error } = await supabase.functions.invoke('instant-welcome-processor');
+      // Use instant-email-processor for welcome emails too
+      const { data, error } = await supabase.functions.invoke('instant-email-processor', {
+        body: { 
+          priority: 'high',
+          event_types: ['customer_welcome', 'welcome_series']
+        }
+      });
 
       if (error) {
         throw new Error(error.message);

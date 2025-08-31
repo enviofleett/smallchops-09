@@ -71,9 +71,21 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
 
   if (secretHost && secretUsername && secretPassword) {
     console.log('✅ Using production SMTP configuration from Function Secrets');
+    
+    // Parse port with robust fallback
+    let port = 587; // Default port
+    if (secretPort) {
+      const parsedPort = parseInt(secretPort.trim(), 10);
+      if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
+        port = parsedPort;
+      } else {
+        console.warn(`⚠️ Invalid SMTP_PORT value: "${secretPort}", using default 587`);
+      }
+    }
+    
     return {
       host: secretHost.trim(),
-      port: parseInt(secretPort || '587'),
+      port: port,
       username: secretUsername.trim(),
       password: secretPassword.trim(),
       senderEmail: (secretFromEmail || secretUsername).trim(),

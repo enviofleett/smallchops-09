@@ -21,6 +21,7 @@ import { OrderInfoCard } from './details/OrderInfoCard';
 import { ActionsPanel } from './details/ActionsPanel';
 import { ItemsList } from './details/ItemsList';
 import { SpecialInstructions } from './details/SpecialInstructions';
+import { PaymentDetailsCard } from './PaymentDetailsCard';
 
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -266,6 +267,15 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                   onRecoveryAttempt={() => recoveryMutation.mutate(order.id)}
                   recoveryPending={recoveryMutation.isPending}
                   recoveryError={!!detailsError || recoveryMutation.isError}
+                />
+
+                {/* Payment Details */}
+                <PaymentDetailsCard
+                  paymentStatus={order.payment_status}
+                  totalAmount={order.total_amount}
+                  paymentMethod={order.payment_method}
+                  paidAt={order.paid_at}
+                  paymentReference={order.payment_reference}
                 />
 
                 {/* Order Items */}

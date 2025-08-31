@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 import { OrderStatus } from '@/types/orders';
@@ -150,11 +149,56 @@ export const getOrders = async ({
   }
 };
 
+/**
+ * Updates an order with proper rider assignment validation
+ */
 export const updateOrder = async (
   orderId: string,
   updates: { status?: OrderStatus; assigned_rider_id?: string | null }
 ): Promise<OrderWithItems> => {
   try {
+    console.log('🔄 Updating order via production-safe method:', orderId, updates);
+
+    // If we're assigning a rider, use the dedicated function for validation
+    if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
+      console.log('🎯 Assigning rider using validated function:', updates.assigned_rider_id);
+      
+      const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('admin-orders-manager', {
+        body: {
+          action: 'assign_rider',
+          orderId,
+          riderId: updates.assigned_rider_id
+        }
+      });
+
+      if (assignmentError || !assignmentResult?.success) {
+        throw new Error(assignmentResult?.error || assignmentError?.message || 'Failed to assign rider');
+      }
+
+      // If there are other updates besides rider assignment, apply them
+      const otherUpdates = { ...updates };
+      delete otherUpdates.assigned_rider_id;
+      
+      if (Object.keys(otherUpdates).length > 0) {
+        const { data: updateResult, error: updateError } = await supabase.functions.invoke('admin-orders-manager', {
+          body: {
+            action: 'update',
+            orderId,
+            updates: otherUpdates
+          }
+        });
+
+        if (updateError || !updateResult?.success) {
+          throw new Error(updateResult?.error || updateError?.message || 'Failed to update order');
+        }
+        
+        return updateResult.order;
+      }
+      
+      return assignmentResult.order;
+    }
+
+    // For non-rider updates, use the standard update path
     const { data, error } = await supabase.functions.invoke('admin-orders-manager', {
       body: {
         action: 'update',
@@ -167,58 +211,60 @@ export const updateOrder = async (
       throw new Error(data?.error || error?.message || 'Failed to update order');
     }
 
+    console.log('✅ Order updated successfully via admin function');
     return data.order;
-  } catch (error) {
-    console.error('Error updating order via admin function:', error);
     
-    // Fallback to direct update
-    const { data, error: fallbackError } = await supabase
-      .from('orders')
-      .update(updates)
-      .eq('id', orderId)
-      .select(`*, 
-        order_items (*),
-        delivery_zones (id, name, base_fee, is_active),
-        order_delivery_schedule (*)
-      `)
-      .maybeSingle();
-
-    // If update with delivery zone fails, try without zone and manually fetch
-    if (fallbackError) {
-      console.warn('Update with delivery zone failed, trying without zone:', fallbackError.message);
+  } catch (error) {
+    console.error('❌ Error updating order via admin function:', error);
+    
+    // Fallback to direct update with enhanced validation
+    try {
+      console.log('🔄 Attempting fallback direct update with validation...');
       
-      const { data: noZoneData, error: noZoneError } = await supabase
+      // If assigning rider, validate first
+      if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
+        const { data: riderCheck, error: riderError } = await supabase
+          .from('drivers')
+          .select('id, is_active')
+          .eq('id', updates.assigned_rider_id)
+          .single();
+
+        if (riderError || !riderCheck) {
+          throw new Error(`Invalid rider ID: ${updates.assigned_rider_id}`);
+        }
+
+        if (!riderCheck.is_active) {
+          throw new Error(`Rider ${updates.assigned_rider_id} is not active`);
+        }
+      }
+
+      const { data: fallbackData, error: fallbackError } = await supabase
         .from('orders')
         .update(updates)
         .eq('id', orderId)
-        .select(`*, order_items (*), order_delivery_schedule (*)`)
+        .select(`*, 
+          order_items (*),
+          delivery_zones (id, name, base_fee, is_active),
+          order_delivery_schedule (*)
+        `)
         .maybeSingle();
 
-      if (noZoneError) {
-        console.error('Fallback update also failed:', noZoneError);
-        throw new Error(noZoneError.message);
+      if (fallbackError) {
+        console.error('❌ Fallback update also failed:', fallbackError);
+        throw new Error(fallbackError.message);
       }
 
-      // Manually fetch delivery zone
-      if (noZoneData?.delivery_zone_id) {
-        try {
-          const { data: zone } = await supabase
-            .from('delivery_zones')
-            .select('id, name, base_fee, is_active')
-            .eq('id', noZoneData.delivery_zone_id)
-            .single();
-          
-           return { ...noZoneData, delivery_zones: zone } as unknown as OrderWithItems;
-        } catch (zoneError) {
-          console.warn(`Failed to fetch zone for updated order ${orderId}:`, zoneError);
-          return { ...noZoneData, delivery_zones: null } as unknown as OrderWithItems;
-        }
-      } else {
-        return { ...noZoneData, delivery_zones: null } as unknown as OrderWithItems;
+      if (!fallbackData) {
+        throw new Error('Order not found');
       }
+
+      console.log('✅ Fallback update successful');
+      return fallbackData as unknown as OrderWithItems;
+      
+    } catch (fallbackError) {
+      console.error('💥 All update methods failed:', fallbackError);
+      throw fallbackError;
     }
-
-    return data as unknown as OrderWithItems;
   }
 };
 

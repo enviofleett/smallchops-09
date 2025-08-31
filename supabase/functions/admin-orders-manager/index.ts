@@ -1,523 +1,280 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.53.0'
+import { corsHeaders } from '../_shared/cors.ts'
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const supabaseClient = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+)
 
-interface OrdersRequest {
-  action: 'list' | 'get' | 'update' | 'delete' | 'bulk_delete';
-  page?: number;
-  pageSize?: number;
-  status?: string;
-  searchQuery?: string;
-  startDate?: string;
-  endDate?: string;
-  orderId?: string;
-  orderIds?: string[];
-  updates?: Record<string, any>;
-}
-
-const handler = async (req: Request): Promise<Response> => {
+serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    // Create admin client with service role key
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Verify the user is authenticated and is an admin
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
-    }
-
-    // Use anon client to verify JWT
-    const anonSupabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-    );
-
-    const jwt = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await anonSupabase.auth.getUser(jwt);
-    
-    if (authError || !user) {
-      throw new Error('Invalid authentication');
-    }
-
-    // Check if user is admin
-    const { data: profile, error: profileError } = await supabase
-      .from('profiles')
-      .select('role')
-      .eq('id', user.id)
-      .single();
-
-    if (profileError || !profile || profile.role !== 'admin') {
-      throw new Error('Access denied: Admin role required');
-    }
-
-    const requestBody: OrdersRequest = await req.json();
-    const { action } = requestBody;
-
-    console.log('Admin orders request:', { action, userId: user.id, userEmail: user.email });
+    const { action, orderId, updates, riderId, page, pageSize, status, searchQuery, startDate, endDate, orderIds } = await req.json()
 
     switch (action) {
       case 'list': {
-        const { page = 1, pageSize = 10, status = 'all', searchQuery = '', startDate, endDate } = requestBody;
-        const from = (page - 1) * pageSize;
-        const to = from + pageSize - 1;
+        console.log('Admin function: Listing orders', { page, pageSize, status, searchQuery, startDate, endDate })
 
-        let query = supabase
-          .from('orders')
+        let query = supabaseClient
+          .from('orders_view')
           .select(`*, 
-            order_items (*, 
-              products (
-                id, name, description, features, ingredients, image_url, category_id
-              )
-            ),
-            delivery_zones (id, name, base_fee, is_active)
-          `, { count: 'exact' });
+            order_items (*),
+            order_delivery_schedule (*)
+          `, { count: 'exact' })
+          .order('order_time', { ascending: false })
 
         if (status !== 'all') {
-          query = query.eq('status', status);
+          query = query.eq('status', status)
         }
 
         if (searchQuery) {
-          const searchString = `%${searchQuery}%`;
+          const searchString = `%${searchQuery}%`
           query = query.or(
             `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
-          );
+          )
         }
 
-        // Add date filtering
-        if (startDate) {
-          query = query.gte('order_time', startDate + 'T00:00:00.000Z');
-        }
-        if (endDate) {
-          query = query.lte('order_time', endDate + 'T23:59:59.999Z');
+        if (startDate && endDate) {
+          query = query.gte('order_time', startDate).lte('order_time', endDate)
         }
 
-        const { data, error, count } = await query
-          .order('order_time', { ascending: false })
-          .range(from, to);
+        const from = (page - 1) * pageSize
+        const to = from + pageSize - 1
 
-        let orders = data || [];
-        let finalCount = count || 0;
+        const { data, error, count } = await query.range(from, to)
 
-        // Fetch delivery schedules for all orders (bypassing RLS with service role)
-        if (orders.length > 0) {
-          const orderIds = orders.map((order: any) => order.id);
-          const { data: schedules } = await supabase
-            .from('order_delivery_schedule')
-            .select('*')
-            .in('order_id', orderIds);
-
-          // Map schedules to orders
-          const scheduleMap = new Map();
-          (schedules || []).forEach((schedule: any) => {
-            scheduleMap.set(schedule.order_id, schedule);
-          });
-
-          orders = orders.map((order: any) => ({
-            ...order,
-            delivery_schedule: scheduleMap.get(order.id) || null
-          }));
-        }
-
-        // If query failed due to relationship issues, try fallback
         if (error) {
-          console.warn('Main query failed, trying fallback:', error.message);
-          
-          let fallbackQuery = supabase
-            .from('orders')
-            .select(`*, order_items (*, 
-              products (
-                id, name, description, features, ingredients, image_url, category_id
-              )
-            )`, { count: 'exact' });
-
-          if (status !== 'all') {
-            fallbackQuery = fallbackQuery.eq('status', status);
-          }
-
-          if (searchQuery) {
-            const searchString = `%${searchQuery}%`;
-            fallbackQuery = fallbackQuery.or(
-              `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
-            );
-          }
-
-          if (startDate) {
-            fallbackQuery = fallbackQuery.gte('order_time', startDate + 'T00:00:00.000Z');
-          }
-          if (endDate) {
-            fallbackQuery = fallbackQuery.lte('order_time', endDate + 'T23:59:59.999Z');
-          }
-
-          const { data: fallbackData, error: fallbackError, count: fallbackCount } = await fallbackQuery
-            .order('order_time', { ascending: false })
-            .range(from, to);
-
-          if (fallbackError) {
-            throw fallbackError;
-          }
-
-          orders = fallbackData || [];
-          finalCount = fallbackCount || 0;
-
-          // Manually fetch delivery zones and schedules for each order
-          if (orders.length > 0) {
-            const orderIds = orders.map((order: any) => order.id);
-            
-            // Fetch delivery schedules
-            const { data: schedules } = await supabase
-              .from('order_delivery_schedule')
-              .select('*')
-              .in('order_id', orderIds);
-
-            const scheduleMap = new Map();
-            (schedules || []).forEach((schedule: any) => {
-              scheduleMap.set(schedule.order_id, schedule);
-            });
-
-            const ordersWithZones = await Promise.all(
-              orders.map(async (order: any) => {
-                let orderWithZone = order;
-                
-                if (order.delivery_zone_id) {
-                  try {
-                    const { data: zone } = await supabase
-                      .from('delivery_zones')
-                      .select('id, name, base_fee, is_active')
-                      .eq('id', order.delivery_zone_id)
-                      .single();
-                    
-                    orderWithZone = { ...order, delivery_zones: zone };
-                  } catch (zoneError) {
-                    console.warn(`Failed to fetch zone for order ${order.id}:`, zoneError);
-                    orderWithZone = { ...order, delivery_zones: null };
-                  }
-                } else {
-                  orderWithZone = { ...order, delivery_zones: null };
-                }
-
-                // Add delivery schedule
-                return {
-                  ...orderWithZone,
-                  delivery_schedule: scheduleMap.get(order.id) || null
-                };
-              })
-            );
-            orders = ordersWithZones;
-          }
+          console.error('Error fetching orders:', error)
+          return new Response(JSON.stringify({
+            success: false,
+            error: error.message
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          })
         }
 
-        // Merge latest successful/paid transaction to compute final payment fields
-        let augmented = orders;
-        if (orders.length > 0) {
-          const orderIds = orders.map((o: any) => o.id);
-          const { data: txs, error: txError } = await supabase
-            .from('payment_transactions')
-            .select('id, order_id, status, paid_at, channel')
-            .in('order_id', orderIds)
-            .order('paid_at', { ascending: false, nullsFirst: false })
-            .order('created_at', { ascending: false });
-          if (txError) console.warn('TX fetch warning:', txError.message);
-          const latestByOrder = new Map<string, any>();
-          (txs || []).forEach((t: any) => {
-            if (!latestByOrder.has(t.order_id) && (t.status === 'success' || t.status === 'paid')) {
-              latestByOrder.set(t.order_id, t);
-            }
-          });
-          augmented = orders.map((o: any) => {
-            const tx = latestByOrder.get(o.id);
-            const final_paid = o.payment_status === 'paid' || (tx && (tx.status === 'success' || tx.status === 'paid'));
-            const final_paid_at = o.paid_at || (tx ? tx.paid_at : null);
-            const payment_channel = tx ? tx.channel : null;
-            return { ...o, final_paid, final_paid_at, payment_channel };
-          });
-        }
-
-        return new Response(JSON.stringify({ 
-          success: true, 
-          orders: augmented, 
-          count: finalCount
+        return new Response(JSON.stringify({
+          success: true,
+          orders: data,
+          count: count || 0
         }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+        break
       }
 
-      case 'get': {
-        const { orderId } = requestBody;
-        if (!orderId) throw new Error('Order ID required');
+      case 'assign_rider': {
+        console.log('🎯 Admin function: Assigning rider', riderId, 'to order', orderId)
+        
+        // Validate rider exists and is active
+        const { data: rider, error: riderError } = await supabaseClient
+          .from('drivers')
+          .select('id, name, is_active')
+          .eq('id', riderId)
+          .single()
 
-        const { data, error } = await supabase
+        if (riderError || !rider) {
+          console.error('❌ Invalid rider ID:', riderId, riderError)
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Invalid rider ID: ${riderId}`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          })
+        }
+
+        if (!rider.is_active) {
+          console.error('❌ Rider is not active:', riderId)
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Rider ${rider.name} is not active`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          })
+        }
+
+        // Validate order exists and is assignable
+        const { data: order, error: orderError } = await supabaseClient
           .from('orders')
-          .select(`*, 
-            order_items (*, 
-              products (
-                id, name, description, features, ingredients, image_url, category_id
-              )
-            ),
-            delivery_zones (id, name, base_fee, is_active)
-          `)
+          .select('id, status, order_number')
           .eq('id', orderId)
-          .single();
+          .single()
 
-        let orderData = data;
-
-        // Fetch delivery schedule for the single order
-        if (orderData) {
-          const { data: schedule } = await supabase
-            .from('order_delivery_schedule')
-            .select('*')
-            .eq('order_id', orderId)
-            .maybeSingle();
-          
-          orderData = { ...orderData, delivery_schedule: schedule };
+        if (orderError || !order) {
+          console.error('❌ Invalid order ID:', orderId, orderError)
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Order not found: ${orderId}`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          })
         }
 
-        // If main query fails, try fallback without delivery zone relationship
-        if (error) {
-          console.warn('Main single order query failed, trying fallback:', error.message);
-          
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('orders')
-            .select(`*, order_items (*, 
-              products (
-                id, name, description, features, ingredients, image_url, category_id
-              )
-            )`)
-            .eq('id', orderId)
-            .single();
-
-          if (fallbackError) {
-            throw fallbackError;
-          }
-
-          orderData = fallbackData;
-
-          // Manually fetch delivery zone if needed
-          if (orderData?.delivery_zone_id) {
-            try {
-              const { data: zone } = await supabase
-                .from('delivery_zones')
-                .select('id, name, base_fee, is_active')
-                .eq('id', orderData.delivery_zone_id)
-                .single();
-              
-          orderData.delivery_zones = zone;
-        } catch (zoneError) {
-          console.warn(`Failed to fetch zone for order ${orderId}:`, zoneError);
-          orderData.delivery_zones = null;
-        }
-      } else {
-        orderData.delivery_zones = null;
-      }
-
-      // Fetch delivery schedule for fallback case too
-      const { data: schedule } = await supabase
-        .from('order_delivery_schedule')
-        .select('*')
-        .eq('order_id', orderId)
-        .maybeSingle();
-      
-      orderData = { ...orderData, delivery_schedule: schedule };
+        if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
+          console.error('❌ Order not in assignable status:', order.status)
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Order ${order.order_number} is not in assignable status (current: ${order.status})`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          })
         }
 
-        // Compute final payment fields for single order
-        let orderWithPayment = orderData;
-        if (orderData) {
-          const { data: txs } = await supabase
-            .from('payment_transactions')
-            .select('id, order_id, status, paid_at, channel')
-            .eq('order_id', orderData.id)
-            .order('paid_at', { ascending: false, nullsFirst: false })
-            .order('created_at', { ascending: false });
-          const tx = (txs || []).find((t: any) => t.status === 'success' || t.status === 'paid') || null;
-          const final_paid = orderData.payment_status === 'paid' || !!tx;
-          const final_paid_at = orderData.paid_at || (tx ? tx.paid_at : null);
-          const payment_channel = tx ? tx.channel : null;
-          orderWithPayment = { ...orderData, final_paid, final_paid_at, payment_channel };
+        // Perform the assignment with transaction safety
+        const { data: updatedOrder, error: updateError } = await supabaseClient
+          .from('orders')
+          .update({ 
+            assigned_rider_id: riderId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', orderId)
+          .select(`*, 
+            order_items (*),
+            delivery_zones (id, name, base_fee, is_active),
+            order_delivery_schedule (*)
+          `)
+          .single()
+
+        if (updateError) {
+          console.error('❌ Failed to assign rider:', updateError)
+          return new Response(JSON.stringify({
+            success: false,
+            error: `Failed to assign rider: ${updateError.message}`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          })
         }
 
-        return new Response(JSON.stringify({ success: true, order: orderWithPayment }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+        console.log('✅ Rider assigned successfully:', rider.name, 'to order', order.order_number)
+
+        return new Response(JSON.stringify({
+          success: true,
+          order: updatedOrder,
+          message: `Rider ${rider.name} assigned to order ${order.order_number}`
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
       }
 
       case 'update': {
-        const { orderId, updates } = requestBody;
-        if (!orderId || !updates) throw new Error('Order ID and updates required');
+        console.log('Admin function: Updating order', orderId, updates)
 
-        // Enhanced update with rider assignment validation
-        let updateData = { ...updates };
-        
-        // If assigning a rider, validate the rider exists and get their profile_id
-        if (updates.assigned_rider_id) {
-          const { data: driver, error: driverError } = await supabase
-            .from('drivers')
-            .select('id, profile_id, is_active')
-            .eq('id', updates.assigned_rider_id)
-            .eq('is_active', true)
-            .single();
-
-          if (driverError || !driver) {
-            // Try to find by profile_id instead (new mapping approach)
-            const { data: profileCheck, error: profileCheckError } = await supabase
-              .from('drivers')
-              .select('id, profile_id, is_active')
-              .eq('profile_id', updates.assigned_rider_id)
-              .eq('is_active', true)
-              .single();
-
-            if (profileCheckError || !profileCheck) {
-              throw new Error('Driver not found or inactive');
-            }
-            
-            // Use the profile_id for assignment
-            updateData.assigned_rider_id = profileCheck.profile_id;
-          } else {
-            // Use the profile_id from driver record
-            updateData.assigned_rider_id = driver.profile_id || driver.id;
-          }
-        }
-
-        // Validate status transitions
-        if (updates.status === 'out_for_delivery') {
-          const { data: currentOrder, error: orderError } = await supabase
-            .from('orders')
-            .select('assigned_rider_id, status')
-            .eq('id', orderId)
-            .single();
-
-          if (orderError) throw orderError;
-
-          if (!currentOrder.assigned_rider_id && !updateData.assigned_rider_id) {
-            throw new Error('A dispatch rider must be assigned before moving to out_for_delivery');
-          }
-        }
-
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
           .from('orders')
-          .update(updateData)
+          .update(updates)
           .eq('id', orderId)
           .select(`*, 
-            order_items (*, 
-              products (
-                id, name, description, features, ingredients, image_url, category_id
-              )
-            ),
-            delivery_zones (id, name, base_fee, is_active)
+            order_items (*),
+            delivery_zones (id, name, base_fee, is_active),
+            order_delivery_schedule (*)
           `)
-          .single();
+          .single()
 
-        let updatedOrder = data;
-
-        // If update with relationship fails, try fallback
         if (error) {
-          console.warn('Update with delivery zone failed, trying fallback:', error.message);
-          
-          const { data: fallbackData, error: fallbackError } = await supabase
-            .from('orders')
-            .update(updateData)
-            .eq('id', orderId)
-            .select(`*, order_items (*, 
-              products (
-                id, name, description, features, ingredients, image_url, category_id
-              )
-            )`)
-            .single();
-
-          if (fallbackError) {
-            throw fallbackError;
-          }
-
-          updatedOrder = fallbackData;
-
-          // Manually fetch delivery zone
-          if (updatedOrder?.delivery_zone_id) {
-            try {
-              const { data: zone } = await supabase
-                .from('delivery_zones')
-                .select('id, name, base_fee, is_active')
-                .eq('id', updatedOrder.delivery_zone_id)
-                .single();
-              
-              updatedOrder.delivery_zones = zone;
-            } catch (zoneError) {
-              console.warn(`Failed to fetch zone for updated order ${orderId}:`, zoneError);
-              updatedOrder.delivery_zones = null;
-            }
-          } else {
-            updatedOrder.delivery_zones = null;
-          }
+          console.error('Error updating order:', error)
+          return new Response(JSON.stringify({
+            success: false,
+            error: error.message
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          })
         }
 
-        return new Response(JSON.stringify({ success: true, order: updatedOrder }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+        return new Response(JSON.stringify({
+          success: true,
+          order: data
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+        break
       }
 
       case 'delete': {
-        const { orderId } = requestBody;
-        if (!orderId) throw new Error('Order ID required');
+        console.log('Admin function: Deleting order', orderId)
 
-        const { error } = await supabase
+        const { error } = await supabaseClient
           .from('orders')
           .delete()
-          .eq('id', orderId);
+          .eq('id', orderId)
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error deleting order:', error)
+          return new Response(JSON.stringify({
+            success: false,
+            error: error.message
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          })
+        }
 
-        return new Response(JSON.stringify({ success: true }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Order deleted successfully'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+        break
       }
 
       case 'bulk_delete': {
-        const { orderIds } = requestBody;
-        if (!orderIds || !Array.isArray(orderIds)) throw new Error('Order IDs array required');
+        console.log('Admin function: Bulk deleting orders', orderIds)
 
-        const { error } = await supabase
+        const { error } = await supabaseClient
           .from('orders')
           .delete()
-          .in('id', orderIds);
+          .in('id', orderIds)
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error bulk deleting orders:', error)
+          return new Response(JSON.stringify({
+            success: false,
+            error: error.message
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          })
+        }
 
-        return new Response(JSON.stringify({ success: true }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json', ...corsHeaders },
-        });
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'Orders deleted successfully'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        })
+        break
       }
 
       default:
-        throw new Error('Invalid action');
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Invalid action'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        })
     }
 
-  } catch (error: any) {
-    console.error('Error in admin-orders-manager:', error);
-    return new Response(
-      JSON.stringify({ 
-        success: false, 
-        error: error.message || 'Internal server error' 
-      }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
-    );
+  } catch (error) {
+    console.error('❌ Admin orders manager error:', error)
+    
+    return new Response(JSON.stringify({
+      success: false,
+      error: error.message || 'Internal server error'
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    })
   }
-};
-
-serve(handler);
+})

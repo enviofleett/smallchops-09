@@ -22,6 +22,8 @@ import { ActionsPanel } from './details/ActionsPanel';
 import { ItemsList } from './details/ItemsList';
 import { SpecialInstructions } from './details/SpecialInstructions';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
+import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
+import { Download, FileText, Printer } from 'lucide-react';
 
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -195,54 +197,123 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
     }
   };
 
+  // Export handlers
+  const handleExportPDF = () => {
+    const exportData = {
+      order,
+      items: detailedOrderData?.items || enrichedItems || order.order_items || [],
+      schedule: detailedOrderData?.delivery_schedule || deliverySchedule,
+      paymentTx: null, // TODO: Add payment transaction data when available
+      pickupPoint
+    };
+    exportOrderToPDF(exportData);
+    toast({ title: 'Success', description: 'PDF exported successfully' });
+  };
+
+  const handleExportCSV = () => {
+    const exportData = {
+      order,
+      items: detailedOrderData?.items || enrichedItems || order.order_items || [],
+      schedule: detailedOrderData?.delivery_schedule || deliverySchedule,
+      paymentTx: null, // TODO: Add payment transaction data when available
+      pickupPoint
+    };
+    exportOrderToCSV(exportData);
+    toast({ title: 'Success', description: 'CSV exported successfully' });
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent 
-        className="max-w-full sm:max-w-6xl h-full sm:h-auto max-h-[95vh] overflow-hidden p-0"
+        className="max-w-[95vw] sm:max-w-7xl h-full sm:h-auto max-h-[95vh] overflow-hidden p-0 print:bg-white print:text-black print:shadow-none"
         id="order-details-modal-content"
       >
         {/* Mobile Header */}
-        <DialogHeader className="p-4 sm:p-6 border-b border-border flex-shrink-0">
+        <DialogHeader className="p-4 sm:p-6 border-b border-border flex-shrink-0 print:border-gray-300">
           <div className="flex items-center justify-between">
-            <DialogTitle className="text-xl font-semibold text-foreground">
-              Order Details
+            <DialogTitle className="text-xl font-semibold text-foreground print:text-black">
+              Order Details - #{order.order_number}
             </DialogTitle>
-            <DialogClose asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <X className="h-4 w-4" />
+            <div className="flex items-center gap-2 print:hidden">
+              <Button 
+                onClick={handleExportPDF} 
+                variant="outline" 
+                size="sm"
+                className="gap-2"
+              >
+                <FileText className="h-4 w-4" />
+                PDF
               </Button>
-            </DialogClose>
+              <Button 
+                onClick={handleExportCSV} 
+                variant="outline" 
+                size="sm"
+                className="gap-2"
+              >
+                <Download className="h-4 w-4" />
+                CSV
+              </Button>
+              <Button 
+                onClick={handlePrint} 
+                variant="outline" 
+                size="sm"
+                className="gap-2"
+              >
+                <Printer className="h-4 w-4" />
+                Print
+              </Button>
+              <DialogClose asChild>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <X className="h-4 w-4" />
+                </Button>
+              </DialogClose>
+            </div>
           </div>
 
           {/* Mobile Quick Stats */}
-          <div className="grid grid-cols-3 gap-2 mt-4 sm:hidden">
+          <div className="grid grid-cols-3 gap-2 mt-4 sm:hidden print:grid print:grid-cols-4 print:mt-4">
             <StatCard
               title="Status"
               value={order.status.charAt(0).toUpperCase() + order.status.slice(1).replace(/_/g, ' ')}
               icon={Clock}
               variant={order.status === 'completed' ? 'success' : order.status === 'cancelled' ? 'destructive' : 'default'}
+              className="print:bg-gray-50 print:text-black"
             />
             <StatCard
               title="Type"
               value={order.order_type.charAt(0).toUpperCase() + order.order_type.slice(1)}
               icon={Clock}
+              className="print:bg-gray-50 print:text-black"
             />
             <StatCard
               title="Payment"
               value={order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
               icon={Clock}
               variant={order.payment_status === 'paid' ? 'success' : order.payment_status === 'failed' ? 'destructive' : 'warning'}
+              className="print:bg-gray-50 print:text-black"
             />
+            <div className="hidden print:block">
+              <StatCard
+                title="Total"
+                value={`₦${order.total_amount?.toLocaleString()}`}
+                icon={Clock}
+                className="print:bg-gray-50 print:text-black"
+              />
+            </div>
           </div>
         </DialogHeader>
 
         {/* Scrollable Content */}
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto print:overflow-visible print:h-auto">
           <div className="p-4 sm:p-6">
             {/* Desktop Layout: 2 columns */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 print:grid-cols-1">
               {/* Left Column - Order Info */}
-              <div className="lg:col-span-2 space-y-6">
+              <div className="lg:col-span-2 print:col-span-1 space-y-6">
                 {/* Customer Information */}
                 <CustomerInfoCard
                   customerName={order.customer_name}
@@ -296,7 +367,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
               </div>
 
               {/* Right Column - Actions */}
-              <div className="space-y-6">
+              <div className="space-y-6 print:hidden">
                 <ActionsPanel
                   selectedStatus={selectedStatus}
                   onStatusChange={setSelectedStatus}
@@ -322,7 +393,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
         </div>
 
         {/* Mobile Footer */}
-        <DialogFooter className="p-4 border-t border-border flex-shrink-0 sm:hidden">
+        <DialogFooter className="p-4 border-t border-border flex-shrink-0 sm:hidden print:hidden">
           <div className="flex gap-2 w-full">
             <Button variant="outline" onClick={onClose} className="flex-1">
               Close
@@ -334,7 +405,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
         </DialogFooter>
 
         {/* Print-friendly footer (hidden on screen) */}
-        <div className="no-print hidden print:block print:mt-8 print:pt-4 print:border-t print:text-center print:text-xs print:text-gray-500">
+        <div className="hidden print:block print:mt-8 print:pt-4 print:border-t print:border-gray-300 print:text-center print:text-xs print:text-gray-500">
           <p>Generated on {format(new Date(), 'PPP')} • Order #{order.order_number}</p>
         </div>
       </DialogContent>

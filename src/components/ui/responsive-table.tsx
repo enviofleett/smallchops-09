@@ -26,7 +26,7 @@ interface MobileCardProps {
 export const MobileCard = ({ children, className = "", onClick }: MobileCardProps) => {
   return (
     <div 
-      className={`bg-white rounded-lg border border-gray-200 p-4 mb-3 shadow-sm ${onClick ? 'cursor-pointer hover:bg-gray-50' : ''} ${className}`}
+      className={`bg-background rounded-lg border border-border p-4 mb-3 shadow-sm ${onClick ? 'cursor-pointer hover:bg-accent/50' : ''} ${className}`}
       onClick={onClick}
     >
       {children}
@@ -41,7 +41,7 @@ interface MobileCardHeaderProps {
 
 export const MobileCardHeader = ({ children, className = "" }: MobileCardHeaderProps) => {
   return (
-    <div className={`flex items-center justify-between mb-3 pb-3 border-b border-gray-100 ${className}`}>
+    <div className={`flex items-center justify-between mb-3 pb-3 border-b border-border/50 ${className}`}>
       {children}
     </div>
   );
@@ -69,8 +69,8 @@ interface MobileCardRowProps {
 export const MobileCardRow = ({ label, value, className = "" }: MobileCardRowProps) => {
   return (
     <div className={`flex justify-between items-center text-sm ${className}`}>
-      <span className="text-gray-600 font-medium">{label}:</span>
-      <span className="text-gray-900">{value}</span>
+      <span className="text-muted-foreground font-medium">{label}:</span>
+      <span className="text-foreground">{value}</span>
     </div>
   );
 };
@@ -82,7 +82,7 @@ interface MobileCardActionsProps {
 
 export const MobileCardActions = ({ children, className = "" }: MobileCardActionsProps) => {
   return (
-    <div className={`flex items-center justify-end gap-2 mt-4 pt-3 border-t border-gray-100 ${className}`}>
+    <div className={`flex items-center justify-end gap-2 mt-4 pt-3 border-t border-border/50 ${className}`}>
       {children}
     </div>
   );

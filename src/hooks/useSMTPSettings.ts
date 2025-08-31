@@ -104,82 +104,50 @@ export const useSMTPSettings = () => {
     },
   });
 
-  // Test email connection using unified SMTP sender with enhanced diagnostics
+  // Test SMTP authentication using the dedicated health check endpoint
   const testConnectionMutation = useMutation({
-    mutationFn: async (testEmail: string) => {
+    mutationFn: async () => {
       try {
-        console.log('🧪 Testing email with unified SMTP sender (enhanced diagnostics)...');
+        console.log('🔍 Running production SMTP authentication health check...');
         
-        // Use standardized payload format with enhanced error reporting
-        const payload = {
-          to: testEmail,
-          subject: 'SMTP Connection Test - Enhanced Diagnostics',
-          templateKey: 'smtp_test', // Try template first
-          variables: {
-            test_time: new Date().toLocaleString(),
-            smtp_host: 'Enhanced Unified SMTP System',
-            business_name: 'Starters Small Chops',
-            diagnostic_info: 'This test includes enhanced authentication and TLS diagnostics'
-          },
-          emailType: 'transactional',
-          // Fallback content if template doesn't exist
-          textContent: `SMTP Connection Test - Enhanced Diagnostics\n\nTest Time: ${new Date().toLocaleString()}\nSMTP Host: Enhanced Unified SMTP System\nBusiness: Starters Small Chops\n\nThis test includes enhanced authentication and TLS diagnostics.\n\nIf you receive this email, your SMTP configuration is working correctly!`,
-          htmlContent: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h2 style="color: #2563eb;">SMTP Connection Test - Enhanced</h2>
-              <p>Congratulations! Your enhanced SMTP configuration is working correctly.</p>
-              <div style="background: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <h3 style="margin-top: 0;">Enhanced Test Details:</h3>
-                <p><strong>Test Time:</strong> ${new Date().toLocaleString()}</p>
-                <p><strong>SMTP System:</strong> Enhanced Unified SMTP System</p>
-                <p><strong>Business:</strong> Starters Small Chops</p>
-                <p><strong>Diagnostics:</strong> Enhanced authentication and TLS validation</p>
-              </div>
-              <p>This email confirms that your enhanced email settings with improved authentication are properly configured and emails can be sent successfully.</p>
-              <div style="background: #e0f7fa; padding: 10px; border-radius: 5px; margin-top: 20px;">
-                <p style="margin: 0;"><strong>Security Note:</strong> Enhanced diagnostics and fallback mechanisms are now active.</p>
-              </div>
-            </div>`
-        };
-
-        console.log('📤 Sending enhanced test email payload:', payload);
-
-        const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
-          body: payload
+        const { data, error } = await supabase.functions.invoke('smtp-auth-healthcheck', {
+          body: {}
         });
 
         if (error) {
-          console.error('❌ Supabase function error:', error);
-          throw new Error(error.message || 'Failed to send test email');
+          console.error('❌ Health check function error:', error);
+          throw new Error(error.message || 'Health check failed');
         }
 
-        // Handle both success/error response formats
-        if (data && !data.success && data.error) {
-          console.error('❌ Enhanced SMTP test error:', data.error);
-          throw new Error(`Enhanced SMTP test failed: ${data.error}`);
+        console.log('📊 Production health check result:', data);
+
+        if (!data.success) {
+          throw new Error(data.error || 'SMTP authentication failed');
         }
 
-        console.log('✅ Enhanced test email sent successfully:', data);
-        return data;
+        return {
+          ...data,
+          message: `✅ Production SMTP Ready: Connected to ${data.provider?.host}:${data.provider?.port} using ${data.auth?.method} (${data.auth?.tlsMode}) in ${data.timing?.totalMs}ms`
+        };
       } catch (error) {
-        console.error('💥 Enhanced SMTP test failed:', error);
-        throw new Error(`Enhanced email test failed: ${error.message}`);
+        console.error('💥 SMTP health check failed:', error);
+        throw new Error(`Production SMTP health check failed: ${error.message}`);
       }
     },
     onSuccess: (data) => {
-      const message = data?.provider?.includes('fallback') 
-        ? 'Test email sent successfully via fallback configuration! Check your inbox.'
-        : 'Test email sent successfully! Check your inbox.';
+      const sourceInfo = data.provider?.source === 'function_secrets' 
+        ? 'using Function Secrets (Production)' 
+        : 'using Database fallback';
         
       toast({
-        title: 'Test Email Sent',
-        description: message,
+        title: 'Production SMTP Authentication Successful',
+        description: `${data.message} - Configuration source: ${sourceInfo}`,
       });
     },
     onError: (error: Error) => {
       toast({
-        title: 'Test Failed',
-        description: `Failed to send test email: ${error.message}`,
+        title: 'SMTP Authentication Failed',
+        description: `Production health check failed: ${error.message}`,
         variant: 'destructive',
       });
     },

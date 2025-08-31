@@ -16,51 +16,90 @@ export const UnifiedEmailControls = () => {
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'success' | 'error' | null>(null);
 
-  const testEmailConnection = async () => {
+  const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
+
+  const testSMTPAuthentication = async () => {
+    setIsTestingConnection(true);
+    setConnectionStatus(null);
+    setHealthCheckResult(null);
+
+    try {
+      console.log('🔍 Running production SMTP authentication health check...');
+      
+      const { data, error } = await supabase.functions.invoke('smtp-auth-healthcheck', {
+        body: {}
+      });
+
+      if (error) {
+        throw new Error(error.message || 'Health check failed');
+      }
+
+      console.log('📊 Health check result:', data);
+      setHealthCheckResult(data);
+
+      if (data.success) {
+        setConnectionStatus('success');
+        toast.success(
+          '✅ Production SMTP Authentication Successful!',
+          {
+            description: `Connected to ${data.provider.host}:${data.provider.port} using ${data.auth.method} with ${data.auth.tlsMode} encryption in ${data.timing.totalMs}ms`
+          }
+        );
+      } else {
+        setConnectionStatus('error');
+        toast.error(
+          '❌ SMTP Authentication Failed',
+          {
+            description: data.error || 'Unknown authentication error'
+          }
+        );
+      }
+    } catch (error: any) {
+      console.error('❌ Health check error:', error);
+      setConnectionStatus('error');
+      setHealthCheckResult({ success: false, error: error.message });
+      toast.error(`❌ Health check failed: ${error.message}`);
+    } finally {
+      setIsTestingConnection(false);
+    }
+  };
+
+  const sendActualTestEmail = async () => {
     if (!testEmail) {
       toast.error('Please enter an email address');
       return;
     }
 
-    setIsTestingConnection(true);
-    setConnectionStatus(null);
-
     try {
       const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: testEmail,
-          subject: 'Unified SMTP Test - ' + new Date().toLocaleString(),
+          subject: 'Production SMTP Test - ' + new Date().toLocaleString(),
           html: `
             <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h2 style="color: #f59e0b;">✅ Unified SMTP Connection Test</h2>
-              <p>Congratulations! Your unified SMTP configuration is working correctly.</p>
-              <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
-                <p><strong>Test Details:</strong></p>
+              <h2 style="color: #10b981;">✅ Production SMTP Test Email</h2>
+              <p>Congratulations! Your production SMTP system is working correctly.</p>
+              <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #bbf7d0;">
+                <p><strong>Production Test Details:</strong></p>
                 <ul>
                   <li>Sent at: ${new Date().toLocaleString()}</li>
-                  <li>System: Unified SMTP Sender</li>
-                  <li>Status: Production Ready ✅</li>
+                  <li>System: YourNotify Production SMTP</li>
+                  <li>Configuration: Function Secrets</li>
+                  <li>Status: Live Production Ready ✅</li>
                 </ul>
               </div>
-              <p>Your email system is now ready for production use!</p>
+              <p>Your email system is now fully configured and ready for live production use!</p>
             </div>
           `,
-          text: `Unified SMTP Test - Sent at ${new Date().toLocaleString()}. System is production ready!`
+          text: `Production SMTP Test - Sent at ${new Date().toLocaleString()}. Live production system ready!`
         }
       });
 
-      if (error) {
-        throw error;
-      }
+      if (error) throw error;
 
-      setConnectionStatus('success');
-      toast.success('✅ Test email sent successfully via Unified SMTP!');
+      toast.success('✅ Production test email sent successfully!');
     } catch (error: any) {
-      console.error('Test email error:', error);
-      setConnectionStatus('error');
-      toast.error(`❌ Test failed: ${error.message}`);
-    } finally {
-      setIsTestingConnection(false);
+      toast.error(`❌ Test email failed: ${error.message}`);
     }
   };
 
@@ -132,30 +171,20 @@ export const UnifiedEmailControls = () => {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TestTube className="h-5 w-5" />
-              Test SMTP Connection
+              Production SMTP Health Check
             </CardTitle>
             <CardDescription>
-              Verify your unified SMTP configuration with a test email
+              Verify production SMTP authentication and readiness (no email sent)
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="test-email">Test Email Address</Label>
-              <Input
-                id="test-email"
-                type="email"
-                placeholder="your-email@example.com"
-                value={testEmail}
-                onChange={(e) => setTestEmail(e.target.value)}
-              />
-            </div>
             <Button 
-              onClick={testEmailConnection} 
-              disabled={isTestingConnection || !testEmail}
+              onClick={testSMTPAuthentication} 
+              disabled={isTestingConnection}
               className="w-full"
             >
               <TestTube className="mr-2 h-4 w-4" />
-              {isTestingConnection ? 'Sending Test Email...' : 'Send Test Email'}
+              {isTestingConnection ? 'Checking Authentication...' : 'Check SMTP Authentication'}
             </Button>
 
             {connectionStatus && (
@@ -166,10 +195,47 @@ export const UnifiedEmailControls = () => {
                 }
                 <AlertDescription className={connectionStatus === 'success' ? 'text-green-800' : 'text-red-800'}>
                   {connectionStatus === 'success' 
-                    ? 'Unified SMTP test successful! Check your inbox.' 
-                    : 'Test failed. Please check your SMTP settings.'}
+                    ? 'Production SMTP authentication successful! System is ready.' 
+                    : 'Authentication failed. Check SMTP credentials.'}
                 </AlertDescription>
               </Alert>
+            )}
+
+            {healthCheckResult && connectionStatus === 'success' && (
+              <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+                <h4 className="font-semibold text-green-900 mb-2">✅ Production Readiness Confirmed</h4>
+                <div className="text-sm text-green-800 space-y-1">
+                  <p><strong>Host:</strong> {healthCheckResult.provider?.host}:{healthCheckResult.provider?.port}</p>
+                  <p><strong>Source:</strong> {healthCheckResult.provider?.source === 'function_secrets' ? 'Function Secrets (Production)' : 'Database (Fallback)'}</p>
+                  <p><strong>Authentication:</strong> {healthCheckResult.auth?.method} with {healthCheckResult.auth?.tlsMode} encryption</p>
+                  <p><strong>Connection Time:</strong> {healthCheckResult.timing?.totalMs}ms</p>
+                </div>
+              </div>
+            )}
+
+            {/* Optional: Send actual test email */}
+            {connectionStatus === 'success' && (
+              <div className="mt-4 pt-4 border-t">
+                <div className="space-y-2">
+                  <Label htmlFor="test-email">Send Test Email (Optional)</Label>
+                  <Input
+                    id="test-email"
+                    type="email"
+                    placeholder="your-email@example.com"
+                    value={testEmail}
+                    onChange={(e) => setTestEmail(e.target.value)}
+                  />
+                </div>
+                <Button 
+                  onClick={sendActualTestEmail} 
+                  disabled={!testEmail}
+                  variant="outline"
+                  className="w-full mt-2"
+                >
+                  <Mail className="mr-2 h-4 w-4" />
+                  Send Test Email
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>

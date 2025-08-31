@@ -2,7 +2,8 @@ import React from 'react';
 import { OrderWithItems } from '@/api/orders';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
-import { Eye, Printer, Package, Truck, Trash2, Calendar, Clock } from 'lucide-react';
+import { Eye, Printer, Package, Truck, Trash2, Calendar, Clock, ExternalLink } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useOrderDeliverySchedules } from '@/hooks/useOrderDeliverySchedules';
 import { MiniCountdownTimer } from './MiniCountdownTimer';
 import { Button } from '@/components/ui/button';
@@ -43,6 +44,7 @@ const getStatusBadge = (status: OrderStatus) => {
 };
 
 const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSelectOrder, onSelectAll }: OrdersTableProps) => {
+  const navigate = useNavigate();
   const orderIds = orders.map(order => order.id);
   const { schedules, loading: schedulesLoading } = useOrderDeliverySchedules(orderIds);
   
@@ -168,6 +170,15 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
             >
               <Eye className="h-3 w-3" />
               View
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate(`/admin/orders/${order.id}`)}
+              className="flex items-center gap-1 h-6 px-2 text-xs"
+            >
+              <ExternalLink className="h-3 w-3" />
+              Full
             </Button>
             <Button
               variant="outline"
@@ -298,6 +309,22 @@ const OrdersTable = ({ orders, onViewOrder, onDeleteOrder, selectedOrders, onSel
                         </TooltipTrigger>
                         <TooltipContent>
                           <p>View Details</p>
+                        </TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => navigate(`/admin/orders/${order.id}`)}
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                            <span className="sr-only">View Full Page</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>View Full Page</p>
                         </TooltipContent>
                       </Tooltip>
                       <Tooltip>

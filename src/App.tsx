@@ -31,6 +31,7 @@ import PublicHome from "./pages/PublicHome";
 // Lazy load admin components
 const Orders = withLazyLoading(() => import("./pages/Orders"));
 const AdminOrders = withLazyLoading(() => import("./pages/admin/AdminOrders"));
+const AdminOrderDetails = withLazyLoading(() => import("./pages/admin/AdminOrderDetails"));
 const AdminDelivery = withLazyLoading(() => import("./pages/admin/AdminDelivery"));
 const Products = withLazyLoading(() => import("./pages/Products"));
 const Customers = withLazyLoading(() => import("./pages/Customers"));
@@ -254,6 +255,7 @@ const App = () => {
                 <Route path="/admin" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
                 <Route path="/dashboard" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/orders" element={<ErrorBoundaryWrapper context="Admin Orders"><AdminOrders /></ErrorBoundaryWrapper>} />
+                <Route path="/admin/orders/:id" element={<ErrorBoundaryWrapper context="Admin Order Details"><AdminOrderDetails /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/delivery" element={<ErrorBoundaryWrapper context="Admin Delivery"><AdminDelivery /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/products" element={<ErrorBoundaryWrapper context="Products"><Products /></ErrorBoundaryWrapper>} />
                 <Route path="/categories" element={<ErrorBoundaryWrapper context="Categories"><Categories /></ErrorBoundaryWrapper>} />

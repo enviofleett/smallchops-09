@@ -2,12 +2,20 @@ import React, { useState, useEffect } from 'react';
 import { OrderWithItems, updateOrder, manuallyQueueCommunicationEvent } from '@/api/orders';
 import { getDispatchRiders, DispatchRider } from '@/api/users';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+  DialogClose
+} from '@/components/ui/dialog';
+import { X, FileText, Download, Printer, ExternalLink, Clock } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { OrderStatus } from '@/types/orders';
 import { format } from 'date-fns';
-import { X, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
@@ -23,7 +31,6 @@ import { ItemsList } from './details/ItemsList';
 import { SpecialInstructions } from './details/SpecialInstructions';
 import { PaymentDetailsCard } from './PaymentDetailsCard';
 import { exportOrderToPDF, exportOrderToCSV } from '@/utils/exportOrder';
-import { Download, FileText, Printer } from 'lucide-react';
 
 interface OrderDetailsDialogProps {
   isOpen: boolean;
@@ -31,7 +38,12 @@ interface OrderDetailsDialogProps {
   order: OrderWithItems;
 }
 
-const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose, order }) => {
+const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
+  isOpen,
+  onClose,
+  order
+}) => {
+  const navigate = useNavigate();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [selectedStatus, setSelectedStatus] = useState<OrderStatus>(order.status);
@@ -266,6 +278,18 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                 <Printer className="h-4 w-4" />
                 Print
               </Button>
+              <Button 
+                onClick={() => {
+                  navigate(`/admin/orders/${order.id}`);
+                  onClose();
+                }}
+                variant="outline" 
+                size="sm"
+                className="gap-2"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Full Page
+              </Button>
               <DialogClose asChild>
                 <Button variant="ghost" size="icon" className="h-8 w-8">
                   <X className="h-4 w-4" />
@@ -280,7 +304,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
               title="Status"
               value={order.status.charAt(0).toUpperCase() + order.status.slice(1).replace(/_/g, ' ')}
               icon={Clock}
-              variant={order.status === 'completed' ? 'success' : order.status === 'cancelled' ? 'destructive' : 'default'}
+              variant={order.status === 'completed' ? 'default' : order.status === 'cancelled' ? 'destructive' : 'default'}
               className="print:bg-gray-50 print:text-black"
             />
             <StatCard
@@ -293,7 +317,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
               title="Payment"
               value={order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
               icon={Clock}
-              variant={order.payment_status === 'paid' ? 'success' : order.payment_status === 'failed' ? 'destructive' : 'warning'}
+              variant={order.payment_status === 'paid' ? 'default' : order.payment_status === 'failed' ? 'destructive' : 'warning'}
               className="print:bg-gray-50 print:text-black"
             />
             <div className="hidden print:block">

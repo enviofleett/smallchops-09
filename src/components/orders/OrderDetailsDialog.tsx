@@ -11,6 +11,7 @@ import { X, Clock } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
+import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 
 // Import our new components
 import { StatCard } from './details/StatCard';
@@ -35,6 +36,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
   const [verifying, setVerifying] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState<string | null>(null);
   const [verifyState, setVerifyState] = useState<'idle'|'success'|'failed'|'pending'>('idle');
+
+  // Use detailed order data to get product features and full information
+  const { data: detailedOrderData, isLoading: isLoadingDetails, error: detailsError } = useDetailedOrderData(order.id);
 
   useEffect(() => {
     setSelectedStatus(order.status);
@@ -262,7 +266,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
 
                 {/* Order Items */}
                 <ItemsList
-                  items={order.order_items || []}
+                  items={detailedOrderData?.items || order.order_items || []}
                   subtotal={order.subtotal || 0}
                   totalVat={order.total_vat || 0}
                   totalDiscount={order.discount_amount || 0}
@@ -273,7 +277,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
                 {/* Special Instructions */}
                 <SpecialInstructions
                   instructions={order.special_instructions}
-                  deliveryInstructions={deliverySchedule?.special_instructions}
+                  deliveryInstructions={detailedOrderData?.delivery_schedule?.special_instructions || deliverySchedule?.special_instructions}
                 />
               </div>
 

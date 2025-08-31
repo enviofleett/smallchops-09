@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
+import { useEnrichedOrderItems } from '@/hooks/useEnrichedOrderItems';
 
 // Import our new components
 import { StatCard } from './details/StatCard';
@@ -39,6 +40,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
 
   // Use detailed order data to get product features and full information
   const { data: detailedOrderData, isLoading: isLoadingDetails, error: detailsError } = useDetailedOrderData(order.id);
+  
+  // Enrich order items to ensure product features are available
+  const { data: enrichedItems, isLoading: isLoadingEnriched } = useEnrichedOrderItems(order.order_items || []);
 
   useEffect(() => {
     setSelectedStatus(order.status);
@@ -266,7 +270,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({ isOpen, onClose
 
                 {/* Order Items */}
                 <ItemsList
-                  items={detailedOrderData?.items || order.order_items || []}
+                  items={detailedOrderData?.items || enrichedItems || order.order_items || []}
                   subtotal={order.subtotal || 0}
                   totalVat={order.total_vat || 0}
                   totalDiscount={order.discount_amount || 0}

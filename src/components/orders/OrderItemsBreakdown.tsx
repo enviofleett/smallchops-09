@@ -3,6 +3,7 @@ import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Package, ShoppingCart, Info } from 'lucide-react';
+import { getFirstImage, toImagesArray } from '@/lib/imageUtils';
 
 interface OrderItem {
   id: string;
@@ -76,34 +77,67 @@ export function OrderItemsBreakdown({
     // First try to get features from the product object (from detailed query)
     let features = item.product?.features || item.features;
     
-    // Handle different data formats - could be array or string
+    // Handle different data formats - could be array, string, or object
     if (!features) return null;
     
     // If it's a string, try to parse it or split it
     if (typeof features === 'string') {
-      // If it looks like JSON, try to parse it
-      if (features.startsWith('[') && features.endsWith(']')) {
+      const trimmed = features.trim();
+      if (!trimmed) return null;
+      
+      // If it looks like JSON array, try to parse it
+      if (trimmed.startsWith('[') && trimmed.endsWith(']')) {
         try {
-          features = JSON.parse(features);
+          features = JSON.parse(trimmed);
         } catch {
           // If parsing fails, split by common delimiters
-          features = features.split(/[,\n]/).map(f => f.trim()).filter(f => f);
+          features = trimmed.split(/[,\n;|]/).map(f => f.trim()).filter(f => f);
+        }
+      } else if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        // Handle JSON objects
+        try {
+          const parsed = JSON.parse(trimmed);
+          features = Object.values(parsed).filter(Boolean);
+        } catch {
+          features = [trimmed];
         }
       } else {
         // Split by common delimiters
-        features = features.split(/[,\n]/).map(f => f.trim()).filter(f => f);
+        features = trimmed.split(/[,\n;|]/).map(f => f.trim()).filter(f => f);
       }
     }
     
-    // Ensure we have an array
+    // Handle objects (convert values to array)
+    if (typeof features === 'object' && !Array.isArray(features)) {
+      features = Object.values(features).filter(Boolean);
+    }
+    
+    // Ensure we have an array with valid content
     if (!Array.isArray(features) || features.length === 0) return null;
     
     return features.map((feature: string, idx: number) => (
       <div key={idx} className="flex items-center gap-2 text-xs text-muted-foreground">
         <div className="w-1 h-1 bg-primary rounded-full flex-shrink-0" />
-        <span className="font-medium text-foreground">{feature.trim()}</span>
+        <span className="font-medium text-foreground">{String(feature).trim()}</span>
       </div>
     ));
+  };
+
+  const renderIngredients = (item: OrderItem) => {
+    const ingredients = item.product?.ingredients;
+    if (!ingredients || typeof ingredients !== 'string') return null;
+    
+    return (
+      <div className="mb-3 p-3 bg-orange-50 rounded-lg border border-orange-200">
+        <div className="flex items-start gap-2">
+          <Info className="h-4 w-4 text-orange-600 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <h5 className="text-sm font-semibold text-orange-800 mb-1">Ingredients:</h5>
+            <p className="text-xs text-orange-700">{ingredients}</p>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -121,9 +155,27 @@ export function OrderItemsBreakdown({
               <div className="flex justify-between items-start gap-4">
                 <div className="flex-1">
                   <div className="flex items-start gap-3">
-                    <div className="w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
-                      <Package className="h-5 w-5 text-primary" />
-                    </div>
+                    {item.product?.image_url ? (
+                      <div className="w-12 h-12 rounded-lg overflow-hidden flex-shrink-0 ring-1 ring-primary/20">
+                        <img 
+                          src={getFirstImage(item.product)} 
+                          alt={item.product_name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => {
+                            const target = e.target as HTMLImageElement;
+                            target.style.display = 'none';
+                            target.nextElementSibling?.classList.remove('hidden');
+                          }}
+                        />
+                        <div className="hidden w-full h-full bg-primary/10 rounded-lg flex items-center justify-center">
+                          <Package className="h-5 w-5 text-primary" />
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center flex-shrink-0 ring-1 ring-primary/20">
+                        <Package className="h-5 w-5 text-primary" />
+                      </div>
+                    )}
                     <div className="flex-1 min-w-0">
                       <h4 className="font-semibold text-foreground break-words mb-1">{item.product_name}</h4>
                       
@@ -141,6 +193,9 @@ export function OrderItemsBreakdown({
                           </div>
                         </div>
                       )}
+                      
+                      {/* Ingredients */}
+                      {showDetailed && renderIngredients(item)}
                       
                       {/* Customizations */}
                       {showDetailed && formatCustomizations(item.customizations) && (

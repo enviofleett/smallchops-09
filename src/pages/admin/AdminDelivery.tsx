@@ -39,6 +39,7 @@ import { SystemStatusChecker } from '@/components/admin/SystemStatusChecker';
 import { formatAddress } from '@/utils/formatAddress';
 import { cn } from '@/lib/utils';
 import { MiniCountdownTimer } from '@/components/orders/MiniCountdownTimer';
+import { DeliveryTabDropdown } from '@/components/admin/delivery/DeliveryTabDropdown';
 import { isOrderOverdue } from '@/utils/scheduleTime';
 
 // Responsive breakpoints for grid layouts
@@ -301,53 +302,27 @@ export default function AdminDelivery() {
         {/* Main Tabs - Responsive */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <div className="relative">
-            {/* Mobile: Scrollable horizontal tabs */}
-            <div className="sm:hidden">
-              <div className="overflow-x-auto pb-2 scrollbar-hide -mx-2 px-2">
-                <TabsList className="flex w-max min-w-full gap-1 p-1 bg-muted rounded-lg">
-                  {[
-                    { value: 'overview', label: 'Overview' },
-                    { value: 'orders', label: 'All Orders' },
-                    { value: 'drivers', label: 'Drivers' },
-                    { value: 'analytics', label: 'Analytics' },
-                    { value: 'overdue', label: 'Overdue', className: 'data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground' },
-                    { value: 'zones', label: 'Delivery Zones' },
-                    { value: 'routes', label: 'Routes' },
-                  ].map(tab => (
-                    <TabsTrigger
-                      key={tab.value}
-                      value={tab.value}
-                      className={cn(
-                        "text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-                        tab.className
-                      )}
-                    >
-                      {tab.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-              </div>
+            {/* Mobile & Tablet: Dropdown */}
+            <div className="block lg:hidden mb-4">
+              <DeliveryTabDropdown
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+              />
             </div>
             
             {/* Desktop: Grid layout */}
-            <div className="hidden sm:block">
-              <TabsList className="grid w-full grid-cols-4 lg:grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
+            <div className="hidden lg:block">
+              <TabsList className="grid w-full grid-cols-4 gap-1 p-1 bg-muted rounded-lg">
                 {[
                   { value: 'overview', label: 'Overview' },
-                  { value: 'orders', label: 'All Orders' },
                   { value: 'drivers', label: 'Drivers' },
                   { value: 'analytics', label: 'Analytics' },
-                  { value: 'overdue', label: 'Overdue', className: 'data-[state=active]:bg-destructive data-[state=active]:text-destructive-foreground' },
-                  { value: 'zones', label: 'Zones' },
-                  { value: 'routes', label: 'Routes' },
+                  { value: 'zones', label: 'Delivery Zones' },
                 ].map(tab => (
                   <TabsTrigger
                     key={tab.value}
                     value={tab.value}
-                    className={cn(
-                      "text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground",
-                      tab.className
-                    )}
+                    className="text-sm px-2 py-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
                   >
                     {tab.label}
                   </TabsTrigger>
@@ -400,47 +375,6 @@ export default function AdminDelivery() {
             </div>
           </TabsContent>
 
-          {/* All Orders Tab - with Delivery Window Filter */}
-          <TabsContent value="orders" className="space-y-6">
-            {/* Delivery Window Filter */}
-            <Card>
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-2">
-                    <Clock className="w-5 h-5" />
-                    Delivery Window Filter
-                  </CardTitle>
-                  <Badge variant="outline">
-                    {filteredOrdersByWindow.length} of {deliveryOrders.length} orders
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <Select value={deliveryWindowFilter} onValueChange={setDeliveryWindowFilter}>
-                  <SelectTrigger className="w-full max-w-xs">
-                    <SelectValue placeholder="Filter by delivery window" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {deliveryWindows.map((window) => (
-                      <SelectItem key={window} value={window}>
-                        {window === 'all' ? 'All Times' :
-                         window === 'due-now' ? '🔥 Due Now (Next 30min)' :
-                         window === 'overdue' ? '⚠️ Overdue' :
-                         window}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </CardContent>
-            </Card>
-
-            <UnifiedDeliveryManagement 
-              mode="all" 
-              selectedDate={selectedDate}
-              ordersOverride={filteredOrdersByWindow}
-            />
-          </TabsContent>
-
           {/* Drivers Tab */}
           <TabsContent value="drivers">
             <AdminDriversTab />
@@ -476,25 +410,9 @@ export default function AdminDelivery() {
             </Card>
           </TabsContent>
 
-          {/* Overdue Tab */}
-          <TabsContent value="overdue" className="space-y-6">
-            <UnifiedDeliveryManagement 
-              mode="overdue" 
-              ordersOverride={deliveryOrders.filter(order => isOrderOverdue(
-                deliverySchedules[order.id]?.delivery_date,
-                deliverySchedules[order.id]?.delivery_time_end
-              ))}
-            />
-          </TabsContent>
-
           {/* Delivery Zones Tab */}
           <TabsContent value="zones">
             <DeliveryZonesManager />
-          </TabsContent>
-
-          {/* Routes Tab */}
-          <TabsContent value="routes">
-            <DeliveryRouteManager selectedDate={selectedDate} />
           </TabsContent>
         </Tabs>
 

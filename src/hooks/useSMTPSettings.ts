@@ -138,7 +138,7 @@ export const useSMTPSettings = () => {
     onSuccess: (data) => {
       const sourceInfo = data.provider?.source === 'function_secrets' 
         ? 'using Function Secrets (Production)' 
-        : 'using Database fallback';
+        : 'using Database Settings (Development/Testing)';
         
       toast({
         title: 'Production SMTP Authentication Successful',

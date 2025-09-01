@@ -269,10 +269,24 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
     >
       <div 
         ref={printRef}
-        className="print:bg-white print:text-black"
+        className={cn(
+          "print:bg-white print:text-black print:p-8 print:font-sans",
+          "print:max-w-none print:w-full print:shadow-none print:border-none"
+        )}
         id="order-details-modal-content"
       >
-        {/* Header Actions */}
+        {/* Print Header - Only visible in print */}
+        <div className="hidden print:block print:mb-8 print:pb-4 print:border-b print:border-gray-300">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">ORDER RECEIPT</h1>
+            <p className="text-lg text-gray-700">Order #{order.order_number}</p>
+            <p className="text-sm text-gray-600 mt-1">
+              Generated on {format(new Date(), 'PPP')} at {format(new Date(), 'p')}
+            </p>
+          </div>
+        </div>
+
+        {/* Header Actions - Hidden in print */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2 mb-6 p-4 sm:p-6 print:hidden bg-muted/30 border-b">
           <div className="flex flex-wrap items-center gap-2">
             <Button 
@@ -322,41 +336,64 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
         </div>
 
         {/* Quick Stats Overview */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8 px-4 sm:px-6 print:grid print:grid-cols-4 print:mb-6 print:px-0">
+        <div className={cn(
+          "grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8 px-4 sm:px-6",
+          "print:grid print:grid-cols-4 print:gap-4 print:mb-8 print:px-0"
+        )}>
           <StatCard
             title="Status"
             value={safeFallback(order.status.charAt(0).toUpperCase() + order.status.slice(1).replace(/_/g, ' '))}
             icon={Clock}
             variant={order.status === 'completed' ? 'default' : order.status === 'cancelled' ? 'destructive' : 'default'}
-            className="print:bg-gray-50 print:text-black"
+            className={cn(
+              "print:bg-gray-100 print:text-black print:border print:border-gray-300",
+              "print:p-4 print:rounded-none print:shadow-none"
+            )}
           />
           <StatCard
             title="Type"
             value={safeFallback(order.order_type.charAt(0).toUpperCase() + order.order_type.slice(1))}
             icon={Clock}
-            className="print:bg-gray-50 print:text-black"
+            className={cn(
+              "print:bg-gray-100 print:text-black print:border print:border-gray-300",
+              "print:p-4 print:rounded-none print:shadow-none"
+            )}
           />
           <StatCard
             title="Payment"
             value={safeFallback(order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1))}
             icon={Clock}
             variant={order.payment_status === 'paid' ? 'default' : order.payment_status === 'failed' ? 'destructive' : 'warning'}
-            className="print:bg-gray-50 print:text-black"
+            className={cn(
+              "print:bg-gray-100 print:text-black print:border print:border-gray-300",
+              "print:p-4 print:rounded-none print:shadow-none"
+            )}
           />
           <StatCard
             title="Total"
             value={`₦${safeFallback(order.total_amount?.toLocaleString(), '0')}`}
             icon={Clock}
-            className="print:bg-gray-50 print:text-black"
+            className={cn(
+              "print:bg-gray-100 print:text-black print:border print:border-gray-300",
+              "print:p-4 print:rounded-none print:shadow-none"
+            )}
           />
         </div>
 
         {/* Main Content - Single Column Layout */}
-        <div className="px-4 sm:px-6 print:px-0">
+        <div className={cn(
+          "px-4 sm:px-6 space-y-6 sm:space-y-8",
+          "print:px-0 print:space-y-6"
+        )}>
           {/* Order Information Sections */}
-          <div className="space-y-6 sm:space-y-8">
-            <section aria-labelledby="customer-info-heading">
-              <h2 id="customer-info-heading" className="text-lg font-semibold text-foreground mb-4 print:text-black">
+          <div className="space-y-6 sm:space-y-8 print:space-y-6">
+            <section aria-labelledby="customer-info-heading" className={cn(
+              "print:break-inside-avoid print:mb-6"
+            )}>
+              <h2 id="customer-info-heading" className={cn(
+                "text-lg font-semibold text-foreground mb-4",
+                "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2"
+              )}>
                 Customer Information
               </h2>
               <CustomerInfoCard
@@ -369,9 +406,13 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               />
             </section>
 
-            <section aria-labelledby="order-info-heading">
-
-              <h2 id="order-info-heading" className="text-lg font-semibold text-foreground mb-4 print:text-black">
+            <section aria-labelledby="order-info-heading" className={cn(
+              "print:break-inside-avoid print:mb-6"
+            )}>
+              <h2 id="order-info-heading" className={cn(
+                "text-lg font-semibold text-foreground mb-4",
+                "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2"
+              )}>
                 Order Details
               </h2>
               <OrderInfoCard
@@ -390,9 +431,13 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               />
             </section>
 
-            <section aria-labelledby="payment-details-heading">
-
-              <h2 id="payment-details-heading" className="text-lg font-semibold text-foreground mb-4 print:text-black">
+            <section aria-labelledby="payment-details-heading" className={cn(
+              "print:break-inside-avoid print:mb-6"
+            )}>
+              <h2 id="payment-details-heading" className={cn(
+                "text-lg font-semibold text-foreground mb-4",
+                "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2"
+              )}>
                 Payment Information
               </h2>
               <PaymentDetailsCard
@@ -404,9 +449,13 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               />
             </section>
 
-            <section aria-labelledby="order-items-heading">
-
-              <h2 id="order-items-heading" className="text-lg font-semibold text-foreground mb-4 print:text-black">
+            <section aria-labelledby="order-items-heading" className={cn(
+              "print:break-inside-avoid print:mb-6"
+            )}>
+              <h2 id="order-items-heading" className={cn(
+                "text-lg font-semibold text-foreground mb-4",
+                "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2"
+              )}>
                 Order Items
               </h2>
               <ItemsList
@@ -419,9 +468,13 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               />
             </section>
 
-            <section aria-labelledby="special-instructions-heading">
-
-              <h2 id="special-instructions-heading" className="text-lg font-semibold text-foreground mb-4 print:text-black">
+            <section aria-labelledby="special-instructions-heading" className={cn(
+              "print:break-inside-avoid print:mb-6"
+            )}>
+              <h2 id="special-instructions-heading" className={cn(
+                "text-lg font-semibold text-foreground mb-4",
+                "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2"
+              )}>
                 Special Instructions
               </h2>
               <SpecialInstructions
@@ -432,7 +485,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
 
             {/* Actions Panel - Integrated Inline */}
             <section className="print:hidden" aria-labelledby="actions-heading">
-              <h2 id="actions-heading" className="text-lg font-semibold text-foreground mb-4 print:text-black">
+              <h2 id="actions-heading" className={cn(
+                "text-lg font-semibold text-foreground mb-4",
+                "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2"
+              )}>
                 Order Actions & Status Management
               </h2>
               <ActionsPanel
@@ -457,14 +513,15 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
             </section>
           </div>
         </div>
-
-        {/* Print-friendly footer (hidden on screen) */}
-        <div className="hidden print:block print:mt-8 print:pt-4 print:border-t print:border-gray-300 print:text-center print:text-xs print:text-gray-500">
-          <p>Generated on {format(new Date(), 'PPP')} • Order #{order.order_number}</p>
-        </div>
         
-        {/* Bottom padding for mobile */}
-        <div className="h-4 sm:h-6 print:hidden"></div>
+        {/* Print Footer - Only visible in print */}
+        <div className="hidden print:block print:mt-8 print:pt-4 print:border-t print:border-gray-300 print:text-center">
+          <div className="text-xs text-gray-600">
+            <p>This order receipt was generated electronically.</p>
+            <p>For any queries, please contact support with order reference #{order.order_number}</p>
+            <p className="mt-2">Generated on {format(new Date(), 'PPP')} at {format(new Date(), 'p')}</p>
+          </div>
+        </div>
       </div>
     </AdaptiveDialog>
   );

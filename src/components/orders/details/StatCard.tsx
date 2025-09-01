@@ -34,19 +34,31 @@ export const StatCard: React.FC<StatCardProps> = ({
   return (
     <div className={cn(
       'rounded-lg border p-3 transition-colors',
+      // Print styles for better appearance
+      'print:bg-gray-100 print:border-gray-300 print:rounded-none print:p-4',
       variantStyles[variant],
       className
     )}>
       <div className="flex items-center justify-between">
         <div className="space-y-1">
-          <p className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+          <p className={cn(
+            "text-xs font-medium text-muted-foreground uppercase tracking-wider",
+            "print:text-black print:text-xs"
+          )}>
             {title}
           </p>
-          <p className="text-lg font-bold text-foreground">
+          <p className={cn(
+            "text-lg font-bold text-foreground",
+            "print:text-black print:text-lg"
+          )}>
             {value}
           </p>
         </div>
-        <Icon className={cn('h-5 w-5', iconStyles[variant])} />
+        <Icon className={cn(
+          'h-5 w-5', 
+          iconStyles[variant],
+          'print:hidden' // Hide icons in print
+        )} />
       </div>
     </div>
   );

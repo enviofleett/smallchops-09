@@ -77,13 +77,19 @@ export const AdaptiveDialog: React.FC<AdaptiveDialogProps> = ({
         "mx-auto p-0",
         className
       )}>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
+        <DialogHeader className="px-6 pt-6 pb-4">
+          <DialogTitle className="text-xl font-semibold leading-none tracking-tight">
+            {title}
+          </DialogTitle>
           {description && (
-            <DialogDescription>{description}</DialogDescription>
+            <DialogDescription className="mt-2 text-sm text-muted-foreground">
+              {description}
+            </DialogDescription>
           )}
         </DialogHeader>
-        {children}
+        <div className="px-6 pb-6">
+          {children}
+        </div>
       </DialogContent>
     </Dialog>
   );

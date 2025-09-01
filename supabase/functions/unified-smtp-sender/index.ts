@@ -47,6 +47,54 @@ function parseResponse(response: string): SMTPResponse {
   return { code, lines, message };
 }
 
+// Validate SMTP configuration values to detect invalid hashed secrets
+function isValidSMTPConfig(host: string, port: string, username: string, password: string): { 
+  isValid: boolean; 
+  errors: string[];
+} {
+  const errors: string[] = [];
+  
+  // Check for hashed values (32 hex characters) - these are invalid for SMTP
+  const hashPattern = /^[a-f0-9]{32}$/;
+  
+  if (hashPattern.test(host)) {
+    errors.push(`SMTP_HOST appears to be a hashed value (${host.substring(0,8)}...), needs actual hostname`);
+  }
+  
+  if (hashPattern.test(port)) {
+    errors.push(`SMTP_PORT appears to be a hashed value (${port.substring(0,8)}...), needs actual port number`);
+  }
+  
+  if (hashPattern.test(username)) {
+    errors.push(`SMTP_USERNAME appears to be a hashed value (${username.substring(0,8)}...), needs actual email/username`);
+  }
+  
+  if (hashPattern.test(password)) {
+    errors.push(`SMTP_PASSWORD appears to be a hashed value (${password.substring(0,8)}...), needs actual password`);
+  }
+  
+  // Validate hostname format
+  if (!host.includes('.') || host.startsWith('http')) {
+    errors.push(`SMTP_HOST "${host}" doesn't look like a valid hostname (should be like mail.example.com)`);
+  }
+  
+  // Validate port range
+  const portNum = parseInt(port, 10);
+  if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
+    errors.push(`SMTP_PORT "${port}" is not a valid port number (should be 25, 587, or 465)`);
+  }
+  
+  // Basic email validation for username
+  if (username && !username.includes('@') && !username.includes('apikey')) {
+    errors.push(`SMTP_USERNAME "${username}" should typically be an email address`);
+  }
+  
+  return {
+    isValid: errors.length === 0,
+    errors
+  };
+}
+
 // Get production SMTP configuration prioritizing Function Secrets
 async function getProductionSMTPConfig(supabase: any): Promise<{
   host: string;
@@ -71,6 +119,20 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
 
   if (secretHost && secretUsername && secretPassword) {
     console.log('✅ Using production SMTP configuration from Function Secrets');
+    
+    // CRITICAL: Validate that secrets contain actual values, not hashes
+    const validation = isValidSMTPConfig(
+      secretHost, 
+      secretPort || '587', 
+      secretUsername, 
+      secretPassword
+    );
+    
+    if (!validation.isValid) {
+      console.error('❌ INVALID SMTP CONFIGURATION DETECTED:');
+      validation.errors.forEach(error => console.error(`   - ${error}`));
+      throw new Error(`Invalid SMTP configuration: ${validation.errors.join('; ')}. Please update Function Secrets with actual SMTP credentials, not hashed values.`);
+    }
     
     // Parse port with robust fallback
     let port = 587; // Default port

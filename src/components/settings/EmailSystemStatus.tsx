@@ -50,14 +50,29 @@ export const EmailSystemStatus = () => {
 
         {isConfigured && (
           <>
-            <div className="grid grid-cols-2 gap-4 text-sm">
-              <div className="flex items-center gap-2">
-                <Settings className="h-4 w-4 text-muted-foreground" />
-                <span>SMTP Host: {settings.smtp_host}</span>
+            <div className="bg-muted/30 p-3 rounded-lg space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium text-muted-foreground">Configuration Source</span>
+                <Badge variant="outline" className="text-xs">
+                  <Database className="h-3 w-3 mr-1" />
+                  Database (Fallback)
+                </Badge>
               </div>
-              <div className="flex items-center gap-2">
-                <Mail className="h-4 w-4 text-muted-foreground" />
-                <span>Sender: {settings.sender_email}</span>
+              
+              <div className="grid grid-cols-2 gap-4 text-sm">
+                <div className="flex items-center gap-2">
+                  <Settings className="h-4 w-4 text-muted-foreground" />
+                  <span>SMTP Host: {settings.smtp_host}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Mail className="h-4 w-4 text-muted-foreground" />
+                  <span>Sender: {settings.sender_email}</span>
+                </div>
+              </div>
+              
+              <div className="text-xs text-amber-600 p-2 bg-amber-50 rounded border border-amber-200">
+                <strong>⚠️ Development Mode:</strong> Using database SMTP settings. For production, 
+                configure SMTP credentials in Function Secrets for better security and performance.
               </div>
             </div>
 
@@ -83,7 +98,7 @@ export const EmailSystemStatus = () => {
               </div>
             </div>
 
-            <div className="bg-muted/30 p-3 rounded-lg">
+            <div className="bg-primary/5 p-3 rounded-lg">
               <div className="flex items-center gap-2 text-sm">
                 <Zap className="h-4 w-4 text-primary" />
                 <span className="font-medium">Production Ready</span>
@@ -96,14 +111,21 @@ export const EmailSystemStatus = () => {
         )}
 
         {!isConfigured && (
-          <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-lg">
-            <div className="flex items-center gap-2 text-sm text-destructive">
-              <AlertCircle className="h-4 w-4" />
-              <span className="font-medium">Configuration Required</span>
+          <div className="space-y-3">
+            <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-lg">
+              <div className="flex items-center gap-2 text-sm text-destructive">
+                <AlertCircle className="h-4 w-4" />
+                <span className="font-medium">Configuration Required</span>
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                Configure SMTP settings via Function Secrets (production) or Communication Settings (development).
+              </p>
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Configure SMTP settings in Communication Settings to enable native email system.
-            </p>
+            
+            <div className="text-xs text-muted-foreground p-3 bg-muted rounded border">
+              <strong>Production Setup:</strong> Add SMTP credentials to Function Secrets in your Supabase dashboard 
+              for secure, production-ready email delivery with better performance and monitoring.
+            </div>
           </div>
         )}
       </CardContent>

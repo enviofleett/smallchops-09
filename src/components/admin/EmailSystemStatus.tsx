@@ -200,7 +200,8 @@ export const EmailSystemStatus = () => {
                 <div className="text-2xl font-bold text-yellow-600">{metrics?.queue_stats.processing || 0}</div>
                 <div className="text-xs text-gray-500">Processing</div>
               </div>
-              <div className="text-2xl font-bold text-red-600">{metrics?.queue_stats.failed || 0}</div>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-red-600">{metrics?.queue_stats.failed || 0}</div>
                 <div className="text-xs text-gray-500">Failed</div>
               </div>
               <div className="text-center">

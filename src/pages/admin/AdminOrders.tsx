@@ -756,7 +756,17 @@ export default function AdminOrders() {
                     Overdue Orders - Paid but Not Delivered
                   </CardTitle>
                   <p className="text-sm text-muted-foreground mt-2">
-                    Orders that have been paid but missed their delivery window and are not yet delivered
+                    Orders that have been paid but missed their delivery window and are not yet delivered.
+                    {overdueStats.total > 0 ? (
+                      <span className="block mt-1 font-medium text-foreground">
+                        Found {overdueStats.total} overdue order{overdueStats.total !== 1 ? 's' : ''}: 
+                        {overdueStats.critical > 0 && <span className="text-destructive"> {overdueStats.critical} critical</span>}
+                        {overdueStats.moderate > 0 && <span className="text-orange-600"> {overdueStats.moderate} moderate</span>}
+                        {overdueStats.recent > 0 && <span className="text-yellow-600"> {overdueStats.recent} recent</span>}
+                      </span>
+                    ) : (
+                      <span className="block mt-1 text-green-600">No overdue orders found.</span>
+                    )}
                   </p>
                 </CardHeader>
                 <CardContent>

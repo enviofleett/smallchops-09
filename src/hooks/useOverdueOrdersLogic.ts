@@ -33,7 +33,8 @@ export const useOverdueOrdersLogic = () => {
         .select(`
           *,
           order_items(*),
-          delivery_zones(*)
+          delivery_zones(*),
+          delivery_schedule:order_delivery_schedule(*)
         `)
         .eq('payment_status', 'paid')
         .not('status', 'in', '(delivered,completed,cancelled,refunded)')
@@ -46,15 +47,16 @@ export const useOverdueOrdersLogic = () => {
     staleTime: 30000
   });
 
-  // Get delivery schedules for these orders
-  const orderIds = potentialOverdueOrders.map(order => order.id);
-  const { data: deliverySchedules = {} } = useQuery({
-    queryKey: ['overdue-delivery-schedules', orderIds],
-    queryFn: () => getSchedulesByOrderIds(orderIds),
-    enabled: orderIds.length > 0,
-    refetchInterval: autoRefreshEnabled ? 60000 : false,
-    staleTime: 30000
-  });
+  // Since we're fetching schedules with the order, create a map
+  const deliverySchedules = useMemo(() => {
+    const scheduleMap: Record<string, any> = {};
+    potentialOverdueOrders.forEach(order => {
+      if (order.delivery_schedule) {
+        scheduleMap[order.id] = order.delivery_schedule;
+      }
+    });
+    return scheduleMap;
+  }, [potentialOverdueOrders]);
 
   // Process overdue orders and calculate statistics
   const overdueData = useMemo(() => {
@@ -67,6 +69,7 @@ export const useOverdueOrdersLogic = () => {
       const schedule = deliverySchedules[order.id];
       if (!schedule) return;
 
+      // Check if order is overdue (past delivery end time)
       if (isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end)) {
         const endTime = new Date(`${schedule.delivery_date}T${schedule.delivery_time_end}`);
         const minutesOverdue = Math.floor((now.getTime() - endTime.getTime()) / (1000 * 60));

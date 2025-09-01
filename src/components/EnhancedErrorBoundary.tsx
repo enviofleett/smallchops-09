@@ -116,7 +116,7 @@ class EnhancedErrorBoundary extends Component<Props, State> {
     
     if (message.includes('network') || message.includes('fetch')) {
       return 'Network Error';
-    } else if (message.includes('chunk') || message.includes('loading')) {
+    } else if (message.includes('chunk') || message.includes('loading') || message.includes('timeout')) {
       return 'Loading Error';
     } else if (message.includes('permission') || message.includes('unauthorized')) {
       return 'Permission Error';
@@ -134,6 +134,9 @@ class EnhancedErrorBoundary extends Component<Props, State> {
       case 'Network Error':
         return 'Check your internet connection and try again.';
       case 'Loading Error':
+        if (error.message.includes('timeout')) {
+          return 'The page is taking longer than usual to load. Please wait a moment and try again.';
+        }
         return 'Try refreshing the page or clearing your browser cache.';
       case 'Permission Error':
         return 'You may need to log in again or contact support.';

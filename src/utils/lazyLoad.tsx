@@ -22,16 +22,26 @@ const FastLoader = () => (
 export function withLazyLoading<T extends ComponentType<any>>(
   importFunc: () => Promise<{ default: T }>,
   fallback: ComponentType = LoadingSpinner,
-  useFastLoader = false
+  useFastLoader = false,
+  timeout = 30000 // Increased timeout for large components
 ) {
-  const LazyComponent = lazy(() => 
-    Promise.race([
-      importFunc(),
+  const LazyComponent = lazy(() => {
+    const startTime = Date.now();
+    
+    return Promise.race([
+      importFunc().catch((error) => {
+        console.error('Component import failed:', error);
+        throw error;
+      }),
       new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Component load timeout')), 10000)
+        setTimeout(() => {
+          const loadTime = Date.now() - startTime;
+          console.warn(`Component load timeout after ${loadTime}ms`);
+          reject(new Error(`Component load timeout after ${loadTime}ms`));
+        }, timeout)
       )
-    ])
-  );
+    ]);
+  });
   
   return function LazyLoadedComponent(props: any) {
     const FallbackComponent = useFastLoader ? FastLoader : fallback;

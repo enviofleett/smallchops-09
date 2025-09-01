@@ -93,6 +93,9 @@ class ProductionErrorBoundary extends Component<Props, State> {
     if (error.message.includes('Network') || error.message.includes('fetch')) {
       return 'network';
     }
+    if (error.message.includes('timeout') || error.message.includes('Component load timeout')) {
+      return 'timeout';
+    }
     if (error.message.includes('Authorization') || error.message.includes('permission')) {
       return 'auth';
     }
@@ -110,6 +113,8 @@ class ProductionErrorBoundary extends Component<Props, State> {
         return 'This usually happens after an app update. Refreshing the page should fix it.';
       case 'network':
         return 'Please check your internet connection and try again.';
+      case 'timeout':
+        return 'The page is taking longer than usual to load. Please wait a moment and try again.';
       case 'auth':
         return 'You may need to log in again or contact support for access.';
       case 'runtime':

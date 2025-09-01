@@ -24,6 +24,7 @@ import RegistrationHealth from "./RegistrationHealth";
 import AdminCheckoutSettingsCard from '@/components/admin/settings/AdminCheckoutSettingsCard';
 import PaymentsWebhooksPanel from '@/components/admin/dev/PaymentsWebhooksPanel';
 import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
+import { ErrorTestComponent } from '@/components/error/ErrorTestComponent';
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 

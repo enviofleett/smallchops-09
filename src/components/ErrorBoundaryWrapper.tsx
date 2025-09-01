@@ -105,7 +105,7 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
     const message = error.message.toLowerCase();
     if (message.includes('network') || message.includes('fetch')) {
       return 'Network Error';
-    } else if (message.includes('chunk') || message.includes('loading')) {
+    } else if (message.includes('chunk') || message.includes('loading') || message.includes('timeout')) {
       return 'Loading Error';
     } else if (message.includes('permission') || message.includes('unauthorized')) {
       return 'Permission Error';
@@ -123,6 +123,9 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
       case 'Network Error':
         return 'Please check your internet connection and try again.';
       case 'Loading Error':
+        if (error.message.includes('timeout')) {
+          return 'This page is taking longer than usual to load. Please wait a moment and try again.';
+        }
         return 'There was a problem loading this page. Please refresh or try again.';
       case 'Permission Error':
         return 'You may not have permission to access this content. Please log in again.';

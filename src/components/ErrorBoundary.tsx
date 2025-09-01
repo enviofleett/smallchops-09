@@ -26,6 +26,15 @@ class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('ErrorBoundary caught an error:', error, errorInfo);
+    
+    // Additional logging for timeout errors
+    if (error.message.includes('timeout')) {
+      console.warn('Component loading timeout detected:', {
+        error: error.message,
+        context: 'Basic ErrorBoundary',
+        timestamp: new Date().toISOString()
+      });
+    }
   }
 
   private handleReset = () => {
@@ -48,7 +57,9 @@ class ErrorBoundary extends Component<Props, State> {
                   <strong>Something went wrong loading this tab</strong>
                   {this.state.error && (
                     <p className="text-sm mt-1 opacity-75">
-                      {this.state.error.message}
+                      {this.state.error.message.includes('timeout') 
+                        ? 'This page is taking longer than usual to load. Please try again.' 
+                        : this.state.error.message}
                     </p>
                   )}
                 </div>

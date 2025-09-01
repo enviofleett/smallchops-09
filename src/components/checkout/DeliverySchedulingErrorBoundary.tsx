@@ -27,6 +27,15 @@ export class DeliverySchedulingErrorBoundary extends React.Component<
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     console.error('Delivery scheduling error:', error, errorInfo);
+    
+    // Log timeout errors with additional context
+    if (error.message.includes('timeout')) {
+      console.warn('Delivery scheduling timeout:', {
+        error: error.message,
+        timestamp: new Date().toISOString(),
+        context: 'DeliverySchedulingErrorBoundary'
+      });
+    }
   }
 
   handleRetry = () => {
@@ -39,7 +48,12 @@ export class DeliverySchedulingErrorBoundary extends React.Component<
         <Alert variant="destructive">
           <AlertTriangle className="h-4 w-4" />
           <AlertDescription className="flex items-center justify-between">
-            <span>Failed to load delivery scheduling. Please try again.</span>
+            <span>
+              {this.state.error?.message.includes('timeout') 
+                ? 'Delivery scheduling is taking longer than usual to load. Please try again.'
+                : 'Failed to load delivery scheduling. Please try again.'
+              }
+            </span>
             <Button
               variant="outline"
               size="sm"

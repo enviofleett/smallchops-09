@@ -796,6 +796,17 @@ serve(async (req: Request) => {
 
     requestBody = await req.json();
     
+    // Handle healthcheck requests without full SMTP validation
+    if (requestBody.healthcheck) {
+      return new Response(JSON.stringify({
+        status: 'healthy',
+        service: 'unified-smtp-sender',
+        timestamp: new Date().toISOString()
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
     // Get business name for branding
     const { data: businessSettings } = await supabase
       .from('business_settings')

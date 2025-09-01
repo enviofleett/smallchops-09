@@ -64,6 +64,19 @@ serve(async (req) => {
     }
 
     const requestBody = await req.json().catch(() => ({}));
+    
+    // Handle health check requests
+    if (requestBody.healthcheck || requestBody.dry_run || requestBody.test_mode) {
+      return new Response(JSON.stringify({
+        status: 'healthy',
+        service: 'unified-email-queue-processor',
+        timestamp: new Date().toISOString(),
+        circuitBreaker: circuitBreakerState.isOpen ? 'open' : 'closed'
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+    
     const batchSize = requestBody.batchSize || 50;
     const priority = requestBody.priority || 'all';
 

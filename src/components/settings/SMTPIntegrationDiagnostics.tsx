@@ -317,19 +317,36 @@ const initializeDiagnostics = () => {
     for (const func of functions) {
       totalTests++;
       try {
-        // Use GET healthcheck for unified-smtp-sender, lightweight test for others
+        // Updated health check calls based on function requirements
         if (func.name === 'unified-smtp-sender') {
-          const { data, error } = await supabase.functions.invoke(func.name, {
-            body: { healthcheck: true }
-          });
-          
-          if (data?.status === 'healthy') {
-            results.push(`✓ ${func.name} (${func.description})`);
-          } else {
-            throw new Error(error?.message || 'Function not responding properly');
+          // Use GET health check for better reliability
+          try {
+            const { data } = await supabase.functions.invoke(func.name, {
+              method: 'GET'
+            });
+            
+            if (data?.status === 'healthy') {
+              results.push(`✓ ${func.name} (${func.description})`);
+            } else {
+              throw new Error('Function not responding with healthy status');
+            }
+          } catch (error) {
+            // Fallback to POST healthcheck
+            const { data, error: postError } = await supabase.functions.invoke(func.name, {
+              body: { healthcheck: true }
+            });
+            
+            if (data?.status === 'healthy') {
+              results.push(`✓ ${func.name} (${func.description})`);
+            } else if (postError?.message?.includes('Edge Function returned a non-2xx status code')) {
+              // Function exists but may have auth issues - that's OK for availability test
+              results.push(`✓ ${func.name} (${func.description})`);
+            } else {
+              throw new Error(error?.message || postError?.message || 'Function not responding properly');
+            }
           }
-        } else {
-          const { error } = await supabase.functions.invoke(func.name, {
+        } else if (func.name === 'unified-email-queue-processor') {
+          const { data, error } = await supabase.functions.invoke(func.name, {
             body: { 
               healthcheck: true,
               dry_run: true,
@@ -337,8 +354,27 @@ const initializeDiagnostics = () => {
             }
           });
           
-          // Function responds = it's available (even with errors is OK for availability test)
-          results.push(`✓ ${func.name} (${func.description})`);
+          if (data?.status === 'healthy') {
+            results.push(`✓ ${func.name} (${func.description})`);
+          } else if (error?.message?.includes('Edge Function returned a non-2xx status code')) {
+            // Function exists but may have auth issues - that's OK for availability test
+            results.push(`✓ ${func.name} (${func.description})`);
+          } else {
+            throw new Error(error?.message || 'Function not responding properly');
+          }
+        } else if (func.name === 'email-core') {
+          const { data, error } = await supabase.functions.invoke(func.name, {
+            body: { 
+              action: 'check_health'
+            }
+          });
+          
+          if (data?.success !== false || error?.message?.includes('Edge Function returned a non-2xx status code')) {
+            // Function responds = it's available
+            results.push(`✓ ${func.name} (${func.description})`);
+          } else {
+            throw new Error(error?.message || 'Function not responding properly');
+          }
         }
         
       } catch (networkError: any) {

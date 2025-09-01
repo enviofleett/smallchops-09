@@ -35,7 +35,12 @@ serve(async (req) => {
       { auth: { persistSession: false } }
     );
 
-    const { action, ...payload } = await req.json();
+    const { action, ...payload } = await req.json().catch(() => ({}));
+
+    // Handle health check requests without action
+    if (!action || action === 'check_health' || payload.healthcheck || payload.dry_run) {
+      return await handleHealthCheck(supabaseClient);
+    }
 
     switch (action) {
       case 'send_email':

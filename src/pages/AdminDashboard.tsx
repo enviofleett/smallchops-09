@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -13,7 +14,7 @@ import {
 import { useAdminDashboardData } from '@/hooks/useAdminDashboardData';
 import { FulfillmentStatistics } from '@/components/admin/FulfillmentStatistics';
 import { FulfillmentWeeklyStats } from '@/components/admin/FulfillmentWeeklyStats';
-import RevenueChart from '@/components/charts/RevenueChart';
+import { FulfillmentChannelStats } from '@/components/admin/FulfillmentChannelStats';
 import { useDashboardData } from '@/hooks/useDashboardData';
 
 const AdminDashboard = () => {
@@ -115,21 +116,8 @@ const AdminDashboard = () => {
 
       {/* Charts and Analytics */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <TrendingUp className="h-5 w-5" />
-              Revenue Trends
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <RevenueChart 
-              data={dashboardData?.revenueTrends} 
-              isLoading={dashboardLoading} 
-            />
-          </CardContent>
-        </Card>
+        {/* Fulfillment Channel Statistics - Replaces Revenue Chart */}
+        <FulfillmentChannelStats />
 
         {/* Fulfillment Statistics */}
         <FulfillmentStatistics 

@@ -5,9 +5,18 @@ import App from "./App.tsx";
 import "./index.css";
 import { initWebVitals } from "./utils/webVitals";
 import { productionMonitoring } from "./utils/productionMonitoring";
+import { initializeConsoleCleanup, suppressWebSocketErrors } from "./utils/consoleCleanup";
+import { initializeSecureStorage } from "./utils/secureStorage";
+import { initializeSecurityMonitoring } from "./utils/securityHeaders";
 
 // Initialize performance monitoring
 initWebVitals();
+
+// Initialize security features
+initializeConsoleCleanup();
+suppressWebSocketErrors();
+initializeSecureStorage();
+initializeSecurityMonitoring();
 
 // Initialize production monitoring
 if (import.meta.env.PROD) {

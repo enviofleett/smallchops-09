@@ -7294,6 +7294,36 @@ export type Database = {
         }
         Relationships: []
       }
+      security_rate_limits: {
+        Row: {
+          attempt_count: number | null
+          blocked_until: string | null
+          created_at: string | null
+          id: string
+          operation_type: string
+          user_id: string | null
+          window_start: string | null
+        }
+        Insert: {
+          attempt_count?: number | null
+          blocked_until?: string | null
+          created_at?: string | null
+          id?: string
+          operation_type: string
+          user_id?: string | null
+          window_start?: string | null
+        }
+        Update: {
+          attempt_count?: number | null
+          blocked_until?: string | null
+          created_at?: string | null
+          id?: string
+          operation_type?: string
+          user_id?: string | null
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       smtp_connection_audit: {
         Row: {
           connection_attempt_at: string | null

@@ -4,7 +4,7 @@
  */
 
 export const initializeConsoleCleanup = () => {
-  if (process.env.NODE_ENV === 'production') {
+  if (import.meta.env.PROD) {
     // Store original console methods
     const originalError = console.error;
     const originalWarn = console.warn;
@@ -106,7 +106,7 @@ export const validatePaystackCSP = () => {
  * Enhanced error suppression for WebSocket connections in production
  */
 export const suppressWebSocketErrors = () => {
-  if (process.env.NODE_ENV === 'production') {
+  if (import.meta.env.PROD) {
     // Suppress WebSocket constructor errors
     const originalWebSocket = window.WebSocket;
     

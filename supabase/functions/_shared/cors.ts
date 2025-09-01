@@ -34,16 +34,16 @@ export function getCorsHeaders(origin?: string | null): Record<string, string> {
   const baseHeaders = {
     'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 
-      'authorization, x-client-info, apikey, content-type, x-requested-with, user-agent',
-    'Access-Control-Max-Age': '86400',
+      'authorization, x-client-info, apikey, content-type, x-requested-with',
+    'Access-Control-Max-Age': '3600', // Reduced from 24h to 1h
     'Access-Control-Allow-Credentials': 'false'
   };
 
-  // If no origin specified, allow all (fallback for development)
+  // If no origin specified, reject with null (more secure)
   if (!origin) {
     return {
       ...baseHeaders,
-      'Access-Control-Allow-Origin': '*'
+      'Access-Control-Allow-Origin': 'null'
     };
   }
 
@@ -56,18 +56,21 @@ export function getCorsHeaders(origin?: string | null): Record<string, string> {
     };
   }
 
-  // Check against development patterns
-  const isDevOrigin = DEV_PATTERNS.some(pattern => pattern.test(origin));
-  if (isDevOrigin) {
-    return {
-      ...baseHeaders,
-      'Access-Control-Allow-Origin': origin,
-      'Vary': 'Origin'
-    };
+  // Check against development patterns (only in non-production)
+  const isProduction = Deno.env.get('ENVIRONMENT') === 'production';
+  if (!isProduction) {
+    const isDevOrigin = DEV_PATTERNS.some(pattern => pattern.test(origin));
+    if (isDevOrigin) {
+      return {
+        ...baseHeaders,
+        'Access-Control-Allow-Origin': origin,
+        'Vary': 'Origin'
+      };
+    }
   }
 
-  // Log rejected origins for monitoring
-  console.log('🚫 CORS: Origin not allowed:', origin);
+  // Log rejected origins without exposing sensitive info
+  console.log('🚫 CORS: Origin not allowed');
   
   // Return restrictive headers for unknown origins
   return {

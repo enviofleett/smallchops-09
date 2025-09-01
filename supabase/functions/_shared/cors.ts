@@ -27,7 +27,8 @@ const DEV_PATTERNS = [
   /^http:\/\/localhost:\d+$/,
   /^https:\/\/.*\.lovable\.app$/,
   /^https:\/\/.*\.lovableproject\.com$/,
-  /^https:\/\/.*\.supabase\.co$/
+  /^https:\/\/.*\.supabase\.co$/,
+  /^https:\/\/.*\.sandbox\.lovable\.dev$/  // Added sandbox domains
 ];
 
 export function getCorsHeaders(origin?: string | null): Record<string, string> {

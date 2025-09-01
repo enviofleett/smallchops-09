@@ -33,9 +33,19 @@ serve(async (req) => {
             order_items (*),
             order_delivery_schedule (*)
           `, { count: 'exact' })
-          .order('order_time', { ascending: false })
+        // Sort by delivery date (today's orders first for confirmed status)
+        if (status === 'confirmed') {
+          query = query.order('order_time', { ascending: false })
+        } else {
+          query = query.order('order_time', { ascending: false })
+        }
 
-        if (status !== 'all') {
+        // Filter based on status - for 'confirmed', only show paid orders
+        if (status === 'confirmed') {
+          query = query.eq('status', status).eq('payment_status', 'paid')
+        } else if (status === 'all') {
+          // Don't filter by status
+        } else {
           query = query.eq('status', status)
         }
 

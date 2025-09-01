@@ -98,20 +98,46 @@ export default function AdminOrders() {
       });
     }
     
-    // Sort confirmed orders by delivery/pickup schedule
+    // Filter and sort confirmed orders - ONLY PAID ORDERS
     if (statusFilter === 'confirmed') {
+      // First filter: only paid confirmed orders
+      ordersCopy = orders.filter(order => 
+        order.status === 'confirmed' && order.payment_status === 'paid'
+      );
+      
+      // Sort with today's orders first, then by delivery schedule
       ordersCopy.sort((a, b) => {
         const scheduleA = deliverySchedules[a.id];
         const scheduleB = deliverySchedules[b.id];
         
-        // Overdue orders get highest priority
-        const aOverdue = scheduleA && isOrderOverdue(scheduleA.delivery_date, scheduleA.delivery_time_end);
-        const bOverdue = scheduleB && isOrderOverdue(scheduleB.delivery_date, scheduleB.delivery_time_end);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
         
-        if (aOverdue && !bOverdue) return -1;
-        if (!aOverdue && bOverdue) return 1;
+        // Check if orders are scheduled for today
+        const aIsToday = scheduleA && new Date(scheduleA.delivery_date).setHours(0, 0, 0, 0) === today.getTime();
+        const bIsToday = scheduleB && new Date(scheduleB.delivery_date).setHours(0, 0, 0, 0) === today.getTime();
         
-        // If both have schedules, sort by delivery date + time
+        // Today's orders come first
+        if (aIsToday && !bIsToday) return -1;
+        if (!aIsToday && bIsToday) return 1;
+        
+        // Among today's orders, overdue ones get highest priority
+        if (aIsToday && bIsToday) {
+          const aOverdue = scheduleA && isOrderOverdue(scheduleA.delivery_date, scheduleA.delivery_time_end);
+          const bOverdue = scheduleB && isOrderOverdue(scheduleB.delivery_date, scheduleB.delivery_time_end);
+          
+          if (aOverdue && !bOverdue) return -1;
+          if (!aOverdue && bOverdue) return 1;
+          
+          // Both today - sort by time slot
+          if (scheduleA && scheduleB) {
+            const timeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
+            const timeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
+            return timeA.getTime() - timeB.getTime();
+          }
+        }
+        
+        // For non-today orders, sort by delivery date + time
         if (scheduleA && scheduleB) {
           const dateTimeA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_start}`);
           const dateTimeB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_start}`);
@@ -122,9 +148,9 @@ export default function AdminOrders() {
         if (scheduleA && !scheduleB) return -1;
         if (!scheduleA && scheduleB) return 1;
         
-        // Fallback to order time
-        return new Date(a.order_time || a.created_at).getTime() - 
-               new Date(b.order_time || b.created_at).getTime();
+        // Fallback to order time (most recent first for unscheduled orders)
+        return new Date(b.order_time || b.created_at).getTime() - 
+               new Date(a.order_time || a.created_at).getTime();
       });
     }
     
@@ -186,7 +212,7 @@ export default function AdminOrders() {
     return {
       all: totalCount,
       pending: orders.filter(o => o.status === 'pending').length,
-      confirmed: orders.filter(o => o.status === 'confirmed').length,
+      confirmed: orders.filter(o => o.status === 'confirmed' && o.payment_status === 'paid').length, // Only paid confirmed orders
       preparing: orders.filter(o => o.status === 'preparing').length,
       out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
       delivered: orders.filter(o => o.status === 'delivered').length,

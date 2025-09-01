@@ -217,40 +217,8 @@ export const MobileOrderTabs = ({
   }
 
   return (
-    <Tabs value={activeTab} onValueChange={onTabChange}>
-      {/* Mobile scrollable tabs */}
-      <div className="overflow-x-auto pb-2 scrollbar-hide">
-        <TabsList className="flex w-max min-w-full gap-1 p-1 bg-muted rounded-lg">
-          <TabsTrigger value="all" className="text-xs whitespace-nowrap px-3 py-2">
-            All ({orderCounts.all})
-          </TabsTrigger>
-          <TabsTrigger value="confirmed" className="text-xs whitespace-nowrap px-3 py-2">
-            Conf ({orderCounts.confirmed})
-          </TabsTrigger>
-          <TabsTrigger value="preparing" className="text-xs whitespace-nowrap px-3 py-2">
-            Prep ({orderCounts.preparing})
-          </TabsTrigger>
-          <TabsTrigger value="ready" className="text-xs whitespace-nowrap px-3 py-2">
-            Ready ({orderCounts.ready})
-          </TabsTrigger>
-          <TabsTrigger value="out_for_delivery" className="text-xs whitespace-nowrap px-3 py-2">
-            Out ({orderCounts.out_for_delivery})
-          </TabsTrigger>
-          <TabsTrigger value="delivered" className="text-xs whitespace-nowrap px-3 py-2">
-            Del ({orderCounts.delivered})
-          </TabsTrigger>
-          <TabsTrigger value="overdue" className="text-xs whitespace-nowrap px-3 py-2 text-destructive">
-            Over ({orderCounts.overdue})
-          </TabsTrigger>
-        </TabsList>
-      </div>
-
-      {/* Tab content */}
-      {['all', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'overdue'].map(status => (
-        <TabsContent key={status} value={status} className="mt-4">
-          {renderOrderList(getOrdersByStatus(status))}
-        </TabsContent>
-      ))}
-    </Tabs>
+    <div className="space-y-3">
+      {orders.map(renderOrderCard)}
+    </div>
   );
 };

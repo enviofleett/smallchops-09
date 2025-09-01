@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -50,7 +49,9 @@ const AdminDashboard = () => {
       <div className="flex items-center justify-center h-64">
         <div className="text-center">
           <div className="text-red-500 text-lg font-medium">Failed to load dashboard</div>
-          <div className="text-red-400 text-sm mt-1">{adminError}</div>
+          <div className="text-red-400 text-sm mt-1">
+            {adminError instanceof Error ? adminError.message : String(adminError)}
+          </div>
         </div>
       </div>
     );

@@ -20,6 +20,7 @@ import { toast } from 'sonner';
 import { Mail, Settings, FileText, TestTube, Activity, BarChart3, AlertCircle, CheckCircle, Clock, Send, TrendingUp, User, Zap } from 'lucide-react';
 import { DeliverySchedulingTab } from './DeliverySchedulingTab';
 import { LegalTermsManager } from './LegalTermsManager';
+import { SMTPIntegrationDiagnostics } from './SMTPIntegrationDiagnostics';
 interface EmailStats {
   totalSent: number;
   deliveredToday: number;
@@ -162,6 +163,9 @@ export const CommunicationsTab = () => {
       </CardContent>
     </Card>;
   return <div className="space-y-6">
+      {/* QA Email Integration Diagnostics */}
+      <SMTPIntegrationDiagnostics />
+      
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-lg font-medium">Email Management</h3>

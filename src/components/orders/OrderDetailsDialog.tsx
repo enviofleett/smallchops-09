@@ -351,10 +351,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           />
         </div>
 
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 px-4 sm:px-6 print:grid-cols-1 print:px-0">
-          {/* Left Column - Order Information */}
-          <div className="lg:col-span-2 print:col-span-1 space-y-6 sm:space-y-8">
+        {/* Main Content - Single Column Layout */}
+        <div className="px-4 sm:px-6 print:px-0">
+          {/* Order Information Sections */}
+          <div className="space-y-6 sm:space-y-8">
             <section aria-labelledby="customer-info-heading">
               <h2 id="customer-info-heading" className="text-lg font-semibold text-foreground mb-4 print:text-black">
                 Customer Information
@@ -429,33 +429,33 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
                 deliveryInstructions={safeFallback(detailedOrderData?.delivery_schedule?.special_instructions || deliverySchedule?.special_instructions)}
               />
             </section>
-          </div>
 
-          {/* Right Column - Actions Panel */}
-          <aside className="space-y-4 sm:space-y-6 print:hidden lg:sticky lg:top-4 lg:self-start" aria-labelledby="actions-heading">
-            <h2 id="actions-heading" className="text-lg font-semibold text-foreground mb-4 px-1">
-              Actions & Status
-            </h2>
-            <ActionsPanel
-              selectedStatus={selectedStatus}
-              onStatusChange={setSelectedStatus}
-              assignedRider={assignedRider}
-              onRiderChange={setAssignedRider}
-              riders={riders}
-              isLoadingRiders={isLoadingRiders}
-              manualStatus={manualStatus}
-              onManualStatusChange={setManualStatus}
-              onManualSend={handleManualSend}
-              onUpdate={handleUpdate}
-              onVerifyPayment={handleVerifyWithPaystack}
-              paymentReference={order.payment_reference}
-              isUpdating={updateMutation.isPending}
-              isSendingManual={manualSendMutation.isPending}
-              isVerifying={verifying}
-              verifyState={verifyState}
-              verifyMessage={verifyMessage}
-            />
-          </aside>
+            {/* Actions Panel - Integrated Inline */}
+            <section className="print:hidden" aria-labelledby="actions-heading">
+              <h2 id="actions-heading" className="text-lg font-semibold text-foreground mb-4 print:text-black">
+                Order Actions & Status Management
+              </h2>
+              <ActionsPanel
+                selectedStatus={selectedStatus}
+                onStatusChange={setSelectedStatus}
+                assignedRider={assignedRider}
+                onRiderChange={setAssignedRider}
+                riders={riders}
+                isLoadingRiders={isLoadingRiders}
+                manualStatus={manualStatus}
+                onManualStatusChange={setManualStatus}
+                onManualSend={handleManualSend}
+                onUpdate={handleUpdate}
+                onVerifyPayment={handleVerifyWithPaystack}
+                paymentReference={order.payment_reference}
+                isUpdating={updateMutation.isPending}
+                isSendingManual={manualSendMutation.isPending}
+                isVerifying={verifying}
+                verifyState={verifyState}
+                verifyMessage={verifyMessage}
+              />
+            </section>
+          </div>
         </div>
 
         {/* Print-friendly footer (hidden on screen) */}

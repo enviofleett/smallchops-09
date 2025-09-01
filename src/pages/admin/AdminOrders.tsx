@@ -29,7 +29,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from '@/hooks/useDebounce';
 import { HourlyDeliveryFilter } from '@/components/admin/orders/HourlyDeliveryFilter';
-import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { OverdueDateFilter } from '@/components/admin/orders/OverdueDateFilter';
+import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay, subDays, isToday, isYesterday } from 'date-fns';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -45,6 +46,9 @@ export default function AdminOrders() {
   const [selectedDay, setSelectedDay] = useState<'today' | 'tomorrow' | null>(null);
   const [selectedHour, setSelectedHour] = useState<string | null>(null);
   
+  // Overdue date filter state for overdue tab
+  const [selectedOverdueDateFilter, setSelectedOverdueDateFilter] = useState<string | null>(null);
+  
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -55,13 +59,17 @@ export default function AdminOrders() {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, debouncedSearchQuery, deliveryFilter, selectedDay, selectedHour]);
+  }, [statusFilter, debouncedSearchQuery, deliveryFilter, selectedDay, selectedHour, selectedOverdueDateFilter]);
 
   // Reset hourly filters when changing tabs (except for confirmed tab)
   useEffect(() => {
     if (activeTab !== 'confirmed') {
       setSelectedDay(null);
       setSelectedHour(null);
+    }
+    // Reset overdue filters when changing tabs (except for overdue tab)
+    if (activeTab !== 'overdue') {
+      setSelectedOverdueDateFilter(null);
     }
   }, [activeTab]);
 
@@ -108,8 +116,24 @@ export default function AdminOrders() {
         const schedule = deliverySchedules[order.id];
         if (!schedule) return false;
         
-        return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
-               ['confirmed', 'preparing', 'ready'].includes(order.status);
+        // Only show paid orders that are overdue and haven't been delivered
+        return order.payment_status === 'paid' && 
+               isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
+               ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status);
+      });
+      
+      // Sort overdue orders by how long they've been overdue (most critical first)
+      ordersCopy.sort((a, b) => {
+        const scheduleA = deliverySchedules[a.id];
+        const scheduleB = deliverySchedules[b.id];
+        
+        if (!scheduleA || !scheduleB) return 0;
+        
+        const deadlineA = new Date(`${scheduleA.delivery_date}T${scheduleA.delivery_time_end}`);
+        const deadlineB = new Date(`${scheduleB.delivery_date}T${scheduleB.delivery_time_end}`);
+        
+        // Most overdue orders come first (earlier deadlines first)
+        return deadlineA.getTime() - deadlineB.getTime();
       });
     }
     
@@ -247,8 +271,42 @@ export default function AdminOrders() {
       });
     }
     
+    // Apply overdue date filtering for overdue tab
+    if (statusFilter === 'overdue' && selectedOverdueDateFilter) {
+      const now = new Date();
+      const today = startOfDay(now);
+      const yesterday = startOfDay(subDays(now, 1));
+      const lastWeek = startOfDay(subDays(now, 7));
+      
+      result = result.filter(order => {
+        const schedule = deliverySchedules[order.id];
+        if (!schedule || !schedule.delivery_date || !schedule.delivery_time_end) return false;
+        
+        try {
+          const deliveryDateTime = new Date(`${schedule.delivery_date}T${schedule.delivery_time_end}`);
+          if (isNaN(deliveryDateTime.getTime())) return false;
+          
+          switch (selectedOverdueDateFilter) {
+            case 'today':
+              return isSameDay(deliveryDateTime, today) || deliveryDateTime >= today;
+            case 'yesterday':
+              return isSameDay(deliveryDateTime, yesterday);
+            case 'last_week':
+              return deliveryDateTime >= lastWeek && deliveryDateTime < yesterday;
+            case 'older':
+              return deliveryDateTime < lastWeek;
+            default:
+              return true;
+          }
+        } catch (error) {
+          console.warn('Error parsing delivery date for overdue filter:', schedule.delivery_date, error);
+          return false;
+        }
+      });
+    }
+    
     return result;
-  }, [prioritySortedOrders, deliverySchedules, deliveryFilter, statusFilter, selectedDay, selectedHour]);
+  }, [prioritySortedOrders, deliverySchedules, deliveryFilter, statusFilter, selectedDay, selectedHour, selectedOverdueDateFilter]);
 
   // Calculate hourly order counts for confirmed orders
   const hourlyOrderCounts = useMemo(() => {
@@ -292,16 +350,68 @@ export default function AdminOrders() {
     return counts;
   }, [prioritySortedOrders, deliverySchedules, statusFilter]);
 
+  // Calculate overdue order counts by date ranges
+  const overdueOrderCounts = useMemo(() => {
+    if (statusFilter !== 'overdue') {
+      return { today: 0, yesterday: 0, lastWeek: 0, older: 0 };
+    }
+    
+    const now = new Date();
+    const today = startOfDay(now);
+    const yesterday = startOfDay(subDays(now, 1));
+    const lastWeek = startOfDay(subDays(now, 7));
+    
+    const counts = { today: 0, yesterday: 0, lastWeek: 0, older: 0 };
+    
+    // Filter for overdue orders (paid orders that are overdue and not delivered)
+    const overdueOrders = orders.filter(order => {
+      const schedule = deliverySchedules[order.id];
+      if (!schedule) return false;
+      
+      return order.payment_status === 'paid' && 
+             isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
+             ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status);
+    });
+    
+    overdueOrders.forEach(order => {
+      const schedule = deliverySchedules[order.id];
+      if (!schedule || !schedule.delivery_date || !schedule.delivery_time_end) return;
+      
+      try {
+        const deliveryDate = new Date(schedule.delivery_date);
+        const deliveryDateTime = new Date(`${schedule.delivery_date}T${schedule.delivery_time_end}`);
+        
+        if (isNaN(deliveryDateTime.getTime())) return;
+        
+        // Categorize based on when the order became overdue
+        if (isSameDay(deliveryDateTime, today) || deliveryDateTime >= today) {
+          counts.today++;
+        } else if (isSameDay(deliveryDateTime, yesterday)) {
+          counts.yesterday++;
+        } else if (deliveryDateTime >= lastWeek) {
+          counts.lastWeek++;
+        } else {
+          counts.older++;
+        }
+      } catch (error) {
+        console.warn('Error processing overdue order for date counts:', order.id, error);
+      }
+    });
+    
+    return counts;
+  }, [orders, deliverySchedules, statusFilter]);
+
   // Get order counts by status for tab badges
   const orderCounts = useMemo(() => {
-    // Calculate overdue count with defensive date handling
+    // Calculate overdue count with defensive date handling - paid orders only
     const overdueCount = orders.filter(order => {
       const schedule = deliverySchedules[order.id];
       if (!schedule || !schedule.delivery_date || !schedule.delivery_time_end) return false;
       
       try {
-        return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
-               ['confirmed', 'preparing', 'ready'].includes(order.status);
+        return order.payment_status === 'paid' && 
+               isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
+               ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status);
       } catch (error) {
         console.warn('Error checking overdue status for order:', order.id, error);
         return false;
@@ -659,6 +769,25 @@ export default function AdminOrders() {
                       onDayChange={setSelectedDay}
                       onHourChange={setSelectedHour}
                       orderCounts={hourlyOrderCounts}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
+              {/* Overdue Date Filter - Only show for overdue tab */}
+              {activeTab === 'overdue' && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <AlertCircle className="w-5 h-5 text-destructive" />
+                      Overdue Period Filters
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <OverdueDateFilter
+                      selectedDateFilter={selectedOverdueDateFilter}
+                      onDateFilterChange={setSelectedOverdueDateFilter}
+                      overdueOrderCounts={overdueOrderCounts}
                     />
                   </CardContent>
                 </Card>

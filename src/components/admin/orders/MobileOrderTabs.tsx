@@ -58,8 +58,10 @@ export const MobileOrderTabs = ({
         if (!schedule || !schedule.delivery_date || !schedule.delivery_time_end) return false;
         
         try {
-          return isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
-                 ['confirmed', 'preparing', 'ready'].includes(order.status);
+          // Only show paid orders that are overdue and haven't been delivered
+          return order.payment_status === 'paid' && 
+                 isOrderOverdue(schedule.delivery_date, schedule.delivery_time_end) && 
+                 ['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(order.status);
         } catch (error) {
           console.warn('Error checking overdue status in mobile tabs:', order.id, error);
           return false;

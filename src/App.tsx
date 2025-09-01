@@ -20,6 +20,7 @@ import { ErrorTrackerComponent } from "./components/monitoring/ErrorTracker";
 import { NetworkProvider } from "./components/network/NetworkProvider";
 import { OnlineStatusBanner } from "./components/network/OnlineStatusBanner";
 import { DeploymentInfo } from "./components/common/DeploymentInfo";
+import AdminLayout from "./components/layout/AdminLayout";
 
 // Initialize payment monitoring and cache busting
 initPaymentMonitoring();

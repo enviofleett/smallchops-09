@@ -28,6 +28,8 @@ import { isOrderOverdue } from '@/utils/scheduleTime';
 import { useToast } from '@/hooks/use-toast';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useDebounce } from '@/hooks/useDebounce';
+import { HourlyDeliveryFilter } from '@/components/admin/orders/HourlyDeliveryFilter';
+import { addDays, format as formatDate, isSameDay, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
 
 export default function AdminOrders() {
   const [selectedOrder, setSelectedOrder] = useState<OrderWithItems | null>(null);
@@ -38,6 +40,11 @@ export default function AdminOrders() {
   const [currentPage, setCurrentPage] = useState(1);
   const [activeTab, setActiveTab] = useState('all');
   const [showDeliveryReport, setShowDeliveryReport] = useState(false);
+  
+  // Hourly delivery filter state for confirmed tab
+  const [selectedDay, setSelectedDay] = useState<'today' | 'tomorrow' | null>(null);
+  const [selectedHour, setSelectedHour] = useState<string | null>(null);
+  
   const isMobile = useIsMobile();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -48,7 +55,15 @@ export default function AdminOrders() {
   // Reset pagination when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [statusFilter, debouncedSearchQuery, deliveryFilter]);
+  }, [statusFilter, debouncedSearchQuery, deliveryFilter, selectedDay, selectedHour]);
+
+  // Reset hourly filters when changing tabs (except for confirmed tab)
+  useEffect(() => {
+    if (activeTab !== 'confirmed') {
+      setSelectedDay(null);
+      setSelectedHour(null);
+    }
+  }, [activeTab]);
 
   // Fetch orders with pagination and filters
   const {
@@ -157,41 +172,125 @@ export default function AdminOrders() {
     return ordersCopy;
   }, [orders, deliverySchedules, statusFilter]);
 
-  // Filter orders by delivery schedule with defensive date handling
+  // Filter orders by delivery schedule with defensive date handling + hourly filtering
   const filteredOrders = useMemo(() => {
-    if (deliveryFilter === 'all') return prioritySortedOrders;
+    let result = prioritySortedOrders;
     
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    // Apply delivery filter first (existing logic)
+    if (deliveryFilter !== 'all') {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      result = prioritySortedOrders.filter(order => {
+        // Only apply delivery schedule filter to paid delivery orders
+        if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
+          return false; // Exclude non-delivery/unpaid orders when applying delivery filters
+        }
+        
+        const schedule = deliverySchedules[order.id];
+        if (!schedule || !schedule.delivery_date) return false;
+        
+        try {
+          const deliveryDate = new Date(schedule.delivery_date);
+          if (isNaN(deliveryDate.getTime())) return false;
+          
+          deliveryDate.setHours(0, 0, 0, 0);
+          
+          if (deliveryFilter === 'due_today') {
+            return deliveryDate.getTime() === today.getTime();
+          } else if (deliveryFilter === 'upcoming') {
+            return deliveryDate.getTime() > today.getTime();
+          }
+        } catch (error) {
+          console.warn('Error parsing delivery date:', schedule.delivery_date, error);
+          return false;
+        }
+        
+        return false;
+      });
+    }
     
-    return prioritySortedOrders.filter(order => {
-      // Only apply delivery schedule filter to paid delivery orders
-      if (order.order_type !== 'delivery' || order.payment_status !== 'paid') {
-        return false; // Exclude non-delivery/unpaid orders when applying delivery filters
-      }
+    // Apply hourly filtering for confirmed tab
+    if (statusFilter === 'confirmed' && (selectedDay || selectedHour)) {
+      const today = startOfDay(new Date());
+      const tomorrow = startOfDay(addDays(new Date(), 1));
+      
+      result = result.filter(order => {
+        const schedule = deliverySchedules[order.id];
+        if (!schedule || !schedule.delivery_date) return false;
+        
+        try {
+          const deliveryDate = startOfDay(new Date(schedule.delivery_date));
+          
+          // Filter by selected day
+          if (selectedDay) {
+            const targetDate = selectedDay === 'today' ? today : tomorrow;
+            if (deliveryDate.getTime() !== targetDate.getTime()) {
+              return false;
+            }
+          }
+          
+          // Filter by selected hour
+          if (selectedHour && schedule.delivery_time_start) {
+            const orderHour = schedule.delivery_time_start.split(':')[0];
+            const selectedHourFormatted = selectedHour.split(':')[0];
+            if (orderHour !== selectedHourFormatted) {
+              return false;
+            }
+          }
+          
+          return true;
+        } catch (error) {
+          console.warn('Error parsing delivery date for hourly filter:', schedule.delivery_date, error);
+          return false;
+        }
+      });
+    }
+    
+    return result;
+  }, [prioritySortedOrders, deliverySchedules, deliveryFilter, statusFilter, selectedDay, selectedHour]);
+
+  // Calculate hourly order counts for confirmed orders
+  const hourlyOrderCounts = useMemo(() => {
+    if (statusFilter !== 'confirmed') return { today: {}, tomorrow: {} };
+    
+    const today = startOfDay(new Date());
+    const tomorrow = startOfDay(addDays(new Date(), 1));
+    const counts = {
+      today: {} as Record<string, number>,
+      tomorrow: {} as Record<string, number>
+    };
+    
+    // Initialize hourly slots
+    for (let hour = 8; hour <= 22; hour++) {
+      const timeSlot = `${hour.toString().padStart(2, '0')}:00`;
+      counts.today[timeSlot] = 0;
+      counts.tomorrow[timeSlot] = 0;
+    }
+    
+    // Count orders for each hour
+    prioritySortedOrders.forEach(order => {
+      if (order.status !== 'confirmed' || order.payment_status !== 'paid') return;
       
       const schedule = deliverySchedules[order.id];
-      if (!schedule || !schedule.delivery_date) return false;
+      if (!schedule || !schedule.delivery_date || !schedule.delivery_time_start) return;
       
       try {
-        const deliveryDate = new Date(schedule.delivery_date);
-        if (isNaN(deliveryDate.getTime())) return false;
+        const deliveryDate = startOfDay(new Date(schedule.delivery_date));
+        const orderHour = `${schedule.delivery_time_start.split(':')[0]}:00`;
         
-        deliveryDate.setHours(0, 0, 0, 0);
-        
-        if (deliveryFilter === 'due_today') {
-          return deliveryDate.getTime() === today.getTime();
-        } else if (deliveryFilter === 'upcoming') {
-          return deliveryDate.getTime() > today.getTime();
+        if (deliveryDate.getTime() === today.getTime()) {
+          counts.today[orderHour] = (counts.today[orderHour] || 0) + 1;
+        } else if (deliveryDate.getTime() === tomorrow.getTime()) {
+          counts.tomorrow[orderHour] = (counts.tomorrow[orderHour] || 0) + 1;
         }
       } catch (error) {
-        console.warn('Error parsing delivery date:', schedule.delivery_date, error);
-        return false;
+        console.warn('Error processing order for hourly counts:', order.id, error);
       }
-      
-      return false;
     });
-  }, [prioritySortedOrders, deliverySchedules, deliveryFilter]);
+    
+    return counts;
+  }, [prioritySortedOrders, deliverySchedules, statusFilter]);
 
   // Get order counts by status for tab badges
   const orderCounts = useMemo(() => {
@@ -544,6 +643,27 @@ export default function AdminOrders() {
             />
           ) : (
             <TabsContent value={activeTab} className="space-y-4">
+              {/* Hourly Delivery Filter - Only show for confirmed tab */}
+              {activeTab === 'confirmed' && (
+                <Card>
+                  <CardHeader className="pb-3">
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Clock className="w-5 h-5" />
+                      Delivery Time Filters
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <HourlyDeliveryFilter
+                      selectedDay={selectedDay}
+                      selectedHour={selectedHour}
+                      onDayChange={setSelectedDay}
+                      onHourChange={setSelectedHour}
+                      orderCounts={hourlyOrderCounts}
+                    />
+                  </CardContent>
+                </Card>
+              )}
+
             {isLoading ? (
               <div className="space-y-4">
                 {[...Array(5)].map((_, i) => (

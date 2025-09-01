@@ -47,58 +47,58 @@ export const QuickStatsBar: React.FC<QuickStatsBarProps> = ({ order, className }
   };
 
   return (
-    <Card className={cn("p-4", className)}>
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+    <Card className={cn("p-3 sm:p-4", className)}>
+      <div className="grid grid-cols-2 gap-3 sm:gap-4">
         {/* Order Status */}
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-primary/10">
-            <Clock className="h-4 w-4 text-primary" />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg bg-muted/50">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-primary/10 flex-shrink-0">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+            </div>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Status</p>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Status</p>
-            <Badge variant={getStatusVariant(order.status)} className="text-xs">
-              {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
-            </Badge>
-          </div>
+          <Badge variant={getStatusVariant(order.status)} className="text-xs font-medium w-fit">
+            {order.status.charAt(0).toUpperCase() + order.status.slice(1)}
+          </Badge>
         </div>
 
         {/* Order Type */}
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-secondary/10">
-            {order.order_type === 'delivery' ? (
-              <Truck className="h-4 w-4 text-secondary" />
-            ) : (
-              <Package className="h-4 w-4 text-secondary" />
-            )}
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg bg-muted/50">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-accent/10 flex-shrink-0">
+              {order.order_type === 'delivery' ? (
+                <Truck className="h-3 w-3 sm:h-4 sm:w-4 text-accent-foreground" />
+              ) : (
+                <Package className="h-3 w-3 sm:h-4 sm:w-4 text-accent-foreground" />
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Type</p>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Type</p>
-            <p className="font-medium text-sm capitalize">{order.order_type}</p>
-          </div>
+          <p className="font-semibold text-sm text-foreground capitalize">{order.order_type}</p>
         </div>
 
         {/* Payment Status */}
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-accent/10">
-            <CreditCard className="h-4 w-4 text-accent-foreground" />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg bg-muted/50 col-span-2 sm:col-span-1">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-secondary/10 flex-shrink-0">
+              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-secondary-foreground" />
+            </div>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Payment</p>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Payment</p>
-            <Badge variant={getPaymentVariant(order.payment_status)} className="text-xs">
-              {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
-            </Badge>
-          </div>
+          <Badge variant={getPaymentVariant(order.payment_status)} className="text-xs font-medium w-fit">
+            {order.payment_status.charAt(0).toUpperCase() + order.payment_status.slice(1)}
+          </Badge>
         </div>
 
         {/* Total Amount */}
-        <div className="flex items-center gap-2">
-          <div className="p-2 rounded-lg bg-success/10">
-            <Package className="h-4 w-4 text-success" />
+        <div className="flex flex-col sm:flex-row sm:items-center gap-2 p-3 rounded-lg bg-muted/50 col-span-2 sm:col-span-1">
+          <div className="flex items-center gap-2">
+            <div className="p-1.5 rounded-md bg-primary/10 flex-shrink-0">
+              <Package className="h-3 w-3 sm:h-4 sm:w-4 text-primary" />
+            </div>
+            <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider">Total</p>
           </div>
-          <div>
-            <p className="text-xs text-muted-foreground">Total</p>
-            <p className="font-bold text-sm">{formatCurrency(order.total_amount)}</p>
-          </div>
+          <p className="font-bold text-base text-foreground">{formatCurrency(order.total_amount)}</p>
         </div>
       </div>
     </Card>

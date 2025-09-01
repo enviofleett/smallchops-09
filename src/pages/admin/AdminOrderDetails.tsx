@@ -94,40 +94,43 @@ const AdminOrderDetails: React.FC = () => {
     <div className="min-h-screen bg-background print:bg-white">
       {/* Header - Hidden on print */}
       <div className="border-b bg-card print:hidden">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+        <div className="container mx-auto px-4 py-3 sm:py-4">
+          {/* Mobile Header Layout */}
+          <div className="flex flex-col space-y-3 sm:space-y-0 sm:flex-row sm:items-center sm:justify-between">
+            {/* Title and Back Button */}
+            <div className="flex items-center gap-3">
               <Button
                 onClick={() => navigate('/admin/orders')}
                 variant="ghost"
                 size="sm"
-                className="gap-2"
+                className="gap-2 p-2 sm:px-3"
               >
                 <ArrowLeft className="h-4 w-4" />
-                Back to Orders
+                <span className="hidden sm:inline">Back</span>
               </Button>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">
+              <div className="min-w-0 flex-1">
+                <h1 className="text-lg sm:text-2xl font-bold text-foreground truncate">
                   Order #{order.order_number}
                 </h1>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-xs sm:text-sm text-muted-foreground hidden sm:block">
                   Order details and management
                 </p>
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <Button onClick={handleExportPDF} variant="outline" size="sm">
-                <FileText className="h-4 w-4 mr-2" />
-                Export PDF
+            {/* Export Buttons */}
+            <div className="flex items-center gap-2 overflow-x-auto">
+              <Button onClick={handleExportPDF} variant="outline" size="sm" className="whitespace-nowrap">
+                <FileText className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">PDF</span>
               </Button>
-              <Button onClick={handleExportCSV} variant="outline" size="sm">
-                <Download className="h-4 w-4 mr-2" />
-                Export CSV
+              <Button onClick={handleExportCSV} variant="outline" size="sm" className="whitespace-nowrap">
+                <Download className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">CSV</span>
               </Button>
-              <Button onClick={handlePrint} variant="outline" size="sm">
-                <Printer className="h-4 w-4 mr-2" />
-                Print
+              <Button onClick={handlePrint} variant="outline" size="sm" className="whitespace-nowrap">
+                <Printer className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Print</span>
               </Button>
             </div>
           </div>
@@ -135,13 +138,13 @@ const AdminOrderDetails: React.FC = () => {
       </div>
 
       {/* Content */}
-      <div className="container mx-auto px-4 py-6 print:px-0 print:py-4">
-        {/* Quick Stats - Mobile and Print */}
-        <QuickStatsBar order={order} className="mb-6 lg:hidden print:block" />
+      <div className="container mx-auto px-4 py-4 sm:py-6 print:px-0 print:py-4">
+        {/* Quick Stats - Always visible on mobile, hidden on desktop unless print */}
+        <QuickStatsBar order={order} className="mb-4 sm:mb-6 lg:hidden print:block" />
         
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-          {/* Main Content - Left Side */}
-          <div className="lg:col-span-3 space-y-6">
+        <div className="grid grid-cols-1 xl:grid-cols-4 gap-4 sm:gap-6">
+          {/* Main Content */}
+          <div className="xl:col-span-3 space-y-4 sm:space-y-6">
             <CustomerInfoCard
               customerName={order.customer_name}
               customerPhone={order.customer_phone}
@@ -196,9 +199,9 @@ const AdminOrderDetails: React.FC = () => {
             />
           </div>
           
-          {/* Actions Panel - Right Side - Hidden on print */}
-          <div className="lg:col-span-1 print:hidden">
-            <div className="sticky top-6">
+          {/* Actions Panel - Right Side on Desktop, Bottom on Mobile - Hidden on print */}
+          <div className="xl:col-span-1 print:hidden">
+            <div className="xl:sticky xl:top-6">
               <ActionsPanel
                 selectedStatus={order.status}
                 onStatusChange={() => {}}
@@ -219,6 +222,19 @@ const AdminOrderDetails: React.FC = () => {
               />
             </div>
           </div>
+        </div>
+        
+        {/* Mobile Action Buttons - Only visible on mobile */}
+        <div className="xl:hidden print:hidden mt-6 flex flex-col sm:flex-row gap-3 p-4 bg-card rounded-lg border">
+          <Button className="flex-1" size="sm">
+            Update Status
+          </Button>
+          <Button variant="outline" className="flex-1" size="sm">
+            Assign Rider
+          </Button>
+          <Button variant="outline" className="flex-1" size="sm">
+            Verify Payment
+          </Button>
         </div>
         
         {/* Print Footer */}

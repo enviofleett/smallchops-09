@@ -151,16 +151,23 @@ export function EnhancedOrderCard({
             </div>
             <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
               <CollapsibleTrigger asChild>
-                <Button variant="ghost" size="sm" className="text-xs sm:text-sm">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="text-xs sm:text-sm"
+                  aria-expanded={isExpanded}
+                  aria-controls="order-details-content"
+                  aria-label={isExpanded ? 'Hide order details' : 'Show order details'}
+                >
                   {isExpanded ? (
                     <>
-                      <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <ChevronUp className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 transition-transform duration-200" />
                       <span className="hidden sm:inline">Hide Details</span>
                       <span className="sm:hidden">Hide</span>
                     </>
                   ) : (
                     <>
-                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                      <ChevronDown className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2 transition-transform duration-200" />
                       <span className="hidden sm:inline">View Details</span>
                       <span className="sm:hidden">Details</span>
                     </>
@@ -172,10 +179,13 @@ export function EnhancedOrderCard({
         </div>
       </div>
 
-      {/* Expandable Content - Mobile optimized */}
+      {/* Expandable Content - Mobile optimized with smooth animation */}
       <Collapsible open={isExpanded} onOpenChange={setIsExpanded}>
-        <CollapsibleContent>
-          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
+        <CollapsibleContent 
+          className="overflow-hidden transition-all duration-300 ease-in-out data-[state=closed]:animate-accordion-up data-[state=open]:animate-accordion-down"
+          id="order-details-content"
+        >
+          <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 animate-fade-in">
             {/* Order Items Breakdown */}
             {order.order_items && order.order_items.length > 0 && (
               <OrderItemsBreakdown

@@ -1,141 +1,59 @@
 import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { CheckCircle, Clock, AlertCircle, XCircle, Package, Truck, Calendar } from 'lucide-react';
+import { cva, type VariantProps } from 'class-variance-authority';
 
-export type StatusType = 
-  | 'success' | 'pending' | 'warning' | 'error' | 'info' 
-  | 'confirmed' | 'preparing' | 'ready' | 'delivered' | 'cancelled'
-  | 'paid' | 'unpaid' | 'refunded' | 'processing';
+const statusBadgeVariants = cva(
+  "inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2",
+  {
+    variants: {
+      variant: {
+        default: "border-transparent bg-primary text-primary-foreground hover:bg-primary/80",
+        secondary: "border-transparent bg-secondary text-secondary-foreground hover:bg-secondary/80",
+        destructive: "border-transparent bg-destructive text-destructive-foreground hover:bg-destructive/80",
+        outline: "text-foreground",
+        pending: "border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300",
+        confirmed: "border-transparent bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300",
+        preparing: "border-transparent bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-300",
+        ready: "border-transparent bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+        out_for_delivery: "border-transparent bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-300",
+        delivered: "border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300",
+        completed: "border-transparent bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-300",
+        cancelled: "border-transparent bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+        paid: "border-transparent bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300",
+        unpaid: "border-transparent bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-300",
+        failed: "border-transparent bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-300",
+        refunded: "border-transparent bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300"
+      },
+    },
+    defaultVariants: {
+      variant: "default",
+    },
+  }
+);
 
-interface StatusBadgeProps {
-  status: StatusType;
+export interface StatusBadgeProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof statusBadgeVariants> {
+  status?: string;
   children?: React.ReactNode;
-  showIcon?: boolean;
-  size?: 'sm' | 'default' | 'lg';
-  className?: string;
 }
 
-const statusConfig: Record<StatusType, {
-  variant: 'default' | 'secondary' | 'destructive' | 'outline';
-  className: string;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-}> = {
-  success: {
-    variant: 'default',
-    className: 'status-success',
-    icon: CheckCircle,
-    label: 'Success'
-  },
-  confirmed: {
-    variant: 'default',
-    className: 'status-success',
-    icon: CheckCircle,
-    label: 'Confirmed'
-  },
-  pending: {
-    variant: 'secondary',
-    className: 'status-warning',
-    icon: Clock,
-    label: 'Pending'
-  },
-  preparing: {
-    variant: 'secondary',
-    className: 'status-warning',
-    icon: Package,
-    label: 'Preparing'
-  },
-  ready: {
-    variant: 'default',
-    className: 'bg-blue-100 text-blue-800 border-blue-200',
-    icon: Package,
-    label: 'Ready'
-  },
-  delivered: {
-    variant: 'default',
-    className: 'status-success',
-    icon: Truck,
-    label: 'Delivered'
-  },
-  warning: {
-    variant: 'secondary',
-    className: 'status-warning',
-    icon: AlertCircle,
-    label: 'Warning'
-  },
-  error: {
-    variant: 'destructive',
-    className: 'status-error',
-    icon: XCircle,
-    label: 'Error'
-  },
-  cancelled: {
-    variant: 'destructive',
-    className: 'status-error',
-    icon: XCircle,
-    label: 'Cancelled'
-  },
-  info: {
-    variant: 'outline',
-    className: 'bg-blue-50 text-blue-700 border-blue-200',
-    icon: AlertCircle,
-    label: 'Info'
-  },
-  paid: {
-    variant: 'default',
-    className: 'status-success',
-    icon: CheckCircle,
-    label: 'Paid'
-  },
-  unpaid: {
-    variant: 'destructive',
-    className: 'status-error',
-    icon: XCircle,
-    label: 'Unpaid'
-  },
-  refunded: {
-    variant: 'secondary',
-    className: 'bg-orange-100 text-orange-800 border-orange-200',
-    icon: AlertCircle,
-    label: 'Refunded'
-  },
-  processing: {
-    variant: 'secondary',
-    className: 'status-warning',
-    icon: Clock,
-    label: 'Processing'
+const StatusBadge = React.forwardRef<HTMLDivElement, StatusBadgeProps>(
+  ({ className, variant, status, children, ...props }, ref) => {
+    // Auto-map status to variant if no explicit variant provided
+    const mappedVariant = variant || (status as any) || 'default';
+    
+    return (
+      <Badge
+        className={cn(statusBadgeVariants({ variant: mappedVariant }), className)}
+        {...props}
+      >
+        {children || (status && status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' '))}
+      </Badge>
+    );
   }
-};
+);
+StatusBadge.displayName = "StatusBadge";
 
-export const StatusBadge: React.FC<StatusBadgeProps> = ({
-  status,
-  children,
-  showIcon = true,
-  size = 'default',
-  className
-}) => {
-  const config = statusConfig[status];
-  const Icon = config.icon;
-
-  const sizeClasses = {
-    sm: 'text-xs h-5 px-2',
-    default: 'text-xs h-6 px-2.5',
-    lg: 'text-sm h-7 px-3'
-  };
-
-  return (
-    <Badge
-      variant={config.variant}
-      className={cn(
-        'inline-flex items-center gap-1.5 font-medium',
-        config.className,
-        sizeClasses[size],
-        className
-      )}
-    >
-      {showIcon && <Icon className="h-3 w-3" />}
-      {children || config.label}
-    </Badge>
-  );
-};
+export { StatusBadge, statusBadgeVariants };

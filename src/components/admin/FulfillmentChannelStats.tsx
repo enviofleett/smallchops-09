@@ -62,7 +62,7 @@ export const FulfillmentChannelStats = () => {
             <div className="h-64 flex items-center justify-center">
               <div className="text-center">
                 <div className="text-red-500 text-sm">Failed to load fulfillment data</div>
-                <div className="text-red-400 text-xs mt-1">{error}</div>
+                <div className="text-red-400 text-xs mt-1">{error instanceof Error ? error.message : 'Unknown error'}</div>
               </div>
             </div>
           ) : (

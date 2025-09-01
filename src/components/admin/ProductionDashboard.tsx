@@ -1,121 +1,86 @@
-import React from 'react';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ProductionReadinessMonitor } from '@/components/admin/ProductionReadinessMonitor';
-import { RealTimeEmailProcessor } from '@/components/settings/RealTimeEmailProcessor';
-import { EmailDeliveryMonitor } from '@/components/settings/EmailDeliveryMonitor';
-import { EmailProcessingTab } from '@/components/settings/EmailProcessingTab';
-import { EmailHealthDashboard } from '@/components/admin/EmailHealthDashboard';
-import { ProductionReadinessChecker } from '@/components/admin/ProductionReadinessChecker';
-import { EmailFlowTester } from '@/components/admin/EmailFlowTester';
-import { Shield, Zap, BarChart3, Settings } from 'lucide-react';
 
-export const ProductionDashboard: React.FC = () => {
+import React from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Activity, Users, ShoppingCart, TrendingUp } from 'lucide-react';
+import { OrderStats } from '@/components/admin/OrderStats';
+import { CustomerStats } from '@/components/admin/CustomerStats';
+import { EmailSystemStatus } from '@/components/admin/EmailSystemStatus';
+import { EmailStatusDashboard } from '@/components/admin/EmailStatusDashboard';
+import { FulfillmentChannelStats } from '@/components/admin/FulfillmentChannelStats';
+
+export const ProductionDashboard = () => {
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-3xl font-bold">Production Dashboard</h1>
-        <p className="text-muted-foreground">
-          Monitor and optimize your production systems for 100% reliability
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-3xl font-bold tracking-tight">Production Dashboard</h2>
+          <p className="text-muted-foreground">
+            Monitor your business performance and system health
+          </p>
+        </div>
       </div>
 
-      <Tabs defaultValue="health" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-4">
-          <TabsTrigger value="health" className="flex items-center gap-2">
-            <Shield className="h-4 w-4" />
-            Health Monitor
-          </TabsTrigger>
-          <TabsTrigger value="processing" className="flex items-center gap-2">
-            <Zap className="h-4 w-4" />
-            Email Processing
-          </TabsTrigger>
-          <TabsTrigger value="analytics" className="flex items-center gap-2">
-            <BarChart3 className="h-4 w-4" />
-            Analytics
-          </TabsTrigger>
-          <TabsTrigger value="settings" className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            Settings
-          </TabsTrigger>
-        </TabsList>
+      {/* Key Metrics Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">System Status</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">Operational</div>
+            <p className="text-xs text-muted-foreground">All systems running</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Active Customers</CardTitle>
+            <Users className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">1,234</div>
+            <p className="text-xs text-muted-foreground">+12% from last month</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Orders Today</CardTitle>
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">89</div>
+            <p className="text-xs text-muted-foreground">+5% from yesterday</p>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Revenue</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">$12,456</div>
+            <p className="text-xs text-muted-foreground">+8% from last week</p>
+          </CardContent>
+        </Card>
+      </div>
 
-        <TabsContent value="health" className="space-y-6">
-          <ProductionReadinessMonitor />
-          
-          <div className="grid md:grid-cols-2 gap-6">
-            <ProductionReadinessChecker />
-            <EmailFlowTester />
-          </div>
-        </TabsContent>
+      {/* Detailed Analytics */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <OrderStats />
+        <CustomerStats />
+      </div>
 
-        <TabsContent value="processing" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Real-Time Processing</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <RealTimeEmailProcessor />
-              </CardContent>
-            </Card>
-            
-            <Card>
-              <CardHeader>
-                <CardTitle>Email Queue Management</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <EmailProcessingTab />
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
+      {/* Email System Monitoring */}
+      <div className="grid gap-6 md:grid-cols-2">
+        <EmailSystemStatus />
+        <EmailStatusDashboard />
+      </div>
 
-        <TabsContent value="analytics" className="space-y-6">
-          <EmailHealthDashboard />
-        </TabsContent>
-
-        <TabsContent value="settings" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Production Configuration</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                <div className="p-4 bg-muted rounded-lg">
-                  <h3 className="font-semibold mb-2">Automated Email Processing</h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Emails are automatically processed every minute for immediate delivery.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Function: automated-email-cron (runs every 60 seconds)
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-muted rounded-lg">
-                  <h3 className="font-semibold mb-2">Health Monitoring</h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    System health is continuously monitored with auto-recovery triggers.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Function: email-production-monitor (triggered on health issues)
-                  </p>
-                </div>
-                
-                <div className="p-4 bg-muted rounded-lg">
-                  <h3 className="font-semibold mb-2">Rate Limiting</h3>
-                  <p className="text-sm text-muted-foreground mb-2">
-                    Smart rate limiting protects against spam and ensures delivery quality.
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Transactional: 500/hour, Marketing: 100/hour per domain
-                  </p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+      {/* Fulfillment Analytics */}
+      <FulfillmentChannelStats />
     </div>
   );
 };

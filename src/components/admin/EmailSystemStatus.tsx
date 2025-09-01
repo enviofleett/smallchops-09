@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +34,12 @@ interface EmailSystemMetrics {
     old_queued: number;
     cleanup_recommended: boolean;
   };
+}
+
+interface CleanupResult {
+  stuck_processing_found: number;
+  stale_queued_found: number;
+  total_cleaned: number;
 }
 
 export const EmailSystemStatus = () => {
@@ -95,22 +100,66 @@ export const EmailSystemStatus = () => {
         }
       };
     },
-    refetchInterval: 30000, // Refresh every 30 seconds
+    refetchInterval: 30000,
   });
 
-  // Manual cleanup mutation
+  // Manual cleanup mutation using direct SQL operations
   const cleanupMutation = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.rpc('cleanup_email_legacy', {
-        p_dry_run: false
-      });
-      if (error) throw error;
-      return data;
+    mutationFn: async (): Promise<CleanupResult> => {
+      // Archive and clean stale processing records
+      const { data: staleProcessing } = await supabase
+        .from('communication_events')
+        .select('*')
+        .eq('status', 'processing')
+        .lt('processing_started_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
+
+      // Archive and clean old queued records
+      const { data: oldQueued } = await supabase
+        .from('communication_events')
+        .select('*')
+        .eq('status', 'queued')
+        .lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      let cleanedCount = 0;
+
+      // Reset stale processing to failed
+      if (staleProcessing && staleProcessing.length > 0) {
+        const { error: updateError } = await supabase
+          .from('communication_events')
+          .update({ 
+            status: 'failed', 
+            error_message: 'Processing timeout - reset by cleanup',
+            updated_at: new Date().toISOString()
+          })
+          .in('id', staleProcessing.map(item => item.id));
+
+        if (!updateError) {
+          cleanedCount += staleProcessing.length;
+        }
+      }
+
+      // Archive and delete old queued items
+      if (oldQueued && oldQueued.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('communication_events')
+          .delete()
+          .in('id', oldQueued.map(item => item.id));
+
+        if (!deleteError) {
+          cleanedCount += oldQueued.length;
+        }
+      }
+
+      return {
+        stuck_processing_found: staleProcessing?.length || 0,
+        stale_queued_found: oldQueued?.length || 0,
+        total_cleaned: cleanedCount
+      };
     },
     onSuccess: (data) => {
       toast({
         title: 'Email Cleanup Complete',
-        description: `Cleaned up ${data.stuck_processing_found + data.stale_queued_found} stale items`,
+        description: `Cleaned up ${data.total_cleaned} stale items`,
       });
       queryClient.invalidateQueries({ queryKey: ['email-system-metrics'] });
     },

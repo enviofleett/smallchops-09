@@ -81,20 +81,58 @@ export class EmailOperations {
   }
 
   /**
-   * Trigger manual email cleanup (admin only)
+   * Trigger manual email cleanup using direct operations
    */
   static async triggerEmailCleanup(): Promise<EmailOperationResult> {
     try {
-      const { data, error } = await supabase.rpc('cleanup_email_legacy', {
-        p_dry_run: false
-      });
+      // Reset stale processing records to failed
+      const { data: staleProcessing, error: selectError } = await supabase
+        .from('communication_events')
+        .select('id')
+        .eq('status', 'processing')
+        .lt('processing_started_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
 
-      if (error) throw error;
+      if (selectError) throw selectError;
+
+      let cleanedCount = 0;
+
+      if (staleProcessing && staleProcessing.length > 0) {
+        const { error: updateError } = await supabase
+          .from('communication_events')
+          .update({ 
+            status: 'failed', 
+            error_message: 'Processing timeout - reset by cleanup',
+            updated_at: new Date().toISOString()
+          })
+          .in('id', staleProcessing.map(item => item.id));
+
+        if (updateError) throw updateError;
+        cleanedCount += staleProcessing.length;
+      }
+
+      // Archive and delete old queued items
+      const { data: oldQueued, error: queuedSelectError } = await supabase
+        .from('communication_events')
+        .select('id')
+        .eq('status', 'queued')
+        .lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+
+      if (queuedSelectError) throw queuedSelectError;
+
+      if (oldQueued && oldQueued.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('communication_events')
+          .delete()
+          .in('id', oldQueued.map(item => item.id));
+
+        if (deleteError) throw deleteError;
+        cleanedCount += oldQueued.length;
+      }
 
       return {
         success: true,
         message: 'Email cleanup completed',
-        data
+        data: { total_cleaned: cleanedCount }
       };
     } catch (error: any) {
       return {

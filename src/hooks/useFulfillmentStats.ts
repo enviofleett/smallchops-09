@@ -20,7 +20,7 @@ export const useFulfillmentStats = () => {
         .from('orders')
         .select('created_at, order_type, status')
         .gte('created_at', sixWeeksAgo.toISOString())
-        .in('status', ['completed', 'delivered', 'paid']);
+        .in('status', ['completed', 'delivered']);
 
       if (error) {
         console.error('Error fetching fulfillment stats:', error);

@@ -22,12 +22,17 @@ export const useDetailedOrderData = (orderId: string) => {
         });
 
         if (error) {
-          console.warn('RPC error, using fallback query:', error);
+          // Only log in development
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('RPC error, using fallback query:', error);
+          }
           throw error; // This will trigger the fallback
         }
         
         if (data && typeof data === 'object' && 'error' in data) {
-          console.warn('RPC returned error, using fallback query:', data.error);
+          if (process.env.NODE_ENV === 'development') {
+            console.warn('RPC returned error, using fallback query:', data.error);
+          }
           throw new Error(data.error as string);
         }
 
@@ -35,7 +40,9 @@ export const useDetailedOrderData = (orderId: string) => {
           return data as unknown as DetailedOrderData;
         }
       } catch (rpcError) {
-        console.warn('RPC failed, trying fallback query:', rpcError);
+        if (process.env.NODE_ENV === 'development') {
+          console.warn('RPC failed, trying fallback query:', rpcError);
+        }
         
         // Fallback: Separate queries with better error handling
         try {
@@ -61,7 +68,9 @@ export const useDetailedOrderData = (orderId: string) => {
             .maybeSingle();
 
           if (orderError) {
-            console.error('Fallback query error:', orderError);
+            if (process.env.NODE_ENV === 'development') {
+              console.error('Fallback query error:', orderError);
+            }
             throw new Error(`Failed to fetch order details: ${orderError.message}`);
           }
 
@@ -80,7 +89,9 @@ export const useDetailedOrderData = (orderId: string) => {
             
             deliverySchedule = scheduleData;
           } catch (scheduleError) {
-            console.warn('Could not fetch delivery schedule:', scheduleError);
+            if (process.env.NODE_ENV === 'development') {
+              console.warn('Could not fetch delivery schedule:', scheduleError);
+            }
             // Continue without schedule - not critical
           }
 
@@ -99,7 +110,9 @@ export const useDetailedOrderData = (orderId: string) => {
             delivery_schedule: deliverySchedule
           } as DetailedOrderData;
         } catch (fallbackError) {
-          console.error('Both RPC and fallback queries failed:', fallbackError);
+          if (process.env.NODE_ENV === 'development') {
+            console.error('Both RPC and fallback queries failed:', fallbackError);
+          }
           throw fallbackError;
         }
       }

@@ -415,41 +415,72 @@ export default function AdminOrders() {
           </CardContent>
         </Card>
 
-        {/* Orders Tabs - Mobile Responsive */}
+        {/* Orders Tabs - Fully Responsive */}
         <Tabs value={activeTab} onValueChange={handleTabChange}>
           <div className="relative">
             {/* Mobile: Scrollable horizontal tabs */}
-            <div className="sm:hidden">
+            <div className="block sm:hidden">
               <div className="overflow-x-auto pb-2 scrollbar-hide">
                 <TabsList className="flex w-max min-w-full gap-1 p-1 bg-muted rounded-lg">
-                  <TabsTrigger value="all" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                  <TabsTrigger value="all" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
                     All ({orderCounts.all})
                   </TabsTrigger>
-                  <TabsTrigger value="pending" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                  <TabsTrigger value="pending" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
                     Pend ({orderCounts.pending})
                   </TabsTrigger>
-                  <TabsTrigger value="confirmed" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                  <TabsTrigger value="confirmed" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
                     Conf ({orderCounts.confirmed})
                   </TabsTrigger>
-                  <TabsTrigger value="preparing" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                  <TabsTrigger value="preparing" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
                     Prep ({orderCounts.preparing})
                   </TabsTrigger>
-                  <TabsTrigger value="out_for_delivery" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                  <TabsTrigger value="out_for_delivery" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
                     Out ({orderCounts.out_for_delivery})
                   </TabsTrigger>
-                  <TabsTrigger value="delivered" className="text-xs whitespace-nowrap px-3 py-2 data-[state=active]:bg-background">
+                  <TabsTrigger value="delivered" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
                     Del ({orderCounts.delivered})
                   </TabsTrigger>
-                  <TabsTrigger value="overdue" className="text-xs whitespace-nowrap px-3 py-2 text-destructive data-[state=active]:bg-background">
+                  <TabsTrigger value="overdue" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 text-destructive data-[state=active]:bg-background">
                     Over ({orderCounts.overdue})
                   </TabsTrigger>
                 </TabsList>
               </div>
             </div>
             
-            {/* Desktop: Grid layout */}
-            <div className="hidden sm:block">
-              <TabsList className="grid w-full grid-cols-3 lg:grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
+            {/* Tablet: 4 columns with overflow */}
+            <div className="hidden sm:block md:hidden">
+              <TabsList className="grid w-full grid-cols-4 gap-1 p-1 bg-muted rounded-lg">
+                <TabsTrigger value="all" className="text-xs px-1 py-2 data-[state=active]:bg-background">
+                  All ({orderCounts.all})
+                </TabsTrigger>
+                <TabsTrigger value="pending" className="text-xs px-1 py-2 data-[state=active]:bg-background">
+                  Pend ({orderCounts.pending})
+                </TabsTrigger>
+                <TabsTrigger value="confirmed" className="text-xs px-1 py-2 data-[state=active]:bg-background">
+                  Conf ({orderCounts.confirmed})
+                </TabsTrigger>
+                <TabsTrigger value="preparing" className="text-xs px-1 py-2 data-[state=active]:bg-background">
+                  Prep ({orderCounts.preparing})
+                </TabsTrigger>
+              </TabsList>
+              <div className="mt-2">
+                <TabsList className="grid w-full grid-cols-3 gap-1 p-1 bg-muted rounded-lg">
+                  <TabsTrigger value="out_for_delivery" className="text-xs px-1 py-2 data-[state=active]:bg-background">
+                    Out ({orderCounts.out_for_delivery})
+                  </TabsTrigger>
+                  <TabsTrigger value="delivered" className="text-xs px-1 py-2 data-[state=active]:bg-background">
+                    Del ({orderCounts.delivered})
+                  </TabsTrigger>
+                  <TabsTrigger value="overdue" className="text-xs px-1 py-2 text-destructive data-[state=active]:bg-background">
+                    Over ({orderCounts.overdue})
+                  </TabsTrigger>
+                </TabsList>
+              </div>
+            </div>
+            
+            {/* Desktop: Full grid layout */}
+            <div className="hidden md:block">
+              <TabsList className="grid w-full grid-cols-7 gap-1 p-1 bg-muted rounded-lg">
                 <TabsTrigger value="all" className="text-sm px-2 py-2 data-[state=active]:bg-background">
                   All Orders ({orderCounts.all})
                 </TabsTrigger>

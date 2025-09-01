@@ -55,7 +55,10 @@ export const getOrders = async ({
     });
 
     if (error) {
-      console.error('Error fetching orders via admin function:', error);
+      // Only log errors in development
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Error fetching orders via admin function:', error);
+      }
       throw new Error(error.message || 'Failed to fetch orders');
     }
 
@@ -65,7 +68,10 @@ export const getOrders = async ({
 
     return { orders: data.orders || [], count: data.count || 0 };
   } catch (error) {
-    console.error('Error fetching orders:', error);
+    // Only log errors in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error fetching orders:', error);
+    }
     
     // Fallback to direct Supabase query for backward compatibility
     const from = (page - 1) * pageSize;
@@ -95,7 +101,9 @@ export const getOrders = async ({
 
     // If query with delivery zones fails, try without them and manually fetch
     if (fallbackError) {
-      console.warn('Query with delivery zones failed, trying fallback:', fallbackError.message);
+      if (process.env.NODE_ENV === 'development') {
+        console.warn('Query with delivery zones failed, trying fallback:', fallbackError.message);
+      }
       
       let fallbackQuery = supabase
         .from('orders_view')
@@ -117,7 +125,9 @@ export const getOrders = async ({
         .range(from, to);
 
       if (noZoneError) {
-        console.error('Fallback query also failed:', noZoneError);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('Fallback query also failed:', noZoneError);
+        }
         throw new Error(noZoneError.message);
       }
 
@@ -134,7 +144,9 @@ export const getOrders = async ({
               
               return { ...order, delivery_zones: zone };
             } catch (zoneError) {
-              console.warn(`Failed to fetch zone for order ${order.id}:`, zoneError);
+              if (process.env.NODE_ENV === 'development') {
+                console.warn(`Failed to fetch zone for order ${order.id}:`, zoneError);
+              }
               return { ...order, delivery_zones: null };
             }
           }
@@ -157,11 +169,15 @@ export const updateOrder = async (
   updates: { status?: OrderStatus; assigned_rider_id?: string | null }
 ): Promise<OrderWithItems> => {
   try {
-    console.log('🔄 Updating order via production-safe method:', orderId, updates);
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔄 Updating order via production-safe method:', orderId, updates);
+    }
 
     // If we're assigning a rider, use the dedicated function for validation
     if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
-      console.log('🎯 Assigning rider using validated function:', updates.assigned_rider_id);
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🎯 Assigning rider using validated function:', updates.assigned_rider_id);
+      }
       
       const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('admin-orders-manager', {
         body: {
@@ -211,15 +227,21 @@ export const updateOrder = async (
       throw new Error(data?.error || error?.message || 'Failed to update order');
     }
 
-    console.log('✅ Order updated successfully via admin function');
+    if (process.env.NODE_ENV === 'development') {
+      console.log('✅ Order updated successfully via admin function');
+    }
     return data.order;
     
   } catch (error) {
-    console.error('❌ Error updating order via admin function:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('❌ Error updating order via admin function:', error);
+    }
     
     // Fallback to direct update with enhanced validation
     try {
-      console.log('🔄 Attempting fallback direct update with validation...');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('🔄 Attempting fallback direct update with validation...');
+      }
       
       // If assigning rider, validate first
       if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
@@ -250,7 +272,9 @@ export const updateOrder = async (
         .maybeSingle();
 
       if (fallbackError) {
-        console.error('❌ Fallback update also failed:', fallbackError);
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ Fallback update also failed:', fallbackError);
+        }
         throw new Error(fallbackError.message);
       }
 
@@ -258,11 +282,15 @@ export const updateOrder = async (
         throw new Error('Order not found');
       }
 
-      console.log('✅ Fallback update successful');
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Fallback update successful');
+      }
       return fallbackData as unknown as OrderWithItems;
       
     } catch (fallbackError) {
-      console.error('💥 All update methods failed:', fallbackError);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('💥 All update methods failed:', fallbackError);
+      }
       throw fallbackError;
     }
   }
@@ -281,7 +309,9 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
       throw new Error(data?.error || error?.message || 'Failed to delete order');
     }
   } catch (error) {
-    console.error('Error deleting order via admin function:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error deleting order via admin function:', error);
+    }
     
     // Fallback to direct delete
     const { error: fallbackError } = await supabase
@@ -290,7 +320,9 @@ export const deleteOrder = async (orderId: string): Promise<void> => {
       .eq('id', orderId);
 
     if (fallbackError) {
-      console.error('Fallback delete also failed:', fallbackError);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Fallback delete also failed:', fallbackError);
+      }
       throw new Error(fallbackError.message);
     }
   }
@@ -309,7 +341,9 @@ export const bulkDeleteOrders = async (orderIds: string[]): Promise<void> => {
       throw new Error(data?.error || error?.message || 'Failed to delete orders');
     }
   } catch (error) {
-    console.error('Error bulk deleting orders via admin function:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error bulk deleting orders via admin function:', error);
+    }
     
     // Fallback to direct delete
     const { error: fallbackError } = await supabase
@@ -318,7 +352,9 @@ export const bulkDeleteOrders = async (orderIds: string[]): Promise<void> => {
       .in('id', orderIds);
 
     if (fallbackError) {
-      console.error('Fallback bulk delete also failed:', fallbackError);
+      if (process.env.NODE_ENV === 'development') {
+        console.error('Fallback bulk delete also failed:', fallbackError);
+      }
       throw new Error(fallbackError.message);
     }
   }
@@ -341,7 +377,9 @@ export const manuallyQueueCommunicationEvent = async (
   });
 
   if (error) {
-    console.error('Error queueing manual communication event:', error);
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Error queueing manual communication event:', error);
+    }
     throw new Error(error.message);
   }
 };

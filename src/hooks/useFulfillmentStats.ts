@@ -1,114 +1,69 @@
 
-import { useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 
-export interface WeeklyFulfillmentStats {
+interface FulfillmentWeekData {
   week: string;
   delivery: number;
   pickup: number;
-  total: number;
 }
 
 export const useFulfillmentStats = () => {
-  const [data, setData] = useState<WeeklyFulfillmentStats[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  return useQuery({
+    queryKey: ['fulfillment-stats'],
+    queryFn: async (): Promise<FulfillmentWeekData[]> => {
+      // Get orders from the last 6 weeks
+      const sixWeeksAgo = new Date();
+      sixWeeksAgo.setDate(sixWeeksAgo.getDate() - 42);
 
-  const fetchFulfillmentStats = async () => {
-    try {
-      setIsLoading(true);
-      setError(null);
-      
-      console.log('Fetching weekly fulfillment statistics...');
-      
-      // Get orders from the last 8 weeks
-      const eightWeeksAgo = new Date();
-      eightWeeksAgo.setDate(eightWeeksAgo.getDate() - 56);
-      
-      const { data: orders, error: ordersError } = await supabase
+      const { data: orders, error } = await supabase
         .from('orders')
-        .select('order_type, order_time, status')
-        .gte('order_time', eightWeeksAgo.toISOString())
-        .in('order_type', ['delivery', 'pickup'])
-        .not('status', 'eq', 'cancelled');
+        .select('created_at, order_type, status')
+        .gte('created_at', sixWeeksAgo.toISOString())
+        .in('status', ['completed', 'delivered', 'paid']);
 
-      if (ordersError) {
-        throw ordersError;
+      if (error) {
+        console.error('Error fetching fulfillment stats:', error);
+        throw new Error(`Failed to fetch fulfillment statistics: ${error.message}`);
       }
 
-      console.log('Raw orders data:', orders?.length || 0, 'orders');
+      // Group by week and fulfillment type
+      const weeklyData: Record<string, { delivery: number; pickup: number }> = {};
 
-      // Group orders by week
-      const weeklyStats = new Map<string, { delivery: number; pickup: number }>();
-      
       orders?.forEach(order => {
-        const orderDate = new Date(order.order_time);
+        const orderDate = new Date(order.created_at);
+        const weekStart = new Date(orderDate);
+        weekStart.setDate(orderDate.getDate() - orderDate.getDay()); // Start of week (Sunday)
         
-        // Get the start of the week (Sunday)
-        const startOfWeek = new Date(orderDate);
-        startOfWeek.setDate(orderDate.getDate() - orderDate.getDay());
+        const weekKey = weekStart.toISOString().split('T')[0]; // YYYY-MM-DD format
         
-        // Format as "MMM DD" for the week start
-        const weekKey = startOfWeek.toLocaleDateString('en-US', { 
-          month: 'short', 
-          day: '2-digit' 
-        });
-        
-        if (!weeklyStats.has(weekKey)) {
-          weeklyStats.set(weekKey, { delivery: 0, pickup: 0 });
+        if (!weeklyData[weekKey]) {
+          weeklyData[weekKey] = { delivery: 0, pickup: 0 };
         }
         
-        const stats = weeklyStats.get(weekKey)!;
         if (order.order_type === 'delivery') {
-          stats.delivery++;
+          weeklyData[weekKey].delivery++;
         } else if (order.order_type === 'pickup') {
-          stats.pickup++;
+          weeklyData[weekKey].pickup++;
         }
       });
 
       // Convert to array and sort by date
-      const statsArray: WeeklyFulfillmentStats[] = Array.from(weeklyStats.entries())
-        .map(([week, stats]) => ({
-          week,
-          delivery: stats.delivery,
-          pickup: stats.pickup,
-          total: stats.delivery + stats.pickup
+      const result: FulfillmentWeekData[] = Object.entries(weeklyData)
+        .map(([week, data]) => ({
+          week: new Date(week).toLocaleDateString('en-US', { 
+            month: 'short', 
+            day: 'numeric' 
+          }),
+          delivery: data.delivery,
+          pickup: data.pickup
         }))
-        .sort((a, b) => {
-          // Parse dates for proper sorting
-          const dateA = new Date(a.week + ', 2024');
-          const dateB = new Date(b.week + ', 2024');
-          return dateA.getTime() - dateB.getTime();
-        })
-        .slice(-6); // Keep only the last 6 weeks
+        .sort((a, b) => new Date(a.week).getTime() - new Date(b.week).getTime())
+        .slice(-6); // Last 6 weeks
 
-      console.log('Processed fulfillment stats:', statsArray);
-      setData(statsArray);
-      
-    } catch (err) {
-      console.error('Error fetching fulfillment stats:', err);
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load fulfillment statistics';
-      setError(errorMessage);
-      
-      // Set fallback empty data
-      setData([]);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchFulfillmentStats();
-  }, []);
-
-  const refresh = () => {
-    fetchFulfillmentStats();
-  };
-
-  return {
-    data,
-    isLoading,
-    error,
-    refresh
-  };
+      return result;
+    },
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+  });
 };

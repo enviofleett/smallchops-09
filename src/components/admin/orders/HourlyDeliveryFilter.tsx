@@ -113,14 +113,14 @@ export const HourlyDeliveryFilter: React.FC<HourlyDeliveryFilterProps> = ({
           {/* Desktop/Tablet: Select dropdown */}
           <div className="hidden sm:block">
             <Select
-              value={selectedHour || ''}
-              onValueChange={(value) => onHourChange(value === '' ? null : value)}
+              value={selectedHour || 'all'}
+              onValueChange={(value) => onHourChange(value === 'all' ? null : value)}
             >
               <SelectTrigger className="w-full sm:w-[200px]">
                 <SelectValue placeholder="Select time slot" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All time slots</SelectItem>
+                <SelectItem value="all">All time slots</SelectItem>
                 {hourlySlots.map((slot) => (
                   <SelectItem key={slot.value} value={slot.value}>
                     <div className="flex items-center justify-between w-full">

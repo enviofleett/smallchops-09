@@ -311,18 +311,14 @@ const initializeDiagnostics = () => {
       try {
         // Use GET healthcheck for unified-smtp-sender, lightweight test for others
         if (func.name === 'unified-smtp-sender') {
-          const response = await fetch(`${supabase.supabaseUrl}/functions/v1/${func.name}`, {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${supabase.supabaseKey}`,
-              'apikey': supabase.supabaseKey
-            }
+          const { data, error } = await supabase.functions.invoke(func.name, {
+            body: { healthcheck: true }
           });
           
-          if (response.ok) {
+          if (data?.status === 'healthy') {
             results.push(`✓ ${func.name} (${func.description})`);
           } else {
-            throw new Error(`HTTP ${response.status}`);
+            throw new Error(error?.message || 'Function not responding properly');
           }
         } else {
           const { error } = await supabase.functions.invoke(func.name, {

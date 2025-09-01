@@ -215,10 +215,7 @@ export function OrderItemsBreakdown({
         <div className="space-y-3">
           {/* Items Subtotal Breakdown */}
           <div className="space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-gray-600">Items Subtotal ({items.length} items)</span>
-              <span className="font-medium">{formatCurrency(subtotal)}</span>
-            </div>
+            
             
             {/* Show individual item totals when there are multiple items */}
             {showDetailed && items.length > 1 && <div className="pl-4 space-y-1 border-l-2 border-gray-100">

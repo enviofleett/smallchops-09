@@ -248,13 +248,13 @@ const initializeDiagnostics = () => {
       const hasPassword = config.smtp_pass && config.smtp_pass.trim() !== '';
       
       if (!hasPassword) {
-        // Check if this might be using environment secrets (production pattern)
+        // Check if this might be using Function Secrets (production pattern)
         const isProductionSetup = config.email_provider || 
                                 config.smtp_host?.includes('smtp.') ||
                                 config.smtp_host?.includes('mail.');
         
         if (isProductionSetup) {
-          warnings.push('Password stored in secrets (production secure)');
+          warnings.push('Password managed via Function Secrets (production secure)');
         } else {
           missing.push('SMTP password');
         }
@@ -298,7 +298,7 @@ const initializeDiagnostics = () => {
   const testFunctionAvailability = async () => {
     const functions = [
       { name: 'unified-smtp-sender', critical: true, description: 'Main email sending service' },
-      { name: 'smtp-auth-healthcheck', critical: true, description: 'SMTP authentication validator' },
+      { name: 'unified-email-queue-processor', critical: true, description: 'Email queue processing' },
       { name: 'email-core', critical: false, description: 'Advanced email processing' }
     ];
     
@@ -309,17 +309,33 @@ const initializeDiagnostics = () => {
     for (const func of functions) {
       totalTests++;
       try {
-        // Use a lightweight test that doesn't trigger actual email sending
-        const { error } = await supabase.functions.invoke(func.name, {
-          body: { 
-            healthcheck: true,
-            dry_run: true,
-            test_mode: true 
+        // Use GET healthcheck for unified-smtp-sender, lightweight test for others
+        if (func.name === 'unified-smtp-sender') {
+          const response = await fetch(`${supabase.supabaseUrl}/functions/v1/${func.name}`, {
+            method: 'GET',
+            headers: {
+              'Authorization': `Bearer ${supabase.supabaseKey}`,
+              'apikey': supabase.supabaseKey
+            }
+          });
+          
+          if (response.ok) {
+            results.push(`✓ ${func.name} (${func.description})`);
+          } else {
+            throw new Error(`HTTP ${response.status}`);
           }
-        });
-        
-        // Function responds = it's available (even with errors is OK for availability test)
-        results.push(`✓ ${func.name} (${func.description})`);
+        } else {
+          const { error } = await supabase.functions.invoke(func.name, {
+            body: { 
+              healthcheck: true,
+              dry_run: true,
+              test_mode: true 
+            }
+          });
+          
+          // Function responds = it's available (even with errors is OK for availability test)
+          results.push(`✓ ${func.name} (${func.description})`);
+        }
         
       } catch (networkError: any) {
         // Network/deployment issues

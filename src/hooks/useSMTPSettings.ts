@@ -104,14 +104,14 @@ export const useSMTPSettings = () => {
     },
   });
 
-  // Test SMTP authentication using the dedicated health check endpoint
+  // Test SMTP authentication using unified-smtp-sender healthcheck
   const testConnectionMutation = useMutation({
     mutationFn: async () => {
       try {
         console.log('🔍 Running production SMTP authentication health check...');
         
-        const { data, error } = await supabase.functions.invoke('smtp-auth-healthcheck', {
-          body: {}
+        const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+          body: { healthcheck: true, check: 'smtp' }
         });
 
         if (error) {
@@ -121,13 +121,13 @@ export const useSMTPSettings = () => {
 
         console.log('📊 Production health check result:', data);
 
-        if (!data.success) {
-          throw new Error(data.error || 'SMTP authentication failed');
+        if (!data.smtpCheck?.configured) {
+          throw new Error(data.smtpCheck?.error || 'SMTP not configured');
         }
 
         return {
           ...data,
-          message: `✅ Production SMTP Ready: Connected to ${data.provider?.host}:${data.provider?.port} using ${data.auth?.method} (${data.auth?.tlsMode}) in ${data.timing?.totalMs}ms`
+          message: `✅ Production SMTP Ready: Connected to ${data.smtpCheck?.host}:${data.smtpCheck?.port} using ${data.smtpCheck?.encryption} (${data.smtpCheck?.source})`
         };
       } catch (error) {
         console.error('💥 SMTP health check failed:', error);

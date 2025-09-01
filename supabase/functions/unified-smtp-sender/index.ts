@@ -823,24 +823,7 @@ serve(async (req: Request) => {
     const finalSubject = requestBody.subject?.trim() || templateSubject;
 
     if (!templateFound && requestBody.templateKey) {
-      console.warn(`⚠️ Template ${requestBody.templateKey} not found - using fallback`);
-      
-      // Return success with template missing warning for caller differentiation
-      return new Response(JSON.stringify({
-        success: true,
-        messageId: `fallback-${Date.now()}`,
-        provider: 'native-smtp',
-        implementation: 'production-native-deno',
-        warnings: [`Template ${requestBody.templateKey} not found - using branded fallback`],
-        metadata: {
-          templateMissing: true,
-          requestedTemplate: requestBody.templateKey,
-          fallbackUsed: true
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
+      console.warn(`⚠️ Template ${requestBody.templateKey} not found - proceeding with branded fallback content`);
     }
 
     // Execute email sending with retry logic

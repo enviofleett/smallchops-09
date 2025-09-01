@@ -278,59 +278,96 @@ export function OrderItemsBreakdown({
               </div>
             </div>}
           
-          {/* Calculation Summary */}
-          {showDetailed && <div className="bg-blue-50 p-3 rounded space-y-1">
-              <div className="text-xs font-medium text-blue-800 mb-2">Order Calculation:</div>
-              <div className="space-y-1 text-xs text-blue-700">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(subtotal)}</span>
-                </div>
-                {totalDiscount > 0 && <div className="flex justify-between text-green-700">
-                    <span>Savings:</span>
-                    <span>-{formatCurrency(totalDiscount)}</span>
-                  </div>}
-                {deliveryFee > 0 && <div className="flex justify-between">
-                    
-                    <span>+{formatCurrency(deliveryFee)}</span>
-                  </div>}
-                {totalVat > 0 && <div className="flex justify-between">
-                    <span>VAT:</span>
-                    <span>+{formatCurrency(totalVat)}</span>
-                  </div>}
+          {/* Calculation Summary - Responsive Container */}
+          {showDetailed && (
+            <div className="bg-blue-50 dark:bg-blue-950/20 p-3 sm:p-4 rounded-lg border border-blue-100 dark:border-blue-900/30 overflow-hidden">
+              <div className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-200 mb-2 sm:mb-3">
+                Order Calculation:
               </div>
-            </div>}
+              <div className="space-y-2 text-xs sm:text-sm text-blue-700 dark:text-blue-300">
+                <div className="flex justify-between items-center min-w-0">
+                  <span className="flex-shrink-0">Subtotal:</span>
+                  <span className="font-medium text-right truncate ml-2">{formatCurrency(subtotal)}</span>
+                </div>
+                {totalDiscount > 0 && (
+                  <div className="flex justify-between items-center text-green-700 dark:text-green-400 min-w-0">
+                    <span className="flex-shrink-0">Total Savings:</span>
+                    <span className="font-medium text-right truncate ml-2">-{formatCurrency(totalDiscount)}</span>
+                  </div>
+                )}
+                {deliveryFee > 0 && (
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="flex-shrink-0">Delivery Fee:</span>
+                    <span className="font-medium text-right truncate ml-2">+{formatCurrency(deliveryFee)}</span>
+                  </div>
+                )}
+                {totalVat > 0 && (
+                  <div className="flex justify-between items-center min-w-0">
+                    <span className="flex-shrink-0">VAT:</span>
+                    <span className="font-medium text-right truncate ml-2">+{formatCurrency(totalVat)}</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
           
-          <Separator className="my-3" />
+          <Separator className="my-3 sm:my-4" />
           
-          {/* Final Total */}
-          <div className="bg-primary/5 p-3 rounded-lg">
-            <div className="flex justify-between items-center">
-              <span className="text-lg font-semibold text-gray-900">Order Total</span>
-              <span className="text-xl font-bold text-primary">{formatCurrency(grandTotal)}</span>
+          {/* Final Total - Enhanced Responsive Design */}
+          <div className="bg-primary/5 dark:bg-primary/10 p-3 sm:p-4 lg:p-5 rounded-lg border border-primary/20 overflow-hidden">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-4 min-w-0">
+              <span className="text-base sm:text-lg lg:text-xl font-semibold text-gray-900 dark:text-gray-100 flex-shrink-0">
+                Order Total
+              </span>
+              <span className="text-lg sm:text-xl lg:text-2xl font-bold text-primary break-all text-right w-full sm:w-auto">
+                {formatCurrency(grandTotal)}
+              </span>
             </div>
             
-            {/* Total Breakdown Helper */}
-            {showDetailed && (totalDiscount > 0 || deliveryFee > 0) && <div className="text-xs text-gray-600 mt-2 pt-2 border-t border-primary/10">
-                You pay {formatCurrency(grandTotal)} 
-                {totalDiscount > 0 && ` (saved ${formatCurrency(totalDiscount)})`}
-                {deliveryFee > 0 && ` including ${formatCurrency(deliveryFee)} delivery`}
-              </div>}
+            {/* Total Breakdown Helper - Mobile Optimized */}
+            {showDetailed && (totalDiscount > 0 || deliveryFee > 0) && (
+              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2 sm:mt-3 pt-2 border-t border-primary/10">
+                <div className="flex flex-col gap-1">
+                  <span className="break-words">You pay {formatCurrency(grandTotal)}</span>
+                  <div className="flex flex-wrap gap-1 text-xs">
+                    {totalDiscount > 0 && (
+                      <span className="text-green-600 dark:text-green-400 break-words">
+                        (saved {formatCurrency(totalDiscount)})
+                      </span>
+                    )}
+                    {deliveryFee > 0 && (
+                      <span className="break-words">including {formatCurrency(deliveryFee)} delivery</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
           
-          {/* Payment & Policy Info */}
-          <div className="text-xs text-gray-500 mt-3 p-3 bg-gray-50 rounded border">
-            <div className="space-y-1">
-              <div className="flex justify-between items-center">
-                <span>Payment Method:</span>
-                <span className="font-medium text-blue-600">Paystack (Secure)</span>
+          {/* Payment & Policy Info - Fully Responsive */}
+          <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-3 p-3 sm:p-4 bg-gray-50 dark:bg-gray-900/50 rounded-lg border border-gray-200 dark:border-gray-800 overflow-hidden">
+            <div className="space-y-2 sm:space-y-3">
+              <div className="space-y-2">
+                <div className="flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4 min-w-0">
+                  <div className="flex justify-between sm:justify-start items-center gap-2 min-w-0">
+                    <span className="flex-shrink-0">Payment Method:</span>
+                    <span className="font-medium text-blue-600 dark:text-blue-400 truncate">
+                      Paystack (Secure)
+                    </span>
+                  </div>
+                  <div className="flex justify-between sm:justify-start items-center gap-2 min-w-0">
+                    <span className="flex-shrink-0">Currency:</span>
+                    <span className="font-medium truncate">Nigerian Naira (₦)</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between items-center">
-                <span>Currency:</span>
-                <span className="font-medium">Nigerian Naira (₦)</span>
-              </div>
-              <div className="text-xs text-gray-400 mt-2 pt-2 border-t">
-                🔒 All transactions are secure and encrypted. Prices include applicable taxes.
+              <div className="text-xs text-gray-400 dark:text-gray-500 pt-2 border-t border-gray-200 dark:border-gray-700">
+                <div className="flex items-start gap-2 break-words">
+                  <span className="flex-shrink-0">🔒</span>
+                  <span className="leading-relaxed">
+                    All transactions are secure and encrypted. Prices include applicable taxes.
+                  </span>
+                </div>
               </div>
             </div>
           </div>

@@ -206,15 +206,6 @@ export function OrderItemsBreakdown({
                     </div>
                   </div>
                 </div>
-                
-                <div className="text-right flex-shrink-0">
-                  <div className="font-semibold text-gray-900">
-                    {formatCurrency(Number(item.total_price ?? 0))}
-                  </div>
-                  {showDetailed && Number(item.vat_amount ?? 0) > 0 && <div className="text-xs text-gray-500 mt-1">
-                      VAT ({item.vat_rate || 7.5}%): {formatCurrency(Number(item.vat_amount ?? 0))}
-                    </div>}
-                </div>
               </div>
             </div>)}
         </div>

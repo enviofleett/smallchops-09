@@ -261,10 +261,7 @@ export function OrderItemsBreakdown({
               </div>}
             
             {/* Service Charge (if any) */}
-            {showDetailed && <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Service Charge</span>
-                <span className="font-medium text-gray-500">₦0.00</span>
-              </div>}
+            {showDetailed}
           </div>
           
           {/* Tax Breakdown */}
@@ -279,37 +276,7 @@ export function OrderItemsBreakdown({
             </div>}
           
           {/* Calculation Summary - Responsive Container */}
-          {showDetailed && (
-            <div className="bg-blue-50 dark:bg-blue-950/20 p-3 sm:p-4 rounded-lg border border-blue-100 dark:border-blue-900/30 overflow-hidden">
-              <div className="text-xs sm:text-sm font-medium text-blue-800 dark:text-blue-200 mb-2 sm:mb-3">
-                Order Calculation:
-              </div>
-              <div className="space-y-2 text-xs sm:text-sm text-blue-700 dark:text-blue-300">
-                <div className="flex justify-between items-center min-w-0">
-                  <span className="flex-shrink-0">Subtotal:</span>
-                  <span className="font-medium text-right truncate ml-2">{formatCurrency(subtotal)}</span>
-                </div>
-                {totalDiscount > 0 && (
-                  <div className="flex justify-between items-center text-green-700 dark:text-green-400 min-w-0">
-                    <span className="flex-shrink-0">Total Savings:</span>
-                    <span className="font-medium text-right truncate ml-2">-{formatCurrency(totalDiscount)}</span>
-                  </div>
-                )}
-                {deliveryFee > 0 && (
-                  <div className="flex justify-between items-center min-w-0">
-                    <span className="flex-shrink-0">Delivery Fee:</span>
-                    <span className="font-medium text-right truncate ml-2">+{formatCurrency(deliveryFee)}</span>
-                  </div>
-                )}
-                {totalVat > 0 && (
-                  <div className="flex justify-between items-center min-w-0">
-                    <span className="flex-shrink-0">VAT:</span>
-                    <span className="font-medium text-right truncate ml-2">+{formatCurrency(totalVat)}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
+          {showDetailed}
           
           <Separator className="my-3 sm:my-4" />
           
@@ -325,23 +292,17 @@ export function OrderItemsBreakdown({
             </div>
             
             {/* Total Breakdown Helper - Mobile Optimized */}
-            {showDetailed && (totalDiscount > 0 || deliveryFee > 0) && (
-              <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2 sm:mt-3 pt-2 border-t border-primary/10">
+            {showDetailed && (totalDiscount > 0 || deliveryFee > 0) && <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2 sm:mt-3 pt-2 border-t border-primary/10">
                 <div className="flex flex-col gap-1">
                   <span className="break-words">You pay {formatCurrency(grandTotal)}</span>
                   <div className="flex flex-wrap gap-1 text-xs">
-                    {totalDiscount > 0 && (
-                      <span className="text-green-600 dark:text-green-400 break-words">
+                    {totalDiscount > 0 && <span className="text-green-600 dark:text-green-400 break-words">
                         (saved {formatCurrency(totalDiscount)})
-                      </span>
-                    )}
-                    {deliveryFee > 0 && (
-                      <span className="break-words">including {formatCurrency(deliveryFee)} delivery</span>
-                    )}
+                      </span>}
+                    {deliveryFee > 0 && <span className="break-words">including {formatCurrency(deliveryFee)} delivery</span>}
                   </div>
                 </div>
-              </div>
-            )}
+              </div>}
           </div>
           
           {/* Payment & Policy Info - Fully Responsive */}

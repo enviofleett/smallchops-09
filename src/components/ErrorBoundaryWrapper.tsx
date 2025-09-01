@@ -144,9 +144,9 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
       const canRetry = this.state.retryCount < this.maxRetries;
 
       return (
-        <div className="min-h-[400px] flex items-center justify-center p-4">
-          <Card className="w-full max-w-lg">
-            <CardContent className="p-6">
+        <div className="min-h-[400px] flex items-center justify-center p-4 sm:p-6">
+          <Card className="w-full max-w-lg shadow-lg border-border/50">
+            <CardContent className="p-4 sm:p-6 space-y-4">
               <div className="flex items-center space-x-3 mb-4">
                 <AlertTriangle className="h-6 w-6 text-destructive" />
                 <h3 className="text-lg font-semibold">

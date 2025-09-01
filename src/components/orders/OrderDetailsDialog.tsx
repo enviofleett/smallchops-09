@@ -15,6 +15,7 @@ import { getDeliveryScheduleByOrderId } from '@/api/deliveryScheduleApi';
 import { usePickupPoint } from '@/hooks/usePickupPoints';
 import { useDetailedOrderData } from '@/hooks/useDetailedOrderData';
 import { useEnrichedOrderItems } from '@/hooks/useEnrichedOrderItems';
+import { cn } from '@/lib/utils';
 
 // Import our new components
 import { StatCard } from './details/StatCard';
@@ -261,7 +262,10 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       onOpenChange={onClose}
       title={`Order Details - #${order.order_number}`}
       size="xl"
-      className="print:bg-white print:text-black print:shadow-none"
+      className={cn(
+        "print:bg-white print:text-black print:shadow-none",
+        "w-full max-w-none sm:max-w-6xl lg:max-w-7xl"
+      )}
     >
       <div 
         ref={printRef}
@@ -269,8 +273,8 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
         id="order-details-modal-content"
       >
         {/* Header Actions */}
-        <div className="flex items-center justify-between mb-6 print:hidden">
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 sm:gap-2 mb-6 p-4 sm:p-6 print:hidden bg-muted/30 border-b">
+          <div className="flex flex-wrap items-center gap-2">
             <Button 
               onClick={handleExportPDF} 
               variant="outline" 
@@ -318,7 +322,7 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
         </div>
 
         {/* Quick Stats Overview */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-8 print:grid print:grid-cols-4 print:mb-6">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8 px-4 sm:px-6 print:grid print:grid-cols-4 print:mb-6 print:px-0">
           <StatCard
             title="Status"
             value={safeFallback(order.status.charAt(0).toUpperCase() + order.status.slice(1).replace(/_/g, ' '))}
@@ -348,9 +352,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
         </div>
 
         {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 print:grid-cols-1">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 sm:gap-6 lg:gap-8 px-4 sm:px-6 print:grid-cols-1 print:px-0">
           {/* Left Column - Order Information */}
-          <div className="lg:col-span-2 print:col-span-1 space-y-8">
+          <div className="lg:col-span-2 print:col-span-1 space-y-6 sm:space-y-8">
             <section aria-labelledby="customer-info-heading">
               <h2 id="customer-info-heading" className="text-lg font-semibold text-foreground mb-4 print:text-black">
                 Customer Information
@@ -428,8 +432,8 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
           </div>
 
           {/* Right Column - Actions Panel */}
-          <aside className="space-y-6 print:hidden" aria-labelledby="actions-heading">
-            <h2 id="actions-heading" className="text-lg font-semibold text-foreground mb-4">
+          <aside className="space-y-4 sm:space-y-6 print:hidden lg:sticky lg:top-4 lg:self-start" aria-labelledby="actions-heading">
+            <h2 id="actions-heading" className="text-lg font-semibold text-foreground mb-4 px-1">
               Actions & Status
             </h2>
             <ActionsPanel
@@ -458,6 +462,9 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
         <div className="hidden print:block print:mt-8 print:pt-4 print:border-t print:border-gray-300 print:text-center print:text-xs print:text-gray-500">
           <p>Generated on {format(new Date(), 'PPP')} • Order #{order.order_number}</p>
         </div>
+        
+        {/* Bottom padding for mobile */}
+        <div className="h-4 sm:h-6 print:hidden"></div>
       </div>
     </AdaptiveDialog>
   );

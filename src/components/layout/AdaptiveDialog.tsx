@@ -28,11 +28,11 @@ export const AdaptiveDialog: React.FC<AdaptiveDialogProps> = ({
   const isMobile = useIsMobile();
 
   const sizeClasses = {
-    sm: 'max-w-sm',
-    md: 'max-w-md',
-    lg: 'max-w-lg',
-    xl: 'max-w-xl',
-    full: 'max-w-full mx-4'
+    sm: 'max-w-sm sm:max-w-md',
+    md: 'max-w-full sm:max-w-2xl',
+    lg: 'max-w-full sm:max-w-4xl',
+    xl: 'max-w-full sm:max-w-6xl lg:max-w-7xl',
+    full: 'max-w-full'
   };
 
   if (isMobile) {
@@ -46,7 +46,8 @@ export const AdaptiveDialog: React.FC<AdaptiveDialogProps> = ({
         <SheetContent 
           side="bottom" 
           className={cn(
-            "max-h-[85vh] overflow-y-auto",
+            "max-h-[90vh] min-h-[50vh] overflow-y-auto rounded-t-lg",
+            "w-full mx-auto",
             className
           )}
         >
@@ -71,7 +72,9 @@ export const AdaptiveDialog: React.FC<AdaptiveDialogProps> = ({
       )}
       <DialogContent className={cn(
         sizeClasses[size],
-        "max-h-[85vh] overflow-y-auto",
+        "max-h-[90vh] overflow-y-auto",
+        "w-[95vw] sm:w-auto",
+        "mx-auto p-0",
         className
       )}>
         <DialogHeader>

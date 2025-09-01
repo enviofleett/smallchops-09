@@ -1,9 +1,11 @@
 import React from 'react';
 import { EmailProductionDashboard } from '@/components/admin/EmailProductionDashboard';
+import { PaystackProductionHealthDashboard } from '@/components/admin/PaystackProductionHealthDashboard';
 
 export const EmailProductionTest: React.FC = () => {
   return (
-    <div className="container mx-auto py-8">
+    <div className="container mx-auto py-8 space-y-8">
+      <PaystackProductionHealthDashboard />
       <EmailProductionDashboard />
     </div>
   );

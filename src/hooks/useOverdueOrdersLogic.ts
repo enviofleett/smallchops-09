@@ -24,7 +24,7 @@ export const useOverdueOrdersLogic = () => {
   const [alertsEnabled, setAlertsEnabled] = useState(true);
   const queryClient = useQueryClient();
 
-  // Fetch orders that could potentially be overdue
+  // Fetch orders that are paid but not delivered after due dates
   const { data: potentialOverdueOrders = [] } = useQuery({
     queryKey: ['potential-overdue-orders'],
     queryFn: async (): Promise<OrderWithItems[]> => {
@@ -35,7 +35,8 @@ export const useOverdueOrdersLogic = () => {
           order_items(*),
           delivery_zones(*)
         `)
-        .in('status', ['confirmed', 'preparing', 'ready', 'out_for_delivery'])
+        .eq('payment_status', 'paid')
+        .not('status', 'in', '(delivered,completed,cancelled,refunded)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;

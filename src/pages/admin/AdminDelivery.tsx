@@ -333,46 +333,18 @@ export default function AdminDelivery() {
 
           {/* Overview Tab */}
           <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-6">
-              {/* Recent Delivery Orders */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Package className="w-5 h-5" />
-                    Recent Delivery Orders
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {ordersLoading ? (
-                    <LoadingSkeleton rows={3} />
-                  ) : (
-                    <div className="space-y-4">
-                      {deliveryOrders.slice(0, 5).map((order) => (
-                        <DeliveryOrderItem key={order.id} order={order} />
-                      ))}
-                      {deliveryOrders.length === 0 && (
-                        <p className="text-center text-muted-foreground py-4">
-                          No delivery orders for today
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Shipping Fees Report */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5" />
-                    Shipping Fees Report
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <ShippingFeesReport />
-                </CardContent>
-              </Card>
-            </div>
+            {/* Shipping Fees Report - Full Width */}
+            <Card className="w-full">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <TrendingUp className="w-5 h-5" />
+                  Shipping Fees Report
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ShippingFeesReport />
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Drivers Tab */}

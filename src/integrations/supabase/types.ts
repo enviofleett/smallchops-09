@@ -6484,6 +6484,42 @@ export type Database = {
         }
         Relationships: []
       }
+      production_readiness_status: {
+        Row: {
+          created_at: string
+          environment: string
+          id: string
+          is_production_ready: boolean
+          issues: string[] | null
+          last_updated: string
+          overall_status: string
+          readiness_score: number
+          warnings: string[] | null
+        }
+        Insert: {
+          created_at?: string
+          environment?: string
+          id?: string
+          is_production_ready?: boolean
+          issues?: string[] | null
+          last_updated?: string
+          overall_status?: string
+          readiness_score?: number
+          warnings?: string[] | null
+        }
+        Update: {
+          created_at?: string
+          environment?: string
+          id?: string
+          is_production_ready?: boolean
+          issues?: string[] | null
+          last_updated?: string
+          overall_status?: string
+          readiness_score?: number
+          warnings?: string[] | null
+        }
+        Relationships: []
+      }
       products: {
         Row: {
           allergen_info: string[] | null

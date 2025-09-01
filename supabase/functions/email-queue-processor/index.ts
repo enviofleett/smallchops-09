@@ -252,9 +252,8 @@ function selectEmailSender(email: QueuedEmail): string {
   }
   
   // Transactional emails use primary SMTP sender
-  if (isTransactionalEmail(email.template_key)) {
-    return 'smtp-email-sender';
-  }
+  // Always use unified SMTP sender
+  return 'unified-smtp-sender';
   
   // All emails use unified SMTP sender
   return 'unified-smtp-sender';

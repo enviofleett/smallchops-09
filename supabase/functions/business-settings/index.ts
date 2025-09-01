@@ -292,7 +292,7 @@ serve(async (req) => {
             console.error('SMTP email sender function failed:', emailError);
             return new Response(JSON.stringify({
               success: false,
-              error: `Email test failed: ${emailError.message || 'Unknown error from smtp-email-sender function'}`
+              error: `Email test failed: ${emailError.message || 'Unknown error from unified-smtp-sender function'}`
             }), {
               status: 400,
               headers: { ...corsHeaders, 'Content-Type': 'application/json' }

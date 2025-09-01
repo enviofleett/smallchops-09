@@ -242,8 +242,8 @@ async function processOrderEmail(supabase: any, event: CommunicationEvent): Prom
       companyName: businessSettings?.name || 'Starters'
     }
 
-    // Invoke SMTP email sender
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    // Invoke unified SMTP email sender
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
       body: {
         templateId: event.template_id || event.template_key || 'order_confirmation',
@@ -275,8 +275,8 @@ async function processWelcomeEmail(supabase: any, event: CommunicationEvent): Pr
   try {
     console.log(`Processing welcome email for: ${event.recipient_email}`);
 
-    // Call SMTP function with CORRECT format and fields
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    // Call unified SMTP function with CORRECT format and fields
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
         // Correctly pass the `template_key` as `templateId`
         templateId: event.template_key,
@@ -325,7 +325,7 @@ async function processPasswordResetEmail(supabase: any, event: CommunicationEven
       companyName: businessSettings?.name || 'Starters'
     }
 
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
         templateId: event.template_id || event.template_key || 'password_reset',
         recipient: {
@@ -354,7 +354,7 @@ async function processPasswordResetEmail(supabase: any, event: CommunicationEven
 
 async function processAdminNotification(supabase: any, event: CommunicationEvent): Promise<boolean> {
   try {
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
         templateId: event.template_id || event.template_key || 'admin_notification',
         recipient: {

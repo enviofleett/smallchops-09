@@ -19,16 +19,45 @@ enable_email_autoconfirm = false
 enable_phone_confirmations = false
 enable_phone_autoconfirm = false
 
-# NATIVE SMTP EMAIL SYSTEM - Single Source of Truth
+# NATIVE SMTP EMAIL SYSTEM - Unified Configuration
 [functions.unified-smtp-sender]
 verify_jwt = false
 
 [functions.unified-email-queue-processor]
 verify_jwt = false
 
+[functions.instant-email-processor]
+verify_jwt = false
+
+# Authentication & User Management
 [functions.supabase-auth-email-sender]
 verify_jwt = false
 
+[functions.customer-auth-register]
+verify_jwt = false
+
+[functions.customer-otp-verification]
+verify_jwt = false
+
+[functions.check-otp-rate-limit]
+verify_jwt = false
+
+[functions.auth-register]
+verify_jwt = false
+
+[functions.auth-verify-otp]
+verify_jwt = false
+
+[functions.auth-profile]
+verify_jwt = true
+
+[functions.secure-customer-auth]
+verify_jwt = false
+
+[functions.finalize-customer-registration]
+verify_jwt = true
+
+# Payment Processing
 [functions.payment-callback]
 verify_jwt = false
 
@@ -53,9 +82,6 @@ verify_jwt = false
 [functions.payment-health-check]
 verify_jwt = true
 
-[functions.unsubscribe-email]
-verify_jwt = false
-
 [functions.paystack-health]
 verify_jwt = true
 
@@ -71,18 +97,6 @@ verify_jwt = true
 [functions.production-paystack-setup]
 verify_jwt = true
 
-[functions.admin-management]
-verify_jwt = true
-
-[functions.reports]
-verify_jwt = true
-
-[functions.get-turnstile-key]
-verify_jwt = false
-
-[functions.test-paystack-credentials]
-verify_jwt = false
-
 [functions.verify-payment-unified]
 verify_jwt = false
 
@@ -95,91 +109,10 @@ verify_jwt = false
 [functions.payment-environment-manager]
 verify_jwt = false
 
-[functions.admin-orders-manager]
-verify_jwt = true
-
-[functions.shipping-fees-report]
-verify_jwt = true
-
 [functions.payment-confirmation-processor]
 verify_jwt = true
 
-[functions.finalize-customer-registration]
-verify_jwt = true
-
-[functions.backfill-missing-schedules]
-verify_jwt = true
-
-[functions.delivery-schedule-health]
-verify_jwt = false
-
-[functions.recover-order-schedule]
-verify_jwt = true
-
-[functions.customer-auth-register]
-verify_jwt = false
-
-[functions.customer-otp-verification]
-verify_jwt = false
-
-[functions.check-otp-rate-limit]
-verify_jwt = false
-
-[functions.auth-register]
-verify_jwt = false
-
-[functions.auth-verify-otp]
-verify_jwt = false
-
-[functions.auth-profile]
-verify_jwt = true
-
-[functions.customer-welcome-processor]
-verify_jwt = false
-
-[functions.instant-email-processor]
-verify_jwt = false
-
-[functions.email-queue-processor]
-verify_jwt = false
-
-[functions.smtp-email-sender]
-verify_jwt = false
-
-[functions.secure-customer-auth]
-verify_jwt = false
-
-[functions.security-monitor]
-verify_jwt = false
-
-[functions.email-trigger-manager]
-verify_jwt = false
-
-[functions.email-automation-trigger]
-verify_jwt = false
-
-[functions.email-automation-engine]
-verify_jwt = false
-
-[functions.email-automation-cron]
-verify_jwt = false
-
-[functions.admin-email-processor]
-verify_jwt = false
-
-[functions.email-compliance-manager]
-verify_jwt = false
-
-[functions.automated-email-cron]
-verify_jwt = false
-
-[functions.welcome-series-processor]
-verify_jwt = false
-
-[functions.user-journey-automation]
-verify_jwt = false
-
-[functions.public-api]
+[functions.test-paystack-credentials]
 verify_jwt = false
 
 [functions.paystack-debug]
@@ -190,3 +123,39 @@ verify_jwt = false
 
 [functions.paystack-health-monitor]
 verify_jwt = false
+
+# Administrative Functions
+[functions.admin-management]
+verify_jwt = true
+
+[functions.admin-orders-manager]
+verify_jwt = true
+
+[functions.reports]
+verify_jwt = true
+
+[functions.shipping-fees-report]
+verify_jwt = true
+
+[functions.security-monitor]
+verify_jwt = false
+
+# Utility Functions
+[functions.unsubscribe-email]
+verify_jwt = false
+
+[functions.get-turnstile-key]
+verify_jwt = false
+
+[functions.public-api]
+verify_jwt = false
+
+# Delivery & Scheduling
+[functions.backfill-missing-schedules]
+verify_jwt = true
+
+[functions.delivery-schedule-health]
+verify_jwt = false
+
+[functions.recover-order-schedule]
+verify_jwt = true

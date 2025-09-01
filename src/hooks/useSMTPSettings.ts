@@ -35,15 +35,16 @@ export const useSMTPSettings = () => {
       }
 
       if (!data) {
-        // No settings found, return default
+        // No settings found, return minimal default structure
+        // All credentials should be configured via Settings page or Function Secrets
         return {
-          smtp_host: 'mail.startersmallchops.com',
+          smtp_host: '',
           smtp_port: 587,
-          smtp_user: 'store@startersmallchops.com',
+          smtp_user: '',
           smtp_pass: '',
-          smtp_secure: false, // Use STARTTLS instead of direct SSL
-          sender_email: 'store@startersmallchops.com',
-          sender_name: 'Starters Small Chops',
+          smtp_secure: false,
+          sender_email: '',
+          sender_name: '',
           use_smtp: false
         };
       }

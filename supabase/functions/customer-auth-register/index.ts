@@ -70,8 +70,8 @@ async function sendOTPEmail(supabase: any, email: string, otp: string, name: str
 
     console.warn('Enhanced email processor failed, trying fallback:', enhancedError);
 
-    // Fallback to direct SMTP sender
-    const { data, error } = await supabase.functions.invoke('smtp-email-sender', {
+    // Use unified SMTP sender
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
       body: {
         templateId: 'customer_registration_otp',

@@ -393,9 +393,9 @@ export default function AdminOrders() {
   const orderCounts = useMemo(() => {
     return {
       all: totalCount,
-      pending: orders.filter(o => o.status === 'pending').length,
       confirmed: orders.filter(o => o.status === 'confirmed' && o.payment_status === 'paid').length, // Only paid confirmed orders
       preparing: orders.filter(o => o.status === 'preparing').length,
+      ready: orders.filter(o => o.status === 'ready').length,
       out_for_delivery: orders.filter(o => o.status === 'out_for_delivery').length,
       delivered: orders.filter(o => o.status === 'delivered').length,
       overdue: overdueOrders.length // Use hook data for overdue count
@@ -481,8 +481,8 @@ export default function AdminOrders() {
                   <Clock className="w-5 h-5" />
                 </div>
                 <div>
-                  <p className="text-sm text-muted-foreground">Pending Orders</p>
-                  <p className="text-2xl font-bold">{orderCounts.pending}</p>
+                  <p className="text-sm text-muted-foreground">Ready Orders</p>
+                  <p className="text-2xl font-bold">{orderCounts.ready}</p>
                 </div>
               </div>
             </CardContent>
@@ -633,14 +633,14 @@ export default function AdminOrders() {
                   <TabsTrigger value="all" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
                     All ({orderCounts.all})
                   </TabsTrigger>
-                  <TabsTrigger value="pending" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
-                    Pend ({orderCounts.pending})
-                  </TabsTrigger>
                   <TabsTrigger value="confirmed" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
                     Conf ({orderCounts.confirmed})
                   </TabsTrigger>
                   <TabsTrigger value="preparing" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
                     Prep ({orderCounts.preparing})
+                  </TabsTrigger>
+                  <TabsTrigger value="ready" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
+                    Ready ({orderCounts.ready})
                   </TabsTrigger>
                   <TabsTrigger value="out_for_delivery" className="text-xs whitespace-nowrap px-2 py-1.5 min-w-0 data-[state=active]:bg-background">
                     Out ({orderCounts.out_for_delivery})
@@ -661,14 +661,14 @@ export default function AdminOrders() {
                 <TabsTrigger value="all" className="text-xs px-1 py-2 data-[state=active]:bg-background">
                   All ({orderCounts.all})
                 </TabsTrigger>
-                <TabsTrigger value="pending" className="text-xs px-1 py-2 data-[state=active]:bg-background">
-                  Pend ({orderCounts.pending})
-                </TabsTrigger>
                 <TabsTrigger value="confirmed" className="text-xs px-1 py-2 data-[state=active]:bg-background">
                   Conf ({orderCounts.confirmed})
                 </TabsTrigger>
                 <TabsTrigger value="preparing" className="text-xs px-1 py-2 data-[state=active]:bg-background">
                   Prep ({orderCounts.preparing})
+                </TabsTrigger>
+                <TabsTrigger value="ready" className="text-xs px-1 py-2 data-[state=active]:bg-background">
+                  Ready ({orderCounts.ready})
                 </TabsTrigger>
               </TabsList>
               <div className="mt-2">
@@ -692,14 +692,14 @@ export default function AdminOrders() {
                 <TabsTrigger value="all" className="text-sm px-2 py-2 data-[state=active]:bg-background">
                   All Orders ({orderCounts.all})
                 </TabsTrigger>
-                <TabsTrigger value="pending" className="text-sm px-2 py-2 data-[state=active]:bg-background">
-                  Pending ({orderCounts.pending})
-                </TabsTrigger>
                 <TabsTrigger value="confirmed" className="text-sm px-2 py-2 data-[state=active]:bg-background">
                   Confirmed ({orderCounts.confirmed})
                 </TabsTrigger>
                 <TabsTrigger value="preparing" className="text-sm px-2 py-2 data-[state=active]:bg-background">
                   Preparing ({orderCounts.preparing})
+                </TabsTrigger>
+                <TabsTrigger value="ready" className="text-sm px-2 py-2 data-[state=active]:bg-background">
+                  Ready ({orderCounts.ready})
                 </TabsTrigger>
                 <TabsTrigger value="out_for_delivery" className="text-sm px-2 py-2 data-[state=active]:bg-background">
                   Out for Delivery ({orderCounts.out_for_delivery})

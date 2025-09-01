@@ -19,9 +19,9 @@ interface MobileOrderTabsProps {
   deliverySchedules: Record<string, any>;
   orderCounts: {
     all: number;
-    pending: number;
     confirmed: number;
     preparing: number;
+    ready: number;
     out_for_delivery: number;
     delivered: number;
     overdue: number;
@@ -43,8 +43,8 @@ export const MobileOrderTabs = ({
       case 'delivered': return 'bg-green-100 text-green-800';
       case 'out_for_delivery': return 'bg-blue-100 text-blue-800';
       case 'preparing': return 'bg-orange-100 text-orange-800';
+      case 'ready': return 'bg-purple-100 text-purple-800';
       case 'confirmed': return 'bg-yellow-100 text-yellow-800';
-      case 'pending': return 'bg-gray-100 text-gray-800';
       case 'cancelled': return 'bg-red-100 text-red-800';
       default: return 'bg-gray-100 text-gray-800';
     }
@@ -170,14 +170,19 @@ export const MobileOrderTabs = ({
           <Button size="sm" variant="outline">
             View Details
           </Button>
-          {order.status === 'pending' && (
-            <Button size="sm">
-              Confirm
-            </Button>
-          )}
           {order.status === 'confirmed' && (
             <Button size="sm">
               Start Preparing
+            </Button>
+          )}
+          {order.status === 'preparing' && (
+            <Button size="sm">
+              Mark Ready
+            </Button>
+          )}
+          {order.status === 'ready' && (
+            <Button size="sm">
+              Out for Delivery
             </Button>
           )}
         </MobileCardActions>
@@ -219,14 +224,14 @@ export const MobileOrderTabs = ({
           <TabsTrigger value="all" className="text-xs whitespace-nowrap px-3 py-2">
             All ({orderCounts.all})
           </TabsTrigger>
-          <TabsTrigger value="pending" className="text-xs whitespace-nowrap px-3 py-2">
-            Pend ({orderCounts.pending})
-          </TabsTrigger>
           <TabsTrigger value="confirmed" className="text-xs whitespace-nowrap px-3 py-2">
             Conf ({orderCounts.confirmed})
           </TabsTrigger>
           <TabsTrigger value="preparing" className="text-xs whitespace-nowrap px-3 py-2">
             Prep ({orderCounts.preparing})
+          </TabsTrigger>
+          <TabsTrigger value="ready" className="text-xs whitespace-nowrap px-3 py-2">
+            Ready ({orderCounts.ready})
           </TabsTrigger>
           <TabsTrigger value="out_for_delivery" className="text-xs whitespace-nowrap px-3 py-2">
             Out ({orderCounts.out_for_delivery})
@@ -241,7 +246,7 @@ export const MobileOrderTabs = ({
       </div>
 
       {/* Tab content */}
-      {['all', 'pending', 'confirmed', 'preparing', 'out_for_delivery', 'delivered', 'overdue'].map(status => (
+      {['all', 'confirmed', 'preparing', 'ready', 'out_for_delivery', 'delivered', 'overdue'].map(status => (
         <TabsContent key={status} value={status} className="mt-4">
           {renderOrderList(getOrdersByStatus(status))}
         </TabsContent>

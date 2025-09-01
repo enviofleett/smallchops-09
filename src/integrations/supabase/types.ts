@@ -1393,6 +1393,27 @@ export type Database = {
         }
         Relationships: []
       }
+      communication_settings_archive: {
+        Row: {
+          archived_at: string
+          data: Json
+          id: string
+          original_id: string | null
+        }
+        Insert: {
+          archived_at?: string
+          data: Json
+          id?: string
+          original_id?: string | null
+        }
+        Update: {
+          archived_at?: string
+          data?: Json
+          id?: string
+          original_id?: string | null
+        }
+        Relationships: []
+      }
       content_management: {
         Row: {
           content: string | null

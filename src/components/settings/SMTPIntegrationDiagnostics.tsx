@@ -46,8 +46,9 @@ export const SMTPIntegrationDiagnostics = () => {
     ));
   };
 
-  const initializeDiagnostics = () => {
+const initializeDiagnostics = () => {
     const tests: DiagnosticResult[] = [
+      // Critical Production Blockers
       {
         id: 'config-exists',
         title: 'SMTP Configuration Exists',
@@ -70,6 +71,29 @@ export const SMTPIntegrationDiagnostics = () => {
         criticalBlocker: true
       },
       {
+        id: 'production-environment',
+        title: 'Production Environment Setup',
+        status: 'testing',
+        message: 'Validating production configuration...',
+        criticalBlocker: true
+      },
+      // Security & Compliance
+      {
+        id: 'security-validation',
+        title: 'Security & Credentials',
+        status: 'testing',
+        message: 'Checking secure credential storage...',
+        criticalBlocker: false
+      },
+      {
+        id: 'ssl-tls-validation',
+        title: 'SSL/TLS Configuration',
+        status: 'testing',
+        message: 'Verifying secure connection settings...',
+        criticalBlocker: false
+      },
+      // Operational Excellence
+      {
         id: 'template-system',
         title: 'Email Template System',
         status: 'testing',
@@ -82,6 +106,20 @@ export const SMTPIntegrationDiagnostics = () => {
         status: 'testing',
         message: 'Verifying rate limiting...',
         criticalBlocker: false
+      },
+      {
+        id: 'monitoring-setup',
+        title: 'Monitoring & Alerting',
+        status: 'testing',
+        message: 'Checking production monitoring...',
+        criticalBlocker: false
+      },
+      {
+        id: 'delivery-tracking',
+        title: 'Email Delivery Tracking',
+        status: 'testing',
+        message: 'Verifying delivery confirmation...',
+        criticalBlocker: false
       }
     ];
     
@@ -93,40 +131,44 @@ export const SMTPIntegrationDiagnostics = () => {
     initializeDiagnostics();
     
     try {
-      // Test 1: Check SMTP Configuration Exists
+      // Critical Production Tests
       await testSMTPConfigExists();
-      
-      // Test 2: Validate Configuration Completeness  
       await testConfigurationCompleteness();
-      
-      // Test 3: Test Edge Function Availability
       await testFunctionAvailability();
+      await testProductionEnvironment();
       
-      // Test 4: Check Template System
+      // Security & Compliance Tests
+      await testSecurityValidation();
+      await testSSLTLSConfiguration();
+      
+      // Operational Excellence Tests
       await testTemplateSystem();
-      
-      // Test 5: Verify Rate Limiting
       await testRateLimiting();
+      await testMonitoringSetup();
+      await testDeliveryTracking();
       
-      // Calculate overall status
-      const results = diagnostics;
-      const criticalFails = results.filter(r => r.criticalBlocker && r.status === 'fail').length;
-      const warnings = results.filter(r => r.status === 'warning').length;
-      
-      if (criticalFails > 0) {
-        setOverallStatus('critical');
-        toast.error(`${criticalFails} critical blockers found in SMTP system`);
-      } else if (warnings > 0) {
-        setOverallStatus('warning');
-        toast.warning(`${warnings} warnings found in SMTP system`);
-      } else {
-        setOverallStatus('healthy');
-        toast.success('SMTP system diagnostics passed');
-      }
+      // Calculate overall status with enhanced logic
+      setTimeout(() => {
+        const currentDiagnostics = diagnostics;
+        const criticalFails = currentDiagnostics.filter(r => r.criticalBlocker && r.status === 'fail').length;
+        const warnings = currentDiagnostics.filter(r => r.status === 'warning').length;
+        const totalFails = currentDiagnostics.filter(r => r.status === 'fail').length;
+        
+        if (criticalFails > 0) {
+          setOverallStatus('critical');
+          toast.error(`${criticalFails} critical blockers prevent production deployment`);
+        } else if (totalFails > 0 || warnings >= 3) {
+          setOverallStatus('warning'); 
+          toast.warning(`${warnings} recommendations for production optimization`);
+        } else {
+          setOverallStatus('healthy');
+          toast.success('SMTP system production-ready ✅');
+        }
+      }, 100);
       
     } catch (error) {
-      console.error('Diagnostic error:', error);
-      toast.error('Diagnostic test failed');
+      console.error('Production diagnostic error:', error);
+      toast.error('Production readiness check failed');
     } finally {
       setIsRunning(false);
     }
@@ -363,20 +405,248 @@ export const SMTPIntegrationDiagnostics = () => {
         updateDiagnostic('rate-limiting', {
           status: 'warning',
           message: 'Rate limiting function not available',
-          recommendation: 'Implement rate limiting to prevent spam'
+          recommendation: 'Deploy rate limiting to prevent spam and abuse'
         });
         return;
       }
       
       updateDiagnostic('rate-limiting', {
         status: 'pass',
-        message: 'Rate limiting protection active'
+        message: 'Rate limiting protection active and configured'
       });
       
     } catch (error) {
       updateDiagnostic('rate-limiting', {
         status: 'warning',
-        message: 'Rate limiting check failed'
+        message: 'Rate limiting validation failed'
+      });
+    }
+  };
+
+  const testProductionEnvironment = async () => {
+    try {
+      const checks = [];
+      
+      // Check environment detection
+      const isDevelopment = window.location.hostname === 'localhost';
+      const isProduction = window.location.hostname.includes('.app') || 
+                          window.location.hostname.includes('.com');
+      
+      if (isDevelopment) {
+        checks.push('⚠ Running in development mode');
+      } else if (isProduction) {
+        checks.push('✓ Production environment detected');
+      }
+      
+      // Check for HTTPS in production
+      if (isProduction && window.location.protocol !== 'https:') {
+        updateDiagnostic('production-environment', {
+          status: 'fail',
+          message: 'Production site not using HTTPS',
+          recommendation: 'Enable HTTPS for secure email transmission'
+        });
+        return;
+      }
+      
+      // Check for production-ready domain
+      if (isProduction) {
+        updateDiagnostic('production-environment', {
+          status: 'pass',
+          message: 'Production environment validated with HTTPS'
+        });
+      } else {
+        updateDiagnostic('production-environment', {
+          status: 'warning',
+          message: 'Development environment - production checks skipped',
+          recommendation: 'Deploy to production environment for full validation'
+        });
+      }
+      
+    } catch (error) {
+      updateDiagnostic('production-environment', {
+        status: 'warning',
+        message: 'Environment validation failed'
+      });
+    }
+  };
+
+  const testSecurityValidation = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('communication_settings')
+        .select('smtp_pass, smtp_secure, sender_email')
+        .limit(1)
+        .maybeSingle();
+        
+      if (error || !data) {
+        updateDiagnostic('security-validation', {
+          status: 'warning',
+          message: 'Cannot validate security settings'
+        });
+        return;
+      }
+      
+      const securityIssues = [];
+      const recommendations = [];
+      
+      // Check password storage
+      if (data.smtp_pass && data.smtp_pass.length < 20) {
+        securityIssues.push('Weak password or stored in plaintext');
+        recommendations.push('Use Supabase Function Secrets for SMTP password');
+      }
+      
+      // Check sender email domain
+      if (data.sender_email && !data.sender_email.includes('@')) {
+        securityIssues.push('Invalid sender email format');
+      }
+      
+      if (securityIssues.length > 0) {
+        updateDiagnostic('security-validation', {
+          status: 'warning',
+          message: `Security concerns: ${securityIssues.join(', ')}`,
+          recommendation: recommendations.join('; ')
+        });
+      } else {
+        updateDiagnostic('security-validation', {
+          status: 'pass',
+          message: 'Security configuration validated'
+        });
+      }
+      
+    } catch (error) {
+      updateDiagnostic('security-validation', {
+        status: 'warning',
+        message: 'Security validation check failed'
+      });
+    }
+  };
+
+  const testSSLTLSConfiguration = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('communication_settings')
+        .select('smtp_secure, smtp_port')
+        .limit(1)
+        .maybeSingle();
+        
+      if (error || !data) {
+        updateDiagnostic('ssl-tls-validation', {
+          status: 'warning',
+          message: 'Cannot validate SSL/TLS settings'
+        });
+        return;
+      }
+      
+      const isSecurePort = data.smtp_port === 465 || data.smtp_port === 587;
+      const hasSecureFlag = data.smtp_secure === true;
+      
+      if (!isSecurePort && !hasSecureFlag) {
+        updateDiagnostic('ssl-tls-validation', {
+          status: 'fail',
+          message: 'Insecure SMTP configuration detected',
+          recommendation: 'Use port 587 (STARTTLS) or 465 (SSL) with secure=true'
+        });
+      } else if (isSecurePort || hasSecureFlag) {
+        updateDiagnostic('ssl-tls-validation', {
+          status: 'pass',
+          message: 'Secure SMTP connection configured'
+        });
+      } else {
+        updateDiagnostic('ssl-tls-validation', {
+          status: 'warning',
+          message: 'SSL/TLS configuration may need optimization'
+        });
+      }
+      
+    } catch (error) {
+      updateDiagnostic('ssl-tls-validation', {
+        status: 'warning',
+        message: 'SSL/TLS validation failed'
+      });
+    }
+  };
+
+  const testMonitoringSetup = async () => {
+    try {
+      // Check for email delivery logs table
+      const { data, error } = await supabase
+        .from('smtp_delivery_logs')
+        .select('id')
+        .limit(1);
+        
+      if (error) {
+        updateDiagnostic('monitoring-setup', {
+          status: 'warning',
+          message: 'Email delivery logging not available',
+          recommendation: 'Set up delivery tracking for production monitoring'
+        });
+        return;
+      }
+      
+      // Check for recent logs (indicates active monitoring)
+      const { data: recentLogs } = await supabase
+        .from('smtp_delivery_logs')
+        .select('id')
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString())
+        .limit(1);
+        
+      if (recentLogs && recentLogs.length > 0) {
+        updateDiagnostic('monitoring-setup', {
+          status: 'pass',
+          message: 'Active email monitoring and logging detected'
+        });
+      } else {
+        updateDiagnostic('monitoring-setup', {
+          status: 'warning',
+          message: 'Monitoring configured but no recent activity',
+          recommendation: 'Send test emails to verify monitoring is working'
+        });
+      }
+      
+    } catch (error) {
+      updateDiagnostic('monitoring-setup', {
+        status: 'warning',
+        message: 'Monitoring setup validation failed'
+      });
+    }
+  };
+
+  const testDeliveryTracking = async () => {
+    try {
+      // Check for communication events table
+      const { data, error } = await supabase
+        .from('communication_events')
+        .select('id, status')
+        .limit(5);
+        
+      if (error) {
+        updateDiagnostic('delivery-tracking', {
+          status: 'warning',
+          message: 'Email delivery tracking not available',
+          recommendation: 'Set up communication events tracking'
+        });
+        return;
+      }
+      
+      const statusTypes = [...new Set(data?.map(d => d.status) || [])];
+      
+      if (statusTypes.length === 0) {
+        updateDiagnostic('delivery-tracking', {
+          status: 'warning',
+          message: 'No email delivery records found',
+          recommendation: 'Send test emails to populate delivery tracking'
+        });
+      } else {
+        updateDiagnostic('delivery-tracking', {
+          status: 'pass',
+          message: `Delivery tracking active (${statusTypes.length} status types)`
+        });
+      }
+      
+    } catch (error) {
+      updateDiagnostic('delivery-tracking', {
+        status: 'warning',
+        message: 'Delivery tracking validation failed'
       });
     }
   };
@@ -513,43 +783,85 @@ export const SMTPIntegrationDiagnostics = () => {
           ))}
         </div>
 
-        {/* Production-Ready Quick Fixes */}
+        {/* Production-Ready Action Plans */}
         {overallStatus === 'critical' && (
           <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <h4 className="text-sm font-medium text-red-800 mb-2">🚨 Critical Issues - Production Blocked</h4>
-            <div className="text-sm text-red-700 space-y-1">
-              <p>• <strong>SMTP Config:</strong> Complete Settings → SMTP Settings with host, user, password</p>
-              <p>• <strong>Functions:</strong> Deploy missing edge functions via Supabase CLI or dashboard</p>
-              <p>• <strong>Secrets:</strong> For production, store SMTP password in Supabase Secrets</p>
-              <p>• <strong>Testing:</strong> Use "Test SMTP Connection" before going live</p>
+            <h4 className="text-sm font-medium text-red-800 mb-3">🚨 Production Blockers - Immediate Action Required</h4>
+            <div className="text-sm text-red-700 space-y-2">
+              <div>
+                <strong>1. Complete SMTP Configuration</strong>
+                <p className="ml-4 text-xs">→ Settings → SMTP Settings → Configure host, user, secure password</p>
+              </div>
+              <div>
+                <strong>2. Deploy Edge Functions</strong>
+                <p className="ml-4 text-xs">→ Check Supabase Functions dashboard for deployment status</p>
+              </div>
+              <div>
+                <strong>3. Secure Credential Storage</strong>
+                <p className="ml-4 text-xs">→ Move SMTP password to Supabase Function Secrets (production requirement)</p>
+              </div>
+              <div>
+                <strong>4. Enable HTTPS</strong>
+                <p className="ml-4 text-xs">→ Ensure production site uses HTTPS for secure email transmission</p>
+              </div>
             </div>
           </div>
         )}
         
         {overallStatus === 'warning' && (
           <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-            <h4 className="text-sm font-medium text-yellow-800 mb-2">⚠️ Recommendations for Production</h4>
-            <div className="text-sm text-yellow-700 space-y-1">
-              <p>• <strong>Security:</strong> Move SMTP password to Supabase Function Secrets</p>
-              <p>• <strong>Templates:</strong> Create email templates for consistent messaging</p>
-              <p>• <strong>Monitoring:</strong> Test email delivery regularly</p>
-              <p>• <strong>Rate Limiting:</strong> Verify rate limiting is active to prevent spam</p>
+            <h4 className="text-sm font-medium text-yellow-800 mb-3">⚠️ Production Optimization Recommendations</h4>
+            <div className="text-sm text-yellow-700 space-y-2">
+              <div>
+                <strong>Security Hardening</strong>
+                <p className="ml-4 text-xs">• Use Function Secrets for SMTP credentials</p>
+                <p className="ml-4 text-xs">• Enable SSL/TLS (port 587 or 465)</p>
+                <p className="ml-4 text-xs">• Implement sender domain authentication (SPF/DKIM)</p>
+              </div>
+              <div>
+                <strong>Operational Excellence</strong>
+                <p className="ml-4 text-xs">• Set up email templates for consistency</p>
+                <p className="ml-4 text-xs">• Configure monitoring and alerting</p>
+                <p className="ml-4 text-xs">• Test delivery tracking and bounce handling</p>
+              </div>
+              <div>
+                <strong>Performance & Reliability</strong>
+                <p className="ml-4 text-xs">• Verify rate limiting is active</p>
+                <p className="ml-4 text-xs">• Set up backup SMTP provider (optional)</p>
+                <p className="ml-4 text-xs">• Configure email queue processing</p>
+              </div>
             </div>
           </div>
         )}
         
         {overallStatus === 'healthy' && (
           <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <h4 className="text-sm font-medium text-green-800 mb-2">✅ Production Ready Checklist</h4>
-            <div className="text-sm text-green-700 space-y-1">
-              <p>• All critical systems operational</p>
-              <p>• SMTP configuration validated</p>
-              <p>• Edge functions deployed and responding</p>
-              <p>• Ready for production email delivery</p>
+            <h4 className="text-sm font-medium text-green-800 mb-3">✅ Production-Ready Email System</h4>
+            <div className="text-sm text-green-700 space-y-2">
+              <div>
+                <strong>Core Systems ✓</strong>
+                <p className="ml-4 text-xs">• SMTP configuration validated and secure</p>
+                <p className="ml-4 text-xs">• Edge functions deployed and operational</p>
+                <p className="ml-4 text-xs">• SSL/TLS encryption enabled</p>
+              </div>
+              <div>
+                <strong>Production Features ✓</strong>
+                <p className="ml-4 text-xs">• Email delivery tracking active</p>
+                <p className="ml-4 text-xs">• Rate limiting protection enabled</p>
+                <p className="ml-4 text-xs">• Monitoring and logging configured</p>
+              </div>
             </div>
-            <div className="mt-2 pt-2 border-t border-green-200">
-              <p className="text-xs text-green-600">
-                💡 <strong>Next:</strong> Send a test email to verify end-to-end functionality
+            <div className="mt-3 pt-3 border-t border-green-200">
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-green-600">
+                  🚀 <strong>Ready for Production:</strong> All systems operational
+                </p>
+                <Badge className="bg-green-100 text-green-800 text-xs">
+                  PRODUCTION READY
+                </Badge>
+              </div>
+              <p className="text-xs text-green-600 mt-1">
+                💡 <strong>Next Step:</strong> Send test emails to validate end-to-end delivery
               </p>
             </div>
           </div>

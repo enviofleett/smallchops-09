@@ -8240,57 +8240,6 @@ export type Database = {
         }
         Relationships: []
       }
-      email_system_config_summary: {
-        Row: {
-          connection_security: string | null
-          created_at: string | null
-          credential_source: string | null
-          id: string | null
-          last_security_audit: string | null
-          production_mode: boolean | null
-          security_status: string | null
-          sender_email: string | null
-          sender_name: string | null
-          smtp_host: string | null
-          smtp_port: number | null
-          smtp_secure: boolean | null
-          updated_at: string | null
-          use_smtp: boolean | null
-        }
-        Insert: {
-          connection_security?: never
-          created_at?: string | null
-          credential_source?: string | null
-          id?: string | null
-          last_security_audit?: string | null
-          production_mode?: boolean | null
-          security_status?: never
-          sender_email?: string | null
-          sender_name?: string | null
-          smtp_host?: string | null
-          smtp_port?: number | null
-          smtp_secure?: boolean | null
-          updated_at?: string | null
-          use_smtp?: boolean | null
-        }
-        Update: {
-          connection_security?: never
-          created_at?: string | null
-          credential_source?: string | null
-          id?: string | null
-          last_security_audit?: string | null
-          production_mode?: boolean | null
-          security_status?: never
-          sender_email?: string | null
-          sender_name?: string | null
-          smtp_host?: string | null
-          smtp_port?: number | null
-          smtp_secure?: boolean | null
-          updated_at?: string | null
-          use_smtp?: boolean | null
-        }
-        Relationships: []
-      }
       orders_view: {
         Row: {
           amount_kobo: number | null
@@ -9042,6 +8991,25 @@ export type Database = {
       get_email_health_status: {
         Args: Record<PropertyKey, never>
         Returns: Json
+      }
+      get_email_system_config_summary: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          connection_security: string
+          created_at: string
+          credential_source: string
+          id: string
+          last_security_audit: string
+          production_mode: boolean
+          security_status: string
+          sender_email: string
+          sender_name: string
+          smtp_host: string
+          smtp_port: number
+          smtp_secure: boolean
+          updated_at: string
+          use_smtp: boolean
+        }[]
       }
       get_email_system_production_status: {
         Args: Record<PropertyKey, never>

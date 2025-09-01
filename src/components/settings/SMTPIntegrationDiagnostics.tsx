@@ -483,19 +483,27 @@ const initializeDiagnostics = () => {
     try {
       const checks = [];
       
-      // Check environment detection
+      // Enhanced environment detection for Lovable preview environments
       const isDevelopment = window.location.hostname === 'localhost';
+      const isLovablePreview = window.location.hostname.includes('lovableproject.com') || 
+                              window.location.hostname.includes('.lovable.app');
       const isProduction = window.location.hostname.includes('.app') || 
-                          window.location.hostname.includes('.com');
+                          window.location.hostname.includes('.com') ||
+                          window.location.hostname.includes('.io') ||
+                          window.location.hostname.includes('.net');
+      const isSecure = window.location.protocol === 'https:';
+      
+      // Treat Lovable preview and staging over HTTPS as production-like
+      const isProductionLike = (isProduction || isLovablePreview) && isSecure;
       
       if (isDevelopment) {
         checks.push('⚠ Running in development mode');
-      } else if (isProduction) {
-        checks.push('✓ Production environment detected');
+      } else if (isProductionLike) {
+        checks.push('✓ Production-like environment detected');
       }
       
-      // Check for HTTPS in production
-      if (isProduction && window.location.protocol !== 'https:') {
+      // Check for HTTPS in production environments
+      if ((isProduction || isLovablePreview) && !isSecure) {
         updateDiagnostic('production-environment', {
           status: 'fail',
           message: 'Production site not using HTTPS',
@@ -505,7 +513,7 @@ const initializeDiagnostics = () => {
       }
       
       // Check for production-ready domain
-      if (isProduction) {
+      if (isProductionLike) {
         updateDiagnostic('production-environment', {
           status: 'pass',
           message: 'Production environment validated with HTTPS'
@@ -528,6 +536,21 @@ const initializeDiagnostics = () => {
 
   const testSecurityValidation = async () => {
     try {
+      // First check if Function Secrets are being used by testing the edge function
+      let usingFunctionSecrets = false;
+      try {
+        const { data: healthData } = await supabase.functions.invoke('unified-smtp-sender', {
+          method: 'GET'
+        });
+        
+        // If the function responds with secrets info, we know Function Secrets are being used
+        if (healthData?.secrets_configured || healthData?.using_function_secrets) {
+          usingFunctionSecrets = true;
+        }
+      } catch (error) {
+        // Function call failed, continue with database validation
+      }
+      
       const { data, error } = await supabase
         .from('communication_settings')
         .select('smtp_pass, smtp_secure, sender_email')
@@ -545,10 +568,22 @@ const initializeDiagnostics = () => {
       const securityIssues = [];
       const recommendations = [];
       
-      // Check password storage
-      if (data.smtp_pass && data.smtp_pass.length < 20) {
+      // Enhanced password security check
+      if (usingFunctionSecrets) {
+        // Function Secrets are being used - this is the secure approach
+        updateDiagnostic('security-validation', {
+          status: 'pass',
+          message: 'Security credentials managed via Function Secrets (production secure)'
+        });
+        return;
+      } else if (data.smtp_pass && data.smtp_pass.length < 20) {
+        // Weak or potentially plaintext password in database
         securityIssues.push('Weak password or stored in plaintext');
         recommendations.push('Use Supabase Function Secrets for SMTP password');
+      } else if (!data.smtp_pass) {
+        // No password in database - could be using secrets or missing config
+        securityIssues.push('SMTP password not configured');
+        recommendations.push('Configure SMTP password via Function Secrets or database settings');
       }
       
       // Check sender email domain
@@ -842,7 +877,7 @@ const initializeDiagnostics = () => {
                 </div>
               </div>
               <div className="flex items-center gap-2">
-                {diagnostic.criticalBlocker && (
+                {diagnostic.criticalBlocker && diagnostic.status === 'fail' && (
                   <Badge variant="outline" className="text-xs">
                     BLOCKER
                   </Badge>

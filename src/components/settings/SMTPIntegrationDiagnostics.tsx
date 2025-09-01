@@ -536,18 +536,37 @@ const initializeDiagnostics = () => {
 
   const testSecurityValidation = async () => {
     try {
-      // First check if Function Secrets are being used by testing the edge function
+      // Check if Function Secrets are being used by calling the health check endpoint
       let usingFunctionSecrets = false;
+      let smtpConfigSource = 'unknown';
+      
       try {
-        const { data: healthData } = await supabase.functions.invoke('unified-smtp-sender', {
-          method: 'GET'
+        // Call the unified-smtp-sender health check with SMTP check enabled
+        const healthCheckUrl = `${window.location.origin}/api/unified-smtp-sender?check=smtp`;
+        const response = await fetch(healthCheckUrl, {
+          method: 'GET',
+          headers: {
+            'Authorization': `Bearer ${(await supabase.auth.getSession()).data.session?.access_token}`,
+            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA',
+            'Content-Type': 'application/json',
+          }
         });
         
-        // If the function responds with secrets info, we know Function Secrets are being used
-        if (healthData?.secrets_configured || healthData?.using_function_secrets) {
-          usingFunctionSecrets = true;
+        if (response.ok) {
+          const healthData = await response.json();
+          
+          // Check if Function Secrets are being used
+          if (healthData?.smtpCheck?.source === 'function_secrets') {
+            usingFunctionSecrets = true;
+            smtpConfigSource = 'function_secrets';
+          } else if (healthData?.smtpCheck?.source === 'database') {
+            smtpConfigSource = 'database';
+          }
+          
+          console.log('SMTP Configuration Source:', smtpConfigSource);
         }
       } catch (error) {
+        console.warn('Health check failed, falling back to database validation:', error);
         // Function call failed, continue with database validation
       }
       

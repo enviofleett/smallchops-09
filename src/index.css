@@ -1,192 +1,6 @@
-/* Print-specific styles for order details */
-@media print {
-  @page {
-    margin: 0.5in;
-    size: A4;
-  }
-  
-  * {
-    -webkit-print-color-adjust: exact !important;
-    color-adjust: exact !important;
-  }
-  
-  .print\:break-inside-avoid {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  
-  .print\:break-after-page {
-    break-after: page;
-    page-break-after: always;
-  }
-  
-  .print\:no-break {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  
-  /* Ensure proper text contrast in print */
-  .print\:text-black {
-    color: #000000 !important;
-  }
-  
-  .print\:bg-white {
-    background-color: #ffffff !important;
-  }
-  
-  .print\:bg-gray-100 {
-    background-color: #f3f4f6 !important;
-  }
-  
-  .print\:border-gray-300 {
-    border-color: #d1d5db !important;
-  }
-  
-  /* Hide interactive elements in print */
-  .print\:hidden {
-    display: none !important;
-  }
-  
-  /* Print layout adjustments */
-  .print\:p-0 {
-    padding: 0 !important;
-  }
-  
-  .print\:p-4 {
-    padding: 1rem !important;
-  }
-  
-  .print\:p-8 {
-    padding: 2rem !important;
-  }
-  
-  .print\:mb-3 {
-    margin-bottom: 0.75rem !important;
-  }
-  
-  .print\:mb-6 {
-    margin-bottom: 1.5rem !important;
-  }
-  
-  .print\:mb-8 {
-    margin-bottom: 2rem !important;
-  }
-  
-  .print\:mt-8 {
-    margin-top: 2rem !important;
-  }
-  
-  .print\:pt-4 {
-    padding-top: 1rem !important;
-  }
-  
-  .print\:pb-2 {
-    padding-bottom: 0.5rem !important;
-  }
-  
-  .print\:pb-4 {
-    padding-bottom: 1rem !important;
-  }
-  
-  .print\:px-0 {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-  }
-  
-  .print\:space-y-6 > :not([hidden]) ~ :not([hidden]) {
-    --tw-space-y-reverse: 0;
-    margin-top: calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));
-    margin-bottom: calc(1.5rem * var(--tw-space-y-reverse));
-  }
-  
-  /* Grid adjustments for print */
-  .print\:grid {
-    display: grid !important;
-  }
-  
-  .print\:grid-cols-4 {
-    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
-  }
-  
-  .print\:gap-4 {
-    gap: 1rem !important;
-  }
-  
-  /* Typography for print */
-  .print\:text-xs {
-    font-size: 0.75rem !important;
-    line-height: 1rem !important;
-  }
-  
-  .print\:text-sm {
-    font-size: 0.875rem !important;
-    line-height: 1.25rem !important;
-  }
-  
-  .print\:text-lg {
-    font-size: 1.125rem !important;
-    line-height: 1.75rem !important;
-  }
-  
-  .print\:text-xl {
-    font-size: 1.25rem !important;
-    line-height: 1.75rem !important;
-  }
-  
-  .print\:text-2xl {
-    font-size: 1.5rem !important;
-    line-height: 2rem !important;
-  }
-  
-  .print\:font-bold {
-    font-weight: 700 !important;
-  }
-  
-  .print\:font-sans {
-    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji" !important;
-  }
-  
-  /* Layout utilities for print */
-  .print\:block {
-    display: block !important;
-  }
-  
-  .print\:text-center {
-    text-align: center !important;
-  }
-  
-  .print\:border {
-    border-width: 1px !important;
-  }
-  
-  .print\:border-b {
-    border-bottom-width: 1px !important;
-  }
-  
-  .print\:border-t {
-    border-top-width: 1px !important;
-  }
-  
-  .print\:rounded-none {
-    border-radius: 0 !important;
-  }
-  
-  .print\:shadow-none {
-    box-shadow: none !important;
-  }
-  
-  .print\:w-full {
-    width: 100% !important;
-  }
-  
-  .print\:max-w-none {
-    max-width: none !important;
-  }
-  
-  .print\:border-none {
-    border-style: none !important;
-  }
-}
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
 @layer utilities {
   .scrollbar-hide {
@@ -463,6 +277,16 @@
 
 /* Print styles for order details modal */
 @media print {
+  @page {
+    margin: 0.5in;
+    size: A4;
+  }
+  
+  * {
+    -webkit-print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+
   body * {
     visibility: hidden;
   }
@@ -484,5 +308,142 @@
   }
   .no-print {
     display: none !important;
+  }
+  
+  /* Print-specific utility classes */
+  .print\:break-inside-avoid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  
+  .print\:text-black {
+    color: #000000 !important;
+  }
+  
+  .print\:bg-white {
+    background-color: #ffffff !important;
+  }
+  
+  .print\:bg-gray-100 {
+    background-color: #f3f4f6 !important;
+  }
+  
+  .print\:border-gray-300 {
+    border-color: #d1d5db !important;
+  }
+  
+  .print\:hidden {
+    display: none !important;
+  }
+  
+  .print\:block {
+    display: block !important;
+  }
+  
+  .print\:text-center {
+    text-align: center !important;
+  }
+  
+  .print\:border {
+    border-width: 1px !important;
+  }
+  
+  .print\:border-b {
+    border-bottom-width: 1px !important;
+  }
+  
+  .print\:border-t {
+    border-top-width: 1px !important;
+  }
+  
+  .print\:rounded-none {
+    border-radius: 0 !important;
+  }
+  
+  .print\:shadow-none {
+    box-shadow: none !important;
+  }
+  
+  .print\:font-bold {
+    font-weight: 700 !important;
+  }
+  
+  .print\:text-xl {
+    font-size: 1.25rem !important;
+    line-height: 1.75rem !important;
+  }
+  
+  .print\:text-2xl {
+    font-size: 1.5rem !important;
+    line-height: 2rem !important;
+  }
+  
+  .print\:text-xs {
+    font-size: 0.75rem !important;
+    line-height: 1rem !important;
+  }
+  
+  .print\:text-lg {
+    font-size: 1.125rem !important;
+    line-height: 1.75rem !important;
+  }
+  
+  .print\:p-4 {
+    padding: 1rem !important;
+  }
+  
+  .print\:p-8 {
+    padding: 2rem !important;
+  }
+  
+  .print\:px-0 {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+  }
+  
+  .print\:mb-3 {
+    margin-bottom: 0.75rem !important;
+  }
+  
+  .print\:mb-6 {
+    margin-bottom: 1.5rem !important;
+  }
+  
+  .print\:mb-8 {
+    margin-bottom: 2rem !important;
+  }
+  
+  .print\:mt-8 {
+    margin-top: 2rem !important;
+  }
+  
+  .print\:pt-4 {
+    padding-top: 1rem !important;
+  }
+  
+  .print\:pb-2 {
+    padding-bottom: 0.5rem !important;
+  }
+  
+  .print\:pb-4 {
+    padding-bottom: 1rem !important;
+  }
+  
+  .print\:space-y-6 > :not([hidden]) ~ :not([hidden]) {
+    --tw-space-y-reverse: 0;
+    margin-top: calc(1.5rem * calc(1 - var(--tw-space-y-reverse)));
+    margin-bottom: calc(1.5rem * var(--tw-space-y-reverse));
+  }
+  
+  .print\:grid {
+    display: grid !important;
+  }
+  
+  .print\:grid-cols-4 {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  }
+  
+  .print\:gap-4 {
+    gap: 1rem !important;
   }
 }

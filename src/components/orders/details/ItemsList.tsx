@@ -24,14 +24,14 @@ export const ItemsList: React.FC<ItemsListProps> = ({
   if (!items || items.length === 0) {
     return (
       <Card>
-        <CardContent className="p-4 sm:p-6">
+        <CardContent className="p-3 sm:p-6">
           <SectionHeading 
             title="Order Items" 
             icon={Package} 
           />
           <div className="text-center py-8 text-muted-foreground">
-            <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
-            <p>No items found for this order</p>
+            <Package className="h-8 w-8 sm:h-12 sm:w-12 mx-auto mb-3 opacity-50" />
+            <p className="text-sm">No items found for this order</p>
           </div>
         </CardContent>
       </Card>
@@ -40,7 +40,7 @@ export const ItemsList: React.FC<ItemsListProps> = ({
 
   return (
     <Card>
-      <CardContent className="p-4 sm:p-6">
+      <CardContent className="p-3 sm:p-6">
         <SectionHeading 
           title="Order Items" 
           icon={Package} 

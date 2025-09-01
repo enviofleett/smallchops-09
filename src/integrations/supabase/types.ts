@@ -9126,10 +9126,7 @@ export type Database = {
       }
       get_public_paystack_config: {
         Args: Record<PropertyKey, never>
-        Returns: {
-          public_key: string
-          test_mode: boolean
-        }[]
+        Returns: Json
       }
       get_queued_communication_events: {
         Args: { batch_size?: number }

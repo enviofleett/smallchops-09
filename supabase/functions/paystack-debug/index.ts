@@ -14,7 +14,30 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { action, reference } = await req.json();
+    let action, reference;
+    
+    // Handle GET requests for health checks with query params
+    if (req.method === 'GET') {
+      const url = new URL(req.url);
+      if (url.searchParams.has('health')) {
+        action = 'check_key_health';
+      }
+    } else if (req.method === 'POST') {
+      // Handle POST requests with JSON body
+      const body = await req.json();
+      action = body.action;
+      reference = body.reference;
+    }
+    
+    if (!action) {
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'No action specified'
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
     
     console.log('🔍 Paystack Debug Helper called:', { action, reference });
 

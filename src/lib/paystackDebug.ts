@@ -43,25 +43,21 @@ class PaystackDebugService {
    */
   async health(): Promise<HealthCheckResult> {
     try {
-      const supabaseUrl = 'https://oknnklksdiqaifhxaccs.supabase.co';
-      const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im9rbm5rbGtzZGlxYWlmaHhhY2NzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTMxOTA5MTQsImV4cCI6MjA2ODc2NjkxNH0.3X0OFCvuaEnf5BUxaCyYDSf1xE1uDBV4P0XBWjfy0IA';
+      const { data, error } = await supabase.functions.invoke('paystack-debug', {
+        body: { action: 'check_key_health' }
+      });
+
+      if (error) throw error;
       
-      const response = await fetch(
-        `${supabaseUrl}/functions/v1/paystack-debug?health=1`,
-        {
-          method: 'GET',
-          headers: {
-            'Authorization': `Bearer ${supabaseKey}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Health check failed: ${response.status}`);
-      }
-
-      return await response.json();
+      // Map the response to the expected format
+      const healthCheck = data?.health_check || {};
+      return {
+        environment: healthCheck.key_environment === 'TEST' ? 'test' : 
+                    healthCheck.key_environment === 'LIVE' ? 'live' : 'unknown',
+        keyPresent: healthCheck.key_configured || false,
+        keyPrefix: healthCheck.key_prefix || null,
+        timestamp: healthCheck.timestamp || new Date().toISOString()
+      };
     } catch (error) {
       console.error('Health check error:', error);
       throw new Error(`Health check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -74,11 +70,22 @@ class PaystackDebugService {
   async checkTransaction(reference: string): Promise<TransactionCheckResult> {
     try {
       const { data, error } = await supabase.functions.invoke('paystack-debug', {
-        body: { action: 'check', reference }
+        body: { action: 'check_reference', reference }
       });
 
       if (error) throw error;
-      return data;
+      
+      // Map the response to the expected format
+      const debugInfo = data?.debug_info || {};
+      return {
+        exists: debugInfo.exists || false,
+        status: debugInfo.transaction_status || undefined,
+        amount: debugInfo.amount || undefined,
+        currency: debugInfo.currency || undefined,
+        paid_at: debugInfo.created_at || undefined,
+        gateway_response: debugInfo.paystack_message || undefined,
+        latency_ms: 0 // Not tracked in current implementation
+      };
     } catch (error) {
       console.error('Transaction check error:', error);
       throw new Error(`Transaction check failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
@@ -91,11 +98,34 @@ class PaystackDebugService {
   async verifyTransaction(reference: string): Promise<DebugVerificationResult> {
     try {
       const { data, error } = await supabase.functions.invoke('paystack-debug', {
-        body: { action: 'verify', reference }
+        body: { action: 'check_reference', reference }
       });
 
       if (error) throw error;
-      return data;
+      
+      // Map the response to the expected format
+      const debugInfo = data?.debug_info || {};
+      const rawResponse = data?.raw_response || {};
+      
+      return {
+        success: data?.success || false,
+        data: rawResponse?.data ? {
+          status: rawResponse.data.status,
+          amount: rawResponse.data.amount ? rawResponse.data.amount / 100 : 0,
+          customer: rawResponse.data.customer,
+          metadata: rawResponse.data.metadata,
+          paid_at: rawResponse.data.created_at,
+          channel: rawResponse.data.channel,
+          reference: rawResponse.data.reference
+        } : undefined,
+        debug: {
+          gateway_response: debugInfo.paystack_message,
+          fees: rawResponse?.data?.fees,
+          authorization: rawResponse?.data?.authorization,
+          latency_ms: 0,
+          paystack_status_code: debugInfo.http_status || 0
+        }
+      };
     } catch (error) {
       console.error('Debug verification error:', error);
       throw new Error(`Debug verification failed: ${error instanceof Error ? error.message : 'Unknown error'}`);

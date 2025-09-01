@@ -17,23 +17,21 @@ export const useProductionReady = () => {
     try {
       setIsLoading(true);
       
-      // Check payment system readiness
-      const { data: paystackReadiness } = await supabase.rpc('check_paystack_production_readiness');
+      // Check overall production readiness using the new function
+      const { data: readinessData, error } = await supabase.rpc('check_production_readiness');
       
-      // Check overall production readiness
-      const { data: generalReadiness } = await supabase.rpc('check_production_readiness');
+      if (error) {
+        throw error;
+      }
+      
+      // Type guard for the readiness data
+      const data = readinessData as any;
       
       const combinedStatus: ProductionReadinessStatus = {
-        isReady: (paystackReadiness as any)?.ready_for_production && (generalReadiness as any)?.ready_for_production,
-        score: Math.min((paystackReadiness as any)?.score || 0, (generalReadiness as any)?.score || 0),
-        issues: [
-          ...((paystackReadiness as any)?.issues || []),
-          ...((generalReadiness as any)?.issues || [])
-        ],
-        warnings: [
-          ...((paystackReadiness as any)?.warnings || []),
-          ...((generalReadiness as any)?.warnings || [])
-        ],
+        isReady: data?.ready_for_production || false,
+        score: data?.score || 0,
+        issues: data?.issues || [],
+        warnings: data?.warnings || [],
         lastChecked: new Date()
       };
       

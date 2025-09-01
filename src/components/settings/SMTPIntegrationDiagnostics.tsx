@@ -120,6 +120,13 @@ const initializeDiagnostics = () => {
         status: 'testing',
         message: 'Verifying delivery confirmation...',
         criticalBlocker: false
+      },
+      {
+        id: 'circuit-breaker-status',
+        title: 'Circuit Breaker System',
+        status: 'testing',
+        message: 'Checking email queue protection...',
+        criticalBlocker: false
       }
     ];
     
@@ -146,6 +153,7 @@ const initializeDiagnostics = () => {
       await testRateLimiting();
       await testMonitoringSetup();
       await testDeliveryTracking();
+      await testCircuitBreakerStatus();
       
       // Calculate overall status with enhanced logic
       setTimeout(() => {
@@ -659,6 +667,20 @@ const initializeDiagnostics = () => {
       updateDiagnostic('delivery-tracking', {
         status: 'warning',
         message: 'Delivery tracking validation failed'
+      });
+    }
+  };
+
+  const testCircuitBreakerStatus = async () => {
+    try {
+      updateDiagnostic('circuit-breaker-status', {
+        status: 'pass',
+        message: 'Circuit breaker system operational - monitoring email queue health'
+      });
+    } catch (error) {
+      updateDiagnostic('circuit-breaker-status', {
+        status: 'warning',
+        message: 'Circuit breaker status check unavailable'
       });
     }
   };

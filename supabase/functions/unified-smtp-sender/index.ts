@@ -881,9 +881,9 @@ serve(async (req: Request) => {
         attempt_count: attemptCount,
         elapsed_ms: elapsed,
         last_smtp_code: result.client.getLastResponseCode(),
-        template_found: templateFound,
-        explicit_subject_used: !!requestBody.subject?.trim(),
-        capabilities: result.connectionInfo.capabilities
+        templateFound: templateFound,
+        fallbackUsed: !templateFound,
+        warnings: !templateFound ? [`Template ${requestBody.templateKey} not found - using branded fallback`] : undefined
       }
     });
 

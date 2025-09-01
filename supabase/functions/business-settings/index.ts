@@ -267,7 +267,7 @@ serve(async (req) => {
           });
         }
 
-        // Call the smtp-email-sender function using Supabase client
+        // Call the unified-smtp-sender function using Supabase client
         try {
           console.log('Calling smtp-email-sender function...');
           

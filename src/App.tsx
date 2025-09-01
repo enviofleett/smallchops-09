@@ -251,7 +251,7 @@ const App = () => {
               <Route path="/delivery-pickup" element={<Navigate to="/admin/delivery" replace />} />
 
               {/* Protected admin routes */}
-              <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
+              <Route element={<ProtectedRoute><AdminLayout /></ProtectedRoute>}>
                 <Route path="/admin" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
                 <Route path="/dashboard" element={<ErrorBoundaryWrapper context="Dashboard"><Index /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/orders" element={<ErrorBoundaryWrapper context="Admin Orders"><AdminOrders /></ErrorBoundaryWrapper>} />

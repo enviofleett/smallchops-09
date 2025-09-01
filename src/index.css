@@ -14,84 +14,134 @@
 
 @layer base {
   :root {
+    /* Core colors */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
+    /* Card colors */
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
 
+    /* Popover colors */
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    /* Brand colors */
+    --primary: 217.2 91.2% 59.8%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 217.2 91.2% 69.8%;
+    --primary-muted: 217.2 91.2% 89.8%;
 
+    /* Secondary colors */
     --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
+    /* Muted colors */
     --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
+    /* Accent colors */
     --accent: 210 40% 96.1%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
+    /* Status colors */
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
+    
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 355.7 100% 97.3%;
+    
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 26 83.3% 14.1%;
 
+    /* UI colors */
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --ring: 217.2 91.2% 59.8%;
 
-    --radius: 0.5rem;
+    /* Design tokens */
+    --radius: 0.75rem;
+    --shadow-sm: 0 1px 2px 0 hsl(0 0% 0% / 0.05);
+    --shadow-md: 0 4px 6px -1px hsl(0 0% 0% / 0.1), 0 2px 4px -2px hsl(0 0% 0% / 0.1);
+    --shadow-lg: 0 10px 15px -3px hsl(0 0% 0% / 0.1), 0 4px 6px -4px hsl(0 0% 0% / 0.1);
+    --shadow-xl: 0 20px 25px -5px hsl(0 0% 0% / 0.1), 0 8px 10px -6px hsl(0 0% 0% / 0.1);
 
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+    --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--accent)));
+    --gradient-muted: linear-gradient(180deg, hsl(var(--muted)), hsl(var(--muted) / 0.3));
+
+    /* Admin-specific colors */
+    --admin-surface: 210 40% 98%;
+    --admin-border: 210 40% 90%;
+    --admin-highlight: 217.2 91.2% 95%;
+
+    /* Sidebar colors */
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
-    --sidebar-primary: 240 5.9% 10%;
-
+    --sidebar-primary: 217.2 91.2% 59.8%;
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
+    /* Core colors */
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 
+    /* Card colors */
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
 
+    /* Popover colors */
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
 
-    --primary: 210 40% 98%;
+    /* Brand colors */
+    --primary: 217.2 91.2% 59.8%;
     --primary-foreground: 222.2 47.4% 11.2%;
+    --primary-glow: 217.2 91.2% 49.8%;
+    --primary-muted: 217.2 91.2% 29.8%;
 
+    /* Secondary colors */
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
 
+    /* Muted colors */
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
+    /* Accent colors */
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
 
+    /* Status colors */
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
+    
+    --success: 142.1 76.2% 36.3%;
+    --success-foreground: 355.7 100% 97.3%;
+    
+    --warning: 47.9 95.8% 53.1%;
+    --warning-foreground: 26 83.3% 14.1%;
 
+    /* UI colors */
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* Admin-specific colors */
+    --admin-surface: 217.2 32.6% 12.5%;
+    --admin-border: 217.2 32.6% 20.5%;
+    --admin-highlight: 217.2 91.2% 15%;
+
+    /* Sidebar colors */
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
-    --sidebar-primary: 224.3 76.3% 48%;
+    --sidebar-primary: 217.2 91.2% 59.8%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 240 3.7% 15.9%;
     --sidebar-accent-foreground: 240 4.8% 95.9%;
@@ -128,17 +178,100 @@
 }
 
 @layer components {
-  /* Mobile-first responsive classes */
-  .mobile-card {
-    @apply bg-card border border-border rounded-lg p-4 shadow-sm;
+  /* Admin Layout Components */
+  .admin-container {
+    @apply mx-auto px-4 sm:px-6 lg:px-8 max-w-7xl;
   }
-  
-  .mobile-nav-item {
-    @apply flex items-center gap-3 p-3 rounded-lg transition-colors hover:bg-accent;
+
+  .admin-card {
+    @apply bg-card border border-border rounded-xl shadow-sm transition-all hover:shadow-md;
   }
-  
-  .mobile-safe-area {
-    @apply pb-safe-bottom pl-safe-left pr-safe-right;
+
+  .admin-header {
+    @apply bg-card border-b border-border px-4 py-3 sm:px-6 lg:px-8;
+  }
+
+  .admin-content {
+    @apply p-4 sm:p-6 lg:p-8;
+  }
+
+  /* Status indicators */
+  .status-success {
+    @apply bg-success/10 text-success border-success/20;
+  }
+
+  .status-warning {
+    @apply bg-warning/10 text-warning border-warning/20;
+  }
+
+  .status-error {
+    @apply bg-destructive/10 text-destructive border-destructive/20;
+  }
+
+  /* Interactive elements */
+  .interactive-card {
+    @apply transition-all duration-200 hover:shadow-lg hover:scale-[1.02] cursor-pointer;
+  }
+
+  .glass-effect {
+    @apply bg-white/80 backdrop-blur-sm border border-white/20 dark:bg-gray-900/80 dark:border-gray-700/20;
+  }
+
+  /* Grid layouts */
+  .responsive-grid {
+    @apply grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4;
+  }
+
+  .responsive-grid-2 {
+    @apply grid gap-4 grid-cols-1 lg:grid-cols-2;
+  }
+
+  .responsive-grid-3 {
+    @apply grid gap-4 grid-cols-1 md:grid-cols-2 lg:grid-cols-3;
+  }
+
+  /* Mobile optimizations */
+  .mobile-optimized {
+    @apply text-sm leading-relaxed;
+  }
+
+  .mobile-button {
+    @apply min-h-[44px] min-w-[44px] touch-manipulation;
+  }
+
+  .mobile-input {
+    @apply min-h-[44px] text-base; /* Prevents zoom on iOS */
+  }
+
+  /* Table responsive */
+  .responsive-table {
+    @apply overflow-x-auto -mx-4 sm:mx-0;
+  }
+
+  .responsive-table table {
+    @apply min-w-full;
+  }
+
+  /* Navigation */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .nav-item.active {
+    @apply bg-primary text-primary-foreground;
+  }
+
+  /* Animations */
+  .fade-in {
+    @apply animate-in fade-in-0 duration-300;
+  }
+
+  .slide-in-from-right {
+    @apply animate-in slide-in-from-right-2 duration-300;
+  }
+
+  .zoom-in {
+    @apply animate-in zoom-in-95 duration-200;
   }
 }
 

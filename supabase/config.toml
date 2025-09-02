@@ -88,6 +88,12 @@ verify_jwt = false
 [functions.delivery-schedule-health]
 verify_jwt = false
 
+[functions.email-delivery-monitor]
+verify_jwt = false
+
+[functions.smtp-auth-healthcheck]
+verify_jwt = false
+
 # AUTOMATED PROCESSORS (service-to-service)
 [functions.backfill-missing-schedules]
 verify_jwt = true

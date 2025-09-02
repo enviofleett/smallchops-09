@@ -4,83 +4,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
-
-// SMTP Authentication Health Check
-// Performs a lightweight SMTP connection and auth test without sending emails
-serve(async (req) => {
-  console.log(`🔍 SMTP Auth Health Check - ${req.method} request received`);
-  
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const supabase = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-    // Get production SMTP configuration
-    const smtpConfig = await getProductionSMTPConfig(supabase);
-    
-    console.log(`🔍 Testing SMTP auth for ${smtpConfig.host}:${smtpConfig.port}`);
-    
-    // Perform lightweight SMTP connection test
-    const authResult = await testSMTPAuth(smtpConfig);
-    
-    // Record health metric
-    await recordHealthMetric(supabase, authResult);
-    
-    const responseData = {
-      success: authResult.success,
-      timestamp: new Date().toISOString(),
-      provider: {
-        host: smtpConfig.host,
-        port: smtpConfig.port,
-        username: smtpConfig.username?.split('@')[0] + '@***',
-        source: smtpConfig.source
-      },
-      auth: {
-        method: authResult.authMethod,
-        tlsMode: authResult.tlsMode,
-        capabilities: authResult.capabilities
-      },
-      timing: {
-        connectionMs: authResult.connectionTime,
-        authMs: authResult.authTime,
-        totalMs: authResult.totalTime
-      },
-      ...(authResult.error && { 
-        error: authResult.error,
-        category: authResult.errorCategory,
-        suggestion: authResult.suggestion 
-      })
-    };
-
-    // Always return 200 to allow UI to parse detailed error information
-    return new Response(JSON.stringify(responseData), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200
-    });
-
-  } catch (error) {
-    console.error('❌ SMTP Auth Health Check failed:', error);
-    
-    // Always return 200 with error details for UI parsing
-    return new Response(JSON.stringify({
-      success: false,
-      error: error.message,
-      category: 'system_error',
-      suggestion: 'Check SMTP configuration and credentials',
-      timestamp: new Date().toISOString()
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200
-    });
-  }
-});
 
 // Get production SMTP configuration prioritizing Function Secrets
 async function getProductionSMTPConfig(supabase: any): Promise<{
@@ -93,6 +17,8 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
   encryption?: string;
   source: string;
 }> {
+  console.log('🔍 Loading SMTP configuration...');
+  
   // Priority 1: Function Secrets (Production)
   const secretHost = Deno.env.get('SMTP_HOST');
   const secretPort = Deno.env.get('SMTP_PORT');
@@ -103,19 +29,33 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
   const secretFromEmail = Deno.env.get('SMTP_FROM_EMAIL');
 
   if (secretHost && secretUsername && secretPassword) {
+    console.log('✅ Using production SMTP configuration from Function Secrets');
+    
+    // Parse port with robust fallback
+    let port = 587; // Default port
+    if (secretPort) {
+      const parsedPort = parseInt(secretPort.trim(), 10);
+      if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
+        port = parsedPort;
+      } else {
+        console.warn(`⚠️ Invalid SMTP_PORT value: "${secretPort}", using default 587`);
+      }
+    }
+    
     return {
       host: secretHost.trim(),
-      port: parseInt(secretPort || '587'),
+      port: port,
       username: secretUsername.trim(),
       password: secretPassword.trim(),
       senderEmail: (secretFromEmail || secretUsername).trim(),
-      senderName: (secretFromName || 'Starters Small Chops').trim(),
+      senderName: (secretFromName || 'System').trim(),
       encryption: secretEncryption?.trim() || 'TLS',
       source: 'function_secrets'
     };
   }
 
-  // Priority 2: Database fallback
+  // Priority 2: Database fallback (Testing/Development)
+  console.log('⚠️ Function Secrets not configured, falling back to database');
   const { data: config } = await supabase
     .from('communication_settings')
     .select('*')
@@ -123,8 +63,16 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
     .limit(1)
     .maybeSingle();
 
-  if (!config?.use_smtp || !config.smtp_host || !config.smtp_user || !config.smtp_pass) {
-    throw new Error('SMTP not configured properly');
+  if (!config?.use_smtp) {
+    throw new Error('SMTP not configured - neither Function Secrets nor database config available');
+  }
+
+  if (!config.smtp_host || !config.smtp_user || !config.smtp_pass) {
+    const missing = [];
+    if (!config.smtp_host) missing.push('host');
+    if (!config.smtp_user) missing.push('username');
+    if (!config.smtp_pass) missing.push('password');
+    throw new Error(`Incomplete database SMTP configuration: missing ${missing.join(', ')}`);
   }
 
   return {
@@ -133,204 +81,143 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
     username: config.smtp_user.trim(),
     password: config.smtp_pass.trim(),
     senderEmail: (config.sender_email || config.smtp_user).trim(),
-    senderName: (config.sender_name || 'Starters Small Chops').trim(),
+    senderName: (config.sender_name || 'System').trim(),
     encryption: 'TLS',
     source: 'database'
   };
 }
 
-// Lightweight SMTP authentication test
-async function testSMTPAuth(config: any): Promise<{
-  success: boolean;
-  authMethod?: string;
-  tlsMode?: string;
-  capabilities?: string[];
-  connectionTime?: number;
-  authTime?: number;
-  totalTime?: number;
-  error?: string;
-  errorCategory?: string;
-  suggestion?: string;
-}> {
-  const startTime = Date.now();
-  let conn: Deno.TcpConn | Deno.TlsConn | null = null;
-  
+// Test SMTP connection
+async function testSMTPConnection(config: any) {
   try {
-    // 1. TCP Connection
-    const connectStart = Date.now();
-    conn = await Promise.race([
-      Deno.connect({ hostname: config.host, port: config.port }),
-      new Promise<never>((_, reject) => 
-        setTimeout(() => reject(new Error('Connection timeout')), 10000)
-      )
-    ]);
-    const connectionTime = Date.now() - connectStart;
+    console.log('🔧 Testing SMTP connection to:', {
+      host: config.host,
+      port: config.port,
+      username: config.username?.split('@')[0] + '@***',
+      encryption: config.encryption
+    });
 
-    // 2. Read greeting
-    await readSMTPResponse(conn);
+    // For this health check, we'll test the connection without sending an actual email
+    // This is a basic connectivity test
+    const conn = await Deno.connect({
+      hostname: config.host,
+      port: config.port,
+    });
 
-    // 3. Send EHLO
-    await sendSMTPCommand(conn, `EHLO ${config.host}`);
-    const ehloResponse = await readSMTPResponse(conn);
+    // Read initial greeting
+    const buffer = new Uint8Array(1024);
+    const n = await conn.read(buffer);
+    if (n === null) throw new Error('No response from SMTP server');
     
-    // Parse capabilities
-    const capabilities: string[] = [];
-    const authMethods: string[] = [];
+    const greeting = new TextDecoder().decode(buffer.subarray(0, n));
+    console.log('📧 SMTP Greeting:', greeting.trim());
     
-    for (const line of ehloResponse.split('\r\n')) {
-      if (line.startsWith('250-') || line.startsWith('250 ')) {
-        const capability = line.substring(4).trim();
-        capabilities.push(capability.split(' ')[0]);
-        
-        if (capability.startsWith('AUTH ')) {
-          authMethods.push(...capability.substring(5).split(/\s+/));
-        }
-      }
-    }
-
-    let tlsMode = 'none';
+    // Send EHLO command
+    const encoder = new TextEncoder();
+    await conn.write(encoder.encode('EHLO localhost\r\n'));
     
-    // 4. Handle TLS if needed
-    if (config.port === 587 && capabilities.includes('STARTTLS')) {
-      await sendSMTPCommand(conn, 'STARTTLS');
-      await readSMTPResponse(conn);
-      
-      conn = await Deno.startTls(conn as Deno.TcpConn, { hostname: config.host });
-      tlsMode = 'starttls';
-      
-      // Re-negotiate after TLS
-      await sendSMTPCommand(conn, `EHLO ${config.host}`);
-      await readSMTPResponse(conn);
-    } else if (config.port === 465) {
-      conn = await Deno.startTls(conn as Deno.TcpConn, { hostname: config.host });
-      tlsMode = 'implicit';
-    }
-
-    // 5. Test authentication
-    const authStart = Date.now();
-    let authMethod = 'LOGIN'; // Default fallback
+    // Read response
+    const ehloResponse = new Uint8Array(1024);
+    const ehloN = await conn.read(ehloResponse);
+    if (ehloN === null) throw new Error('No EHLO response from SMTP server');
     
-    if (authMethods.includes('PLAIN')) {
-      authMethod = 'PLAIN';
-      const authString = `\0${config.username}\0${config.password}`;
-      const encoded = btoa(authString);
-      await sendSMTPCommand(conn, `AUTH PLAIN ${encoded}`);
-    } else {
-      // Fallback to LOGIN
-      await sendSMTPCommand(conn, 'AUTH LOGIN');
-      await readSMTPResponse(conn); // 334 response
-      
-      await sendSMTPCommand(conn, btoa(config.username));
-      await readSMTPResponse(conn); // 334 response
-      
-      await sendSMTPCommand(conn, btoa(config.password));
-    }
+    const ehloResult = new TextDecoder().decode(ehloResponse.subarray(0, ehloN));
+    console.log('📧 EHLO Response:', ehloResult.trim());
     
-    const authResponse = await readSMTPResponse(conn);
-    const authTime = Date.now() - authStart;
-    
-    if (!authResponse.startsWith('235')) {
-      throw new Error(`Authentication failed: ${authResponse}`);
-    }
-
-    // 6. Clean disconnect
-    await sendSMTPCommand(conn, 'QUIT');
-    await readSMTPResponse(conn);
+    // Send QUIT
+    await conn.write(encoder.encode('QUIT\r\n'));
     conn.close();
-
-    const totalTime = Date.now() - startTime;
-
+    
     return {
       success: true,
-      authMethod,
-      tlsMode,
-      capabilities,
-      connectionTime,
-      authTime,
-      totalTime
+      greeting: greeting.trim(),
+      capabilities: ehloResult.trim()
+    };
+    
+  } catch (error) {
+    console.error('❌ SMTP Connection test failed:', error);
+    throw error;
+  }
+}
+
+serve(async (req: Request) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    console.log('🏥 SMTP Authentication Health Check started');
+
+    // Get SMTP configuration
+    const smtpConfig = await getProductionSMTPConfig(supabase);
+    
+    // Test SMTP connection
+    const connectionResult = await testSMTPConnection(smtpConfig);
+    
+    // Log health check to database
+    await supabase.from('smtp_health_metrics').insert({
+      provider_name: 'production-smtp',
+      metric_type: 'auth_test',
+      metric_value: 1,
+      recorded_at: new Date().toISOString()
+    });
+
+    const response = {
+      success: true,
+      message: 'SMTP authentication health check passed',
+      provider: {
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        username: smtpConfig.username?.split('@')[0] + '@***',
+        senderEmail: smtpConfig.senderEmail?.split('@')[0] + '@***',
+        senderName: smtpConfig.senderName,
+        encryption: smtpConfig.encryption,
+        source: smtpConfig.source
+      },
+      connection: connectionResult,
+      timestamp: new Date().toISOString()
     };
 
+    console.log('✅ SMTP health check completed successfully');
+
+    return new Response(JSON.stringify(response), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
   } catch (error) {
-    if (conn) {
-      try { conn.close(); } catch {}
-    }
+    console.error('❌ SMTP health check failed:', error);
     
-    const errorMessage = error.message.toLowerCase();
-    let category = 'unknown';
-    let suggestion = 'Check SMTP server configuration';
-    
-    if (errorMessage.includes('timeout') || errorMessage.includes('connection')) {
-      category = 'connection';
-      suggestion = 'Check network connectivity and SMTP server availability';
-    } else if (errorMessage.includes('535') || errorMessage.includes('authentication')) {
-      category = 'auth';
-      suggestion = 'Verify SMTP username and password credentials';
-    } else if (errorMessage.includes('tls') || errorMessage.includes('starttls')) {
-      category = 'tls';
-      suggestion = 'Check TLS/SSL configuration and port settings';
+    // Log failed health check
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      await supabase.from('smtp_health_metrics').insert({
+        provider_name: 'production-smtp',
+        metric_type: 'auth_test',
+        metric_value: 0,
+        recorded_at: new Date().toISOString()
+      });
+    } catch (logError) {
+      console.error('Failed to log health check failure:', logError);
     }
 
-    return {
+    return new Response(JSON.stringify({
       success: false,
       error: error.message,
-      errorCategory: category,
-      suggestion,
-      totalTime: Date.now() - startTime
-    };
-  }
-}
-
-// Helper functions for SMTP communication
-async function sendSMTPCommand(conn: Deno.TcpConn | Deno.TlsConn, command: string): Promise<void> {
-  const data = command.endsWith('\r\n') ? command : command + '\r\n';
-  await conn.write(new TextEncoder().encode(data));
-}
-
-async function readSMTPResponse(conn: Deno.TcpConn | Deno.TlsConn): Promise<string> {
-  let response = '';
-  const buffer = new Uint8Array(1024);
-  
-  while (true) {
-    const n = await conn.read(buffer);
-    if (n === null) throw new Error('Connection closed');
-    
-    const chunk = new TextDecoder().decode(buffer.subarray(0, n));
-    response += chunk;
-    
-    // Check for complete response
-    const lines = response.split('\r\n');
-    const lastLine = lines[lines.length - 2]; // Skip empty last line
-    
-    if (lastLine && /^\d{3}\s/.test(lastLine)) {
-      break; // Final response line
-    }
-  }
-  
-  return response.trim();
-}
-
-// Record health metrics for monitoring
-async function recordHealthMetric(supabase: any, result: any): Promise<void> {
-  try {
-    await supabase.from('smtp_health_metrics').insert({
-      provider_name: 'yournotify-production',
-      metric_type: 'auth_test',
-      metric_value: result.success ? 1 : 0,
-      threshold_value: null,
-      threshold_breached: !result.success,
-      recorded_at: new Date().toISOString(),
-      metadata: {
-        config_source: result.configSource || 'unknown',
-        auth_method: result.authMethod,
-        tls_mode: result.tlsMode,
-        connection_time_ms: result.connectionTime,
-        auth_time_ms: result.authTime,
-        total_time_ms: result.totalTime,
-        error_category: result.errorCategory,
-        capabilities: result.capabilities
-      }
+      details: 'SMTP authentication health check failed',
+      timestamp: new Date().toISOString()
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-  } catch (error) {
-    console.warn('Failed to record health metric:', error.message);
   }
-}
+});

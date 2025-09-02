@@ -866,6 +866,44 @@ serve(async (req: Request) => {
     
     // Handle healthcheck requests without full SMTP validation
     if (requestBody.healthcheck) {
+      // Enhanced healthcheck with credential status
+      if (requestBody.check === 'credentials') {
+        try {
+          const smtpConfig = await getProductionSMTPConfig(supabase);
+          
+          const credentialNames = ['SMTP_HOST', 'SMTP_PORT', 'SMTP_USERNAME', 'SMTP_PASSWORD', 'SMTP_FROM_EMAIL', 'SMTP_FROM_NAME'];
+          const credentials: Record<string, any> = {};
+          
+          // Map our internal config to external credential names
+          credentials.SMTP_HOST = smtpConfig.host;
+          credentials.SMTP_PORT = smtpConfig.port.toString();
+          credentials.SMTP_USERNAME = smtpConfig.username;
+          credentials.SMTP_PASSWORD = smtpConfig.password;
+          credentials.SMTP_FROM_EMAIL = smtpConfig.senderEmail;
+          credentials.SMTP_FROM_NAME = smtpConfig.senderName;
+          
+          return new Response(JSON.stringify({
+            status: 'healthy',
+            service: 'unified-smtp-sender',
+            credentials: credentials,
+            source: smtpConfig.source,
+            timestamp: new Date().toISOString()
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        } catch (error) {
+          return new Response(JSON.stringify({
+            status: 'error',
+            service: 'unified-smtp-sender',
+            error: error.message,
+            timestamp: new Date().toISOString()
+          }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          });
+        }
+      }
+      
       return new Response(JSON.stringify({
         status: 'healthy',
         service: 'unified-smtp-sender',

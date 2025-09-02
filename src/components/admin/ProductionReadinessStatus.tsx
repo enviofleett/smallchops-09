@@ -33,14 +33,14 @@ export const ProductionReadinessStatus = () => {
       category: 'security',
       critical: true
     },
-    {
-      id: 'email_delivery',
-      name: 'Email Delivery System',
-      description: 'Email system is configured and delivering messages',
-      status: 'checking',
-      category: 'email',
-      critical: true
-    },
+      {
+        id: 'production_email_system',
+        name: 'Production Email System Status',
+        description: 'Comprehensive email system health and readiness check',
+        status: 'checking',
+        category: 'email',
+        critical: true
+      },
     {
       id: 'auth_flow',
       name: 'Authentication Flow',
@@ -107,17 +107,55 @@ export const ProductionReadinessStatus = () => {
         updatedChecks[0].details = `${criticalIssues} critical security issues found`;
       }
 
-      // Check Email Delivery
-      const { data: emailHealth } = await supabase
-        .from('communication_events')
-        .select('status')
-        .gte('created_at', new Date(Date.now() - 60 * 60 * 1000).toISOString()); // Last hour
+      // Check Production Email System (comprehensive check)
+      try {
+        // Run both health checks in parallel
+        const [emailMonitorResult, smtpAuthResult] = await Promise.allSettled([
+          supabase.functions.invoke('email-delivery-monitor', { body: { timeframe: '24h' } }),
+          supabase.functions.invoke('smtp-auth-healthcheck', { body: {} })
+        ]);
 
-      const emailSuccessRate = emailHealth?.length > 0 ? 
-        (emailHealth.filter(e => e.status === 'sent').length / emailHealth.length) * 100 : 0;
-      
-      updatedChecks[1].status = emailSuccessRate >= 90 ? 'pass' : emailSuccessRate >= 70 ? 'warning' : 'fail';
-      updatedChecks[1].details = `${Math.round(emailSuccessRate)}% success rate in last hour`;
+        let emailScore = 0;
+        let smtpScore = 0;
+        let issues: string[] = [];
+
+        // Evaluate email delivery monitoring
+        if (emailMonitorResult.status === 'fulfilled' && emailMonitorResult.value.data?.success) {
+          const report = emailMonitorResult.value.data.report;
+          emailScore = report.healthScore || 0;
+          if (report.issues?.length > 0) {
+            issues.push(...report.issues);
+          }
+        } else {
+          issues.push('Email monitoring unavailable');
+        }
+
+        // Evaluate SMTP authentication
+        if (smtpAuthResult.status === 'fulfilled' && smtpAuthResult.value.data?.success) {
+          smtpScore = 100;
+        } else {
+          smtpScore = 0;
+          issues.push('SMTP authentication failed');
+        }
+
+        // Calculate overall email system health
+        const overallEmailHealth = (emailScore + smtpScore) / 2;
+        
+        if (overallEmailHealth >= 90) {
+          updatedChecks[1].status = 'pass';
+          updatedChecks[1].details = `System Health: ${Math.round(overallEmailHealth)}% - Production Ready`;
+        } else if (overallEmailHealth >= 70) {
+          updatedChecks[1].status = 'warning';
+          updatedChecks[1].details = `System Health: ${Math.round(overallEmailHealth)}% - Issues: ${issues.slice(0, 2).join(', ')}`;
+        } else {
+          updatedChecks[1].status = 'fail';
+          updatedChecks[1].details = `System Health: ${Math.round(overallEmailHealth)}% - Critical Issues: ${issues.slice(0, 3).join(', ')}`;
+        }
+
+      } catch (emailError) {
+        updatedChecks[1].status = 'fail';
+        updatedChecks[1].details = `Email system diagnostics failed: ${emailError.message}`;
+      }
 
       // Check Auth Flow
       const { data: recentRegistrations } = await supabase
@@ -140,16 +178,31 @@ export const ProductionReadinessStatus = () => {
       updatedChecks[3].status = rateLimitData && rateLimitData.length > 0 ? 'pass' : 'warning';
       updatedChecks[3].details = rateLimitData?.length > 0 ? 'Rate limiting active' : 'Rate limiting not tested';
 
-      // Check SMTP Health
-      const { data: smtpHealth } = await supabase
-        .from('smtp_health_metrics')
-        .select('provider_name')
-        .gte('recorded_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
-        .limit(5);
+      // Check SMTP Health with Authentication Test
+      try {
+        const { data: smtpAuthResult, error: authError } = await supabase.functions.invoke('smtp-auth-healthcheck', {
+          body: {}
+        });
 
-      const healthyProviders = smtpHealth?.length || 0;
-      updatedChecks[4].status = healthyProviders > 0 ? 'pass' : 'warning';
-      updatedChecks[4].details = `${healthyProviders} healthy SMTP providers`;
+        if (!authError && smtpAuthResult?.success) {
+          updatedChecks[4].status = 'pass';
+          updatedChecks[4].details = `SMTP ready via ${smtpAuthResult.provider?.source === 'function_secrets' ? 'Function Secrets' : 'Database'}`;
+        } else {
+          // Fallback to metrics check
+          const { data: smtpHealth } = await supabase
+            .from('smtp_health_metrics')
+            .select('provider_name')
+            .gte('recorded_at', new Date(Date.now() - 60 * 60 * 1000).toISOString())
+            .limit(5);
+
+          const healthyProviders = smtpHealth?.length || 0;
+          updatedChecks[4].status = healthyProviders > 0 ? 'pass' : 'warning';
+          updatedChecks[4].details = `${healthyProviders} recent health metrics (auth check failed)`;
+        }
+      } catch (smtpError) {
+        updatedChecks[4].status = 'fail';
+        updatedChecks[4].details = `SMTP health check failed: ${smtpError.message}`;
+      }
 
       // Check Bounce Handling
       const { data: bounceData } = await supabase
@@ -259,25 +312,40 @@ export const ProductionReadinessStatus = () => {
       {/* Overall Status Header */}
       <Card className={`border-2 ${readyForProduction ? 'border-green-500 bg-green-50' : criticalFailures > 0 ? 'border-red-500 bg-red-50' : 'border-yellow-500 bg-yellow-50'}`}>
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Rocket className={`h-8 w-8 ${readyForProduction ? 'text-green-600' : 'text-gray-500'}`} />
-              <div>
-                <CardTitle className="text-xl">
-                  {readyForProduction ? 'Ready for Production!' : 'Production Readiness Check'}
-                </CardTitle>
-                <CardDescription>
-                  {readyForProduction 
-                    ? 'All critical systems are operational and ready for live deployment'
-                    : `${criticalFailures} critical issue${criticalFailures !== 1 ? 's' : ''} need${criticalFailures === 1 ? 's' : ''} attention before going live`
-                  }
-                </CardDescription>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <Rocket className={`h-8 w-8 ${readyForProduction ? 'text-green-600' : 'text-gray-500'}`} />
+                  <div>
+                    <CardTitle className="text-xl">
+                      {readyForProduction ? '🚀 Production Ready!' : '🔧 Production Readiness Check'}
+                    </CardTitle>
+                    <CardDescription>
+                      {readyForProduction 
+                        ? 'All critical systems are operational and ready for live deployment'
+                        : `${criticalFailures} critical issue${criticalFailures !== 1 ? 's' : ''} need${criticalFailures === 1 ? 's' : ''} attention before going live`
+                      }
+                    </CardDescription>
+                  </div>
+                </div>
+                
+                <div className="flex items-center gap-3">
+                  {/* Email System Status Indicator */}
+                  <div className="text-right">
+                    <div className="text-xs font-medium text-muted-foreground">Email System</div>
+                    <div className={`text-sm font-semibold ${
+                      checks.find(c => c.id === 'production_email_system')?.status === 'pass' ? 'text-green-600' : 
+                      checks.find(c => c.id === 'production_email_system')?.status === 'warning' ? 'text-yellow-600' : 'text-red-600'
+                    }`}>
+                      {checks.find(c => c.id === 'production_email_system')?.status === 'pass' ? '✅ Ready' : 
+                       checks.find(c => c.id === 'production_email_system')?.status === 'warning' ? '⚠️ Issues' : '❌ Failed'}
+                    </div>
+                  </div>
+                  
+                  <Button onClick={runReadinessChecks} disabled={isRunning}>
+                    {isRunning ? 'Running Checks...' : 'Re-run Checks'}
+                  </Button>
+                </div>
               </div>
-            </div>
-            <Button onClick={runReadinessChecks} disabled={isRunning}>
-              {isRunning ? 'Running Checks...' : 'Re-run Checks'}
-            </Button>
-          </div>
           
           <div className="space-y-3">
             <div className="flex items-center justify-between">

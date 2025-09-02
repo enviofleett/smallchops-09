@@ -59,22 +59,25 @@ serve(async (req) => {
       })
     };
 
+    // Always return 200 to allow UI to parse detailed error information
     return new Response(JSON.stringify(responseData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: authResult.success ? 200 : 500
+      status: 200
     });
 
   } catch (error) {
     console.error('❌ SMTP Auth Health Check failed:', error);
     
+    // Always return 200 with error details for UI parsing
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
-      timestamp: new Date().toISOString(),
-      suggestion: 'Check SMTP configuration and credentials'
+      category: 'system_error',
+      suggestion: 'Check SMTP configuration and credentials',
+      timestamp: new Date().toISOString()
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500
+      status: 200
     });
   }
 });

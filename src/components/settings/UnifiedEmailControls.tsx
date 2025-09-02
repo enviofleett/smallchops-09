@@ -30,8 +30,15 @@ export const UnifiedEmailControls = () => {
         body: {}
       });
 
+      // Handle Supabase function errors (network/invocation issues)
       if (error) {
-        throw new Error(error.message || 'Health check failed');
+        console.error('❌ Function invocation error:', error);
+        setConnectionStatus('error');
+        setHealthCheckResult({ success: false, error: error.message });
+        toast.error('❌ Health check failed', {
+          description: error.message || 'Failed to connect to health check service'
+        });
+        return;
       }
 
       console.log('📊 Health check result:', data);
@@ -48,17 +55,19 @@ export const UnifiedEmailControls = () => {
       } else {
         setConnectionStatus('error');
         toast.error(
-          '❌ SMTP Authentication Failed',
+          `❌ SMTP Authentication Failed${data.category ? ` (${data.category})` : ''}`,
           {
-            description: data.error || 'Unknown authentication error'
+            description: data.suggestion || data.error || 'Unknown authentication error'
           }
         );
       }
     } catch (error: any) {
-      console.error('❌ Health check error:', error);
+      console.error('❌ Unexpected health check error:', error);
       setConnectionStatus('error');
       setHealthCheckResult({ success: false, error: error.message });
-      toast.error(`❌ Health check failed: ${error.message}`);
+      toast.error('❌ Unexpected error during health check', {
+        description: error.message
+      });
     } finally {
       setIsTestingConnection(false);
     }

@@ -853,6 +853,59 @@ serve(async (req: Request) => {
       });
     }
     
+    // CRITICAL: Input normalization and validation
+    // Normalize field names for backward compatibility
+    if (!requestBody.to && requestBody.recipient_email) {
+      requestBody.to = requestBody.recipient_email;
+    }
+    if (!requestBody.templateKey && requestBody.templateId) {
+      requestBody.templateKey = requestBody.templateId;
+    }
+    if (!requestBody.htmlContent && requestBody.html_content) {
+      requestBody.htmlContent = requestBody.html_content;
+    }
+    if (!requestBody.textContent && requestBody.text_content) {
+      requestBody.textContent = requestBody.text_content;
+    }
+    
+    // CRITICAL: Validate recipient email early
+    if (!requestBody.to || typeof requestBody.to !== 'string' || requestBody.to.trim() === '') {
+      console.error('❌ Missing or invalid recipient email:', {
+        to: requestBody.to,
+        recipient_email: requestBody.recipient_email,
+        requestKeys: Object.keys(requestBody)
+      });
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Missing or invalid recipient email address',
+        diagnostics: {
+          provided_to: requestBody.to,
+          provided_recipient_email: requestBody.recipient_email,
+          suggestion: 'Ensure "to" field contains a valid email address'
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
+
+    // Validate email format
+    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+    if (!emailRegex.test(requestBody.to.trim())) {
+      console.error('❌ Invalid email format:', requestBody.to);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid email format',
+        diagnostics: {
+          provided_email: requestBody.to,
+          suggestion: 'Ensure email follows valid format (user@domain.com)'
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
+    
     // Get business name for branding
     const { data: businessSettings } = await supabase
       .from('business_settings')
@@ -862,7 +915,7 @@ serve(async (req: Request) => {
     
     const businessName = businessSettings?.name || 'System';
 
-    console.log('📧 SMTP sender request:', {
+    console.log('📧 SMTP sender request (normalized):', {
       to: requestBody.to,
       templateKey: requestBody.templateKey,
       businessName,

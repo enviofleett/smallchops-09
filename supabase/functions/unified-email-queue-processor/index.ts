@@ -128,6 +128,30 @@ serve(async (req) => {
       try {
         console.log(`🔄 Processing email ${email.id} for ${email.recipient_email}`);
         
+        // CRITICAL: Skip processing if email address is invalid
+        if (!email.recipient_email || !isValidEmail(email.recipient_email)) {
+          console.warn(`⚠️ Skipping email ${email.id} - invalid recipient: "${email.recipient_email}"`);
+          
+          await supabase
+            .from('communication_events')
+            .update({ 
+              status: 'failed',
+              error_message: `Invalid recipient email address: "${email.recipient_email}"`,
+              retry_count: 99, // Mark as permanently failed
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', email.id);
+          
+          failureCount++;
+          results.push({
+            eventId: email.id,
+            recipient: email.recipient_email,
+            status: 'failed',
+            error: 'Invalid email address'
+          });
+          continue;
+        }
+        
         // Mark as processing
         await supabase
           .from('communication_events')
@@ -315,6 +339,29 @@ serve(async (req) => {
     );
   }
 });
+
+// Email validation function
+function isValidEmail(email: string): boolean {
+  if (!email || typeof email !== 'string') {
+    return false;
+  }
+  
+  const normalizedEmail = email.trim().toLowerCase();
+  
+  // Basic format validation
+  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
+  if (!emailRegex.test(normalizedEmail)) {
+    return false;
+  }
+  
+  // Check for obvious test/placeholder values
+  if (normalizedEmail.includes('test@') || normalizedEmail.includes('example.com') || 
+      normalizedEmail === 'user@domain.com' || normalizedEmail.length < 5) {
+    return false;
+  }
+  
+  return true;
+}
 
 // Check circuit breaker state
 async function checkCircuitBreaker(supabase: any): Promise<{

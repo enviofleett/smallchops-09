@@ -457,33 +457,99 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       payment_gateway_response: paystackData
     });
 
-    if (rpcError) {
-      log('error', '❌ RPC verification failed', { reference, error: rpcError });
-      return {
-        success: false,
-        error: rpcError.message || 'Database operation failed'
-      };
-    }
-
-    // Handle both array and object returns from RPC
+    // Handle both array and object returns from RPC (or use existing order data from duplicate key handling)
     let orderData;
-    if (Array.isArray(orderResult)) {
-      if (!orderResult || orderResult.length === 0) {
-        log('error', '❌ No order data returned from RPC (array empty)', { reference });
+    
+    if (rpcError) {
+      // Handle duplicate key violation as idempotent success
+      const isDuplicateKeyError = rpcError.message?.includes('duplicate key value violates unique constraint') ||
+                                 rpcError.message?.includes('idx_communication_events_unique_payment_confirmation');
+      
+      if (isDuplicateKeyError) {
+        log('info', '✅ Duplicate key detected - payment already processed, fetching existing order', { 
+          reference, 
+          error: rpcError.message 
+        });
+        
+        // Fetch existing order details since payment is already processed
+        try {
+          const { data: existingOrder, error: fetchError } = await supabase
+            .from('orders')
+            .select('id, order_number, customer_name, customer_email, total_amount, order_type')
+            .eq('payment_reference', reference)
+            .single();
+            
+          if (fetchError || !existingOrder) {
+            log('error', '❌ Could not fetch existing order after duplicate key error', { 
+              reference, 
+              fetchError: fetchError?.message 
+            });
+            return {
+              success: false,
+              error: 'Payment processed but order details unavailable'
+            };
+          }
+          
+          log('info', '✅ Retrieved existing order details for idempotent success', { 
+            reference, 
+            order_id: existingOrder.id,
+            order_number: existingOrder.order_number
+          });
+          
+          // Use existing order data
+          orderData = {
+            order_id: existingOrder.id,
+            order_number: existingOrder.order_number,
+            customer_name: existingOrder.customer_name,
+            customer_email: existingOrder.customer_email,
+            amount: existingOrder.total_amount,
+            order_type: existingOrder.order_type
+          };
+          
+        } catch (fetchException) {
+          log('error', '❌ Exception fetching existing order after duplicate key error', { 
+            reference, 
+            error: fetchException.message 
+          });
+          return {
+            success: false,
+            error: 'Payment processed but unable to retrieve order details'
+          };
+        }
+      } else {
+        // Non-duplicate errors are genuine failures
+        log('error', '❌ RPC verification failed', { reference, error: rpcError });
+        
+        // Sanitize error message for user display
+        const sanitizedError = rpcError.message?.includes('duplicate key') ? 
+          'Payment is being processed - please check your order status' :
+          'Payment processing temporarily unavailable - please contact support';
+          
+        return {
+          success: false,
+          error: sanitizedError
+        };
+      }
+    } else {
+      // Normal RPC success - process the returned order data
+      if (Array.isArray(orderResult)) {
+        if (!orderResult || orderResult.length === 0) {
+          log('error', '❌ No order data returned from RPC (array empty)', { reference });
+          return {
+            success: false,
+            error: 'Order not found or already processed'
+          };
+        }
+        orderData = orderResult[0];
+      } else if (orderResult && typeof orderResult === 'object') {
+        orderData = orderResult;
+      } else {
+        log('error', '❌ No order data returned from RPC (invalid format)', { reference, orderResult });
         return {
           success: false,
           error: 'Order not found or already processed'
         };
       }
-      orderData = orderResult[0];
-    } else if (orderResult && typeof orderResult === 'object') {
-      orderData = orderResult;
-    } else {
-      log('error', '❌ No order data returned from RPC (invalid format)', { reference, orderResult });
-      return {
-        success: false,
-        error: 'Order not found or already processed'
-      };
     }
 
     // Check if RPC returned error result
@@ -693,12 +759,15 @@ function createSuccessRedirect(reference: string, orderId: string) {
   });
 }
 
-// Create error redirect
+// Create error redirect with sanitized user messages
 function createErrorRedirect(message: string, reference?: string) {
+  // Sanitize error message for user display
+  const sanitizedMessage = sanitizeErrorMessage(message);
+  
   const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com';
   const errorParams = new URLSearchParams({
     status: 'error',
-    message: message
+    message: sanitizedMessage
   });
   
   // Include reference if provided for better error handling
@@ -708,7 +777,12 @@ function createErrorRedirect(message: string, reference?: string) {
   
   const errorUrl = `${frontendUrl}/payment/callback?${errorParams.toString()}`;
   
-  log('error', '❌ Creating error redirect', { errorUrl, message, reference });
+  log('error', '❌ Creating error redirect', { 
+    errorUrl, 
+    originalMessage: message,
+    sanitizedMessage,
+    reference 
+  });
   
   const corsHeaders = getCorsHeaders(null);
   
@@ -719,4 +793,58 @@ function createErrorRedirect(message: string, reference?: string) {
       'Location': errorUrl
     }
   });
+}
+
+// Sanitize error messages for user display
+function sanitizeErrorMessage(message: string): string {
+  if (!message || typeof message !== 'string') {
+    return 'Payment processing encountered an issue - please contact support';
+  }
+  
+  const lowerMessage = message.toLowerCase();
+  
+  // Map specific error patterns to user-friendly messages
+  if (lowerMessage.includes('duplicate key')) {
+    return 'Payment is being processed - please check your order status';
+  }
+  
+  if (lowerMessage.includes('constraint') || lowerMessage.includes('violation')) {
+    return 'Payment validation failed - please contact support';
+  }
+  
+  if (lowerMessage.includes('timeout') || lowerMessage.includes('network')) {
+    return 'Payment verification is taking longer than expected - please check your order status in a few minutes';
+  }
+  
+  if (lowerMessage.includes('not found') || lowerMessage.includes('reference')) {
+    return 'Payment reference not found - please ensure the payment was completed properly';
+  }
+  
+  if (lowerMessage.includes('invalid') || lowerMessage.includes('format')) {
+    return 'Invalid payment information - please contact support';
+  }
+  
+  if (lowerMessage.includes('database') || lowerMessage.includes('connection')) {
+    return 'Service temporarily unavailable - please try again in a few minutes';
+  }
+  
+  if (lowerMessage.includes('paystack') || lowerMessage.includes('api')) {
+    return 'Payment gateway temporarily unavailable - please contact support';
+  }
+  
+  // For any unmatched technical errors, provide a generic message
+  if (lowerMessage.includes('error') || lowerMessage.includes('failed') || lowerMessage.includes('exception')) {
+    return 'Payment processing encountered an issue - please contact support for assistance';
+  }
+  
+  // If message seems user-friendly already (no technical terms), keep it
+  const technicalTerms = ['rpc', 'sql', 'postgres', 'supabase', 'function', 'null', 'undefined', 'exception', 'stack'];
+  const containsTechnicalTerms = technicalTerms.some(term => lowerMessage.includes(term));
+  
+  if (!containsTechnicalTerms && message.length < 100) {
+    return message;
+  }
+  
+  // Default fallback
+  return 'Payment processing is temporarily unavailable - please contact support';
 }

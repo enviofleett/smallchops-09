@@ -538,7 +538,12 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         onConflict: 'reference'
       });
       
-    log('info', '✅ Payment transaction record updated');
+      log('info', '✅ Payment transaction record updated');
+    } catch (txnError) {
+      log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
+        error: txnError.message
+      });
+    }
 
     // Enhanced immediate payment confirmation email with fallback queue
     try {
@@ -650,11 +655,6 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
           queueError: queueError.message
         });
       }
-    }
-    } catch (txnError) {
-      log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
-        error: txnError.message
-      });
     }
 
     return {

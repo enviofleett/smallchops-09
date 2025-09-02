@@ -19,7 +19,10 @@ enable_email_autoconfirm = false
 enable_phone_confirmations = false
 enable_phone_autoconfirm = false
 
-# NATIVE SMTP EMAIL SYSTEM - Unified Configuration
+# SECURE EMAIL SYSTEM - Production Ready
+[functions.email-service-core]
+verify_jwt = true
+
 [functions.unified-smtp-sender]
 verify_jwt = false
 
@@ -29,52 +32,25 @@ verify_jwt = false
 [functions.instant-email-processor]
 verify_jwt = false
 
-# Authentication & User Management
-[functions.supabase-auth-email-sender]
-verify_jwt = false
-
-[functions.customer-auth-register]
+# SECURE AUTHENTICATION
+[functions.secure-customer-auth]
 verify_jwt = false
 
 [functions.customer-otp-verification]
 verify_jwt = false
 
-[functions.check-otp-rate-limit]
-verify_jwt = false
-
-[functions.auth-register]
-verify_jwt = false
-
-[functions.auth-verify-otp]
-verify_jwt = false
-
 [functions.auth-profile]
 verify_jwt = true
 
-[functions.secure-customer-auth]
-verify_jwt = false
-
-[functions.finalize-customer-registration]
+# SECURE PAYMENT PROCESSING
+[functions.paystack-secure]
 verify_jwt = true
-
-# Payment Processing
-[functions.payment-callback]
-verify_jwt = false
 
 [functions.secure-payment-processor]
 verify_jwt = true
 
-[functions.verify-payment]
+[functions.payment-callback]
 verify_jwt = false
-
-[functions.paystack-verify]
-verify_jwt = false
-
-[functions.paystack-secure]
-verify_jwt = true
-
-[functions.process-checkout]
-verify_jwt = true
 
 [functions.paystack-webhook-secure]
 verify_jwt = false
@@ -85,49 +61,7 @@ verify_jwt = true
 [functions.paystack-health]
 verify_jwt = true
 
-[functions.paystack-batch-verify]
-verify_jwt = true
-
-[functions.payment-reconcile]
-verify_jwt = true
-
-[functions.paystack-webhook-test]
-verify_jwt = true
-
-[functions.production-paystack-setup]
-verify_jwt = true
-
-[functions.verify-payment-unified]
-verify_jwt = false
-
-[functions.payment-recovery-migration]
-verify_jwt = false
-
-[functions.payment-health-diagnostic]
-verify_jwt = false
-
-[functions.payment-environment-manager]
-verify_jwt = false
-
-[functions.payment-confirmation-processor]
-verify_jwt = true
-
-[functions.test-paystack-credentials]
-verify_jwt = false
-
-[functions.paystack-debug]
-verify_jwt = false
-
-[functions.paystack-batch-verifier]
-verify_jwt = false
-
-[functions.paystack-health-monitor]
-verify_jwt = false
-
-# Administrative Functions
-[functions.admin-management]
-verify_jwt = true
-
+# ADMIN FUNCTIONS (require authentication)
 [functions.admin-orders-manager]
 verify_jwt = true
 
@@ -137,10 +71,7 @@ verify_jwt = true
 [functions.shipping-fees-report]
 verify_jwt = true
 
-[functions.security-monitor]
-verify_jwt = false
-
-# Utility Functions
+# PUBLIC UTILITIES
 [functions.unsubscribe-email]
 verify_jwt = false
 
@@ -150,12 +81,16 @@ verify_jwt = false
 [functions.public-api]
 verify_jwt = false
 
-# Delivery & Scheduling
-[functions.backfill-missing-schedules]
-verify_jwt = true
+# HEALTH & MONITORING
+[functions.security-monitor]
+verify_jwt = false
 
 [functions.delivery-schedule-health]
 verify_jwt = false
+
+# AUTOMATED PROCESSORS (service-to-service)
+[functions.backfill-missing-schedules]
+verify_jwt = true
 
 [functions.recover-order-schedule]
 verify_jwt = true

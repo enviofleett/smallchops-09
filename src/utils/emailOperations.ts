@@ -81,63 +81,76 @@ export class EmailOperations {
   }
 
   /**
-   * Trigger manual email cleanup using direct operations
+   * Trigger secure email cleanup via admin-only endpoint
    */
-  static async triggerEmailCleanup(): Promise<EmailOperationResult> {
+  static async triggerEmailCleanup(daysOld: number = 30): Promise<EmailOperationResult> {
     try {
-      // Reset stale processing records to failed
-      const { data: staleProcessing, error: selectError } = await supabase
-        .from('communication_events')
-        .select('id')
-        .eq('status', 'processing')
-        .lt('processing_started_at', new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString());
+      const { data, error } = await supabase.functions.invoke('email-service-core', {
+        body: { 
+          action: 'cleanup',
+          cleanup_options: { days_old: daysOld }
+        }
+      });
 
-      if (selectError) throw selectError;
-
-      let cleanedCount = 0;
-
-      if (staleProcessing && staleProcessing.length > 0) {
-        const { error: updateError } = await supabase
-          .from('communication_events')
-          .update({ 
-            status: 'failed', 
-            error_message: 'Processing timeout - reset by cleanup',
-            updated_at: new Date().toISOString()
-          })
-          .in('id', staleProcessing.map(item => item.id));
-
-        if (updateError) throw updateError;
-        cleanedCount += staleProcessing.length;
-      }
-
-      // Archive and delete old queued items
-      const { data: oldQueued, error: queuedSelectError } = await supabase
-        .from('communication_events')
-        .select('id')
-        .eq('status', 'queued')
-        .lt('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
-
-      if (queuedSelectError) throw queuedSelectError;
-
-      if (oldQueued && oldQueued.length > 0) {
-        const { error: deleteError } = await supabase
-          .from('communication_events')
-          .delete()
-          .in('id', oldQueued.map(item => item.id));
-
-        if (deleteError) throw deleteError;
-        cleanedCount += oldQueued.length;
-      }
+      if (error) throw error;
 
       return {
-        success: true,
-        message: 'Email cleanup completed',
-        data: { total_cleaned: cleanedCount }
+        success: data.success,
+        message: data.message,
+        data: data.results
       };
     } catch (error: any) {
       return {
         success: false,
         message: `Email cleanup failed: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Get secure email system statistics
+   */
+  static async getEmailStats(): Promise<EmailOperationResult> {
+    try {
+      const { data, error } = await supabase.functions.invoke('email-service-core', {
+        body: { action: 'get_stats' }
+      });
+
+      if (error) throw error;
+
+      return {
+        success: true,
+        message: 'Email stats retrieved successfully',
+        data: data.stats
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Failed to get email stats: ${error.message}`
+      };
+    }
+  }
+
+  /**
+   * Check email system health
+   */
+  static async checkEmailHealth(): Promise<EmailOperationResult> {
+    try {
+      const { data, error } = await supabase.functions.invoke('email-service-core', {
+        body: { action: 'health_check' }
+      });
+
+      if (error) throw error;
+
+      return {
+        success: data.success,
+        message: `Email system is ${data.health}`,
+        data: data
+      };
+    } catch (error: any) {
+      return {
+        success: false,
+        message: `Email health check failed: ${error.message}`
       };
     }
   }

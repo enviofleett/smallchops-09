@@ -9337,6 +9337,15 @@ export type Database = {
         }
         Returns: undefined
       }
+      log_email_security_event: {
+        Args: {
+          p_details?: Json
+          p_email_address: string
+          p_event_type: string
+          p_function_name: string
+        }
+        Returns: undefined
+      }
       log_moq_violation: {
         Args: {
           p_action_taken?: string

@@ -1,247 +1,360 @@
 
-import React from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import React, { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { 
-  Mail, 
-  Settings, 
-  Activity,
-  Archive,
-  AlertTriangle
-} from 'lucide-react';
-import { EmailSystemStatus } from './EmailSystemStatus';
-import { useSMTPSettings } from '@/hooks/useSMTPSettings';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-
-interface RecentEmailActivity {
-  id: string;
-  event_type: string;
-  recipient_email: string;
-  status: string;
-  created_at: string;
-  error_message?: string;
-}
+import { AlertCircle, CheckCircle2, Clock, Mail, RefreshCw, Shield, Activity } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { EmailOperations } from '@/utils/emailOperations';
 
 export const EmailManagement = () => {
-  const { settings, isLoading: settingsLoading, testConnection, isTesting } = useSMTPSettings();
+  const [isLoading, setIsLoading] = useState(false);
+  const [emailStats, setEmailStats] = useState<any>(null);
+  const [healthData, setHealthData] = useState<any>(null);
+  const { toast } = useToast();
 
-  // Get recent email activity
-  const { data: recentActivity, isLoading: activityLoading } = useQuery({
-    queryKey: ['recent-email-activity'],
-    queryFn: async (): Promise<RecentEmailActivity[]> => {
-      const { data, error } = await supabase
-        .from('communication_events')
-        .select('id, event_type, recipient_email, status, created_at, error_message')
-        .order('created_at', { ascending: false })
-        .limit(20);
+  // Load email statistics and health on mount
+  useEffect(() => {
+    loadEmailData();
+  }, []);
 
-      if (error) throw error;
-      return data || [];
-    },
-    refetchInterval: 30000,
-  });
+  const loadEmailData = async () => {
+    setIsLoading(true);
+    try {
+      // Load stats and health data in parallel
+      const [statsResult, healthResult] = await Promise.all([
+        EmailOperations.getEmailStats(),
+        EmailOperations.checkEmailHealth()
+      ]);
 
-  // Get system health stats
-  const { data: healthStats } = useQuery({
-    queryKey: ['email-health-stats'],
-    queryFn: async () => {
-      const { data } = await supabase
-        .from('communication_events')
-        .select('status')
-        .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+      if (statsResult.success) {
+        setEmailStats(statsResult.data);
+      }
 
-      const statusCounts = data?.reduce((acc, event) => {
-        acc[event.status] = (acc[event.status] || 0) + 1;
-        return acc;
-      }, {} as Record<string, number>) || {};
+      if (healthResult.success) {
+        setHealthData(healthResult.data);
+      }
+    } catch (error) {
+      console.error('Failed to load email data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load email system data",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      const total = Object.values(statusCounts).reduce((sum, count) => sum + count, 0);
-      const successRate = total > 0 ? Math.round(((statusCounts.sent || 0) / total) * 100) : 0;
+  const handleCleanup = async () => {
+    if (!confirm('Are you sure you want to clean up old email records? This action cannot be undone.')) {
+      return;
+    }
 
-      return { statusCounts, total, successRate };
-    },
-    refetchInterval: 60000,
-  });
+    setIsLoading(true);
+    try {
+      const result = await EmailOperations.triggerEmailCleanup(30);
+      
+      if (result.success) {
+        toast({
+          title: "Cleanup Completed",
+          description: `Cleaned ${result.data?.events_cleaned || 0} events and ${result.data?.logs_cleaned || 0} logs`,
+        });
+        // Refresh data after cleanup
+        loadEmailData();
+      } else {
+        throw new Error(result.message);
+      }
+    } catch (error: any) {
+      toast({
+        title: "Cleanup Failed",
+        description: error.message || "Failed to clean up email records",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-  const getStatusColor = (status: string) => {
+  const testSmtpConnection = async () => {
+    setIsLoading(true);
+    try {
+      const result = await EmailOperations.testEmailConnection();
+      
+      toast({
+        title: result.success ? "SMTP Test Successful" : "SMTP Test Failed",
+        description: result.message,
+        variant: result.success ? "default" : "destructive",
+      });
+    } catch (error: any) {
+      toast({
+        title: "SMTP Test Error",
+        description: error.message || "Failed to test SMTP connection",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const getStatusBadgeVariant = (status: string) => {
     switch (status) {
-      case 'sent': return 'bg-green-100 text-green-800';
-      case 'failed': return 'bg-red-100 text-red-800';
-      case 'processing': return 'bg-blue-100 text-blue-800';
-      case 'queued': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case 'sent': return 'default';
+      case 'failed': return 'destructive';
+      case 'queued': return 'secondary';
+      case 'processing': return 'outline';
+      default: return 'secondary';
+    }
+  };
+
+  const getHealthIcon = (health: string) => {
+    switch (health) {
+      case 'healthy': return <CheckCircle2 className="h-4 w-4 text-green-500" />;
+      case 'unhealthy': return <AlertCircle className="h-4 w-4 text-red-500" />;
+      default: return <Clock className="h-4 w-4 text-yellow-500" />;
     }
   };
 
   return (
     <div className="space-y-6">
-      {/* System Status */}
-      <EmailSystemStatus />
-
-      {/* Main Email Management */}
+      {/* Health Status Overview */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Mail className="h-5 w-5" />
-            Email System Management
+            <Shield className="h-5 w-5" />
+            Email System Health
           </CardTitle>
+          <CardDescription>
+            Production-ready email monitoring and management
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="overview" className="w-full">
-            <TabsList className="grid w-full grid-cols-4">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
-              <TabsTrigger value="activity">Recent Activity</TabsTrigger>
-              <TabsTrigger value="settings">SMTP Settings</TabsTrigger>
-              <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="overview" className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-blue-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-blue-600">Success Rate (7 days)</p>
-                      <p className="text-2xl font-bold text-blue-700">{healthStats?.successRate || 0}%</p>
-                    </div>
-                    <Activity className="h-8 w-8 text-blue-600" />
-                  </div>
-                </div>
-                
-                <div className="bg-green-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-green-600">Total Emails</p>
-                      <p className="text-2xl font-bold text-green-700">{healthStats?.total || 0}</p>
-                    </div>
-                    <Mail className="h-8 w-8 text-green-600" />
-                  </div>
-                </div>
-                
-                <div className="bg-red-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-sm font-medium text-red-600">Failed</p>
-                      <p className="text-2xl font-bold text-red-700">{healthStats?.statusCounts.failed || 0}</p>
-                    </div>
-                    <AlertTriangle className="h-8 w-8 text-red-600" />
-                  </div>
-                </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              {healthData && getHealthIcon(healthData.health)}
+              <div>
+                <p className="font-medium">
+                  System Status: {healthData?.health || 'Unknown'}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Last checked: {healthData?.timestamp ? new Date(healthData.timestamp).toLocaleString() : 'Never'}
+                </p>
               </div>
-            </TabsContent>
-
-            <TabsContent value="activity" className="space-y-4">
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium">Recent Email Activity</h4>
-                {activityLoading ? (
-                  <div className="space-y-2">
-                    {[...Array(5)].map((_, i) => (
-                      <div key={i} className="h-12 bg-gray-100 rounded animate-pulse" />
-                    ))}
-                  </div>
-                ) : (
-                  <div className="space-y-2 max-h-96 overflow-y-auto">
-                    {recentActivity?.map((activity) => (
-                      <div key={activity.id} className="flex items-center justify-between p-3 border rounded-lg">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-sm font-medium">{activity.event_type}</span>
-                            <Badge className={getStatusColor(activity.status)}>
-                              {activity.status}
-                            </Badge>
-                          </div>
-                          <p className="text-xs text-gray-500">{activity.recipient_email}</p>
-                          {activity.error_message && (
-                            <p className="text-xs text-red-500 mt-1">{activity.error_message}</p>
-                          )}
-                        </div>
-                        <div className="text-xs text-gray-400">
-                          {new Date(activity.created_at).toLocaleDateString()}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="settings" className="space-y-4">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h4 className="text-sm font-medium">SMTP Configuration</h4>
-                    <p className="text-xs text-gray-500">
-                      Status: {settings?.use_smtp ? 'Enabled' : 'Disabled'}
-                    </p>
-                  </div>
-                  <Button
-                    size="sm"
-                    onClick={() => testConnection()}
-                    disabled={isTesting || settingsLoading}
-                  >
-                    {isTesting ? 'Testing...' : 'Test Connection'}
-                  </Button>
-                </div>
-                
-                {settings?.smtp_host && (
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <div className="grid grid-cols-2 gap-2 text-xs">
-                      <div>
-                        <span className="font-medium">Host:</span> {settings.smtp_host}
-                      </div>
-                      <div>
-                        <span className="font-medium">Port:</span> {settings.smtp_port}
-                      </div>
-                      <div>
-                        <span className="font-medium">Sender:</span> {settings.sender_email}
-                      </div>
-                      <div>
-                        <span className="font-medium">Secure:</span> {settings.smtp_secure ? 'Yes' : 'No'}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
-
-            <TabsContent value="maintenance" className="space-y-4">
-              <div className="space-y-4">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-start space-x-3">
-                    <Archive className="h-5 w-5 text-blue-600 mt-0.5" />
-                    <div>
-                      <h4 className="text-sm font-medium text-blue-800">Automated Cleanup</h4>
-                      <p className="text-xs text-blue-700 mt-1">
-                        Email cleanup runs daily at midnight UTC. Stale items are automatically archived and removed.
-                      </p>
-                      <div className="text-xs text-blue-600 mt-2">
-                        • Processing items older than 2 hours are marked as failed<br/>
-                        • Queued items older than 1 day are marked as failed<br/>
-                        • Failed logs are archived after 7 days<br/>
-                        • Sent logs are kept for 30 days
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <div className="flex items-start space-x-3">
-                    <Settings className="h-5 w-5 text-yellow-600 mt-0.5" />
-                    <div>
-                      <h4 className="text-sm font-medium text-yellow-800">Manual Actions</h4>
-                      <p className="text-xs text-yellow-700 mt-1">
-                        Use the "Clean Up" button in the system status above to manually trigger cleanup if needed.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadEmailData}
+                disabled={isLoading}
+              >
+                <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={testSmtpConnection}
+                disabled={isLoading}
+              >
+                <Mail className="h-4 w-4 mr-2" />
+                Test SMTP
+              </Button>
+            </div>
+          </div>
         </CardContent>
       </Card>
+
+      <Tabs defaultValue="overview" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="statistics">Statistics</TabsTrigger>
+          <TabsTrigger value="maintenance">Maintenance</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="overview" className="space-y-4">
+          {/* System Checks */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Database Connection</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  {healthData?.checks?.database === 'healthy' ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-red-500" />
+                  )}
+                  <span className="text-sm capitalize">
+                    {healthData?.checks?.database || 'Unknown'}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">SMTP Configuration</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  {healthData?.checks?.smtp === 'healthy' ? (
+                    <CheckCircle2 className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 text-yellow-500" />
+                  )}
+                  <span className="text-sm capitalize">
+                    {healthData?.checks?.smtp || 'Unknown'}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm font-medium">Queue Processing</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm">
+                    {emailStats?.by_status?.queued || 0} queued
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Recent Activity */}
+          {healthData?.stats?.last_24h && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Last 24 Hours Activity</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex gap-4">
+                  {Object.entries(healthData.stats.last_24h).map(([status, count]) => (
+                    <Badge key={status} variant={getStatusBadgeVariant(status)}>
+                      {status}: {count as number}
+                    </Badge>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
+
+        <TabsContent value="statistics" className="space-y-4">
+          {emailStats && (
+            <>
+              <Card>
+                <CardHeader>
+                  <CardTitle>Email Statistics (Last 7 Days)</CardTitle>
+                  <CardDescription>
+                    Total emails processed: {emailStats.total}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    {Object.entries(emailStats.by_status).map(([status, count]) => (
+                      <div key={status} className="text-center">
+                        <div className="text-2xl font-bold">{count as number}</div>
+                        <div className="text-sm text-muted-foreground capitalize">{status}</div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle>By Priority</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2">
+                      {Object.entries(emailStats.by_priority).map(([priority, count]) => (
+                        <div key={priority} className="flex justify-between">
+                          <span className="capitalize">{priority}</span>
+                          <span className="font-medium">{count as number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader>
+                    <CardTitle>By Event Type</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-2 max-h-40 overflow-y-auto">
+                      {Object.entries(emailStats.by_event_type).map(([type, count]) => (
+                        <div key={type} className="flex justify-between">
+                          <span className="text-sm">{type}</span>
+                          <span className="font-medium">{count as number}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </>
+          )}
+        </TabsContent>
+
+        <TabsContent value="maintenance" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>System Maintenance</CardTitle>
+              <CardDescription>
+                Admin-only operations for email system maintenance
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <h4 className="font-medium">Clean Up Old Records</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Archive and remove email records older than 30 days
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleCleanup}
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <AlertCircle className="h-4 w-4 mr-2" />
+                  )}
+                  Run Cleanup
+                </Button>
+              </div>
+
+              <div className="flex items-center justify-between p-4 border rounded-lg">
+                <div>
+                  <h4 className="font-medium">SMTP Health Check</h4>
+                  <p className="text-sm text-muted-foreground">
+                    Test SMTP connection and configuration
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={testSmtpConnection}
+                  disabled={isLoading}
+                >
+                  <Mail className="h-4 w-4 mr-2" />
+                  Test Connection
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

@@ -9678,15 +9678,15 @@ export type Database = {
               p_order_id: string
               p_recipient_email: string
               p_reference: string
-              p_template_variables?: Json
+              p_template_variables: Json
             }
           | {
-              p_order_id?: string
+              p_order_id: string
               p_recipient_email: string
               p_reference: string
               p_template_variables?: Json
             }
-        Returns: string
+        Returns: Json
       }
       validate_admin_access: {
         Args: Record<PropertyKey, never>

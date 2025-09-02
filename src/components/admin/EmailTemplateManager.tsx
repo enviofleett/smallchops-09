@@ -185,15 +185,14 @@ export const EmailTemplateManager: React.FC = () => {
 
   const testTemplate = async (template: EmailTemplate) => {
     try {
+      // Load production data for realistic template variables
+      const productionVariables = await loadProductionData();
+      
       const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: 'test@example.com',
           template_key: template.template_key,
-          variables: {
-            customerName: 'Test User',
-            orderNumber: 'TEST-001',
-            amount: '100.00'
-          }
+          variables: productionVariables
         }
       });
 
@@ -201,7 +200,7 @@ export const EmailTemplateManager: React.FC = () => {
 
       toast({
         title: "Test Email Sent",
-        description: "Template test email sent successfully",
+        description: `Template "${template.template_name}" sent with live production data`,
       });
     } catch (error: any) {
       toast({
@@ -209,6 +208,78 @@ export const EmailTemplateManager: React.FC = () => {
         description: error.message || "Failed to send test email",
         variant: "destructive",
       });
+    }
+  };
+
+  const loadProductionData = async () => {
+    try {
+      // Get business settings for production branding
+      const { data: businessSettings } = await supabase
+        .from('business_settings')
+        .select('name, tagline, website_url, admin_notification_email, working_hours, whatsapp_support_number')
+        .limit(1)
+        .maybeSingle();
+
+      // Get recent customer data for realistic examples
+      const { data: customerData } = await supabase
+        .from('customer_accounts')
+        .select('name, email')
+        .limit(1)
+        .maybeSingle();
+
+      // Get recent order data for realistic examples
+      const { data: orderData } = await supabase
+        .from('orders')
+        .select('order_number, total_amount, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Build comprehensive production data object
+      return {
+        // Business information
+        business_name: businessSettings?.name || 'Your Business',
+        business_tagline: businessSettings?.tagline || 'Quality products delivered',
+        business_website: businessSettings?.website_url || 'https://yourbusiness.com',
+        business_email: businessSettings?.admin_notification_email || 'admin@yourbusiness.com',
+        business_phone: businessSettings?.whatsapp_support_number || '+1234567890',
+        business_hours: businessSettings?.working_hours || 'Mon-Fri 9AM-6PM',
+        
+        // Customer information
+        customer_name: customerData?.name || 'John Doe',
+        customer_email: customerData?.email || 'john@example.com',
+        customerName: customerData?.name || 'John Doe',
+        
+        // Order information
+        order_number: orderData?.order_number || 'ORD-2024-001',
+        orderNumber: orderData?.order_number || 'ORD-2024-001',
+        order_total: orderData?.total_amount?.toString() || '150.00',
+        amount: orderData?.total_amount?.toString() || '150.00',
+        order_status: orderData?.status || 'confirmed',
+        
+        // Common variables
+        current_year: new Date().getFullYear().toString(),
+        current_date: new Date().toLocaleDateString(),
+        support_email: businessSettings?.admin_notification_email || 'support@yourbusiness.com',
+        
+        // Delivery information
+        delivery_address: '123 Main Street, Lagos, Nigeria',
+        estimated_delivery: new Date(Date.now() + 24 * 60 * 60 * 1000).toLocaleDateString()
+      };
+    } catch (error) {
+      console.error('Error loading production data:', error);
+      // Return fallback sample data if production data fails
+      return {
+        business_name: 'Your Business',
+        customer_name: 'John Doe',
+        customerName: 'John Doe',
+        order_number: 'ORD-2024-001',
+        orderNumber: 'ORD-2024-001',
+        amount: '150.00',
+        order_total: '150.00',
+        current_year: new Date().getFullYear().toString(),
+        current_date: new Date().toLocaleDateString()
+      };
     }
   };
 

@@ -197,7 +197,7 @@ Never use placeholder, test, or hashed values in production.
       username: secretUsername.trim(),
       password: secretPassword.trim(),
       senderEmail: (secretFromEmail || secretUsername).trim(),
-      senderName: (secretFromName || 'Starters Small Chops').trim(),
+      senderName: (secretFromName || 'System').trim(),
       encryption: secretEncryption?.trim() || 'TLS',
       source: 'function_secrets'
     };
@@ -230,7 +230,7 @@ Never use placeholder, test, or hashed values in production.
     username: config.smtp_user.trim(),
     password: config.smtp_pass.trim(),
     senderEmail: (config.sender_email || config.smtp_user).trim(),
-    senderName: (config.sender_name || 'Starters Small Chops').trim(),
+    senderName: (config.sender_name || 'System').trim(),
     encryption: 'TLS',
     source: 'database'
   };
@@ -241,7 +241,7 @@ async function processTemplate(
   supabase: any, 
   templateKey: string, 
   variables: Record<string, any> = {},
-  businessName: string = 'Starters Small Chops'
+  businessName: string = 'System'
 ): Promise<{ subject: string; html: string; text: string; templateFound: boolean }> {
   
   let template = null;
@@ -860,7 +860,7 @@ serve(async (req: Request) => {
       .limit(1)
       .maybeSingle();
     
-    const businessName = businessSettings?.name || 'Starters Small Chops';
+    const businessName = businessSettings?.name || 'System';
 
     console.log('📧 SMTP sender request:', {
       to: requestBody.to,

@@ -25,6 +25,7 @@ import AdminCheckoutSettingsCard from '@/components/admin/settings/AdminCheckout
 import PaymentsWebhooksPanel from '@/components/admin/dev/PaymentsWebhooksPanel';
 import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
 import { ErrorTestComponent } from '@/components/error/ErrorTestComponent';
+import { EmailCredentialsManager } from '@/components/admin/EmailCredentialsManager';
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 
@@ -187,10 +188,11 @@ const Settings = () => {
                 <PaymentsWebhooksPanel />
               </TabsContent>
               
-              <TabsContent value="email" className="space-y-4 md:space-y-6">
-                <Tabs defaultValue="communications" className="space-y-4 md:space-y-6">
+                  <TabsContent value="email" className="space-y-4 md:space-y-6">
+                <Tabs defaultValue="credentials" className="space-y-4 md:space-y-6">
                   <div className="overflow-x-auto pb-2 -mx-4 px-4">
-                    <TabsList className="grid w-full min-w-[320px] grid-cols-2 sm:grid-cols-4 h-auto p-1">
+                    <TabsList className="grid w-full min-w-[400px] grid-cols-2 sm:grid-cols-5 h-auto p-1">
+                      <TabsTrigger value="credentials" className="text-xs sm:text-sm px-2 py-2">Credentials</TabsTrigger>
                       <TabsTrigger value="communications" className="text-xs sm:text-sm px-2 py-2">Settings</TabsTrigger>
                       <TabsTrigger value="processing" className="text-xs sm:text-sm px-2 py-2">Processing</TabsTrigger>
                       <TabsTrigger value="monitoring" className="text-xs sm:text-sm px-2 py-2">Monitoring</TabsTrigger>
@@ -198,6 +200,14 @@ const Settings = () => {
                     </TabsList>
                   </div>
                   
+                  <TabsContent value="credentials" className="space-y-4 md:space-y-6">
+                    <Card>
+                      <CardContent className="pt-6">
+                        <EmailCredentialsManager />
+                      </CardContent>
+                    </Card>
+                  </TabsContent>
+
                   <TabsContent value="communications" className="space-y-4 md:space-y-6">
                     <Card>
                       <CardContent className="pt-6">

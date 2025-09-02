@@ -51,47 +51,68 @@ function parseResponse(response: string): SMTPResponse {
 function isValidSMTPConfig(host: string, port: string, username: string, password: string): { 
   isValid: boolean; 
   errors: string[];
+  suggestions: string[];
 } {
   const errors: string[] = [];
+  const suggestions: string[] = [];
   
   // Check for hashed values (32 hex characters) - these are invalid for SMTP
   const hashPattern = /^[a-f0-9]{32}$/;
   
   if (hashPattern.test(host)) {
     errors.push(`SMTP_HOST appears to be a hashed value (${host.substring(0,8)}...), needs actual hostname`);
+    suggestions.push('Set SMTP_HOST to your email provider hostname (e.g., smtp.gmail.com)');
   }
   
   if (hashPattern.test(port)) {
     errors.push(`SMTP_PORT appears to be a hashed value (${port.substring(0,8)}...), needs actual port number`);
+    suggestions.push('Set SMTP_PORT to your email provider port (usually 587 or 465)');
   }
   
   if (hashPattern.test(username)) {
     errors.push(`SMTP_USERNAME appears to be a hashed value (${username.substring(0,8)}...), needs actual email/username`);
+    suggestions.push('Set SMTP_USERNAME to your email address or API username');
   }
   
   if (hashPattern.test(password)) {
     errors.push(`SMTP_PASSWORD appears to be a hashed value (${password.substring(0,8)}...), needs actual password`);
+    suggestions.push('Set SMTP_PASSWORD to your email password or API key');
   }
   
   // Validate hostname format
   if (!host.includes('.') || host.startsWith('http')) {
     errors.push(`SMTP_HOST "${host}" doesn't look like a valid hostname (should be like mail.example.com)`);
+    suggestions.push('Use a proper SMTP hostname like smtp.gmail.com, smtp.sendgrid.net, or smtp-mail.outlook.com');
   }
   
   // Validate port range
   const portNum = parseInt(port, 10);
   if (isNaN(portNum) || portNum < 1 || portNum > 65535) {
     errors.push(`SMTP_PORT "${port}" is not a valid port number (should be 25, 587, or 465)`);
+    suggestions.push('Use port 587 for most providers, or 465 for SSL connections');
   }
   
   // Basic email validation for username
-  if (username && !username.includes('@') && !username.includes('apikey')) {
-    errors.push(`SMTP_USERNAME "${username}" should typically be an email address`);
+  if (username && !username.includes('@') && !username.includes('apikey') && username.length < 10) {
+    errors.push(`SMTP_USERNAME "${username}" should typically be an email address or API key`);
+    suggestions.push('Use your full email address for Gmail/Outlook, or "apikey" for SendGrid');
+  }
+  
+  // Check for obvious placeholder/test values
+  if (username.toLowerCase().includes('test') || username.toLowerCase().includes('example') || username.toLowerCase() === 'starters') {
+    errors.push(`SMTP_USERNAME "${username}" appears to be a placeholder or test value`);
+    suggestions.push('Replace with your actual SMTP username/email address');
+  }
+  
+  if (password.toLowerCase().includes('test') || password.toLowerCase().includes('example') || password.length < 8) {
+    errors.push(`SMTP_PASSWORD appears to be a placeholder or test value`);
+    suggestions.push('Use your actual email password or API key (at least 8 characters)');
   }
   
   return {
     isValid: errors.length === 0,
-    errors
+    errors,
+    suggestions
   };
 }
 
@@ -131,7 +152,32 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
     if (!validation.isValid) {
       console.error('❌ INVALID SMTP CONFIGURATION DETECTED:');
       validation.errors.forEach(error => console.error(`   - ${error}`));
-      throw new Error(`Invalid SMTP configuration: ${validation.errors.join('; ')}. Please update Function Secrets with actual SMTP credentials, not hashed values.`);
+      console.error('🔧 SUGGESTED FIXES:');
+      validation.suggestions.forEach(suggestion => console.error(`   → ${suggestion}`));
+      
+      const detailedError = `
+Invalid SMTP configuration detected. Please fix the following issues:
+
+ERRORS:
+${validation.errors.map(error => `• ${error}`).join('\n')}
+
+SUGGESTED FIXES:
+${validation.suggestions.map(suggestion => `→ ${suggestion}`).join('\n')}
+
+SETUP GUIDE:
+1. Go to Supabase Dashboard → Settings → Edge Functions
+2. Add/update Function Secrets with your real SMTP credentials:
+   - SMTP_HOST: Your provider's hostname (e.g., smtp.gmail.com)
+   - SMTP_PORT: Usually 587 or 465
+   - SMTP_USERNAME: Your email address or API username
+   - SMTP_PASSWORD: Your email password or API key
+   - SMTP_FROM_EMAIL: The email address to send from
+   - SMTP_FROM_NAME: The display name for outgoing emails
+
+Never use placeholder, test, or hashed values in production.
+      `.trim();
+      
+      throw new Error(detailedError);
     }
     
     // Parse port with robust fallback

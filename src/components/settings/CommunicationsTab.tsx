@@ -21,6 +21,7 @@ import { Mail, Settings, FileText, TestTube, Activity, BarChart3, AlertCircle, C
 import { DeliverySchedulingTab } from './DeliverySchedulingTab';
 import { LegalTermsManager } from './LegalTermsManager';
 import { SMTPIntegrationDiagnostics } from './SMTPIntegrationDiagnostics';
+import { SMTPConfigurationGuide } from './SMTPConfigurationGuide';
 interface EmailStats {
   totalSent: number;
   deliveredToday: number;
@@ -233,11 +234,7 @@ export const CommunicationsTab = () => {
         </TabsContent>
 
         <TabsContent value="settings" className="space-y-4">
-          <Card>
-            <CardContent>
-              <SMTPSettingsTab />
-            </CardContent>
-          </Card>
+          <SMTPConfigurationGuide />
         </TabsContent>
 
         <TabsContent value="templates" className="space-y-4">

@@ -51,11 +51,9 @@ export const PaymentsWebhooksPanel: React.FC = () => {
   const refreshHealth = useCallback(async () => {
     setLoadingHealth(true);
     try {
-      const { data, error } = await supabase.functions.invoke('paystack-verify', {
-        body: { health: true }
-      });
-      if (error) throw error;
-      setHealth(data);
+      const res = await fetch(VERIFY_HEALTH_URL, { method: 'GET' });
+      const json = await res.json();
+      setHealth(json);
     } catch (e: any) {
       setHealth({ ok: false, hasPaystackKey: false, hasServiceRole: false, hasSupabaseUrl: false });
     } finally {

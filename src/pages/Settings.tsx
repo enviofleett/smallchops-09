@@ -26,7 +26,6 @@ import PaymentsWebhooksPanel from '@/components/admin/dev/PaymentsWebhooksPanel'
 import { PerformanceDebugger } from '@/components/monitoring/PerformanceDebugger';
 import { ErrorTestComponent } from '@/components/error/ErrorTestComponent';
 import { EmailCredentialsManager } from '@/components/admin/EmailCredentialsManager';
-import { PaystackLiveModeDashboard } from '@/components/payments/PaystackLiveModeDashboard';
 const Settings = () => {
   const [activeTab, setActiveTab] = useState("communications");
 
@@ -116,9 +115,8 @@ const Settings = () => {
         <TabsContent value="payments" className="space-y-4 md:space-y-6">
           <Tabs defaultValue="payment-providers" className="space-y-4 md:space-y-6">
             <div className="overflow-x-auto pb-2 -mx-4 px-4">
-              <TabsList className="grid w-full min-w-[400px] grid-cols-3 h-auto p-1">
+              <TabsList className="grid w-full min-w-[300px] grid-cols-2 h-auto p-1">
                 <TabsTrigger value="payment-providers" className="text-xs sm:text-sm px-2 py-2">Payment Providers</TabsTrigger>
-                <TabsTrigger value="live-dashboard" className="text-xs sm:text-sm px-2 py-2">Live Dashboard</TabsTrigger>
                 <TabsTrigger value="pickup-points" className="text-xs sm:text-sm px-2 py-2">Pickup Points</TabsTrigger>
               </TabsList>
             </div>
@@ -135,10 +133,6 @@ const Settings = () => {
                   <PaymentSettingsTab />
                 </CardContent>
               </Card>
-            </TabsContent>
-
-            <TabsContent value="live-dashboard" className="space-y-4 md:space-y-6">
-              <PaystackLiveModeDashboard />
             </TabsContent>
             
             <TabsContent value="pickup-points" className="space-y-4 md:space-y-6">

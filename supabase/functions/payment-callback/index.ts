@@ -673,11 +673,6 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         reference: reference
       });
     }
-    } catch (txnError) {
-      log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
-        error: txnError.message
-      });
-    }
 
     return {
       success: true,

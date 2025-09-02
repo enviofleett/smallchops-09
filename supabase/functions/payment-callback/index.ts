@@ -591,7 +591,12 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         onConflict: 'reference'
       });
       
-    log('info', '✅ Payment transaction record updated');
+      log('info', '✅ Payment transaction record updated');
+    } catch (txnError) {
+      log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
+        error: txnError.message
+      });
+    }
 
     // Queue payment confirmation email via payment-confirmation-processor (production-ready)
     if (recipientEmail) {

@@ -8342,6 +8342,65 @@ export type Database = {
         }
         Relationships: []
       }
+      email_template_health: {
+        Row: {
+          active_templates: number | null
+          last_updated: string | null
+          marketing_count: number | null
+          stale_templates: number | null
+          total_templates: number | null
+          transactional_count: number | null
+        }
+        Relationships: []
+      }
+      email_templates: {
+        Row: {
+          category: string | null
+          created_at: string | null
+          full_html: boolean | null
+          html_content: string | null
+          is_active: boolean | null
+          style: string | null
+          subject: string | null
+          template_key: string | null
+          template_name: string | null
+          template_type: string | null
+          text_content: string | null
+          updated_at: string | null
+          variables: string[] | null
+        }
+        Insert: {
+          category?: string | null
+          created_at?: string | null
+          full_html?: boolean | null
+          html_content?: string | null
+          is_active?: boolean | null
+          style?: string | null
+          subject?: string | null
+          template_key?: string | null
+          template_name?: string | null
+          template_type?: string | null
+          text_content?: string | null
+          updated_at?: string | null
+          variables?: string[] | null
+        }
+        Update: {
+          category?: string | null
+          created_at?: string | null
+          full_html?: boolean | null
+          html_content?: string | null
+          is_active?: boolean | null
+          style?: string | null
+          subject?: string | null
+          template_key?: string | null
+          template_name?: string | null
+          template_type?: string | null
+          text_content?: string | null
+          updated_at?: string | null
+          variables?: string[] | null
+        }
+        Relationships: []
+      }
       orders_view: {
         Row: {
           amount_kobo: number | null

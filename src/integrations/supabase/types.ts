@@ -3825,11 +3825,75 @@ export type Database = {
         }
         Relationships: []
       }
+      enhanced_email_template_versions: {
+        Row: {
+          category: string | null
+          change_note: string | null
+          changed_at: string | null
+          changed_by: string | null
+          created_at: string | null
+          full_html: boolean | null
+          html_template: string | null
+          id: string
+          is_active: boolean | null
+          style: string | null
+          subject_template: string | null
+          template_id: string
+          template_key: string
+          template_name: string
+          template_type: string | null
+          text_template: string | null
+          variables: string[] | null
+          version_number: number
+        }
+        Insert: {
+          category?: string | null
+          change_note?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          full_html?: boolean | null
+          html_template?: string | null
+          id?: string
+          is_active?: boolean | null
+          style?: string | null
+          subject_template?: string | null
+          template_id: string
+          template_key: string
+          template_name: string
+          template_type?: string | null
+          text_template?: string | null
+          variables?: string[] | null
+          version_number?: number
+        }
+        Update: {
+          category?: string | null
+          change_note?: string | null
+          changed_at?: string | null
+          changed_by?: string | null
+          created_at?: string | null
+          full_html?: boolean | null
+          html_template?: string | null
+          id?: string
+          is_active?: boolean | null
+          style?: string | null
+          subject_template?: string | null
+          template_id?: string
+          template_key?: string
+          template_name?: string
+          template_type?: string | null
+          text_template?: string | null
+          variables?: string[] | null
+          version_number?: number
+        }
+        Relationships: []
+      }
       enhanced_email_templates: {
         Row: {
           category: string | null
           created_at: string
           created_by: string | null
+          full_html: boolean | null
           html_template: string
           id: string
           is_active: boolean | null
@@ -3847,6 +3911,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          full_html?: boolean | null
           html_template: string
           id?: string
           is_active?: boolean | null
@@ -3864,6 +3929,7 @@ export type Database = {
           category?: string | null
           created_at?: string
           created_by?: string | null
+          full_html?: boolean | null
           html_template?: string
           id?: string
           is_active?: boolean | null

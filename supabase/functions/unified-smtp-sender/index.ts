@@ -236,16 +236,62 @@ Never use placeholder, test, or hashed values in production.
   };
 }
 
-// Template processing with fallback
+// Base email layout for non-full_html templates
+const BASE_EMAIL_LAYOUT = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{{subject}}</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background-color: #f8f9fa; }
+    .container { max-width: 600px; margin: 0 auto; background: white; }
+    .header { background: linear-gradient(135deg, #f59e0b, #d97706); color: white; padding: 20px; text-align: center; }
+    .content { padding: 30px; }
+    .footer { background: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #666; border-top: 1px solid #e9ecef; }
+    .brand { font-size: 24px; font-weight: bold; margin: 0; }
+    .unsubscribe { margin-top: 10px; }
+    .unsubscribe a { color: #6c757d; text-decoration: none; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1 class="brand">{{business_name}}</h1>
+    </div>
+    <div class="content">
+      {{content}}
+    </div>
+    <div class="footer">
+      <p>This email was sent by {{business_name}}.</p>
+      <div class="unsubscribe">
+        <a href="{{unsubscribe_url}}">Unsubscribe</a> | <a href="{{website_url}}">Visit Website</a>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+`;
+
+// Template processing with fallback, base layout wrapping, and missing variable tracking
 async function processTemplate(
   supabase: any, 
   templateKey: string, 
   variables: Record<string, any> = {},
   businessName: string = 'System'
-): Promise<{ subject: string; html: string; text: string; templateFound: boolean }> {
+): Promise<{ 
+  subject: string; 
+  html: string; 
+  text: string; 
+  templateFound: boolean;
+  missingVariables: string[];
+  templateType?: string;
+}> {
   
   let template = null;
   let templateFound = false;
+  let templateType = 'standard';
 
   if (templateKey) {
     try {
@@ -259,12 +305,13 @@ async function processTemplate(
 
       if (viewTemplate) {
         template = viewTemplate;
+        templateType = viewTemplate.template_type || 'standard';
         templateFound = true;
       } else {
         // Fallback to enhanced_email_templates with field mapping
         const { data: enhancedTemplate } = await supabase
           .from('enhanced_email_templates')
-          .select('*')
+          .select('template_type, subject, subject_template, html_content, html_template, text_content, text_template')
           .eq('template_key', templateKey)
           .eq('is_active', true)
           .maybeSingle();
@@ -273,8 +320,10 @@ async function processTemplate(
           template = {
             subject: enhancedTemplate.subject || enhancedTemplate.subject_template,
             html_content: enhancedTemplate.html_content || enhancedTemplate.html_template,
-            text_content: enhancedTemplate.text_content || enhancedTemplate.text_template
+            text_content: enhancedTemplate.text_content || enhancedTemplate.text_template,
+            template_type: enhancedTemplate.template_type || 'standard'
           };
+          templateType = template.template_type;
           templateFound = true;
         }
       }
@@ -302,14 +351,42 @@ async function processTemplate(
   `;
   let text = template?.text_content || `${businessName}\n\nThank you for your business with us.\n\nThis is an automated notification regarding your recent activity.\n\nThis email was sent from our automated system.`;
 
+  // Extract all template variables to track missing ones
+  const allContent = [subject, html, text].join(' ');
+  const templateVariables = new Set<string>();
+  const variableRegex = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
+  let match;
+  while ((match = variableRegex.exec(allContent)) !== null) {
+    templateVariables.add(match[1]);
+  }
+
+  // Add base layout variables for non-full_html templates
+  const enhancedVariables = { ...variables };
+  if (templateType !== 'full_html') {
+    enhancedVariables.business_name = enhancedVariables.business_name || businessName;
+    enhancedVariables.website_url = enhancedVariables.website_url || '#';  
+    enhancedVariables.unsubscribe_url = enhancedVariables.unsubscribe_url || '#';
+  }
+
   // Variable substitution with safe replacement
-  if (variables && Object.keys(variables).length > 0) {
+  const missingVariables: string[] = [];
+  if (templateVariables.size > 0) {
     [subject, html, text].forEach((content, index) => {
       if (content) {
         let processed = content;
-        Object.entries(variables).forEach(([key, value]) => {
+        
+        // Track which variables are actually used vs provided
+        templateVariables.forEach(varName => {
+          if (!(varName in enhancedVariables) || enhancedVariables[varName] === null || enhancedVariables[varName] === undefined) {
+            if (!missingVariables.includes(varName)) {
+              missingVariables.push(varName);
+            }
+          }
+        });
+        
+        Object.entries(enhancedVariables).forEach(([key, value]) => {
           if (value !== null && value !== undefined) {
-            const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+            const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
             processed = processed.replace(regex, String(value));
           }
         });
@@ -321,7 +398,26 @@ async function processTemplate(
     });
   }
 
-  return { subject, html, text, templateFound };
+  // Apply base layout wrapping for non-full_html templates
+  if (templateType !== 'full_html' && html && !html.includes('<!DOCTYPE html>')) {
+    const layoutVariables = {
+      ...enhancedVariables,
+      content: html,
+      subject: subject
+    };
+    
+    let wrappedHtml = BASE_EMAIL_LAYOUT;
+    Object.entries(layoutVariables).forEach(([key, value]) => {
+      if (value !== null && value !== undefined) {
+        const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+        wrappedHtml = wrappedHtml.replace(regex, String(value));
+      }
+    });
+    
+    html = wrappedHtml;
+  }
+
+  return { subject, html, text, templateFound, missingVariables, templateType };
 }
 
 // Production-ready SMTP client with robust error handling
@@ -991,7 +1087,7 @@ serve(async (req: Request) => {
     });
 
     // Process template with fallback and explicit subject handling
-    const { subject: templateSubject, html, text, templateFound } = await processTemplate(
+    const { subject: templateSubject, html, text, templateFound, missingVariables, templateType } = await processTemplate(
       supabase,
       requestBody.templateKey,
       requestBody.variables,
@@ -1060,9 +1156,14 @@ serve(async (req: Request) => {
         attempt_count: attemptCount,
         elapsed_ms: elapsed,
         last_smtp_code: result.client.getLastResponseCode(),
-        templateFound: templateFound,
-        fallbackUsed: !templateFound,
-        warnings: !templateFound ? [`Template ${requestBody.templateKey} not found - using branded fallback`] : undefined
+         templateFound: templateFound,
+         templateType: templateType,
+         fallbackUsed: !templateFound,
+         missingVariables: missingVariables,
+         warnings: [
+           ...(!templateFound ? [`Template ${requestBody.templateKey} not found - using branded fallback`] : []),
+           ...(missingVariables.length > 0 ? [`Missing template variables: ${missingVariables.join(', ')}`] : [])
+         ].filter(Boolean)
       }
     });
 

@@ -100,6 +100,9 @@ verify_jwt = false
 [functions.clear-email-queue]
 verify_jwt = false
 
+[functions.email-template-seeder]
+verify_jwt = false
+
 # AUTOMATED PROCESSORS (service-to-service)
 [functions.backfill-missing-schedules]
 verify_jwt = true

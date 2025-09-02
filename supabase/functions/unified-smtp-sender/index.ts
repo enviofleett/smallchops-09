@@ -842,6 +842,28 @@ serve(async (req: Request) => {
 
     requestBody = await req.json();
     
+    // P0 HOTFIX: Validate required "to" field immediately
+    if (!requestBody.to || typeof requestBody.to !== 'string' || !requestBody.to.includes('@')) {
+      console.error('❌ Invalid or missing recipient email:', {
+        to: requestBody.to,
+        type: typeof requestBody.to,
+        hasAt: requestBody.to && typeof requestBody.to === 'string' ? requestBody.to.includes('@') : false
+      });
+      
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid or missing recipient email address',
+        reason: 'invalid_recipient',
+        received: {
+          to: requestBody.to,
+          type: typeof requestBody.to
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
+    
     // Handle healthcheck requests without full SMTP validation
     if (requestBody.healthcheck) {
       return new Response(JSON.stringify({

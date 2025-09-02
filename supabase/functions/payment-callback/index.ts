@@ -594,15 +594,68 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       
     log('info', '✅ Payment transaction record updated');
 
+    // P0 HOTFIX: Fetch customer_email if missing from RPC response
+    let customerEmail = orderData.customer_email;
+    let customerName = orderData.customer_name;
+    
+    if (!customerEmail && orderData.order_id) {
+      log('warn', '⚠️ Customer email missing from RPC, fetching from orders table', { 
+        order_id: orderData.order_id, 
+        reference 
+      });
+      
+      try {
+        const { data: orderDetails, error: fetchError } = await supabase
+          .from('orders')
+          .select('customer_email, customer_name')
+          .eq('id', orderData.order_id)
+          .maybeSingle();
+          
+        if (!fetchError && orderDetails) {
+          customerEmail = orderDetails.customer_email;
+          customerName = orderDetails.customer_name || customerName;
+          log('info', '✅ Customer email fetched successfully', { 
+            order_id: orderData.order_id, 
+            customer_email: customerEmail ? 'present' : 'still_missing',
+            reference 
+          });
+        } else {
+          log('warn', '⚠️ Could not fetch customer email from orders table', { 
+            order_id: orderData.order_id, 
+            error: fetchError?.message,
+            reference 
+          });
+        }
+      } catch (fetchException) {
+        log('warn', '⚠️ Exception fetching customer email', { 
+          order_id: orderData.order_id, 
+          error: fetchException.message,
+          reference 
+        });
+      }
+    }
+
     // Enhanced immediate payment confirmation email with fallback queue
     try {
+      // P0 HOTFIX: Only attempt email send if we have a valid recipient
+      if (!customerEmail || typeof customerEmail !== 'string' || !customerEmail.includes('@')) {
+        log('warn', '⚠️ No valid customer email - skipping immediate send, using queue fallback only', {
+          order_id: orderData.order_id,
+          customer_email: customerEmail ? 'invalid_format' : 'missing',
+          reference
+        });
+        
+        // Skip direct send, go straight to fallback queue
+        throw new Error('No valid customer email available for immediate send');
+      }
+
       const confirmationEmailResult = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
-          to: orderData.customer_email,
+          to: customerEmail,
           subject: 'Payment Confirmation - Order ' + orderData.order_number,
           templateKey: 'payment_confirmation',
           variables: {
-            customerName: orderData.customer_name || 'Valued Customer',
+            customerName: customerName || 'Valued Customer',
             orderNumber: orderData.order_number,
             amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
             paymentMethod: 'Paystack',
@@ -629,9 +682,9 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
           const { data: eventId, error: rpcError } = await supabase.rpc('upsert_payment_confirmation_event', {
             p_reference: reference,
             p_order_id: orderData.order_id,
-            p_recipient_email: orderData.customer_email,
+            p_recipient_email: customerEmail || orderData.customer_email,
             p_template_variables: {
-              customerName: orderData.customer_name || 'Valued Customer',
+              customerName: customerName || 'Valued Customer',
               orderNumber: orderData.order_number,
               amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
               paymentMethod: 'Paystack',
@@ -664,7 +717,7 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       } else {
         log('info', '✅ Payment confirmation email sent immediately', {
           order_id: orderData.order_id,
-          customer_email: orderData.customer_email,
+          customer_email: customerEmail,
           messageId: confirmationEmailResult.data?.messageId,
           provider: confirmationEmailResult.data?.provider,
           reference
@@ -675,7 +728,7 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         error: emailError.message,
         stack: emailError.stack,
         order_id: orderData.order_id,
-        customer_email: orderData.customer_email,
+        customer_email: customerEmail,
         reference: reference
       };
       
@@ -686,9 +739,9 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         const { data: eventId, error: rpcError } = await supabase.rpc('upsert_payment_confirmation_event', {
           p_reference: reference,
           p_order_id: orderData.order_id,
-          p_recipient_email: orderData.customer_email,
+          p_recipient_email: customerEmail || orderData.customer_email,
           p_template_variables: {
-            customerName: orderData.customer_name || 'Valued Customer',
+            customerName: customerName || 'Valued Customer',
             orderNumber: orderData.order_number,
             amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
             paymentMethod: 'Paystack',

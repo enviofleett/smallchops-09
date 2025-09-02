@@ -457,99 +457,33 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       payment_gateway_response: paystackData
     });
 
-    // Handle both array and object returns from RPC (or use existing order data from duplicate key handling)
-    let orderData;
-    
     if (rpcError) {
-      // Handle duplicate key violation as idempotent success
-      const isDuplicateKeyError = rpcError.message?.includes('duplicate key value violates unique constraint') ||
-                                 rpcError.message?.includes('idx_communication_events_unique_payment_confirmation');
-      
-      if (isDuplicateKeyError) {
-        log('info', '✅ Duplicate key detected - payment already processed, fetching existing order', { 
-          reference, 
-          error: rpcError.message 
-        });
-        
-        // Fetch existing order details since payment is already processed
-        try {
-          const { data: existingOrder, error: fetchError } = await supabase
-            .from('orders')
-            .select('id, order_number, customer_name, customer_email, total_amount, order_type')
-            .eq('payment_reference', reference)
-            .single();
-            
-          if (fetchError || !existingOrder) {
-            log('error', '❌ Could not fetch existing order after duplicate key error', { 
-              reference, 
-              fetchError: fetchError?.message 
-            });
-            return {
-              success: false,
-              error: 'Payment processed but order details unavailable'
-            };
-          }
-          
-          log('info', '✅ Retrieved existing order details for idempotent success', { 
-            reference, 
-            order_id: existingOrder.id,
-            order_number: existingOrder.order_number
-          });
-          
-          // Use existing order data
-          orderData = {
-            order_id: existingOrder.id,
-            order_number: existingOrder.order_number,
-            customer_name: existingOrder.customer_name,
-            customer_email: existingOrder.customer_email,
-            amount: existingOrder.total_amount,
-            order_type: existingOrder.order_type
-          };
-          
-        } catch (fetchException) {
-          log('error', '❌ Exception fetching existing order after duplicate key error', { 
-            reference, 
-            error: fetchException.message 
-          });
-          return {
-            success: false,
-            error: 'Payment processed but unable to retrieve order details'
-          };
-        }
-      } else {
-        // Non-duplicate errors are genuine failures
-        log('error', '❌ RPC verification failed', { reference, error: rpcError });
-        
-        // Sanitize error message for user display
-        const sanitizedError = rpcError.message?.includes('duplicate key') ? 
-          'Payment is being processed - please check your order status' :
-          'Payment processing temporarily unavailable - please contact support';
-          
-        return {
-          success: false,
-          error: sanitizedError
-        };
-      }
-    } else {
-      // Normal RPC success - process the returned order data
-      if (Array.isArray(orderResult)) {
-        if (!orderResult || orderResult.length === 0) {
-          log('error', '❌ No order data returned from RPC (array empty)', { reference });
-          return {
-            success: false,
-            error: 'Order not found or already processed'
-          };
-        }
-        orderData = orderResult[0];
-      } else if (orderResult && typeof orderResult === 'object') {
-        orderData = orderResult;
-      } else {
-        log('error', '❌ No order data returned from RPC (invalid format)', { reference, orderResult });
+      log('error', '❌ RPC verification failed', { reference, error: rpcError });
+      return {
+        success: false,
+        error: rpcError.message || 'Database operation failed'
+      };
+    }
+
+    // Handle both array and object returns from RPC
+    let orderData;
+    if (Array.isArray(orderResult)) {
+      if (!orderResult || orderResult.length === 0) {
+        log('error', '❌ No order data returned from RPC (array empty)', { reference });
         return {
           success: false,
           error: 'Order not found or already processed'
         };
       }
+      orderData = orderResult[0];
+    } else if (orderResult && typeof orderResult === 'object') {
+      orderData = orderResult;
+    } else {
+      log('error', '❌ No order data returned from RPC (invalid format)', { reference, orderResult });
+      return {
+        success: false,
+        error: 'Order not found or already processed'
+      };
     }
 
     // Check if RPC returned error result
@@ -604,106 +538,122 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         onConflict: 'reference'
       });
       
-      log('info', '✅ Payment transaction record updated');
-    } catch (txnError) {
-      log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
-        error: txnError.message
-      });
-    }
+    log('info', '✅ Payment transaction record updated');
 
     // Enhanced immediate payment confirmation email with fallback queue
     try {
-      const rawEmail = typeof orderData.customer_email === 'string' ? orderData.customer_email.trim() : '';
-      if (!rawEmail) {
-        log('warn', '⚠️ No valid customer email - skipping payment confirmation', {
-          reference,
-          order_id: orderData.order_id,
-          customer_email: orderData.customer_email
-        });
-      } else {
-        // Avoid duplicates
-        const { data: existingConfirmation } = await supabase
-          .from('communication_events')
-          .select('id, status')
-          .eq('order_id', orderData.order_id)
-          .eq('recipient_email', rawEmail.toLowerCase())
-          .eq('event_type', 'payment_confirmation')
-          .eq('template_key', 'payment_confirmation')
-          .single();
-
-        if (existingConfirmation) {
-          log('info', '✅ Payment confirmation email already exists - skipping duplicate', {
-            reference,
-            order_id: orderData.order_id,
-            existing_id: existingConfirmation.id,
-            status: existingConfirmation.status
-          });
-        } else {
-          // Try immediate send
-          const res = await supabase.functions.invoke('unified-smtp-sender', {
-            body: {
-              to: rawEmail,
-              subject: 'Payment Confirmation - Order ' + orderData.order_number,
-              templateKey: 'payment_confirmation',
-              variables: {
-                customerName: orderData.customer_name || 'Valued Customer',
-                orderNumber: orderData.order_number,
-                amount: orderData.amount?.toString() || (paystackAmount ?? 0).toString(),
-                paymentMethod: 'Paystack',
-                orderType: orderData.order_type || 'order'
-              }
-            }
-          });
-
-          if (res.error) {
-            log('warn', '⚠️ Immediate payment confirmation failed - queuing fallback', {
-              error: res.error.message || 'Unknown error',
-              httpStatus: res.status || 'unknown',
-              reference,
-              order_id: orderData.order_id,
-              customer_email: rawEmail
-            });
-
-            try {
-              await supabase.from('communication_events').insert({
-                order_id: orderData.order_id,
-                recipient_email: rawEmail.toLowerCase(),
-                event_type: 'payment_confirmation',
-                template_key: 'payment_confirmation',
-                email_type: 'transactional',
-                status: 'queued',
-                priority: 'high',
-                variables: {
-                  customerName: orderData.customer_name || 'Valued Customer',
-                  orderNumber: orderData.order_number,
-                  amount: orderData.amount?.toString() || (paystackAmount ?? 0).toString(),
-                  paymentMethod: 'Paystack'
-                }
-              });
-              log('info', '✅ Payment confirmation fallback queued for later processing');
-            } catch (queueError) {
-              if (queueError.message?.includes('duplicate key value violates unique constraint')) {
-                log('info', '✅ Payment confirmation already queued (duplicate key) - continuing');
-              } else {
-                log('error', '❌ Failed to queue payment confirmation fallback', {
-                  error: queueError.message,
-                  reference,
-                  order_id: orderData.order_id
-                });
-              }
-            }
-          } else {
-            log('info', '✅ Immediate payment confirmation email sent successfully');
+      const confirmationEmailResult = await supabase.functions.invoke('unified-smtp-sender', {
+        body: {
+          to: orderData.customer_email,
+          subject: 'Payment Confirmation - Order ' + orderData.order_number,
+          templateKey: 'payment_confirmation',
+          variables: {
+            customerName: orderData.customer_name || 'Valued Customer',
+            orderNumber: orderData.order_number,
+            amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+            paymentMethod: 'Paystack',
+            orderType: orderData.order_type || 'order'
           }
         }
+      });
+
+      // Enhanced error logging with HTTP status and response details
+      if (confirmationEmailResult.error) {
+        const errorDetails = {
+          error: confirmationEmailResult.error.message || 'Unknown error',
+          httpStatus: confirmationEmailResult.status || 'unknown',
+          responseBody: confirmationEmailResult.data || null,
+          order_id: orderData.order_id,
+          customer_email: orderData.customer_email,
+          reference: reference
+        };
+        
+        log('warn', '⚠️ Immediate payment confirmation email failed - creating queue fallback', errorDetails);
+        
+        // Queue fallback: Create communication event for later processing
+        try {
+          await supabase.from('communication_events').insert({
+            order_id: orderData.order_id,
+            recipient_email: orderData.customer_email,
+            event_type: 'payment_confirmation',
+            template_key: 'payment_confirmation',
+            status: 'queued',
+            priority: 'high',
+            email_type: 'transactional',
+            variables: {
+              customerName: orderData.customer_name || 'Valued Customer',
+              orderNumber: orderData.order_number,
+              amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+              paymentMethod: 'Paystack',
+              orderType: orderData.order_type || 'order',
+              fallback_reason: 'immediate_send_failed'
+            }
+          });
+          
+          log('info', '✅ Payment confirmation queued for later delivery', {
+            order_id: orderData.order_id,
+            fallback_used: true
+          });
+        } catch (queueError) {
+          log('error', '❌ Failed to queue payment confirmation fallback', {
+            order_id: orderData.order_id,
+            queueError: queueError.message
+          });
+        }
+      } else {
+        log('info', '✅ Payment confirmation email sent immediately', {
+          order_id: orderData.order_id,
+          customer_email: orderData.customer_email,
+          messageId: confirmationEmailResult.data?.messageId,
+          provider: confirmationEmailResult.data?.provider
+        });
       }
     } catch (emailError) {
-      // Non-blocking: Log the error but don't fail the entire payment process
-      log('warn', '⚠️ Payment confirmation email process failed (non-blocking)', {
+      const errorDetails = {
         error: emailError.message,
-        reference,
+        stack: emailError.stack,
         order_id: orderData.order_id,
-        customer_email: orderData.customer_email
+        customer_email: orderData.customer_email,
+        reference: reference
+      };
+      
+      log('warn', '⚠️ Exception sending immediate payment confirmation - creating queue fallback', errorDetails);
+      
+      // Queue fallback for exceptions too
+      try {
+        await supabase.from('communication_events').insert({
+          order_id: orderData.order_id,
+          recipient_email: orderData.customer_email,
+          event_type: 'payment_confirmation',
+          template_key: 'payment_confirmation',
+          status: 'queued',
+          priority: 'high',
+          email_type: 'transactional',
+          variables: {
+            customerName: orderData.customer_name || 'Valued Customer',
+            orderNumber: orderData.order_number,
+            amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+            paymentMethod: 'Paystack',
+            orderType: orderData.order_type || 'order',
+            fallback_reason: 'exception_during_send'
+          }
+        });
+        
+        log('info', '✅ Payment confirmation queued after exception', {
+          order_id: orderData.order_id,
+          fallback_used: true
+        });
+      } catch (queueError) {
+        log('error', '❌ Critical: Failed both immediate send and queue fallback', {
+          order_id: orderData.order_id,
+          originalError: emailError.message,
+          queueError: queueError.message
+        });
+      }
+    }
+    } catch (txnError) {
+      log('warn', '⚠️ Payment transaction update failed (non-blocking)', {
+        error: txnError.message
       });
     }
 
@@ -743,15 +693,12 @@ function createSuccessRedirect(reference: string, orderId: string) {
   });
 }
 
-// Create error redirect with sanitized user messages
+// Create error redirect
 function createErrorRedirect(message: string, reference?: string) {
-  // Sanitize error message for user display
-  const sanitizedMessage = sanitizeErrorMessage(message);
-  
   const frontendUrl = Deno.env.get('FRONTEND_URL') || 'https://startersmallchops.com';
   const errorParams = new URLSearchParams({
     status: 'error',
-    message: sanitizedMessage
+    message: message
   });
   
   // Include reference if provided for better error handling
@@ -761,12 +708,7 @@ function createErrorRedirect(message: string, reference?: string) {
   
   const errorUrl = `${frontendUrl}/payment/callback?${errorParams.toString()}`;
   
-  log('error', '❌ Creating error redirect', { 
-    errorUrl, 
-    originalMessage: message,
-    sanitizedMessage,
-    reference 
-  });
+  log('error', '❌ Creating error redirect', { errorUrl, message, reference });
   
   const corsHeaders = getCorsHeaders(null);
   
@@ -777,58 +719,4 @@ function createErrorRedirect(message: string, reference?: string) {
       'Location': errorUrl
     }
   });
-}
-
-// Sanitize error messages for user display
-function sanitizeErrorMessage(message: string): string {
-  if (!message || typeof message !== 'string') {
-    return 'Payment processing encountered an issue - please contact support';
-  }
-  
-  const lowerMessage = message.toLowerCase();
-  
-  // Map specific error patterns to user-friendly messages
-  if (lowerMessage.includes('duplicate key')) {
-    return 'Payment is being processed - please check your order status';
-  }
-  
-  if (lowerMessage.includes('constraint') || lowerMessage.includes('violation')) {
-    return 'Payment validation failed - please contact support';
-  }
-  
-  if (lowerMessage.includes('timeout') || lowerMessage.includes('network')) {
-    return 'Payment verification is taking longer than expected - please check your order status in a few minutes';
-  }
-  
-  if (lowerMessage.includes('not found') || lowerMessage.includes('reference')) {
-    return 'Payment reference not found - please ensure the payment was completed properly';
-  }
-  
-  if (lowerMessage.includes('invalid') || lowerMessage.includes('format')) {
-    return 'Invalid payment information - please contact support';
-  }
-  
-  if (lowerMessage.includes('database') || lowerMessage.includes('connection')) {
-    return 'Service temporarily unavailable - please try again in a few minutes';
-  }
-  
-  if (lowerMessage.includes('paystack') || lowerMessage.includes('api')) {
-    return 'Payment gateway temporarily unavailable - please contact support';
-  }
-  
-  // For any unmatched technical errors, provide a generic message
-  if (lowerMessage.includes('error') || lowerMessage.includes('failed') || lowerMessage.includes('exception')) {
-    return 'Payment processing encountered an issue - please contact support for assistance';
-  }
-  
-  // If message seems user-friendly already (no technical terms), keep it
-  const technicalTerms = ['rpc', 'sql', 'postgres', 'supabase', 'function', 'null', 'undefined', 'exception', 'stack'];
-  const containsTechnicalTerms = technicalTerms.some(term => lowerMessage.includes(term));
-  
-  if (!containsTechnicalTerms && message.length < 100) {
-    return message;
-  }
-  
-  // Default fallback
-  return 'Payment processing is temporarily unavailable - please contact support';
 }

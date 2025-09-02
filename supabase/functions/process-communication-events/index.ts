@@ -213,8 +213,11 @@ async function processOrderStatusUpdate(supabase: any, event: any): Promise<bool
   }
 
   const emailPayload = {
-    to: payload.customer_email,
-    templateKey: templateId, // FIXED: Use templateKey and to field
+    templateId,
+    recipient: {
+      email: payload.customer_email,
+      name: payload.customer_name || 'Valued Customer'
+    },
     variables: {
       customerName: payload.customer_name || 'Valued Customer',
       orderNumber: payload.order_number || 'N/A',
@@ -242,8 +245,11 @@ async function processPriceChangeNotification(supabase: any, event: any): Promis
   }
 
   const emailPayload = {
-    to: payload.customer_email,
-    templateKey: 'price_change_alert', // FIXED: Use templateKey and to field
+    templateId: 'price_change_alert',
+    recipient: {
+      email: payload.customer_email,
+      name: payload.customer_name || 'Valued Customer'
+    },
     variables: {
       customerName: payload.customer_name || 'Valued Customer',
       productName: payload.product_name,
@@ -272,8 +278,11 @@ async function processPromotionAlert(supabase: any, event: any): Promise<boolean
   }
 
   const emailPayload = {
-    to: payload.customer_email,
-    templateKey: 'promotion_alert', // FIXED: Use templateKey and to field
+    templateId: 'promotion_alert',
+    recipient: {
+      email: payload.customer_email,
+      name: payload.customer_name || 'Valued Customer'
+    },
     variables: {
       customerName: payload.customer_name || 'Valued Customer',
       promotionTitle: payload.promotion_title,
@@ -302,8 +311,11 @@ async function processWelcomeEmail(supabase: any, event: any): Promise<boolean> 
   }
 
   const emailPayload = {
-    to: payload.customer_email,
-    templateKey: 'welcome', // FIXED: Use templateKey and to field
+    templateId: 'welcome',
+    recipient: {
+      email: payload.customer_email,
+      name: payload.customer_name || 'Valued Customer'
+    },
     variables: {
       customerName: payload.customer_name || 'Valued Customer',
       welcomeMessage: 'Welcome to our platform!',
@@ -339,7 +351,7 @@ async function processOrderEmail(supabase: any, event: any): Promise<boolean> {
 
   const emailPayload = {
     to: event.recipient_email,
-    templateKey: templateId, // FIXED: Use templateKey instead of templateId
+    templateId: templateId,
     variables: {
       ...event.variables,
       ...event.template_variables
@@ -388,7 +400,7 @@ async function processCustomerWelcomeEmail(supabase: any, event: any): Promise<b
 
   const emailPayload = {
     to: event.recipient_email,
-    templateKey: 'welcome_customer', // FIXED: Use templateKey
+    templateId: 'welcome_customer',
     variables: enhancedVariables,
     emailType: 'transactional'
   }

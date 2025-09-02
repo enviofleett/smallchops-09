@@ -47,42 +47,6 @@ function parseResponse(response: string): SMTPResponse {
   return { code, lines, message };
 }
 
-// Email validation function
-function validateEmailRequest(payload: any): { isValid: boolean; errors: string[] } {
-  const errors: string[] = [];
-  
-  // Check if 'to' field exists and is valid
-  if (!payload.to) {
-    errors.push('Missing recipient email address ("to" field is required)');
-  } else if (typeof payload.to !== 'string') {
-    errors.push('Recipient email must be a string');
-  } else {
-    const normalizedTo = payload.to.trim().toLowerCase();
-    
-    // Basic email format validation
-    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-    if (!emailRegex.test(normalizedTo)) {
-      errors.push(`Invalid recipient email format: "${payload.to}"`);
-    }
-    
-    // Check for obvious test/placeholder values
-    if (normalizedTo.includes('test@') || normalizedTo.includes('example.com') || 
-        normalizedTo === 'user@domain.com' || normalizedTo.length < 5) {
-      errors.push(`Recipient email appears to be a placeholder or test value: "${payload.to}"`);
-    }
-  }
-  
-  // Check if we have either content or a template
-  if (!payload.subject && !payload.html && !payload.text && !payload.templateKey) {
-    errors.push('Email must have either content (subject/html/text) or a templateKey');
-  }
-  
-  return {
-    isValid: errors.length === 0,
-    errors
-  };
-}
-
 // Validate SMTP configuration values to detect invalid hashed secrets
 function isValidSMTPConfig(host: string, port: string, username: string, password: string): { 
   isValid: boolean; 
@@ -526,297 +490,325 @@ class ProductionSMTPClient {
     
     // AUTH PLAIN format: \0username\0password
     const authString = `\0${this.username}\0${this.password}`;
-    const encodedAuth = this.safeBase64Encode(authString);
+    const encoded = this.safeBase64Encode(authString);
+    this.log(`AUTH PLAIN string length: ${authString.length}, encoded: ${encoded.length} chars`);
     
-    await this.sendCommand(`AUTH PLAIN ${encodedAuth}`, [235]);
+    await this.sendCommand(`AUTH PLAIN ${encoded}`, [235]);
+    
     this.log('AUTH PLAIN successful');
   }
 
-  async connect(): Promise<void> {
+  private async authenticate(): Promise<string> {
+    // Try AUTH PLAIN first as it's more reliable for many providers
+    if (this.authMethods.includes('PLAIN')) {
+      await this.authenticatePlain();
+      return 'PLAIN';
+    } else if (this.authMethods.includes('LOGIN') || this.authMethods.length === 0) {
+      // Fallback to LOGIN if PLAIN not available
+      await this.authenticateLogin();
+      return 'LOGIN';
+    } else {
+      throw new Error(`No supported AUTH methods. Server supports: ${this.authMethods.join(', ')}`);
+    }
+  }
+
+  private normalizeCRLF(content: string): string {
+    return content.replace(/\r?\n/g, '\r\n');
+  }
+
+  private dotStuff(content: string): string {
+    return content.replace(/^\.(.*)$/gm, '..$1');
+  }
+
+  async connect(): Promise<{ tlsMode: string; authMethod: string; capabilities: string[] }> {
+    this.log(`Connecting to ${this.hostname}:${this.port}`);
+    
     try {
-      this.log(`Connecting to ${this.hostname}:${this.port}...`);
-      
-      // Initial TCP connection with timeout
+      // Establish TCP connection
       this.conn = await withTimeout(
         Deno.connect({ hostname: this.hostname, port: this.port }),
         TIMEOUTS.connect,
-        'Initial connection'
+        'TCP connect'
       );
-      
-      this.log('TCP connection established');
-      
+
       // Read server greeting
       const greeting = await this.readResponse();
       if (greeting.code !== 220) {
-        throw new Error(`Unexpected greeting: ${greeting.message}`);
+        throw new Error(`Server rejected connection: ${greeting.message}`);
       }
-      
+
       // Send EHLO
-      const domain = Deno.env.get('SMTP_DOMAIN') || 'localhost';
-      const ehloResponse = await this.sendCommand(`EHLO ${domain}`, [250]);
+      const ehloResponse = await this.sendCommand(`EHLO ${this.hostname}`, [250]);
       this.parseCapabilities(ehloResponse);
-      
-      // Upgrade to TLS if available and port suggests it (587)
-      if (this.capabilities.has('STARTTLS') && this.port === 587) {
-        this.log('Upgrading to TLS...');
-        await this.sendCommand('STARTTLS', [220]);
-        
-        // Upgrade the connection to TLS
+
+      let tlsMode = 'none';
+      let authMethod = '';
+
+      // Handle TLS negotiation based on port and capabilities
+      if (this.port === 587) {
+        if (this.capabilities.has('STARTTLS')) {
+          this.log('Starting STARTTLS negotiation...');
+          await this.sendCommand('STARTTLS', [220]);
+          
+          this.conn = await withTimeout(
+            Deno.startTls(this.conn as Deno.TcpConn, { hostname: this.hostname }),
+            TIMEOUTS.connect,
+            'STARTTLS upgrade'
+          );
+          
+          tlsMode = 'starttls';
+          
+          // Re-negotiate after TLS
+          const postTlsEhlo = await this.sendCommand(`EHLO ${this.hostname}`, [250]);
+          this.parseCapabilities(postTlsEhlo);
+          this.log('STARTTLS upgrade successful');
+        } else {
+          // STARTTLS not advertised on 587 - try fallback to 465
+          throw new Error('STARTTLS not advertised on port 587');
+        }
+      } else if (this.port === 465) {
+        this.log('Upgrading to implicit TLS...');
         this.conn = await withTimeout(
-          Deno.startTls(this.conn, { hostname: this.hostname }),
+          Deno.startTls(this.conn as Deno.TcpConn, { hostname: this.hostname }),
           TIMEOUTS.connect,
-          'TLS upgrade'
+          'Implicit TLS upgrade'
         );
         
-        this.log('TLS upgrade successful');
+        tlsMode = 'implicit';
         
-        // Re-send EHLO after TLS upgrade
-        const ehloAfterTLS = await this.sendCommand(`EHLO ${domain}`, [250]);
-        this.parseCapabilities(ehloAfterTLS);
+        // Send EHLO after TLS
+        const postTlsEhlo = await this.sendCommand(`EHLO ${this.hostname}`, [250]);
+        this.parseCapabilities(postTlsEhlo);
+        this.log('Implicit TLS upgrade successful');
       }
+
+      // Authenticate
+      this.log('Starting authentication...');
+      authMethod = await this.authenticate();
       
-      // Authenticate using best available method
-      if (this.authMethods.includes('PLAIN')) {
-        await this.authenticatePlain();
-      } else if (this.authMethods.includes('LOGIN')) {
-        await this.authenticateLogin();
-      } else {
-        throw new Error(`No supported authentication method. Server supports: ${this.authMethods.join(', ')}`);
-      }
-      
+      return {
+        tlsMode,
+        authMethod,
+        capabilities: Array.from(this.capabilities)
+      };
+
     } catch (error) {
-      if (this.conn) {
-        try {
-          this.conn.close();
-        } catch (closeError) {
-          this.log(`Error closing connection: ${closeError.message}`);
-        }
-        this.conn = null;
-      }
+      await this.cleanup();
       throw error;
     }
   }
 
-  async sendEmail(config: {
+  async sendEmail(message: {
     from: string;
     to: string;
     subject: string;
-    html: string;
-    text?: string;
+    text: string;
+    html?: string;
   }): Promise<void> {
     if (!this.conn) throw new Error('Not connected');
+
+    const extractEmail = (addr: string) => {
+      const match = addr.match(/<(.+)>/);
+      return match ? match[1] : addr;
+    };
+
+    const fromEmail = extractEmail(message.from);
+    const toEmail = extractEmail(message.to);
+
+    // MAIL FROM
+    await this.sendCommand(`MAIL FROM:<${fromEmail}>`, [250]);
     
-    try {
-      // Set sender
-      await this.sendCommand(`MAIL FROM:<${config.from}>`, [250]);
-      
-      // Set recipient
-      await this.sendCommand(`RCPT TO:<${config.to}>`, [250]);
-      
-      // Start data transmission
-      await this.sendCommand('DATA', [354]);
-      
-      // Prepare email content
-      const emailContent = [
-        `From: ${config.from}`,
-        `To: ${config.to}`,
-        `Subject: ${config.subject}`,
-        `MIME-Version: 1.0`,
-        `Content-Type: multipart/alternative; boundary="boundary-${Date.now()}"`,
-        '',
-        `--boundary-${Date.now()}`,
-        `Content-Type: text/plain; charset=UTF-8`,
-        '',
-        config.text || config.html.replace(/<[^>]*>/g, ''),
-        '',
-        `--boundary-${Date.now()}`,
-        `Content-Type: text/html; charset=UTF-8`,
-        '',
-        config.html,
-        '',
-        `--boundary-${Date.now()}--`,
-        '.'
-      ].join('\r\n');
-      
-      // Send email content
-      const encoder = new TextEncoder();
-      await withTimeout(
-        this.conn.write(encoder.encode(emailContent)),
-        TIMEOUTS.data,
-        'Email content transmission'
-      );
-      
-      // Wait for completion response
-      const dataResponse = await this.readResponse();
-      if (dataResponse.code !== 250) {
-        throw new Error(`Email sending failed: ${dataResponse.message}`);
-      }
-      
-      this.log(`Email sent successfully: ${dataResponse.message}`);
-      
-    } catch (error) {
-      this.log(`Email sending failed: ${error.message}`);
-      throw error;
+    // RCPT TO
+    await this.sendCommand(`RCPT TO:<${toEmail}>`, [250]);
+    
+    // DATA
+    await this.sendCommand('DATA', [354]);
+
+    // Build email with proper MIME structure
+    const boundary = `boundary_${Date.now()}_${Math.random().toString(36)}`;
+    const messageId = `<${Date.now()}.${Math.random().toString(36)}@${this.hostname}>`;
+    
+    let emailData = '';
+    emailData += `From: ${message.from}\r\n`;
+    emailData += `To: ${message.to}\r\n`;
+    emailData += `Subject: =?UTF-8?B?${btoa(message.subject)}?=\r\n`;
+    emailData += `Date: ${new Date().toUTCString()}\r\n`;
+    emailData += `Message-ID: ${messageId}\r\n`;
+    emailData += `MIME-Version: 1.0\r\n`;
+    
+    if (message.html) {
+      emailData += `Content-Type: multipart/alternative; boundary="${boundary}"\r\n\r\n`;
+      emailData += `--${boundary}\r\n`;
+      emailData += `Content-Type: text/plain; charset=UTF-8\r\n`;
+      emailData += `Content-Transfer-Encoding: quoted-printable\r\n\r\n`;
+      emailData += `${this.normalizeCRLF(message.text)}\r\n\r\n`;
+      emailData += `--${boundary}\r\n`;
+      emailData += `Content-Type: text/html; charset=UTF-8\r\n`;
+      emailData += `Content-Transfer-Encoding: quoted-printable\r\n\r\n`;
+      emailData += `${this.normalizeCRLF(message.html)}\r\n\r\n`;
+      emailData += `--${boundary}--\r\n`;
+    } else {
+      emailData += `Content-Type: text/plain; charset=UTF-8\r\n`;
+      emailData += `Content-Transfer-Encoding: quoted-printable\r\n\r\n`;
+      emailData += `${this.normalizeCRLF(message.text)}\r\n`;
     }
+
+    // Dot-stuff and send data
+    const stuffedData = this.dotStuff(emailData);
+    
+    await withTimeout(
+      this.conn.write(new TextEncoder().encode(stuffedData + '\r\n.\r\n')),
+      TIMEOUTS.data,
+      'Send email data'
+    );
+    
+    const response = await this.readResponse();
+    if (response.code !== 250) {
+      throw new Error(`Email send failed: ${response.message}`);
+    }
+
+    this.log('Email sent successfully');
   }
 
-  async disconnect(): Promise<void> {
+  async cleanup(): Promise<void> {
     if (this.conn) {
       try {
         await this.sendCommand('QUIT', [221]);
-      } catch (error) {
-        this.log(`Error during QUIT: ${error.message}`);
+      } catch (e) {
+        this.log(`QUIT error: ${e.message}`);
       }
-      
       try {
         this.conn.close();
-      } catch (error) {
-        this.log(`Error closing connection: ${error.message}`);
+      } catch (e) {
+        this.log(`Close error: ${e.message}`);
       }
-      
       this.conn = null;
-      this.log('Disconnected');
     }
   }
+
+  getLastResponseCode(): number {
+    return this.lastResponseCode;
+  }
 }
 
-// Rate limiting check with exponential backoff
-async function checkRateLimit(supabase: any, recipient: string): Promise<{ 
-  allowed: boolean; 
-  reason?: string; 
-  retryAfter?: number;
-}> {
-  const now = new Date().toISOString();
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+// Error categorization for better diagnostics
+function categorizeError(error: Error): { category: string; isTransient: boolean; suggestion: string } {
+  const message = error.message.toLowerCase();
   
-  // Count recent emails to this recipient
-  const { data: recentEmails, error } = await supabase
-    .from('smtp_delivery_confirmations')
-    .select('id, created_at, delivery_status')
-    .eq('recipient_email', recipient.toLowerCase())
-    .gte('created_at', oneHourAgo)
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    console.warn('Rate limit check failed:', error.message);
-    return { allowed: true }; // Fail open
-  }
-
-  const emailCount = recentEmails?.length || 0;
-  const hourlyLimit = 10;
-
-  if (emailCount >= hourlyLimit) {
-    console.warn(`⚠️ Rate limit exceeded for ${recipient}`);
+  if (message.includes('timeout')) {
     return {
-      allowed: false,
-      reason: 'hourly_limit_exceeded',
-      retryAfter: 3600 // 1 hour in seconds
+      category: 'timeout',
+      isTransient: true,
+      suggestion: 'Check network connectivity and increase timeout values'
     };
   }
-
-  return { allowed: true };
-}
-
-// Get business information for branding
-async function getBusinessInfo(supabase: any): Promise<{ name: string; email?: string }> {
-  try {
-    const { data: settings } = await supabase
-      .from('business_settings')
-      .select('name, admin_notification_email')
-      .limit(1)
-      .maybeSingle();
-    
-    return {
-      name: settings?.name || 'Starters Small Chops',
-      email: settings?.admin_notification_email
-    };
-  } catch (error) {
-    return { name: 'Starters Small Chops' };
-  }
-}
-
-// Log delivery confirmation
-async function logDeliveryConfirmation(
-  supabase: any, 
-  recipient: string, 
-  status: 'sent' | 'failed',
-  errorMessage?: string,
-  messageId?: string
-): Promise<void> {
-  try {
-    await supabase.from('smtp_delivery_confirmations').insert({
-      recipient_email: recipient.toLowerCase(),
-      delivery_status: status,
-      error_message: errorMessage,
-      provider_message_id: messageId,
-      delivered_at: status === 'sent' ? new Date().toISOString() : null
-    });
-  } catch (error) {
-    console.warn('Failed to log delivery confirmation:', error.message);
-  }
-}
-
-// Main serve function
-serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req.headers.get('origin'));
   
-  // Handle CORS preflight requests
+  if (message.includes('authentication failed') || message.includes('535')) {
+    return {
+      category: 'auth',
+      isTransient: false,
+      suggestion: 'Verify SMTP username and password credentials'
+    };
+  }
+  
+  if (message.includes('connection') || message.includes('network') || message.includes('econnreset')) {
+    return {
+      category: 'network',
+      isTransient: true,
+      suggestion: 'Check network connectivity and SMTP server availability'
+    };
+  }
+  
+  if (message.includes('starttls') || message.includes('tls') || message.includes('badresource')) {
+    return {
+      category: 'tls',
+      isTransient: false,
+      suggestion: 'Try alternative port (465 for implicit TLS, 587 for STARTTLS)'
+    };
+  }
+  
+  return {
+    category: 'unknown',
+    isTransient: false,
+    suggestion: 'Check SMTP server configuration and logs for details'
+  };
+}
+
+// Retry logic with exponential backoff
+async function executeWithRetry<T>(
+  operation: () => Promise<T>,
+  operationName: string
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 1; attempt <= RETRY_CONFIG.maxAttempts; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error as Error;
+      const errorInfo = categorizeError(lastError);
+      
+      console.log(`${operationName} attempt ${attempt} failed: ${lastError.message}`);
+      
+      // Don't retry non-transient errors
+      if (!errorInfo.isTransient || attempt === RETRY_CONFIG.maxAttempts) {
+        throw lastError;
+      }
+      
+      // Calculate delay with exponential backoff and jitter
+      const baseDelay = Math.min(
+        RETRY_CONFIG.baseDelayMs * Math.pow(2, attempt - 1),
+        RETRY_CONFIG.maxDelayMs
+      );
+      
+      await sleep(baseDelay, RETRY_CONFIG.jitterFactor);
+      console.log(`Retrying ${operationName} in ${baseDelay}ms (attempt ${attempt + 1}/${RETRY_CONFIG.maxAttempts})`);
+    }
+  }
+  
+  throw lastError!;
+}
+
+serve(async (req: Request) => {
+  const origin = req.headers.get('origin');
+  const corsHeaders = getCorsHeaders(origin);
+  
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-  
-  if (req.method !== 'POST') {
-    return new Response(JSON.stringify({ 
-      error: 'Method not allowed. Use POST.' 
-    }), {
-      status: 405,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
-  }
 
-  try {
-    const payload = await req.json();
+  // Enhanced health check with optional SMTP connectivity test
+  if (req.method === 'GET') {
+    const url = new URL(req.url);
+    const checkSmtp = url.searchParams.get('check') === 'smtp';
     
-    // CRITICAL: Validate email addresses before processing
-    const emailValidation = validateEmailRequest(payload);
-    if (!emailValidation.isValid) {
-      console.error('❌ Invalid email request:', emailValidation.errors);
-      return new Response(JSON.stringify({ 
-        success: false,
-        error: 'Invalid email request: ' + emailValidation.errors.join(', '),
-        details: emailValidation.errors
-      }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-    
-    console.log('📧 SMTP sender request (normalized):', {
-      to: payload.to,
-      templateKey: payload.templateKey,
-      businessName: payload.businessName || 'System',
-      hasVariables: !!(payload.variables && Object.keys(payload.variables).length > 0)
-    });
+    const healthData: any = {
+      status: 'healthy',
+      service: 'unified-smtp-sender',
+      implementation: 'production-native-deno',
+      features: [
+        'function_secrets_priority',
+        'template_resolution_with_fallback',
+        'retry_with_exponential_backoff',
+        'tls_negotiation_with_fallback',
+        'multi_line_response_parsing',
+        'credential_masking',
+        'enhanced_error_categorization'
+      ],
+      timestamp: new Date().toISOString()
+    };
 
-    // Handle health check first (lightweight)
-    if (payload.healthcheck || payload.test_mode || req.url.includes('health')) {
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-
-      const healthData: any = {
-        status: 'healthy',
-        service: 'unified-smtp-sender',
-        timestamp: new Date().toISOString(),
-        version: '2.0-production'
-      };
-
-      // Quick SMTP config check
+    if (checkSmtp) {
       try {
+        const supabase = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+        );
+
         const smtpConfig = await getProductionSMTPConfig(supabase);
-        healthData.smtpCheck = { 
-          configured: true, 
+        
+        healthData.smtpCheck = {
+          configured: true,
           source: smtpConfig.source,
           host: smtpConfig.host,
           port: smtpConfig.port,
@@ -829,24 +821,26 @@ serve(async (req) => {
           error: error.message 
         };
       }
-
-      return new Response(JSON.stringify(healthData), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
     }
 
-    // Main email sending logic
-    let requestBody: any = {};
-    let startTime = Date.now();
-    let attemptCount = 0;
-    
+    return new Response(JSON.stringify(healthData), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
+    });
+  }
+
+  // Main email sending logic
+  let requestBody: any = {};
+  let startTime = Date.now();
+  let attemptCount = 0;
+  
+  try {
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    requestBody = payload;
+    requestBody = await req.json();
     
     // Handle healthcheck requests without full SMTP validation
     if (requestBody.healthcheck) {
@@ -859,191 +853,226 @@ serve(async (req) => {
       });
     }
     
-    // CRITICAL: Input normalization and validation
-    // Normalize field names for backward compatibility
-    if (!requestBody.to && requestBody.recipient_email) {
-      requestBody.to = requestBody.recipient_email;
-    }
-    if (!requestBody.templateKey && requestBody.templateId) {
-      requestBody.templateKey = requestBody.templateId;
-    }
-    if (!requestBody.htmlContent && requestBody.html_content) {
-      requestBody.htmlContent = requestBody.html_content;
-    }
-    if (!requestBody.textContent && requestBody.text_content) {
-      requestBody.textContent = requestBody.text_content;
-    }
-
-    const normalizedRecipient = requestBody.to?.trim().toLowerCase();
+    // Get business name for branding
+    const { data: businessSettings } = await supabase
+      .from('business_settings')
+      .select('name')
+      .limit(1)
+      .maybeSingle();
     
-    // Rate limiting check
-    const rateLimitResult = await checkRateLimit(supabase, normalizedRecipient);
-    if (!rateLimitResult.allowed) {
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Rate limit exceeded',
-        details: rateLimitResult.reason,
-        retryAfter: rateLimitResult.retryAfter
-      }), {
-        status: 429,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
+    const businessName = businessSettings?.name || 'System';
 
-    // Get business information
-    const businessInfo = await getBusinessInfo(supabase);
-    
-    // Process template if needed
-    const templateResult = await processTemplate(
-      supabase, 
-      requestBody.templateKey, 
-      requestBody.variables || {},
-      businessInfo.name
-    );
+    console.log('📧 SMTP sender request:', {
+      to: requestBody.to,
+      templateKey: requestBody.templateKey,
+      businessName,
+      hasVariables: !!requestBody.variables
+    });
 
-    // Prepare email content
-    const subject = requestBody.subject || templateResult.subject;
-    const htmlContent = requestBody.htmlContent || requestBody.html || templateResult.html;
-    const textContent = requestBody.textContent || requestBody.text || templateResult.text;
-
-    console.log(`📧 Processed email content: subject="${subject?.substring(0, 50)}...", template=${requestBody.templateKey}, found=${templateResult.templateFound}`);
-
-    // Get SMTP configuration with retry
-    let smtpConfig;
-    for (let configAttempt = 1; configAttempt <= 2; configAttempt++) {
+    // Optional safety checks
+    if (requestBody.to && typeof requestBody.to === 'string') {
       try {
-        smtpConfig = await getProductionSMTPConfig(supabase);
-        break;
-      } catch (error) {
-        if (configAttempt === 2) throw error;
-        console.warn(`SMTP config attempt ${configAttempt} failed: ${error.message}`);
-        await sleep(1000);
+        // Check email suppression
+        const { data: suppressionCheck } = await supabase
+          .rpc('is_email_suppressed', { email_address: requestBody.to });
+        
+        if (suppressionCheck) {
+          console.log(`⚠️ Email ${requestBody.to} is suppressed - skipping send`);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Email address is suppressed',
+            reason: 'suppressed'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+
+        // Check rate limiting
+        const { data: rateLimitCheck } = await supabase
+          .rpc('check_email_rate_limit', { email_address: requestBody.to });
+          
+        if (rateLimitCheck && !rateLimitCheck.allowed) {
+          console.log(`⚠️ Rate limit exceeded for ${requestBody.to}`);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Rate limit exceeded',
+            reason: 'rate_limited',
+            resetAt: rateLimitCheck.reset_at
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 429
+          });
+        }
+      } catch (checkError) {
+        console.warn('Safety check failed:', checkError.message);
       }
     }
 
-    console.log(`📧 Using SMTP config: ${smtpConfig.host}:${smtpConfig.port} (${smtpConfig.source})`);
+    // Get production SMTP configuration
+    const smtpConfig = await getProductionSMTPConfig(supabase);
 
-    // Send email with retry logic
-    let lastError: Error | null = null;
+    // Check sender domain mismatch warning
+    const senderDomain = smtpConfig.senderEmail?.split('@')[1];
+    const userDomain = smtpConfig.username?.split('@')[1];
+    if (senderDomain && userDomain && senderDomain !== userDomain) {
+      console.warn(`⚠️ Sender domain (${senderDomain}) differs from auth domain (${userDomain})`);
+    }
+
+    // Log masked configuration
+    console.log('🔍 Production SMTP Configuration:', {
+      source: smtpConfig.source,
+      host: smtpConfig.host,
+      port: smtpConfig.port,
+      username: smtpConfig.username?.split('@')[0] + '@***',
+      senderEmail: smtpConfig.senderEmail?.split('@')[0] + '@***',
+      senderName: smtpConfig.senderName,
+      encryption: smtpConfig.encryption
+    });
+
+    // Process template with fallback and explicit subject handling
+    const { subject: templateSubject, html, text, templateFound } = await processTemplate(
+      supabase,
+      requestBody.templateKey,
+      requestBody.variables,
+      businessName
+    );
     
-    for (attemptCount = 1; attemptCount <= RETRY_CONFIG.maxAttempts; attemptCount++) {
+    // Respect explicit subject from caller if provided, otherwise use template/fallback
+    const finalSubject = requestBody.subject?.trim() || templateSubject;
+
+    if (!templateFound && requestBody.templateKey) {
+      console.warn(`⚠️ Template ${requestBody.templateKey} not found - proceeding with branded fallback content`);
+    }
+
+    // Execute email sending with retry logic
+    const result = await executeWithRetry(async () => {
+      attemptCount++;
+      
       const client = new ProductionSMTPClient({
         hostname: smtpConfig.host,
         port: smtpConfig.port,
         username: smtpConfig.username,
         password: smtpConfig.password,
-        debug: true
+        debug: requestBody.debug === true
       });
 
+      let connectionInfo: { tlsMode: string; authMethod: string; capabilities: string[] };
+      
       try {
-        console.log(`📧 SMTP attempt ${attemptCount}/${RETRY_CONFIG.maxAttempts} to ${normalizedRecipient}`);
-        
-        await client.connect();
+        connectionInfo = await client.connect();
         
         await client.sendEmail({
-          from: smtpConfig.senderEmail,
-          to: normalizedRecipient,
-          subject: subject,
-          html: htmlContent,
-          text: textContent
+          from: `${smtpConfig.senderName} <${smtpConfig.senderEmail}>`,
+          to: requestBody.to,
+          subject: finalSubject,
+          text,
+          html
         });
         
-        await client.disconnect();
-        
-        const processingTime = Date.now() - startTime;
-        console.log(`✅ Email sent successfully in ${processingTime}ms (attempt ${attemptCount})`);
-        
-        // Log successful delivery
-        await logDeliveryConfirmation(
-          supabase, 
-          normalizedRecipient, 
-          'sent',
-          undefined,
-          `smtp-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`
-        );
-
-        return new Response(JSON.stringify({
-          success: true,
-          messageId: `smtp-${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
-          provider: 'native-smtp',
-          processingTimeMs: processingTime,
-          attempt: attemptCount,
-          templateUsed: templateResult.templateFound,
-          recipient: normalizedRecipient
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-
+        return { client, connectionInfo };
       } catch (error) {
-        lastError = error;
-        console.error(`❌ SMTP attempt ${attemptCount} failed:`, error.message);
-        
-        // Always disconnect on error
-        try {
-          await client.disconnect();
-        } catch (disconnectError) {
-          console.warn('Disconnect error:', disconnectError.message);
-        }
-        
-        // Check if this is a retryable error
-        const errorMessage = error.message.toLowerCase();
-        const isRetryable = !errorMessage.includes('535') && // Auth failure is not retryable
-                           !errorMessage.includes('authentication') &&
-                           !errorMessage.includes('invalid recipient') &&
-                           attemptCount < RETRY_CONFIG.maxAttempts;
-        
-        if (isRetryable) {
-          const delay = Math.min(
-            RETRY_CONFIG.baseDelayMs * Math.pow(2, attemptCount - 1),
-            RETRY_CONFIG.maxDelayMs
-          );
-          console.log(`⏳ Retrying in ${delay}ms...`);
-          await sleep(delay, RETRY_CONFIG.jitterFactor);
-        } else {
-          break; // Non-retryable error or max attempts reached
-        }
+        await client.cleanup();
+        throw error;
       }
-    }
+    }, 'SMTP email sending');
 
-    // All attempts failed
-    const processingTime = Date.now() - startTime;
-    const finalError = lastError?.message || 'Unknown SMTP error';
-    
-    console.error(`❌ All SMTP attempts failed after ${processingTime}ms:`, finalError);
-    
-    // Log failed delivery
-    await logDeliveryConfirmation(
-      supabase, 
-      normalizedRecipient, 
-      'failed',
-      finalError
-    );
+    await result.client.cleanup();
+    const elapsed = Date.now() - startTime;
+
+    // Log successful delivery with enriched metadata
+    await supabase.from('smtp_delivery_logs').insert({
+      recipient_email: requestBody.to,
+      subject: finalSubject,
+      delivery_status: 'sent',
+      smtp_response: 'Email sent successfully',
+      delivery_timestamp: new Date().toISOString(),
+      sender_email: smtpConfig.senderEmail,
+      provider: 'native-smtp',
+      template_key: requestBody.templateKey || null,
+      metadata: {
+        implementation: 'production-native-deno',
+        smtp_host: smtpConfig.host,
+        smtp_port: smtpConfig.port,
+        config_source: smtpConfig.source,
+        tls_mode: result.connectionInfo.tlsMode,
+        auth_method: result.connectionInfo.authMethod,
+        attempt_count: attemptCount,
+        elapsed_ms: elapsed,
+        last_smtp_code: result.client.getLastResponseCode(),
+        templateFound: templateFound,
+        fallbackUsed: !templateFound,
+        warnings: !templateFound ? [`Template ${requestBody.templateKey} not found - using branded fallback`] : undefined
+      }
+    });
 
     return new Response(JSON.stringify({
-      success: false,
-      error: finalError,
-      processingTimeMs: processingTime,
-      attempts: attemptCount,
+      success: true,
+      messageId: `prod-${Date.now()}`,
       provider: 'native-smtp',
-      recipient: normalizedRecipient
+      implementation: 'production-native-deno',
+      metadata: {
+        configSource: smtpConfig.source,
+        tlsMode: result.connectionInfo.tlsMode,
+        authMethod: result.connectionInfo.authMethod,
+        attempts: attemptCount,
+        elapsedMs: elapsed
+      }
     }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200
     });
 
   } catch (error) {
-    console.error('=== SMTP Sender Critical Error ===');
-    console.error('Error:', error.message);
-    console.error('Stack:', error.stack);
+    const elapsed = Date.now() - startTime;
+    const errorInfo = categorizeError(error as Error);
     
+    console.error('💥 SMTP sender error:', error);
+
+    // Log error with enriched metadata
+    try {
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+      
+      await supabase.from('smtp_delivery_logs').insert({
+        recipient_email: requestBody.to || 'unknown',
+        subject: requestBody.subject || 'Unknown',
+        delivery_status: 'failed',
+        smtp_response: error.message,
+        error_message: error.message,
+        delivery_timestamp: new Date().toISOString(),
+        template_key: requestBody.templateKey || null,
+        metadata: {
+          implementation: 'production-native-deno',
+          error_category: errorInfo.category,
+          transient: errorInfo.isTransient,
+          attempt_count: attemptCount,
+          elapsed_ms: elapsed,
+          suggestion: errorInfo.suggestion,
+          explicit_subject_used: !!requestBody.subject?.trim()
+        }
+      });
+    } catch (logError) {
+      console.error('Failed to log error:', logError);
+    }
+
     return new Response(JSON.stringify({
       success: false,
       error: error.message,
       provider: 'native-smtp',
-      critical: true
+      implementation: 'production-native-deno',
+      diagnostics: {
+        category: errorInfo.category,
+        transient: errorInfo.isTransient,
+        suggestion: errorInfo.suggestion,
+        attempts: attemptCount,
+        elapsedMs: elapsed
+      }
     }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500
     });
   }
 });

@@ -39,41 +39,12 @@ export const SMTPIntegrationDiagnostics = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [diagnostics, setDiagnostics] = useState<DiagnosticResult[]>([]);
   const [overallStatus, setOverallStatus] = useState<'healthy' | 'warning' | 'critical'>('healthy');
-  const [placeholderWarning, setPlaceholderWarning] = useState<string | null>(null);
 
   const updateDiagnostic = (id: string, updates: Partial<DiagnosticResult>) => {
     setDiagnostics(prev => prev.map(d => 
       d.id === id ? { ...d, ...updates } : d
     ));
   };
-
-  // Check for placeholder secrets in Function Secrets
-  const checkPlaceholderSecrets = async () => {
-    try {
-      const { data, error } = await supabase.functions.invoke('smtp-auth-healthcheck');
-      
-      if (error) {
-        const errorMsg = error.message || 'Unknown error';
-        
-        // Check if error message indicates placeholder/hashed values
-        if (errorMsg.includes('appears to be a hashed value') || 
-            errorMsg.includes('placeholder') || 
-            errorMsg.includes('test value') ||
-            errorMsg.includes('Invalid SMTP configuration detected')) {
-          setPlaceholderWarning(
-            'CRITICAL: Your Function Secrets contain placeholder or hashed values instead of actual SMTP credentials. ' +
-            'Go to Supabase Dashboard → Settings → Edge Functions and update your Function Secrets with real values.'
-          );
-        }
-      }
-    } catch (error) {
-      // Ignore errors for this check
-    }
-  };
-
-  useEffect(() => {
-    checkPlaceholderSecrets();
-  }, []);
 
 const initializeDiagnostics = () => {
     const tests: DiagnosticResult[] = [

@@ -245,21 +245,39 @@ export const EmailCredentialsManager = () => {
         <CardContent>
           <div className="grid gap-3">
             {credentials.map((cred) => (
-              <div key={cred.name} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center gap-2">
-                  <Key className="h-4 w-4" />
-                  <span className="font-medium">{cred.name}</span>
+              <div key={cred.name} className="flex items-center justify-between p-4 border border-border rounded-lg bg-card hover:bg-accent/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-md ${cred.isSet ? 'bg-green-100 dark:bg-green-900/20' : 'bg-amber-100 dark:bg-amber-900/20'}`}>
+                    <Key className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <span className="font-medium text-foreground">{cred.name}</span>
+                    <div className="text-xs text-muted-foreground">
+                      {cred.name === 'SMTP_HOST' && 'Mail server hostname'}
+                      {cred.name === 'SMTP_PORT' && 'Connection port (587/465)'}
+                      {cred.name === 'SMTP_USERNAME' && 'Authentication username'}
+                      {cred.name === 'SMTP_PASSWORD' && 'Authentication password'}
+                      {cred.name === 'SMTP_FROM_EMAIL' && 'Sender email address'}
+                      {cred.name === 'SMTP_FROM_NAME' && 'Sender display name'}
+                    </div>
+                  </div>
                 </div>
                 <div className="flex items-center gap-2">
                   {cred.isSet ? (
                     <>
-                      <CheckCircle2 className="h-4 w-4 text-green-600" />
-                      <span className="text-sm text-muted-foreground">{cred.masked}</span>
+                      <CheckCircle2 className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-green-600 dark:text-green-400">Configured</div>
+                        <div className="text-xs text-muted-foreground">{cred.masked}</div>
+                      </div>
                     </>
                   ) : (
                     <>
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
-                      <span className="text-sm text-muted-foreground">Not configured</span>
+                      <AlertTriangle className="h-4 w-4 text-amber-500 dark:text-amber-400" />
+                      <div className="text-right">
+                        <div className="text-sm font-medium text-amber-600 dark:text-amber-400">Missing</div>
+                        <div className="text-xs text-muted-foreground">Add to Function Secrets</div>
+                      </div>
                     </>
                   )}
                 </div>

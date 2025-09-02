@@ -59,7 +59,109 @@ export const EmailTemplateManager: React.FC = () => {
   const [previewMode, setPreviewMode] = useState<'light' | 'dark'>('light');
   const [testEmail, setTestEmail] = useState('');
   const [sampleVariables, setSampleVariables] = useState<Record<string, string>>({});
+  const [productionData, setProductionData] = useState<Record<string, string>>({});
   const [isSeeding, setIsSeeding] = useState(false);
+
+  // Load live production data for template variables
+  const loadProductionData = async () => {
+    try {
+      // Get business settings for production branding
+      const { data: businessSettings } = await supabase
+        .from('business_settings')
+        .select('name, tagline, website_url, admin_notification_email, working_hours, whatsapp_support_number')
+        .limit(1)
+        .maybeSingle();
+
+      // Get recent customer data for realistic examples
+      const { data: recentCustomer } = await supabase
+        .from('customer_accounts')
+        .select('name, email')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Get recent order for order-related templates
+      const { data: recentOrder } = await supabase
+        .from('orders')
+        .select('order_number, total_amount, status, created_at')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Get product data for product-related templates - using fallback data to avoid complex queries
+      const currentDate = new Date();
+      const productionVariables = {
+        // Business information
+        business_name: businessSettings?.name || 'Your Business',
+        business_tagline: businessSettings?.tagline || 'Quality products delivered',
+        website_url: businessSettings?.website_url || 'https://yourbusiness.com',
+        support_email: businessSettings?.admin_notification_email || 'support@yourbusiness.com',
+        working_hours: businessSettings?.working_hours || '9 AM - 6 PM',
+        whatsapp_number: businessSettings?.whatsapp_support_number || 'Not configured',
+        
+        // Customer information (use real recent customer or fallback)
+        customer_name: recentCustomer?.name || 'John Doe',
+        customer_email: recentCustomer?.email || 'customer@example.com',
+        
+        // Order information (use real recent order or fallback)
+        order_number: recentOrder?.order_number || 'ORD-001',
+        order_total: recentOrder?.total_amount ? `₦${Number(recentOrder.total_amount).toLocaleString()}` : '₦5,000',
+        order_status: recentOrder?.status || 'confirmed',
+        order_date: recentOrder?.created_at ? new Date(recentOrder.created_at).toLocaleDateString() : currentDate.toLocaleDateString(),
+        
+        // Product information (fallback data)
+        product_name: 'Featured Product',
+        product_price: '₦1,000',
+        
+        // Time-based variables
+        current_year: currentDate.getFullYear().toString(),
+        current_date: currentDate.toLocaleDateString(),
+        current_time: currentDate.toLocaleTimeString(),
+        
+        // Common email elements
+        unsubscribe_url: `${businessSettings?.website_url || 'https://yourbusiness.com'}/unsubscribe`,
+        privacy_policy_url: `${businessSettings?.website_url || 'https://yourbusiness.com'}/privacy`,
+        terms_url: `${businessSettings?.website_url || 'https://yourbusiness.com'}/terms`,
+        
+        // Support information
+        support_phone: businessSettings?.whatsapp_support_number || 'Contact us via email',
+        help_center_url: `${businessSettings?.website_url || 'https://yourbusiness.com'}/help`,
+        
+        // Social proof
+        customer_count: '1000+',
+        years_in_business: '5+',
+        
+        // Delivery information
+        delivery_estimate: '1-2 business days',
+        pickup_location: 'Main Store',
+        
+        // Promotional content
+        discount_code: 'SAVE10',
+        discount_amount: '10%',
+        promo_valid_until: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+      };
+
+      setProductionData(productionVariables);
+      setSampleVariables(productionVariables);
+      
+      console.log('✅ Loaded production data for template variables:', Object.keys(productionVariables));
+    } catch (error: any) {
+      console.error('Failed to load production data:', error);
+      // Fallback to basic sample data if production data fails
+      const fallbackData = {
+        business_name: 'Your Business',
+        customer_name: 'John Doe',
+        customer_email: 'customer@example.com',
+        order_number: 'ORD-001',
+        order_total: '₦5,000',
+        current_year: new Date().getFullYear().toString(),
+        current_date: new Date().toLocaleDateString(),
+        website_url: 'https://yourbusiness.com',
+        support_email: 'support@yourbusiness.com',
+      };
+      setSampleVariables(fallbackData);
+    }
+  };
 
   // Form state
   const [formData, setFormData] = useState<Partial<EmailTemplate>>({
@@ -78,6 +180,7 @@ export const EmailTemplateManager: React.FC = () => {
 
   useEffect(() => {
     loadTemplates();
+    loadProductionData(); // Load production data on component mount
   }, []);
 
   const loadTemplates = async () => {
@@ -197,25 +300,28 @@ export const EmailTemplateManager: React.FC = () => {
     }
 
     try {
-      const variables = { ...sampleVariables };
+      // Use production data for test sends to ensure realistic content
+      const variables = { ...productionData };
       
-      // Add common variables if not provided
-      if (!variables.business_name) variables.business_name = 'Test Business';
-      if (!variables.customer_name) variables.customer_name = 'Test Customer';
-      if (!variables.current_year) variables.current_year = new Date().getFullYear().toString();
+      // Override with any template-specific test data if needed
+      variables.customer_email = testEmail; // Use the test email as recipient
+      variables.test_mode = 'true'; // Indicate this is a test send
+      
+      console.log('🧪 Sending test email with production variables:', variables);
 
       const { error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: testEmail,
-          template_key: template.template_key,
-          variables: variables
+          templateKey: template.template_key,
+          variables: variables,
+          debug: true
         }
       });
 
       if (error) throw error;
-      toast.success(`Test email sent to ${testEmail}`);
+      toast.success(`Test email sent to ${testEmail} with live production data!`);
     } catch (error: any) {
-      console.error('Failed to send test email:', error);
+      console.error('Test send failed:', error);
       toast.error('Failed to send test email: ' + error.message);
     }
   };
@@ -248,16 +354,16 @@ export const EmailTemplateManager: React.FC = () => {
     }
   };
 
-  const renderPreview = (template: EmailTemplate) => {
+  const renderPreview = (template: EmailTemplate): string => {
     let htmlContent = template.html_template;
     
-    // Replace variables with sample data
-    Object.entries(sampleVariables).forEach(([key, value]) => {
+    // Use production data for realistic preview
+    Object.entries(productionData).forEach(([key, value]) => {
       const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
       htmlContent = htmlContent.replace(regex, value);
     });
 
-    // Apply dark mode styles if needed
+    // Apply dark mode styles if needed  
     if (previewMode === 'dark') {
       htmlContent = htmlContent.replace(
         /style="([^"]*background[^"]*(?:white|#ffffff|#fff)[^"]*)/gi,
@@ -667,8 +773,31 @@ export const EmailTemplateManager: React.FC = () => {
                             Dark Mode
                           </Button>
                         </div>
-                        <div className="border rounded-lg p-4 max-h-96 overflow-auto">
-                          <div dangerouslySetInnerHTML={{ __html: renderPreview(template) }} />
+                        <div className="border rounded-lg overflow-hidden">
+                          <div className="bg-muted p-2 border-b flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <Eye className="h-4 w-4" />
+                              <span className="text-sm font-medium">Live Preview (Production Data)</span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge variant={productionData.business_name !== 'Your Business' ? 'default' : 'secondary'}>
+                                {productionData.business_name !== 'Your Business' ? 'Live Data' : 'Sample Data'}
+                              </Badge>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={loadProductionData}
+                                className="flex items-center gap-1"
+                              >
+                                <RefreshCw className="h-3 w-3" />
+                                Refresh
+                              </Button>
+                            </div>
+                          </div>
+                          <div 
+                            className={`p-4 max-h-96 overflow-auto ${previewMode === 'dark' ? 'bg-gray-900' : 'bg-white'}`}
+                            dangerouslySetInnerHTML={{ __html: renderPreview(template) }}
+                          />
                         </div>
                       </div>
                     </DialogContent>

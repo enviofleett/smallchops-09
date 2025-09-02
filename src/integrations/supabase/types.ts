@@ -8369,28 +8369,6 @@ export type Database = {
         }
         Relationships: []
       }
-      payment_system_health: {
-        Row: {
-          amount_mismatches: number | null
-          avg_transaction_amount: number | null
-          calculated_at: string | null
-          failed_orders: number | null
-          failed_payments: number | null
-          health_status: string | null
-          last_transaction_time: string | null
-          order_completion_rate_percent: number | null
-          paid_orders: number | null
-          payment_errors: number | null
-          pending_orders: number | null
-          pending_payments: number | null
-          reference_errors: number | null
-          success_rate_percent: number | null
-          successful_payments: number | null
-          total_orders: number | null
-          total_transactions: number | null
-        }
-        Relationships: []
-      }
       production_metrics: {
         Row: {
           total_paid_orders: number | null
@@ -8541,6 +8519,10 @@ export type Database = {
       check_admin_invitation_rate_limit: {
         Args: { user_id_param: string }
         Returns: boolean
+      }
+      check_auth_health: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
       }
       check_customer_operation_rate_limit: {
         Args: { p_admin_id: string; p_limit?: number; p_operation: string }

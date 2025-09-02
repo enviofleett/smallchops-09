@@ -613,20 +613,20 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
 
     // Enhanced immediate payment confirmation email with fallback queue
     try {
-      // CRITICAL: Only send email if customer_email is valid
-      if (!orderData.customer_email || typeof orderData.customer_email !== 'string' || orderData.customer_email.trim() === '') {
+      const rawEmail = typeof orderData.customer_email === 'string' ? orderData.customer_email.trim() : '';
+      if (!rawEmail) {
         log('warn', '⚠️ No valid customer email - skipping payment confirmation', {
           reference,
           order_id: orderData.order_id,
           customer_email: orderData.customer_email
         });
       } else {
-        // Check if payment confirmation email already sent to avoid duplicates
+        // Avoid duplicates
         const { data: existingConfirmation } = await supabase
           .from('communication_events')
           .select('id, status')
           .eq('order_id', orderData.order_id)
-          .eq('recipient_email', orderData.customer_email.trim().toLowerCase())
+          .eq('recipient_email', rawEmail.toLowerCase())
           .eq('event_type', 'payment_confirmation')
           .eq('template_key', 'payment_confirmation')
           .single();
@@ -639,69 +639,61 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
             status: existingConfirmation.status
           });
         } else {
-          // Send immediate confirmation email
-          const confirmationEmailResult = await supabase.functions.invoke('unified-smtp-sender', {
+          // Try immediate send
+          const res = await supabase.functions.invoke('unified-smtp-sender', {
             body: {
-              to: orderData.customer_email.trim(),
+              to: rawEmail,
               subject: 'Payment Confirmation - Order ' + orderData.order_number,
               templateKey: 'payment_confirmation',
               variables: {
                 customerName: orderData.customer_name || 'Valued Customer',
                 orderNumber: orderData.order_number,
-                amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
+                amount: orderData.amount?.toString() || (paystackAmount ?? 0).toString(),
                 paymentMethod: 'Paystack',
                 orderType: orderData.order_type || 'order'
               }
             }
           });
 
-          // Enhanced error logging with HTTP status and response details
-          if (confirmationEmailResult.error) {
-            const errorDetails = {
-              error: confirmationEmailResult.error.message || 'Unknown error',
-              httpStatus: confirmationEmailResult.status || 'unknown',
-              responseBody: confirmationEmailResult.data || null,
+          if (res.error) {
+            log('warn', '⚠️ Immediate payment confirmation failed - queuing fallback', {
+              error: res.error.message || 'Unknown error',
+              httpStatus: res.status || 'unknown',
+              reference,
               order_id: orderData.order_id,
-              customer_email: orderData.customer_email,
-              reference: reference
-            };
-            
-            log('warn', '⚠️ Immediate payment confirmation email failed - creating queue fallback', errorDetails);
-            
-              // Queue fallback: Create communication event for later processing (idempotent)
-              try {
-                await supabase.from('communication_events').insert({
-                  order_id: orderData.order_id,
-                  recipient_email: orderData.customer_email.trim().toLowerCase(),
-                  event_type: 'payment_confirmation',
-                  template_key: 'payment_confirmation',
-                  email_type: 'transactional',
-                  status: 'queued',
-                  priority: 'high',
-                  variables: {
-                    customerName: orderData.customer_name || 'Valued Customer',
-                    orderNumber: orderData.order_number,
-                    amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
-                    paymentMethod: 'Paystack'
-                  }
-                });
-                
-                log('info', '✅ Payment confirmation fallback queued for later processing');
-              } catch (queueError) {
-                // If this is a duplicate key error, it means email already queued - that's OK
-                if (queueError.message?.includes('duplicate key value violates unique constraint')) {
-                  log('info', '✅ Payment confirmation already queued (duplicate key) - continuing');
-                } else {
-                  log('error', '❌ Failed to queue payment confirmation fallback', {
-                    error: queueError.message,
-                    reference,
-                    order_id: orderData.order_id
-                  });
+              customer_email: rawEmail
+            });
+
+            try {
+              await supabase.from('communication_events').insert({
+                order_id: orderData.order_id,
+                recipient_email: rawEmail.toLowerCase(),
+                event_type: 'payment_confirmation',
+                template_key: 'payment_confirmation',
+                email_type: 'transactional',
+                status: 'queued',
+                priority: 'high',
+                variables: {
+                  customerName: orderData.customer_name || 'Valued Customer',
+                  orderNumber: orderData.order_number,
+                  amount: orderData.amount?.toString() || (paystackAmount ?? 0).toString(),
+                  paymentMethod: 'Paystack'
                 }
+              });
+              log('info', '✅ Payment confirmation fallback queued for later processing');
+            } catch (queueError) {
+              if (queueError.message?.includes('duplicate key value violates unique constraint')) {
+                log('info', '✅ Payment confirmation already queued (duplicate key) - continuing');
+              } else {
+                log('error', '❌ Failed to queue payment confirmation fallback', {
+                  error: queueError.message,
+                  reference,
+                  order_id: orderData.order_id
+                });
               }
-            } else {
-              log('info', '✅ Immediate payment confirmation email sent successfully');
             }
+          } else {
+            log('info', '✅ Immediate payment confirmation email sent successfully');
           }
         }
       }

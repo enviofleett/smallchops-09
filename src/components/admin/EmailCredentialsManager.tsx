@@ -161,30 +161,52 @@ export const EmailCredentialsManager = () => {
     setLastError('');
 
     try {
-      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
-        body: { healthcheck: true, check: 'smtp' }
+      console.log('🔍 Testing production email readiness...');
+      
+      // Test SMTP authentication health check
+      const { data: authData, error: authError } = await supabase.functions.invoke('smtp-auth-healthcheck', {
+        body: {}
       });
 
-      if (error) {
-        throw new Error(error.message);
+      if (authError) {
+        throw new Error(`Health check failed: ${authError.message}`);
       }
 
-      if (data.smtpCheck?.configured) {
+      console.log('📊 Auth health result:', authData);
+
+      if (authData?.success) {
         setConnectionStatus('success');
+        
+        // Get configuration source info
+        const configSource = authData.provider?.source === 'function_secrets' 
+          ? 'Function Secrets (Production Ready)' 
+          : 'Database (Development Mode)';
+          
         toast({
-          title: 'Connection Successful',
-          description: `Connected to ${data.smtpCheck.host}:${data.smtpCheck.port} using ${data.smtpCheck.encryption}`,
+          title: 'Production Email Ready!',
+          description: `✅ SMTP authenticated successfully via ${configSource}`,
         });
+        
+        // Update status with detailed info
+        setLastError('');
+        setCredentials(prev => prev.map(cred => ({
+          ...cred,
+          isSet: true,
+          masked: '✓ Configured'
+        })));
+        
       } else {
-        throw new Error(data.smtpCheck?.error || 'SMTP not configured');
+        throw new Error(authData?.error || 'SMTP authentication failed');
       }
+      
     } catch (error: any) {
-      console.error('Connection test failed:', error);
+      console.error('❌ Production readiness test failed:', error);
       setConnectionStatus('error');
       setLastError(error.message);
+      
       toast({
-        title: 'Connection Failed',
-        description: error.message,
+        title: 'Production Not Ready',
+        description: `❌ ${error.message}`,
         variant: 'destructive',
       });
     } finally {
@@ -249,7 +271,7 @@ export const EmailCredentialsManager = () => {
             <div className="mt-4">
               <Button onClick={testConnection} disabled={isTesting} className="w-full">
                 <TestTube className="h-4 w-4 mr-2" />
-                {isTesting ? 'Testing Connection...' : 'Test SMTP Connection'}
+                {isTesting ? 'Testing Production Readiness...' : 'Test Production Email Readiness'}
               </Button>
 
               {connectionStatus === 'success' && (

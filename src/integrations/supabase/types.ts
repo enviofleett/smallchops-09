@@ -9672,6 +9672,15 @@ export type Database = {
         }
         Returns: Json
       }
+      upsert_payment_confirmation_event: {
+        Args: {
+          p_order_id: string
+          p_recipient_email: string
+          p_reference: string
+          p_template_variables?: Json
+        }
+        Returns: string
+      }
       validate_admin_access: {
         Args: Record<PropertyKey, never>
         Returns: boolean

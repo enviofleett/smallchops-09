@@ -458,6 +458,57 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
     });
 
     if (rpcError) {
+      // Handle duplicate key constraint as idempotent success
+      if (rpcError.message && rpcError.message.includes('duplicate key value violates unique constraint')) {
+        log('info', '✅ Payment already processed (duplicate constraint) - fetching order for success redirect', { 
+          reference, 
+          constraint_error: rpcError.message 
+        });
+        
+        // Fetch the existing order for success redirect
+        try {
+          const { data: existingOrder, error: fetchError } = await supabase
+            .from('orders')
+            .select('id, order_number, status, payment_status')
+            .eq('payment_reference', reference)
+            .single();
+            
+          if (fetchError || !existingOrder) {
+            log('error', '❌ Could not fetch existing order after duplicate constraint', { 
+              reference, 
+              fetchError: fetchError?.message 
+            });
+            return {
+              success: false,
+              error: 'Payment processed but order details unavailable'
+            };
+          }
+          
+          log('info', '✅ Successfully fetched existing order after duplicate constraint', {
+            reference,
+            order_id: existingOrder.id,
+            order_number: existingOrder.order_number,
+            status: existingOrder.status,
+            payment_status: existingOrder.payment_status
+          });
+          
+          return {
+            success: true,
+            order_id: existingOrder.id,
+            order_number: existingOrder.order_number
+          };
+        } catch (fetchError) {
+          log('error', '❌ Exception fetching existing order after duplicate constraint', { 
+            reference, 
+            error: fetchError.message 
+          });
+          return {
+            success: false,
+            error: 'Payment processed but order verification failed'
+          };
+        }
+      }
+      
       log('error', '❌ RPC verification failed', { reference, error: rpcError });
       return {
         success: false,
@@ -568,19 +619,15 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
           reference: reference
         };
         
-        log('warn', '⚠️ Immediate payment confirmation email failed - creating queue fallback', errorDetails);
+        log('warn', '⚠️ Immediate payment confirmation email failed - creating idempotent queue fallback', errorDetails);
         
-        // Queue fallback: Create communication event for later processing
+        // Idempotent queue fallback: Use RPC function for safe insertion
         try {
-          await supabase.from('communication_events').insert({
-            order_id: orderData.order_id,
-            recipient_email: orderData.customer_email,
-            event_type: 'payment_confirmation',
-            template_key: 'payment_confirmation',
-            status: 'queued',
-            priority: 'high',
-            email_type: 'transactional',
-            variables: {
+          const { data: eventId, error: rpcError } = await supabase.rpc('upsert_payment_confirmation_event', {
+            p_reference: reference,
+            p_order_id: orderData.order_id,
+            p_recipient_email: orderData.customer_email,
+            p_template_variables: {
               customerName: orderData.customer_name || 'Valued Customer',
               orderNumber: orderData.order_number,
               amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
@@ -590,14 +637,25 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
             }
           });
           
-          log('info', '✅ Payment confirmation queued for later delivery', {
-            order_id: orderData.order_id,
-            fallback_used: true
-          });
+          if (rpcError) {
+            log('warn', '⚠️ Idempotent email event creation failed', {
+              order_id: orderData.order_id,
+              rpcError: rpcError.message,
+              reference
+            });
+          } else {
+            log('info', '✅ Payment confirmation queued for later delivery (idempotent)', {
+              order_id: orderData.order_id,
+              event_id: eventId,
+              fallback_used: true,
+              reference
+            });
+          }
         } catch (queueError) {
-          log('error', '❌ Failed to queue payment confirmation fallback', {
+          log('error', '❌ Failed to queue payment confirmation fallback via RPC', {
             order_id: orderData.order_id,
-            queueError: queueError.message
+            queueError: queueError.message,
+            reference
           });
         }
       } else {
@@ -605,7 +663,8 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
           order_id: orderData.order_id,
           customer_email: orderData.customer_email,
           messageId: confirmationEmailResult.data?.messageId,
-          provider: confirmationEmailResult.data?.provider
+          provider: confirmationEmailResult.data?.provider,
+          reference
         });
       }
     } catch (emailError) {
@@ -617,19 +676,15 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
         reference: reference
       };
       
-      log('warn', '⚠️ Exception sending immediate payment confirmation - creating queue fallback', errorDetails);
+      log('warn', '⚠️ Exception sending immediate payment confirmation - creating idempotent queue fallback', errorDetails);
       
-      // Queue fallback for exceptions too
+      // Idempotent queue fallback for exceptions too
       try {
-        await supabase.from('communication_events').insert({
-          order_id: orderData.order_id,
-          recipient_email: orderData.customer_email,
-          event_type: 'payment_confirmation',
-          template_key: 'payment_confirmation',
-          status: 'queued',
-          priority: 'high',
-          email_type: 'transactional',
-          variables: {
+        const { data: eventId, error: rpcError } = await supabase.rpc('upsert_payment_confirmation_event', {
+          p_reference: reference,
+          p_order_id: orderData.order_id,
+          p_recipient_email: orderData.customer_email,
+          p_template_variables: {
             customerName: orderData.customer_name || 'Valued Customer',
             orderNumber: orderData.order_number,
             amount: orderData.amount?.toString() || paystackAmount?.toString() || '0',
@@ -639,15 +694,27 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
           }
         });
         
-        log('info', '✅ Payment confirmation queued after exception', {
-          order_id: orderData.order_id,
-          fallback_used: true
-        });
+        if (rpcError) {
+          log('error', '❌ Critical: Failed both immediate send and idempotent queue fallback', {
+            order_id: orderData.order_id,
+            originalError: emailError.message,
+            rpcError: rpcError.message,
+            reference
+          });
+        } else {
+          log('info', '✅ Payment confirmation queued after exception (idempotent)', {
+            order_id: orderData.order_id,
+            event_id: eventId,
+            fallback_used: true,
+            reference
+          });
+        }
       } catch (queueError) {
-        log('error', '❌ Critical: Failed both immediate send and queue fallback', {
+        log('error', '❌ Critical: Exception during idempotent queue fallback', {
           order_id: orderData.order_id,
           originalError: emailError.message,
-          queueError: queueError.message
+          queueError: queueError.message,
+          reference
         });
       }
     }

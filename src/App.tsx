@@ -29,50 +29,50 @@ initPaymentMonitoring();
 import NotFound from "./pages/NotFound";
 import PublicHome from "./pages/PublicHome";
 
-// Lazy load admin components
-const Orders = withLazyLoading(() => import("./pages/Orders"));
-const AdminOrders = withLazyLoading(() => import("./pages/admin/AdminOrders"));
-const AdminOrderDetails = withLazyLoading(() => import("./pages/admin/AdminOrderDetails"));
-const AdminDelivery = withLazyLoading(() => import("./pages/admin/AdminDelivery"));
-const Products = withLazyLoading(() => import("./pages/Products"));
-const Customers = withLazyLoading(() => import("./pages/Customers"));
-const Reports = withLazyLoading(() => import("./pages/Reports"));
-const PaymentSettings = withLazyLoading(() => import("./pages/PaymentSettings").then(m => ({ default: m.PaymentSettings })));
-const Index = withLazyLoading(() => import("./pages/Index"));
-const ProductDetail = withLazyLoading(() => import("./pages/ProductDetail"));
-const CategoryProducts = withLazyLoading(() => import("./pages/CategoryProducts"));
-const Promotions = withLazyLoading(() => import("./pages/Promotions"));
-const BookingManagement = withLazyLoading(() => import("./pages/BookingManagement"));
-const DeliveryPickup = withLazyLoading(() => import("./pages/DeliveryPickup"));
-const AuditLogs = withLazyLoading(() => import("./pages/AuditLogs"));
-const Settings = withLazyLoading(() => import("./pages/Settings"));
-const Categories = withLazyLoading(() => import("./pages/Categories"));
+// Lazy load admin components with optimized loading
+const Orders = withLazyLoading(() => import("./pages/Orders"), undefined, false, 10000);
+const AdminOrders = withLazyLoading(() => import("./pages/admin/AdminOrders"), undefined, false, 10000);
+const AdminOrderDetails = withLazyLoading(() => import("./pages/admin/AdminOrderDetails"), undefined, false, 10000);
+const AdminDelivery = withLazyLoading(() => import("./pages/admin/AdminDelivery"), undefined, false, 10000);
+const Products = withLazyLoading(() => import("./pages/Products"), undefined, false, 10000);
+const Customers = withLazyLoading(() => import("./pages/Customers"), undefined, false, 10000);
+const Reports = withLazyLoading(() => import("./pages/Reports"), undefined, false, 10000);
+const PaymentSettings = withLazyLoading(() => import("./pages/PaymentSettings").then(m => ({ default: m.PaymentSettings })), undefined, false, 10000);
+const Index = withLazyLoading(() => import("./pages/Index"), undefined, true, 8000); // Critical page - fast loader
+const ProductDetail = withLazyLoading(() => import("./pages/ProductDetail"), undefined, true, 10000);
+const CategoryProducts = withLazyLoading(() => import("./pages/CategoryProducts"), undefined, true, 10000);
+const Promotions = withLazyLoading(() => import("./pages/Promotions"), undefined, false, 10000);
+const BookingManagement = withLazyLoading(() => import("./pages/BookingManagement"), undefined, false, 10000);
+const DeliveryPickup = withLazyLoading(() => import("./pages/DeliveryPickup"), undefined, false, 10000);
+const AuditLogs = withLazyLoading(() => import("./pages/AuditLogs"), undefined, false, 10000);
+const Settings = withLazyLoading(() => import("./pages/Settings"), undefined, false, 12000); // Larger component
+const Categories = withLazyLoading(() => import("./pages/Categories"), undefined, false, 10000);
 
-// Lazy load customer components
-const CustomerFavorites = withLazyLoading(() => import("./pages/CustomerFavorites"));
-const PurchaseHistory = withLazyLoading(() => import("./pages/PurchaseHistory"));
-const PaymentCallback = withLazyLoading(() => import("./pages/PaymentCallbackPage").then(m => ({ default: m.PaymentCallbackPage })));
-const PaymentCallbackRedirect = withLazyLoading(() => import("./pages/PaymentCallbackRedirect"));
-const Unsubscribe = withLazyLoading(() => import("./pages/Unsubscribe"));
-const AdminSetup = withLazyLoading(() => import("./pages/AdminSetup"));
-const CustomerRegister = withLazyLoading(() => import("./pages/CustomerRegister"));
-const SimpleRegisterPage = withLazyLoading(() => import("./pages/SimpleRegisterPage"));
-const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfile"));
-const AuthPage = withLazyLoading(() => import("./pages/AuthPage"));
-const AdminAuth = withLazyLoading(() => import("./pages/admin/AdminAuth"));
-const Cart = withLazyLoading(() => import("./pages/Cart"));
-const Booking = withLazyLoading(() => import("./pages/Booking"));
-const PublicProducts = withLazyLoading(() => import("./pages/PublicProducts"));
-const Contact = withLazyLoading(() => import("./pages/Contact"));
-const About = withLazyLoading(() => import("./pages/About"));
-const PaystackTest = withLazyLoading(() => import("./pages/PaystackTest"));
-const PaystackTestingDashboard = withLazyLoading(() => import("./pages/PaystackTestingDashboard"));
-const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"));
-const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"));
-const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"));
-const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"));
-const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"));
-const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })));
+// Lazy load customer components with optimized loading
+const CustomerFavorites = withLazyLoading(() => import("./pages/CustomerFavorites"), undefined, false, 10000);
+const PurchaseHistory = withLazyLoading(() => import("./pages/PurchaseHistory"), undefined, false, 10000);
+const PaymentCallback = withLazyLoading(() => import("./pages/PaymentCallbackPage").then(m => ({ default: m.PaymentCallbackPage })), undefined, false, 15000);
+const PaymentCallbackRedirect = withLazyLoading(() => import("./pages/PaymentCallbackRedirect"), undefined, false, 8000);
+const Unsubscribe = withLazyLoading(() => import("./pages/Unsubscribe"), undefined, true, 8000);
+const AdminSetup = withLazyLoading(() => import("./pages/AdminSetup"), undefined, false, 10000);
+const CustomerRegister = withLazyLoading(() => import("./pages/CustomerRegister"), undefined, true, 10000);
+const SimpleRegisterPage = withLazyLoading(() => import("./pages/SimpleRegisterPage"), undefined, true, 8000);
+const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfile"), undefined, false, 10000);
+const AuthPage = withLazyLoading(() => import("./pages/AuthPage"), undefined, true, 8000); // Critical auth page
+const AdminAuth = withLazyLoading(() => import("./pages/admin/AdminAuth"), undefined, true, 8000); // Critical auth page
+const Cart = withLazyLoading(() => import("./pages/Cart"), undefined, true, 10000); // Critical customer journey
+const Booking = withLazyLoading(() => import("./pages/Booking"), undefined, true, 12000); // Complex booking component
+const PublicProducts = withLazyLoading(() => import("./pages/PublicProducts"), undefined, true, 10000); // High traffic page
+const Contact = withLazyLoading(() => import("./pages/Contact"), undefined, true, 8000);
+const About = withLazyLoading(() => import("./pages/About"), undefined, true, 8000);
+const PaystackTest = withLazyLoading(() => import("./pages/PaystackTest"), undefined, false, 10000);
+const PaystackTestingDashboard = withLazyLoading(() => import("./pages/PaystackTestingDashboard"), undefined, false, 12000);
+const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"), undefined, true, 8000);
+const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"), undefined, true, 8000);
+const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"), undefined, true, 8000);
+const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"), undefined, false, 10000);
+const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"), undefined, true, 10000);
+const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })), undefined, false, 15000);
 
 // Hardened QueryClient with comprehensive error handling and performance optimizations
 const queryClient = new QueryClient({
@@ -124,11 +124,14 @@ const queryClient = new QueryClient({
   },
 });
 
-// Preload critical routes
+// Preload critical routes for better performance
 if (typeof window !== 'undefined') {
-  preloadRoute(() => import("./pages/PublicProducts"));
-  preloadRoute(() => import("./pages/Cart"));
-  preloadRoute(() => import("./pages/Booking"));
+  preloadRoute(() => import("./pages/Index"), 'high'); // Homepage - highest priority
+  preloadRoute(() => import("./pages/PublicProducts"), 'high'); // Product catalog - high traffic
+  preloadRoute(() => import("./pages/Cart"), 'high'); // Shopping cart - critical path
+  preloadRoute(() => import("./pages/Booking"), 'low'); // Secondary page
+  preloadRoute(() => import("./pages/AuthPage"), 'low'); // Auth pages
+  preloadRoute(() => import("./pages/Contact"), 'low'); // Support pages
 }
 
 

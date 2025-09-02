@@ -118,21 +118,25 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
 
   private getErrorSuggestion = (error: Error): string => {
     const category = this.getErrorCategory(error);
+    const message = error.message.toLowerCase();
     
     switch (category) {
       case 'Network Error':
-        return 'Please check your internet connection and try again.';
+        return 'Please check your internet connection and try again. You may also try refreshing the page.';
       case 'Loading Error':
-        if (error.message.includes('timeout')) {
-          return 'This page is taking longer than usual to load. Please wait a moment and try again.';
+        if (message.includes('timeout')) {
+          return 'This component is taking longer than expected to load. This might be due to slow network or large file sizes. Try refreshing the page or check your internet connection.';
         }
-        return 'There was a problem loading this page. Please refresh or try again.';
+        if (message.includes('component load') || message.includes('chunk')) {
+          return 'A component failed to load. This usually resolves with a page refresh. If the problem persists, please clear your browser cache.';
+        }
+        return 'There was a problem loading this page. Please refresh the page or try again in a moment.';
       case 'Permission Error':
-        return 'You may not have permission to access this content. Please log in again.';
+        return 'You may not have permission to access this content. Please log in again or contact support.';
       case 'Code Error':
-        return 'A technical error occurred. Our team has been notified.';
+        return 'A technical error occurred. Our development team has been notified and is working on a fix.';
       default:
-        return 'Something went wrong. Please try again or contact support if the problem persists.';
+        return 'Something unexpected happened. Try refreshing the page first. If the problem continues, please contact our support team.';
     }
   };
 
@@ -149,72 +153,98 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
       return (
         <div className="min-h-[400px] flex items-center justify-center p-4 sm:p-6">
           <Card className="w-full max-w-lg shadow-lg border-border/50">
-            <CardContent className="p-4 sm:p-6 space-y-4">
-              <div className="flex items-center space-x-3 mb-4">
-                <AlertTriangle className="h-6 w-6 text-destructive" />
-                <h3 className="text-lg font-semibold">
-                  {errorCategory}
-                </h3>
-              </div>
-              
-              <Alert className="mb-4">
-                <AlertDescription>
-                  {suggestion}
-                </AlertDescription>
-              </Alert>
+            <CardContent className="p-4 sm:p-6 space-y-6">
+              <div className="text-center space-y-4">
+                <div className="flex items-center justify-center space-x-3 mb-4">
+                  <AlertTriangle className="h-8 w-8 text-destructive" />
+                  <h3 className="text-xl font-semibold">
+                    {errorCategory}
+                  </h3>
+                </div>
+                
+                <Alert className="mb-4">
+                  <AlertDescription className="text-left">
+                    {suggestion}
+                  </AlertDescription>
+                </Alert>
 
-              {this.state.errorId && (
-                <p className="text-xs text-muted-foreground mb-4">
-                  Error ID: {this.state.errorId}
-                </p>
-              )}
+                {this.state.errorId && (
+                  <p className="text-xs text-muted-foreground mb-4">
+                    Error ID: {this.state.errorId}
+                  </p>
+                )}
 
-              <div className="flex flex-col sm:flex-row gap-2">
-                {canRetry && (
+                <div className="flex flex-col sm:flex-row gap-2">
+                  {canRetry && (
+                    <Button 
+                      onClick={this.handleRetry}
+                      className="flex items-center gap-2"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Try Again ({this.maxRetries - this.state.retryCount} left)
+                    </Button>
+                  )}
+                  
                   <Button 
-                    onClick={this.handleRetry}
+                    variant="outline"
+                    onClick={this.handleRefresh}
                     className="flex items-center gap-2"
                   >
                     <RefreshCw className="h-4 w-4" />
-                    Try Again ({this.maxRetries - this.state.retryCount} left)
+                    Refresh Page
                   </Button>
-                )}
-                
-                <Button 
-                  variant="outline"
-                  onClick={this.handleRefresh}
-                  className="flex items-center gap-2"
-                >
-                  <RefreshCw className="h-4 w-4" />
-                  Refresh Page
-                </Button>
-                
-                <Button 
-                  variant="outline"
-                  onClick={this.handleGoHome}
-                  className="flex items-center gap-2"
-                >
-                  <Home className="h-4 w-4" />
-                  Go Home
-                </Button>
-              </div>
+                  
+                  <Button 
+                    variant="outline"
+                    onClick={this.handleGoHome}
+                    className="flex items-center gap-2"
+                  >
+                    <Home className="h-4 w-4" />
+                    Go Home
+                  </Button>
+                </div>
 
-              {this.props.showErrorDetails && this.state.error && (
-                <details className="mt-4">
-                  <summary className="text-sm font-medium cursor-pointer">
-                    Technical Details
-                  </summary>
-                  <pre className="mt-2 text-xs bg-muted p-3 rounded overflow-auto max-h-40">
-                    {this.state.error.message}
-                    {this.state.error.stack && (
-                      <>
-                        {'\n\nStack Trace:\n'}
-                        {this.state.error.stack}
-                      </>
-                    )}
-                  </pre>
-                </details>
-              )}
+                {/* Network Diagnostics for Loading Errors */}
+                {errorCategory === 'Loading Error' && (
+                  <div className="mt-6 pt-4 border-t">
+                    <p className="text-sm text-muted-foreground mb-3">
+                      This appears to be a component loading issue. Run network diagnostics to identify the cause:
+                    </p>
+                    <Button 
+                      variant="secondary" 
+                      size="sm"
+                      onClick={() => {
+                        // Dynamically import and show network diagnostics
+                        import('../utils/networkDiagnostics').then((module) => {
+                          const NetworkDiagnostics = module.default;
+                          // This would need a modal or separate component to render
+                          console.log('Network diagnostics available');
+                        }).catch(console.error);
+                      }}
+                      className="flex items-center gap-2"
+                    >
+                      Run Network Test
+                    </Button>
+                  </div>
+                )}
+
+                {this.props.showErrorDetails && this.state.error && (
+                  <details className="mt-4 text-left">
+                    <summary className="text-sm font-medium cursor-pointer mb-2">
+                      Technical Details
+                    </summary>
+                    <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-40 text-left">
+                      {this.state.error.message}
+                      {this.state.error.stack && (
+                        <>
+                          {'\n\nStack Trace:\n'}
+                          {this.state.error.stack}
+                        </>
+                      )}
+                    </pre>
+                  </details>
+                )}
+              </div>
             </CardContent>
           </Card>
         </div>

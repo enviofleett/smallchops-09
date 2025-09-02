@@ -88,6 +88,9 @@ verify_jwt = false
 [functions.delivery-schedule-health]
 verify_jwt = false
 
+[functions.auth-security-validator]
+verify_jwt = false
+
 [functions.email-delivery-monitor]
 verify_jwt = false
 

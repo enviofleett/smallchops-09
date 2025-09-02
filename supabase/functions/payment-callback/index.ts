@@ -449,7 +449,7 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
       currency: paystackData.currency
     });
 
-    // Use secure RPC to verify and update payment status
+    // Use secure RPC to verify and update payment status (avoids double trigger firing)
     const { data: orderResult, error: rpcError } = await supabase.rpc('verify_and_update_payment_status', {
       payment_ref: reference,
       new_status: 'confirmed',
@@ -458,9 +458,12 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
     });
 
     if (rpcError) {
-      // Handle duplicate key constraint as idempotent success
-      if (rpcError.message && rpcError.message.includes('duplicate key value violates unique constraint')) {
-        log('info', '✅ Payment already processed (duplicate constraint) - fetching order for success redirect', { 
+      // Handle duplicate key constraint or payment confirmation duplicates as idempotent success
+      if (rpcError.message && (
+        rpcError.message.includes('duplicate key value violates unique constraint') ||
+        rpcError.message.includes('idx_communication_events_unique_payment_confirmation')
+      )) {
+        log('info', '✅ Payment confirmation already exists (idempotent success)', { 
           reference, 
           constraint_error: rpcError.message 
         });
@@ -471,7 +474,7 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
             .from('orders')
             .select('id, order_number, status, payment_status')
             .eq('payment_reference', reference)
-            .single();
+            .maybeSingle();
             
           if (fetchError || !existingOrder) {
             log('error', '❌ Could not fetch existing order after duplicate constraint', { 
@@ -484,7 +487,7 @@ async function processVerifiedPayment(supabase: any, reference: string, paystack
             };
           }
           
-          log('info', '✅ Successfully fetched existing order after duplicate constraint', {
+          log('info', '✅ Successfully fetched existing order after idempotent success', {
             reference,
             order_id: existingOrder.id,
             order_number: existingOrder.order_number,

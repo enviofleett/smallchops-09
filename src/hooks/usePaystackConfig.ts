@@ -46,11 +46,17 @@ export const usePaystackConfig = () => {
         throw new Error('Invalid Paystack public key format.');
       }
 
+      // Check if we're in live mode based on environment config
+      const isLiveMode = !configData.test_mode;
+      const environment = isLiveMode ? 'live' : 'test';
+
       setConfig({
         publicKey: configData.public_key,
         isTestMode: configData.test_mode || false,
         isValid: true,
-        environment: configData.test_mode ? 'test' : 'live'
+        environment,
+        secretKey: isLiveMode ? configData.live_secret_key : configData.test_secret_key,
+        webhookSecret: isLiveMode ? configData.live_webhook_secret : configData.test_webhook_secret
       });
 
     } catch (err) {

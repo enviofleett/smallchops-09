@@ -9644,6 +9644,10 @@ export type Database = {
           status: string
         }[]
       }
+      trigger_order_emails: {
+        Args: { order_uuid: string }
+        Returns: undefined
+      }
       update_admin_role: {
         Args: { p_new_role: string; p_user_id: string }
         Returns: Json

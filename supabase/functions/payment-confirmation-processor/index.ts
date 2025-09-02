@@ -63,7 +63,9 @@ serve(async (req) => {
         template_key: 'payment_confirmation',
         variables: {
           customer_name: customer_name || 'Valued Customer',
+          customerName: customer_name || 'Valued Customer', // Alias for template compatibility
           order_id: order_id,
+          order_number: order_id, // Some templates may expect this
           amount: `₦${amount.toLocaleString()}`,
           payment_reference: payment_reference || 'N/A'
         },
@@ -79,7 +81,7 @@ serve(async (req) => {
 
     console.log(`Queued payment confirmation for order ${order_id}`);
 
-    // Trigger instant email processor for immediate processing
+    // Trigger instant email processor for immediate processing with fallback
     const { error: processorError } = await supabase.functions.invoke('instant-email-processor', {
       body: { 
         priority: 'high', 
@@ -89,10 +91,26 @@ serve(async (req) => {
     });
 
     if (processorError) {
-      console.error('Error triggering email processor:', processorError);
+      console.error('Error triggering instant email processor:', processorError);
+      
+      // Fallback: trigger unified-email-queue-processor for batch processing
+      console.log('⚡ Falling back to unified-email-queue-processor');
+      try {
+        await supabase.functions.invoke('unified-email-queue-processor', {
+          body: { 
+            batch_size: 5,
+            priority_filter: 'high'
+          }
+        });
+        console.log('✅ Fallback processor invoked successfully');
+      } catch (fallbackError) {
+        console.error('❌ Fallback processor also failed:', fallbackError);
+      }
+    } else {
+      console.log('✅ Instant email processor triggered successfully');
     }
 
-    // Also trigger instant email processor as backup
+    // Also trigger instant email processor as backup (legacy call - keeping for redundancy)
     await supabase.functions.invoke('instant-email-processor', {
       body: { priority: 'high' }
     });

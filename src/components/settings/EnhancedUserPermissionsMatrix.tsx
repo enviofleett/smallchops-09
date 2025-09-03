@@ -249,13 +249,23 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
           target_user_id: currentUser.id
         });
 
-        if (rateLimitCheck && typeof rateLimitCheck === 'object' && 'allowed' in rateLimitCheck && !(rateLimitCheck as any).allowed) {
-          toast({
-            title: "Rate limit exceeded",
-            description: `Too many permission changes. Try again later.`,
-            variant: "destructive"
-          });
-          return;
+        if (rateLimitCheck && !rateLimitError) {
+          // Handle different return types from the rate limit function
+          let isAllowed = true;
+          if (typeof rateLimitCheck === 'boolean') {
+            isAllowed = rateLimitCheck;
+          } else if (typeof rateLimitCheck === 'object' && 'allowed' in rateLimitCheck) {
+            isAllowed = (rateLimitCheck as any).allowed;
+          }
+          
+          if (!isAllowed) {
+            toast({
+              title: "Rate limit exceeded",
+              description: `Too many permission changes. Try again later.`,
+              variant: "destructive"
+            });
+            return;
+          }
         }
       } catch (rateLimitError) {
         // Rate limiting not available, proceed without it

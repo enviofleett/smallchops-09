@@ -320,14 +320,14 @@ export default function CreatePromotionForm({
   }, [isSubmitting, disabled, form, createMutation, onSuccess]);
 
   return (
-    <div className="space-y-4 sm:space-y-6">
+    <div className="space-y-4 sm:space-y-6 pb-4">
       <div className="flex items-center justify-between">
         <h3 className="text-lg sm:text-xl font-semibold">Create New Promotion</h3>
       </div>
 
       <Form {...form}>
         <form
-          className="space-y-4 sm:space-y-6 pb-20 md:pb-0"
+          className="space-y-4 sm:space-y-6"
           onSubmit={form.handleSubmit(handleSubmit)}
           autoComplete="off"
           noValidate
@@ -730,26 +730,37 @@ export default function CreatePromotionForm({
           />
         </div>
 
-        {/* Submit Button */}
-        <div className="pt-4 sm:pt-6 flex items-center gap-3 justify-end">
-          <Button
-            type="submit"
-            disabled={disabled || isSubmitting || createMutation.isPending}
-            className="w-full sm:w-auto min-h-[44px]"
-            size="lg"
-          >
-            {isSubmitting || createMutation.isPending ? (
-              <div className="flex items-center">
-                <div className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-                <span>Creating...</span>
-              </div>
-            ) : (
-              <div className="flex items-center">
-                <Plus className="w-4 h-4 mr-2" />
-                <span>Create Promotion</span>
-              </div>
-            )}
-          </Button>
+        {/* Submit Button - Sticky for better UX */}
+        <div className="sticky bottom-0 bg-background pt-4 sm:pt-6 border-t mt-6">
+          <div className="flex items-center gap-3 justify-end">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => form.reset()}
+              disabled={disabled || isSubmitting || createMutation.isPending}
+              className="w-auto"
+            >
+              Reset
+            </Button>
+            <Button
+              type="submit"
+              disabled={disabled || isSubmitting || createMutation.isPending}
+              className="w-full sm:w-auto min-h-[44px]"
+              size="lg"
+            >
+              {isSubmitting || createMutation.isPending ? (
+                <div className="flex items-center">
+                  <div className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                  <span>Creating...</span>
+                </div>
+              ) : (
+                <div className="flex items-center">
+                  <Plus className="w-4 h-4 mr-2" />
+                  <span>Create Promotion</span>
+                </div>
+              )}
+            </Button>
+          </div>
         </div>
         </form>
       </Form>

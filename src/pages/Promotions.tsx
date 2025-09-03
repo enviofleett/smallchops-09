@@ -334,14 +334,16 @@ function handleStatusChange(promo: Promotion, newStatus: PromotionStatus) {
 
       {/* Create Promotion Dialog */}
       <Dialog open={isDialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] p-0 overflow-hidden">
-          <DialogHeader className="p-4 sm:p-6 pb-3 border-b">
+        <DialogContent className="max-w-4xl w-[95vw] max-h-[90vh] p-0 overflow-hidden flex flex-col">
+          <DialogHeader className="p-4 sm:p-6 pb-3 border-b flex-shrink-0">
             <DialogTitle className="text-lg sm:text-xl">Create Promotion</DialogTitle>
           </DialogHeader>
-          <div className="p-4 sm:p-6 overflow-y-auto">
-            <CreatePromotionForm
-              onSuccess={() => setDialogOpen(false)}
-            />
+          <div className="flex-1 overflow-y-auto min-h-0">
+            <div className="p-4 sm:p-6">
+              <CreatePromotionForm
+                onSuccess={() => setDialogOpen(false)}
+              />
+            </div>
           </div>
         </DialogContent>
       </Dialog>

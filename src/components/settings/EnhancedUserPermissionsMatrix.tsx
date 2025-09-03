@@ -71,6 +71,38 @@ const getMenuIcon = (menuKey: string) => {
     case 'payment': return <CreditCard className="h-4 w-4" />;
     case 'reports': return <BarChart3 className="h-4 w-4" />;
     case 'settings': return <Settings className="h-4 w-4" />;
+    
+    // Settings sub-tabs
+    case 'settings_communications': return <Settings className="h-4 w-4" />;
+    case 'settings_communications_branding': return <RefreshCw className="h-4 w-4" />;
+    case 'settings_communications_content': return <Package className="h-4 w-4" />;
+    case 'settings_communications_support': return <Users className="h-4 w-4" />;
+    case 'settings_communications_email_processing': return <Settings className="h-4 w-4" />;
+    
+    case 'settings_payments': return <CreditCard className="h-4 w-4" />;
+    case 'settings_payments_providers': return <CreditCard className="h-4 w-4" />;
+    case 'settings_payments_pickup_points': return <Truck className="h-4 w-4" />;
+    
+    case 'settings_admin': return <Shield className="h-4 w-4" />;
+    case 'settings_admin_users': return <Users className="h-4 w-4" />;
+    case 'settings_admin_permissions': return <Shield className="h-4 w-4" />;
+    
+    case 'settings_developer': return <Settings className="h-4 w-4" />;
+    case 'settings_developer_auth': return <Shield className="h-4 w-4" />;
+    case 'settings_developer_buying_logic': return <ShoppingCart className="h-4 w-4" />;
+    case 'settings_developer_checkout': return <CreditCard className="h-4 w-4" />;
+    case 'settings_developer_payments_webhooks': return <CreditCard className="h-4 w-4" />;
+    case 'settings_developer_email': return <Settings className="h-4 w-4" />;
+    case 'settings_developer_email_credentials': return <Shield className="h-4 w-4" />;
+    case 'settings_developer_email_communications': return <Settings className="h-4 w-4" />;
+    case 'settings_developer_email_processing': return <RefreshCw className="h-4 w-4" />;
+    case 'settings_developer_email_monitoring': return <BarChart3 className="h-4 w-4" />;
+    case 'settings_developer_email_analytics': return <BarChart3 className="h-4 w-4" />;
+    case 'settings_developer_oauth': return <Shield className="h-4 w-4" />;
+    case 'settings_developer_registration_health': return <BarChart3 className="h-4 w-4" />;
+    case 'settings_developer_production_readiness': return <Shield className="h-4 w-4" />;
+    case 'settings_developer_performance': return <BarChart3 className="h-4 w-4" />;
+    
     default: return <Shield className="h-4 w-4" />;
   }
 };
@@ -214,9 +246,14 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
       
       setPermissions(permissionMap);
       
-      // Auto-expand payment section to show new permissions
-      if (allKeys.some(key => key.startsWith('payment'))) {
-        setExpandedMenus(prev => new Set([...prev, 'payment']));
+      // Auto-expand settings and payment sections to show new permissions
+      const sectionsToExpand = ['settings', 'payment'];
+      if (allKeys.some(key => sectionsToExpand.some(section => key.startsWith(section)))) {
+        setExpandedMenus(prev => {
+          const newSet = new Set([...prev]);
+          sectionsToExpand.forEach(section => newSet.add(section));
+          return newSet;
+        });
       }
     }
   }, [userPermissions, menuStructure]);
@@ -351,6 +388,16 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
                 Payment Feature
               </Badge>
             )}
+            {menu.key.startsWith('settings_developer') && (
+              <Badge variant="destructive" className="text-xs">
+                Developer Only
+              </Badge>
+            )}
+            {menu.key.startsWith('settings_admin') && (
+              <Badge variant="secondary" className="text-xs">
+                Admin Only
+              </Badge>
+            )}
           </div>
           
           <Select
@@ -457,9 +504,13 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
   return (
     <Card>
       <CardHeader>
-        <CardTitle>User Permissions Matrix</CardTitle>
+        <CardTitle className="flex items-center gap-2">
+          <Shield className="h-5 w-5" />
+          User Permissions Matrix
+        </CardTitle>
         <CardDescription>
-          Manage access levels for different features including payment settings
+          Comprehensive access control for all application features including settings, payments, and developer tools. 
+          Configure granular permissions for each admin user across all system areas.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">

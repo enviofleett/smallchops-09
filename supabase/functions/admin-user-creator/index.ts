@@ -171,12 +171,19 @@ serve(async (req) => {
 
     console.log(`[ADMIN-CREATE] Creating admin user: ${body.email}`);
 
-    // Check if user already exists
+    // Check if user already exists in auth or profiles
     const { data: existingUser } = await supabase.auth.admin.listUsers();
-    const userExists = existingUser.users.find(u => u.email === body.email);
+    const authUserExists = existingUser.users.find(u => u.email === body.email);
     
-    if (userExists) {
-      // Return a 200 with explicit code so the client can handle gracefully
+    // Also check if profile exists
+    const { data: existingProfile } = await supabase
+      .from('profiles')
+      .select('id, email')
+      .eq('email', body.email)
+      .single();
+    
+    if (authUserExists || existingProfile) {
+      console.log(`[ADMIN-CREATE] User already exists - Auth: ${!!authUserExists}, Profile: ${!!existingProfile}`);
       return new Response(JSON.stringify({
         success: false,
         error: 'User with this email already exists',
@@ -212,10 +219,10 @@ serve(async (req) => {
 
     console.log(`[ADMIN-CREATE] Auth user created: ${authData.user?.id}`);
 
-    // Create profile
+    // Create profile with upsert to handle race conditions
     const { error: profileError } = await supabase
       .from('profiles')
-      .insert({
+      .upsert({
         id: authData.user!.id,
         email: body.email,
         role: body.role,
@@ -223,12 +230,20 @@ serve(async (req) => {
         name: body.email.split('@')[0], // Default name from email
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
+      }, {
+        onConflict: 'id',
+        ignoreDuplicates: false
       });
 
     if (profileError) {
       console.error('[ADMIN-CREATE] Profile creation failed:', profileError);
-      // Try to cleanup auth user
-      await supabase.auth.admin.deleteUser(authData.user!.id);
+      // Try to cleanup auth user if profile creation fails
+      try {
+        await supabase.auth.admin.deleteUser(authData.user!.id);
+        console.log('[ADMIN-CREATE] Cleaned up auth user after profile failure');
+      } catch (cleanupError) {
+        console.error('[ADMIN-CREATE] Failed to cleanup auth user:', cleanupError);
+      }
       throw new Error(`Failed to create profile: ${profileError.message}`);
     }
 

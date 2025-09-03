@@ -152,16 +152,16 @@ export const sendOrderStatusNotification = async (
 ): Promise<void> => {
   try {
     // Map order status to notification template
-    // Corrected status-to-template mapping based on actual order statuses
+    // Status-to-template mapping using existing template keys
     const templateKeyMap: Record<string, string> = {
-      'confirmed': 'order_confirmed',
-      'preparing': 'order_preparing',
+      'confirmed': 'order_confirmation',
+      'preparing': 'order_processing',
       'ready': 'order_ready',
       'out_for_delivery': 'out_for_delivery',
       'delivered': 'order_completed',
       'completed': 'order_completed',
       'cancelled': 'order_canceled',
-      'paid': 'payment_confirmed'
+      'paid': 'payment_confirmation'
     };
 
     const templateKey = templateKeyMap[newStatus];

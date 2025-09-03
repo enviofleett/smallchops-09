@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { PermissionMatrixHealthMonitor } from "@/components/admin/PermissionMatrixHealthMonitor";
 import { 
   ChevronDown, 
   ChevronRight, 
@@ -198,7 +199,7 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
 
         if (error) {
           console.error('Error fetching user permissions:', error);
-          throw error;
+          throw new Error(`Permission fetch failed: ${error.message}`);
         }
         
         console.log('Fetched user permissions for user:', currentUser.id, data);
@@ -209,8 +210,14 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
       }
     },
     enabled: !!currentUser?.id,
-    retry: 3,
-    retryDelay: 1000
+    retry: (failureCount, error) => {
+      // Don't retry on permission errors
+      if (error?.message?.includes('Permission') || error?.message?.includes('Access denied')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000)
   });
 
   // Update local permissions state when data loads
@@ -276,10 +283,31 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
   };
 
   const handleSavePermissions = async () => {
-    if (!currentUser?.id) return;
+    if (!currentUser?.id) {
+      toast({
+        title: "No user selected",
+        description: "Please select a user to update permissions.",
+        variant: "destructive"
+      });
+      return;
+    }
     
     setIsSubmitting(true);
     try {
+      // Validate permissions data
+      const validPermissions = Object.entries(permissions).filter(([key, value]) => 
+        key && value && ['none', 'view', 'edit'].includes(value)
+      );
+
+      if (validPermissions.length === 0) {
+        toast({
+          title: "No permissions to update",
+          description: "Please configure at least one permission.",
+          variant: "destructive"
+        });
+        return;
+      }
+
       // Check rate limit first (skip if function not available)
       try {
         const { data: rateLimitCheck, error: rateLimitError } = await supabase.rpc('check_permission_change_rate_limit', {
@@ -298,7 +326,7 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
           if (!isAllowed) {
             toast({
               title: "Rate limit exceeded",
-              description: `Too many permission changes. Try again later.`,
+              description: `Too many permission changes. Please wait before trying again.`,
               variant: "destructive"
             });
             return;
@@ -312,7 +340,7 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
       // Use secure RPC function for permission updates
       const { data: result, error: updateError } = await supabase.rpc('update_user_permissions_secure', {
         target_user_id: currentUser.id,
-        permissions_data: permissions
+        permissions_data: Object.fromEntries(validPermissions)
       });
 
       if (updateError) {
@@ -320,16 +348,20 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
         throw new Error(updateError.message || 'Failed to update permissions');
       }
 
-      // Record the rate limit usage
-      await supabase.rpc('record_permission_change_rate_limit', {
-        target_user_id: currentUser.id,
-        changes_count: (result && typeof result === 'object' && 'changes_count' in result) ? 
-          Number(result.changes_count) || 1 : 1
-      });
+      // Record the rate limit usage (non-blocking)
+      try {
+        await supabase.rpc('record_permission_change_rate_limit', {
+          target_user_id: currentUser.id,
+          changes_count: (result && typeof result === 'object' && 'changes_count' in result) ? 
+            Number(result.changes_count) || validPermissions.length : validPermissions.length
+        });
+      } catch (rateLimitLogError) {
+        console.warn('Could not log rate limit usage:', rateLimitLogError);
+      }
 
       toast({
         title: "Permissions updated successfully", 
-        description: `${(result && typeof result === 'object' && 'changes_count' in result) ? (result as any).changes_count : 'Several'} permissions updated for ${currentUser.name}`,
+        description: `${(result && typeof result === 'object' && 'changes_count' in result) ? (result as any).changes_count : validPermissions.length} permissions updated for ${currentUser.name}`,
       });
 
       // Refresh permissions data
@@ -340,21 +372,31 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
     } catch (error: any) {
       console.error('Error updating permissions:', error);
       
-      // Implement retry logic for network errors
-      if (retryCount < 2 && (error.message?.includes('network') || error.message?.includes('fetch'))) {
+      // Implement retry logic for network errors only
+      if (retryCount < 2 && 
+          (error.message?.includes('network') || 
+           error.message?.includes('fetch') || 
+           error.message?.includes('timeout'))) {
         setRetryCount(prev => prev + 1);
-        setTimeout(() => handleSavePermissions(), 2000);
+        setTimeout(() => handleSavePermissions(), Math.min(2000 * (retryCount + 1), 10000));
         toast({
-          title: "Retrying...",
-          description: `Network error, retrying (${retryCount + 1}/3)`,
+          title: "Connection issue, retrying...",
+          description: `Attempt ${retryCount + 1}/3 - Network error detected`,
           variant: "destructive"
         });
         return;
       }
 
+      // Handle specific error types
+      const errorMessage = error.message?.includes('Permission denied') 
+        ? "You don't have permission to perform this action."
+        : error.message?.includes('User not found')
+        ? "The selected user could not be found."
+        : error.message || "An unexpected error occurred while updating permissions.";
+
       toast({
-        title: "Error updating permissions",
-        description: error.message || "Failed to update permissions. Please try again.",
+        title: "Failed to update permissions",
+        description: errorMessage,
         variant: "destructive"
       });
     } finally {
@@ -502,17 +544,22 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Shield className="h-5 w-5" />
-          User Permissions Matrix
-        </CardTitle>
-        <CardDescription>
-          Comprehensive access control for all application features including settings, payments, and developer tools. 
-          Configure granular permissions for each admin user across all system areas.
-        </CardDescription>
-      </CardHeader>
+    <div className="space-y-6">
+      {/* Health Monitor */}
+      <PermissionMatrixHealthMonitor />
+      
+      {/* Main Permission Matrix */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Shield className="h-5 w-5" />
+            User Permissions Matrix
+          </CardTitle>
+          <CardDescription>
+            Comprehensive access control for all application features including settings, payments, and developer tools. 
+            Configure granular permissions for each admin user across all system areas.
+          </CardDescription>
+        </CardHeader>
       <CardContent className="space-y-6">
         {!selectedUser && (
           <div>
@@ -532,7 +579,7 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
                   <SelectItem key={user.id} value={user.id}>
                     <div className="flex items-center gap-2">
                       <Badge variant="outline">{user.role}</Badge>
-                      {user.name}
+                      <span>{user.name}</span>
                     </div>
                   </SelectItem>
                 ))}
@@ -548,9 +595,10 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
                 <h3 className="text-lg font-semibold">
                   Permissions for {currentUser.name}
                 </h3>
-                <p className="text-sm text-muted-foreground">
-                  Role: <Badge>{currentUser.role}</Badge>
-                </p>
+                <div className="text-sm text-muted-foreground flex items-center gap-2">
+                  <span>Role:</span>
+                  <Badge>{currentUser.role}</Badge>
+                </div>
               </div>
               <Button 
                 onClick={handleSavePermissions} 
@@ -581,5 +629,6 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
         )}
       </CardContent>
     </Card>
+    </div>
   );
 };

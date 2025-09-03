@@ -30,13 +30,13 @@ export const usePermissions = () => {
 };
 
 export const useHasPermission = (menuKey: string, requiredLevel: 'view' | 'edit' = 'view') => {
-  const { data: permissions } = usePermissions();
+  const { data: permissions, isLoading } = usePermissions();
   const { user } = useAuth();
 
-  // Admins have all permissions
-  if (user?.role === 'admin') return true;
+  // Return false while loading permissions
+  if (isLoading || !user?.id) return false;
 
-  // Check specific permission
+  // Check specific permission for admin users too
   const permission = permissions?.find(p => p.menu_key === menuKey);
   if (!permission) return false;
 

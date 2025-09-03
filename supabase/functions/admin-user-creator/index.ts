@@ -1,3 +1,4 @@
+// Admin User Creator Edge Function
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
@@ -7,45 +8,45 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-interface CreateAdminRequest {
-  email: string;
-  role: string;
-  immediate_password?: string;
-  send_email?: boolean;
-  admin_created?: boolean;
-}
-
-// Generate secure password
-function generateSecurePassword(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*';
-  let password = '';
-  
-  // Ensure we have at least one of each type
-  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)]; // Uppercase
-  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)]; // Lowercase
-  password += '0123456789'[Math.floor(Math.random() * 10)]; // Number
-  password += '!@#$%^&*'[Math.floor(Math.random() * 8)]; // Special
-  
-  // Fill the rest randomly
-  for (let i = 4; i < 16; i++) {
-    password += chars[Math.floor(Math.random() * chars.length)];
+// Utility: Safe JSON parsing with validation
+async function safeJsonParse(req: Request) {
+  const contentType = req.headers.get('content-type') || ''
+  if (!contentType.toLowerCase().includes('application/json')) {
+    return null
   }
   
-  // Shuffle the password
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  try {
+    const text = await req.text()
+    if (!text.trim()) return null
+    return JSON.parse(text)
+  } catch {
+    return null
+  }
 }
 
-// Validate admin permissions
-async function validateAdminUser(supabase: any, authHeader: string) {
+// Utility: Standardized JSON response
+function jsonResponse(
+  body: { success: boolean; data?: any; error?: string; code?: string; message?: string },
+  status = 200
+) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+  })
+}
+
+// Utility: Get authenticated admin user
+async function getAuthenticatedAdminUser(supabase: any, req: Request) {
+  const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
-    throw new Error('Authorization header required');
+    throw { status: 401, code: 'MISSING_AUTH', message: 'Missing authorization header' }
   }
 
-  const token = authHeader.replace('Bearer ', '');
-  const { data: { user }, error: userError } = await supabase.auth.getUser(token);
+  const token = authHeader.replace('Bearer ', '')
+  const { data: { user }, error: userError } = await supabase.auth.getUser(token)
   
   if (userError || !user) {
-    throw new Error('Invalid authentication token');
+    throw { status: 401, code: 'INVALID_TOKEN', message: 'Invalid token' }
   }
 
   // Check if user is admin
@@ -53,294 +54,275 @@ async function validateAdminUser(supabase: any, authHeader: string) {
     .from('profiles')
     .select('role, is_active')
     .eq('id', user.id)
-    .single();
+    .single()
 
-  if (profileError || !profile || profile.role !== 'admin' || !profile.is_active) {
-    throw new Error('Admin privileges required');
+  if (profileError || !profile) {
+    throw { status: 403, code: 'ACCESS_DENIED', message: 'Access denied - profile not found' }
   }
 
-  return user;
+  if (profile.role !== 'admin' || !profile.is_active) {
+    throw { status: 403, code: 'ACCESS_DENIED', message: 'Access denied - admin privileges required' }
+  }
+
+  return user
 }
 
 serve(async (req) => {
-  console.log(`[ADMIN-CREATE] Request received: ${req.method} ${req.url}`);
-  
-  // Handle CORS preflight
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders })
   }
 
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    
-    console.log('[ADMIN-CREATE] Environment check:', {
-      hasUrl: !!supabaseUrl,
-      hasServiceKey: !!supabaseServiceKey,
-      urlLength: supabaseUrl?.length || 0,
-      keyLength: supabaseServiceKey?.length || 0
-    });
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
     
     if (!supabaseUrl || !supabaseServiceKey) {
-      console.error('[ADMIN-CREATE] Missing environment variables');
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Server configuration error - missing environment variables',
-        code: 'CONFIG_ERROR'
-      }), {
-        status: 500,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      });
+      console.error('[ADMIN-CREATOR] Missing Supabase environment variables')
+      return jsonResponse({ 
+        success: false, 
+        error: 'Server misconfiguration', 
+        code: 'SERVER_CONFIG' 
+      }, 500)
     }
-
-    console.log('[ADMIN-CREATE] Initializing Supabase client...');
     
-    // Initialize Supabase client with service role
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
         autoRefreshToken: false,
         persistSession: false
       }
-    });
+    })
 
-    console.log('[ADMIN-CREATE] Validating admin permissions...');
+    // Authenticate and authorize user
+    const user = await getAuthenticatedAdminUser(supabase, req)
     
-    // Validate requesting admin
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      console.error('[ADMIN-CREATE] No authorization header provided');
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Authorization required - please log in as admin',
-        code: 'AUTH_REQUIRED'
-      }), {
-        status: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      });
+    if (req.method !== 'POST') {
+      return jsonResponse({ 
+        success: false, 
+        error: 'Method not allowed', 
+        code: 'METHOD_NOT_ALLOWED' 
+      }, 405)
     }
+
+    // Safe JSON parsing
+    const body = await safeJsonParse(req)
     
-    const requestingAdmin = await validateAdminUser(supabase, authHeader);
-    console.log(`[ADMIN-CREATE] Admin validated: ${requestingAdmin.email}`);
-
-    // Parse request body
-    let body: CreateAdminRequest;
-    try {
-      body = await req.json();
-      console.log('[ADMIN-CREATE] Request body parsed:', {
-        email: body.email,
-        role: body.role,
-        hasPassword: !!body.immediate_password,
-        sendEmail: body.send_email,
-        adminCreated: body.admin_created
-      });
-    } catch (parseError) {
-      console.error('[ADMIN-CREATE] Failed to parse request body:', parseError);
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Invalid request format - please check your data',
-        code: 'PARSE_ERROR'
-      }), {
-        status: 400,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      });
-    }
-    
-    if (!body.email || !body.role) {
-      throw new Error('Email and role are required');
-    }
-
-    // Validate email format
-    const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/;
-    if (!emailRegex.test(body.email)) {
-      throw new Error('Invalid email format');
-    }
-
-    // Validate role
-    if (!['admin', 'user'].includes(body.role)) {
-      throw new Error('Role must be either "admin" or "user"');
-    }
-
-    console.log(`[ADMIN-CREATE] Creating admin user: ${body.email}`);
-
-    // Check if user already exists in auth or profiles
-    const { data: existingUser } = await supabase.auth.admin.listUsers();
-    const authUserExists = existingUser.users.find(u => u.email === body.email);
-    
-    // Also check if profile exists
-    const { data: existingProfile } = await supabase
-      .from('profiles')
-      .select('id, email')
-      .eq('email', body.email)
-      .single();
-    
-    if (authUserExists || existingProfile) {
-      console.log(`[ADMIN-CREATE] User already exists - Auth: ${!!authUserExists}, Profile: ${!!existingProfile}`);
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'User with this email already exists',
-        code: 'USER_EXISTS'
-      }), {
-        status: 200,
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders,
-        },
-      });
-    }
-
-    // Generate password (use provided or generate secure one)
-    const password = body.immediate_password || generateSecurePassword();
-
-    // Create auth user with admin client
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
-      email: body.email,
-      password: password,
-      email_confirm: !body.admin_created, // Skip email confirmation for admin-created users
-      user_metadata: {
-        role: body.role,
-        admin_created: body.admin_created || false,
-        created_by: requestingAdmin.id
-      }
-    });
-
-    if (authError) {
-      console.error('[ADMIN-CREATE] Auth user creation failed:', authError);
-      throw new Error(`Failed to create auth user: ${authError.message}`);
-    }
-
-    console.log(`[ADMIN-CREATE] Auth user created: ${authData.user?.id}`);
-
-    // Create profile with upsert to handle race conditions
-    const { error: profileError } = await supabase
-      .from('profiles')
-      .upsert({
-        id: authData.user!.id,
-        email: body.email,
-        role: body.role,
-        is_active: true,
-        name: body.email.split('@')[0], // Default name from email
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      }, {
-        onConflict: 'id',
-        ignoreDuplicates: false
-      });
-
-    if (profileError) {
-      console.error('[ADMIN-CREATE] Profile creation failed:', profileError);
-      // Try to cleanup auth user if profile creation fails
-      try {
-        await supabase.auth.admin.deleteUser(authData.user!.id);
-        console.log('[ADMIN-CREATE] Cleaned up auth user after profile failure');
-      } catch (cleanupError) {
-        console.error('[ADMIN-CREATE] Failed to cleanup auth user:', cleanupError);
-      }
-      throw new Error(`Failed to create profile: ${profileError.message}`);
-    }
-
-    // Log the creation
-    await supabase
-      .from('audit_logs')
-      .insert({
-        action: 'admin_user_created',
-        category: 'Admin Management',
-        message: `Admin user created: ${body.email} with role ${body.role}`,
-        user_id: requestingAdmin.id,
-        entity_id: authData.user!.id,
-        new_values: {
-          email: body.email,
-          role: body.role,
-          admin_created: body.admin_created,
-          immediate_access: !!body.immediate_password
-        }
-      });
-
-    // Send welcome email if requested (make email sending non-blocking)
-    if (body.send_email !== false) {
-      try {
-        // Use a simpler email approach - don't block on complex email processor
-        console.log('[ADMIN-CREATE] Skipping email send - not blocking admin creation');
-        // TODO: Implement simple email notification later
-      } catch (emailError) {
-        console.warn('[ADMIN-CREATE] Email notification skipped:', emailError);
-        // Don't fail the entire request if email fails
+    if (!body) {
+      throw { 
+        status: 400, 
+        code: 'BAD_JSON', 
+        message: 'Invalid or empty JSON body' 
       }
     }
 
-    const response = {
-      success: true,
-      message: 'Admin user created successfully',
-      data: {
-        user_id: authData.user!.id,
-        email: body.email,
-        role: body.role,
-        immediate_access: body.admin_created || !!body.immediate_password,
-        password: body.admin_created ? password : undefined // Only return password for admin-created users
-      }
-    };
-
-    console.log(`[ADMIN-CREATE] Admin user created successfully: ${body.email}`);
-
-    return new Response(JSON.stringify(response), {
-      status: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders,
-      },
-    });
+    return await createAdminUser(supabase, body, user)
 
   } catch (error: any) {
-    console.error('[ADMIN-CREATE] Error:', error.message || error);
+    const status = error?.status || 500
+    const code = error?.code || 'UNEXPECTED_ERROR'
+    const message = error?.message || 'Unexpected error occurred'
     
-    // Enhanced error logging for production debugging
-    console.error('[ADMIN-CREATE] Error stack:', error.stack);
-    console.error('[ADMIN-CREATE] Error details:', {
-      message: error.message,
-      code: error.code,
-      details: error.details,
-      hint: error.hint
-    });
+    console.error('[ADMIN-CREATOR] Error:', { status, code, message, url: req.url })
     
-    // Determine appropriate status code
-    let statusCode = 500;
-    let errorMessage = 'An unexpected error occurred while creating admin user';
+    return jsonResponse({ 
+      success: false, 
+      error: message, 
+      code 
+    }, status)
+  }
+})
+
+async function createAdminUser(supabase: any, body: any, createdBy: any) {
+  console.log('[ADMIN-CREATOR] Creating admin user:', body.email)
+  
+  // Enhanced input validation
+  if (!body.email || !body.role) {
+    throw { 
+      status: 400, 
+      code: 'REQUIRED_FIELDS', 
+      message: 'Email and role are required' 
+    }
+  }
+
+  // More robust email validation
+  const emailRegex = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}$/
+  if (!emailRegex.test(body.email)) {
+    throw { 
+      status: 400, 
+      code: 'INVALID_EMAIL', 
+      message: 'Invalid email format' 
+    }
+  }
+
+  if (!['admin', 'user'].includes(body.role)) {
+    throw { 
+      status: 400, 
+      code: 'INVALID_ROLE', 
+      message: 'Role must be either "admin" or "user"' 
+    }
+  }
+
+  // Check if user already exists
+  const { data: existingUser } = await supabase.auth.admin.listUsers({
+    filter: `email.eq.${body.email}`
+  })
+
+  if (existingUser?.users?.length > 0) {
+    console.log('[ADMIN-CREATOR] User already exists:', body.email)
+    return jsonResponse({
+      success: false,
+      code: 'USER_EXISTS',
+      message: 'A user with this email already exists'
+    })
+  }
+
+  const hasImmediateAccess = body.immediate_password && body.immediate_password.length > 0
+  
+  let createdUser
+  let userPassword = body.immediate_password
+
+  if (hasImmediateAccess) {
+    // Create user with password and automatically verify email
+    console.log('[ADMIN-CREATOR] Creating user with immediate access and auto-verified email')
     
-    if (error.message.includes('required') || error.message.includes('Invalid')) {
-      statusCode = 400;
-      errorMessage = error.message;
-    } else if (error.message.includes('already exists')) {
-      statusCode = 409;
-      errorMessage = 'An admin user with this email already exists';
-    } else if (error.message.includes('Admin privileges')) {
-      statusCode = 403;
-      errorMessage = 'Insufficient admin privileges to create users';
-    } else if (error.message.includes('Server configuration')) {
-      statusCode = 500;
-      errorMessage = 'Server configuration error - please contact support';
-    } else {
-      errorMessage = error.message || errorMessage;
+    const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+      email: body.email,
+      password: userPassword,
+      email_confirm: true, // Automatically confirm email - this bypasses email verification
+      user_metadata: {
+        role: body.role,
+        created_by_admin: true,
+        immediate_access: true,
+        created_at: new Date().toISOString()
+      }
+    })
+
+    if (createError) {
+      console.error('[ADMIN-CREATOR] Error creating user:', createError)
+      throw { 
+        status: 500, 
+        code: 'USER_CREATION_FAILED', 
+        message: `Failed to create user: ${createError.message}` 
+      }
+    }
+
+    createdUser = newUser.user
+    console.log('[ADMIN-CREATOR] User created with auto-verified email:', createdUser.id)
+
+  } else {
+    // Create user without password - they'll need to use password reset
+    console.log('[ADMIN-CREATOR] Creating user for invitation flow')
+    
+    const { data: newUser, error: createError } = await supabase.auth.admin.createUser({
+      email: body.email,
+      email_confirm: false, // Will need to verify via email
+      user_metadata: {
+        role: body.role,
+        created_by_admin: true,
+        immediate_access: false,
+        created_at: new Date().toISOString()
+      }
+    })
+
+    if (createError) {
+      console.error('[ADMIN-CREATOR] Error creating user:', createError)
+      throw { 
+        status: 500, 
+        code: 'USER_CREATION_FAILED', 
+        message: `Failed to create user: ${createError.message}` 
+      }
+    }
+
+    createdUser = newUser.user
+  }
+
+  // Create profile for the user
+  const { error: profileError } = await supabase
+    .from('profiles')
+    .insert({
+      id: createdUser.id,
+      name: body.email.split('@')[0], // Use email prefix as default name
+      email: body.email,
+      role: body.role,
+      is_active: true,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    })
+
+  if (profileError) {
+    console.error('[ADMIN-CREATOR] Error creating profile:', profileError)
+    // Try to clean up the created user
+    try {
+      await supabase.auth.admin.deleteUser(createdUser.id)
+    } catch (cleanupError) {
+      console.error('[ADMIN-CREATOR] Failed to cleanup user after profile error:', cleanupError)
     }
     
-    return new Response(JSON.stringify({
-      success: false,
-      error: errorMessage,
-      code: 'ADMIN_CREATION_ERROR',
-      timestamp: new Date().toISOString()
-    }), {
-      status: statusCode,
-      headers: {
-        'Content-Type': 'application/json',
-        ...corsHeaders,
-      },
-    });
+    throw { 
+      status: 500, 
+      code: 'PROFILE_CREATION_FAILED', 
+      message: `Failed to create user profile: ${profileError.message}` 
+    }
   }
-});
+
+  // Log the user creation
+  await supabase
+    .from('audit_logs')
+    .insert({
+      action: 'admin_user_created',
+      category: 'Admin Management',
+      message: `Admin user created: ${body.email} ${hasImmediateAccess ? '(with immediate access)' : '(invitation flow)'}`,
+      user_id: createdBy.id,
+      entity_id: createdUser.id,
+      new_values: {
+        email: body.email,
+        role: body.role,
+        immediate_access: hasImmediateAccess,
+        email_verified: hasImmediateAccess, // Auto-verified for immediate access
+        created_by: createdBy.id
+      }
+    })
+
+  // Send welcome email if requested and not using immediate access
+  if (body.send_email && !hasImmediateAccess) {
+    try {
+      await supabase.functions.invoke('supabase-auth-email-sender', {
+        body: {
+          templateId: 'admin_welcome',
+          to: body.email,
+          variables: {
+            role: body.role,
+            companyName: 'Starters Small Chops',
+            login_url: 'https://startersmallchops.com/auth'
+          },
+          emailType: 'transactional'
+        }
+      })
+      console.log('[ADMIN-CREATOR] Welcome email sent successfully')
+    } catch (emailError) {
+      console.warn('[ADMIN-CREATOR] Failed to send welcome email:', emailError)
+      // Don't fail the whole request if email fails
+    }
+  }
+
+  const responseData = {
+    user_id: createdUser.id,
+    email: body.email,
+    role: body.role,
+    immediate_access: hasImmediateAccess,
+    email_verified: hasImmediateAccess
+  }
+
+  // Include password in response only for immediate access
+  if (hasImmediateAccess) {
+    responseData.password = userPassword
+  }
+
+  return jsonResponse({
+    success: true, 
+    message: hasImmediateAccess 
+      ? 'Admin user created with immediate access and auto-verified email'
+      : 'Admin user created successfully',
+    data: responseData
+  })
+}

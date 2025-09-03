@@ -176,7 +176,18 @@ serve(async (req) => {
     const userExists = existingUser.users.find(u => u.email === body.email);
     
     if (userExists) {
-      throw new Error('User with this email already exists');
+      // Return a 200 with explicit code so the client can handle gracefully
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'User with this email already exists',
+        code: 'USER_EXISTS'
+      }), {
+        status: 200,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      });
     }
 
     // Generate password (use provided or generate secure one)

@@ -101,6 +101,13 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
         setSendEmail(true);
         onOpenChange(false);
         onSuccess?.();
+      } else if (data?.code === 'USER_EXISTS') {
+        toast({
+          title: 'User Already Exists',
+          description: 'An account with this email already exists. You can set their role to admin instead.',
+          variant: 'destructive'
+        });
+        return;
       } else {
         throw new Error(data?.error || 'Failed to create admin user');
       }

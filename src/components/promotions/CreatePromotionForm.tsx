@@ -33,7 +33,6 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
-import { DaysSelector } from "./DaysSelector";
 
 const PromotionFormSchema = z.object({
   name: z.string()
@@ -89,7 +88,6 @@ const PromotionFormSchema = z.object({
     .refine(val => !val || /^[A-Z0-9]{3,20}$/.test(val), "Code must be 3-20 characters, letters and numbers only"),
   applicable_categories: z.array(z.string()).optional(),
   applicable_products: z.array(z.string()).optional(),
-  applicable_days: z.array(z.string()).optional(),
   valid_from: z.date().optional(),
   valid_until: z.date().optional(),
 }).refine((data) => {
@@ -159,7 +157,6 @@ export default function CreatePromotionForm({
       code: "",
       applicable_categories: [],
       applicable_products: [],
-      applicable_days: [],
       valid_from: undefined,
       valid_until: undefined,
     },
@@ -621,28 +618,6 @@ export default function CreatePromotionForm({
           <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Schedule</h4>
         </div>
         
-        {/* Days Selection */}
-        <FormField
-          control={form.control}
-          name="applicable_days"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Applicable Days</FormLabel>
-              <FormControl>
-                <DaysSelector
-                  selectedDays={field.value || []}
-                  onDaysChange={field.onChange}
-                  disabled={disabled || isSubmitting}
-                />
-              </FormControl>
-              <FormDescription>
-                Select specific days or leave empty for all days
-              </FormDescription>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-
         {/* Dates */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Start Date */}

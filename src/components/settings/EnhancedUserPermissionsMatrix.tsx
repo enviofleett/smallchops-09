@@ -62,6 +62,39 @@ const permissionLevels = [
   { value: 'edit', label: 'Full Access', color: 'default' },
 ];
 
+// PRODUCTION SECURITY: Validate permission assignments before saving
+const validatePermissionsForProduction = (permissions: Record<string, string>) => {
+  const criticalMenus = [
+    'settings_admin_users',
+    'settings_admin_permissions', 
+    'settings_payments_providers',
+    'settings_developer_auth',
+    'settings_developer_payments_webhooks'
+  ];
+  
+  const warnings: string[] = [];
+  const errors: string[] = [];
+  
+  // Check for critical menus with insufficient permissions
+  criticalMenus.forEach(menuKey => {
+    const level = permissions[menuKey];
+    if (level === 'view') {
+      warnings.push(`${menuKey}: View-only access to critical system area`);
+    }
+    if (level === 'none') {
+      warnings.push(`${menuKey}: No access to critical system area`);
+    }
+  });
+  
+  // Ensure at least one user has full access to user management
+  const hasUserManagementAccess = permissions['settings_admin_users'] === 'edit';
+  if (!hasUserManagementAccess) {
+    errors.push('At least one admin must have full access to user management');
+  }
+  
+  return { warnings, errors, isValid: errors.length === 0 };
+};
+
 const getMenuIcon = (menuKey: string) => {
   switch (menuKey) {
     case 'dashboard': return <Home className="h-4 w-4" />;

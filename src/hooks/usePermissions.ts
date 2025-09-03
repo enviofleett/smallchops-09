@@ -33,16 +33,24 @@ export const useHasPermission = (menuKey: string, requiredLevel: 'view' | 'edit'
   const { data: permissions, isLoading } = usePermissions();
   const { user } = useAuth();
 
-  // Return false while loading permissions
+  // PRODUCTION SECURITY: Return false while loading permissions to prevent unauthorized access
   if (isLoading || !user?.id) return false;
 
-  // Check specific permission for admin users too
+  // PRODUCTION SECURITY: Find exact permission for the menu key
   const permission = permissions?.find(p => p.menu_key === menuKey);
+  
+  // PRODUCTION SECURITY: Deny access if no permission found (default deny policy)
   if (!permission) return false;
 
+  // PRODUCTION SECURITY: Only allow access for valid permission levels
+  // 'none' permission level explicitly denies access
+  if (permission.permission_level === 'none') return false;
+
+  // PRODUCTION LOGIC: For 'view' access, allow both 'view' and 'edit' levels
   if (requiredLevel === 'view') {
     return permission.permission_level === 'view' || permission.permission_level === 'edit';
   }
 
+  // PRODUCTION LOGIC: For 'edit' access, only allow 'edit' level (full access)
   return permission.permission_level === 'edit';
 };

@@ -9,15 +9,28 @@ export const usePermissionGuard = (menuKey: string, requiredLevel: 'view' | 'edi
   const { user, isLoading: authLoading } = useAuth();
   const hasPermission = useHasPermission(menuKey, requiredLevel);
   
-  // Safety checks for production
+  // PRODUCTION SECURITY: Enhanced safety checks
   const isLoading = authLoading;
   const isAuthenticated = !!user?.id;
   
-  // Return permission status with loading state
+  // PRODUCTION SECURITY: Triple validation for production access
+  // 1. User must be authenticated
+  // 2. User must have specific permission for the menu
+  // 3. Permission level must meet the required level (view/edit)
+  const productionSafePermission = isAuthenticated && hasPermission && !isLoading;
+  
   return {
-    hasPermission: isAuthenticated && hasPermission,
+    hasPermission: productionSafePermission,
     isLoading,
-    isAuthenticated
+    isAuthenticated,
+    // Additional production context
+    menuKey,
+    requiredLevel,
+    debugInfo: process.env.NODE_ENV === 'development' ? {
+      userAuthenticated: isAuthenticated,
+      rawPermissionCheck: hasPermission,
+      isLoading: isLoading
+    } : undefined
   };
 };
 

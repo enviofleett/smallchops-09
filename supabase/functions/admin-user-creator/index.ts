@@ -221,7 +221,6 @@ serve(async (req) => {
         role: body.role,
         is_active: true,
         name: body.email.split('@')[0], // Default name from email
-        email_verified: body.admin_created || false,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       });

@@ -98,6 +98,15 @@ const AdminAuth = () => {
               </Alert>
             )}
 
+            {isLogin && isLoading && (
+              <Alert className="border-blue-200 bg-blue-50">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                <AlertDescription>
+                  Logging you in and setting up your admin access...
+                </AlertDescription>
+              </Alert>
+            )}
+
             {!isLogin && (
               <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>

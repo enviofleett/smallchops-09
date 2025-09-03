@@ -614,6 +614,70 @@ export const EmailTemplateManager: React.FC = () => {
               />
             </div>
 
+            {/* Available Variables Reference */}
+            <Card className="border-blue-200 bg-blue-50/50">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-sm flex items-center gap-2">
+                  <Code className="h-4 w-4" />
+                  Available Template Variables
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Use these variables in your templates with double curly braces: <code>{'{{variable_name}}'}</code>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4 text-sm">
+                <div className="grid gap-3 md:grid-cols-3">
+                  <div>
+                    <h4 className="font-medium text-green-700 mb-2">Business Information</h4>
+                    <div className="space-y-1 text-xs">
+                      <div><code>business_name</code> - Business name</div>
+                      <div><code>business_tagline</code> - Business tagline</div>
+                      <div><code>business_website</code> - Website URL</div>
+                      <div><code>business_email</code> - Business email</div>
+                      <div><code>business_phone</code> - WhatsApp number</div>
+                      <div><code>business_hours</code> - Working hours</div>
+                      <div><code>support_email</code> - Support email</div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium text-blue-700 mb-2">Customer Information</h4>
+                    <div className="space-y-1 text-xs">
+                      <div><code>customer_name</code> - Customer full name</div>
+                      <div><code>customerName</code> - Customer name (alias)</div>
+                      <div><code>customer_email</code> - Customer email</div>
+                    </div>
+                    
+                    <h4 className="font-medium text-purple-700 mb-2 mt-3">Date & Time</h4>
+                    <div className="space-y-1 text-xs">
+                      <div><code>current_year</code> - Current year</div>
+                      <div><code>current_date</code> - Current date</div>
+                    </div>
+                  </div>
+                  
+                  <div>
+                    <h4 className="font-medium text-orange-700 mb-2">Order Information</h4>
+                    <div className="space-y-1 text-xs">
+                      <div><code>order_number</code> - Order number</div>
+                      <div><code>orderNumber</code> - Order number (alias)</div>
+                      <div><code>order_total</code> - Order total amount</div>
+                      <div><code>amount</code> - Amount (alias)</div>
+                      <div><code>order_status</code> - Order status</div>
+                      <div><code>delivery_address</code> - Delivery address</div>
+                      <div><code>estimated_delivery</code> - Estimated delivery</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <Alert className="border-amber-200 bg-amber-50">
+                  <AlertDescription className="text-xs">
+                    <strong>Pro tip:</strong> All variables are automatically populated with live production data when templates are sent. 
+                    Test templates use real data from your database for accurate previews.
+                  </AlertDescription>
+                </Alert>
+              </CardContent>
+            </Card>
+
             <div className="flex items-center justify-between pt-4">
               <div className="flex items-center space-x-2">
                 <input

@@ -25,87 +25,53 @@ export function DaysSelector({
   onDaysChange,
   disabled = false,
 }: DaysSelectorProps) {
-  // PRODUCTION: Prevent unnecessary re-renders with stable state
-  const [localSelectedDays, setLocalSelectedDays] = React.useState<string[]>(() => selectedDays);
-  
-  // PRODUCTION: Sync with external state changes
-  React.useEffect(() => {
-    setLocalSelectedDays(selectedDays || []);
-  }, [selectedDays]);
+  // PRODUCTION: Simple, direct state management without local state
+  const safeSelectedDays = React.useMemo(() => selectedDays || [], [selectedDays]);
 
-  // PRODUCTION: Debounced external state update
-  const debouncedOnDaysChange = React.useCallback(
-    React.useMemo(() => {
-      let timeoutId: NodeJS.Timeout;
-      return (newDays: string[]) => {
-        clearTimeout(timeoutId);
-        timeoutId = setTimeout(() => {
-          onDaysChange(newDays);
-        }, 50);
-      };
-    }, [onDaysChange]),
-    [onDaysChange]
-  );
-
-  // PRODUCTION: Enhanced day toggle with local state management
+  // PRODUCTION: Direct day toggle handler - no debouncing, no local state
   const handleDayToggle = React.useCallback((day: string, checked: boolean) => {
+    if (disabled) return;
+    
     try {
-      if (disabled) return;
+      const newDays = checked 
+        ? safeSelectedDays.includes(day) ? safeSelectedDays : [...safeSelectedDays, day]
+        : safeSelectedDays.filter((d) => d !== day);
       
-      setLocalSelectedDays(prevDays => {
-        const newDays = checked 
-          ? prevDays.includes(day) ? prevDays : [...prevDays, day]
-          : prevDays.filter((d) => d !== day);
-        
-        debouncedOnDaysChange(newDays);
-        return newDays;
-      });
+      onDaysChange(newDays);
     } catch (error) {
       console.error('Error toggling day selection:', error);
     }
-  }, [disabled, debouncedOnDaysChange]);
+  }, [onDaysChange, disabled, safeSelectedDays]);
 
-  // PRODUCTION: Enhanced select all with local state management
+  // PRODUCTION: Direct select all handler
   const handleSelectAll = React.useCallback(() => {
+    if (disabled) return;
+    
     try {
-      if (disabled) return;
+      const newDays = safeSelectedDays.length === DAYS_OF_WEEK.length 
+        ? [] 
+        : DAYS_OF_WEEK.map((day) => day.value);
       
-      setLocalSelectedDays(prevDays => {
-        const newDays = prevDays.length === DAYS_OF_WEEK.length 
-          ? [] 
-          : DAYS_OF_WEEK.map((day) => day.value);
-        
-        debouncedOnDaysChange(newDays);
-        return newDays;
-      });
+      onDaysChange(newDays);
     } catch (error) {
       console.error('Error in select all operation:', error);
     }
-  }, [disabled, debouncedOnDaysChange]);
+  }, [onDaysChange, disabled, safeSelectedDays]);
 
-  // PRODUCTION: Stable keyboard navigation handler
+  // PRODUCTION: Simple keyboard navigation
   const handleKeyDown = React.useCallback((event: React.KeyboardEvent, day: string) => {
     if (disabled) return;
     
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      const isSelected = localSelectedDays.includes(day);
+      const isSelected = safeSelectedDays.includes(day);
       handleDayToggle(day, !isSelected);
     }
-  }, [handleDayToggle, disabled, localSelectedDays]);
+  }, [handleDayToggle, disabled, safeSelectedDays]);
 
-  // PRODUCTION: Memoized computed values to prevent re-renders
-  const { allSelected, noneSelected } = React.useMemo(() => ({
-    allSelected: localSelectedDays.length === DAYS_OF_WEEK.length,
-    noneSelected: localSelectedDays.length === 0,
-  }), [localSelectedDays.length]);
-
-  // PRODUCTION: Cleanup on unmount
-  React.useEffect(() => {
-    return () => {
-      // Clear any pending debounced calls
-    };
-  }, []);
+  // PRODUCTION: Simple computed values
+  const allSelected = safeSelectedDays.length === DAYS_OF_WEEK.length;
+  const noneSelected = safeSelectedDays.length === 0;
 
   return (
     <Card className="border-primary/20">
@@ -143,9 +109,9 @@ export function DaysSelector({
           </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="w-3 h-3" />
-            {localSelectedDays.length === 0
+            {safeSelectedDays.length === 0
               ? "Active every day"
-              : `Active ${localSelectedDays.length} day${localSelectedDays.length !== 1 ? "s" : ""}`}
+              : `Active ${safeSelectedDays.length} day${safeSelectedDays.length !== 1 ? "s" : ""}`}
           </div>
         </div>
 
@@ -156,12 +122,12 @@ export function DaysSelector({
           aria-labelledby="days-selection-label"
         >
         {DAYS_OF_WEEK.map((day) => {
-          const isSelected = localSelectedDays.includes(day.value);
+          const isSelected = safeSelectedDays.includes(day.value);
           return (
             <div
               key={day.value}
               className={`
-                flex items-center gap-2 p-2 md:p-3 rounded-lg border transition-colors focus-within:ring-2 focus-within:ring-primary/50
+                flex items-center gap-2 p-2 md:p-3 rounded-lg border transition-colors
                 ${
                   isSelected
                     ? "bg-primary/5 border-primary/30"
@@ -169,11 +135,6 @@ export function DaysSelector({
                 }
                 ${disabled ? "opacity-50 cursor-not-allowed" : "cursor-pointer hover:bg-muted/70"}
               `}
-              role="button"
-              tabIndex={disabled ? -1 : 0}
-              aria-pressed={isSelected}
-              aria-label={`${day.label} - ${isSelected ? 'selected' : 'not selected'}`}
-              onKeyDown={(e) => handleKeyDown(e, day.value)}
               onClick={(e) => {
                 e.preventDefault();
                 if (!disabled) {
@@ -190,8 +151,6 @@ export function DaysSelector({
                   }
                 }}
                 disabled={disabled}
-                tabIndex={-1} // Remove from tab order, parent handles focus
-                aria-hidden="true" // Hidden from screen readers, parent provides context
               />
               <div className="flex flex-col">
                 <span className="text-sm font-medium">{day.short}</span>
@@ -204,12 +163,12 @@ export function DaysSelector({
         })}
         </div>
 
-        {localSelectedDays.length > 0 && (
+        {safeSelectedDays.length > 0 && (
           <div className="mt-4 p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">
               <strong>Active on:</strong>{" "}
               {DAYS_OF_WEEK
-                .filter((day) => localSelectedDays.includes(day.value))
+                .filter((day) => safeSelectedDays.includes(day.value))
                 .map((day) => day.label)
                 .join(", ")}
             </p>

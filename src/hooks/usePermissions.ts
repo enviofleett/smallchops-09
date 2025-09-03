@@ -36,14 +36,11 @@ export const useHasPermission = (menuKey: string, requiredLevel: 'view' | 'edit'
   // PRODUCTION SECURITY: Return false while loading permissions to prevent unauthorized access
   if (isLoading || !user?.id) return false;
 
-  // PRODUCTION ADMIN OVERRIDE: Check if user is admin first
-  const isAdmin = permissions?.some(p => p.menu_key === 'settings_admin_users' && p.permission_level === 'edit');
-  
   // PRODUCTION SECURITY: Find exact permission for the menu key
   let permission = permissions?.find(p => p.menu_key === menuKey);
   
   // PRODUCTION FALLBACK: Legacy key mapping for backward compatibility
-  if (!permission && !isAdmin) {
+  if (!permission) {
     const legacyKeyMap: Record<string, string> = {
       'orders_view': 'orders',
       'categories_view': 'categories', 
@@ -59,11 +56,6 @@ export const useHasPermission = (menuKey: string, requiredLevel: 'view' | 'edit'
       permission = permissions?.find(p => p.menu_key === legacyKey);
     }
   }
-
-  // PRODUCTION ADMIN OVERRIDE: Admins get full access to all menus
-  if (isAdmin) {
-    return true;
-  }
   
   // PRODUCTION SECURITY: Deny access if no permission found (default deny policy)
   if (!permission) return false;
@@ -72,7 +64,16 @@ export const useHasPermission = (menuKey: string, requiredLevel: 'view' | 'edit'
   // 'none' permission level explicitly denies access
   if (permission.permission_level === 'none') return false;
 
-  // PRODUCTION LOGIC: For 'view' access, allow both 'view' and 'edit' levels
+  // PRODUCTION ADMIN STRICT MODE: Admin users must have explicit 'edit' permissions
+  // No admin overrides - all users including admins must have proper permissions
+  const isAdminUser = permissions?.some(p => p.menu_key === 'settings_admin_users' && p.permission_level === 'edit');
+  
+  if (isAdminUser) {
+    // PRODUCTION: Admins can only access menus with explicit 'edit' (Full Access) permissions
+    return permission.permission_level === 'edit';
+  }
+
+  // PRODUCTION LOGIC: For regular users, allow view/edit based on required level
   if (requiredLevel === 'view') {
     return permission.permission_level === 'view' || permission.permission_level === 'edit';
   }

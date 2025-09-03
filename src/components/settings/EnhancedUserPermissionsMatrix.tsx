@@ -63,7 +63,7 @@ const permissionLevels = [
 ];
 
 // PRODUCTION SECURITY: Validate permission assignments before saving
-const validatePermissionsForProduction = (permissions: Record<string, string>) => {
+const validatePermissionsForProduction = (permissions: Record<string, string>, isAdminUser: boolean) => {
   const criticalMenus = [
     'settings_admin_users',
     'settings_admin_permissions', 
@@ -75,21 +75,32 @@ const validatePermissionsForProduction = (permissions: Record<string, string>) =
   const warnings: string[] = [];
   const errors: string[] = [];
   
-  // Check for critical menus with insufficient permissions
-  criticalMenus.forEach(menuKey => {
-    const level = permissions[menuKey];
-    if (level === 'view') {
-      warnings.push(`${menuKey}: View-only access to critical system area`);
+  // STRICT ADMIN MODE: Admin users must have 'edit' for all menu access
+  if (isAdminUser) {
+    Object.entries(permissions).forEach(([menuKey, level]) => {
+      if (level === 'view') {
+        warnings.push(`${menuKey}: Admin users need 'Full Access' not 'View Only' for menu access`);
+      }
+      if (level === 'none') {
+        warnings.push(`${menuKey}: Admin user will lose access to this menu with 'No Access'`);
+      }
+    });
+    
+    // Critical: Ensure admin retains user management access
+    if (permissions['settings_admin_users'] !== 'edit') {
+      errors.push('Admin users must maintain Full Access to User Management to prevent lockout');
     }
-    if (level === 'none') {
-      warnings.push(`${menuKey}: No access to critical system area`);
-    }
-  });
-  
-  // Ensure at least one user has full access to user management
-  const hasUserManagementAccess = permissions['settings_admin_users'] === 'edit';
-  if (!hasUserManagementAccess) {
-    errors.push('At least one admin must have full access to user management');
+  } else {
+    // Check for critical menus with insufficient permissions for regular users
+    criticalMenus.forEach(menuKey => {
+      const level = permissions[menuKey];
+      if (level === 'view') {
+        warnings.push(`${menuKey}: View-only access to critical system area`);
+      }
+      if (level === 'none') {
+        warnings.push(`${menuKey}: No access to critical system area`);
+      }
+    });
   }
   
   return { warnings, errors, isValid: errors.length === 0 };
@@ -339,6 +350,25 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
           variant: "destructive"
         });
         return;
+      }
+
+      // PRODUCTION VALIDATION: Check permissions for admin users
+      const isAdminUser = currentUser.role === 'admin';
+      const validation = validatePermissionsForProduction(permissions, isAdminUser);
+      
+      if (!validation.isValid) {
+        toast({
+          title: "Permission validation failed",
+          description: validation.errors.join('. '),
+          variant: "destructive"
+        });
+        return;
+      }
+      
+      // Show warnings for admin permission assignments
+      if (validation.warnings.length > 0) {
+        console.warn('Permission warnings:', validation.warnings);
+        // Could add a confirmation dialog here for warnings
       }
 
       // Check rate limit first (skip if function not available)

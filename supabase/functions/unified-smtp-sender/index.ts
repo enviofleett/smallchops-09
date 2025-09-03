@@ -6,20 +6,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 const isProductionMode = Deno.env.get('EMAIL_PRODUCTION_MODE')?.toLowerCase() === 'true' || 
                         Deno.env.get('DENO_ENV') === 'production';
 
-// Branded fallback configuration
-const allowBrandedFallback = Deno.env.get('EMAIL_ALLOW_BRANDED_FALLBACK')?.toLowerCase() === 'true';
-const brandedFallbackWhitelist = Deno.env.get('BRANDED_FALLBACK_WHITELIST')?.split(',').map(s => s.trim()) || [
-  'order_status_update',
-  'order_confirmation', 
-  'order_preparing',
-  'order_ready',
-  'out_for_delivery',
-  'customer_welcome',
-  'admin_status_update'
-];
-
 console.log(`🔒 Email Production Mode: ${isProductionMode ? 'ENABLED' : 'DISABLED'} (EMAIL_PRODUCTION_MODE=${Deno.env.get('EMAIL_PRODUCTION_MODE')}, DENO_ENV=${Deno.env.get('DENO_ENV')})`);
-console.log(`🎨 Branded Fallback Mode: ${allowBrandedFallback ? 'ENABLED' : 'DISABLED'} (Whitelist: ${brandedFallbackWhitelist.join(', ')})`);
 
 // Configuration constants
 const TIMEOUTS = {
@@ -293,149 +280,7 @@ const BASE_EMAIL_LAYOUT = `
 </html>
 `;
 
-// Branded Fallback Library - Curated templates for production-safe fallbacks
-const BRANDED_FALLBACK_LIBRARY: Record<string, {
-  subject: string;
-  html: string;
-  text: string;
-  variables?: string[];
-}> = {
-  order_status_update: {
-    subject: '{{business_name}} - Order {{order_number}} Status Update',
-    html: `
-      <h2>Order Status Update</h2>
-      <p>Hello {{customer_name}},</p>
-      <p>Your order <strong>#{{order_number}}</strong> status has been updated to: <strong>{{status}}</strong></p>
-      {{#order_items}}
-      <div style="margin: 15px 0; padding: 10px; border: 1px solid #e9ecef; border-radius: 4px;">
-        <h4 style="margin: 0 0 5px 0;">{{order_items}}</h4>
-      </div>
-      {{/order_items}}
-      <p><strong>Order Total:</strong> ₦{{total_amount}}</p>
-      {{#delivery_address}}
-      <p><strong>Delivery Address:</strong><br>{{delivery_address}}</p>
-      {{/delivery_address}}
-      <p>Thank you for choosing {{business_name}}!</p>
-    `,
-    text: `Order Status Update\n\nHello {{customer_name}},\n\nYour order #{{order_number}} status has been updated to: {{status}}\n\nOrder Items:\n{{order_items}}\n\nOrder Total: ₦{{total_amount}}\n\n{{#delivery_address}}Delivery Address:\n{{delivery_address}}\n\n{{/delivery_address}}Thank you for choosing {{business_name}}!`,
-    variables: ['customer_name', 'order_number', 'status', 'order_items', 'total_amount', 'delivery_address']
-  },
-  
-  order_confirmation: {
-    subject: '{{business_name}} - Order Confirmation #{{order_number}}',
-    html: `
-      <h2>Order Confirmation</h2>
-      <p>Hello {{customer_name}},</p>
-      <p>Thank you for your order! We've received your order <strong>#{{order_number}}</strong> and we're preparing it for you.</p>
-      <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
-        <h3 style="margin-top: 0;">Order Details</h3>
-        {{order_items}}
-        <p style="margin-bottom: 0;"><strong>Total: ₦{{total_amount}}</strong></p>
-      </div>
-      {{#delivery_address}}
-      <p><strong>Delivery Address:</strong><br>{{delivery_address}}</p>
-      {{/delivery_address}}
-      <p>We'll keep you updated on your order status. Thank you for choosing {{business_name}}!</p>
-    `,
-    text: `Order Confirmation\n\nHello {{customer_name}},\n\nThank you for your order! We've received your order #{{order_number}} and we're preparing it for you.\n\nOrder Details:\n{{order_items}}\nTotal: ₦{{total_amount}}\n\n{{#delivery_address}}Delivery Address:\n{{delivery_address}}\n\n{{/delivery_address}}We'll keep you updated on your order status. Thank you for choosing {{business_name}}!`,
-    variables: ['customer_name', 'order_number', 'order_items', 'total_amount', 'delivery_address']
-  },
-  
-  order_preparing: {
-    subject: '{{business_name}} - Your Order is Being Prepared #{{order_number}}',
-    html: `
-      <h2>Your Order is Being Prepared!</h2>
-      <p>Hello {{customer_name}},</p>
-      <p>Great news! We're now preparing your order <strong>#{{order_number}}</strong>.</p>
-      <p>Our kitchen team is carefully preparing your items. You'll receive another notification when your order is ready.</p>
-      <p><strong>Estimated preparation time:</strong> {{preparation_time}} minutes</p>
-      <p>Thank you for your patience and for choosing {{business_name}}!</p>
-    `,
-    text: `Your Order is Being Prepared!\n\nHello {{customer_name}},\n\nGreat news! We're now preparing your order #{{order_number}}.\n\nOur kitchen team is carefully preparing your items. You'll receive another notification when your order is ready.\n\nEstimated preparation time: {{preparation_time}} minutes\n\nThank you for your patience and for choosing {{business_name}}!`,
-    variables: ['customer_name', 'order_number', 'preparation_time']
-  },
-  
-  order_ready: {
-    subject: '{{business_name}} - Your Order is Ready! #{{order_number}}',
-    html: `
-      <h2>Your Order is Ready!</h2>
-      <p>Hello {{customer_name}},</p>
-      <p>Your order <strong>#{{order_number}}</strong> is now ready and waiting for you!</p>
-      {{#pickup_address}}
-      <div style="margin: 15px 0; padding: 10px; background: #e8f5e8; border-radius: 4px;">
-        <h4>Pickup Location:</h4>
-        <p>{{pickup_address}}</p>
-      </div>
-      {{/pickup_address}}
-      <p>Please come and collect your order at your earliest convenience.</p>
-      <p>Thank you for choosing {{business_name}}!</p>
-    `,
-    text: `Your Order is Ready!\n\nHello {{customer_name}},\n\nYour order #{{order_number}} is now ready and waiting for you!\n\n{{#pickup_address}}Pickup Location:\n{{pickup_address}}\n\n{{/pickup_address}}Please come and collect your order at your earliest convenience.\n\nThank you for choosing {{business_name}}!`,
-    variables: ['customer_name', 'order_number', 'pickup_address']
-  },
-  
-  out_for_delivery: {
-    subject: '{{business_name}} - Your Order is Out for Delivery #{{order_number}}',
-    html: `
-      <h2>Your Order is Out for Delivery!</h2>
-      <p>Hello {{customer_name}},</p>
-      <p>Your order <strong>#{{order_number}}</strong> is now out for delivery and on its way to you!</p>
-      {{#driver_name}}
-      <div style="margin: 15px 0; padding: 10px; background: #e3f2fd; border-radius: 4px;">
-        <h4>Delivery Details:</h4>
-        <p><strong>Driver:</strong> {{driver_name}}</p>
-        {{#driver_phone}}<p><strong>Phone:</strong> {{driver_phone}}</p>{{/driver_phone}}
-        <p><strong>Estimated arrival:</strong> {{estimated_delivery_time}} minutes</p>
-      </div>
-      {{/driver_name}}
-      <p>Please ensure someone is available to receive the order.</p>
-      <p>Thank you for choosing {{business_name}}!</p>
-    `,
-    text: `Your Order is Out for Delivery!\n\nHello {{customer_name}},\n\nYour order #{{order_number}} is now out for delivery and on its way to you!\n\n{{#driver_name}}Delivery Details:\nDriver: {{driver_name}}\n{{#driver_phone}}Phone: {{driver_phone}}\n{{/driver_phone}}Estimated arrival: {{estimated_delivery_time}} minutes\n\n{{/driver_name}}Please ensure someone is available to receive the order.\n\nThank you for choosing {{business_name}}!`,
-    variables: ['customer_name', 'order_number', 'driver_name', 'driver_phone', 'estimated_delivery_time']
-  },
-  
-  customer_welcome: {
-    subject: 'Welcome to {{business_name}}, {{customer_name}}!',
-    html: `
-      <h2>Welcome to {{business_name}}!</h2>
-      <p>Hello {{customer_name}},</p>
-      <p>Welcome! We're thrilled to have you join our family of food lovers.</p>
-      <p>{{business_name}} is dedicated to providing you with delicious, fresh meals made with love and the finest ingredients.</p>
-      <div style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 4px;">
-        <h3 style="margin-top: 0;">What's Next?</h3>
-        <ul style="margin: 0;">
-          <li>Browse our menu and discover your favorites</li>
-          <li>Place your first order and enjoy fast delivery</li>
-          <li>Join our loyalty program for exclusive offers</li>
-        </ul>
-      </div>
-      <p>Thank you for choosing {{business_name}}. We look forward to serving you!</p>
-    `,
-    text: `Welcome to {{business_name}}!\n\nHello {{customer_name}},\n\nWelcome! We're thrilled to have you join our family of food lovers.\n\n{{business_name}} is dedicated to providing you with delicious, fresh meals made with love and the finest ingredients.\n\nWhat's Next?\n- Browse our menu and discover your favorites\n- Place your first order and enjoy fast delivery\n- Join our loyalty program for exclusive offers\n\nThank you for choosing {{business_name}}. We look forward to serving you!`,
-    variables: ['customer_name']
-  },
-  
-  admin_status_update: {
-    subject: '[{{business_name}}] Admin Alert - Order {{order_number}} Status Change',
-    html: `
-      <h2>Order Status Update</h2>
-      <p><strong>Order:</strong> #{{order_number}}</p>
-      <p><strong>Customer:</strong> {{customer_name}} ({{customer_email}})</p>
-      <p><strong>Status changed to:</strong> {{status}}</p>
-      <p><strong>Total:</strong> ₦{{total_amount}}</p>
-      <p><strong>Time:</strong> {{timestamp}}</p>
-      {{#delivery_address}}
-      <p><strong>Delivery Address:</strong><br>{{delivery_address}}</p>
-      {{/delivery_address}}
-      <p>Please take appropriate action if required.</p>
-    `,
-    text: `Order Status Update\n\nOrder: #{{order_number}}\nCustomer: {{customer_name}} ({{customer_email}})\nStatus changed to: {{status}}\nTotal: ₦{{total_amount}}\nTime: {{timestamp}}\n\n{{#delivery_address}}Delivery Address:\n{{delivery_address}}\n\n{{/delivery_address}}Please take appropriate action if required.`,
-    variables: ['order_number', 'customer_name', 'customer_email', 'status', 'total_amount', 'timestamp', 'delivery_address']
-  }
-};
-
-// Enhanced template processing with branded fallback library
+// Template processing with fallback, base layout wrapping, and missing variable tracking
 async function processTemplate(
   supabase: any, 
   templateKey: string, 
@@ -448,17 +293,12 @@ async function processTemplate(
   templateFound: boolean;
   missingVariables: string[];
   templateType?: string;
-  fallbackUsed: boolean;
-  fallbackMode?: 'database' | 'branded' | 'basic';
 }> {
   
   let template = null;
   let templateFound = false;
   let templateType = 'standard';
-  let fallbackUsed = false;
-  let fallbackMode: 'database' | 'branded' | 'basic' | undefined;
 
-  // Step 1: Try to find template in database
   if (templateKey) {
     try {
       // First try the email_templates view (preferred)
@@ -473,7 +313,6 @@ async function processTemplate(
         template = viewTemplate;
         templateType = viewTemplate.template_type || 'standard';
         templateFound = true;
-        console.log(`✅ Using database template '${templateKey}' from email_templates view`);
       } else {
         // Fallback to enhanced_email_templates with field mapping
         const { data: enhancedTemplate } = await supabase
@@ -492,7 +331,6 @@ async function processTemplate(
           };
           templateType = template.template_type;
           templateFound = true;
-          console.log(`✅ Using database template '${templateKey}' from enhanced_email_templates table`);
         }
       }
     } catch (error) {
@@ -500,78 +338,37 @@ async function processTemplate(
     }
   }
 
-  // Step 2: Handle missing templates based on mode and whitelist
-  if (!templateFound && templateKey) {
-    // Production mode with branded fallback enabled
-    if (isProductionMode && allowBrandedFallback && brandedFallbackWhitelist.includes(templateKey)) {
-      const brandedTemplate = BRANDED_FALLBACK_LIBRARY[templateKey];
-      if (brandedTemplate) {
-        template = {
-          subject: brandedTemplate.subject,
-          html_content: brandedTemplate.html,
-          text_content: brandedTemplate.text,
-          template_type: 'standard'
-        };
-        templateType = 'standard';
-        fallbackUsed = true;
-        fallbackMode = 'branded';
-        console.log(`✅ PRODUCTION_MODE: Using branded fallback template '${templateKey}' (whitelisted)`);
-      } else {
-        throw new Error(`PRODUCTION_MODE: Template '${templateKey}' not found in database or branded fallback library.`);
-      }
+  // PRODUCTION MODE: Strict template enforcement
+  if (isProductionMode) {
+    if (!templateKey) {
+      throw new Error('PRODUCTION_MODE: All emails must specify a valid templateKey. Direct content emails are not allowed in production.');
     }
-    // Production mode without branded fallback - strict enforcement
-    else if (isProductionMode) {
-      throw new Error(`PRODUCTION_MODE: Template '${templateKey}' not found in database. Only active templates are allowed in production.`);
+    
+    if (!templateFound) {
+      throw new Error(`PRODUCTION_MODE: Template '${templateKey}' not found in database. Only active templates from enhanced_email_templates are allowed in production.`);
     }
-    // Development mode - use branded fallback if available, otherwise basic fallback
-    else {
-      const brandedTemplate = BRANDED_FALLBACK_LIBRARY[templateKey];
-      if (brandedTemplate) {
-        template = {
-          subject: brandedTemplate.subject,
-          html_content: brandedTemplate.html,
-          text_content: brandedTemplate.text,
-          template_type: 'standard'
-        };
-        templateType = 'standard';
-        fallbackUsed = true;
-        fallbackMode = 'branded';
-        console.log(`⚠️ DEVELOPMENT_MODE: Using branded fallback template '${templateKey}'`);
-      } else {
-        // Basic fallback for development
-        fallbackUsed = true;
-        fallbackMode = 'basic';
-        console.warn(`⚠️ DEVELOPMENT_MODE: Using basic fallback for '${templateKey}' - add to Email Template Manager or Branded Fallback Library`);
-      }
-    }
+    
+    console.log(`✅ PRODUCTION_MODE: Using verified template '${templateKey}' from database`);
   }
 
-  // Step 3: Get business branding for enhanced variables
-  let businessSettings = null;
-  try {
-    const { data } = await supabase
-      .from('business_settings')
-      .select('name, website_url, logo_url, primary_color, tagline')
-      .limit(1)
-      .maybeSingle();
-    businessSettings = data;
-  } catch (error) {
-    console.warn('Failed to fetch business settings:', error.message);
+  // DEVELOPMENT MODE: Log when fallback templates are used
+  if (!isProductionMode && !templateFound && templateKey) {
+    console.warn(`⚠️ DEVELOPMENT_MODE: Template '${templateKey}' not found in database - using fallback. Add this template to Email Template Manager to ensure it works in production.`);
   }
 
-  // Step 4: Process template content
+  // Template processing - use template if found, fallback only in non-production
   let subject: string;
   let html: string;
   let text: string;
   
-  if (template) {
-    // Use found or branded fallback template
+  if (templateFound && template) {
+    // Use database template
     subject = template.subject || template.subject_template || `${businessName} - Notification`;
     html = template.html_content || template.html_template || '';
     text = template.text_content || template.text_template || '';
-  } else if (fallbackMode === 'basic') {
-    // Basic fallback (development only)
+  } else if (!isProductionMode) {
+    // Fallback template (only allowed in development)
+    console.warn(`⚠️ DEVELOPMENT_MODE: Using fallback template for '${templateKey}'`);
     subject = `${businessName} - Important Notification`;
     html = `
       <html>
@@ -590,21 +387,11 @@ async function processTemplate(
     `;
     text = `${businessName} - Important Notification\n\nThank you for your business with us.\n\nThis is an automated notification regarding your recent activity.\n\nThis email was sent from our automated system. Please do not reply directly.`;
   } else {
-    throw new Error('Template processing failed - no content available');
+    // This should never happen in production mode due to earlier checks
+    throw new Error('PRODUCTION_MODE: Template processing failed - no fallback allowed');
   }
 
-  // Step 5: Enhanced variable preparation with business branding
-  const enhancedVariables = { ...variables };
-  
-  // Add business branding variables
-  enhancedVariables.business_name = enhancedVariables.business_name || businessSettings?.name || businessName;
-  enhancedVariables.website_url = enhancedVariables.website_url || businessSettings?.website_url || '#';
-  enhancedVariables.unsubscribe_url = enhancedVariables.unsubscribe_url || `${businessSettings?.website_url || '#'}/unsubscribe`;
-  enhancedVariables.business_logo = enhancedVariables.business_logo || businessSettings?.logo_url || '';
-  enhancedVariables.primary_color = enhancedVariables.primary_color || businessSettings?.primary_color || '#f59e0b';
-  enhancedVariables.business_tagline = enhancedVariables.business_tagline || businessSettings?.tagline || '';
-
-  // Step 6: Variable extraction and substitution
+  // Extract all template variables to track missing ones
   const allContent = [subject, html, text].join(' ');
   const templateVariables = new Set<string>();
   const variableRegex = /\{\{\s*([a-zA-Z_][a-zA-Z0-9_]*)\s*\}\}/g;
@@ -613,33 +400,45 @@ async function processTemplate(
     templateVariables.add(match[1]);
   }
 
-  // Track missing variables
+  // Add base layout variables for non-full_html templates
+  const enhancedVariables = { ...variables };
+  if (templateType !== 'full_html') {
+    enhancedVariables.business_name = enhancedVariables.business_name || businessName;
+    enhancedVariables.website_url = enhancedVariables.website_url || '#';  
+    enhancedVariables.unsubscribe_url = enhancedVariables.unsubscribe_url || '#';
+  }
+
+  // Variable substitution with safe replacement
   const missingVariables: string[] = [];
-  templateVariables.forEach(varName => {
-    if (!(varName in enhancedVariables) || enhancedVariables[varName] === null || enhancedVariables[varName] === undefined) {
-      missingVariables.push(varName);
-    }
-  });
+  if (templateVariables.size > 0) {
+    [subject, html, text].forEach((content, index) => {
+      if (content) {
+        let processed = content;
+        
+        // Track which variables are actually used vs provided
+        templateVariables.forEach(varName => {
+          if (!(varName in enhancedVariables) || enhancedVariables[varName] === null || enhancedVariables[varName] === undefined) {
+            if (!missingVariables.includes(varName)) {
+              missingVariables.push(varName);
+            }
+          }
+        });
+        
+        Object.entries(enhancedVariables).forEach(([key, value]) => {
+          if (value !== null && value !== undefined) {
+            const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+            processed = processed.replace(regex, String(value));
+          }
+        });
+        
+        if (index === 0) subject = processed;
+        else if (index === 1) html = processed;
+        else text = processed;
+      }
+    });
+  }
 
-  // Variable substitution
-  [subject, html, text].forEach((content, index) => {
-    if (content) {
-      let processed = content;
-      
-      Object.entries(enhancedVariables).forEach(([key, value]) => {
-        if (value !== null && value !== undefined) {
-          const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
-          processed = processed.replace(regex, String(value));
-        }
-      });
-      
-      if (index === 0) subject = processed;
-      else if (index === 1) html = processed;
-      else text = processed;
-    }
-  });
-
-  // Step 7: Apply base layout wrapping for non-full_html templates
+  // Apply base layout wrapping for non-full_html templates
   if (templateType !== 'full_html' && html && !html.includes('<!DOCTYPE html>')) {
     const layoutVariables = {
       ...enhancedVariables,
@@ -658,21 +457,7 @@ async function processTemplate(
     html = wrappedHtml;
   }
 
-  // Log fallback usage for monitoring
-  if (fallbackUsed) {
-    console.log(`📧 Fallback Usage - Template: ${templateKey}, Mode: ${fallbackMode}, Missing Variables: ${missingVariables.join(', ') || 'none'}`);
-  }
-
-  return { 
-    subject, 
-    html, 
-    text, 
-    templateFound, 
-    missingVariables, 
-    templateType,
-    fallbackUsed,
-    fallbackMode
-  };
+  return { subject, html, text, templateFound, missingVariables, templateType };
 }
 
 // Production-ready SMTP client with robust error handling
@@ -1193,79 +978,27 @@ serve(async (req: Request) => {
 
     requestBody = await req.json();
     
-    // FIELD NORMALIZATION: Handle both naming conventions
-    let {
-      to,
-      recipient_email,
-      templateKey,
-      template_key,
-      subject,
-      html,
-      text,
-      variables = {},
-      priority = 'normal'
-    } = requestBody;
-
-    // Normalize field names - handle both to/recipient_email and templateKey/template_key
-    to = to || recipient_email;
-    templateKey = templateKey || template_key;
-
-    // Update requestBody with normalized values for downstream processing
-    requestBody.to = to;
-    requestBody.templateKey = templateKey;
-    requestBody.variables = variables;
-    requestBody.priority = priority;
-    
-    // STRICT VALIDATION: Required fields with detailed error messages
-    if (!to || typeof to !== 'string' || to.trim().length === 0 || !to.includes('@')) {
-      console.error('❌ Email validation failed: Missing or invalid "to" field', { 
-        originalPayload: { to: requestBody.to, recipient_email: requestBody.recipient_email },
-        normalized: { to },
-        type: typeof to 
+    // P0 HOTFIX: Validate required "to" field immediately
+    if (!requestBody.to || typeof requestBody.to !== 'string' || !requestBody.to.includes('@')) {
+      console.error('❌ Invalid or missing recipient email:', {
+        to: requestBody.to,
+        type: typeof requestBody.to,
+        hasAt: requestBody.to && typeof requestBody.to === 'string' ? requestBody.to.includes('@') : false
       });
       
       return new Response(JSON.stringify({
         success: false,
-        error: 'Missing or invalid recipient email address',
-        details: 'The "to" or "recipient_email" field is required and must be a valid email address',
+        error: 'Invalid or missing recipient email address',
+        reason: 'invalid_recipient',
         received: {
           to: requestBody.to,
-          recipient_email: requestBody.recipient_email,
-          normalized_to: to,
-          type: typeof to
+          type: typeof requestBody.to
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400
       });
     }
-
-    if (!templateKey || typeof templateKey !== 'string' || templateKey.trim().length === 0) {
-      console.error('❌ Email validation failed: Missing template key', { 
-        originalPayload: { templateKey: requestBody.templateKey, template_key: requestBody.template_key },
-        normalized: { templateKey },
-        to: to
-      });
-      
-      return new Response(JSON.stringify({
-        success: false,
-        error: 'Missing template key',
-        details: 'The "templateKey" or "template_key" field is required',
-        received: {
-          templateKey: requestBody.templateKey,
-          template_key: requestBody.template_key,
-          normalized_templateKey: templateKey,
-          type: typeof templateKey
-        }
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 400
-      });
-    }
-
-    // Trim and clean values
-    to = to.trim();
-    templateKey = templateKey.trim();
     
     // Handle healthcheck requests without full SMTP validation
     if (requestBody.healthcheck) {
@@ -1326,52 +1059,50 @@ serve(async (req: Request) => {
     const businessName = businessSettings?.name || 'System';
 
     console.log('📧 SMTP sender request:', {
-      to: to,
-      templateKey: templateKey,
+      to: requestBody.to,
+      templateKey: requestBody.templateKey,
       businessName,
-      hasVariables: !!variables,
-      fieldNormalization: {
-        original_to: requestBody.to !== to ? requestBody.to : 'same',
-        original_templateKey: requestBody.templateKey !== templateKey ? requestBody.templateKey : 'same'
-      }
+      hasVariables: !!requestBody.variables
     });
 
-    // Safety checks with normalized values
-    try {
-      // Check email suppression
-      const { data: suppressionCheck } = await supabase
-        .rpc('is_email_suppressed', { email_address: to });
-      
-      if (suppressionCheck) {
-        console.log(`⚠️ Email ${to} is suppressed - skipping send`);
-        return new Response(JSON.stringify({
-          success: false,
-          error: 'Email address is suppressed',
-          reason: 'suppressed'
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 400
-        });
-      }
-
-      // Check rate limiting
-      const { data: rateLimitCheck } = await supabase
-        .rpc('check_email_rate_limit', { email_address: to });
+    // Optional safety checks
+    if (requestBody.to && typeof requestBody.to === 'string') {
+      try {
+        // Check email suppression
+        const { data: suppressionCheck } = await supabase
+          .rpc('is_email_suppressed', { email_address: requestBody.to });
         
-      if (rateLimitCheck && !rateLimitCheck.allowed) {
-        console.log(`⚠️ Rate limit exceeded for ${to}`);
-        return new Response(JSON.stringify({
-          success: false,
-          error: 'Rate limit exceeded',
-          reason: 'rate_limited',
-          resetAt: rateLimitCheck.reset_at
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 429
-        });
+        if (suppressionCheck) {
+          console.log(`⚠️ Email ${requestBody.to} is suppressed - skipping send`);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Email address is suppressed',
+            reason: 'suppressed'
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400
+          });
+        }
+
+        // Check rate limiting
+        const { data: rateLimitCheck } = await supabase
+          .rpc('check_email_rate_limit', { email_address: requestBody.to });
+          
+        if (rateLimitCheck && !rateLimitCheck.allowed) {
+          console.log(`⚠️ Rate limit exceeded for ${requestBody.to}`);
+          return new Response(JSON.stringify({
+            success: false,
+            error: 'Rate limit exceeded',
+            reason: 'rate_limited',
+            resetAt: rateLimitCheck.reset_at
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 429
+          });
+        }
+      } catch (checkError) {
+        console.warn('Safety check failed:', checkError.message);
       }
-    } catch (checkError) {
-      console.warn('Safety check failed:', checkError.message);
     }
 
     // Get production SMTP configuration
@@ -1395,19 +1126,19 @@ serve(async (req: Request) => {
       encryption: smtpConfig.encryption
     });
 
-    // Process template with enhanced branded fallback library using normalized values
-    const { subject: templateSubject, html: processedHtml, text: processedText, templateFound, missingVariables, templateType, fallbackUsed, fallbackMode } = await processTemplate(
+    // Process template with fallback and explicit subject handling
+    const { subject: templateSubject, html, text, templateFound, missingVariables, templateType } = await processTemplate(
       supabase,
-      templateKey,
-      variables,
+      requestBody.templateKey,
+      requestBody.variables,
       businessName
     );
     
     // Respect explicit subject from caller if provided, otherwise use template/fallback
     const finalSubject = requestBody.subject?.trim() || templateSubject;
 
-    if (fallbackUsed) {
-      console.warn(`⚠️ Fallback template used for '${requestBody.templateKey}' - Mode: ${fallbackMode}, Source: ${fallbackMode === 'branded' ? 'Branded Fallback Library' : 'Basic Development Fallback'}`);
+    if (!templateFound && requestBody.templateKey) {
+      console.warn(`⚠️ Template ${requestBody.templateKey} not found - proceeding with branded fallback content`);
     }
 
     // Execute email sending with retry logic
@@ -1427,13 +1158,13 @@ serve(async (req: Request) => {
       try {
         connectionInfo = await client.connect();
         
-      await client.sendEmail({
-        from: `${smtpConfig.senderName} <${smtpConfig.senderEmail}>`,
-        to: requestBody.to,
-        subject: finalSubject,
-        text: processedText,
-        html: processedHtml
-      });
+        await client.sendEmail({
+          from: `${smtpConfig.senderName} <${smtpConfig.senderEmail}>`,
+          to: requestBody.to,
+          subject: finalSubject,
+          text,
+          html
+        });
         
         return { client, connectionInfo };
       } catch (error) {
@@ -1467,11 +1198,10 @@ serve(async (req: Request) => {
         last_smtp_code: result.client.getLastResponseCode(),
          templateFound: templateFound,
          templateType: templateType,
-         fallbackUsed: fallbackUsed,
-         fallbackMode: fallbackMode,
+         fallbackUsed: !templateFound,
          missingVariables: missingVariables,
          warnings: [
-           ...(fallbackUsed ? [`Fallback template used (${fallbackMode}) for '${requestBody.templateKey}'`] : []),
+           ...(!templateFound ? [`Template ${requestBody.templateKey} not found - using branded fallback`] : []),
            ...(missingVariables.length > 0 ? [`Missing template variables: ${missingVariables.join(', ')}`] : [])
          ].filter(Boolean)
       }

@@ -7,29 +7,9 @@ const supabaseClient = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 )
 
-// Helper function to create user-scoped client for admin operations
-const createUserClient = (authHeader: string | null) => {
-  if (!authHeader) {
-    throw new Error('Authorization header required for admin operations')
-  }
-  
-  return createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    {
-      global: {
-        headers: {
-          Authorization: authHeader
-        }
-      }
-    }
-  )
-}
-
 serve(async (req) => {
   const origin = req.headers.get('origin')
   const corsHeaders = getCorsHeaders(origin)
-  const authHeader = req.headers.get('authorization')
   
   console.log(`🌐 Request from origin: ${origin || 'none'}`)
 
@@ -129,36 +109,23 @@ serve(async (req) => {
 
         // Use appropriate RPC based on order status
         if (['confirmed', 'preparing', 'ready'].includes(orderCheck.status)) {
-          // Use start_delivery for new assignments with user-scoped client
+          // Use start_delivery for new assignments
           console.log('🚀 Using start_delivery RPC for order in status:', orderCheck.status)
           
-          try {
-            const userClient = createUserClient(authHeader)
-            const { data: result, error: rpcError } = await userClient
-              .rpc('start_delivery', {
-                p_order_id: orderId,
-                p_rider_id: riderId
-              })
+          const { data: result, error: rpcError } = await supabaseClient
+            .rpc('start_delivery', {
+              p_order_id: orderId,
+              p_rider_id: riderId
+            })
 
-            if (rpcError) {
-              console.error('❌ start_delivery RPC failed:', rpcError)
-              const statusCode = rpcError.message?.includes('Only admins') ? 403 : 400
-              return new Response(JSON.stringify({
-                success: false,
-                error: rpcError.message
-              }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: statusCode
-              })
-            }
-          } catch (clientError) {
-            console.error('❌ Failed to create user client:', clientError)
+          if (rpcError) {
+            console.error('❌ start_delivery RPC failed:', rpcError)
             return new Response(JSON.stringify({
               success: false,
-              error: 'Authentication required for rider assignment'
+              error: rpcError.message
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 401
+              status: 400
             })
           }
 
@@ -183,37 +150,24 @@ serve(async (req) => {
           })
 
         } else if (orderCheck.status === 'out_for_delivery') {
-          // Use reassign_order_rider for reassignments with user-scoped client
+          // Use reassign_order_rider for reassignments
           console.log('🔄 Using reassign_order_rider RPC for order in status:', orderCheck.status)
           
-          try {
-            const userClient = createUserClient(authHeader)
-            const { data: result, error: rpcError } = await userClient
-              .rpc('reassign_order_rider', {
-                p_order_id: orderId,
-                p_new_rider_id: riderId,
-                p_reason: 'Admin reassignment via dashboard'
-              })
+          const { data: result, error: rpcError } = await supabaseClient
+            .rpc('reassign_order_rider', {
+              p_order_id: orderId,
+              p_new_rider_id: riderId,
+              p_reason: 'Admin reassignment via dashboard'
+            })
 
-            if (rpcError) {
-              console.error('❌ reassign_order_rider RPC failed:', rpcError)
-              const statusCode = rpcError.message?.includes('Only admins') ? 403 : 400
-              return new Response(JSON.stringify({
-                success: false,
-                error: rpcError.message
-              }), {
-                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-                status: statusCode
-              })
-            }
-          } catch (clientError) {
-            console.error('❌ Failed to create user client:', clientError)
+          if (rpcError) {
+            console.error('❌ reassign_order_rider RPC failed:', rpcError)
             return new Response(JSON.stringify({
               success: false,
-              error: 'Authentication required for rider reassignment'
+              error: rpcError.message
             }), {
               headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-              status: 401
+              status: 400
             })
           }
 

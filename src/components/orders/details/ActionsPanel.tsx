@@ -152,11 +152,6 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
               🔄 This will reassign the rider for an order already out for delivery
             </p>
           )}
-          {(['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus)) && (
-            <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
-              🔐 Admin permissions required for rider assignment/reassignment
-            </p>
-          )}
         </div>
 
         {/* Manual Notification */}

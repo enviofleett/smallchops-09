@@ -2,8 +2,16 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Loader2, Shield, User } from "lucide-react";
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow } from "@/components/ui/responsive-table";
+
+interface AdminProfile {
+  id: string;
+  email: string;
+  role: string;
+  is_active: boolean;
+}
 
 interface AuditLogRow {
   id: string;
@@ -19,6 +27,7 @@ interface AuditLogRow {
   new_values: any;
   ip_address: string | null;
   user_agent: string | null;
+  admin_profile?: AdminProfile;
 }
 
 interface Props {
@@ -32,6 +41,108 @@ interface Props {
 }
 
 const PAGE_SIZE = 20;
+
+/**
+ * PRODUCTION COMPONENT: Enhanced Admin User Display
+ * Shows admin user information with role badges and proper fallbacks
+ */
+const AdminUserDisplay: React.FC<{ log: AuditLogRow }> = ({ log }) => {
+  // System operation (no user)
+  if (!log.user_id) {
+    return (
+      <div className="flex items-center gap-2">
+        <Shield className="w-4 h-4 text-gray-400" />
+        <span className="text-gray-400 font-medium">System</span>
+      </div>
+    );
+  }
+
+  // Admin user with profile
+  if (log.admin_profile) {
+    return (
+      <div className="flex items-center gap-2">
+        <User className="w-4 h-4 text-blue-600" />
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="font-medium text-gray-900">
+              {log.admin_profile.email}
+            </span>
+            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200">
+              {log.admin_profile.role.toUpperCase()}
+            </Badge>
+          </div>
+          {log.user_name && log.user_name !== log.admin_profile.email && (
+            <span className="text-xs text-gray-500">
+              Display: {log.user_name}
+            </span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback for admin without profile (should not happen in production)
+  return (
+    <div className="flex items-center gap-2">
+      <User className="w-4 h-4 text-orange-500" />
+      <div className="flex flex-col gap-1">
+        <span className="font-medium text-gray-900">
+          {log.user_name || `User ${log.user_id?.substring(0, 8)}...`}
+        </span>
+        <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
+          ADMIN
+        </Badge>
+      </div>
+    </div>
+  );
+};
+
+/**
+ * PRODUCTION COMPONENT: Mobile Admin User Display (Compact Version)
+ */
+const MobileAdminUserDisplay: React.FC<{ log: AuditLogRow }> = ({ log }) => {
+  // System operation
+  if (!log.user_id) {
+    return (
+      <div className="flex items-center gap-2">
+        <Shield className="w-3 h-3 text-gray-400" />
+        <span className="text-gray-400 text-sm">System</span>
+      </div>
+    );
+  }
+
+  // Admin user with profile
+  if (log.admin_profile) {
+    return (
+      <div className="flex items-center gap-2">
+        <User className="w-3 h-3 text-blue-600" />
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-gray-900">
+            {log.admin_profile.email}
+          </span>
+          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200 w-fit">
+            {log.admin_profile.role.toUpperCase()}
+          </Badge>
+        </div>
+      </div>
+    );
+  }
+
+  // Fallback
+  return (
+    <div className="flex items-center gap-2">
+      <User className="w-3 h-3 text-orange-500" />
+      <div className="flex flex-col">
+        <span className="text-sm font-medium">
+          {log.user_name || `User ${log.user_id?.substring(0, 8)}...`}
+        </span>
+        <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 w-fit">
+          ADMIN
+        </Badge>
+      </div>
+    </div>
+  );
+};
 
 const AuditLogTable: React.FC<Props> = ({ filters }) => {
   const [logs, setLogs] = useState<AuditLogRow[]>([]);
@@ -70,10 +181,10 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
           .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
         // PRODUCTION FILTER: Show all admin activities and system operations
-        // First get all profiles with admin role
+        // First get all profiles with admin role for enhanced display
         const { data: adminProfiles, error: adminError } = await supabase
           .from('profiles')
-          .select('id')
+          .select('id, email, role, is_active')
           .eq('role', 'admin')
           .eq('is_active', true);
 
@@ -83,6 +194,9 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
         }
 
         const adminIds = adminProfiles?.map(p => p.id) || [];
+        const adminProfilesMap = new Map(
+          adminProfiles?.map(profile => [profile.id, profile]) || []
+        );
         
         // Filter for admin users OR system operations (null user_id)
         if (adminIds.length > 0) {
@@ -129,9 +243,11 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
           throw error;
         }
 
-        // Production security: Sanitize sensitive data for display
-        const sanitizedLogs = (data as AuditLogRow[]).map(log => ({
+        // PRODUCTION ENHANCEMENT: Enrich logs with admin profile information
+        const enrichedLogs = (data as AuditLogRow[]).map(log => ({
           ...log,
+          // Add admin profile information for enhanced display
+          admin_profile: log.user_id ? adminProfilesMap.get(log.user_id) : undefined,
           // Mask sensitive IP addresses partially for privacy
           ip_address: log.ip_address ? 
             log.ip_address.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)/, '$1.$2.xxx.xxx') : 
@@ -142,8 +258,8 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
             null
         }));
 
-        setLogs(sanitizedLogs);
-        setHasMore(sanitizedLogs.length === PAGE_SIZE);
+        setLogs(enrichedLogs);
+        setHasMore(enrichedLogs.length === PAGE_SIZE);
         
       } catch (error) {
         console.error('Error in fetchLogs:', error);
@@ -188,8 +304,8 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
             
             <MobileCardContent>
               <MobileCardRow 
-                label="User" 
-                value={log.user_name || log.user_id || <span className="text-gray-300">system</span>} 
+                label="Admin User" 
+                value={<MobileAdminUserDisplay log={log} />} 
               />
               {log.entity_type && (
                 <MobileCardRow 
@@ -263,7 +379,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
         <TableHeader>
           <TableRow>
             <TableHead className="w-32">Date/Time</TableHead>
-            <TableHead>User</TableHead>
+            <TableHead>Admin User</TableHead>
             <TableHead>Action</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Entity</TableHead>
@@ -293,7 +409,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
                   {new Date(log.event_time).toLocaleString()}
                 </TableCell>
                 <TableCell>
-                  {log.user_name || log.user_id || <span className="text-gray-300">system</span>}
+                  <AdminUserDisplay log={log} />
                 </TableCell>
                 <TableCell>
                   <span className="capitalize font-semibold text-blue-700">{log.action}</span>

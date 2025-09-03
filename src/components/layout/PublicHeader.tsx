@@ -7,6 +7,7 @@ import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 import { AuthButton } from '@/components/auth/AuthButton';
+import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 
 export const PublicHeader = () => {
   return (
@@ -96,6 +97,9 @@ const PublicHeaderContent = () => {
 
           {/* Right Actions - Mobile optimized */}
           <div className="flex items-center space-x-2 sm:space-x-4">
+            {/* Notifications - For authenticated users */}
+            {isAuthenticated && <NotificationsDropdown />}
+
             {/* Track Order - For authenticated users */}
             {isAuthenticated && (
               <Button

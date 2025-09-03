@@ -315,10 +315,27 @@ export const EmailTemplateManager: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {/* Production Mode Alert */}
+      <Alert className="border-orange-200 bg-orange-50">
+        <AlertDescription>
+          <div className="flex items-center gap-2">
+            <Badge variant="outline" className="text-orange-600 border-orange-300">
+              PRODUCTION MODE
+            </Badge>
+            <span className="text-orange-700">
+              All email communications in production MUST use templates from this manager. 
+              Fallback emails are disabled to ensure brand consistency and security.
+            </span>
+          </div>
+        </AlertDescription>
+      </Alert>
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-bold">Email Template Manager</h2>
-          <p className="text-muted-foreground">Create and manage email templates</p>
+          <p className="text-muted-foreground">
+            Manage production email templates - the single source of truth for all email communications
+          </p>
         </div>
         <Button onClick={startCreate}>
           <Plus className="h-4 w-4 mr-2" />

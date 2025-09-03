@@ -332,18 +332,53 @@ async function processTemplate(
     }
   }
 
-  // Branded fallback template
-  let subject = template?.subject || `${businessName} - Important Notification`;
-  let html = template?.html_content || `
-    <html>
-      <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
-        <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-          <h2 style="color: #f59e0b; margin-bottom: 20px;">${businessName}</h2>
-          <p>Thank you for your business with us.</p>
-          <p>This is an automated notification regarding your recent activity.</p>
-          <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 12px; color: #666;">
-            This email was sent from our automated system. Please do not reply directly.
+  // PRODUCTION MODE: Strict template enforcement
+  if (isProductionMode) {
+    if (!templateKey) {
+      throw new Error('PRODUCTION_MODE: All emails must specify a valid templateKey. Direct content emails are not allowed in production.');
+    }
+    
+    if (!templateFound) {
+      throw new Error(`PRODUCTION_MODE: Template '${templateKey}' not found in database. Only active templates from enhanced_email_templates are allowed in production.`);
+    }
+    
+    console.log(`✅ PRODUCTION_MODE: Using verified template '${templateKey}' from database`);
+  }
+
+  // Template processing - use template if found, fallback only in non-production
+  let subject: string;
+  let html: string;
+  let text: string;
+  
+  if (templateFound && template) {
+    // Use database template
+    subject = template.subject || template.subject_template || `${businessName} - Notification`;
+    html = template.html_content || template.html_template || '';
+    text = template.text_content || template.text_template || '';
+  } else if (!isProductionMode) {
+    // Fallback template (only allowed in development)
+    console.warn(`⚠️ DEVELOPMENT_MODE: Using fallback template for '${templateKey}'`);
+    subject = `${businessName} - Important Notification`;
+    html = `
+      <html>
+        <body style="font-family: Arial, sans-serif; color: #333; line-height: 1.6;">
+          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
+            <h2 style="color: #f59e0b; margin-bottom: 20px;">${businessName}</h2>
+            <p>Thank you for your business with us.</p>
+            <p>This is an automated notification regarding your recent activity.</p>
+            <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+            <p style="font-size: 12px; color: #666;">
+              This email was sent from our automated system. Please do not reply directly.
+            </p>
+          </div>
+        </body>
+      </html>
+    `;
+    text = `${businessName} - Important Notification\n\nThank you for your business with us.\n\nThis is an automated notification regarding your recent activity.\n\nThis email was sent from our automated system. Please do not reply directly.`;
+  } else {
+    // This should never happen in production mode due to earlier checks
+    throw new Error('PRODUCTION_MODE: Template processing failed - no fallback allowed');
+  }
           </p>
         </div>
       </body>

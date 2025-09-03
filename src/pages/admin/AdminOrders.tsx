@@ -1163,8 +1163,8 @@ function AdminOrderCard({
                 </div>
               )}
               
-              {/* Delivery Schedule Display or Fallback */}
-              {deliverySchedule ? (
+              {/* Delivery Schedule Display */}
+              {deliverySchedule && (
                 <div className="space-y-3">
                   <DeliveryScheduleDisplay 
                     schedule={deliverySchedule}
@@ -1185,18 +1185,6 @@ function AdminOrderCard({
                       />
                     </div>
                   )}
-                </div>
-              ) : (
-                <div className="bg-amber-50 border border-amber-200 p-3 rounded-lg mt-3">
-                  <div className="flex items-start gap-2">
-                    <span className="text-amber-600 text-lg">⚠️</span>
-                    <div>
-                      <p className="text-sm font-medium text-amber-800">Schedule not yet set</p>
-                      <p className="text-xs text-amber-600 mt-1">
-                        Customer will receive confirmation once {order.order_type === 'delivery' ? 'delivery' : 'pickup'} is scheduled
-                      </p>
-                    </div>
-                  </div>
                 </div>
               )}
 

@@ -288,6 +288,84 @@ async function handleOrderStatusChangeJourney(
     throw new Error('Order status is required for status change journey');
   }
 
+  // Get order details to check fulfillment type
+  const { data: orderDetails, error: orderError } = await supabase
+    .from('orders')
+    .select('id, order_type, order_number, customer_email, customer_name')
+    .eq('id', orderData.order_id)
+    .single();
+
+  if (orderError) {
+    console.error('Failed to fetch order details:', orderError);
+    throw new Error(`Failed to fetch order details: ${orderError.message}`);
+  }
+
+  // Special handling for delivery orders changing to "out_for_delivery"
+  if (status === 'out_for_delivery' && orderDetails.order_type === 'delivery') {
+    console.log(`🚚 DELIVERY OUT FOR DELIVERY: Processing delivery notification for order ${orderData.order_number}`);
+    
+    try {
+      // Call the dedicated delivery notification function with driver info
+      const { data: deliveryEmailResponse, error: deliveryEmailError } = await supabase.functions.invoke('send-out-for-delivery-email', {
+        body: {
+          order_id: orderData.order_id
+        }
+      });
+
+      if (deliveryEmailError) {
+        console.error('Failed to send delivery notification:', deliveryEmailError);
+        throw new Error(`Failed to send delivery notification: ${deliveryEmailError.message}`);
+      }
+
+      // Log successful delivery notification
+      await supabase
+        .from('audit_logs')
+        .insert({
+          action: 'delivery_out_for_delivery_notification_sent',
+          category: 'Order Fulfillment',
+          message: `Delivery out-for-delivery notification with driver info sent for order ${orderData.order_number}`,
+          entity_id: orderData.order_id,
+          new_values: {
+            order_id: orderData.order_id,
+            order_number: orderData.order_number,
+            customer_email: orderDetails.customer_email,
+            fulfillment_type: 'delivery',
+            notification_type: 'out_for_delivery_with_driver',
+            notification_time: new Date().toISOString(),
+            email_response: deliveryEmailResponse
+          }
+        });
+
+      console.log(`✅ Delivery notification sent successfully for order ${orderData.order_number}`);
+      
+      // Return early - the dedicated function handles the email
+      return events;
+      
+    } catch (error: any) {
+      console.error('Error in delivery notification process:', error);
+      
+      // Log the failure
+      await supabase
+        .from('audit_logs')
+        .insert({
+          action: 'delivery_notification_failed',
+          category: 'Order Fulfillment',
+          message: `Failed to send delivery notification for order ${orderData.order_number}: ${error.message}`,
+          entity_id: orderData.order_id,
+          new_values: {
+            order_id: orderData.order_id,
+            order_number: orderData.order_number,
+            error: error.message,
+            fulfillment_type: 'delivery',
+            failed_at: new Date().toISOString()
+          }
+        });
+
+      // Continue with standard template-based notification as fallback
+      console.log('Falling back to standard template notification...');
+    }
+  }
+
   // Map status to template
   const statusTemplateMap: Record<string, string> = {
     'confirmed': 'order_confirmed',
@@ -329,6 +407,7 @@ async function handleOrderStatusChangeJourney(
         old_status: metadata?.old_status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '',
         new_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
         updated_at: metadata?.updated_at || new Date().toISOString(),
+        fulfillment_type: orderDetails.order_type,
         ...metadata
       },
       priority: 'normal'
@@ -357,6 +436,7 @@ async function handleOrderStatusChangeJourney(
           order_number: orderData.order_number,
           customer_email: userData.email,
           template_used: templateKey,
+          fulfillment_type: 'pickup',
           notification_time: new Date().toISOString()
         }
       });

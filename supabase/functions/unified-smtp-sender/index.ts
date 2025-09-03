@@ -1396,7 +1396,7 @@ serve(async (req: Request) => {
     });
 
     // Process template with enhanced branded fallback library using normalized values
-    const { subject: templateSubject, html, text, templateFound, missingVariables, templateType, fallbackUsed, fallbackMode } = await processTemplate(
+    const { subject: templateSubject, html: processedHtml, text: processedText, templateFound, missingVariables, templateType, fallbackUsed, fallbackMode } = await processTemplate(
       supabase,
       templateKey,
       variables,

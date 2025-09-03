@@ -153,11 +153,11 @@ async function processEmails(supabase: any, emails: any[], priority: string) {
         emailResult = await supabase.functions.invoke('unified-smtp-sender', {
           body: {
             to: email.recipient_email,
-            subject: email.variables?.subject || 'Notification from Starters Small Chops',
-            htmlContent: email.variables?.html_content,
-            textContent: email.variables?.text_content,
+            subject: email.template_variables?.subject || email.variables?.subject || 'Notification from Starters Small Chops',
+            htmlContent: email.template_variables?.html_content || email.variables?.html_content,
+            textContent: email.template_variables?.text_content || email.variables?.text_content,
             templateKey: normalizedTemplateKey,
-            variables: email.variables
+            variables: email.template_variables || email.variables
           }
         })
       } catch (sendError) {

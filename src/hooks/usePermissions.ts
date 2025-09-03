@@ -36,8 +36,34 @@ export const useHasPermission = (menuKey: string, requiredLevel: 'view' | 'edit'
   // PRODUCTION SECURITY: Return false while loading permissions to prevent unauthorized access
   if (isLoading || !user?.id) return false;
 
+  // PRODUCTION ADMIN OVERRIDE: Check if user is admin first
+  const isAdmin = permissions?.some(p => p.menu_key === 'settings_admin_users' && p.permission_level === 'edit');
+  
   // PRODUCTION SECURITY: Find exact permission for the menu key
-  const permission = permissions?.find(p => p.menu_key === menuKey);
+  let permission = permissions?.find(p => p.menu_key === menuKey);
+  
+  // PRODUCTION FALLBACK: Legacy key mapping for backward compatibility
+  if (!permission && !isAdmin) {
+    const legacyKeyMap: Record<string, string> = {
+      'orders_view': 'orders',
+      'categories_view': 'categories', 
+      'products_view': 'products',
+      'customers_view': 'customers',
+      'promotions_view': 'promotions',
+      'reports-sales': 'reports',
+      'delivery_zones': 'delivery'
+    };
+    
+    const legacyKey = legacyKeyMap[menuKey];
+    if (legacyKey) {
+      permission = permissions?.find(p => p.menu_key === legacyKey);
+    }
+  }
+
+  // PRODUCTION ADMIN OVERRIDE: Admins get full access to all menus
+  if (isAdmin) {
+    return true;
+  }
   
   // PRODUCTION SECURITY: Deny access if no permission found (default deny policy)
   if (!permission) return false;

@@ -187,6 +187,24 @@ serve(async (req) => {
       case 'update': {
         console.log('Admin function: Updating order', orderId, updates)
 
+        // Get the current order to compare status changes
+        const { data: currentOrder, error: fetchError } = await supabaseClient
+          .from('orders')
+          .select('status, customer_email, customer_name, order_number')
+          .eq('id', orderId)
+          .single()
+
+        if (fetchError) {
+          console.error('Error fetching current order:', fetchError)
+          return new Response(JSON.stringify({
+            success: false,
+            error: fetchError.message
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 500
+          })
+        }
+
         const { data, error } = await supabaseClient
           .from('orders')
           .update(updates)
@@ -207,6 +225,43 @@ serve(async (req) => {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 500
           })
+        }
+
+        // Trigger status change email if status has changed and customer has email
+        if (updates.status && updates.status !== currentOrder.status && currentOrder.customer_email) {
+          try {
+            console.log(`Triggering status change email: ${currentOrder.status} -> ${updates.status}`)
+            
+            const { error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
+              body: {
+                journey_type: 'order_status_change',
+                user_data: {
+                  email: currentOrder.customer_email,
+                  name: currentOrder.customer_name
+                },
+                order_data: {
+                  order_id: orderId,
+                  order_number: currentOrder.order_number,
+                  status: updates.status
+                },
+                metadata: {
+                  old_status: currentOrder.status,
+                  new_status: updates.status,
+                  updated_at: new Date().toISOString()
+                }
+              }
+            })
+
+            if (emailError) {
+              console.error('Failed to trigger status change email:', emailError)
+              // Don't fail the order update if email fails
+            } else {
+              console.log('✅ Status change email triggered successfully')
+            }
+          } catch (emailError) {
+            console.error('Error triggering status change email:', emailError)
+            // Don't fail the order update if email fails
+          }
         }
 
         return new Response(JSON.stringify({

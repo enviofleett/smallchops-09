@@ -77,7 +77,7 @@ serve(async (req: Request) => {
       });
 
     // Trigger immediate email processing for high-priority events
-    if (['order_placement', 'password_reset'].includes(journey_type)) {
+    if (['order_placement', 'order_status_change', 'password_reset'].includes(journey_type)) {
       try {
         await supabase.functions.invoke('instant-email-processor');
       } catch (processError) {
@@ -242,11 +242,14 @@ async function handleOrderStatusChangeJourney(
 
   // Map status to template
   const statusTemplateMap: Record<string, string> = {
-    'processing': 'order_processing',
-    'shipped': 'order_shipped',
+    'confirmed': 'order_confirmed',
+    'preparing': 'order_preparing', 
+    'ready': 'order_ready',
     'out_for_delivery': 'order_out_for_delivery',
     'delivered': 'order_delivered',
-    'cancelled': 'order_cancelled'
+    'cancelled': 'order_cancelled',
+    'completed': 'order_completed',
+    'returned': 'order_returned'
   };
 
   const templateKey = statusTemplateMap[status];
@@ -264,12 +267,20 @@ async function handleOrderStatusChangeJourney(
       status: 'queued',
       template_key: templateKey,
       template_variables: {
-        customer_name: userData.name || 'Customer',
+        customer_name: userData.name || 'Valued Customer',
         order_number: orderData.order_number,
-        order_status: status,
-        status_date: new Date().toLocaleDateString(),
-        tracking_url: `https://yourdomain.com/track/${orderData.order_id}`,
-        estimated_delivery: metadata?.estimated_delivery || 'Soon',
+        order_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        status_date: new Date().toLocaleDateString('en-NG', { 
+          year: 'numeric', 
+          month: 'long', 
+          day: 'numeric' 
+        }),
+        business_name: 'Starters Small Chops',
+        support_email: 'support@starterssmallchops.com',
+        order_id: orderData.order_id,
+        old_status: metadata?.old_status?.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) || '',
+        new_status: status.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+        updated_at: metadata?.updated_at || new Date().toISOString(),
         ...metadata
       },
       priority: 'normal'

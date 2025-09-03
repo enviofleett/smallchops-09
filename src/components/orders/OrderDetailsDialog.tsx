@@ -156,9 +156,12 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
       assigned_rider_id?: string | null;
     }) => updateOrder(order.id, updates),
     onSuccess: () => {
+      const statusChanged = selectedStatus !== order.status;
       toast({
         title: 'Success',
-        description: 'Order updated successfully.'
+        description: statusChanged 
+          ? 'Order updated successfully. Status change notification will be sent to customer.'
+          : 'Order updated successfully.'
       });
       queryClient.invalidateQueries({
         queryKey: ['orders']

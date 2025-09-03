@@ -2,6 +2,12 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { getCorsHeaders } from '../_shared/cors.ts';
 
+// Production mode configuration
+const isProductionMode = Deno.env.get('EMAIL_PRODUCTION_MODE')?.toLowerCase() === 'true' || 
+                        Deno.env.get('DENO_ENV') === 'production';
+
+console.log(`🔒 Email Production Mode: ${isProductionMode ? 'ENABLED' : 'DISABLED'} (EMAIL_PRODUCTION_MODE=${Deno.env.get('EMAIL_PRODUCTION_MODE')}, DENO_ENV=${Deno.env.get('DENO_ENV')})`);
+
 // Configuration constants
 const TIMEOUTS = {
   connect: 10000,    // 10s connection timeout

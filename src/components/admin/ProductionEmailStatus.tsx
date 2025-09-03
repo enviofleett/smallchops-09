@@ -33,6 +33,7 @@ export const ProductionEmailStatus: React.FC = () => {
   const requiredTemplates = [
     { key: 'order_confirmation', name: 'Order Confirmation', critical: true },
     { key: 'order_delivered', name: 'Order Delivered', critical: true },
+    { key: 'order_out_for_delivery', name: 'Out for Delivery', critical: true },
     { key: 'shipping_notification', name: 'Shipping Notification', critical: true },
     { key: 'order_ready', name: 'Order Ready for Pickup', critical: true },
     { key: 'customer_welcome', name: 'Customer Welcome', critical: false },

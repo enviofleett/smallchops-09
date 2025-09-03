@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { logPermissionChange, logSecurityEvent } from '@/utils/adminActivityLogger';
 import { PermissionMatrixHealthMonitor } from "@/components/admin/PermissionMatrixHealthMonitor";
 import { 
   ChevronDown, 
@@ -398,6 +399,38 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
       } catch (rateLimitError) {
         // Rate limiting not available, proceed without it
         console.warn('Rate limiting not available:', rateLimitError);
+      }
+
+      // PRODUCTION ADMIN ACTIVITY LOGGING: Track all permission changes
+      try {
+        // Log the permission change with comprehensive audit trail
+        const previousPermissions = userPermissions?.reduce((acc, perm) => {
+          acc[perm.menu_key] = perm.permission_level;
+          return acc;
+        }, {} as Record<string, string>) || {};
+
+        await logPermissionChange(
+          currentUser.id,
+          Object.fromEntries(validPermissions),
+          previousPermissions
+        );
+
+        // Log security event for admin permission changes
+        if (currentUser.role === 'admin') {
+          await logSecurityEvent(
+            'admin_permission_modified',
+            {
+              target_user_id: currentUser.id,
+              target_user_name: currentUser.name,
+              changes_count: validPermissions.length,
+              validation_warnings: validation.warnings,
+              admin_user: isAdminUser
+            },
+            'high'
+          );
+        }
+      } catch (loggingError) {
+        console.warn('Admin activity logging failed (non-blocking):', loggingError);
       }
 
       // Use secure RPC function for permission updates

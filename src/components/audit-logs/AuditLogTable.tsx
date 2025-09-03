@@ -47,45 +47,111 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
     const fetchLogs = async () => {
       setLoading(true);
 
-      let query = supabase
-        .from("audit_logs")
-        .select(`
-          *,
-          profiles!audit_logs_user_id_fkey(role)
-        `)
-        .order("event_time", { ascending: false })
-        .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+      try {
+        // PRODUCTION SECURITY: Query admin activities with optimized approach
+        let query = supabase
+          .from("audit_logs")
+          .select(`
+            id,
+            event_time,
+            user_id,
+            user_name,
+            action,
+            category,
+            entity_type,
+            entity_id,
+            message,
+            old_values,
+            new_values,
+            ip_address,
+            user_agent
+          `)
+          .order("event_time", { ascending: false })
+          .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
-      // ADMIN-ONLY FILTER: Show only admin users + chudesyl@gmail.com + system activities
-      query = query.or(
-        `user_id.is.null,profiles.role.eq.admin,user_name.eq.chudesyl@gmail.com`
-      );
+        // PRODUCTION FILTER: Show all admin activities and system operations
+        // First get all profiles with admin role
+        const { data: adminProfiles, error: adminError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('role', 'admin')
+          .eq('is_active', true);
 
-      // Additional filters
-      if (filters.category) query = query.eq("category", filters.category);
-      if (filters.user) query = query.ilike("user_name", `%${filters.user}%`);
-      if (filters.dateFrom) query = query.gte("event_time", filters.dateFrom);
-      if (filters.dateTo) query = query.lte("event_time", filters.dateTo + "T23:59:59");
-      if (filters.search) {
-        // Only filter on searchable text columns for simplicity
-        query = query.or(
-          [
-            `action.ilike.%${filters.search}%`,
-            `entity_type.ilike.%${filters.search}%`,
-            `message.ilike.%${filters.search}%`
-          ].join(",")
-        );
-      }
-      const { data, error } = await query;
-      if (error) {
+        if (adminError) {
+          console.error('Error fetching admin profiles:', adminError);
+          throw adminError;
+        }
+
+        const adminIds = adminProfiles?.map(p => p.id) || [];
+        
+        // Filter for admin users OR system operations (null user_id)
+        if (adminIds.length > 0) {
+          query = query.or(`user_id.is.null,user_id.in.(${adminIds.join(',')})`);
+        } else {
+          // If no admins found, only show system operations
+          query = query.is('user_id', null);
+        }
+
+        // Additional production filters
+        if (filters.category) {
+          query = query.eq("category", filters.category);
+        }
+        
+        if (filters.user) {
+          query = query.ilike("user_name", `%${filters.user}%`);
+        }
+        
+        if (filters.dateFrom) {
+          query = query.gte("event_time", filters.dateFrom);
+        }
+        
+        if (filters.dateTo) {
+          query = query.lte("event_time", filters.dateTo + "T23:59:59");
+        }
+        
+        if (filters.search) {
+          // Enhanced search across multiple fields
+          query = query.or(
+            [
+              `action.ilike.%${filters.search}%`,
+              `entity_type.ilike.%${filters.search}%`,
+              `message.ilike.%${filters.search}%`,
+              `category.ilike.%${filters.search}%`,
+              `user_name.ilike.%${filters.search}%`
+            ].join(",")
+          );
+        }
+
+        const { data, error } = await query;
+        
+        if (error) {
+          console.error('Error fetching audit logs:', error);
+          throw error;
+        }
+
+        // Production security: Sanitize sensitive data for display
+        const sanitizedLogs = (data as AuditLogRow[]).map(log => ({
+          ...log,
+          // Mask sensitive IP addresses partially for privacy
+          ip_address: log.ip_address ? 
+            log.ip_address.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)/, '$1.$2.xxx.xxx') : 
+            null,
+          // Ensure user_agent doesn't contain sensitive info
+          user_agent: log.user_agent ? 
+            log.user_agent.substring(0, 100) + (log.user_agent.length > 100 ? '...' : '') : 
+            null
+        }));
+
+        setLogs(sanitizedLogs);
+        setHasMore(sanitizedLogs.length === PAGE_SIZE);
+        
+      } catch (error) {
+        console.error('Error in fetchLogs:', error);
         setLogs([]);
         setHasMore(false);
+      } finally {
         setLoading(false);
-        return;
       }
-      setLogs(data as AuditLogRow[]);
-      setHasMore((data as AuditLogRow[]).length === PAGE_SIZE);
-      setLoading(false);
     };
 
     fetchLogs();
@@ -175,9 +241,18 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
 
   return (
     <div>
-      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-        <p className="text-sm text-blue-800">
-          <strong>Note:</strong> Showing activities from admin users and system operations only.
+      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+        <div className="flex items-center gap-2 mb-2">
+          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
+          <h3 className="text-sm font-semibold text-blue-800">Production Security Monitor</h3>
+        </div>
+        <p className="text-sm text-blue-700">
+          Tracking all administrative activities and system operations. IP addresses are partially masked for privacy compliance.
+          {logs.length > 0 && (
+            <span className="block mt-1 font-medium">
+              Currently showing {logs.length} recent admin activities.
+            </span>
+          )}
         </p>
       </div>
       <ResponsiveTable

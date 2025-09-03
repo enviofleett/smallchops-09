@@ -40,6 +40,35 @@ interface Props {
   };
 }
 
+/**
+ * PRODUCTION UTILITY: Extract clean username from email or display name
+ * Handles various username formats for audit log display
+ */
+const extractUsername = (log: AuditLogRow): string => {
+  // System operations
+  if (!log.user_id) {
+    return "System";
+  }
+
+  // Admin profile email - extract username part
+  if (log.admin_profile?.email) {
+    const emailParts = log.admin_profile.email.split("@");
+    return emailParts[0] || log.admin_profile.email;
+  }
+
+  // Fallback to user_name - extract username if it's an email
+  if (log.user_name) {
+    if (log.user_name.includes("@")) {
+      const emailParts = log.user_name.split("@");
+      return emailParts[0] || log.user_name;
+    }
+    return log.user_name;
+  }
+
+  // Last resort - show truncated user ID
+  return `admin_${log.user_id.substring(0, 6)}`;
+};
+
 const PAGE_SIZE = 20;
 
 /**
@@ -410,15 +439,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
                 </TableCell>
                 <TableCell>
                   <span className="font-medium text-gray-900">
-                    {!log.user_id ? (
-                      <span className="text-gray-500">System</span>
-                    ) : log.admin_profile?.email ? (
-                      log.admin_profile.email
-                    ) : log.user_name ? (
-                      log.user_name
-                    ) : (
-                      `Admin ${log.user_id.substring(0, 8)}...`
-                    )}
+                    {extractUsername(log)}
                   </span>
                 </TableCell>
                 <TableCell>

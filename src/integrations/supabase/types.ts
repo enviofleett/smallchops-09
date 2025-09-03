@@ -8093,7 +8093,7 @@ export type Database = {
         Row: {
           id: string
           menu_key: string
-          menu_section: Database["public"]["Enums"]["menu_section"]
+          menu_section: Database["public"]["Enums"]["menu_section"] | null
           permission_level: Database["public"]["Enums"]["permission_level"]
           sub_menu_section: string | null
           user_id: string
@@ -8101,7 +8101,7 @@ export type Database = {
         Insert: {
           id?: string
           menu_key: string
-          menu_section: Database["public"]["Enums"]["menu_section"]
+          menu_section?: Database["public"]["Enums"]["menu_section"] | null
           permission_level?: Database["public"]["Enums"]["permission_level"]
           sub_menu_section?: string | null
           user_id: string
@@ -8109,7 +8109,7 @@ export type Database = {
         Update: {
           id?: string
           menu_key?: string
-          menu_section?: Database["public"]["Enums"]["menu_section"]
+          menu_section?: Database["public"]["Enums"]["menu_section"] | null
           permission_level?: Database["public"]["Enums"]["permission_level"]
           sub_menu_section?: string | null
           user_id?: string

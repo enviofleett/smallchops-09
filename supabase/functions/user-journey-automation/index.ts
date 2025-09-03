@@ -340,7 +340,29 @@ async function handleOrderStatusChangeJourney(
     events.push(statusUpdateEvent.data);
   }
 
-  console.log(`Created status update email for order ${orderData.order_number}: ${status}`);
+  // Log pickup-specific notification for production monitoring
+  if (templateKey === 'pickup_ready') {
+    console.log(`🚚 PICKUP READY: Notification sent for order ${orderData.order_number} to ${userData.email}`);
+    
+    // Additional audit log for pickup notifications
+    await supabase
+      .from('audit_logs')
+      .insert({
+        action: 'pickup_ready_notification_sent',
+        category: 'Order Fulfillment',
+        message: `Pickup ready notification sent for order ${orderData.order_number}`,
+        entity_id: orderData.order_id,
+        new_values: {
+          order_id: orderData.order_id,
+          order_number: orderData.order_number,
+          customer_email: userData.email,
+          template_used: templateKey,
+          notification_time: new Date().toISOString()
+        }
+      });
+  }
+
+  console.log(`Created status update email for order ${orderData.order_number}: ${status} (template: ${templateKey})`);
   return events;
 }
 

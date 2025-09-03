@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Search, ShoppingCart, User, Menu, X, Heart, MapPin } from 'lucide-react';
+import { Search, ShoppingCart, Menu, X, Heart } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
@@ -19,10 +19,9 @@ export const PublicHeader = () => {
 
 const PublicHeaderContent = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isMenuOpen, setIsMenuOpen] = useState(false); // Keep for backward compatibility
   const { getItemCount } = useCart();
-  const { data: settings, error } = useBusinessSettings();
-  const { isAuthenticated, customerAccount, isLoading } = useCustomerAuth();
+  const { data: settings } = useBusinessSettings();
+  const { isAuthenticated } = useCustomerAuth();
   const navigate = useNavigate();
 
   const handleCartClick = () => {
@@ -100,18 +99,6 @@ const PublicHeaderContent = () => {
             {/* Notifications - For authenticated users */}
             {isAuthenticated && <NotificationsDropdown />}
 
-            {/* Track Order - For authenticated users */}
-            {isAuthenticated && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden md:flex"
-                onClick={() => navigate('/track-order')}
-                title="Track Order"
-              >
-                <MapPin className="h-5 w-5" />
-              </Button>
-            )}
 
             {/* Favorites - Hidden on small mobile */}
             <Button

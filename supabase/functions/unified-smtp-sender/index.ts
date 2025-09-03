@@ -385,12 +385,6 @@ async function processTemplate(
     // This should never happen in production mode due to earlier checks
     throw new Error('PRODUCTION_MODE: Template processing failed - no fallback allowed');
   }
-          </p>
-        </div>
-      </body>
-    </html>
-  `;
-  let text = template?.text_content || `${businessName}\n\nThank you for your business with us.\n\nThis is an automated notification regarding your recent activity.\n\nThis email was sent from our automated system.`;
 
   // Extract all template variables to track missing ones
   const allContent = [subject, html, text].join(' ');

@@ -409,7 +409,17 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
                   {new Date(log.event_time).toLocaleString()}
                 </TableCell>
                 <TableCell>
-                  <AdminUserDisplay log={log} />
+                  <span className="font-medium text-gray-900">
+                    {!log.user_id ? (
+                      <span className="text-gray-500">System</span>
+                    ) : log.admin_profile?.email ? (
+                      log.admin_profile.email
+                    ) : log.user_name ? (
+                      log.user_name
+                    ) : (
+                      `Admin ${log.user_id.substring(0, 8)}...`
+                    )}
+                  </span>
                 </TableCell>
                 <TableCell>
                   <span className="capitalize font-semibold text-blue-700">{log.action}</span>

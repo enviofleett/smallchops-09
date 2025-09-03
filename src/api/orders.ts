@@ -192,6 +192,12 @@ export const updateOrder = async (
         if (process.env.NODE_ENV === 'development') {
           console.error('❌ Rider assignment failed:', errorMsg);
         }
+        
+        // Handle specific permission errors
+        if (errorMsg.includes('Only admins') || errorMsg.includes('Insufficient permissions')) {
+          throw new Error('Admin permissions required to assign riders. Please contact your administrator.');
+        }
+        
         throw new Error(errorMsg);
       }
 
@@ -213,7 +219,14 @@ export const updateOrder = async (
         });
 
         if (updateError || !updateResult?.success) {
-          throw new Error(updateResult?.error || updateError?.message || 'Failed to update order');
+          const errorMsg = updateResult?.error || updateError?.message || 'Failed to update order';
+          
+          // Handle specific permission errors
+          if (errorMsg.includes('Only admins') || errorMsg.includes('Insufficient permissions')) {
+            throw new Error('Admin permissions required to update orders. Please contact your administrator.');
+          }
+          
+          throw new Error(errorMsg);
         }
         
         return updateResult.order;
@@ -232,7 +245,14 @@ export const updateOrder = async (
     });
 
     if (error || !data.success) {
-      throw new Error(data?.error || error?.message || 'Failed to update order');
+      const errorMsg = data?.error || error?.message || 'Failed to update order';
+      
+      // Handle specific permission errors
+      if (errorMsg.includes('Only admins') || errorMsg.includes('Insufficient permissions')) {
+        throw new Error('Admin permissions required to update orders. Please contact your administrator.');
+      }
+      
+      throw new Error(errorMsg);
     }
 
     if (process.env.NODE_ENV === 'development') {

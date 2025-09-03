@@ -106,9 +106,33 @@ export const CreateAdminDialog = ({ open, onOpenChange, onSuccess }: CreateAdmin
       }
     } catch (error: any) {
       console.error('Admin creation error:', error);
+      
+      // Enhanced error handling for production
+      let errorTitle = 'Creation Failed';
+      let errorDescription = 'Failed to create admin user. Please try again.';
+      
+      if (error.message.includes('FunctionsHttpError')) {
+        errorTitle = 'Server Error';
+        errorDescription = 'Admin creation service is temporarily unavailable. Please try again in a moment.';
+      } else if (error.message.includes('already exists')) {
+        errorTitle = 'User Already Exists';
+        errorDescription = 'An admin user with this email already exists. Please use a different email address.';
+      } else if (error.message.includes('Invalid email')) {
+        errorTitle = 'Invalid Email';
+        errorDescription = 'Please enter a valid email address.';
+      } else if (error.message.includes('Authorization')) {
+        errorTitle = 'Permission Denied';
+        errorDescription = 'You do not have permission to create admin users. Please contact a system administrator.';
+      } else if (error.message.includes('Server configuration')) {
+        errorTitle = 'System Configuration Error';
+        errorDescription = 'The admin creation system is not properly configured. Please contact technical support.';
+      } else if (error.message) {
+        errorDescription = error.message;
+      }
+      
       toast({
-        title: 'Creation Failed',
-        description: error.message || 'Failed to create admin user. Please try again.',
+        title: errorTitle,
+        description: errorDescription,
         variant: 'destructive'
       });
     } finally {

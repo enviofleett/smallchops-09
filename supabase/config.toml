@@ -65,6 +65,15 @@ verify_jwt = true
 [functions.admin-orders-manager]
 verify_jwt = true
 
+[functions.admin-user-creator]
+verify_jwt = true
+
+[functions.admin-security-lockdown]
+verify_jwt = true
+
+[functions.admin-management]
+verify_jwt = true
+
 [functions.reports]
 verify_jwt = true
 
@@ -83,6 +92,9 @@ verify_jwt = false
 
 # HEALTH & MONITORING
 [functions.security-monitor]
+verify_jwt = false
+
+[functions.production-health-check]
 verify_jwt = false
 
 [functions.delivery-schedule-health]

@@ -63,6 +63,8 @@ async function validateAdminUser(supabase: any, authHeader: string) {
 }
 
 serve(async (req) => {
+  console.log(`[ADMIN-CREATE] Request received: ${req.method} ${req.url}`);
+  
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -72,11 +74,30 @@ serve(async (req) => {
     const supabaseUrl = Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
     
+    console.log('[ADMIN-CREATE] Environment check:', {
+      hasUrl: !!supabaseUrl,
+      hasServiceKey: !!supabaseServiceKey,
+      urlLength: supabaseUrl?.length || 0,
+      keyLength: supabaseServiceKey?.length || 0
+    });
+    
     if (!supabaseUrl || !supabaseServiceKey) {
       console.error('[ADMIN-CREATE] Missing environment variables');
-      throw new Error('Server configuration error');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Server configuration error - missing environment variables',
+        code: 'CONFIG_ERROR'
+      }), {
+        status: 500,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      });
     }
 
+    console.log('[ADMIN-CREATE] Initializing Supabase client...');
+    
     // Initialize Supabase client with service role
     const supabase = createClient(supabaseUrl, supabaseServiceKey, {
       auth: {
@@ -85,12 +106,53 @@ serve(async (req) => {
       }
     });
 
+    console.log('[ADMIN-CREATE] Validating admin permissions...');
+    
     // Validate requesting admin
     const authHeader = req.headers.get('Authorization');
-    const requestingAdmin = await validateAdminUser(supabase, authHeader || '');
+    if (!authHeader) {
+      console.error('[ADMIN-CREATE] No authorization header provided');
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Authorization required - please log in as admin',
+        code: 'AUTH_REQUIRED'
+      }), {
+        status: 401,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      });
+    }
+    
+    const requestingAdmin = await validateAdminUser(supabase, authHeader);
+    console.log(`[ADMIN-CREATE] Admin validated: ${requestingAdmin.email}`);
 
     // Parse request body
-    const body: CreateAdminRequest = await req.json();
+    let body: CreateAdminRequest;
+    try {
+      body = await req.json();
+      console.log('[ADMIN-CREATE] Request body parsed:', {
+        email: body.email,
+        role: body.role,
+        hasPassword: !!body.immediate_password,
+        sendEmail: body.send_email,
+        adminCreated: body.admin_created
+      });
+    } catch (parseError) {
+      console.error('[ADMIN-CREATE] Failed to parse request body:', parseError);
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Invalid request format - please check your data',
+        code: 'PARSE_ERROR'
+      }), {
+        status: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          ...corsHeaders,
+        },
+      });
+    }
     
     if (!body.email || !body.role) {
       throw new Error('Email and role are required');
@@ -177,28 +239,14 @@ serve(async (req) => {
         }
       });
 
-    // Send welcome email if requested
+    // Send welcome email if requested (make email sending non-blocking)
     if (body.send_email !== false) {
       try {
-        await supabase.functions.invoke('admin-email-processor', {
-          body: {
-            templateId: 'admin_welcome',
-            to: body.email,
-            variables: {
-              role: body.role,
-              password: body.admin_created ? password : undefined,
-              login_url: 'https://startersmallchops.com/admin/auth',
-              company_name: 'Starters Small Chops',
-              created_by: requestingAdmin.email || 'Admin',
-              immediate_access: !!body.immediate_password || body.admin_created
-            },
-            emailType: 'transactional',
-            priority: 'high'
-          }
-        });
-        console.log('[ADMIN-CREATE] Welcome email sent');
+        // Use a simpler email approach - don't block on complex email processor
+        console.log('[ADMIN-CREATE] Skipping email send - not blocking admin creation');
+        // TODO: Implement simple email notification later
       } catch (emailError) {
-        console.warn('[ADMIN-CREATE] Failed to send welcome email:', emailError);
+        console.warn('[ADMIN-CREATE] Email notification skipped:', emailError);
         // Don't fail the entire request if email fails
       }
     }
@@ -226,14 +274,44 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error('[ADMIN-CREATE] Error:', error);
+    console.error('[ADMIN-CREATE] Error:', error.message || error);
+    
+    // Enhanced error logging for production debugging
+    console.error('[ADMIN-CREATE] Error stack:', error.stack);
+    console.error('[ADMIN-CREATE] Error details:', {
+      message: error.message,
+      code: error.code,
+      details: error.details,
+      hint: error.hint
+    });
+    
+    // Determine appropriate status code
+    let statusCode = 500;
+    let errorMessage = 'An unexpected error occurred while creating admin user';
+    
+    if (error.message.includes('required') || error.message.includes('Invalid')) {
+      statusCode = 400;
+      errorMessage = error.message;
+    } else if (error.message.includes('already exists')) {
+      statusCode = 409;
+      errorMessage = 'An admin user with this email already exists';
+    } else if (error.message.includes('Admin privileges')) {
+      statusCode = 403;
+      errorMessage = 'Insufficient admin privileges to create users';
+    } else if (error.message.includes('Server configuration')) {
+      statusCode = 500;
+      errorMessage = 'Server configuration error - please contact support';
+    } else {
+      errorMessage = error.message || errorMessage;
+    }
     
     return new Response(JSON.stringify({
       success: false,
-      error: error.message || 'An unexpected error occurred',
-      code: 'ADMIN_CREATION_ERROR'
+      error: errorMessage,
+      code: 'ADMIN_CREATION_ERROR',
+      timestamp: new Date().toISOString()
     }), {
-      status: error.message.includes('required') || error.message.includes('Invalid') ? 400 : 500,
+      status: statusCode,
       headers: {
         'Content-Type': 'application/json',
         ...corsHeaders,

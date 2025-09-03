@@ -320,14 +320,14 @@ export default function CreatePromotionForm({
   }, [isSubmitting, disabled, form, createMutation, onSuccess]);
 
   return (
-    <div className="space-y-4 max-h-[85vh] overflow-y-auto">
-      <div className="flex items-center justify-between sticky top-0 bg-background pb-2">
-        <h3 className="text-lg font-semibold">Create New Promotion</h3>
+    <div className="space-y-4 sm:space-y-6">
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg sm:text-xl font-semibold">Create New Promotion</h3>
       </div>
 
       <Form {...form}>
         <form
-          className="space-y-4 pb-20 md:pb-6"
+          className="space-y-4 sm:space-y-6 pb-20 md:pb-0"
           onSubmit={form.handleSubmit(handleSubmit)}
           autoComplete="off"
           noValidate
@@ -336,7 +336,7 @@ export default function CreatePromotionForm({
         <div className="space-y-1">
           <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Basics</h4>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Name */}
           <FormField
             control={form.control}
@@ -351,8 +351,10 @@ export default function CreatePromotionForm({
                   <Input
                     placeholder="Eg: Summer Discount"
                     autoFocus
+                    autoComplete="off"
+                    aria-describedby="name-description"
                     {...field}
-                    disabled={disabled}
+                    disabled={disabled || isSubmitting}
                   />
                 </FormControl>
                 <FormMessage />
@@ -370,7 +372,7 @@ export default function CreatePromotionForm({
                 <Select
                   onValueChange={val => field.onChange(val)}
                   value={field.value}
-                  disabled={disabled}
+                  disabled={disabled || isSubmitting}
                 >
                   <FormControl>
                     <SelectTrigger>
@@ -405,14 +407,15 @@ export default function CreatePromotionForm({
             control={form.control}
             name="description"
             render={({ field }) => (
-              <FormItem className="col-span-1 sm:col-span-2">
+              <FormItem className="col-span-1 md:col-span-2">
                 <FormLabel>Description</FormLabel>
                 <FormControl>
                   <Textarea
                     placeholder="Describe how this promotion works and when it applies..."
                     {...field}
-                    disabled={disabled}
+                    disabled={disabled || isSubmitting}
                     rows={3}
+                    className="resize-none"
                   />
                 </FormControl>
                 <FormMessage />
@@ -426,7 +429,7 @@ export default function CreatePromotionForm({
           <h4 className="font-medium text-sm text-muted-foreground uppercase tracking-wide">Configuration</h4>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Value field - different labels based on type */}
           {watchType !== "free_delivery" && (
             <FormField
@@ -452,9 +455,10 @@ export default function CreatePromotionForm({
                       inputMode="numeric"
                       min={0}
                       max={watchType === "percentage" ? 100 : undefined}
+                      step={watchType === "percentage" ? 1 : watchType === "fixed_amount" ? 50 : 1}
                       {...field}
                       value={field.value ?? ""}
-                      disabled={disabled}
+                      disabled={disabled || isSubmitting}
                     />
                   </FormControl>
                   <FormDescription>
@@ -486,9 +490,10 @@ export default function CreatePromotionForm({
                     type="number"
                     inputMode="numeric"
                     min={0}
+                    step={100}
                     {...field}
                     value={field.value ?? ""}
-                    disabled={disabled}
+                    disabled={disabled || isSubmitting}
                   />
                 </FormControl>
                 <FormDescription>
@@ -515,9 +520,10 @@ export default function CreatePromotionForm({
                       type="number"
                       inputMode="numeric"
                       min={0}
+                      step={100}
                       {...field}
                       value={field.value ?? ""}
-                      disabled={disabled}
+                      disabled={disabled || isSubmitting}
                     />
                   </FormControl>
                   <FormDescription>
@@ -542,9 +548,11 @@ export default function CreatePromotionForm({
                     type="number"
                     inputMode="numeric"
                     min={1}
+                    max={10000}
+                    step={1}
                     {...field}
                     value={field.value ?? ""}
-                    disabled={disabled}
+                    disabled={disabled || isSubmitting}
                   />
                 </FormControl>
                 <FormDescription>
@@ -565,8 +573,13 @@ export default function CreatePromotionForm({
           <div className="flex items-center justify-between">
             <span className="text-sm text-muted-foreground">Auto-generate code</span>
             <div className="flex items-center gap-2">
-              <Shuffle className="w-4 h-4" />
-              <Switch checked={generateCode} onCheckedChange={setGenerateCode} />
+              <Switch 
+                checked={generateCode} 
+                onCheckedChange={setGenerateCode}
+                disabled={disabled || isSubmitting}
+                aria-label="Auto-generate promotion code"
+              />
+              <Shuffle className="w-4 h-4 text-muted-foreground" />
             </div>
           </div>
           
@@ -580,15 +593,17 @@ export default function CreatePromotionForm({
                     <Input
                       placeholder="Optional promo code (e.g., SAVE20)"
                       {...field}
-                      disabled={disabled || generateCode}
+                      disabled={disabled || generateCode || isSubmitting}
                       className="uppercase"
+                      maxLength={20}
                     />
                     {!generateCode && (
                       <Button
                         type="button"
                         variant="outline"
                         onClick={() => form.setValue('code', generatePromotionCode())}
-                        disabled={disabled}
+                        disabled={disabled || isSubmitting}
+                        className="shrink-0"
                       >
                         Generate
                       </Button>
@@ -617,7 +632,7 @@ export default function CreatePromotionForm({
                 <DaysSelector
                   selectedDays={field.value || []}
                   onDaysChange={field.onChange}
-                  disabled={disabled}
+                  disabled={disabled || isSubmitting}
                 />
               </FormControl>
               <FormDescription>
@@ -629,7 +644,7 @@ export default function CreatePromotionForm({
         />
 
         {/* Dates */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
           {/* Start Date */}
           <FormField
             control={form.control}
@@ -647,7 +662,7 @@ export default function CreatePromotionForm({
                           "w-full justify-start text-left font-normal",
                           !field.value && "text-muted-foreground"
                         )}
-                        disabled={disabled}
+                        disabled={disabled || isSubmitting}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
                         {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
@@ -687,7 +702,7 @@ export default function CreatePromotionForm({
                           "w-full justify-start text-left font-normal",
                           !field.value && "text-muted-foreground"
                         )}
-                        disabled={disabled}
+                        disabled={disabled || isSubmitting}
                       >
                         <CalendarIcon className="mr-2 h-4 w-4 opacity-50" />
                         {field.value ? format(field.value, "PPP") : <span>Pick a date</span>}
@@ -715,36 +730,25 @@ export default function CreatePromotionForm({
           />
         </div>
 
-        {/* Desktop Submit */}
-        <div className="hidden md:flex items-center gap-3 justify-end">
+        {/* Submit Button */}
+        <div className="pt-4 sm:pt-6 flex items-center gap-3 justify-end">
           <Button
             type="submit"
             disabled={disabled || isSubmitting || createMutation.isPending}
-            className="w-auto"
-          >
-            {isSubmitting || createMutation.isPending ? (
-              <span className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
-            ) : (
-              <Plus className="w-4 h-4 mr-2" />
-            )}
-            {isSubmitting ? "Creating..." : "Create Promotion"}
-          </Button>
-        </div>
-
-        {/* Mobile Sticky Submit */}
-        <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg z-50">
-          <Button
-            type="submit"
-            disabled={disabled || isSubmitting || createMutation.isPending}
-            className="w-full min-h-[44px]"
+            className="w-full sm:w-auto min-h-[44px]"
             size="lg"
           >
             {isSubmitting || createMutation.isPending ? (
-              <span className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+              <div className="flex items-center">
+                <div className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
+                <span>Creating...</span>
+              </div>
             ) : (
-              <Plus className="w-4 h-4 mr-2" />
+              <div className="flex items-center">
+                <Plus className="w-4 h-4 mr-2" />
+                <span>Create Promotion</span>
+              </div>
             )}
-            {isSubmitting ? "Creating..." : "Create Promotion"}
           </Button>
         </div>
         </form>

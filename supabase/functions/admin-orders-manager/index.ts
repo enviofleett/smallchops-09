@@ -89,44 +89,15 @@ serve(async (req) => {
       case 'assign_rider': {
         console.log('🎯 Admin function: Assigning rider', riderId, 'to order', orderId)
         
-        // Validate rider exists and is active
-        const { data: rider, error: riderError } = await supabaseClient
-          .from('drivers')
-          .select('id, name, is_active')
-          .eq('id', riderId)
-          .single()
-
-        if (riderError || !rider) {
-          console.error('❌ Invalid rider ID:', riderId, riderError)
-          return new Response(JSON.stringify({
-            success: false,
-            error: `Invalid rider ID: ${riderId}`
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          })
-        }
-
-        if (!rider.is_active) {
-          console.error('❌ Rider is not active:', riderId)
-          return new Response(JSON.stringify({
-            success: false,
-            error: `Rider ${rider.name} is not active`
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          })
-        }
-
-        // Validate order exists and is assignable
-        const { data: order, error: orderError } = await supabaseClient
+        // Get order status to determine which RPC to use
+        const { data: orderCheck, error: orderCheckError } = await supabaseClient
           .from('orders')
           .select('id, status, order_number')
           .eq('id', orderId)
           .single()
 
-        if (orderError || !order) {
-          console.error('❌ Invalid order ID:', orderId, orderError)
+        if (orderCheckError || !orderCheck) {
+          console.error('❌ Order not found:', orderId, orderCheckError)
           return new Response(JSON.stringify({
             success: false,
             error: `Order not found: ${orderId}`
@@ -136,52 +107,100 @@ serve(async (req) => {
           })
         }
 
-        if (!['confirmed', 'preparing', 'ready'].includes(order.status)) {
-          console.error('❌ Order not in assignable status:', order.status)
+        // Use appropriate RPC based on order status
+        if (['confirmed', 'preparing', 'ready'].includes(orderCheck.status)) {
+          // Use start_delivery for new assignments
+          console.log('🚀 Using start_delivery RPC for order in status:', orderCheck.status)
+          
+          const { data: result, error: rpcError } = await supabaseClient
+            .rpc('start_delivery', {
+              p_order_id: orderId,
+              p_rider_id: riderId
+            })
+
+          if (rpcError) {
+            console.error('❌ start_delivery RPC failed:', rpcError)
+            return new Response(JSON.stringify({
+              success: false,
+              error: rpcError.message
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            })
+          }
+
+          console.log('✅ Order started for delivery successfully')
+          
+          // Fetch updated order with relations
+          const { data: updatedOrder, error: fetchError } = await supabaseClient
+            .from('orders_view')
+            .select(`*, 
+              order_items (*),
+              order_delivery_schedule (*)
+            `)
+            .eq('id', orderId)
+            .single()
+
+          return new Response(JSON.stringify({
+            success: true,
+            order: updatedOrder,
+            message: `Order ${orderCheck.order_number} started for delivery`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+
+        } else if (orderCheck.status === 'out_for_delivery') {
+          // Use reassign_order_rider for reassignments
+          console.log('🔄 Using reassign_order_rider RPC for order in status:', orderCheck.status)
+          
+          const { data: result, error: rpcError } = await supabaseClient
+            .rpc('reassign_order_rider', {
+              p_order_id: orderId,
+              p_new_rider_id: riderId,
+              p_reason: 'Admin reassignment via dashboard'
+            })
+
+          if (rpcError) {
+            console.error('❌ reassign_order_rider RPC failed:', rpcError)
+            return new Response(JSON.stringify({
+              success: false,
+              error: rpcError.message
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 400
+            })
+          }
+
+          console.log('✅ Rider reassigned successfully')
+          
+          // Fetch updated order with relations
+          const { data: updatedOrder, error: fetchError } = await supabaseClient
+            .from('orders_view')
+            .select(`*, 
+              order_items (*),
+              order_delivery_schedule (*)
+            `)
+            .eq('id', orderId)
+            .single()
+
+          return new Response(JSON.stringify({
+            success: true,
+            order: updatedOrder,
+            message: `Rider reassigned for order ${orderCheck.order_number}`
+          }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          })
+
+        } else {
+          console.error('❌ Order not in assignable or reassignable status:', orderCheck.status)
           return new Response(JSON.stringify({
             success: false,
-            error: `Order ${order.order_number} is not in assignable status (current: ${order.status})`
+            error: `Order ${orderCheck.order_number} cannot have rider assigned in status: ${orderCheck.status}`
           }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
             status: 400
           })
         }
-
-        // Perform the assignment with transaction safety
-        const { data: updatedOrder, error: updateError } = await supabaseClient
-          .from('orders')
-          .update({ 
-            assigned_rider_id: riderId,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', orderId)
-          .select(`*, 
-            order_items (*),
-            delivery_zones (id, name, base_fee, is_active),
-            order_delivery_schedule (*)
-          `)
-          .single()
-
-        if (updateError) {
-          console.error('❌ Failed to assign rider:', updateError)
-          return new Response(JSON.stringify({
-            success: false,
-            error: `Failed to assign rider: ${updateError.message}`
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 500
-          })
-        }
-
-        console.log('✅ Rider assigned successfully:', rider.name, 'to order', order.order_number)
-
-        return new Response(JSON.stringify({
-          success: true,
-          order: updatedOrder,
-          message: `Rider ${rider.name} assigned to order ${order.order_number}`
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        })
       }
 
       case 'update': {

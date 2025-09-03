@@ -9630,6 +9630,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      reassign_order_rider: {
+        Args: { p_new_rider_id: string; p_order_id: string; p_reason?: string }
+        Returns: Json
+      }
       record_health_metric: {
         Args: {
           p_metric_name: string
@@ -9730,6 +9734,10 @@ export type Database = {
       show_trgm: {
         Args: { "": string }
         Returns: string[]
+      }
+      start_delivery: {
+        Args: { p_order_id: string; p_rider_id: string }
+        Returns: Json
       }
       sync_payment_to_order_status: {
         Args: {

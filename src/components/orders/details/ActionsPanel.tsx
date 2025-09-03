@@ -101,14 +101,22 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
 
         {/* Rider Assignment */}
         <div className="space-y-2">
-          <label className="text-sm font-medium text-foreground">Assign Dispatch Rider</label>
+          <label className="text-sm font-medium text-foreground">
+            {selectedStatus === 'out_for_delivery' ? 'Reassign Dispatch Rider' : 'Assign Dispatch Rider'}
+          </label>
           <Select
             value={assignedRider ?? 'unassigned'}
             onValueChange={(value) => onRiderChange(value === 'unassigned' ? null : value)}
-            disabled={isLoadingRiders}
+            disabled={isLoadingRiders || !['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus)}
           >
             <SelectTrigger className="w-full bg-background">
-              <SelectValue placeholder={isLoadingRiders ? "Loading riders..." : "Select a rider"} />
+              <SelectValue placeholder={
+                isLoadingRiders 
+                  ? "Loading riders..." 
+                  : !['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus)
+                    ? "Change status first to assign rider"
+                    : "Select a rider"
+              } />
             </SelectTrigger>
             <SelectContent className="bg-background border shadow-lg z-50 max-h-[200px] overflow-y-auto">
               <SelectItem value="unassigned">Unassigned</SelectItem>
@@ -129,9 +137,19 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
               ))}
             </SelectContent>
           </Select>
+          {!['confirmed', 'preparing', 'ready', 'out_for_delivery'].includes(selectedStatus) && (
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              ⚠️ Riders can only be assigned when order is confirmed, preparing, ready, or out for delivery
+            </p>
+          )}
           {riders?.length === 0 && !isLoadingRiders && (
             <p className="text-xs text-muted-foreground">
               ⚠️ No active dispatch riders found. Contact admin to add riders.
+            </p>
+          )}
+          {selectedStatus === 'out_for_delivery' && (
+            <p className="text-xs text-blue-600 dark:text-blue-400">
+              🔄 This will reassign the rider for an order already out for delivery
             </p>
           )}
         </div>

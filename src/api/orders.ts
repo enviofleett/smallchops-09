@@ -173,10 +173,10 @@ export const updateOrder = async (
       console.log('🔄 Updating order via production-safe method:', orderId, updates);
     }
 
-    // If we're assigning a rider, use the dedicated function for validation
+    // If we're assigning a rider, use the secure RPC-based assignment
     if (updates.assigned_rider_id && updates.assigned_rider_id !== null) {
       if (process.env.NODE_ENV === 'development') {
-        console.log('🎯 Assigning rider using validated function:', updates.assigned_rider_id);
+        console.log('🎯 Assigning/reassigning rider using secure RPC:', updates.assigned_rider_id);
       }
       
       const { data: assignmentResult, error: assignmentError } = await supabase.functions.invoke('admin-orders-manager', {
@@ -188,10 +188,18 @@ export const updateOrder = async (
       });
 
       if (assignmentError || !assignmentResult?.success) {
-        throw new Error(assignmentResult?.error || assignmentError?.message || 'Failed to assign rider');
+        const errorMsg = assignmentResult?.error || assignmentError?.message || 'Failed to assign rider';
+        if (process.env.NODE_ENV === 'development') {
+          console.error('❌ Rider assignment failed:', errorMsg);
+        }
+        throw new Error(errorMsg);
       }
 
-      // If there are other updates besides rider assignment, apply them
+      if (process.env.NODE_ENV === 'development') {
+        console.log('✅ Rider assignment successful via secure RPC');
+      }
+
+      // If there are other updates besides rider assignment, apply them separately
       const otherUpdates = { ...updates };
       delete otherUpdates.assigned_rider_id;
       

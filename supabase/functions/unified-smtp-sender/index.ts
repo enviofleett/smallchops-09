@@ -351,6 +351,11 @@ async function processTemplate(
     console.log(`✅ PRODUCTION_MODE: Using verified template '${templateKey}' from database`);
   }
 
+  // DEVELOPMENT MODE: Log when fallback templates are used
+  if (!isProductionMode && !templateFound && templateKey) {
+    console.warn(`⚠️ DEVELOPMENT_MODE: Template '${templateKey}' not found in database - using fallback. Add this template to Email Template Manager to ensure it works in production.`);
+  }
+
   // Template processing - use template if found, fallback only in non-production
   let subject: string;
   let html: string;

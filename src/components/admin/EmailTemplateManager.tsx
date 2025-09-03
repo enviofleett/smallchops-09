@@ -283,6 +283,124 @@ export const EmailTemplateManager: React.FC = () => {
     }
   };
 
+  const sendToCustomers = async (template: EmailTemplate) => {
+    if (!confirm(`Are you sure you want to send "${template.template_name}" to all verified customers? This action cannot be undone.`)) {
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Get all verified customers
+      const { data: paidCustomers, error: customerError } = await supabase
+        .from('customer_accounts')
+        .select('id, email, name')
+        .eq('email_verified', true);
+
+      if (customerError) throw customerError;
+
+      if (!paidCustomers || paidCustomers.length === 0) {
+        toast({
+          title: "No Recipients Found",
+          description: "No verified customers found to send emails to",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Load production data with all tags
+      const productionVariables = await loadProductionData();
+      
+      let successCount = 0;
+      let failureCount = 0;
+
+      // Send emails in batches to avoid overwhelming the system
+      const batchSize = 10;
+      for (let i = 0; i < paidCustomers.length; i += batchSize) {
+        const batch = paidCustomers.slice(i, i + batchSize);
+        
+        const batchPromises = batch.map(async (customer) => {
+          try {
+            // Personalize variables for each customer
+            const personalizedVariables = {
+              ...productionVariables,
+              customer_name: customer.name || 'Valued Customer',
+              customer_email: customer.email,
+              customerName: customer.name || 'Valued Customer'
+            };
+
+            const { error } = await supabase.functions.invoke('unified-smtp-sender', {
+              body: {
+                to: customer.email,
+                template_key: template.template_key,
+                variables: personalizedVariables
+              }
+            });
+
+            if (error) throw error;
+            
+            // Log successful send for audit
+            await supabase
+              .from('audit_logs')
+              .insert({
+                action: 'mass_email_sent',
+                category: 'Email Marketing',
+                message: `Template "${template.template_name}" sent to ${customer.email}`,
+                new_values: {
+                  template_key: template.template_key,
+                  recipient: customer.email,
+                  customer_id: customer.id
+                }
+              });
+
+            successCount++;
+          } catch (error: any) {
+            console.error(`Failed to send email to ${customer.email}:`, error);
+            failureCount++;
+            
+            // Log failed send for tracking
+            await supabase
+              .from('audit_logs')
+              .insert({
+                action: 'mass_email_failed',
+                category: 'Email Marketing', 
+                message: `Failed to send template "${template.template_name}" to ${customer.email}: ${error.message}`,
+                new_values: {
+                  template_key: template.template_key,
+                  recipient: customer.email,
+                  customer_id: customer.id,
+                  error: error.message
+                }
+              });
+          }
+        });
+
+        // Wait for batch to complete before next batch
+        await Promise.allSettled(batchPromises);
+        
+        // Small delay between batches to be respectful to email servers
+        if (i + batchSize < paidCustomers.length) {
+          await new Promise(resolve => setTimeout(resolve, 1000));
+        }
+      }
+
+      toast({
+        title: "Mass Email Campaign Complete",
+        description: `Successfully sent to ${successCount} customers. ${failureCount} failed.`,
+        variant: successCount > 0 ? "default" : "destructive"
+      });
+
+    } catch (error: any) {
+      console.error('Error in mass email campaign:', error);
+      toast({
+        title: "Campaign Failed", 
+        description: error.message || "Failed to send mass email campaign",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   useEffect(() => {
     fetchTemplates();
   }, []);

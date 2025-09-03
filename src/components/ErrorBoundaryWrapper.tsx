@@ -103,7 +103,11 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
 
   private getErrorCategory = (error: Error): string => {
     const message = error.message.toLowerCase();
-    if (message.includes('network') || message.includes('fetch')) {
+    
+    // Specific handling for ComponentLoadError
+    if (error.name === 'ComponentLoadError' || message.includes('failed to load component')) {
+      return 'Component Load Error';
+    } else if (message.includes('network') || message.includes('fetch')) {
       return 'Network Error';
     } else if (message.includes('chunk') || message.includes('loading') || message.includes('timeout')) {
       return 'Loading Error';
@@ -121,6 +125,8 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
     const message = error.message.toLowerCase();
     
     switch (category) {
+      case 'Component Load Error':
+        return 'Please refresh your page';
       case 'Network Error':
         return 'Please check your internet connection and try again. You may also try refreshing the page.';
       case 'Loading Error':
@@ -149,6 +155,35 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
       const errorCategory = this.state.error ? this.getErrorCategory(this.state.error) : 'Unknown Error';
       const suggestion = this.state.error ? this.getErrorSuggestion(this.state.error) : 'Please try again.';
       const canRetry = this.state.retryCount < this.maxRetries;
+
+      // Show simplified UI for ComponentLoadError
+      if (errorCategory === 'Component Load Error') {
+        return (
+          <div className="min-h-[200px] flex items-center justify-center p-4 sm:p-6">
+            <Card className="w-full max-w-md shadow-lg border-border/50">
+              <CardContent className="p-4 sm:p-6 space-y-6">
+                <div className="text-center space-y-4">
+                  <AlertTriangle className="h-12 w-12 text-destructive mx-auto" />
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-medium">Component Loading Failed</h3>
+                    <p className="text-muted-foreground text-base">
+                      Please refresh your page
+                    </p>
+                  </div>
+                  
+                  <Button 
+                    onClick={this.handleRefresh}
+                    className="flex items-center gap-2 w-full"
+                  >
+                    <RefreshCw className="h-4 w-4" />
+                    Refresh Page
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      }
 
       return (
         <div className="min-h-[400px] flex items-center justify-center p-4 sm:p-6">

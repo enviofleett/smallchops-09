@@ -9088,7 +9088,12 @@ export type Database = {
       }
       get_admin_users_secure: {
         Args: Record<PropertyKey, never>
-        Returns: Json
+        Returns: {
+          id: string
+          is_active: boolean
+          name: string
+          role: Database["public"]["Enums"]["user_role"]
+        }[]
       }
       get_all_customers_display: {
         Args: Record<PropertyKey, never>
@@ -9207,7 +9212,15 @@ export type Database = {
       }
       get_menu_structure_secure: {
         Args: Record<PropertyKey, never>
-        Returns: Json
+        Returns: {
+          id: string
+          is_active: boolean
+          key: string
+          label: string
+          parent_key: string
+          permission_levels: Json
+          sort_order: number
+        }[]
       }
       get_order_linking_stats: {
         Args: Record<PropertyKey, never>
@@ -9317,8 +9330,11 @@ export type Database = {
         Returns: string
       }
       get_user_permissions_secure: {
-        Args: { p_user_id: string }
-        Returns: Json
+        Args: { target_user_id: string }
+        Returns: {
+          menu_key: string
+          permission_level: Database["public"]["Enums"]["permission_level"]
+        }[]
       }
       get_user_role: {
         Args: { user_uuid: string }
@@ -9843,11 +9859,9 @@ export type Database = {
         Returns: Json
       }
       update_user_permissions_secure: {
-        Args: {
-          p_change_reason?: string
-          p_permissions: Json
-          p_user_id: string
-        }
+        Args:
+          | { p_change_reason?: string; p_permissions: Json; p_user_id: string }
+          | { permissions_data: Json; target_user_id: string }
         Returns: Json
       }
       upsert_payment_confirmation_event: {

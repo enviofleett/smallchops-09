@@ -107,6 +107,8 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
     // Specific handling for ComponentLoadError
     if (error.name === 'ComponentLoadError' || message.includes('failed to load component')) {
       return 'Component Load Error';
+    } else if (message.includes('maximum update depth exceeded')) {
+      return 'Form Input Error';
     } else if (message.includes('network') || message.includes('fetch')) {
       return 'Network Error';
     } else if (message.includes('chunk') || message.includes('loading') || message.includes('timeout')) {
@@ -127,6 +129,8 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
     switch (category) {
       case 'Component Load Error':
         return 'Please refresh your page';
+      case 'Form Input Error':
+        return 'There was an issue with form input handling. Please refresh the page and try again. If the problem persists, try clearing your browser cache.';
       case 'Network Error':
         return 'Please check your internet connection and try again. You may also try refreshing the page.';
       case 'Loading Error':
@@ -155,6 +159,45 @@ export class ErrorBoundaryWrapper extends Component<Props, State> {
       const errorCategory = this.state.error ? this.getErrorCategory(this.state.error) : 'Unknown Error';
       const suggestion = this.state.error ? this.getErrorSuggestion(this.state.error) : 'Please try again.';
       const canRetry = this.state.retryCount < this.maxRetries;
+
+      // Show simplified UI for Form Input Error
+      if (errorCategory === 'Form Input Error') {
+        return (
+          <div className="min-h-[300px] flex items-center justify-center p-4 sm:p-6">
+            <Card className="w-full max-w-md shadow-lg border-border/50">
+              <CardContent className="p-4 sm:p-6 space-y-6">
+                <div className="text-center space-y-4">
+                  <AlertTriangle className="h-12 w-12 text-orange-500 mx-auto" />
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-medium">Form Input Issue</h3>
+                    <p className="text-muted-foreground text-sm">
+                      There was an issue with form input handling. Please refresh the page and try again.
+                    </p>
+                  </div>
+                  
+                  <div className="flex flex-col gap-2">
+                    <Button 
+                      onClick={this.handleRefresh}
+                      className="flex items-center gap-2 w-full"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Refresh Page
+                    </Button>
+                    <Button 
+                      variant="outline"
+                      onClick={this.handleGoHome}
+                      className="flex items-center gap-2 w-full"
+                    >
+                      <Home className="h-4 w-4" />
+                      Go Home
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+      }
 
       // Show simplified UI for ComponentLoadError
       if (errorCategory === 'Component Load Error') {

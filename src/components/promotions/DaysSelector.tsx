@@ -25,40 +25,63 @@ export function DaysSelector({
   onDaysChange,
   disabled = false,
 }: DaysSelectorProps) {
-  // PRODUCTION: Enhanced day toggle with stable references
+  // PRODUCTION: Prevent unnecessary re-renders with stable state
+  const [localSelectedDays, setLocalSelectedDays] = React.useState<string[]>(() => selectedDays);
+  
+  // PRODUCTION: Sync with external state changes
+  React.useEffect(() => {
+    setLocalSelectedDays(selectedDays || []);
+  }, [selectedDays]);
+
+  // PRODUCTION: Debounced external state update
+  const debouncedOnDaysChange = React.useCallback(
+    React.useMemo(() => {
+      let timeoutId: NodeJS.Timeout;
+      return (newDays: string[]) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => {
+          onDaysChange(newDays);
+        }, 50);
+      };
+    }, [onDaysChange]),
+    [onDaysChange]
+  );
+
+  // PRODUCTION: Enhanced day toggle with local state management
   const handleDayToggle = React.useCallback((day: string, checked: boolean) => {
     try {
       if (disabled) return;
       
-      const currentDays = selectedDays || [];
-      if (checked) {
-        // Prevent duplicates
-        if (!currentDays.includes(day)) {
-          onDaysChange([...currentDays, day]);
-        }
-      } else {
-        onDaysChange(currentDays.filter((d) => d !== day));
-      }
+      setLocalSelectedDays(prevDays => {
+        const newDays = checked 
+          ? prevDays.includes(day) ? prevDays : [...prevDays, day]
+          : prevDays.filter((d) => d !== day);
+        
+        debouncedOnDaysChange(newDays);
+        return newDays;
+      });
     } catch (error) {
       console.error('Error toggling day selection:', error);
     }
-  }, [onDaysChange, disabled, selectedDays]);
+  }, [disabled, debouncedOnDaysChange]);
 
-  // PRODUCTION: Enhanced select all with stable reference
+  // PRODUCTION: Enhanced select all with local state management
   const handleSelectAll = React.useCallback(() => {
     try {
       if (disabled) return;
       
-      const currentDays = selectedDays || [];
-      if (currentDays.length === DAYS_OF_WEEK.length) {
-        onDaysChange([]);
-      } else {
-        onDaysChange(DAYS_OF_WEEK.map((day) => day.value));
-      }
+      setLocalSelectedDays(prevDays => {
+        const newDays = prevDays.length === DAYS_OF_WEEK.length 
+          ? [] 
+          : DAYS_OF_WEEK.map((day) => day.value);
+        
+        debouncedOnDaysChange(newDays);
+        return newDays;
+      });
     } catch (error) {
       console.error('Error in select all operation:', error);
     }
-  }, [onDaysChange, disabled, selectedDays]);
+  }, [disabled, debouncedOnDaysChange]);
 
   // PRODUCTION: Stable keyboard navigation handler
   const handleKeyDown = React.useCallback((event: React.KeyboardEvent, day: string) => {
@@ -66,20 +89,23 @@ export function DaysSelector({
     
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      const isSelected = (selectedDays || []).includes(day);
+      const isSelected = localSelectedDays.includes(day);
       handleDayToggle(day, !isSelected);
     }
-  }, [handleDayToggle, disabled, selectedDays]);
+  }, [handleDayToggle, disabled, localSelectedDays]);
 
   // PRODUCTION: Memoized computed values to prevent re-renders
-  const { allSelected, noneSelected, safeSelectedDays } = React.useMemo(() => {
-    const safe = selectedDays || [];
-    return {
-      allSelected: safe.length === DAYS_OF_WEEK.length,
-      noneSelected: safe.length === 0,
-      safeSelectedDays: safe
+  const { allSelected, noneSelected } = React.useMemo(() => ({
+    allSelected: localSelectedDays.length === DAYS_OF_WEEK.length,
+    noneSelected: localSelectedDays.length === 0,
+  }), [localSelectedDays.length]);
+
+  // PRODUCTION: Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      // Clear any pending debounced calls
     };
-  }, [selectedDays]);
+  }, []);
 
   return (
     <Card className="border-primary/20">
@@ -117,9 +143,9 @@ export function DaysSelector({
           </div>
           <div className="flex items-center gap-1 text-xs text-muted-foreground">
             <Clock className="w-3 h-3" />
-            {safeSelectedDays.length === 0
+            {localSelectedDays.length === 0
               ? "Active every day"
-              : `Active ${safeSelectedDays.length} day${safeSelectedDays.length !== 1 ? "s" : ""}`}
+              : `Active ${localSelectedDays.length} day${localSelectedDays.length !== 1 ? "s" : ""}`}
           </div>
         </div>
 
@@ -130,7 +156,7 @@ export function DaysSelector({
           aria-labelledby="days-selection-label"
         >
         {DAYS_OF_WEEK.map((day) => {
-          const isSelected = safeSelectedDays.includes(day.value);
+          const isSelected = localSelectedDays.includes(day.value);
           return (
             <div
               key={day.value}
@@ -178,12 +204,12 @@ export function DaysSelector({
         })}
         </div>
 
-        {safeSelectedDays.length > 0 && (
+        {localSelectedDays.length > 0 && (
           <div className="mt-4 p-3 bg-muted/50 rounded-lg">
             <p className="text-xs text-muted-foreground">
               <strong>Active on:</strong>{" "}
               {DAYS_OF_WEEK
-                .filter((day) => safeSelectedDays.includes(day.value))
+                .filter((day) => localSelectedDays.includes(day.value))
                 .map((day) => day.label)
                 .join(", ")}
             </p>

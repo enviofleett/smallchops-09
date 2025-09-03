@@ -1427,13 +1427,13 @@ serve(async (req: Request) => {
       try {
         connectionInfo = await client.connect();
         
-        await client.sendEmail({
-          from: `${smtpConfig.senderName} <${smtpConfig.senderEmail}>`,
-          to: requestBody.to,
-          subject: finalSubject,
-          text,
-          html
-        });
+      await client.sendEmail({
+        from: `${smtpConfig.senderName} <${smtpConfig.senderEmail}>`,
+        to: requestBody.to,
+        subject: finalSubject,
+        text: processedText,
+        html: processedHtml
+      });
         
         return { client, connectionInfo };
       } catch (error) {

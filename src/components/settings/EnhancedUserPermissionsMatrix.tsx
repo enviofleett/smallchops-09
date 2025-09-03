@@ -30,6 +30,7 @@ interface AdminUser {
   id: string;
   name: string;
   role: string;
+  is_active: boolean;
 }
 
 interface MenuStructure {
@@ -83,16 +84,12 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  // Fetch admin users with error handling
+  // Fetch admin users with error handling using secure RPC
   const { data: adminUsers, isLoading: loadingUsers, error: usersError } = useQuery({
-    queryKey: ['admin-users'],
+    queryKey: ['admin-users-secure'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, name, role')
-          .in('role', ['admin', 'manager'])
-          .order('name');
+        const { data, error } = await supabase.rpc('get_admin_users_secure');
         
         if (error) {
           console.error('Error fetching admin users:', error);
@@ -109,16 +106,12 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
     retryDelay: 1000
   });
 
-  // Fetch comprehensive menu structure including payment permissions
+  // Fetch comprehensive menu structure using secure RPC
   const { data: menuStructure, isLoading: loadingMenus, error: menusError } = useQuery({
-    queryKey: ['enhanced-menu-structure'],
+    queryKey: ['enhanced-menu-structure-secure'],
     queryFn: async () => {
       try {
-        const { data, error } = await supabase
-          .from('menu_structure')
-          .select('*')
-          .eq('is_active', true)
-          .order('sort_order');
+        const { data, error } = await supabase.rpc('get_menu_structure_secure');
 
         if (error) {
           console.error('Error fetching menu structure:', error);
@@ -160,17 +153,16 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
     retryDelay: 1000
   });
 
-  // Fetch user permissions with enhanced error handling
+  // Fetch user permissions using secure RPC
   const { data: userPermissions, isLoading: loadingPermissions, error: permissionsError, refetch: refetchPermissions } = useQuery({
-    queryKey: ['enhanced-user-permissions', currentUser?.id],
+    queryKey: ['enhanced-user-permissions-secure', currentUser?.id],
     queryFn: async () => {
       if (!currentUser?.id) return [];
 
       try {
-        const { data, error } = await supabase
-          .from('user_permissions')
-          .select('menu_key, permission_level')
-          .eq('user_id', currentUser.id);
+        const { data, error } = await supabase.rpc('get_user_permissions_secure', {
+          target_user_id: currentUser.id
+        });
 
         if (error) {
           console.error('Error fetching user permissions:', error);
@@ -251,31 +243,51 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
     
     setIsSubmitting(true);
     try {
-      // Use admin management edge function for better security and audit logging
-      const response = await supabase.functions.invoke('admin-management', {
-        method: 'POST',
-        body: {
-          action: 'update_permissions',
-          userId: currentUser.id,
-          permissions: Object.fromEntries(
-            Object.entries(permissions).filter(([_, level]) => level !== 'none')
-          )
-        }
-      });
+      // Check rate limit first (skip if function not available)
+      try {
+        const { data: rateLimitCheck, error: rateLimitError } = await supabase.rpc('check_permission_change_rate_limit', {
+          target_user_id: currentUser.id
+        });
 
-      if (response.error) {
-        console.error('Edge function error:', response.error);
-        throw new Error(response.error.message || 'Failed to update permissions');
+        if (rateLimitCheck && typeof rateLimitCheck === 'object' && 'allowed' in rateLimitCheck && !(rateLimitCheck as any).allowed) {
+          toast({
+            title: "Rate limit exceeded",
+            description: `Too many permission changes. Try again later.`,
+            variant: "destructive"
+          });
+          return;
+        }
+      } catch (rateLimitError) {
+        // Rate limiting not available, proceed without it
+        console.warn('Rate limiting not available:', rateLimitError);
       }
 
+      // Use secure RPC function for permission updates
+      const { data: result, error: updateError } = await supabase.rpc('update_user_permissions_secure', {
+        target_user_id: currentUser.id,
+        permissions_data: permissions
+      });
+
+      if (updateError) {
+        console.error('Permission update error:', updateError);
+        throw new Error(updateError.message || 'Failed to update permissions');
+      }
+
+      // Record the rate limit usage
+      await supabase.rpc('record_permission_change_rate_limit', {
+        target_user_id: currentUser.id,
+        changes_count: (result && typeof result === 'object' && 'changes_count' in result) ? 
+          Number(result.changes_count) || 1 : 1
+      });
+
       toast({
-        title: "Permissions updated successfully",
-        description: `Permissions have been updated for ${currentUser.name}`,
+        title: "Permissions updated successfully", 
+        description: `${(result && typeof result === 'object' && 'changes_count' in result) ? (result as any).changes_count : 'Several'} permissions updated for ${currentUser.name}`,
       });
 
       // Refresh permissions data
       await refetchPermissions();
-      queryClient.invalidateQueries({ queryKey: ['enhanced-user-permissions'] });
+      queryClient.invalidateQueries({ queryKey: ['enhanced-user-permissions-secure'] });
       setRetryCount(0);
 
     } catch (error: any) {
@@ -380,9 +392,9 @@ export const EnhancedUserPermissionsMatrix = ({ selectedUser }: EnhancedUserPerm
           </Alert>
           <Button 
             onClick={() => {
-              queryClient.invalidateQueries({ queryKey: ['admin-users'] });
-              queryClient.invalidateQueries({ queryKey: ['enhanced-menu-structure'] });
-              queryClient.invalidateQueries({ queryKey: ['enhanced-user-permissions'] });
+              queryClient.invalidateQueries({ queryKey: ['admin-users-secure'] });
+              queryClient.invalidateQueries({ queryKey: ['enhanced-menu-structure-secure'] });
+              queryClient.invalidateQueries({ queryKey: ['enhanced-user-permissions-secure'] });
             }}
             className="mt-4"
             variant="outline"

@@ -8748,11 +8748,13 @@ export type Database = {
         Returns: Json
       }
       check_permission_change_rate_limit: {
-        Args: {
-          p_max_changes?: number
-          p_target_user_id: string
-          p_window_minutes?: number
-        }
+        Args:
+          | { max_changes_per_hour?: number; target_user_id: string }
+          | {
+              p_max_changes?: number
+              p_target_user_id: string
+              p_window_minutes?: number
+            }
         Returns: boolean
       }
       check_production_readiness: {
@@ -9734,7 +9736,9 @@ export type Database = {
         Returns: string
       }
       record_permission_change_rate_limit: {
-        Args: { p_target_user_id: string }
+        Args:
+          | { changes_count?: number; target_user_id: string }
+          | { p_target_user_id: string }
         Returns: undefined
       }
       record_smtp_health_metric: {

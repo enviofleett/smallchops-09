@@ -1,11 +1,14 @@
 import React from 'react';
-import { Settings, ShieldCheck, Send, RefreshCw } from 'lucide-react';
+import { Settings, ShieldCheck, Send, RefreshCw, Info } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { SectionHeading } from './SectionHeading';
 import { OrderStatus } from '@/types/orders';
 import { Constants } from '@/integrations/supabase/types';
+import { EmailStatusGuide } from '../EmailStatusGuide';
+import { EmailTestButton } from '../EmailTestButton';
 
 interface DispatchRider {
   id: string;
@@ -33,6 +36,10 @@ interface ActionsDrawerProps {
   isVerifying?: boolean;
   verifyState?: 'idle' | 'success' | 'failed' | 'pending';
   verifyMessage?: string | null;
+  // Order details for email testing
+  orderId?: string;
+  customerEmail?: string;
+  orderNumber?: string;
 }
 
 export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
@@ -52,7 +59,10 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
   isSendingManual,
   isVerifying,
   verifyState = 'idle',
-  verifyMessage
+  verifyMessage,
+  orderId,
+  customerEmail,
+  orderNumber
 }) => {
   return (
     <Card>
@@ -72,11 +82,21 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
             <SelectContent className="bg-background border shadow-lg z-50">
               {Constants.public.Enums.order_status.map((status) => (
                 <SelectItem key={status} value={status}>
-                  {status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')}
+                  <div className="flex items-center justify-between w-full">
+                    <span>{status.charAt(0).toUpperCase() + status.slice(1).replace(/_/g, ' ')}</span>
+                    {['ready', 'out_for_delivery', 'delivered', 'cancelled', 'completed', 'returned'].includes(status) && (
+                      <span className="text-xs text-blue-500 ml-2">📧</span>
+                    )}
+                  </div>
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
+          {['ready', 'out_for_delivery', 'delivered', 'cancelled', 'completed', 'returned'].includes(selectedStatus) && (
+            <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1">
+              📧 Customer will receive email notification for this status
+            </p>
+          )}
         </div>
 
         {/* Rider Assignment */}
@@ -196,6 +216,22 @@ export const ActionsPanel: React.FC<ActionsDrawerProps> = ({
               'Update Order'
             )}
           </Button>
+        </div>
+
+        {/* Email Automation Info */}
+        <div className="pt-4 border-t border-border">
+          <Collapsible>
+            <CollapsibleTrigger className="flex items-center justify-between w-full p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <Info className="h-4 w-4 text-blue-500" />
+                Email Automation Status
+              </div>
+              <span className="text-xs text-muted-foreground">View Details</span>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="mt-3">
+              <EmailStatusGuide />
+            </CollapsibleContent>
+          </Collapsible>
         </div>
       </CardContent>
     </Card>

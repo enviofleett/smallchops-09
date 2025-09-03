@@ -409,7 +409,28 @@ const OrderDetailsDialog: React.FC<OrderDetailsDialogProps> = ({
               <h2 id="actions-heading" className={cn("text-lg font-semibold text-foreground mb-4", "print:text-xl print:text-black print:mb-3 print:font-bold print:border-b print:border-gray-300 print:pb-2")}>
                 Order Actions & Status Management
               </h2>
-              <ActionsPanel selectedStatus={selectedStatus} onStatusChange={setSelectedStatus} assignedRider={assignedRider} onRiderChange={setAssignedRider} riders={riders} isLoadingRiders={isLoadingRiders} manualStatus={manualStatus} onManualStatusChange={setManualStatus} onManualSend={handleManualSend} onUpdate={handleUpdate} onVerifyPayment={handleVerifyWithPaystack} paymentReference={order.payment_reference} isUpdating={updateMutation.isPending} isSendingManual={manualSendMutation.isPending} isVerifying={verifying} verifyState={verifyState} verifyMessage={verifyMessage} />
+              <ActionsPanel 
+                selectedStatus={selectedStatus} 
+                onStatusChange={setSelectedStatus} 
+                assignedRider={assignedRider} 
+                onRiderChange={setAssignedRider} 
+                riders={riders} 
+                isLoadingRiders={isLoadingRiders} 
+                manualStatus={manualStatus} 
+                onManualStatusChange={setManualStatus} 
+                onManualSend={handleManualSend} 
+                onUpdate={handleUpdate} 
+                onVerifyPayment={handleVerifyWithPaystack} 
+                paymentReference={order.payment_reference} 
+                isUpdating={updateMutation.isPending} 
+                isSendingManual={manualSendMutation.isPending} 
+                isVerifying={verifying} 
+                verifyState={verifyState} 
+                verifyMessage={verifyMessage}
+                orderId={order.id}
+                customerEmail={order.customer_email}
+                orderNumber={order.order_number}
+              />
             </section>
           </div>
         </div>

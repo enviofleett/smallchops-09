@@ -6223,6 +6223,33 @@ export type Database = {
         }
         Relationships: []
       }
+      permission_change_rate_limit: {
+        Row: {
+          changes_count: number | null
+          created_at: string | null
+          id: string
+          target_user_id: string
+          user_id: string
+          window_start: string | null
+        }
+        Insert: {
+          changes_count?: number | null
+          created_at?: string | null
+          id?: string
+          target_user_id: string
+          user_id: string
+          window_start?: string | null
+        }
+        Update: {
+          changes_count?: number | null
+          created_at?: string | null
+          id?: string
+          target_user_id?: string
+          user_id?: string
+          window_start?: string | null
+        }
+        Relationships: []
+      }
       pickup_points: {
         Row: {
           address: string
@@ -8720,6 +8747,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      check_permission_change_rate_limit: {
+        Args: {
+          p_max_changes?: number
+          p_target_user_id: string
+          p_window_minutes?: number
+        }
+        Returns: boolean
+      }
       check_production_readiness: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -9051,6 +9086,10 @@ export type Database = {
           updated_at: string
         }[]
       }
+      get_admin_users_secure: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_all_customers_display: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -9166,6 +9205,10 @@ export type Database = {
           webhook_url: string
         }[]
       }
+      get_menu_structure_secure: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       get_order_linking_stats: {
         Args: Record<PropertyKey, never>
         Returns: Json
@@ -9272,6 +9315,10 @@ export type Database = {
       get_time_ago: {
         Args: { target_time: string }
         Returns: string
+      }
+      get_user_permissions_secure: {
+        Args: { p_user_id: string }
+        Returns: Json
       }
       get_user_role: {
         Args: { user_uuid: string }
@@ -9670,6 +9717,10 @@ export type Database = {
         }
         Returns: string
       }
+      record_permission_change_rate_limit: {
+        Args: { p_target_user_id: string }
+        Returns: undefined
+      }
       record_smtp_health_metric: {
         Args: {
           p_metric_type: string
@@ -9788,6 +9839,14 @@ export type Database = {
           new_payment_reference: string
           order_fulfillment_type?: string
           order_uuid: string
+        }
+        Returns: Json
+      }
+      update_user_permissions_secure: {
+        Args: {
+          p_change_reason?: string
+          p_permissions: Json
+          p_user_id: string
         }
         Returns: Json
       }

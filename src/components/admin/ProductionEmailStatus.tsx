@@ -27,6 +27,8 @@ export const ProductionEmailStatus: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [templateStatuses, setTemplateStatuses] = useState<TemplateStatus[]>([]);
   const [systemHealth, setSystemHealth] = useState<any>(null);
+  const [smtpHealth, setSmtpHealth] = useState<any>(null);
+  const [isTestingSmtp, setIsTestingSmtp] = useState(false);
   const { toast } = useToast();
 
   // Core templates that should exist in production
@@ -50,6 +52,36 @@ export const ProductionEmailStatus: React.FC = () => {
     'customer_welcome',
     'admin_status_update'
   ];
+
+  const testSMTPConnection = async () => {
+    try {
+      setIsTestingSmtp(true);
+      
+      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+        body: { healthcheck: true, check: 'credentials' }
+      });
+      
+      if (error) throw error;
+      
+      setSmtpHealth(data);
+      
+      toast({
+        title: "SMTP Test Complete",
+        description: data.status === 'healthy' ? "SMTP connection is configured correctly" : "SMTP configuration has issues",
+        variant: data.status === 'healthy' ? "default" : "destructive"
+      });
+    } catch (error: any) {
+      console.error('SMTP test failed:', error);
+      setSmtpHealth({ status: 'error', error: error.message });
+      toast({
+        title: "SMTP Test Failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsTestingSmtp(false);
+    }
+  };
 
   const checkProductionReadiness = async () => {
     try {
@@ -156,6 +188,15 @@ export const ProductionEmailStatus: React.FC = () => {
             >
               Refresh Status
             </Button>
+            
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={testSMTPConnection}
+              disabled={isTestingSmtp}
+            >
+              {isTestingSmtp ? 'Testing SMTP...' : 'Test SMTP'}
+            </Button>
           </div>
 
           {!isProductionReady && (
@@ -215,7 +256,7 @@ export const ProductionEmailStatus: React.FC = () => {
       </div>
 
       {/* System Health */}
-      {systemHealth && (
+      {(systemHealth || smtpHealth) && (
         <Card>
           <CardHeader>
             <div className="flex items-center gap-2">
@@ -224,15 +265,62 @@ export const ProductionEmailStatus: React.FC = () => {
             </div>
           </CardHeader>
           <CardContent>
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <p className="text-sm font-medium mb-2">Service Status</p>
-                <Badge variant="default">{systemHealth.status}</Badge>
-              </div>
-              <div>
-                <p className="text-sm font-medium mb-2">Implementation</p>
-                <code className="text-xs bg-muted px-2 py-1 rounded">{systemHealth.implementation}</code>
-              </div>
+            <div className="space-y-4">
+              {/* System Health */}
+              {systemHealth && (
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <p className="text-sm font-medium mb-2">Service Status</p>
+                    <Badge variant="default">{systemHealth.status}</Badge>
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium mb-2">Implementation</p>
+                    <code className="text-xs bg-muted px-2 py-1 rounded">{systemHealth.implementation}</code>
+                  </div>
+                </div>
+              )}
+              
+              {/* SMTP Health */}
+              {smtpHealth && (
+                <div className="border-t pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-medium">SMTP Configuration Status</p>
+                    <Badge variant={smtpHealth.status === 'healthy' ? 'default' : 'destructive'}>
+                      {smtpHealth.status}
+                    </Badge>
+                  </div>
+                  
+                  {smtpHealth.credentials && (
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="font-medium">Host:</span> {smtpHealth.credentials.SMTP_HOST}
+                      </div>
+                      <div>
+                        <span className="font-medium">Port:</span> {smtpHealth.credentials.SMTP_PORT}
+                      </div>
+                      <div>
+                        <span className="font-medium">Username:</span> {smtpHealth.credentials.SMTP_USERNAME?.split('@')[0]}@***
+                      </div>
+                      <div>
+                        <span className="font-medium">From:</span> {smtpHealth.credentials.SMTP_FROM_EMAIL?.split('@')[0]}@***
+                      </div>
+                      <div className="col-span-2">
+                        <span className="font-medium">Source:</span> 
+                        <Badge variant="outline" className="ml-2">
+                          {smtpHealth.source}
+                        </Badge>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {smtpHealth.error && (
+                    <div className="mt-3 p-3 bg-destructive/10 rounded border border-destructive/20">
+                      <p className="text-sm text-destructive font-medium">SMTP Configuration Error:</p>
+                      <p className="text-sm text-destructive">{smtpHealth.error}</p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>

@@ -1193,27 +1193,79 @@ serve(async (req: Request) => {
 
     requestBody = await req.json();
     
-    // P0 HOTFIX: Validate required "to" field immediately
-    if (!requestBody.to || typeof requestBody.to !== 'string' || !requestBody.to.includes('@')) {
-      console.error('❌ Invalid or missing recipient email:', {
-        to: requestBody.to,
-        type: typeof requestBody.to,
-        hasAt: requestBody.to && typeof requestBody.to === 'string' ? requestBody.to.includes('@') : false
+    // FIELD NORMALIZATION: Handle both naming conventions
+    let {
+      to,
+      recipient_email,
+      templateKey,
+      template_key,
+      subject,
+      html,
+      text,
+      variables = {},
+      priority = 'normal'
+    } = requestBody;
+
+    // Normalize field names - handle both to/recipient_email and templateKey/template_key
+    to = to || recipient_email;
+    templateKey = templateKey || template_key;
+
+    // Update requestBody with normalized values for downstream processing
+    requestBody.to = to;
+    requestBody.templateKey = templateKey;
+    requestBody.variables = variables;
+    requestBody.priority = priority;
+    
+    // STRICT VALIDATION: Required fields with detailed error messages
+    if (!to || typeof to !== 'string' || to.trim().length === 0 || !to.includes('@')) {
+      console.error('❌ Email validation failed: Missing or invalid "to" field', { 
+        originalPayload: { to: requestBody.to, recipient_email: requestBody.recipient_email },
+        normalized: { to },
+        type: typeof to 
       });
       
       return new Response(JSON.stringify({
         success: false,
-        error: 'Invalid or missing recipient email address',
-        reason: 'invalid_recipient',
+        error: 'Missing or invalid recipient email address',
+        details: 'The "to" or "recipient_email" field is required and must be a valid email address',
         received: {
           to: requestBody.to,
-          type: typeof requestBody.to
+          recipient_email: requestBody.recipient_email,
+          normalized_to: to,
+          type: typeof to
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 400
       });
     }
+
+    if (!templateKey || typeof templateKey !== 'string' || templateKey.trim().length === 0) {
+      console.error('❌ Email validation failed: Missing template key', { 
+        originalPayload: { templateKey: requestBody.templateKey, template_key: requestBody.template_key },
+        normalized: { templateKey },
+        to: to
+      });
+      
+      return new Response(JSON.stringify({
+        success: false,
+        error: 'Missing template key',
+        details: 'The "templateKey" or "template_key" field is required',
+        received: {
+          templateKey: requestBody.templateKey,
+          template_key: requestBody.template_key,
+          normalized_templateKey: templateKey,
+          type: typeof templateKey
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400
+      });
+    }
+
+    // Trim and clean values
+    to = to.trim();
+    templateKey = templateKey.trim();
     
     // Handle healthcheck requests without full SMTP validation
     if (requestBody.healthcheck) {
@@ -1274,50 +1326,52 @@ serve(async (req: Request) => {
     const businessName = businessSettings?.name || 'System';
 
     console.log('📧 SMTP sender request:', {
-      to: requestBody.to,
-      templateKey: requestBody.templateKey,
+      to: to,
+      templateKey: templateKey,
       businessName,
-      hasVariables: !!requestBody.variables
+      hasVariables: !!variables,
+      fieldNormalization: {
+        original_to: requestBody.to !== to ? requestBody.to : 'same',
+        original_templateKey: requestBody.templateKey !== templateKey ? requestBody.templateKey : 'same'
+      }
     });
 
-    // Optional safety checks
-    if (requestBody.to && typeof requestBody.to === 'string') {
-      try {
-        // Check email suppression
-        const { data: suppressionCheck } = await supabase
-          .rpc('is_email_suppressed', { email_address: requestBody.to });
-        
-        if (suppressionCheck) {
-          console.log(`⚠️ Email ${requestBody.to} is suppressed - skipping send`);
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Email address is suppressed',
-            reason: 'suppressed'
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400
-          });
-        }
-
-        // Check rate limiting
-        const { data: rateLimitCheck } = await supabase
-          .rpc('check_email_rate_limit', { email_address: requestBody.to });
-          
-        if (rateLimitCheck && !rateLimitCheck.allowed) {
-          console.log(`⚠️ Rate limit exceeded for ${requestBody.to}`);
-          return new Response(JSON.stringify({
-            success: false,
-            error: 'Rate limit exceeded',
-            reason: 'rate_limited',
-            resetAt: rateLimitCheck.reset_at
-          }), {
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 429
-          });
-        }
-      } catch (checkError) {
-        console.warn('Safety check failed:', checkError.message);
+    // Safety checks with normalized values
+    try {
+      // Check email suppression
+      const { data: suppressionCheck } = await supabase
+        .rpc('is_email_suppressed', { email_address: to });
+      
+      if (suppressionCheck) {
+        console.log(`⚠️ Email ${to} is suppressed - skipping send`);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Email address is suppressed',
+          reason: 'suppressed'
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        });
       }
+
+      // Check rate limiting
+      const { data: rateLimitCheck } = await supabase
+        .rpc('check_email_rate_limit', { email_address: to });
+        
+      if (rateLimitCheck && !rateLimitCheck.allowed) {
+        console.log(`⚠️ Rate limit exceeded for ${to}`);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'Rate limit exceeded',
+          reason: 'rate_limited',
+          resetAt: rateLimitCheck.reset_at
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 429
+        });
+      }
+    } catch (checkError) {
+      console.warn('Safety check failed:', checkError.message);
     }
 
     // Get production SMTP configuration
@@ -1341,11 +1395,11 @@ serve(async (req: Request) => {
       encryption: smtpConfig.encryption
     });
 
-    // Process template with enhanced branded fallback library
+    // Process template with enhanced branded fallback library using normalized values
     const { subject: templateSubject, html, text, templateFound, missingVariables, templateType, fallbackUsed, fallbackMode } = await processTemplate(
       supabase,
-      requestBody.templateKey,
-      requestBody.variables,
+      templateKey,
+      variables,
       businessName
     );
     

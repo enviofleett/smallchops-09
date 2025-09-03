@@ -74,6 +74,7 @@ const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"), undef
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"), undefined, true, 10000);
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })), undefined, false, 15000);
 const EmailProductionTest = withLazyLoading(() => import("./pages/EmailProductionTest").then(m => ({ default: m.EmailProductionTest })), undefined, false, 12000);
+const EmailNotificationTest = withLazyLoading(() => import("./pages/EmailNotificationTest"), undefined, false, 12000);
 
 // Hardened QueryClient with comprehensive error handling and performance optimizations
 const queryClient = new QueryClient({
@@ -272,6 +273,7 @@ const App = () => {
                 <Route path="/settings" element={<ErrorBoundaryWrapper context="Settings"><Settings /></ErrorBoundaryWrapper>} />
                 <Route path="/payment-settings" element={<ErrorBoundaryWrapper context="Payment Settings"><PaymentSettings /></ErrorBoundaryWrapper>} />
                 <Route path="/admin/email-production-test" element={<ErrorBoundaryWrapper context="Email Production Test"><EmailProductionTest /></ErrorBoundaryWrapper>} />
+                <Route path="/admin/order-notifications" element={<ErrorBoundaryWrapper context="Email Notification Test"><EmailNotificationTest /></ErrorBoundaryWrapper>} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>

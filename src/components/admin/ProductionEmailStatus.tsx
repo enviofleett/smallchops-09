@@ -32,12 +32,23 @@ export const ProductionEmailStatus: React.FC = () => {
   // Core templates that should exist in production
   const requiredTemplates = [
     { key: 'order_confirmation', name: 'Order Confirmation', critical: true },
-    { key: 'order_delivered', name: 'Order Delivered', critical: true },
-    { key: 'order_out_for_delivery', name: 'Out for Delivery', critical: true },
-    { key: 'shipping_notification', name: 'Shipping Notification', critical: true },
+    { key: 'order_status_update', name: 'Order Status Update', critical: true },
+    { key: 'order_preparing', name: 'Order Preparing', critical: true },
     { key: 'order_ready', name: 'Order Ready for Pickup', critical: true },
+    { key: 'out_for_delivery', name: 'Out for Delivery', critical: true },
     { key: 'customer_welcome', name: 'Customer Welcome', critical: false },
-    { key: 'payment_confirmation', name: 'Payment Confirmation', critical: true }
+    { key: 'admin_status_update', name: 'Admin Status Update', critical: true }
+  ];
+
+  // Branded fallback whitelist (matches server-side configuration)
+  const brandedFallbackWhitelist = [
+    'order_status_update',
+    'order_confirmation', 
+    'order_preparing',
+    'order_ready',
+    'out_for_delivery',
+    'customer_welcome',
+    'admin_status_update'
   ];
 
   const checkProductionReadiness = async () => {
@@ -227,12 +238,73 @@ export const ProductionEmailStatus: React.FC = () => {
         </Card>
       )}
 
+      {/* Branded Fallback Configuration */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Mail className="h-5 w-5" />
+            <CardTitle>Branded Fallback Configuration</CardTitle>
+          </div>
+          <CardDescription>
+            Production-safe fallback templates for missing database templates
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <Badge variant="default" className="gap-1">
+                <CheckCircle2 className="h-3 w-3" />
+                Branded Fallback Enabled
+              </Badge>
+              <span className="text-sm text-muted-foreground">
+                Whitelisted templates can use curated fallbacks in production
+              </span>
+            </div>
+            
+            <div>
+              <p className="text-sm font-medium mb-2">Whitelisted Templates ({brandedFallbackWhitelist.length})</p>
+              <div className="flex flex-wrap gap-1">
+                {brandedFallbackWhitelist.map((templateKey) => {
+                  const templateStatus = templateStatuses.find(t => t.key === templateKey);
+                  const hasDatabaseTemplate = templateStatus?.exists && templateStatus?.active;
+                  
+                  return (
+                    <Badge 
+                      key={templateKey} 
+                      variant={hasDatabaseTemplate ? "default" : "outline"}
+                      className="text-xs"
+                    >
+                      {templateKey}
+                      {!hasDatabaseTemplate && (
+                        <span className="ml-1 text-amber-600">*</span>
+                      )}
+                    </Badge>
+                  );
+                })}
+              </div>
+              <p className="text-xs text-muted-foreground mt-1">
+                * Templates marked with asterisk will use branded fallbacks
+              </p>
+            </div>
+            
+            <Alert className="border-amber-200 bg-amber-50">
+              <AlertTriangle className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-700">
+                <strong>Branded Fallback Mode:</strong> Missing templates on the whitelist will use curated branded fallbacks instead of failing. 
+                For best results, create actual templates in the Email Template Manager.
+              </AlertDescription>
+            </Alert>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Production Mode Information */}
       <Alert>
         <Mail className="h-4 w-4" />
         <AlertDescription>
-          <strong>Production Mode Active:</strong> All email communications must use templates from the Email Template Manager. 
-          Direct email content and fallback templates are disabled to ensure consistent branding and prevent unauthorized messages.
+          <strong>Production Email System:</strong> Templates are prioritized from (1) Email Template Manager database, 
+          (2) Branded Fallback Library for whitelisted templates, (3) System will reject non-whitelisted missing templates. 
+          This ensures consistent branding while maintaining reliability.
         </AlertDescription>
       </Alert>
     </div>

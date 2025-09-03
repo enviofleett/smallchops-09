@@ -85,15 +85,15 @@ export const EmailSystemStatus = () => {
                 </div>
                 <div className="flex items-center gap-1">
                   <CheckCircle className="h-3 w-3 text-green-500" />
-                  <span>Purchase Receipts</span>
+                  <span>Order Confirmations</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <CheckCircle className="h-3 w-3 text-green-500" />
+                  <span>Status Updates</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <CheckCircle className="h-3 w-3 text-green-500" />
                   <span>Admin Notifications</span>
-                </div>
-                <div className="flex items-center gap-1">
-                  <CheckCircle className="h-3 w-3 text-green-500" />
-                  <span>Order Ready Alerts</span>
                 </div>
               </div>
             </div>
@@ -101,10 +101,10 @@ export const EmailSystemStatus = () => {
             <div className="bg-primary/5 p-3 rounded-lg">
               <div className="flex items-center gap-2 text-sm">
                 <Zap className="h-4 w-4 text-primary" />
-                <span className="font-medium">Production Ready</span>
+                <span className="font-medium">Branded Fallback System Active</span>
               </div>
               <p className="text-xs text-muted-foreground mt-1">
-                All email communications use your configured SMTP settings as the single source of truth.
+                Missing templates use curated branded fallbacks from the Branded Fallback Library, ensuring consistent messaging with business branding.
               </p>
             </div>
           </>

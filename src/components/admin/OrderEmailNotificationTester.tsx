@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,18 +14,32 @@ import {
   Mail, 
   Send, 
   RefreshCw,
-  AlertTriangle 
+  AlertTriangle,
+  Zap
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { sendOrderStatusNotification } from '@/api/notifications';
+import { sendOrderStatusNotification, getNotificationLogs } from '@/api/notifications';
 
 interface TestResult {
   status: string;
   success: boolean;
+  emailSent: boolean;
+  smsSent: boolean;
   message: string;
   templateKey: string;
   timestamp: string;
+}
+
+interface DeliveryAttempt {
+  id: string;
+  order_id?: string;
+  template_key?: string;
+  recipient: string;
+  channel: string;
+  status: string;
+  error_message?: string;
+  created_at: string;
 }
 
 const ORDER_STATUSES = [
@@ -49,6 +63,8 @@ const OrderEmailNotificationTester = () => {
   const [orderNumber, setOrderNumber] = useState('ORD-12345');
   const [customVariables, setCustomVariables] = useState('{}');
   const [templateCheck, setTemplateCheck] = useState<{[key: string]: boolean}>({});
+  const [deliveryAttempts, setDeliveryAttempts] = useState<DeliveryAttempt[]>([]);
+  const [loadingDeliveryAttempts, setLoadingDeliveryAttempts] = useState(false);
 
   const checkTemplateAvailability = async () => {
     setIsRunning(true);
@@ -73,6 +89,50 @@ const OrderEmailNotificationTester = () => {
       toast.error('Failed to check template availability');
     } finally {
       setIsRunning(false);
+    }
+  };
+
+  const loadDeliveryAttempts = async () => {
+    setLoadingDeliveryAttempts(true);
+    try {
+      // Try notification_delivery_log first
+      const logs = await getNotificationLogs({ limit: 20 });
+      if (logs.length > 0) {
+        setDeliveryAttempts(logs.map(log => ({
+          id: log.id!,
+          order_id: log.order_id,
+          template_key: log.template_id, // Note: notification_delivery_log uses template_id
+          recipient: log.recipient,
+          channel: log.channel,
+          status: log.status,
+          error_message: log.error_message,
+          created_at: log.created_at!
+        })));
+      } else {
+        // Fallback to communication_events if no logs found
+        const { data: events } = await supabase
+          .from('communication_events')
+          .select('*')
+          .order('created_at', { ascending: false })
+          .limit(20);
+        
+        if (events) {
+          setDeliveryAttempts(events.map(event => ({
+            id: event.id,
+            order_id: event.order_id,
+            template_key: event.template_key,
+            recipient: event.recipient_email || 'Unknown',
+            channel: 'email',
+            status: event.status,
+            error_message: event.error_message,
+            created_at: event.created_at
+          })));
+        }
+      }
+    } catch (error) {
+      console.error('Failed to load delivery attempts:', error);
+    } finally {
+      setLoadingDeliveryAttempts(false);
     }
   };
 
@@ -106,7 +166,7 @@ const OrderEmailNotificationTester = () => {
         console.warn('Invalid custom variables JSON, using defaults');
       }
 
-      await sendOrderStatusNotification(
+      const result = await sendOrderStatusNotification(
         'test-order-id',
         status,
         testEmail,
@@ -114,28 +174,42 @@ const OrderEmailNotificationTester = () => {
         orderData
       );
 
-      const result: TestResult = {
+      const testResult: TestResult = {
         status: statusInfo.label,
-        success: true,
-        message: `Email sent successfully to ${testEmail}`,
+        success: result.success,
+        emailSent: result.emailSent,
+        smsSent: result.smsSent,
+        message: result.message,
         templateKey: statusInfo.templateKey,
         timestamp: new Date().toISOString()
       };
 
-      setTestResults(prev => [result, ...prev]);
-      toast.success(`${statusInfo.label} email sent successfully!`);
+      setTestResults(prev => [testResult, ...prev]);
+      
+      if (result.success) {
+        toast.success(`${statusInfo.label} notifications sent successfully!`);
+      } else if (result.emailSent || result.smsSent) {
+        toast.warning(`${statusInfo.label}: Partial success - ${result.message}`);
+      } else {
+        toast.error(`${statusInfo.label}: Failed - ${result.message}`);
+      }
+
+      // Refresh delivery attempts after test
+      loadDeliveryAttempts();
 
     } catch (error: any) {
-      const result: TestResult = {
+      const testResult: TestResult = {
         status: statusInfo.label,
         success: false,
+        emailSent: false,
+        smsSent: false,
         message: error.message || 'Unknown error occurred',
         templateKey: statusInfo.templateKey,
         timestamp: new Date().toISOString()
       };
 
-      setTestResults(prev => [result, ...prev]);
-      toast.error(`Failed to send ${statusInfo.label} email: ${error.message}`);
+      setTestResults(prev => [testResult, ...prev]);
+      toast.error(`Failed to send ${statusInfo.label} notifications: ${error.message}`);
     } finally {
       setIsRunning(false);
     }
@@ -161,8 +235,9 @@ const OrderEmailNotificationTester = () => {
     toast.success('Full email notification test completed!');
   };
 
-  React.useEffect(() => {
+  useEffect(() => {
     checkTemplateAvailability();
+    loadDeliveryAttempts();
   }, []);
 
   const successCount = testResults.filter(r => r.success).length;
@@ -329,6 +404,16 @@ const OrderEmailNotificationTester = () => {
             </Button>
             
             <Button
+              variant="outline"
+              onClick={loadDeliveryAttempts}
+              disabled={loadingDeliveryAttempts}
+              className="flex items-center gap-2"
+            >
+              <Zap className={`h-4 w-4 ${loadingDeliveryAttempts ? 'animate-spin' : ''}`} />
+              Refresh Delivery Log
+            </Button>
+            
+            <Button
               variant="ghost"
               onClick={() => setTestResults([])}
               disabled={isRunning}
@@ -374,6 +459,78 @@ const OrderEmailNotificationTester = () => {
         </CardContent>
       </Card>
 
+      {/* Recent Delivery Attempts */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Recent Delivery Attempts</CardTitle>
+          <CardDescription>
+            Latest email/SMS delivery attempts from the system
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingDeliveryAttempts ? (
+            <div className="flex items-center justify-center py-8">
+              <RefreshCw className="h-6 w-6 animate-spin" />
+              <span className="ml-2">Loading delivery attempts...</span>
+            </div>
+          ) : deliveryAttempts.length > 0 ? (
+            <div className="space-y-3">
+              {deliveryAttempts.map((attempt) => (
+                <div
+                  key={attempt.id}
+                  className={`flex items-center gap-3 p-3 rounded-lg border ${
+                    attempt.status === 'sent' || attempt.status === 'delivered' 
+                      ? 'bg-green-50 border-green-200' 
+                      : attempt.status === 'pending' 
+                      ? 'bg-yellow-50 border-yellow-200'
+                      : 'bg-red-50 border-red-200'
+                  }`}
+                >
+                  <div className="flex-shrink-0">
+                    {attempt.status === 'sent' || attempt.status === 'delivered' ? (
+                      <CheckCircle className="h-5 w-5 text-green-600" />
+                    ) : attempt.status === 'pending' ? (
+                      <Clock className="h-5 w-5 text-yellow-600" />
+                    ) : (
+                      <XCircle className="h-5 w-5 text-red-600" />
+                    )}
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="font-medium capitalize">{attempt.status}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {attempt.channel}
+                      </Badge>
+                      {attempt.template_key && (
+                        <Badge variant="secondary" className="text-xs">
+                          {attempt.template_key}
+                        </Badge>
+                      )}
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      To: {attempt.recipient}
+                      {attempt.order_id && ` | Order: ${attempt.order_id}`}
+                    </div>
+                    {attempt.error_message && (
+                      <div className="text-sm text-red-600 mt-1">
+                        Error: {attempt.error_message}
+                      </div>
+                    )}
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    {new Date(attempt.created_at).toLocaleString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              No delivery attempts found. Try running a test to see results here.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Test Results */}
       {testResults.length > 0 && (
         <Card>
@@ -389,12 +546,16 @@ const OrderEmailNotificationTester = () => {
                 <div
                   key={index}
                   className={`flex items-center gap-3 p-3 rounded-lg border ${
-                    result.success ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
+                    result.success ? 'bg-green-50 border-green-200' : 
+                    (result.emailSent || result.smsSent) ? 'bg-yellow-50 border-yellow-200' :
+                    'bg-red-50 border-red-200'
                   }`}
                 >
                   <div className="flex-shrink-0">
                     {result.success ? (
                       <CheckCircle className="h-5 w-5 text-green-600" />
+                    ) : (result.emailSent || result.smsSent) ? (
+                      <AlertTriangle className="h-5 w-5 text-yellow-600" />
                     ) : (
                       <XCircle className="h-5 w-5 text-red-600" />
                     )}
@@ -405,6 +566,16 @@ const OrderEmailNotificationTester = () => {
                       <Badge variant="outline" className="text-xs">
                         {result.templateKey}
                       </Badge>
+                      {result.emailSent && (
+                        <Badge variant="secondary" className="text-xs bg-green-100 text-green-800">
+                          Email ✓
+                        </Badge>
+                      )}
+                      {result.smsSent && (
+                        <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+                          SMS ✓
+                        </Badge>
+                      )}
                     </div>
                     <div className="text-sm text-muted-foreground">{result.message}</div>
                   </div>

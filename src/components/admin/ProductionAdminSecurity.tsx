@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Progress } from '@/components/ui/progress';
 import { 
   Shield, 
   Activity, 
@@ -11,137 +12,49 @@ import {
   Users, 
   Lock,
   CheckCircle,
-  RefreshCw
+  RefreshCw,
+  XCircle,
+  Zap,
+  Eye,
+  AlertCircle
 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-
-interface SecurityMetrics {
-  activeAdmins: number;
-  activeSessions: number;
-  failedLogins: number;
-  suspiciousActivity: number;
-  lastSecurityScan: string;
-  rlsPoliciesActive: number;
-}
-
-interface SessionActivity {
-  id: string;
-  user_name: string;
-  action: string;
-  ip_address: string;
-  created_at: string;
-  risk_level: 'low' | 'medium' | 'high';
-}
+import { useProductionSecurity } from '@/hooks/useProductionSecurity';
 
 export const ProductionAdminSecurity = () => {
-  const [metrics, setMetrics] = useState<SecurityMetrics | null>(null);
-  const [recentActivity, setRecentActivity] = useState<SessionActivity[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRefreshing, setIsRefreshing] = useState(false);
-  const { toast } = useToast();
+  const {
+    metrics,
+    alerts,
+    readiness,
+    isLoading,
+    isRefreshing,
+    fetchSecurityMetrics,
+    acknowledgeAlert,
+    emergencyLockdown
+  } = useProductionSecurity();
 
-  const fetchSecurityMetrics = async () => {
-    try {
-      setIsRefreshing(true);
-      
-      // Get active admin count
-      const { data: admins } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('role', 'admin')
-        .eq('is_active', true);
 
-      // Get recent admin activity
-      const { data: auditLogs } = await supabase
-        .from('audit_logs')
-        .select('*')
-        .order('event_time', { ascending: false })
-        .limit(10);
-
-      // Get admin sessions
-      const { data: sessions } = await supabase
-        .from('admin_sessions')
-        .select('*')
-        .eq('is_active', true);
-
-      // Calculate security metrics
-      const securityMetrics: SecurityMetrics = {
-        activeAdmins: admins?.length || 0,
-        activeSessions: sessions?.length || 0,
-        failedLogins: auditLogs?.filter(log => 
-          log.action.includes('login_failed')
-        ).length || 0,
-        suspiciousActivity: auditLogs?.filter(log => 
-          log.category === 'Security' && log.message.includes('suspicious')
-        ).length || 0,
-        lastSecurityScan: new Date().toISOString(),
-        rlsPoliciesActive: 45 // This would be calculated from actual RLS policy count
-      };
-
-      // Process recent activity
-      const activity: SessionActivity[] = auditLogs?.map(log => ({
-        id: log.id,
-        user_name: log.user_name || 'System',
-        action: log.action,
-        ip_address: log.ip_address || 'Unknown',
-        created_at: log.event_time,
-        risk_level: log.category === 'Security' ? 'high' : 
-                   log.action.includes('delete') ? 'medium' : 'low'
-      })) || [];
-
-      setMetrics(securityMetrics);
-      setRecentActivity(activity);
-      
-    } catch (error) {
-      console.error('Failed to fetch security metrics:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load security metrics',
-        variant: 'destructive'
-      });
-    } finally {
-      setIsLoading(false);
-      setIsRefreshing(false);
+  const getSystemHealthColor = (health: string) => {
+    switch (health) {
+      case 'critical': return 'text-red-600';
+      case 'warning': return 'text-yellow-600';
+      default: return 'text-green-600';
     }
   };
 
-  const lockdownAdminAccess = async () => {
-    try {
-      const { error } = await supabase.functions.invoke('admin-security-lockdown', {
-        body: { action: 'emergency_lockdown' }
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: 'Emergency Lockdown Activated',
-        description: 'All admin sessions have been terminated',
-      });
-
-      fetchSecurityMetrics();
-    } catch (error) {
-      toast({
-        title: 'Lockdown Failed',
-        description: 'Failed to activate emergency lockdown',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  useEffect(() => {
-    fetchSecurityMetrics();
-    
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchSecurityMetrics, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const getRiskBadgeVariant = (level: string) => {
+  const getThreatLevelBadge = (level: string) => {
     switch (level) {
       case 'high': return 'destructive';
       case 'medium': return 'secondary';
       default: return 'default';
+    }
+  };
+
+  const getAlertSeverityIcon = (severity: string) => {
+    switch (severity) {
+      case 'critical': return <XCircle className="h-4 w-4 text-red-500" />;
+      case 'high': return <AlertTriangle className="h-4 w-4 text-orange-500" />;
+      case 'medium': return <AlertCircle className="h-4 w-4 text-yellow-500" />;
+      default: return <CheckCircle className="h-4 w-4 text-blue-500" />;
     }
   };
 
@@ -156,8 +69,83 @@ export const ProductionAdminSecurity = () => {
 
   return (
     <div className="space-y-6">
+      {/* Production Readiness Banner */}
+      {readiness && (
+        <Card className={`border-2 ${readiness.isReady ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}`}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center space-x-3">
+                {readiness.isReady ? (
+                  <CheckCircle className="h-6 w-6 text-green-600" />
+                ) : (
+                  <XCircle className="h-6 w-6 text-red-600" />
+                )}
+                <div>
+                  <h3 className={`font-semibold ${readiness.isReady ? 'text-green-800' : 'text-red-800'}`}>
+                    {readiness.isReady ? '🚀 Production Ready' : '⚠️ Production Issues Detected'}
+                  </h3>
+                  <p className={`text-sm ${readiness.isReady ? 'text-green-700' : 'text-red-700'}`}>
+                    {readiness.isReady 
+                      ? 'All security checks passed. System ready for live deployment.'
+                      : `${readiness.criticalIssues.length} critical issues need attention before deployment.`
+                    }
+                  </p>
+                </div>
+              </div>
+              <div className="text-right">
+                <div className={`text-2xl font-bold ${readiness.isReady ? 'text-green-600' : 'text-red-600'}`}>
+                  {readiness.score}/100
+                </div>
+                <Progress value={readiness.score} className="w-24 mt-1" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Critical Alerts */}
+      {alerts.length > 0 && (
+        <Card className="border-red-200 bg-red-50">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-red-800">
+              <Zap className="h-5 w-5" />
+              Security Alerts ({alerts.filter(a => !a.acknowledged).length} unacknowledged)
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {alerts.slice(0, 3).map((alert) => (
+              <div key={alert.id} className="flex items-center justify-between p-3 border border-red-200 rounded-lg bg-white">
+                <div className="flex items-center space-x-3">
+                  {getAlertSeverityIcon(alert.severity)}
+                  <div>
+                    <div className="font-medium text-sm">{alert.message}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {new Date(alert.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <Badge variant={alert.severity === 'critical' ? 'destructive' : 'secondary'}>
+                    {alert.severity.toUpperCase()}
+                  </Badge>
+                  {!alert.acknowledged && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => acknowledgeAlert(alert.id)}
+                    >
+                      Acknowledge
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
       {/* Security Overview Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -166,7 +154,7 @@ export const ProductionAdminSecurity = () => {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.activeAdmins}</div>
+            <div className="text-2xl font-bold">{metrics?.activeAdmins || 0}</div>
             <p className="text-xs text-muted-foreground">
               Currently active administrator accounts
             </p>
@@ -177,13 +165,13 @@ export const ProductionAdminSecurity = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Activity className="h-4 w-4" />
-              Active Sessions
+              Live Sessions
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{metrics?.activeSessions}</div>
+            <div className="text-2xl font-bold">{metrics?.activeSessions || 0}</div>
             <p className="text-xs text-muted-foreground">
-              Live admin sessions
+              Active admin sessions
             </p>
           </CardContent>
         </Card>
@@ -192,14 +180,31 @@ export const ProductionAdminSecurity = () => {
           <CardHeader className="pb-2">
             <CardTitle className="text-sm font-medium flex items-center gap-2">
               <Shield className="h-4 w-4" />
-              RLS Policies
+              Security Policies
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-600">{metrics?.rlsPoliciesActive}</div>
+            <div className="text-2xl font-bold text-green-600">{metrics?.rlsPoliciesActive || 0}</div>
             <p className="text-xs text-muted-foreground">
-              Active security policies
+              Active RLS policies
             </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm font-medium flex items-center gap-2">
+              <Eye className="h-4 w-4" />
+              System Health
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className={`text-2xl font-bold capitalize ${getSystemHealthColor(metrics?.systemHealth || 'unknown')}`}>
+              {metrics?.systemHealth || 'Unknown'}
+            </div>
+            <Badge variant={getThreatLevelBadge(metrics?.threatLevel || 'low')} className="mt-1">
+              {metrics?.threatLevel || 'Low'} Threat
+            </Badge>
           </CardContent>
         </Card>
       </div>
@@ -212,18 +217,28 @@ export const ProductionAdminSecurity = () => {
               <Lock className="h-5 w-5" />
               Production Security Status
             </CardTitle>
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={fetchSecurityMetrics}
-              disabled={isRefreshing}
-            >
-              {isRefreshing ? (
-                <RefreshCw className="h-4 w-4 animate-spin" />
-              ) : (
-                'Refresh'
-              )}
-            </Button>
+            <div className="flex space-x-2">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={fetchSecurityMetrics}
+                disabled={isRefreshing}
+              >
+                {isRefreshing ? (
+                  <RefreshCw className="h-4 w-4 animate-spin" />
+                ) : (
+                  'Refresh'
+                )}
+              </Button>
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={emergencyLockdown}
+              >
+                <Lock className="h-4 w-4 mr-1" />
+                Emergency Lockdown
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -274,60 +289,104 @@ export const ProductionAdminSecurity = () => {
             </div>
           </div>
 
-          {/* Emergency Controls */}
-          <Alert className="border-red-200 bg-red-50">
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              <div className="flex items-center justify-between">
-                <span className="text-sm">
-                  Emergency lockdown will terminate all admin sessions immediately
-                </span>
-                <Button 
-                  variant="destructive" 
-                  size="sm"
-                  onClick={lockdownAdminAccess}
-                >
-                  Emergency Lockdown
-                </Button>
-              </div>
-            </AlertDescription>
-          </Alert>
+          {/* Production Readiness Details */}
+          {readiness && !readiness.isReady && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {readiness.criticalIssues.length > 0 && (
+                <Alert className="border-red-200 bg-red-50">
+                  <XCircle className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <div className="font-medium text-red-800">Critical Issues:</div>
+                      <ul className="list-disc list-inside text-sm text-red-700 space-y-1">
+                        {readiness.criticalIssues.map((issue, index) => (
+                          <li key={index}>{issue}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+              
+              {readiness.warnings.length > 0 && (
+                <Alert className="border-yellow-200 bg-yellow-50">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <div className="font-medium text-yellow-800">Warnings:</div>
+                      <ul className="list-disc list-inside text-sm text-yellow-700 space-y-1">
+                        {readiness.warnings.map((warning, index) => (
+                          <li key={index}>{warning}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </AlertDescription>
+                </Alert>
+              )}
+            </div>
+          )}
+
+          {readiness?.recommendations && readiness.recommendations.length > 0 && (
+            <Alert className="border-blue-200 bg-blue-50">
+              <CheckCircle className="h-4 w-4" />
+              <AlertDescription>
+                <div className="space-y-2">
+                  <div className="font-medium text-blue-800">Recommendations:</div>
+                  <ul className="list-disc list-inside text-sm text-blue-700 space-y-1">
+                    {readiness.recommendations.map((rec, index) => (
+                      <li key={index}>{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
 
-      {/* Recent Activity */}
+      {/* System Status Summary */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Clock className="h-5 w-5" />
-            Recent Admin Activity
+            <Activity className="h-5 w-5" />
+            Production Status Summary
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
-            {recentActivity.slice(0, 5).map((activity) => (
-              <div key={activity.id} className="flex items-center justify-between p-3 border rounded-lg">
-                <div className="flex items-center space-x-3">
-                  <div className="w-2 h-2 rounded-full bg-blue-500" />
-                  <div>
-                    <div className="font-medium text-sm">{activity.user_name}</div>
-                    <div className="text-xs text-muted-foreground">{activity.action}</div>
-                    <div className="text-xs text-muted-foreground">
-                      {activity.ip_address} • {new Date(activity.created_at).toLocaleString()}
-                    </div>
-                  </div>
-                </div>
-                <Badge variant={getRiskBadgeVariant(activity.risk_level)}>
-                  {activity.risk_level.toUpperCase()}
-                </Badge>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-lg font-semibold text-red-600">
+                {metrics?.failedLogins || 0}
               </div>
-            ))}
-            
-            {recentActivity.length === 0 && (
-              <div className="text-center py-4 text-muted-foreground">
-                No recent admin activity
+              <div className="text-xs text-muted-foreground">Failed Logins (24h)</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-orange-600">
+                {metrics?.suspiciousActivity || 0}
               </div>
-            )}
+              <div className="text-xs text-muted-foreground">Suspicious Events</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-green-600">
+                {metrics?.rlsPoliciesActive || 0}
+              </div>
+              <div className="text-xs text-muted-foreground">Security Policies</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-semibold text-blue-600">
+                {readiness?.score || 0}%
+              </div>
+              <div className="text-xs text-muted-foreground">Production Score</div>
+            </div>
+          </div>
+          
+          <div className="mt-4 text-center">
+            <div className="text-xs text-muted-foreground">
+              Last updated: {metrics?.lastSecurityScan 
+                ? new Date(metrics.lastSecurityScan).toLocaleString()
+                : 'Never'
+              }
+            </div>
           </div>
         </CardContent>
       </Card>

@@ -10,6 +10,7 @@ import { EnhancedUserPermissionsMatrix } from "./EnhancedUserPermissionsMatrix";
 import { AdminActionsLog } from "./AdminActionsLog";
 import { AdminHealthMonitor } from "../admin/AdminHealthMonitor";
 import { AdminInvitationMonitor } from "./AdminInvitationMonitor";
+import { ProductionAdminSecurity } from "../admin/ProductionAdminSecurity";
 import { useAdminManagement } from '@/hooks/useAdminManagement';
 import { useAdminInvitation } from '@/hooks/useAdminInvitation';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -460,8 +461,8 @@ export const AdminUserControl = () => {
 
           <TabsContent value="monitor">
             <div className="space-y-6">
+              <ProductionAdminSecurity />
               <AdminInvitationMonitor />
-              {/* Import the ProductionAdminSecurity component when ready */}
             </div>
           </TabsContent>
 

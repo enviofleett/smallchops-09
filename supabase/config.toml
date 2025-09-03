@@ -103,6 +103,10 @@ verify_jwt = false
 [functions.email-template-seeder]
 verify_jwt = false
 
+# USER JOURNEY AUTOMATION (internal use)
+[functions.user-journey-automation]
+verify_jwt = false
+
 # AUTOMATED PROCESSORS (service-to-service)
 [functions.backfill-missing-schedules]
 verify_jwt = true

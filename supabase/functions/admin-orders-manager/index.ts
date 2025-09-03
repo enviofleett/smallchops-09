@@ -232,6 +232,30 @@ serve(async (req) => {
           try {
             console.log(`Triggering status change email: ${currentOrder.status} -> ${updates.status}`)
             
+            // Create HMAC signature for internal authentication
+            const timestamp = Math.floor(Date.now() / 1000).toString()
+            const message = `${timestamp}:user-journey-automation`
+            const secret = Deno.env.get('UJ_INTERNAL_SECRET') || 'fallback-secret-key'
+            
+            const encoder = new TextEncoder()
+            const keyData = await crypto.subtle.importKey(
+              'raw',
+              encoder.encode(secret),
+              { name: 'HMAC', hash: 'SHA-256' },
+              false,
+              ['sign']
+            )
+            
+            const signature = await crypto.subtle.sign(
+              'HMAC',
+              keyData,
+              encoder.encode(message)
+            )
+            
+            const signatureHex = Array.from(new Uint8Array(signature))
+              .map(b => b.toString(16).padStart(2, '0'))
+              .join('')
+            
             const { error: emailError } = await supabaseClient.functions.invoke('user-journey-automation', {
               body: {
                 journey_type: 'order_status_change',
@@ -249,6 +273,10 @@ serve(async (req) => {
                   new_status: updates.status,
                   updated_at: new Date().toISOString()
                 }
+              },
+              headers: {
+                'x-internal-secret': signatureHex,
+                'x-timestamp': timestamp
               }
             })
 

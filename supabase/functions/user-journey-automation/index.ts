@@ -30,11 +30,59 @@ serve(async (req: Request) => {
   }
 
   try {
+    // Verify internal authentication for server-to-server calls
+    const internalSecret = req.headers.get('x-internal-secret')
+    const timestamp = req.headers.get('x-timestamp')
+    
+    if (internalSecret && timestamp) {
+      console.log('🔐 Verifying internal authentication...')
+      
+      const secret = Deno.env.get('UJ_INTERNAL_SECRET') || 'fallback-secret-key'
+      const message = `${timestamp}:user-journey-automation`
+      
+      // Verify timestamp is recent (within 5 minutes)
+      const currentTime = Math.floor(Date.now() / 1000)
+      const requestTime = parseInt(timestamp)
+      if (Math.abs(currentTime - requestTime) > 300) {
+        console.error('❌ Request timestamp too old or invalid')
+        return new Response(
+          JSON.stringify({ error: 'Request timestamp invalid' }), 
+          { status: 401, headers: corsHeaders }
+        )
+      }
+      
+      // Verify HMAC signature
+      const encoder = new TextEncoder()
+      const keyData = await crypto.subtle.importKey(
+        'raw',
+        encoder.encode(secret),
+        { name: 'HMAC', hash: 'SHA-256' },
+        false,
+        ['sign']
+      )
+      
+      const signature = await crypto.subtle.sign('HMAC', keyData, encoder.encode(message))
+      const signatureHex = Array.from(new Uint8Array(signature))
+        .map(b => b.toString(16).padStart(2, '0'))
+        .join('')
+      
+      if (signatureHex !== internalSecret) {
+        console.error('❌ Invalid HMAC signature')
+        return new Response(
+          JSON.stringify({ error: 'Invalid authentication signature' }), 
+          { status: 401, headers: corsHeaders }
+        )
+      }
+      
+      console.log('✅ Internal authentication verified')
+    }
+
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { journey_type, user_data, order_data, metadata }: UserJourneyEvent = await req.json();
+    const requestBody = await req.json()
+    const { journey_type, user_data, order_data, metadata }: UserJourneyEvent = requestBody;
 
     console.log(`Processing user journey: ${journey_type} for ${user_data.email}`);
 

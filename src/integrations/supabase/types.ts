@@ -9785,6 +9785,7 @@ export type Database = {
       }
       upsert_payment_confirmation_event: {
         Args:
+          | { p_order_id: string; p_priority?: string; p_template_key?: string }
           | {
               p_order_id: string
               p_recipient_email: string

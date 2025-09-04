@@ -51,6 +51,114 @@ interface Props {
 }
 
 /**
+ * PRODUCTION UTILITY: Convert technical action codes to user-friendly messages
+ * Maps audit log actions to readable descriptions for admin dashboard
+ */
+const getActionMessage = (action: string, category?: string | null, entityType?: string | null): string => {
+  const actionMessages: Record<string, string> = {
+    // Authentication & User Management
+    'admin_login': 'Admin logged in',
+    'admin_logout': 'Admin logged out',
+    'admin_signup': 'New admin account created',
+    'user_created': 'User account created',
+    'user_updated': 'User profile updated',
+    'user_deleted': 'User account deleted',
+    'password_reset': 'Password reset initiated',
+    'email_verified': 'Email address verified',
+    
+    // Order Management
+    'order_created': 'New order placed',
+    'order_updated': 'Order details updated',
+    'order_status_changed': 'Order status changed',
+    'order_cancelled': 'Order cancelled',
+    'order_confirmed': 'Order confirmed',
+    'order_completed': 'Order completed',
+    'order_refunded': 'Order refunded',
+    'payment_confirmed': 'Payment confirmed',
+    'payment_failed': 'Payment failed',
+    
+    // Product Management
+    'product_created': 'Product added',
+    'product_updated': 'Product updated',
+    'product_deleted': 'Product removed',
+    'product_price_changed': 'Product price changed',
+    'inventory_updated': 'Inventory updated',
+    
+    // System Administration
+    'settings_updated': 'System settings changed',
+    'permissions_updated': 'User permissions changed',
+    'email_sent': 'Email notification sent',
+    'backup_created': 'System backup created',
+    'maintenance_mode': 'Maintenance mode toggled',
+    
+    // Security Events
+    'login_attempt_failed': 'Failed login attempt',
+    'session_expired': 'User session expired',
+    'suspicious_activity': 'Suspicious activity detected',
+    'rate_limit_exceeded': 'Rate limit exceeded',
+    'access_denied': 'Access denied',
+    
+    // Data Management
+    'data_export': 'Data exported',
+    'data_import': 'Data imported',
+    'bulk_update': 'Bulk data update',
+    'data_cleanup': 'Data cleanup performed',
+    
+    // Communication
+    'email_template_updated': 'Email template updated',
+    'notification_sent': 'Notification sent',
+    'sms_sent': 'SMS message sent',
+    
+    // Delivery Management
+    'rider_assigned': 'Delivery rider assigned',
+    'delivery_scheduled': 'Delivery scheduled',
+    'delivery_completed': 'Delivery completed',
+    'delivery_failed': 'Delivery failed',
+    
+    // Financial
+    'payment_processed': 'Payment processed',
+    'refund_issued': 'Refund issued',
+    'transaction_created': 'Transaction created',
+    'invoice_generated': 'Invoice generated',
+  };
+  
+  // Try exact match first
+  if (actionMessages[action]) {
+    return actionMessages[action];
+  }
+  
+  // Try pattern matching for dynamic actions
+  if (action.includes('_created') && entityType) {
+    return `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} created`;
+  }
+  if (action.includes('_updated') && entityType) {
+    return `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} updated`;
+  }
+  if (action.includes('_deleted') && entityType) {
+    return `${entityType.charAt(0).toUpperCase() + entityType.slice(1)} deleted`;
+  }
+  
+  // Category-based fallbacks
+  if (category) {
+    switch (category.toLowerCase()) {
+      case 'user management':
+        return `User ${action.replace('_', ' ')}`;
+      case 'order processing':
+        return `Order ${action.replace('_', ' ')}`;
+      case 'security':
+        return `Security: ${action.replace('_', ' ')}`;
+      case 'system maintenance':
+        return `System ${action.replace('_', ' ')}`;
+      default:
+        return action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+    }
+  }
+  
+  // Default: humanize the action string
+  return action.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+};
+
+/**
  * PRODUCTION UTILITY: Extract clean username from email or display name
  * Handles various username formats for audit log display
  */
@@ -383,11 +491,11 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
           <MobileCard key={log.id}>
             <MobileCardHeader>
               <div>
-                <p className="font-medium text-gray-800">
-                  <SafeHtml className="capitalize font-semibold text-blue-700">
-                    {log.action}
-                  </SafeHtml>
-                </p>
+                 <p className="font-medium text-gray-800">
+                   <SafeHtml className="capitalize font-semibold text-blue-700">
+                     {getActionMessage(log.action, log.category, log.entity_type)}
+                   </SafeHtml>
+                 </p>
                 <p className="text-sm text-gray-600">{new Date(log.event_time).toLocaleString()}</p>
               </div>
               <div className="text-right">
@@ -524,7 +632,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
                 </TableCell>
                 <TableCell>
                   <SafeHtml className="capitalize font-semibold text-blue-700">
-                    {log.action}
+                    {getActionMessage(log.action, log.category, log.entity_type)}
                   </SafeHtml>
                 </TableCell>
                 <TableCell>

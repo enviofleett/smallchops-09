@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, User, LogOut, Home, Package, Users, BarChart3, Settings } from 'lucide-react';
+import { Search, User, LogOut, Home, Package, Users, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { SidebarTrigger } from "@/components/ui/sidebar";
@@ -67,13 +67,6 @@ const TopNav = () => {
                         >
                           <Users className="h-4 w-4" />
                           <span>Customers</span>
-                        </NavigationMenuLink>
-                        <NavigationMenuLink 
-                          onClick={() => navigate('/analytics')}
-                          className="flex items-center gap-2 p-3 rounded-md hover:bg-accent cursor-pointer"
-                        >
-                          <BarChart3 className="h-4 w-4" />
-                          <span>Analytics</span>
                         </NavigationMenuLink>
                       </div>
                     </div>

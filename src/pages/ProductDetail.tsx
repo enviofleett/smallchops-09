@@ -43,7 +43,7 @@ import { ProductMOQIndicator } from '@/components/products/ProductMOQIndicator';
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { addItem } = useCart();
+  const { addItem, cart } = useCart();
   const { toast } = useToast();
 
   const [product, setProduct] = useState<ProductWithDiscount | null>(null);
@@ -129,6 +129,12 @@ const ProductDetail = () => {
       if (productData) {
         setProduct(productData);
         
+        // Set initial quantity to MOQ if MOQ > 1
+        const moq = productData.minimum_order_quantity || 1;
+        if (moq > 1) {
+          setQuantity(moq);
+        }
+        
         // Fetch related products from same category - show up to 4 products
         const allProducts = await getProductsWithDiscounts(productData.category_id);
         const related = allProducts
@@ -154,8 +160,24 @@ const ProductDetail = () => {
     }
   };
 
+  // Get current cart quantity for this product
+  const getCurrentCartQuantity = () => {
+    if (!product) return 0;
+    const cartItem = cart.items.find(item => item.product_id === product.id);
+    return cartItem?.quantity || 0;
+  };
+
+  // Get minimum quantity (considering MOQ)
+  const getMinimumQuantity = () => {
+    if (!product) return 1;
+    return product.minimum_order_quantity || 1;
+  };
+
   const handleAddToCart = () => {
     if (!product) return;
+    
+    const moq = product.minimum_order_quantity || 1;
+    const actualQuantity = Math.max(quantity, moq);
     
     addItem({
       id: product.id,
@@ -165,11 +187,16 @@ const ProductDetail = () => {
       discount_amount: product.discount_amount,
       vat_rate: 7.5, // Default VAT rate
       image_url: product.image_url,
-    }, quantity);
+      minimum_order_quantity: moq,
+    }, actualQuantity);
+    
+    const addedQuantityText = actualQuantity > quantity ? 
+      `${actualQuantity} ${product.name} added to cart (adjusted to meet minimum order quantity)` :
+      `${actualQuantity} ${product.name} added to cart`;
     
     toast({
       title: "Added to Cart",
-      description: `${quantity} ${product.name} added to cart`,
+      description: addedQuantityText,
     });
   };
 
@@ -370,6 +397,7 @@ const ProductDetail = () => {
                 minimumOrderQuantity={product.minimum_order_quantity}
                 price={product.discounted_price || product.price}
                 stockQuantity={product.stock_quantity}
+                currentCartQuantity={getCurrentCartQuantity()}
                 variant="detailed"
                 showDetailedInfo={true}
               />
@@ -379,12 +407,17 @@ const ProductDetail = () => {
             <div className="space-y-4">
               <div className="flex items-center gap-4">
                 <span className="text-sm font-medium">Quantity:</span>
+                {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
+                  <span className="text-xs text-gray-500">
+                    (Min: {product.minimum_order_quantity})
+                  </span>
+                )}
                 <div className="flex items-center border rounded-lg">
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                    disabled={quantity <= 1}
+                    onClick={() => setQuantity(Math.max(getMinimumQuantity(), quantity - 1))}
+                    disabled={quantity <= getMinimumQuantity()}
                   >
                     <Minus className="h-4 w-4" />
                   </Button>

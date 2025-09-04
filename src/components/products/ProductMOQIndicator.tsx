@@ -24,8 +24,8 @@ export const ProductMOQIndicator = ({
   showDetailedInfo = false,
   variant = 'compact'
 }: ProductMOQIndicatorProps) => {
-  // Don't show if MOQ is 1 or less
-  if (minimumOrderQuantity <= 1) return null;
+  // Don't show if MOQ is 1 or less or if required data is missing
+  if (!minimumOrderQuantity || minimumOrderQuantity <= 1 || !price) return null;
 
   const isStockSufficient = !stockQuantity || stockQuantity >= minimumOrderQuantity;
   const isCurrentlyMet = currentCartQuantity >= minimumOrderQuantity;

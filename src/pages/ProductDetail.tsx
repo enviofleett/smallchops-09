@@ -27,7 +27,10 @@ import { ReviewCard } from '@/components/reviews/ReviewCard';
 import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { getProductWithDiscounts, getProductsWithDiscounts } from '@/api/productsWithDiscounts';
-import { useProductReviews, useProductRatingSummary, useVoteOnReview } from '@/hooks/useProductReviews';
+import { useProductRatings } from '@/hooks/useProductRatings';
+import { RatingSummaryComponent } from '@/components/product/RatingSummary';
+import { ReviewsList } from '@/components/product/ReviewsList';
+import { ReviewForm } from '@/components/product/ReviewForm';
 import { useProductFavorite } from '@/hooks/useProductFavorite';
 import { WhatsAppSupportWidget } from '@/components/ui/WhatsAppSupportWidget';
 import { PriceDisplay } from '@/components/ui/price-display';
@@ -55,14 +58,7 @@ const ProductDetail = () => {
   const [loading, setLoading] = useState(true);
   const [reviewFilter, setReviewFilter] = useState<{ rating?: number; sortBy: string }>({ sortBy: 'newest' });
 
-  const { data: reviewsData } = useProductReviews(id || '', { 
-    page: 1, 
-    limit: 10, 
-    rating: reviewFilter.rating,
-    sortBy: reviewFilter.sortBy as any
-  });
-  const { data: ratingSummary } = useProductRatingSummary(id || '');
-  const voteOnReviewMutation = useVoteOnReview();
+  const productRatings = useProductRatings(id || '');
   
   // Initialize favorites for this product
   const { isFavorite, isLoading: favoriteLoading, toggleFavorite } = useProductFavorite(id || '');
@@ -229,14 +225,8 @@ const ProductDetail = () => {
   };
 
   const handleReviewVote = (reviewId: string, voteType: 'helpful' | 'not_helpful') => {
-    voteOnReviewMutation.mutate({ reviewId, voteType }, {
-      onSuccess: () => {
-        toast({ title: "Thank you for your feedback!" });
-      },
-      onError: () => {
-        toast({ title: "Failed to record vote", variant: "destructive" });
-      }
-    });
+    // Placeholder for review voting functionality
+    console.log('Review vote:', reviewId, voteType);
   };
 
   const getPromotionBadge = () => {
@@ -336,11 +326,11 @@ const ProductDetail = () => {
               <h1 className="text-2xl sm:text-3xl font-bold mb-2">{product.name}</h1>
               <div className="flex items-center gap-4 mb-4">
                 <StarRating 
-                  rating={ratingSummary?.average_rating || 0} 
+                  rating={productRatings?.ratingSummary?.average_rating || 0} 
                   size="md"
                 />
                 <span className="text-sm text-muted-foreground">
-                  ({ratingSummary?.total_reviews || 0} review{ratingSummary?.total_reviews !== 1 ? 's' : ''})
+                  ({productRatings?.ratingSummary?.total_reviews || 0} review{productRatings?.ratingSummary?.total_reviews !== 1 ? 's' : ''})
                 </span>
               </div>
             </div>
@@ -506,52 +496,28 @@ const ProductDetail = () => {
           {/* Rating Summary */}
           <Card>
             <CardContent className="p-6">
-              <ProductRatingsSummary summary={ratingSummary} />
+              {productRatings.ratingSummary ? (
+                <RatingSummaryComponent summary={productRatings.ratingSummary} />
+              ) : (
+                <div className="text-center py-8">
+                  <p className="text-muted-foreground">No ratings yet</p>
+                </div>
+              )}
             </CardContent>
           </Card>
 
-          {/* Review Filters */}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant={!reviewFilter.rating ? "default" : "outline"}
-              size="sm"
-              onClick={() => setReviewFilter({ ...reviewFilter, rating: undefined })}
-            >
-              All Reviews
-            </Button>
-            {[5, 4, 3, 2, 1].map((rating) => (
-              <Button
-                key={rating}
-                variant={reviewFilter.rating === rating ? "default" : "outline"}
-                size="sm"
-                onClick={() => setReviewFilter({ ...reviewFilter, rating })}
-              >
-                {rating} ⭐
-              </Button>
-            ))}
-          </div>
+          {/* Review Form */}
+          <ReviewForm
+            onSubmit={() => {}}
+            isSubmitting={false}
+          />
 
           {/* Reviews List */}
-          <div className="space-y-4">
-            {reviewsData && reviewsData.reviews.length > 0 ? (
-              reviewsData.reviews.map((review) => (
-                <ReviewCard
-                  key={review.id}
-                  review={review}
-                  onVoteUpdate={() => {}}
-                />
-              ))
-            ) : (
-              <Card>
-                <CardContent className="p-8 text-center">
-                  <div className="space-y-2">
-                    <h4 className="text-lg font-medium">No reviews yet</h4>
-                    <p className="text-muted-foreground">Be the first to review this product!</p>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-          </div>
+          <ReviewsList
+            reviews={productRatings.reviews || []}
+            onToggleHelpfulness={() => {}}
+            isUpdatingHelpfulness={false}
+          />
         </div>
 
         {/* Related Products */}

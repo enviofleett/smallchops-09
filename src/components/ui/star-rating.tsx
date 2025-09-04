@@ -8,6 +8,7 @@ interface StarRatingProps {
   interactive?: boolean;
   onRatingChange?: (rating: number) => void;
   className?: string;
+  setHoverRating?: (rating: number) => void;
 }
 
 export const StarRating = ({
@@ -17,6 +18,7 @@ export const StarRating = ({
   interactive = false,
   onRatingChange,
   className,
+  setHoverRating,
 }: StarRatingProps) => {
   const sizeClasses = {
     sm: 'w-4 h-4',
@@ -42,18 +44,21 @@ export const StarRating = ({
             key={index}
             className={cn(
               sizeClasses[size],
-              'transition-colors',
+              'transition-colors duration-200',
               {
                 'text-yellow-400 fill-yellow-400': isFilled,
+                'text-yellow-200 fill-yellow-200': isPartial,
                 'text-muted-foreground': !isFilled && !isPartial,
-                'cursor-pointer hover:text-yellow-400': interactive,
+                'cursor-pointer hover:text-yellow-300 hover:scale-110': interactive,
               }
             )}
             onClick={() => handleStarClick(starRating)}
+            onMouseEnter={() => interactive && setHoverRating?.(starRating)}
+            onMouseLeave={() => interactive && setHoverRating?.(0)}
           />
         );
       })}
-      {rating > 0 && (
+      {rating > 0 && !interactive && (
         <span className="text-sm text-muted-foreground ml-1">
           {rating.toFixed(1)}
         </span>

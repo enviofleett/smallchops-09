@@ -729,10 +729,21 @@ class ProductionSMTPClient {
   }
 
   private async authenticate(): Promise<string> {
-    // Try AUTH PLAIN first as it's more reliable for many providers
+    // Enhanced authentication with Gmail 535 error handling
     if (this.authMethods.includes('PLAIN')) {
-      await this.authenticatePlain();
-      return 'PLAIN';
+      try {
+        await this.authenticatePlain();
+        return 'PLAIN';
+      } catch (error) {
+        // Gmail often rejects AUTH PLAIN with 535 - try LOGIN instead
+        if (error.message.includes('535') && this.authMethods.includes('LOGIN')) {
+          this.log('AUTH PLAIN failed with 535, retrying with AUTH LOGIN...');
+          await this.authenticateLogin();
+          return 'LOGIN';
+        } else {
+          throw error;
+        }
+      }
     } else if (this.authMethods.includes('LOGIN') || this.authMethods.length === 0) {
       // Fallback to LOGIN if PLAIN not available
       await this.authenticateLogin();
@@ -936,9 +947,11 @@ function categorizeError(error: Error): { category: string; isTransient: boolean
   if (message.includes('authentication failed') || message.includes('535')) {
     let suggestion = 'Verify SMTP username and password credentials';
     
-    // Enhanced guidance for Gmail 535 errors
-    if (message.includes('535') && message.includes('username and password not accepted')) {
-      suggestion = 'Gmail authentication failed. Common fixes: 1) Enable 2-Step Verification on your Google account, 2) Generate a 16-character App Password at https://myaccount.google.com/apppasswords (not your regular password), 3) Use your full Gmail address as SMTP_USERNAME, 4) Remove spaces from App Password';
+    // Enhanced guidance for Gmail 535 errors with specific troubleshooting
+    if (message.includes('535')) {
+      suggestion = 'Authentication rejected (535). For Gmail: 1) Enable 2-Step Verification, 2) Generate 16-char App Password at https://myaccount.google.com/apppasswords, 3) Use full Gmail address as SMTP_USERNAME, 4) Remove spaces from App Password, 5) Verify account security alerts, 6) Try allowing less secure app access temporarily';
+    } else if (message.includes('username and password not accepted')) {
+      suggestion = 'Username/password rejected. Check credentials in Function Secrets. For Gmail, use App Password (not regular password)';
     }
     
     return {
@@ -948,11 +961,11 @@ function categorizeError(error: Error): { category: string; isTransient: boolean
     };
   }
   
-  if (message.includes('connection') || message.includes('network') || message.includes('econnreset')) {
+  if (message.includes('connection') || message.includes('network') || message.includes('econnreset') || message.includes('connection refused')) {
     return {
       category: 'network',
       isTransient: true,
-      suggestion: 'Check network connectivity and SMTP server availability'
+      suggestion: 'Check network connectivity and SMTP server availability. For Gmail, verify host is smtp.gmail.com'
     };
   }
   
@@ -960,7 +973,7 @@ function categorizeError(error: Error): { category: string; isTransient: boolean
     return {
       category: 'tls',
       isTransient: false,
-      suggestion: 'Try alternative port (465 for implicit TLS, 587 for STARTTLS)'
+      suggestion: 'TLS/STARTTLS issue. Try port 465 (implicit TLS) if 587 (STARTTLS) fails, or set SMTP_ENCRYPTION to match your provider'
     };
   }
   

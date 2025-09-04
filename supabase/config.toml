@@ -137,3 +137,13 @@ verify_jwt = true
 
 [functions.email-queue-cleanup]
 verify_jwt = true
+
+# MISSING PRODUCTION FUNCTIONS
+[functions.payment-environment-manager]
+verify_jwt = true
+
+[functions.process-communication-events-enhanced]
+verify_jwt = false
+
+[functions.enhanced-email-rate-limiter]
+verify_jwt = false

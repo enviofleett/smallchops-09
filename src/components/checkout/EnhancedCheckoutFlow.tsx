@@ -627,15 +627,40 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({
           <CardContent className="space-y-3">
             <div>
               <Label htmlFor="customer_name">Full Name *</Label>
-              <Input id="customer_name" value={formData.customer_name} onChange={e => handleFormChange('customer_name', e.target.value)} placeholder="Enter your full name" required className="h-10" />
+              <Input 
+                id="customer_name" 
+                value={formData.customer_name} 
+                onChange={e => handleFormChange('customer_name', e.target.value)} 
+                placeholder="Enter your full name" 
+                required 
+                className="h-10" 
+                readOnly={isAuthenticated && !!(profile as any)?.name}
+              />
             </div>
             <div>
               <Label htmlFor="customer_email">Email *</Label>
-              <Input id="customer_email" type="email" value={formData.customer_email} onChange={e => handleFormChange('customer_email', e.target.value)} placeholder="Enter your email" required className="h-10" />
+              <Input 
+                id="customer_email" 
+                type="email" 
+                value={formData.customer_email} 
+                onChange={e => handleFormChange('customer_email', e.target.value)} 
+                placeholder="Enter your email" 
+                required 
+                className="h-10" 
+                readOnly={isAuthenticated && !!(profile as any)?.email}
+              />
             </div>
             <div>
               <Label htmlFor="customer_phone">Phone Number</Label>
-              <Input id="customer_phone" type="tel" value={formData.customer_phone} onChange={e => handleFormChange('customer_phone', e.target.value)} placeholder="Enter your phone number" className="h-10" />
+              <Input 
+                id="customer_phone" 
+                type="tel" 
+                value={formData.customer_phone} 
+                onChange={e => handleFormChange('customer_phone', e.target.value)} 
+                placeholder="Enter your phone number" 
+                className="h-10" 
+                readOnly={isAuthenticated && !!(profile as any)?.phone}
+              />
             </div>
           </CardContent>
         </Card>

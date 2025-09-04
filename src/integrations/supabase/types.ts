@@ -7875,6 +7875,38 @@ export type Database = {
         }
         Relationships: []
       }
+      user_favorites: {
+        Row: {
+          created_at: string
+          id: string
+          product_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          product_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          product_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_favorites_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_permission_audit: {
         Row: {
           action: string
@@ -8935,6 +8967,18 @@ export type Database = {
         Args: { target_time: string }
         Returns: string
       }
+      get_user_favorites_with_products: {
+        Args: { p_user_id?: string }
+        Returns: {
+          created_at: string
+          favorite_id: string
+          product_id: string
+          product_image_url: string
+          product_name: string
+          product_price: number
+          product_status: Database["public"]["Enums"]["product_status"]
+        }[]
+      }
       get_user_permissions_secure: {
         Args: { target_user_id: string }
         Returns: {
@@ -9449,6 +9493,10 @@ export type Database = {
           message: string
           status: string
         }[]
+      }
+      toggle_user_favorite: {
+        Args: { p_product_id: string }
+        Returns: Json
       }
       trigger_order_emails: {
         Args: { order_uuid: string }

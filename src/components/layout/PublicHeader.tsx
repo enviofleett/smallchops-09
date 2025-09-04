@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Search, ShoppingCart, User, Menu, X, Heart, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCart } from '@/hooks/useCart';
+import { useFavorites } from '@/hooks/useFavorites';
 import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
@@ -23,6 +24,7 @@ const PublicHeaderContent = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isMenuOpen, setIsMenuOpen] = useState(false); // Keep for backward compatibility
   const { getItemCount } = useCart();
+  const { getFavoritesCount } = useFavorites();
   const { data: settings, error } = useBusinessSettings();
   const { isAuthenticated, customerAccount, isLoading } = useCustomerAuth();
   const navigate = useNavigate();
@@ -103,16 +105,21 @@ const PublicHeaderContent = () => {
             <Button
               variant="ghost"
               size="icon"
-              className="hidden sm:flex"
+              className="hidden sm:flex relative"
               onClick={() => {
                 if (isAuthenticated) {
-                  navigate('/customer-favorites');
+                  navigate('/favorites');
                 } else {
-                  navigate('/auth?redirect=/customer-favorites');
+                  navigate('/auth?redirect=/favorites');
                 }
               }}
             >
               <Heart className="h-5 w-5" />
+              {getFavoritesCount() > 0 && (
+                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                  {getFavoritesCount()}
+                </span>
+              )}
             </Button>
 
             {/* Notifications */}
@@ -197,17 +204,22 @@ const PublicHeaderContent = () => {
                   </button>
                 )}
                 <button 
-                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full"
+                  className="text-foreground hover:text-primary transition-colors py-3 text-base font-medium text-left w-full flex items-center justify-between"
                   onClick={() => {
                     setIsMobileMenuOpen(false);
                     if (isAuthenticated) {
-                      navigate('/customer-favorites');
+                      navigate('/favorites');
                     } else {
-                      navigate('/auth?redirect=/customer-favorites');
+                      navigate('/auth?redirect=/favorites');
                     }
                   }}
                 >
-                  Favorites
+                  <span>Favorites</span>
+                  {getFavoritesCount() > 0 && (
+                    <span className="bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                      {getFavoritesCount()}
+                    </span>
+                  )}
                 </button>
                 <Link 
                   to="/about" 

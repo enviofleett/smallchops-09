@@ -28,6 +28,7 @@ import { useCart } from '@/hooks/useCart';
 import { useToast } from '@/hooks/use-toast';
 import { getProductWithDiscounts, getProductsWithDiscounts } from '@/api/productsWithDiscounts';
 import { useProductReviews, useProductRatingSummary, useVoteOnReview } from '@/hooks/useProductReviews';
+import { useProductFavorite } from '@/hooks/useProductFavorite';
 import { WhatsAppSupportWidget } from '@/components/ui/WhatsAppSupportWidget';
 import { PriceDisplay } from '@/components/ui/price-display';
 import { StarRating } from '@/components/ui/star-rating';
@@ -52,10 +53,8 @@ const ProductDetail = () => {
   const [selectedZoneId, setSelectedZoneId] = useState<string>('');
   const [deliveryFee, setDeliveryFee] = useState<number>(0);
   const [loading, setLoading] = useState(true);
-  const [isFavorite, setIsFavorite] = useState(false);
   const [reviewFilter, setReviewFilter] = useState<{ rating?: number; sortBy: string }>({ sortBy: 'newest' });
 
-  // Fetch reviews and rating summary
   const { data: reviewsData } = useProductReviews(id || '', { 
     page: 1, 
     limit: 10, 
@@ -64,6 +63,9 @@ const ProductDetail = () => {
   });
   const { data: ratingSummary } = useProductRatingSummary(id || '');
   const voteOnReviewMutation = useVoteOnReview();
+  
+  // Initialize favorites for this product
+  const { isFavorite, isLoading: favoriteLoading, toggleFavorite } = useProductFavorite(id || '');
 
   useEffect(() => {
     console.log('ProductDetail component mounted, ID from params:', id);
@@ -441,7 +443,8 @@ const ProductDetail = () => {
                 </Button>
                 <FavoriteButton
                   isFavorite={isFavorite}
-                  onToggle={() => setIsFavorite(!isFavorite)}
+                  isLoading={favoriteLoading}
+                  onToggle={toggleFavorite}
                   size="lg"
                   className="order-1 sm:order-2 self-center sm:self-auto"
                 />

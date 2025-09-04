@@ -62,7 +62,7 @@ const SimpleRegisterPage = withLazyLoading(() => import("./pages/SimpleRegisterP
 const CustomerProfile = withLazyLoading(() => import("./pages/CustomerProfile"), undefined, false, 10000);
 const AuthPage = withLazyLoading(() => import("./pages/AuthPage"), undefined, true, 8000); // Critical auth page
 const AdminAuth = withLazyLoading(() => import("./pages/admin/AdminAuth"), undefined, true, 8000); // Critical auth page
-const Cart = withLazyLoading(() => import("./pages/Cart"), undefined, true, 10000); // Critical customer journey
+const Favorites = withLazyLoading(() => import("./pages/Favorites"), undefined, true, 10000);
 const Booking = withLazyLoading(() => import("./pages/Booking"), undefined, true, 12000); // Complex booking component
 const PublicProducts = withLazyLoading(() => import("./pages/PublicProducts"), undefined, true, 10000); // High traffic page
 const Contact = withLazyLoading(() => import("./pages/Contact"), undefined, true, 8000);
@@ -205,6 +205,7 @@ const App = () => {
               <Route path="/home" element={<Navigate to="/" replace />} />
               <Route path="/products" element={<PublicProducts />} />
               <Route path="/cart" element={<Cart />} />
+              <Route path="/favorites" element={<Favorites />} />
               <Route path="/booking" element={<Booking />} />
               <Route path="/about" element={<About />} />
               <Route path="/contact" element={<Contact />} />

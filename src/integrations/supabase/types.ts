@@ -158,6 +158,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "admin_invitations_invited_by_fkey"
+            columns: ["invited_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       admin_notification_preferences: {
@@ -197,6 +204,13 @@ export type Database = {
             columns: ["admin_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "admin_notification_preferences_admin_id_fkey"
+            columns: ["admin_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -567,13 +581,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "bogo_allocations_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "public_products_view"
             referencedColumns: ["id"]
           },
           {
@@ -1788,13 +1795,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "customer_favorites_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "public_products_view"
             referencedColumns: ["id"]
           },
         ]
@@ -3175,6 +3175,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "drivers_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       email_automation_config: {
@@ -4144,6 +4151,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "map_api_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       map_settings: {
@@ -4375,13 +4389,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "notification_queue_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "public_products_view"
             referencedColumns: ["id"]
           },
         ]
@@ -4776,13 +4783,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "order_items_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "public_products_view"
             referencedColumns: ["id"]
           },
         ]
@@ -6430,13 +6430,6 @@ export type Database = {
             referencedRelation: "products"
             referencedColumns: ["id"]
           },
-          {
-            foreignKeyName: "product_price_history_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "public_products_view"
-            referencedColumns: ["id"]
-          },
         ]
       }
       product_ratings_summary: {
@@ -6467,13 +6460,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: true
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_ratings_summary_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: true
-            referencedRelation: "public_products_view"
             referencedColumns: ["id"]
           },
         ]
@@ -6561,13 +6547,6 @@ export type Database = {
             columns: ["product_id"]
             isOneToOne: false
             referencedRelation: "products"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "product_reviews_product_id_fkey"
-            columns: ["product_id"]
-            isOneToOne: false
-            referencedRelation: "public_products_view"
             referencedColumns: ["id"]
           },
         ]
@@ -8248,6 +8227,13 @@ export type Database = {
             referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "user_permissions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
         ]
       }
       vehicle_assignments: {
@@ -8287,10 +8273,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "vehicle_assignments_assigned_by_fkey"
+            columns: ["assigned_by"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "vehicle_assignments_dispatch_rider_id_fkey"
             columns: ["dispatch_rider_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vehicle_assignments_dispatch_rider_id_fkey"
+            columns: ["dispatch_rider_id"]
+            isOneToOne: false
+            referencedRelation: "user_profiles"
             referencedColumns: ["id"]
           },
           {
@@ -8516,88 +8516,6 @@ export type Database = {
           },
         ]
       }
-      delivery_zone_monitoring: {
-        Row: {
-          delivery_orders: number | null
-          missing_zone_orders: number | null
-          order_date: string | null
-          payment_status_mismatches: number | null
-          pending_orders: number | null
-          total_orders: number | null
-          zone_completion_rate: number | null
-        }
-        Relationships: []
-      }
-      email_delivery_analytics: {
-        Row: {
-          bounced_emails: number | null
-          date: string | null
-          failed_emails: number | null
-          sent_emails: number | null
-          success_rate_percent: number | null
-          total_emails: number | null
-        }
-        Relationships: []
-      }
-      email_template_health: {
-        Row: {
-          active_templates: number | null
-          last_updated: string | null
-          marketing_count: number | null
-          stale_templates: number | null
-          total_templates: number | null
-          transactional_count: number | null
-        }
-        Relationships: []
-      }
-      email_templates: {
-        Row: {
-          category: string | null
-          created_at: string | null
-          full_html: boolean | null
-          html_content: string | null
-          is_active: boolean | null
-          style: string | null
-          subject: string | null
-          template_key: string | null
-          template_name: string | null
-          template_type: string | null
-          text_content: string | null
-          updated_at: string | null
-          variables: string[] | null
-        }
-        Insert: {
-          category?: string | null
-          created_at?: string | null
-          full_html?: boolean | null
-          html_content?: string | null
-          is_active?: boolean | null
-          style?: string | null
-          subject?: string | null
-          template_key?: string | null
-          template_name?: string | null
-          template_type?: string | null
-          text_content?: string | null
-          updated_at?: string | null
-          variables?: string[] | null
-        }
-        Update: {
-          category?: string | null
-          created_at?: string | null
-          full_html?: boolean | null
-          html_content?: string | null
-          is_active?: boolean | null
-          style?: string | null
-          subject?: string | null
-          template_key?: string | null
-          template_name?: string | null
-          template_type?: string | null
-          text_content?: string | null
-          updated_at?: string | null
-          variables?: string[] | null
-        }
-        Relationships: []
-      }
       order_analytics_view: {
         Row: {
           avg_order_value: number | null
@@ -8611,84 +8529,39 @@ export type Database = {
       }
       orders_view: {
         Row: {
-          amount_kobo: number | null
-          assigned_rider_id: string | null
           created_at: string | null
-          created_by: string | null
           customer_email: string | null
-          customer_id: string | null
           customer_name: string | null
-          customer_phone: string | null
-          delivery_address: Json | null
-          delivery_fee: number | null
-          delivery_status: string | null
-          delivery_time: string | null
-          delivery_time_slot_id: string | null
-          delivery_zone_id: string | null
-          delivery_zone_name: string | null
-          discount_amount: number | null
-          email: string | null
-          estimated_delivery_date: string | null
-          guest_session_id: string | null
           id: string | null
-          idempotency_key: string | null
           order_number: string | null
-          order_time: string | null
           order_type: Database["public"]["Enums"]["order_type"] | null
-          paid_at: string | null
-          payment_method: string | null
-          payment_reference: string | null
-          payment_status: Database["public"]["Enums"]["payment_status"] | null
-          payment_verified_at: string | null
-          paystack_reference: string | null
-          pickup_point_id: string | null
-          pickup_ready: boolean | null
-          pickup_time: string | null
-          preferred_delivery_time: string | null
-          processing_lock: boolean | null
-          reference_updated_at: string | null
-          special_instructions: string | null
           status: Database["public"]["Enums"]["order_status"] | null
-          subtotal: number | null
-          subtotal_cost: number | null
-          tax_amount: number | null
           total_amount: number | null
-          total_vat: number | null
           updated_at: string | null
-          updated_by: string | null
-          user_id: string | null
-          zone_delivery_fee: number | null
         }
-        Relationships: [
-          {
-            foreignKeyName: "orders_assigned_rider_id_fkey"
-            columns: ["assigned_rider_id"]
-            isOneToOne: false
-            referencedRelation: "drivers"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_customer_id_fkey"
-            columns: ["customer_id"]
-            isOneToOne: false
-            referencedRelation: "customer_accounts"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_delivery_zone_id_fkey"
-            columns: ["delivery_zone_id"]
-            isOneToOne: false
-            referencedRelation: "delivery_zones"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "orders_pickup_point_id_fkey"
-            columns: ["pickup_point_id"]
-            isOneToOne: false
-            referencedRelation: "pickup_points"
-            referencedColumns: ["id"]
-          },
-        ]
+        Insert: {
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          id?: string | null
+          order_number?: string | null
+          order_type?: Database["public"]["Enums"]["order_type"] | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          customer_email?: string | null
+          customer_name?: string | null
+          id?: string | null
+          order_number?: string | null
+          order_type?: Database["public"]["Enums"]["order_type"] | null
+          status?: Database["public"]["Enums"]["order_status"] | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
       }
       payment_analytics_view: {
         Row: {
@@ -8699,77 +8572,32 @@ export type Database = {
         }
         Relationships: []
       }
-      payment_flow_health: {
-        Row: {
-          completed_orders: number | null
-          completion_rate_percent: number | null
-          paid_orders: number | null
-          payment_pending: number | null
-          pending_orders: number | null
-          period: string | null
-          total_orders: number | null
-        }
-        Relationships: []
-      }
-      production_metrics: {
-        Row: {
-          total_paid_orders: number | null
-          total_paying_customers: number | null
-          total_products: number | null
-          total_revenue: number | null
-        }
-        Relationships: []
-      }
-      public_products_view: {
-        Row: {
-          allergen_info: string[] | null
-          category_id: string | null
-          category_name: string | null
-          description: string | null
-          features: Json | null
-          id: string | null
-          image_url: string | null
-          is_promotional: boolean | null
-          name: string | null
-          preparation_time: number | null
-          price: number | null
-          sku: string | null
-          status: Database["public"]["Enums"]["product_status"] | null
-          stock_quantity: number | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "products_category_id_fkey"
-            columns: ["category_id"]
-            isOneToOne: false
-            referencedRelation: "categories"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_profiles: {
         Row: {
           created_at: string | null
-          full_name: string | null
           id: string | null
-          is_verified: boolean | null
-          phone_number: string | null
+          is_active: boolean | null
+          name: string | null
+          role: Database["public"]["Enums"]["user_role"] | null
+          status: Database["public"]["Enums"]["user_status"] | null
           updated_at: string | null
         }
         Insert: {
           created_at?: string | null
-          full_name?: string | null
           id?: string | null
-          is_verified?: boolean | null
-          phone_number?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
+          status?: Database["public"]["Enums"]["user_status"] | null
           updated_at?: string | null
         }
         Update: {
           created_at?: string | null
-          full_name?: string | null
           id?: string | null
-          is_verified?: boolean | null
-          phone_number?: string | null
+          is_active?: boolean | null
+          name?: string | null
+          role?: Database["public"]["Enums"]["user_role"] | null
+          status?: Database["public"]["Enums"]["user_status"] | null
           updated_at?: string | null
         }
         Relationships: []

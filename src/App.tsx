@@ -5,6 +5,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
+import { NotificationProvider } from "@/context/NotificationContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import Layout from "./components/Layout";
 import ErrorBoundaryWrapper from "./components/ErrorBoundaryWrapper";
@@ -191,7 +192,8 @@ const App = () => {
           <Sonner />
           <DynamicFavicon />
           <OnlineStatusBanner />
-          <AuthProvider>
+          <NotificationProvider>
+            <AuthProvider>
             <BrowserRouter>
             <Routes>
               {/* Customer store at root */}
@@ -273,8 +275,9 @@ const App = () => {
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
-          </BrowserRouter>
-        </AuthProvider>
+            </BrowserRouter>
+          </AuthProvider>
+        </NotificationProvider>
         </NetworkProvider>
       </TooltipProvider>
       <DeploymentInfo />

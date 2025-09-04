@@ -7,6 +7,9 @@ import { useBusinessSettings } from '@/hooks/useBusinessSettings';
 import { useCustomerAuth } from '@/hooks/useCustomerAuth';
 import ProductionErrorBoundary from '@/components/ProductionErrorBoundary';
 import { AuthButton } from '@/components/auth/AuthButton';
+import { NotificationBell } from '@/components/notifications/NotificationBell';
+import { NotificationPreview } from '@/components/notifications/NotificationPreview';
+import { NotificationIntegration } from '@/components/notifications/NotificationIntegration';
 
 export const PublicHeader = () => {
   return (
@@ -125,6 +128,9 @@ const PublicHeaderContent = () => {
               <Heart className="h-5 w-5" />
             </Button>
 
+            {/* Notifications */}
+            <NotificationBell />
+
             {/* Cart */}
             <Button
               variant="ghost"
@@ -235,6 +241,12 @@ const PublicHeaderContent = () => {
           </div>
         )}
       </div>
+      
+      {/* Notification Preview - Global */}
+      <NotificationPreview />
+      
+      {/* Notification Integration - Global Event Listeners */}
+      <NotificationIntegration />
     </header>
   );
 };

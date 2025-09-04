@@ -8573,6 +8573,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      execute_production_go_live: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       find_or_create_customer: {
         Args: {
           p_email: string

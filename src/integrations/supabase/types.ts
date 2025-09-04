@@ -9291,6 +9291,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      production_go_live_cleanup: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       reassign_order_rider: {
         Args: { p_new_rider_id: string; p_order_id: string; p_reason?: string }
         Returns: Json

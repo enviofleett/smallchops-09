@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo, useCallback } from 'react';
+import { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { useCartTracking } from '@/hooks/useCartTracking';
 import { calculateAdvancedOrderDiscount, CartPromotion } from '@/lib/discountCalculations';
 import { calculateCartVATSummary } from '@/lib/vatCalculations';
@@ -7,6 +7,7 @@ import { usePromotions } from './usePromotions';
 import { useGuestSession } from './useGuestSession';
 import { useCustomerAuth } from './useCustomerAuth';
 import { useToast } from '@/hooks/use-toast';
+import { CartContext } from '@/contexts/CartContext';
 
 export interface CartItem {
   id: string;
@@ -50,7 +51,7 @@ export interface Cart {
   promotion_code?: string;
 }
 
-export const useCart = () => {
+export const useCartInternal = () => {
   const { data: promotions = [] } = usePromotions();
   const { guestSession, generateGuestSession } = useGuestSession();
   const { customerAccount } = useCustomerAuth();
@@ -367,4 +368,13 @@ export const useCart = () => {
     getItemCount,
     isEmpty
   };
+};
+
+// Context consumer hook to ensure a single cart instance app-wide
+export const useCart = () => {
+  const ctx = useContext(CartContext);
+  if (!ctx) {
+    throw new Error('useCart must be used within CartProvider');
+  }
+  return ctx;
 };

@@ -23,6 +23,7 @@ import { OnlineStatusBanner } from "./components/network/OnlineStatusBanner";
 import { DeploymentInfo } from "./components/common/DeploymentInfo";
 import { NotificationIntegration } from "@/components/notifications/NotificationIntegration";
 import AdminLayout from "./components/layout/AdminLayout";
+import { CartProvider } from "@/contexts/CartProvider";
 
 // Initialize payment monitoring and cache busting
 initPaymentMonitoring();
@@ -197,6 +198,7 @@ const App = () => {
            <NotificationProvider>
              <NotificationIntegration />
              <AuthProvider>
+             <CartProvider>
             <BrowserRouter>
             <Routes>
               {/* Customer store at root */}
@@ -280,6 +282,7 @@ const App = () => {
               <Route path="*" element={<NotFound />} />
             </Routes>
             </BrowserRouter>
+            </CartProvider>
           </AuthProvider>
         </NotificationProvider>
         </NetworkProvider>

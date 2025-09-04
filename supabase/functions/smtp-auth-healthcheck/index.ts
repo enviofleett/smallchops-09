@@ -29,33 +29,45 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
   const secretFromEmail = Deno.env.get('SMTP_FROM_EMAIL');
 
   if (secretHost && secretUsername && secretPassword) {
-    console.log('✅ Using production SMTP configuration from Function Secrets');
+    console.log('📧 Using Function Secrets configuration (Production)');
     
-    // Parse port with robust fallback
-    let port = 587; // Default port
-    if (secretPort) {
-      const parsedPort = parseInt(secretPort.trim(), 10);
-      if (!isNaN(parsedPort) && parsedPort > 0 && parsedPort <= 65535) {
-        port = parsedPort;
-      } else {
-        console.warn(`⚠️ Invalid SMTP_PORT value: "${secretPort}", using default 587`);
+    const port = secretPort ? parseInt(secretPort.trim(), 10) : 587;
+    const normalizedPassword = secretPassword.replace(/\s+/g, '').trim();
+    const normalizedUsername = secretUsername.trim();
+    
+    // Gmail-specific validation
+    if (secretHost.includes('gmail.com') && port === 587) {
+      if (!normalizedUsername.includes('@')) {
+        throw new Error('Gmail SMTP requires full email address as username');
+      }
+      if (normalizedPassword.length !== 16) {
+        throw new Error('Gmail requires a 16-character App Password. Generate one at https://myaccount.google.com/apppasswords');
       }
     }
     
     return {
       host: secretHost.trim(),
       port: port,
-      username: secretUsername.trim(),
-      password: secretPassword.trim(),
-      senderEmail: (secretFromEmail || secretUsername).trim(),
+      username: normalizedUsername,
+      password: normalizedPassword,
+      senderEmail: (secretFromEmail || normalizedUsername).trim(),
       senderName: (secretFromName || 'System').trim(),
       encryption: secretEncryption?.trim() || 'TLS',
       source: 'function_secrets'
     };
   }
 
-  // Priority 2: Database fallback (Testing/Development)
-  console.log('⚠️ Function Secrets not configured, falling back to database');
+  // Production safety check
+  const isProduction = Deno.env.get('ENVIRONMENT') === 'production' || 
+                      Deno.env.get('SUPABASE_URL')?.includes('supabase.co');
+  
+  if (isProduction) {
+    throw new Error('Production environment requires SMTP configuration via Function Secrets');
+  }
+
+  // Priority 2: Database Configuration (Development Fallback)
+  console.log('📧 Falling back to database configuration (development mode)');
+  
   const { data: config } = await supabase
     .from('communication_settings')
     .select('*')
@@ -64,23 +76,37 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
     .maybeSingle();
 
   if (!config?.use_smtp) {
-    throw new Error('SMTP not configured - neither Function Secrets nor database config available');
+    throw new Error('SMTP configuration not found in Function Secrets or database');
   }
 
-  if (!config.smtp_host || !config.smtp_user || !config.smtp_pass) {
+  if (!config.smtp_host || !config.smtp_user) {
     const missing = [];
     if (!config.smtp_host) missing.push('host');
     if (!config.smtp_user) missing.push('username');
-    if (!config.smtp_pass) missing.push('password');
-    throw new Error(`Incomplete database SMTP configuration: missing ${missing.join(', ')}`);
+    throw new Error(`Incomplete SMTP configuration in database: missing ${missing.join(', ')}`);
   }
+
+  const normalizedPassword = (config.smtp_pass || '').toString().replace(/\s+/g, '').trim();
+  const normalizedUsername = config.smtp_user.trim();
+
+  // Gmail-specific validation for database config
+  if (config.smtp_host?.includes('gmail.com') && (config.smtp_port || 587) === 587) {
+    if (!normalizedUsername.includes('@')) {
+      throw new Error('Gmail SMTP requires full email address as username');
+    }
+    if (normalizedPassword.length !== 16 && normalizedPassword.length > 0) {
+      throw new Error('Gmail requires a 16-character App Password. Generate one at https://myaccount.google.com/apppasswords');
+    }
+  }
+
+  console.log('📧 Database configuration loaded');
 
   return {
     host: config.smtp_host.trim(),
     port: config.smtp_port || 587,
-    username: config.smtp_user.trim(),
-    password: config.smtp_pass.trim(),
-    senderEmail: (config.sender_email || config.smtp_user).trim(),
+    username: normalizedUsername,
+    password: normalizedPassword,
+    senderEmail: (config.sender_email || normalizedUsername).trim(),
     senderName: (config.sender_name || 'System').trim(),
     encryption: 'TLS',
     source: 'database'

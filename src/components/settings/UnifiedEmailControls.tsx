@@ -14,13 +14,23 @@ export const UnifiedEmailControls = () => {
   const [testEmail, setTestEmail] = useState('');
   const [isTestingConnection, setIsTestingConnection] = useState(false);
   const [isProcessingQueue, setIsProcessingQueue] = useState(false);
-  const [connectionStatus, setConnectionStatus] = useState<'success' | 'error' | null>(null);
+  const [connectionStatus, setConnectionStatus] = useState<{
+    isConnected: boolean;
+    provider?: string;
+    source?: string;
+    message?: string;
+    lastChecked?: Date;
+  }>({
+    isConnected: false
+  });
 
   const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
 
   const testSMTPAuthentication = async () => {
     setIsTestingConnection(true);
-    setConnectionStatus(null);
+    setConnectionStatus({
+      isConnected: false
+    });
     setHealthCheckResult(null);
 
     try {
@@ -33,7 +43,11 @@ export const UnifiedEmailControls = () => {
       // Handle Supabase function errors (network/invocation issues)
       if (error) {
         console.error('❌ Function invocation error:', error);
-        setConnectionStatus('error');
+        setConnectionStatus({
+          isConnected: false,
+          message: error.message,
+          lastChecked: new Date()
+        });
         setHealthCheckResult({ success: false, error: error.message });
         toast.error('❌ Health check failed', {
           description: error.message || 'Failed to connect to health check service'
@@ -44,26 +58,39 @@ export const UnifiedEmailControls = () => {
       console.log('📊 Health check result:', data);
       setHealthCheckResult(data);
 
-      if (data.success) {
-        setConnectionStatus('success');
-        toast.success(
-          '✅ Production SMTP Authentication Successful!',
-          {
-            description: `Connected to ${data.provider.host}:${data.provider.port} using ${data.auth.method} with ${data.auth.tlsMode} encryption in ${data.timing.totalMs}ms`
-          }
-        );
+      if (data.success && data.connection_healthy) {
+        setConnectionStatus({
+          isConnected: true,
+          provider: data.provider,
+          source: data.source,
+          message: data.message,
+          lastChecked: new Date()
+        });
+        
+        const sourceLabel = data.source === 'function_secrets' ? 'Function Secrets (Production)' : 'Database (Development)';
+        toast.success('SMTP Connection Verified', {
+          description: `Successfully connected to ${data.provider} via ${sourceLabel}`,
+        });
       } else {
-        setConnectionStatus('error');
-        toast.error(
-          `❌ SMTP Authentication Failed${data.category ? ` (${data.category})` : ''}`,
-          {
-            description: data.suggestion || data.error || 'Unknown authentication error'
-          }
-        );
+        setConnectionStatus({
+          isConnected: false,
+          provider: data.provider,
+          source: data.source,
+          message: data.error || data.message,
+          lastChecked: new Date()
+        });
+        
+        toast.error('SMTP Connection Failed', {
+          description: data.troubleshooting || data.error || "Failed to establish SMTP connection"
+        });
       }
     } catch (error: any) {
       console.error('❌ Unexpected health check error:', error);
-      setConnectionStatus('error');
+      setConnectionStatus({
+        isConnected: false,
+        message: error.message,
+        lastChecked: new Date()
+      });
       setHealthCheckResult({ success: false, error: error.message });
       toast.error('❌ Unexpected error during health check', {
         description: error.message
@@ -183,21 +210,33 @@ export const UnifiedEmailControls = () => {
               {isTestingConnection ? 'Checking Authentication...' : 'Check SMTP Authentication'}
             </Button>
 
-            {connectionStatus && (
-              <Alert className={connectionStatus === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
-                {connectionStatus === 'success' 
+            {connectionStatus.lastChecked && (
+              <Alert className={connectionStatus.isConnected ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+                {connectionStatus.isConnected 
                   ? <CheckCircle className="h-4 w-4 text-green-600" />
                   : <AlertTriangle className="h-4 w-4 text-red-600" />
                 }
-                <AlertDescription className={connectionStatus === 'success' ? 'text-green-800' : 'text-red-800'}>
-                  {connectionStatus === 'success' 
-                    ? 'Production SMTP authentication successful! System is ready.' 
-                    : 'Authentication failed. Check SMTP credentials.'}
+                <AlertDescription className={connectionStatus.isConnected ? 'text-green-800' : 'text-red-800'}>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      {connectionStatus.isConnected 
+                        ? 'Production SMTP authentication successful! System is ready.' 
+                        : connectionStatus.message || 'Authentication failed. Check SMTP credentials.'}
+                    </div>
+                    {connectionStatus.provider && connectionStatus.source && (
+                      <div className="flex items-center gap-2">
+                        <Badge variant={connectionStatus.source === 'function_secrets' ? "default" : "secondary"}>
+                          {connectionStatus.source === 'function_secrets' ? 'Production' : 'Development'}
+                        </Badge>
+                        <span className="text-xs">{connectionStatus.provider}</span>
+                      </div>
+                    )}
+                  </div>
                 </AlertDescription>
               </Alert>
             )}
 
-            {healthCheckResult && connectionStatus === 'success' && (
+            {healthCheckResult && connectionStatus.isConnected && (
               <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
                 <h4 className="font-semibold text-green-900 mb-2">✅ Production Readiness Confirmed</h4>
                 <div className="text-sm text-green-800 space-y-1">
@@ -210,7 +249,7 @@ export const UnifiedEmailControls = () => {
             )}
 
             {/* Optional: Send actual test email */}
-            {connectionStatus === 'success' && (
+            {connectionStatus.isConnected && (
               <div className="mt-4 pt-4 border-t">
                 <div className="space-y-2">
                   <Label htmlFor="test-email">Send Test Email (Optional)</Label>

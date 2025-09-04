@@ -210,8 +210,9 @@ Never use placeholder, test, or hashed values in production.
     };
   }
 
-  // Priority 2: Database fallback (Testing/Development)
-  console.log('⚠️ Function Secrets not configured, falling back to database');
+  // Database Configuration (Development Fallback Only)
+  console.log('📧 Falling back to database SMTP configuration (development mode)');
+  
   const { data: config } = await supabase
     .from('communication_settings')
     .select('*')
@@ -220,23 +221,42 @@ Never use placeholder, test, or hashed values in production.
     .maybeSingle();
 
   if (!config?.use_smtp) {
-    throw new Error('SMTP not configured - neither Function Secrets nor database config available');
+    throw new Error('No SMTP configuration found in Function Secrets or database. For production, configure Function Secrets.');
   }
 
-  if (!config.smtp_host || !config.smtp_user || !config.smtp_pass) {
+  if (!config.smtp_host || !config.smtp_user) {
     const missing = [];
     if (!config.smtp_host) missing.push('host');
     if (!config.smtp_user) missing.push('username');
-    if (!config.smtp_pass) missing.push('password');
     throw new Error(`Incomplete database SMTP configuration: missing ${missing.join(', ')}`);
+  }
+
+  console.log('📧 Database config loaded:', maskSMTPConfig({
+    host: config.smtp_host,
+    port: config.smtp_port,
+    user: config.smtp_user,
+    encryption: 'TLS'
+  }));
+
+  const normalizedPassword = (config.smtp_pass || '').toString().replace(/\s+/g, '').trim();
+  const normalizedUsername = config.smtp_user.trim();
+
+  // Gmail-specific validation for database config too
+  if (config.smtp_host?.includes('gmail.com') && (config.smtp_port || 587) === 587) {
+    if (!normalizedUsername.includes('@')) {
+      throw new Error('Gmail SMTP requires full email address as username');
+    }
+    if (normalizedPassword.length !== 16 && normalizedPassword.length > 0) {
+      throw new Error('Gmail requires a 16-character App Password. Generate one at https://myaccount.google.com/apppasswords');
+    }
   }
 
   return {
     host: config.smtp_host.trim(),
     port: config.smtp_port || 587,
-    username: config.smtp_user.trim(),
-    password: (config.smtp_pass || '').toString().replace(/\s+/g, '').trim(),
-    senderEmail: (config.sender_email || config.smtp_user).trim(),
+    username: normalizedUsername,
+    password: normalizedPassword,
+    senderEmail: (config.sender_email || normalizedUsername).trim(),
     senderName: (config.sender_name || 'System').trim(),
     encryption: 'TLS',
     source: 'database'
@@ -1022,13 +1042,46 @@ serve(async (req: Request) => {
         };
 
         console.log('✅ SMTP health check passed');
+        
+        return new Response(JSON.stringify({
+          success: true,
+          message: 'SMTP health check completed successfully',
+          smtp_configured: true,
+          connection_healthy: connectionHealthy,
+          provider: smtpConfig.host,
+          source: smtpConfig.source,
+          ...healthData
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200
+        });
       } catch (error) {
         console.error('❌ SMTP health check failed:', error.message);
-        healthData.smtpCheck = { 
-          configured: false, 
-          error: error.message,
-          connection_healthy: false
-        };
+        
+        // Enhanced error handling with actionable guidance
+        let errorMessage = 'SMTP configuration failed';
+        let troubleshooting = '';
+        
+        if (error.message.includes('Gmail requires a 16-character App Password')) {
+          troubleshooting = 'Gmail requires an App Password (not your regular password). Enable 2-Step Verification and generate an App Password at https://myaccount.google.com/apppasswords';
+        } else if (error.message.includes('Function Secrets')) {
+          troubleshooting = 'Configure SMTP credentials in Supabase Function Secrets for production use';
+        } else {
+          troubleshooting = 'Check your SMTP configuration and credentials';
+        }
+        
+        return new Response(JSON.stringify({
+          success: false,
+          error: errorMessage,
+          details: error.message,
+          troubleshooting: troubleshooting,
+          smtp_configured: false,
+          connection_healthy: false,
+          ...healthData
+        }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        });
       }
 
       return new Response(JSON.stringify(healthData), {

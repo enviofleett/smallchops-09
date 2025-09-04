@@ -27,6 +27,8 @@ import { useCheckoutStateRecovery } from "@/utils/checkoutStateManager";
 import { safeErrorMessage, normalizePaymentResponse } from '@/utils/errorHandling';
 import { validatePaymentFlow, formatDiagnosticResults } from '@/utils/paymentDiagnostics';
 import { cn } from "@/lib/utils";
+import { useEnhancedMOQValidation } from '@/hooks/useEnhancedMOQValidation';
+import { MOQAdjustmentModal } from '@/components/cart/MOQAdjustmentModal';
 
 import {
   Dialog,
@@ -171,6 +173,11 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   const [deliveryZone, setDeliveryZone] = useState<any>(null);
   const [pickupPoint, setPickupPoint] = useState<any>(null);
   const [lastPaymentError, setLastPaymentError] = useState<string | null>(null);
+  const [showMOQModal, setShowMOQModal] = useState(false);
+  const [moqValidationResult, setMoqValidationResult] = useState<any>(null);
+
+  // Initialize MOQ validation
+  const { validateMOQWithPricing, autoAdjustQuantities } = useEnhancedMOQValidation();
 
   // Initialize checkout state recovery
   const { 
@@ -340,7 +347,29 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
       setIsSubmitting(true);
       setLastPaymentError(null);
 
-      // Validate required fields before processing
+      // Validate MOQ requirements before processing
+      console.log('🔍 Validating MOQ requirements for cart:', items);
+      const moqValidation = await validateMOQWithPricing(items);
+      
+      if (!moqValidation.isValid && moqValidation.violations.length > 0) {
+        console.log('❌ MOQ validation failed:', moqValidation.violations);
+        
+        // Try to auto-adjust quantities
+        const adjustmentResult = await autoAdjustQuantities(items);
+        
+        if (adjustmentResult.adjustmentsMade.length > 0) {
+          // Show adjustment modal
+          setMoqValidationResult(adjustmentResult);
+          setShowMOQModal(true);
+          setIsSubmitting(false);
+          return;
+        } else {
+          // Cannot auto-adjust, show error
+          throw new Error(`MOQ requirements not met: ${moqValidation.violations[0].productName} requires minimum ${moqValidation.violations[0].minimumRequired} items`);
+        }
+      }
+
+      // Validate required fields after MOQ check
       if (!formData.customer_email?.trim()) {
         throw new Error('Customer email is required');
       }
@@ -921,191 +950,211 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   );
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleClose}>
-      <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden overscroll-contain p-0">
-        {/* Mobile Header */}
-        <div className="flex md:hidden items-center justify-between p-3 border-b bg-background flex-shrink-0">
-          <div className="flex items-center gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={onClose}
-              className="h-8 w-8 p-0"
-            >
-              <X className="h-4 w-4" />
-            </Button>
-            <h2 className="text-base font-semibold">
-              {checkoutStep === 'auth' && 'Complete Order'}
-              {checkoutStep === 'details' && 'Checkout'}
-              {checkoutStep === 'payment' && 'Payment'}
-            </h2>
-          </div>
-        </div>
-
-        {/* Mobile Order Summary */}
-        <div className="md:hidden flex-shrink-0">
-          <OrderSummaryCard
-            items={items}
-            subtotal={subtotal}
-            deliveryFee={deliveryFee}
-            total={total}
-            collapsibleOnMobile={true}
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0 overflow-hidden">
-          {/* Desktop Left Panel - Order Details */}
-          <div className="hidden lg:block lg:col-span-1 bg-muted/30 border-r overflow-y-auto">
-            <div className="p-6">
-              <div className="flex items-center gap-3 mb-6">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onClose}
-                  className="h-8 w-8 p-0"
-                >
-                  <X className="h-4 w-4" />
-                </Button>
-                <h2 className="text-lg font-semibold">Order Details</h2>
-              </div>
-              
-              <OrderSummaryCard
-                items={items}
-                subtotal={subtotal}
-                deliveryFee={deliveryFee}
-                total={total}
-                collapsibleOnMobile={false}
-                className="shadow-none border-0 bg-transparent"
-              />
+    <>
+      <Dialog open={isOpen} onOpenChange={handleClose}>
+        <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden overscroll-contain p-0">
+          {/* Mobile Header */}
+          <div className="flex md:hidden items-center justify-between p-3 border-b bg-background flex-shrink-0">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="h-8 w-8 p-0"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+              <h2 className="text-base font-semibold">
+                {checkoutStep === 'auth' && 'Complete Order'}
+                {checkoutStep === 'details' && 'Checkout'}
+                {checkoutStep === 'payment' && 'Payment'}
+              </h2>
             </div>
           </div>
 
-          {/* Main Content Panel */}
-          <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
-            {/* Desktop Header */}
-            <div className="hidden md:block flex-shrink-0">
-              <DialogHeader className="px-6 py-4 border-b">
-                <div className="flex items-center justify-between">
-                  <DialogTitle className="text-xl">
-                    {checkoutStep === 'auth' && 'Complete Your Order'}
-                    {checkoutStep === 'details' && 'Delivery Details'}
-                    {checkoutStep === 'payment' && 'Payment'}
-                  </DialogTitle>
-                  <DialogClose asChild>
-                    <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </DialogClose>
+          {/* Mobile Order Summary */}
+          <div className="md:hidden flex-shrink-0">
+            <OrderSummaryCard
+              items={items}
+              subtotal={subtotal}
+              deliveryFee={deliveryFee}
+              total={total}
+              collapsibleOnMobile={true}
+            />
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 flex-1 min-h-0 overflow-hidden">
+            {/* Desktop Left Panel - Order Details */}
+            <div className="hidden lg:block lg:col-span-1 bg-muted/30 border-r overflow-y-auto">
+              <div className="p-6">
+                <div className="flex items-center gap-3 mb-6">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={onClose}
+                    className="h-8 w-8 p-0"
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <h2 className="text-lg font-semibold">Order Details</h2>
                 </div>
-              </DialogHeader>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center py-12">
-                  <div className="space-y-4 text-center">
-                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-                    <p className="text-muted-foreground">Checking account...</p>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {checkoutStep === 'auth' && renderAuthStep()}
-                  {checkoutStep === 'details' && renderDetailsStep()}
-                  {checkoutStep === 'payment' && renderPaymentStep()}
-                </>
-              )}
-            </div>
-
-            {/* Sticky Bottom Action */}
-            {checkoutStep === 'details' && (
-              <div className="flex-shrink-0 p-3 md:p-6 border-t bg-background/80 backdrop-blur-sm">
-                {/* Terms and Conditions */}
-                {termsRequired && (
-                  <div className="mb-3 flex items-start gap-2">
-                    <input
-                      type="checkbox"
-                      id="terms-checkbox"
-                      checked={termsAccepted}
-                      onChange={(e) => setTermsAccepted(e.target.checked)}
-                      className="mt-1 h-4 w-4 accent-primary"
-                    />
-                    <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer">
-                      I agree to the{' '}
-                      <button
-                        type="button"
-                        onClick={() => setShowTermsDialog(true)}
-                        className="text-primary hover:underline font-medium"
-                      >
-                        Terms and Conditions
-                      </button>
-                    </Label>
-                  </div>
-                )}
-
-                <Button
-                  onClick={handleFormSubmit}
-                  disabled={!canProceedToDetails || isSubmitting || !isAuthenticated}
-                  className="w-full h-11 md:h-14 text-sm md:text-lg font-medium"
-                  size="lg"
-                >
-                  {isSubmitting ? (
-                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                  ) : !isAuthenticated ? (
-                    "Please log in to continue"
-                  ) : (
-                    `Proceed to Payment • ₦${total.toLocaleString()}`
-                  )}
-                </Button>
                 
-                {lastPaymentError && (
-                  <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                    <p className="text-sm text-destructive">{lastPaymentError}</p>
+                <OrderSummaryCard
+                  items={items}
+                  subtotal={subtotal}
+                  deliveryFee={deliveryFee}
+                  total={total}
+                  collapsibleOnMobile={false}
+                  className="shadow-none border-0 bg-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Main Content Panel */}
+            <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
+              {/* Desktop Header */}
+              <div className="hidden md:block flex-shrink-0">
+                <DialogHeader className="px-6 py-4 border-b">
+                  <div className="flex items-center justify-between">
+                    <DialogTitle className="text-xl">
+                      {checkoutStep === 'auth' && 'Complete Your Order'}
+                      {checkoutStep === 'details' && 'Delivery Details'}
+                      {checkoutStep === 'payment' && 'Payment'}
+                    </DialogTitle>
+                    <DialogClose asChild>
+                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </DialogClose>
                   </div>
+                </DialogHeader>
+              </div>
+
+              <div className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-6">
+                {isLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="space-y-4 text-center">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                      <p className="text-muted-foreground">Checking account...</p>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {checkoutStep === 'auth' && renderAuthStep()}
+                    {checkoutStep === 'details' && renderDetailsStep()}
+                    {checkoutStep === 'payment' && renderPaymentStep()}
+                  </>
                 )}
               </div>
-            )}
-          </div>
-        </div>
 
-        {/* Terms and Conditions Dialog */}
-        <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
-          <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <FileText className="w-5 h-5" />
-                Terms and Conditions
-              </DialogTitle>
-            </DialogHeader>
-            <div className="prose prose-sm max-w-none">
-              {termsContent ? (
-                <SafeHtml className="prose prose-sm max-w-none">
-                  {termsContent}
-                </SafeHtml>
-              ) : (
-                <p>Terms and conditions content is being loaded...</p>
+              {/* Sticky Bottom Action */}
+              {checkoutStep === 'details' && (
+                <div className="flex-shrink-0 p-3 md:p-6 border-t bg-background/80 backdrop-blur-sm">
+                  {/* Terms and Conditions */}
+                  {termsRequired && (
+                    <div className="mb-3 flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        id="terms-checkbox"
+                        checked={termsAccepted}
+                        onChange={(e) => setTermsAccepted(e.target.checked)}
+                        className="mt-1 h-4 w-4 accent-primary"
+                      />
+                      <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer">
+                        I agree to the{' '}
+                        <button
+                          type="button"
+                          onClick={() => setShowTermsDialog(true)}
+                          className="text-primary hover:underline font-medium"
+                        >
+                          Terms and Conditions
+                        </button>
+                      </Label>
+                    </div>
+                  )}
+
+                  <Button
+                    onClick={handleFormSubmit}
+                    disabled={!canProceedToDetails || isSubmitting || !isAuthenticated}
+                    className="w-full h-11 md:h-14 text-sm md:text-lg font-medium"
+                    size="lg"
+                  >
+                    {isSubmitting ? (
+                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                    ) : !isAuthenticated ? (
+                      "Please log in to continue"
+                    ) : (
+                      `Proceed to Payment • ₦${total.toLocaleString()}`
+                    )}
+                  </Button>
+                  
+                  {lastPaymentError && (
+                    <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
+                      <p className="text-sm text-destructive">{lastPaymentError}</p>
+                    </div>
+                  )}
+                </div>
               )}
             </div>
-            <div className="flex justify-end gap-2 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => setShowTermsDialog(false)}
-              >
-                Close
-              </Button>
-              <Button
-                onClick={() => {
-                  setTermsAccepted(true);
-                  setShowTermsDialog(false);
-                }}
-              >
-                I Agree
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </DialogContent>
-    </Dialog>
+          </div>
+
+          {/* Terms and Conditions Dialog */}
+          <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
+            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <FileText className="w-5 h-5" />
+                  Terms and Conditions
+                </DialogTitle>
+              </DialogHeader>
+              <div className="prose prose-sm max-w-none">
+                {termsContent ? (
+                  <SafeHtml className="prose prose-sm max-w-none">
+                    {termsContent}
+                  </SafeHtml>
+                ) : (
+                  <p>Terms and conditions content is being loaded...</p>
+                )}
+              </div>
+              <div className="flex justify-end gap-2 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowTermsDialog(false)}
+                >
+                  Close
+                </Button>
+                <Button
+                  onClick={() => {
+                    setTermsAccepted(true);
+                    setShowTermsDialog(false);
+                  }}
+                >
+                  I Agree
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </DialogContent>
+      </Dialog>
+      
+      {/* MOQ Adjustment Modal */}
+      <MOQAdjustmentModal
+        isOpen={showMOQModal}
+        onClose={() => setShowMOQModal(false)}
+        onConfirm={async () => {
+          setShowMOQModal(false);
+          toast({
+            title: "Cart Updated",
+            description: "Quantities have been adjusted to meet minimum order requirements. Proceeding to payment.",
+          });
+          // Retry checkout after adjustment
+          await handleFormSubmit();
+        }}
+        onCancel={() => setShowMOQModal(false)}
+        adjustments={moqValidationResult?.adjustmentsMade || []}
+        pricingImpact={moqValidationResult?.pricingImpact}
+      />
+    </>
   );
 });
 

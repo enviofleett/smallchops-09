@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo, useCallback, useContext } from 'react';
 import { useCartTracking } from '@/hooks/useCartTracking';
 import { calculateAdvancedOrderDiscount, CartPromotion } from '@/lib/discountCalculations';
 import { calculateCartVATSummary } from '@/lib/vatCalculations';
-import { validatePromotionCode } from '@/api/productsWithDiscounts';
+import { validatePromotionCode } from '@/api/promotionValidation';
 import { usePromotions } from './usePromotions';
 import { useGuestSession } from './useGuestSession';
 import { useCustomerAuth } from './useCustomerAuth';
@@ -332,18 +332,47 @@ export const useCartInternal = () => {
     setCart(calculateCartSummary(cart.items, deliveryFee, cart.promotion_code));
   };
 
-  const applyPromotionCode = async (code: string): Promise<{ success: boolean; message: string }> => {
+  const applyPromotionCode = async (code: string): Promise<{ success: boolean; message: string; rate_limited?: boolean; attempts_remaining?: number }> => {
     try {
-      const validation = await validatePromotionCode(code, cart.summary.subtotal);
+      // Get customer info for validation
+      const customerInfo = {
+        email: customerAccount?.email,
+        id: customerAccount?.id
+      };
+
+      const validation = await validatePromotionCode(
+        code, 
+        cart.summary.subtotal,
+        customerInfo.email,
+        customerInfo.id,
+        cart.items
+      );
       
-      if (validation.valid) {
-        setCart(calculateCartSummary(cart.items, 0, code)); // No delivery fee in cart
-        return { success: true, message: 'Promotion code applied successfully!' };
+      if (validation.valid && validation.promotion) {
+        const newCart = calculateCartSummary(cart.items, 0, code);
+        setCart(newCart);
+        
+        return { 
+          success: true, 
+          message: validation.promotion.name ? 
+            `"${validation.promotion.name}" applied successfully!` : 
+            'Promotion code applied successfully!',
+          attempts_remaining: validation.attempts_remaining
+        };
       } else {
-        return { success: false, message: validation.error || 'Invalid promotion code' };
+        return { 
+          success: false, 
+          message: validation.error || 'Invalid promotion code',
+          rate_limited: validation.rate_limited,
+          attempts_remaining: validation.attempts_remaining
+        };
       }
     } catch (error) {
-      return { success: false, message: 'Failed to validate promotion code' };
+      console.error('Promotion code application error:', error);
+      return { 
+        success: false, 
+        message: 'Failed to validate promotion code. Please try again.' 
+      };
     }
   };
 

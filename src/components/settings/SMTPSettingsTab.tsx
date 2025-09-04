@@ -245,13 +245,79 @@ const testSMTPConnection = async () => {
   setConnectionStatus('idle');
   
   try {
+    const formData = form.getValues();
+    
     // Use health check instead of sending actual emails
-    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+    const { data: healthData, error: healthError } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
         healthcheck: true,
         check: 'smtp'
       }
     });
+
+    if (healthError) throw healthError;
+
+    if (healthData?.smtpCheck?.configured) {
+      setConnectionStatus('success');
+      toast({
+        title: "SMTP Connection Successful",
+        description: "Your SMTP configuration is working correctly",
+        variant: "default"
+      });
+      
+      setConnectionTestResult({
+        success: true,
+        message: `SMTP connection successful to ${formData.smtp_host}:${formData.smtp_port}`,
+        timestamp: new Date().toLocaleString()
+      });
+    } else {
+      throw new Error(healthData?.message || 'SMTP configuration test failed');
+    }
+
+  } catch (error: any) {
+    console.error('SMTP connection test failed:', error);
+    setConnectionStatus('error');
+    
+    const errorMessage = error.message || 'Failed to test SMTP connection';
+    toast({
+      title: "SMTP Connection Failed",
+      description: errorMessage,
+      variant: "destructive"
+    });
+
+    const formData = form.getValues();
+    
+    // Try to provide helpful error message based on form data
+    const { data: testData, error: testError } = await supabase.functions.invoke('unified-smtp-sender', {
+      body: {
+        healthcheck: true,
+        testConfig: {
+          host: formData.smtp_host,
+          port: formData.smtp_port,
+          user: formData.smtp_user,
+          pass: formData.smtp_pass,
+          secure: formData.smtp_secure,
+          from_email: formData.sender_email || formData.smtp_user,
+          from_name: formData.sender_name || 'Test Sender'
+        }
+      }
+    });
+    
+    setConnectionTestResult({
+      success: false,
+      message: errorMessage,
+      timestamp: new Date().toLocaleString(),
+      details: {
+        host: formData.smtp_host,
+        port: formData.smtp_port,
+        secure: formData.smtp_secure,
+        error: errorMessage
+      }
+    });
+  } finally {
+    setTestingConnection(false);
+  }
+};
     
     // Enhanced validation
     const validationError = validateSMTPCredentials(formData);

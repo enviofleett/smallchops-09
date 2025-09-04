@@ -135,17 +135,48 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
   }, [calendarDate, availableSlots]);
   const loadAvailableSlots = useCallback(async () => {
     try {
-      console.log('📋 Loading delivery slots...');
+      console.log('📋 Loading delivery slots with new production API...');
       setLoading(true);
       setError(null);
+      
       // Use the new 6-month range instead of 30 days
-      const endDate = addMonths(new Date(), DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS);
-      console.log('🕐 Getting slots from service for 6-month range...');
-      const slots = await deliverySchedulingService.getAvailableDeliverySlots(new Date(), endDate);
-      console.log('✅ Delivery slots loaded:', slots.length);
-      setAvailableSlots(slots);
-      if (slots.length === 0) {
-        setError('No delivery slots available. Please contact support.');
+      const startDate = dateValidation.minDate;
+      const endDate = dateValidation.maxDate;
+      
+      console.log('🕐 Getting slots from production API for 6-month range:', {
+        start: format(startDate, 'yyyy-MM-dd'),
+        end: format(endDate, 'yyyy-MM-dd')
+      });
+      
+      // Use the new production delivery booking API
+      const { deliveryBookingAPI } = await import('@/api/deliveryBookingApi');
+      
+      const response = await deliveryBookingAPI.getAvailableSlots({
+        start_date: deliveryBookingAPI.formatDateForAPI(startDate),
+        end_date: deliveryBookingAPI.formatDateForAPI(endDate)
+      });
+      
+      console.log('✅ Production delivery slots loaded:', response.slots.length);
+      console.log('📊 Business days available:', response.business_days, 'of', response.total_days, 'total days');
+      
+      // Convert the new API format to existing format for compatibility
+      const convertedSlots: DeliverySlot[] = response.slots.map(slot => ({
+        date: slot.date,
+        is_business_day: slot.is_business_day,
+        is_holiday: slot.is_holiday,
+        holiday_name: slot.holiday_name,
+        time_slots: slot.time_slots.map(timeSlot => ({
+          start_time: timeSlot.start_time,
+          end_time: timeSlot.end_time,
+          available: timeSlot.available,
+          reason: timeSlot.reason
+        }))
+      }));
+      
+      setAvailableSlots(convertedSlots);
+      
+      if (convertedSlots.length === 0) {
+        setError('No delivery slots available for the next 6 months. Please contact support.');
       }
     } catch (err) {
       console.error('❌ Failed to load delivery slots:', err);
@@ -154,7 +185,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [dateValidation]);
 
   // Legacy date modifier functions for existing slot data
   const getDateModifiers = (date: Date) => {

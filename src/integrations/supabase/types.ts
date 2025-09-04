@@ -8434,6 +8434,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      clear_production_data: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       confirm_payment_atomic: {
         Args: {
           p_amount: number

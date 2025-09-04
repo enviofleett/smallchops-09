@@ -39,7 +39,7 @@ export const ProductMOQIndicator = ({
 
   return (
     <div className={cn(
-      "rounded-md border bg-card p-3 w-full",
+      "rounded-md border bg-card p-3 w-[70%]",
       "border-l-4",
       {
         "border-l-green-500 bg-green-50/30 border-green-200": statusColor === 'success',

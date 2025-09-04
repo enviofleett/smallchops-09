@@ -72,6 +72,7 @@ const PaystackTestingDashboard = withLazyLoading(() => import("./pages/PaystackT
 const AuthCallback = withLazyLoading(() => import("./pages/AuthCallback"), undefined, true, 8000);
 const EmailVerificationPage = withLazyLoading(() => import("./pages/EmailVerificationPage"), undefined, true, 8000);
 const PasswordResetPage = withLazyLoading(() => import("./pages/PasswordResetPage"), undefined, true, 8000);
+const Cart = withLazyLoading(() => import("./pages/Cart"), undefined, true, 10000);
 const OrderDetails = withLazyLoading(() => import("./pages/OrderDetails"), undefined, false, 10000);
 const TrackOrder = withLazyLoading(() => import("./pages/TrackOrder"), undefined, true, 10000);
 const EmergencyPaymentFix = withLazyLoading(() => import("./components/admin/EmergencyPaymentFix").then(m => ({ default: m.default })), undefined, false, 15000);

@@ -8569,6 +8569,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      execute_go_live_cleanup: {
+        Args: Record<PropertyKey, never>
+        Returns: Json
+      }
       find_or_create_customer: {
         Args: {
           p_email: string

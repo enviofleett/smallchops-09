@@ -23,6 +23,9 @@ enable_phone_autoconfirm = false
 [functions.email-service-core]
 verify_jwt = true
 
+[functions.smtp-email-service]
+verify_jwt = true
+
 [functions.unified-smtp-sender]
 verify_jwt = true
 

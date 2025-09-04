@@ -11,7 +11,7 @@ export const OrderStats = () => {
     queryKey: ['order-stats'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('orders_view')
+        .from('orders')
         .select('status, created_at, total_amount')
         .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
       

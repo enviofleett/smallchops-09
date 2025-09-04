@@ -78,7 +78,7 @@ export const getOrders = async ({
     const to = from + pageSize - 1;
 
     let query = supabase
-      .from('orders_view')
+      .from('orders')
       .select(`*, 
         order_items (*),
         order_delivery_schedule (*)
@@ -106,7 +106,7 @@ export const getOrders = async ({
       }
       
       let fallbackQuery = supabase
-        .from('orders_view')
+        .from('orders')
         .select(`*, order_items (*), order_delivery_schedule (*)`, { count: 'exact' });
 
       if (status !== 'all') {

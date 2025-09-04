@@ -39,12 +39,32 @@ export const EmailTemplateHealthCard: React.FC = () => {
   const loadHealthData = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('email_template_health')
-        .select('*')
-        .single();
+      // Get email template health data from enhanced_email_templates
+      const { data: templates, error } = await supabase
+        .from('enhanced_email_templates')
+        .select('template_key, template_name, is_active, template_type, updated_at');
 
       if (error) throw error;
+
+      // Calculate health metrics
+      const total_templates = templates?.length || 0;
+      const active_templates = templates?.filter(t => t.is_active).length || 0;
+      const transactional_count = templates?.filter(t => t.template_type === 'transactional').length || 0;
+      const marketing_count = templates?.filter(t => t.template_type === 'marketing').length || 0;
+      
+      // Calculate stale templates (updated more than 30 days ago)
+      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+      const stale_templates = templates?.filter(t => new Date(t.updated_at) < thirtyDaysAgo).length || 0;
+      
+      const data = {
+        total_templates,
+        active_templates,
+        transactional_count,
+        marketing_count,
+        stale_templates,
+        last_updated: new Date().toISOString()
+      };
+
       setHealthData(data);
     } catch (error: any) {
       console.error('Failed to load template health data:', error);

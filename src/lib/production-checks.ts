@@ -20,8 +20,8 @@ export class ProductionValidator {
     const checks: ProductionCheck[] = [];
 
     try {
-      // Test database connection with orders_view
-      const { data, error } = await supabase.from('orders_view').select('id').limit(1);
+      // Test database connection with orders
+      const { data, error } = await supabase.from('orders').select('id').limit(1);
       
       if (error) {
         checks.push({
@@ -108,7 +108,7 @@ export class ProductionValidator {
 
     try {
       // Test order management components
-      const { data, error } = await supabase.from('orders_view').select('id').limit(1);
+      const { data, error } = await supabase.from('orders').select('id').limit(1);
       
       if (error) {
         checks.push({

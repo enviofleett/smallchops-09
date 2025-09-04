@@ -99,19 +99,6 @@ const PublicHeaderContent = () => {
 
           {/* Right Actions - Mobile optimized */}
           <div className="flex items-center space-x-2 sm:space-x-4">
-            {/* Track Order - For authenticated users */}
-            {isAuthenticated && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden md:flex"
-                onClick={() => navigate('/track-order')}
-                title="Track Order"
-              >
-                <MapPin className="h-5 w-5" />
-              </Button>
-            )}
-
             {/* Favorites - Hidden on small mobile */}
             <Button
               variant="ghost"

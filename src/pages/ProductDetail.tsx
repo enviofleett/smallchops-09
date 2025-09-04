@@ -36,6 +36,7 @@ import { DiscountBadge } from '@/components/ui/discount-badge';
 import { ProductWithDiscount, formatCurrency } from '@/lib/discountCalculations';
 import { sanitizeHtml } from '@/utils/htmlSanitizer';
 import { SkeletonLoader } from '@/components/ui/SkeletonLoader';
+import { ProductMOQIndicator } from '@/components/products/ProductMOQIndicator';
 
 // Remove the mock Review interface since we're using the real one from API
 
@@ -361,6 +362,17 @@ const ProductDetail = () => {
                   ))}
                 </ul>
               </div>
+            )}
+
+            {/* MOQ Requirements */}
+            {product.minimum_order_quantity && product.minimum_order_quantity > 1 && (
+              <ProductMOQIndicator
+                minimumOrderQuantity={product.minimum_order_quantity}
+                price={product.discounted_price || product.price}
+                stockQuantity={product.stock_quantity}
+                variant="detailed"
+                showDetailedInfo={true}
+              />
             )}
 
             {/* Quantity and Add to Cart */}

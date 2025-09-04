@@ -201,7 +201,8 @@ Never use placeholder, test, or hashed values in production.
       host: secretHost.trim(),
       port: port,
       username: secretUsername.trim(),
-      password: secretPassword.trim(),
+      // Normalize password: remove spaces that are sometimes copied from UI (e.g., Gmail App Passwords)
+      password: secretPassword.replace(/\s+/g, '').trim(),
       senderEmail: (secretFromEmail || secretUsername).trim(),
       senderName: (secretFromName || 'System').trim(),
       encryption: secretEncryption?.trim() || 'TLS',
@@ -234,7 +235,7 @@ Never use placeholder, test, or hashed values in production.
     host: config.smtp_host.trim(),
     port: config.smtp_port || 587,
     username: config.smtp_user.trim(),
-    password: config.smtp_pass.trim(),
+    password: (config.smtp_pass || '').toString().replace(/\s+/g, '').trim(),
     senderEmail: (config.sender_email || config.smtp_user).trim(),
     senderName: (config.sender_name || 'System').trim(),
     encryption: 'TLS',

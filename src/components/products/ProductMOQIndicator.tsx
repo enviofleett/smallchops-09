@@ -39,93 +39,74 @@ export const ProductMOQIndicator = ({
 
   return (
     <div className={cn(
-      "rounded-lg border bg-card p-4 transition-all duration-200",
+      "rounded-md border bg-card p-3 w-full",
       "border-l-4",
       {
-        "border-l-green-500 bg-green-50/50 border-green-200": statusColor === 'success',
-        "border-l-amber-500 bg-amber-50/50 border-amber-200": statusColor === 'warning',
-        "border-l-red-500 bg-red-50/50 border-red-200": statusColor === 'destructive'
+        "border-l-green-500 bg-green-50/30 border-green-200": statusColor === 'success',
+        "border-l-amber-500 bg-amber-50/30 border-amber-200": statusColor === 'warning',
+        "border-l-red-500 bg-red-50/30 border-red-200": statusColor === 'destructive'
       },
       className
     )}>
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      {/* Compact Header with Status */}
+      <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <div className={cn(
-            "p-1.5 rounded-full",
+            "p-1 rounded",
             {
-              "bg-green-100 text-green-700": statusColor === 'success',
-              "bg-amber-100 text-amber-700": statusColor === 'warning',
-              "bg-red-100 text-red-700": statusColor === 'destructive'
+              "bg-green-100 text-green-600": statusColor === 'success',
+              "bg-amber-100 text-amber-600": statusColor === 'warning',
+              "bg-red-100 text-red-600": statusColor === 'destructive'
             }
           )}>
-            <ShoppingCart className="h-3 w-3 sm:h-4 sm:w-4" />
+            <ShoppingCart className="h-3 w-3" />
           </div>
-          <span className="text-sm font-medium text-foreground">
-            Minimum Order
+          <span className="text-xs font-medium text-muted-foreground">
+            Min Order: {minimumOrderQuantity} units
           </span>
         </div>
         
-        <Badge 
-          variant="outline"
-          className={cn(
-            "font-medium",
-            {
-              "bg-green-100 text-green-700 border-green-300": statusColor === 'success',
-              "bg-amber-100 text-amber-700 border-amber-300": statusColor === 'warning',
-              "bg-red-100 text-red-700 border-red-300": statusColor === 'destructive'
-            }
-          )}
-        >
-          {minimumOrderQuantity} units
-        </Badge>
+        <span className="text-xs font-semibold text-foreground">
+          {formatCurrency(minimumCost)}
+        </span>
       </div>
 
-      {/* Content Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
-        <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">Minimum Cost</p>
-          <p className="text-sm font-semibold text-foreground">{formatCurrency(minimumCost)}</p>
-        </div>
-        
+      {/* Compact Status Bar */}
+      <div className="space-y-1.5">
         {currentCartQuantity > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">In Cart</p>
-            <p className={cn(
-              "text-sm font-semibold",
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-muted-foreground">In Cart:</span>
+            <span className={cn(
+              "font-medium",
               {
                 "text-green-600": statusColor === 'success',
-                "text-amber-600": statusColor === 'warning',
+                "text-amber-600": statusColor === 'warning', 
                 "text-red-600": statusColor === 'destructive'
               }
             )}>
-              {currentCartQuantity} / {minimumOrderQuantity} units
-            </p>
+              {currentCartQuantity} / {minimumOrderQuantity}
+            </span>
+          </div>
+        )}
+
+        {/* Single Status Message */}
+        {!isStockSufficient ? (
+          <div className="flex items-center gap-1.5 p-1.5 rounded bg-red-100 text-red-700 text-xs">
+            <AlertTriangle className="h-3 w-3 flex-shrink-0" />
+            <span>Insufficient stock</span>
+          </div>
+        ) : !isCurrentlyMet ? (
+          <div className="flex items-center justify-between p-1.5 rounded bg-amber-100 text-amber-700 text-xs">
+            <span>Need {shortfall} more</span>
+            <span className="font-medium">+{formatCurrency(shortfall * price)}</span>
+          </div>
+        ) : (
+          <div className="flex items-center gap-1.5 p-1.5 rounded bg-green-100 text-green-600 text-xs">
+            <div className="h-1.5 w-1.5 rounded-full bg-green-500"></div>
+            <span>Requirement met</span>
           </div>
         )}
       </div>
-
-      {/* Status Messages */}
-      {!isStockSufficient && (
-        <div className="flex items-center gap-2 p-2 rounded bg-red-100 text-red-800 text-xs">
-          <AlertTriangle className="h-3 w-3 flex-shrink-0" />
-          <span>Insufficient stock available</span>
-        </div>
-      )}
-      
-      {isStockSufficient && !isCurrentlyMet && (
-        <div className="flex items-center justify-between p-2 rounded bg-amber-100 text-amber-800 text-xs">
-          <span>Need {shortfall} more units to order</span>
-          <span className="font-medium">+{formatCurrency(shortfall * price)}</span>
-        </div>
-      )}
-      
-      {isCurrentlyMet && (
-        <div className="flex items-center gap-2 p-2 rounded bg-green-100 text-green-800 text-xs">
-          <div className="h-2 w-2 rounded-full bg-green-500"></div>
-          <span>Minimum quantity requirement met</span>
-        </div>
-      )}
     </div>
   );
 };

@@ -35,17 +35,32 @@ export const ProductionReadinessCheck: React.FC = () => {
         throw new Error(error.message);
       }
 
-      setResults(data);
+      // Handle both direct data and wrapped response
+      const responseData = data?.data || data;
       
-      if (data.overall_status === 'ready') {
+      if (!responseData || typeof responseData !== 'object') {
+        throw new Error('Invalid response format from health check');
+      }
+
+      setResults({
+        overall_status: responseData.overall_status || 'unknown',
+        score: responseData.score || 0,
+        checks: responseData.checks || [],
+        recommendations: responseData.recommendations || []
+      });
+      
+      const status = responseData.overall_status || 'unknown';
+      const score = responseData.score || 0;
+      
+      if (status === 'ready') {
         toast({
           title: "Production Ready! 🚀",
-          description: `System passed ${data.score}% of production readiness checks`,
+          description: `System passed ${score}% of production readiness checks`,
         });
       } else {
         toast({
           title: "Production Check Complete",
-          description: `Found issues that need attention (Score: ${data.score}%)`,
+          description: `Found issues that need attention (Score: ${score}%)`,
           variant: "destructive",
         });
       }
@@ -133,7 +148,7 @@ export const ProductionReadinessCheck: React.FC = () => {
                 <div className="flex items-center gap-2">
                   {getStatusIcon(results.overall_status)}
                   <span className="font-semibold">
-                    Production Status: {results.overall_status.toUpperCase()}
+                    Production Status: {results.overall_status?.toUpperCase() || 'UNKNOWN'}
                   </span>
                 </div>
                 <Badge variant="outline" className="ml-2">

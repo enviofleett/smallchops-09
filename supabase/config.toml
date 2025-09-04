@@ -97,6 +97,12 @@ verify_jwt = false
 [functions.production-health-check]
 verify_jwt = false
 
+[functions.production-environment-setup]
+verify_jwt = true
+
+[functions.enhanced-paystack-webhook]
+verify_jwt = false
+
 [functions.delivery-schedule-health]
 verify_jwt = false
 

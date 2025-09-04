@@ -2458,6 +2458,101 @@ export type Database = {
           },
         ]
       }
+      delivery_booking_analytics: {
+        Row: {
+          advance_booking_days: number
+          booking_date: string
+          booking_id: string
+          booking_time_slot: string
+          created_at: string | null
+          customer_id: string
+          id: string
+        }
+        Insert: {
+          advance_booking_days: number
+          booking_date: string
+          booking_id: string
+          booking_time_slot: string
+          created_at?: string | null
+          customer_id: string
+          id?: string
+        }
+        Update: {
+          advance_booking_days?: number
+          booking_date?: string
+          booking_id?: string
+          booking_time_slot?: string
+          created_at?: string | null
+          customer_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_booking_analytics_booking_id_fkey"
+            columns: ["booking_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_bookings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_bookings: {
+        Row: {
+          actual_arrival: string | null
+          contact_phone: string | null
+          created_at: string | null
+          customer_id: string
+          delivery_address: Json
+          delivery_date: string
+          delivery_notes: string | null
+          delivery_time_end: string
+          delivery_time_start: string
+          driver_id: string | null
+          estimated_arrival: string | null
+          id: string
+          order_id: string | null
+          special_instructions: string | null
+          status: string
+          updated_at: string | null
+        }
+        Insert: {
+          actual_arrival?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          customer_id: string
+          delivery_address: Json
+          delivery_date: string
+          delivery_notes?: string | null
+          delivery_time_end: string
+          delivery_time_start: string
+          driver_id?: string | null
+          estimated_arrival?: string | null
+          id?: string
+          order_id?: string | null
+          special_instructions?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Update: {
+          actual_arrival?: string | null
+          contact_phone?: string | null
+          created_at?: string | null
+          customer_id?: string
+          delivery_address?: Json
+          delivery_date?: string
+          delivery_notes?: string | null
+          delivery_time_end?: string
+          delivery_time_start?: string
+          driver_id?: string | null
+          estimated_arrival?: string | null
+          id?: string
+          order_id?: string | null
+          special_instructions?: string | null
+          status?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       delivery_fees: {
         Row: {
           base_fee: number
@@ -2515,6 +2610,36 @@ export type Database = {
           min_order_for_free_delivery?: number | null
           updated_at?: string | null
           zone_id?: string | null
+        }
+        Relationships: []
+      }
+      delivery_holidays: {
+        Row: {
+          created_at: string | null
+          date: string
+          description: string | null
+          id: string
+          is_recurring: boolean | null
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          date: string
+          description?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          date?: string
+          description?: string | null
+          id?: string
+          is_recurring?: boolean | null
+          name?: string
+          updated_at?: string | null
         }
         Relationships: []
       }

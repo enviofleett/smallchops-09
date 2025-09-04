@@ -952,19 +952,20 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
   return (
     <>
       <Dialog open={isOpen} onOpenChange={handleClose}>
-        <DialogContent className="max-w-5xl h-[95vh] md:h-[90vh] overflow-hidden overscroll-contain p-0">
-          {/* Mobile Header */}
-          <div className="flex md:hidden items-center justify-between p-3 border-b bg-background flex-shrink-0">
-            <div className="flex items-center gap-2">
+        <DialogContent className="w-full max-w-sm sm:max-w-lg md:max-w-3xl lg:max-w-5xl h-screen sm:h-[95vh] md:h-[90vh] overflow-hidden overscroll-contain p-0 border-0 sm:border sm:rounded-lg">
+          {/* Mobile Header with Safe Area */}
+          <div className="flex md:hidden items-center justify-between p-4 pb-3 border-b bg-background flex-shrink-0 safe-area-inset-top">
+            <div className="flex items-center gap-3">
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onClose}
-                className="h-8 w-8 p-0"
+                className="h-9 w-9 p-0 touch-target"
+                aria-label="Close checkout"
               >
-                <X className="h-4 w-4" />
+                <X className="h-5 w-5" />
               </Button>
-              <h2 className="text-base font-semibold">
+              <h2 className="text-lg font-semibold truncate">
                 {checkoutStep === 'auth' && 'Complete Order'}
                 {checkoutStep === 'details' && 'Checkout'}
                 {checkoutStep === 'payment' && 'Payment'}
@@ -972,8 +973,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
             </div>
           </div>
 
-          {/* Mobile Order Summary */}
-          <div className="md:hidden flex-shrink-0">
+          {/* Mobile Order Summary with improved spacing */}
+          <div className="md:hidden flex-shrink-0 px-4 pt-2">
             <OrderSummaryCard
               items={items}
               subtotal={subtotal}
@@ -993,6 +994,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                     size="sm"
                     onClick={onClose}
                     className="h-8 w-8 p-0"
+                    aria-label="Close checkout"
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -1010,19 +1012,24 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
               </div>
             </div>
 
-            {/* Main Content Panel */}
+            {/* Main Content Panel with improved mobile layout */}
             <div className="lg:col-span-2 flex flex-col min-h-0 overflow-hidden">
               {/* Desktop Header */}
               <div className="hidden md:block flex-shrink-0">
-                <DialogHeader className="px-6 py-4 border-b">
+                <DialogHeader className="px-4 md:px-6 py-4 border-b">
                   <div className="flex items-center justify-between">
-                    <DialogTitle className="text-xl">
+                    <DialogTitle className="text-xl font-semibold">
                       {checkoutStep === 'auth' && 'Complete Your Order'}
                       {checkoutStep === 'details' && 'Delivery Details'}
                       {checkoutStep === 'payment' && 'Payment'}
                     </DialogTitle>
                     <DialogClose asChild>
-                      <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="h-8 w-8 p-0"
+                        aria-label="Close checkout"
+                      >
                         <X className="h-4 w-4" />
                       </Button>
                     </DialogClose>
@@ -1030,7 +1037,8 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                 </DialogHeader>
               </div>
 
-              <div className="flex-1 overflow-y-auto px-3 md:px-6 py-3 md:py-6">
+              {/* Scrollable Content Area with improved mobile padding */}
+              <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-6 safe-area-inset-bottom">
                 {isLoading ? (
                   <div className="flex items-center justify-center py-12">
                     <div className="space-y-4 text-center">
@@ -1039,87 +1047,106 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                     </div>
                   </div>
                 ) : (
-                  <>
+                  <div className="max-w-2xl mx-auto">
                     {checkoutStep === 'auth' && renderAuthStep()}
                     {checkoutStep === 'details' && renderDetailsStep()}
                     {checkoutStep === 'payment' && renderPaymentStep()}
-                  </>
+                  </div>
                 )}
               </div>
 
-              {/* Sticky Bottom Action */}
+              {/* Sticky Bottom Action with improved mobile experience */}
               {checkoutStep === 'details' && (
-                <div className="flex-shrink-0 p-3 md:p-6 border-t bg-background/80 backdrop-blur-sm">
-                  {/* Terms and Conditions */}
-                  {termsRequired && (
-                    <div className="mb-3 flex items-start gap-2">
-                      <input
-                        type="checkbox"
-                        id="terms-checkbox"
-                        checked={termsAccepted}
-                        onChange={(e) => setTermsAccepted(e.target.checked)}
-                        className="mt-1 h-4 w-4 accent-primary"
-                      />
-                      <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer">
-                        I agree to the{' '}
-                        <button
-                          type="button"
-                          onClick={() => setShowTermsDialog(true)}
-                          className="text-primary hover:underline font-medium"
-                        >
-                          Terms and Conditions
-                        </button>
-                      </Label>
-                    </div>
-                  )}
-
-                  <Button
-                    onClick={handleFormSubmit}
-                    disabled={!canProceedToDetails || isSubmitting || !isAuthenticated}
-                    className="w-full h-11 md:h-14 text-sm md:text-lg font-medium"
-                    size="lg"
-                  >
-                    {isSubmitting ? (
-                      <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
-                    ) : !isAuthenticated ? (
-                      "Please log in to continue"
-                    ) : (
-                      `Proceed to Payment • ₦${total.toLocaleString()}`
+                <div className="flex-shrink-0 p-4 md:p-6 border-t bg-background/95 backdrop-blur-sm safe-area-inset-bottom">
+                  <div className="max-w-2xl mx-auto">
+                    {/* Terms and Conditions with improved mobile layout */}
+                    {termsRequired && (
+                      <div className="mb-4 flex items-start gap-3">
+                        <input
+                          type="checkbox"
+                          id="terms-checkbox"
+                          checked={termsAccepted}
+                          onChange={(e) => setTermsAccepted(e.target.checked)}
+                          className="mt-1 h-4 w-4 accent-primary touch-target"
+                        />
+                        <Label htmlFor="terms-checkbox" className="text-sm leading-relaxed cursor-pointer flex-1">
+                          I agree to the{' '}
+                          <button
+                            type="button"
+                            onClick={() => setShowTermsDialog(true)}
+                            className="text-primary hover:underline font-medium underline-offset-2 transition-colors"
+                          >
+                            Terms and Conditions
+                          </button>
+                        </Label>
+                      </div>
                     )}
-                  </Button>
-                  
-                  {lastPaymentError && (
-                    <div className="mt-3 p-3 bg-destructive/10 border border-destructive/20 rounded-md">
-                      <p className="text-sm text-destructive">{lastPaymentError}</p>
-                    </div>
-                  )}
+
+                    {/* Improved CTA Button */}
+                    <Button
+                      onClick={handleFormSubmit}
+                      disabled={!canProceedToDetails || isSubmitting || !isAuthenticated}
+                      className="w-full h-12 md:h-14 text-base md:text-lg font-semibold rounded-xl shadow-lg transition-all duration-200 active:scale-[0.98] touch-target"
+                      size="lg"
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <RefreshCw className="w-5 h-5 mr-2 animate-spin" />
+                          Processing...
+                        </>
+                      ) : !isAuthenticated ? (
+                        "Please log in to continue"
+                      ) : (
+                        <>
+                          <span className="hidden sm:inline">Proceed to Payment • </span>
+                          <span className="sm:hidden">Pay </span>
+                          ₦{total.toLocaleString()}
+                        </>
+                      )}
+                    </Button>
+                    
+                    {/* Error Display with improved styling */}
+                    {lastPaymentError && (
+                      <div className="mt-4 p-4 bg-destructive/10 border border-destructive/20 rounded-lg">
+                        <p className="text-sm text-destructive leading-relaxed">{lastPaymentError}</p>
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Terms and Conditions Dialog */}
+          {/* Terms and Conditions Dialog with mobile optimization */}
           <Dialog open={showTermsDialog} onOpenChange={setShowTermsDialog}>
-            <DialogContent className="max-w-3xl max-h-[80vh] overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="flex items-center gap-2">
+            <DialogContent className="w-full max-w-sm sm:max-w-3xl h-screen sm:max-h-[85vh] overflow-y-auto p-0 sm:p-6">
+              <DialogHeader className="p-4 sm:p-0 border-b sm:border-0">
+                <DialogTitle className="flex items-center gap-2 text-lg">
                   <FileText className="w-5 h-5" />
                   Terms and Conditions
                 </DialogTitle>
               </DialogHeader>
-              <div className="prose prose-sm max-w-none">
-                {termsContent ? (
-                  <SafeHtml className="prose prose-sm max-w-none">
-                    {termsContent}
-                  </SafeHtml>
-                ) : (
-                  <p>Terms and conditions content is being loaded...</p>
-                )}
+              <div className="p-4 sm:p-0">
+                <div className="prose prose-sm max-w-none">
+                  {termsContent ? (
+                    <SafeHtml className="prose prose-sm max-w-none">
+                      {termsContent}
+                    </SafeHtml>
+                  ) : (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="text-center space-y-2">
+                        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto"></div>
+                        <p className="text-muted-foreground">Loading terms and conditions...</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="flex justify-end gap-2 pt-4 border-t">
+              <div className="flex flex-col sm:flex-row justify-end gap-3 p-4 sm:p-0 sm:pt-4 border-t sm:border-t-0 safe-area-inset-bottom">
                 <Button
                   variant="outline"
                   onClick={() => setShowTermsDialog(false)}
+                  className="w-full sm:w-auto"
                 >
                   Close
                 </Button>
@@ -1128,6 +1155,7 @@ const EnhancedCheckoutFlowComponent = React.memo<EnhancedCheckoutFlowProps>(({ i
                     setTermsAccepted(true);
                     setShowTermsDialog(false);
                   }}
+                  className="w-full sm:w-auto"
                 >
                   I Agree
                 </Button>

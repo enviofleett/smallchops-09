@@ -9299,6 +9299,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: number
       }
+      production_cleanup: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       production_go_live_cleanup: {
         Args: Record<PropertyKey, never>
         Returns: Json

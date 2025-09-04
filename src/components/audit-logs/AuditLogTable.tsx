@@ -2,16 +2,8 @@
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Loader2, Shield, User } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow } from "@/components/ui/responsive-table";
-
-interface AdminProfile {
-  id: string;
-  email: string;
-  role: string;
-  is_active: boolean;
-}
 
 interface AuditLogRow {
   id: string;
@@ -27,7 +19,6 @@ interface AuditLogRow {
   new_values: any;
   ip_address: string | null;
   user_agent: string | null;
-  admin_profile?: AdminProfile;
 }
 
 interface Props {
@@ -40,138 +31,7 @@ interface Props {
   };
 }
 
-/**
- * PRODUCTION UTILITY: Extract clean username from email or display name
- * Handles various username formats for audit log display
- */
-const extractUsername = (log: AuditLogRow): string => {
-  // System operations
-  if (!log.user_id) {
-    return "System";
-  }
-
-  // Admin profile email - extract username part
-  if (log.admin_profile?.email) {
-    const emailParts = log.admin_profile.email.split("@");
-    return emailParts[0] || log.admin_profile.email;
-  }
-
-  // Fallback to user_name - extract username if it's an email
-  if (log.user_name) {
-    if (log.user_name.includes("@")) {
-      const emailParts = log.user_name.split("@");
-      return emailParts[0] || log.user_name;
-    }
-    return log.user_name;
-  }
-
-  // Last resort - show truncated user ID
-  return `admin_${log.user_id.substring(0, 6)}`;
-};
-
 const PAGE_SIZE = 20;
-
-/**
- * PRODUCTION COMPONENT: Enhanced Admin User Display
- * Shows admin user information with role badges and proper fallbacks
- */
-const AdminUserDisplay: React.FC<{ log: AuditLogRow }> = ({ log }) => {
-  // System operation (no user)
-  if (!log.user_id) {
-    return (
-      <div className="flex items-center gap-2">
-        <Shield className="w-4 h-4 text-gray-400" />
-        <span className="text-gray-400 font-medium">System</span>
-      </div>
-    );
-  }
-
-  // Admin user with profile
-  if (log.admin_profile) {
-    return (
-      <div className="flex items-center gap-2">
-        <User className="w-4 h-4 text-blue-600" />
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="font-medium text-gray-900">
-              {log.admin_profile.email}
-            </span>
-            <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200">
-              {log.admin_profile.role.toUpperCase()}
-            </Badge>
-          </div>
-          {log.user_name && log.user_name !== log.admin_profile.email && (
-            <span className="text-xs text-gray-500">
-              Display: {log.user_name}
-            </span>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Fallback for admin without profile (should not happen in production)
-  return (
-    <div className="flex items-center gap-2">
-      <User className="w-4 h-4 text-orange-500" />
-      <div className="flex flex-col gap-1">
-        <span className="font-medium text-gray-900">
-          {log.user_name || `User ${log.user_id?.substring(0, 8)}...`}
-        </span>
-        <Badge variant="outline" className="text-xs text-orange-600 border-orange-300">
-          ADMIN
-        </Badge>
-      </div>
-    </div>
-  );
-};
-
-/**
- * PRODUCTION COMPONENT: Mobile Admin User Display (Compact Version)
- */
-const MobileAdminUserDisplay: React.FC<{ log: AuditLogRow }> = ({ log }) => {
-  // System operation
-  if (!log.user_id) {
-    return (
-      <div className="flex items-center gap-2">
-        <Shield className="w-3 h-3 text-gray-400" />
-        <span className="text-gray-400 text-sm">System</span>
-      </div>
-    );
-  }
-
-  // Admin user with profile
-  if (log.admin_profile) {
-    return (
-      <div className="flex items-center gap-2">
-        <User className="w-3 h-3 text-blue-600" />
-        <div className="flex flex-col">
-          <span className="text-sm font-medium text-gray-900">
-            {log.admin_profile.email}
-          </span>
-          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 border-blue-200 w-fit">
-            {log.admin_profile.role.toUpperCase()}
-          </Badge>
-        </div>
-      </div>
-    );
-  }
-
-  // Fallback
-  return (
-    <div className="flex items-center gap-2">
-      <User className="w-3 h-3 text-orange-500" />
-      <div className="flex flex-col">
-        <span className="text-sm font-medium">
-          {log.user_name || `User ${log.user_id?.substring(0, 8)}...`}
-        </span>
-        <Badge variant="outline" className="text-xs text-orange-600 border-orange-300 w-fit">
-          ADMIN
-        </Badge>
-      </div>
-    </div>
-  );
-};
 
 const AuditLogTable: React.FC<Props> = ({ filters }) => {
   const [logs, setLogs] = useState<AuditLogRow[]>([]);
@@ -187,116 +47,45 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
     const fetchLogs = async () => {
       setLoading(true);
 
-      try {
-        // PRODUCTION SECURITY: Query admin activities with optimized approach
-        let query = supabase
-          .from("audit_logs")
-          .select(`
-            id,
-            event_time,
-            user_id,
-            user_name,
-            action,
-            category,
-            entity_type,
-            entity_id,
-            message,
-            old_values,
-            new_values,
-            ip_address,
-            user_agent
-          `)
-          .order("event_time", { ascending: false })
-          .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+      let query = supabase
+        .from("audit_logs")
+        .select(`
+          *,
+          profiles!audit_logs_user_id_fkey(role)
+        `)
+        .order("event_time", { ascending: false })
+        .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
 
-        // PRODUCTION FILTER: Show all admin activities and system operations
-        // First get all profiles with admin role for enhanced display
-        const { data: adminProfiles, error: adminError } = await supabase
-          .from('profiles')
-          .select('id, email, role, is_active')
-          .eq('role', 'admin')
-          .eq('is_active', true);
+      // ADMIN-ONLY FILTER: Show only admin users + chudesyl@gmail.com + system activities
+      query = query.or(
+        `user_id.is.null,profiles.role.eq.admin,user_name.eq.chudesyl@gmail.com`
+      );
 
-        if (adminError) {
-          console.error('Error fetching admin profiles:', adminError);
-          throw adminError;
-        }
-
-        const adminIds = adminProfiles?.map(p => p.id) || [];
-        const adminProfilesMap = new Map(
-          adminProfiles?.map(profile => [profile.id, profile]) || []
+      // Additional filters
+      if (filters.category) query = query.eq("category", filters.category);
+      if (filters.user) query = query.ilike("user_name", `%${filters.user}%`);
+      if (filters.dateFrom) query = query.gte("event_time", filters.dateFrom);
+      if (filters.dateTo) query = query.lte("event_time", filters.dateTo + "T23:59:59");
+      if (filters.search) {
+        // Only filter on searchable text columns for simplicity
+        query = query.or(
+          [
+            `action.ilike.%${filters.search}%`,
+            `entity_type.ilike.%${filters.search}%`,
+            `message.ilike.%${filters.search}%`
+          ].join(",")
         );
-        
-        // Filter for admin users OR system operations (null user_id)
-        if (adminIds.length > 0) {
-          query = query.or(`user_id.is.null,user_id.in.(${adminIds.join(',')})`);
-        } else {
-          // If no admins found, only show system operations
-          query = query.is('user_id', null);
-        }
-
-        // Additional production filters
-        if (filters.category) {
-          query = query.eq("category", filters.category);
-        }
-        
-        if (filters.user) {
-          query = query.ilike("user_name", `%${filters.user}%`);
-        }
-        
-        if (filters.dateFrom) {
-          query = query.gte("event_time", filters.dateFrom);
-        }
-        
-        if (filters.dateTo) {
-          query = query.lte("event_time", filters.dateTo + "T23:59:59");
-        }
-        
-        if (filters.search) {
-          // Enhanced search across multiple fields
-          query = query.or(
-            [
-              `action.ilike.%${filters.search}%`,
-              `entity_type.ilike.%${filters.search}%`,
-              `message.ilike.%${filters.search}%`,
-              `category.ilike.%${filters.search}%`,
-              `user_name.ilike.%${filters.search}%`
-            ].join(",")
-          );
-        }
-
-        const { data, error } = await query;
-        
-        if (error) {
-          console.error('Error fetching audit logs:', error);
-          throw error;
-        }
-
-        // PRODUCTION ENHANCEMENT: Enrich logs with admin profile information
-        const enrichedLogs = (data as AuditLogRow[]).map(log => ({
-          ...log,
-          // Add admin profile information for enhanced display
-          admin_profile: log.user_id ? adminProfilesMap.get(log.user_id) : undefined,
-          // Mask sensitive IP addresses partially for privacy
-          ip_address: log.ip_address ? 
-            log.ip_address.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)/, '$1.$2.xxx.xxx') : 
-            null,
-          // Ensure user_agent doesn't contain sensitive info
-          user_agent: log.user_agent ? 
-            log.user_agent.substring(0, 100) + (log.user_agent.length > 100 ? '...' : '') : 
-            null
-        }));
-
-        setLogs(enrichedLogs);
-        setHasMore(enrichedLogs.length === PAGE_SIZE);
-        
-      } catch (error) {
-        console.error('Error in fetchLogs:', error);
+      }
+      const { data, error } = await query;
+      if (error) {
         setLogs([]);
         setHasMore(false);
-      } finally {
         setLoading(false);
+        return;
       }
+      setLogs(data as AuditLogRow[]);
+      setHasMore((data as AuditLogRow[]).length === PAGE_SIZE);
+      setLoading(false);
     };
 
     fetchLogs();
@@ -333,8 +122,8 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
             
             <MobileCardContent>
               <MobileCardRow 
-                label="Admin User" 
-                value={<MobileAdminUserDisplay log={log} />} 
+                label="User" 
+                value={log.user_name || log.user_id || <span className="text-gray-300">system</span>} 
               />
               {log.entity_type && (
                 <MobileCardRow 
@@ -386,18 +175,9 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
 
   return (
     <div>
-      <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-        <div className="flex items-center gap-2 mb-2">
-          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-          <h3 className="text-sm font-semibold text-blue-800">Production Security Monitor</h3>
-        </div>
-        <p className="text-sm text-blue-700">
-          Tracking all administrative activities and system operations. IP addresses are partially masked for privacy compliance.
-          {logs.length > 0 && (
-            <span className="block mt-1 font-medium">
-              Currently showing {logs.length} recent admin activities.
-            </span>
-          )}
+      <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-sm text-blue-800">
+          <strong>Note:</strong> Showing activities from admin users and system operations only.
         </p>
       </div>
       <ResponsiveTable
@@ -408,7 +188,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
         <TableHeader>
           <TableRow>
             <TableHead className="w-32">Date/Time</TableHead>
-            <TableHead>Admin User</TableHead>
+            <TableHead>User</TableHead>
             <TableHead>Action</TableHead>
             <TableHead>Category</TableHead>
             <TableHead>Entity</TableHead>
@@ -438,9 +218,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
                   {new Date(log.event_time).toLocaleString()}
                 </TableCell>
                 <TableCell>
-                  <span className="font-medium text-gray-900">
-                    {extractUsername(log)}
-                  </span>
+                  {log.user_name || log.user_id || <span className="text-gray-300">system</span>}
                 </TableCell>
                 <TableCell>
                   <span className="capitalize font-semibold text-blue-700">{log.action}</span>

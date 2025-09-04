@@ -21,19 +21,32 @@ export function useProductionPromotions() {
     refetchOnWindowFocus: false,
   });
 
-  // Filter for valid, active promotions (no day filtering needed anymore)
+  // Filter for valid, active promotions
   const activePromotions = allPromotions.filter((promotion: Promotion) => {
     try {
-      return promotion.status === 'active';
+      return (
+        promotion.status === 'active' &&
+        isPromotionValidForCurrentDay(promotion)
+      );
     } catch (error) {
       console.warn('Error filtering promotion:', error);
       return false;
     }
   });
 
-  // Get promotions applicable to specific days (always returns all promotions now)
+  // Get promotions applicable to specific days
   const getPromotionsForDay = (dayOfWeek: string) => {
-    return allPromotions; // All promotions are valid every day
+    return allPromotions.filter((promotion: Promotion) => {
+      try {
+        if (!promotion.applicable_days || promotion.applicable_days.length === 0) {
+          return true; // Applies to all days
+        }
+        return promotion.applicable_days.includes(dayOfWeek.toLowerCase());
+      } catch (error) {
+        console.warn('Error checking promotion day:', error);
+        return false;
+      }
+    });
   };
 
   return {

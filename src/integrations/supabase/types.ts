@@ -9869,12 +9869,20 @@ export type Database = {
         Returns: Json
       }
       upsert_payment_confirmation_event: {
-        Args: {
-          p_order_id: string
-          p_recipient_email: string
-          p_reference: string
-          p_template_variables?: Json
-        }
+        Args:
+          | { p_order_id: string; p_priority?: string; p_template_key?: string }
+          | {
+              p_order_id: string
+              p_recipient_email: string
+              p_reference: string
+              p_template_variables: Json
+            }
+          | {
+              p_order_id: string
+              p_recipient_email: string
+              p_reference: string
+              p_template_variables?: Json
+            }
         Returns: Json
       }
       validate_admin_access: {

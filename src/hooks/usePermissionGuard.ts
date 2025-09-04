@@ -13,10 +13,10 @@ export const usePermissionGuard = (menuKey: string, requiredLevel: 'view' | 'edi
   const isLoading = authLoading;
   const isAuthenticated = !!user?.id;
   
-  // PRODUCTION SECURITY: Enhanced triple validation for production access
+  // PRODUCTION SECURITY: Triple validation for production access
   // 1. User must be authenticated
   // 2. User must have specific permission for the menu
-  // 3. For admin users, only 'edit' permissions grant access (strict mode)
+  // 3. Permission level must meet the required level (view/edit)
   const productionSafePermission = isAuthenticated && hasPermission && !isLoading;
   
   return {
@@ -29,8 +29,7 @@ export const usePermissionGuard = (menuKey: string, requiredLevel: 'view' | 'edi
     debugInfo: process.env.NODE_ENV === 'development' ? {
       userAuthenticated: isAuthenticated,
       rawPermissionCheck: hasPermission,
-      isLoading: isLoading,
-      strictAdminMode: true
+      isLoading: isLoading
     } : undefined
   };
 };

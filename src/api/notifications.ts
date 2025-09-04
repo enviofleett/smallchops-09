@@ -149,75 +149,46 @@ export const sendOrderStatusNotification = async (
   customerEmail: string,
   customerPhone?: string,
   orderData?: Record<string, any>
-): Promise<{ success: boolean; emailSent: boolean; smsSent: boolean; message: string }> => {
-  // Map order status to notification template
-  // Status-to-template mapping using existing template keys
-  const templateKeyMap: Record<string, string> = {
-    'confirmed': 'order_confirmation',
-    'preparing': 'order_processing',
-    'ready': 'order_ready',
-    'out_for_delivery': 'out_for_delivery',
-    'delivered': 'order_completed',
-    'completed': 'order_completed',
-    'cancelled': 'order_canceled',
-    'paid': 'payment_confirmation'
-  };
-
-  const templateKey = templateKeyMap[newStatus];
-  if (!templateKey) {
-    throw new Error(`No notification template for status: ${newStatus}`);
-  }
-
-  let emailSent = false;
-  let smsSent = false;
-  const errors: string[] = [];
-
-  // Send email notification
+): Promise<void> => {
   try {
-    const emailResult = await sendNotification({
+    // Map order status to notification template
+    const templateKeyMap: Record<string, string> = {
+      'confirmed': 'delivery_scheduled',
+      'out_for_delivery': 'out_for_delivery',
+      'delivered': 'delivery_completed',
+      'completed': 'delivery_completed',
+      'ready': 'pickup_ready'
+    };
+
+    const templateKey = templateKeyMap[newStatus];
+    if (!templateKey) {
+      console.log(`No notification template for status: ${newStatus}`);
+      return;
+    }
+
+    // Send email notification
+    await sendNotification({
       template_key: templateKey,
       recipient: customerEmail,
       channel: 'email',
       variables: orderData,
       order_id: orderId
     });
-    emailSent = emailResult.success;
-    if (!emailResult.success) {
-      errors.push(`Email: ${emailResult.message}`);
-    }
-  } catch (error: any) {
-    errors.push(`Email: ${error.message}`);
-  }
 
-  // Send SMS notification if phone number is available
-  if (customerPhone) {
-    try {
-      const smsResult = await sendNotification({
+    // Send SMS notification if phone number is available
+    if (customerPhone) {
+      await sendNotification({
         template_key: templateKey,
         recipient: customerPhone,
         channel: 'sms',
         variables: orderData,
         order_id: orderId
       });
-      smsSent = smsResult.success;
-      if (!smsResult.success) {
-        errors.push(`SMS: ${smsResult.message}`);
-      }
-    } catch (error: any) {
-      errors.push(`SMS: ${error.message}`);
     }
-  } else {
-    smsSent = true; // Consider SMS as successful if not attempted
+  } catch (error) {
+    console.error('Failed to send order status notification:', error);
+    // Don't throw error to avoid blocking order updates
   }
-
-  const overallSuccess = emailSent && smsSent;
-  
-  return {
-    success: overallSuccess,
-    emailSent,
-    smsSent,
-    message: errors.length > 0 ? errors.join(', ') : 'Notifications sent successfully'
-  };
 };
 
 // Template variable replacement utility

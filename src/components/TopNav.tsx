@@ -1,11 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, User, LogOut, Home, Package, Users, BarChart3, Settings } from 'lucide-react';
+import { Search, Bell, User, LogOut, Menu, Home, Package, Users, BarChart3, Settings } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { useBusinessSettings } from '../hooks/useBusinessSettings';
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { NotificationsDropdown } from '@/components/notifications/NotificationsDropdown';
 import {
   NavigationMenu,
   NavigationMenuContent,
@@ -121,7 +120,12 @@ const TopNav = () => {
         {/* Right side */}
         <div className="flex items-center gap-2 md:gap-4">
           {/* Notifications */}
-          <NotificationsDropdown />
+          <button className="relative p-2 text-muted-foreground hover:text-foreground transition-colors rounded-lg hover:bg-accent">
+            <Bell className="h-4 w-4 md:h-5 md:w-5" />
+            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs rounded-full h-4 w-4 md:h-5 md:w-5 flex items-center justify-center">
+              3
+            </span>
+          </button>
 
           {/* User Menu */}
           <div className="relative">

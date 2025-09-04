@@ -7,17 +7,14 @@ const corsHeaders = {
 };
 
 // Template keys that should exist in the database
-// Required templates that match existing and new ones
 const REQUIRED_TEMPLATES = [
-  'order_confirmation',    // Order confirmed by admin (exists)
-  'order_processing',      // Order is being prepared (exists)
-  'order_ready',          // Order ready for pickup (exists)
-  'out_for_delivery',     // Order out for delivery (exists)
-  'order_completed',      // Order delivered/completed (exists)
-  'order_canceled',       // Order cancelled (need to create)
-  'payment_confirmation', // Payment confirmed (exists)
-  'admin_new_order',      // Admin notification for new orders (exists)
-  'customer_welcome'      // Customer welcome email (exists)
+  'order_confirmed',
+  'order_completed', 
+  'out_for_delivery',
+  'admin_new_order',
+  'customer_welcome',
+  'order_canceled',
+  'payment_confirmed'
 ];
 
 serve(async (req) => {

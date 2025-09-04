@@ -138,7 +138,15 @@ const PublicHome = () => {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
   });
 
-  // Production logging removed for performance
+  // Debug logging for production troubleshooting
+  console.log('🏠 PublicHome Debug:', {
+    productsCount: products?.length || 0,
+    isLoading: isLoadingProducts,
+    hasError: !!productsError,
+    activeCategory,
+    searchTerm,
+    productsPreview: products?.slice(0, 2)?.map(p => ({ id: p.id, name: p.name }))
+  });
 
   // Fetch categories (PRODUCTION OPTIMIZED)
   const { data: categories = [] } = useQuery({
@@ -210,13 +218,20 @@ const PublicHome = () => {
 
   // Filter and shuffle products - Enhanced with advanced filtering
   const filteredAndShuffledProducts = useMemo(() => {
-    if (!Array.isArray(products) || products.length === 0) {
+    if (!Array.isArray(products)) {
+      console.warn('🚨 Products is not an array:', products);
+      return [];
+    }
+    
+    if (products.length === 0) {
+      console.log('📦 No products available');
       return [];
     }
 
     // Apply all filters
     const filtered = products.filter(product => {
       if (!product?.name) {
+        console.warn('🚨 Product missing name:', product);
         return false;
       }
 
@@ -238,7 +253,19 @@ const PublicHome = () => {
     });
 
     // Apply smart reshuffling for equal visibility
-    return createBalancedProductShuffle(filtered);
+    const shuffled = createBalancedProductShuffle(filtered);
+    
+    console.log('🔍 Filtered and shuffled products:', {
+      total: products.length,
+      filtered: filtered.length,
+      searchTerm,
+      filtersActive: filters.onlyPromotions || 
+        filters.priceRange[0] > priceRange[0] || 
+        filters.priceRange[1] < priceRange[1] ||
+        filters.minRating > 0
+    });
+    
+    return shuffled;
   }, [products, searchTerm, filters, createBalancedProductShuffle, priceRange]);
 
   // Pagination with shuffled products
@@ -266,6 +293,7 @@ const PublicHome = () => {
         description: `${moq > 1 ? `${moq} units of ` : ''}${product.name} ${moq > 1 ? '(minimum order)' : ''} added to your cart.`,
       });
     } catch (error) {
+      console.error('Error adding to cart:', error);
       toast({
         title: "Error",
         description: "Failed to add item to cart. Please try again.",
@@ -423,12 +451,7 @@ const PublicHome = () => {
 
               {/* Products Loading State */}
               {isLoadingProducts ? (
-                <div 
-                  className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6"
-                  role="status" 
-                  aria-live="polite" 
-                  aria-label="Loading products"
-                >
+                <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6">
                   {[...Array(9)].map((_, i) => (
                     <Card key={i} className="h-80 animate-pulse">
                       <CardContent className="p-0">
@@ -443,16 +466,12 @@ const PublicHome = () => {
                   ))}
                 </div>
               ) : productsError ? (
-                <div className="text-center py-8 sm:py-12" role="alert">
+                <div className="text-center py-8 sm:py-12">
                   <h3 className="text-lg sm:text-xl font-semibold mb-2 text-red-600">Unable to load products</h3>
                   <p className="text-gray-600 mb-4 px-4">
                     There was an issue loading our products. Please try again.
                   </p>
-                  <Button 
-                    onClick={() => refetchProducts()} 
-                    variant="outline"
-                    aria-label="Retry loading products"
-                  >
+                  <Button onClick={() => refetchProducts()} variant="outline">
                     Try Again
                   </Button>
                 </div>
@@ -481,7 +500,6 @@ const PublicHome = () => {
                         });
                       }} 
                       variant="outline"
-                      aria-label="Clear all active filters and reset search"
                     >
                       Clear All Filters
                     </Button>
@@ -490,11 +508,7 @@ const PublicHome = () => {
               ) : (
                   <>
                     {/* Products Grid - Mobile optimized */}
-                    <div 
-                      className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-8"
-                      role="grid"
-                      aria-label="Products grid"
-                    >
+                    <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3 gap-3 sm:gap-4 lg:gap-6 mb-8">
                       {currentProducts.map((product) => (
                         <MemoizedProductCard
                           key={product.id}
@@ -507,44 +521,35 @@ const PublicHome = () => {
 
                     {/* Pagination - Mobile optimized */}
                     {totalPages > 1 && (
-                      <nav 
-                        className="flex justify-center items-center space-x-2 flex-wrap gap-2"
-                        role="navigation"
-                        aria-label="Product pages navigation"
-                      >
+                      <div className="flex justify-center items-center space-x-2 flex-wrap gap-2">
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                           disabled={currentPage <= 1}
                           className="text-xs sm:text-sm px-2 sm:px-3"
-                          aria-label="Go to previous page"
                         >
                           Prev
                         </Button>
                         
                         {/* Show fewer page numbers on mobile */}
-                        <div role="group" aria-label="Page numbers">
-                          {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                            const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                            if (pageNum <= totalPages) {
-                              return (
-                                <Button
-                                  key={pageNum}
-                                  variant={currentPage === pageNum ? "default" : "outline"}
-                                  size="sm"
-                                  onClick={() => setCurrentPage(pageNum)}
-                                  className="w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm"
-                                  aria-label={`Go to page ${pageNum}`}
-                                  aria-current={currentPage === pageNum ? "page" : undefined}
-                                >
-                                  {pageNum}
-                                </Button>
-                              );
-                            }
-                            return null;
-                          })}
-                        </div>
+                        {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                          const pageNum = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
+                          if (pageNum <= totalPages) {
+                            return (
+                              <Button
+                                key={pageNum}
+                                variant={currentPage === pageNum ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => setCurrentPage(pageNum)}
+                                className="w-8 h-8 sm:w-10 sm:h-10 text-xs sm:text-sm"
+                              >
+                                {pageNum}
+                              </Button>
+                            );
+                          }
+                          return null;
+                        })}
                         
                         <Button
                           variant="outline"
@@ -552,11 +557,10 @@ const PublicHome = () => {
                           onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
                           disabled={currentPage >= totalPages}
                           className="text-xs sm:text-sm px-2 sm:px-3"
-                          aria-label="Go to next page"
                         >
                           Next
                         </Button>
-                      </nav>
+                      </div>
                     )}
                   </>
                 )}

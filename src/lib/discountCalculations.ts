@@ -400,9 +400,20 @@ export function formatDiscount(discountPercentage: number): string {
 }
 
 /**
- * Production-ready function to check if a promotion is valid (always returns true now)
+ * Production-ready function to check if a promotion is valid for the current day
  */
 export function isPromotionValidForCurrentDay(promotion: Promotion): boolean {
-  // Since we removed day restrictions, all promotions are valid every day
-  return true;
+  try {
+    // If no specific days are set, promotion is valid all days
+    if (!promotion.applicable_days || promotion.applicable_days.length === 0) {
+      return true;
+    }
+
+    const currentDay = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toLowerCase();
+    
+    return promotion.applicable_days.includes(currentDay);
+  } catch (error) {
+    console.warn('Error checking promotion day validity:', error);
+    return false; // Fail safely to prevent crashes
+  }
 }

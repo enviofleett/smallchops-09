@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { format } from "date-fns";
 import { Edit, CalendarIcon } from "lucide-react";
+import { DaysSelector } from "./DaysSelector";
 import { useUpdatePromotion } from "@/hooks/usePromotions";
 import { Button } from "@/components/ui/button";
 import {
@@ -64,6 +65,7 @@ const EditPromotionSchema = z.object({
     .optional()
     .transform(val => isNaN(val as any) ? undefined : val),
   code: z.string().optional(),
+  applicable_days: z.array(z.string()).optional(),
   valid_from: z.date().optional(),
   valid_until: z.date().optional(),
 });
@@ -103,6 +105,7 @@ export default function EditPromotionDialog({
       max_discount_amount: undefined,
       usage_limit: undefined,
       code: "",
+      applicable_days: [],
       valid_from: undefined,
       valid_until: undefined,
     },
@@ -117,6 +120,7 @@ export default function EditPromotionDialog({
         value: promotion.value || undefined,
         min_order_amount: promotion.min_order_amount || undefined,
         code: promotion.code || "",
+        applicable_days: promotion.applicable_days || [],
         valid_from: promotion.valid_from ? new Date(promotion.valid_from) : undefined,
         valid_until: promotion.valid_until ? new Date(promotion.valid_until) : undefined,
       });
@@ -312,7 +316,23 @@ export default function EditPromotionDialog({
                 )}
               />
 
-              {/* Days Selection - REMOVED */}
+              {/* Days Selection */}
+              <FormField
+                control={form.control}
+                name="applicable_days"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormControl>
+                      <DaysSelector
+                        selectedDays={field.value || []}
+                        onDaysChange={field.onChange}
+                        disabled={false}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
 
               {/* Dates */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

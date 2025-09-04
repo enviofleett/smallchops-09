@@ -1,10 +1,20 @@
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Shield, User } from "lucide-react";
+import { Loader2, Shield, User, AlertTriangle, Clock } from "lucide-react";
 import { ResponsiveTable, MobileCard, MobileCardHeader, MobileCardContent, MobileCardRow } from "@/components/ui/responsive-table";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { SafeHtml } from "@/components/ui/safe-html";
+import { useToast } from "@/hooks/use-toast";
+import { 
+  secureAuditLogData, 
+  sanitizeSearchFilters, 
+  checkAuditLogRateLimit,
+  logAuditLogAccess,
+  type SecureAuditLogRow 
+} from "@/utils/auditLogSecurity";
 
 interface AdminProfile {
   id: string;
@@ -174,136 +184,192 @@ const MobileAdminUserDisplay: React.FC<{ log: AuditLogRow }> = ({ log }) => {
 };
 
 const AuditLogTable: React.FC<Props> = ({ filters }) => {
-  const [logs, setLogs] = useState<AuditLogRow[]>([]);
+  const [logs, setLogs] = useState<SecureAuditLogRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
+  const [rateLimited, setRateLimited] = useState(false);
+  const [retryAfter, setRetryAfter] = useState(0);
+  const { toast } = useToast();
 
+  // Memoize sanitized filters to prevent unnecessary re-renders
+  const sanitizedFilters = useMemo(() => sanitizeSearchFilters(filters), [filters]);
+
+  // Rate limit retry timer
+  useEffect(() => {
+    if (retryAfter > 0) {
+      const timer = setInterval(() => {
+        setRetryAfter(prev => {
+          if (prev <= 1) {
+            setRateLimited(false);
+            return 0;
+          }
+          return prev - 1;
+        });
+      }, 1000);
+      return () => clearInterval(timer);
+    }
+  }, [retryAfter]);
+
+  // Reset page when filters change
   useEffect(() => {
     setPage(1);
-  }, [filters]);
+  }, [sanitizedFilters]);
+
+  // Enhanced fetch function with security measures
+  const fetchLogs = useCallback(async () => {
+    if (rateLimited) {
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Check rate limits before proceeding
+      const { data: user } = await supabase.auth.getUser();
+      const rateLimitCheck = await checkAuditLogRateLimit(user.user?.id || null);
+      
+      if (!rateLimitCheck.allowed) {
+        setRateLimited(true);
+        setRetryAfter(rateLimitCheck.retryAfter || 60);
+        toast({
+          title: "Rate Limit Exceeded",
+          description: rateLimitCheck.reason || "Please wait before requesting more audit logs.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // PRODUCTION SECURITY: Query admin activities with enhanced security
+      let query = supabase
+        .from("audit_logs")
+        .select(`
+          id,
+          event_time,
+          user_id,
+          user_name,
+          action,
+          category,
+          entity_type,
+          entity_id,
+          message,
+          old_values,
+          new_values,
+          ip_address,
+          user_agent
+        `)
+        .order("event_time", { ascending: false })
+        .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
+
+      // Get admin profiles for enhanced display
+      const { data: adminProfiles, error: adminError } = await supabase
+        .from('profiles')
+        .select('id, email, role, is_active')
+        .eq('role', 'admin')
+        .eq('is_active', true);
+
+      if (adminError) {
+        console.error('Error fetching admin profiles:', adminError);
+        throw adminError;
+      }
+
+      const adminIds = adminProfiles?.map(p => p.id) || [];
+      const adminProfilesMap = new Map(
+        adminProfiles?.map(profile => [profile.id, profile]) || []
+      );
+      
+      // Filter for admin users OR system operations (null user_id)
+      if (adminIds.length > 0) {
+        query = query.or(`user_id.is.null,user_id.in.(${adminIds.join(',')})`);
+      } else {
+        query = query.is('user_id', null);
+      }
+
+      // Apply sanitized filters safely
+      if (sanitizedFilters.category) {
+        query = query.eq("category", sanitizedFilters.category);
+      }
+      
+      if (sanitizedFilters.user) {
+        query = query.ilike("user_name", `%${sanitizedFilters.user}%`);
+      }
+      
+      if (sanitizedFilters.dateFrom) {
+        query = query.gte("event_time", sanitizedFilters.dateFrom);
+      }
+      
+      if (sanitizedFilters.dateTo) {
+        query = query.lte("event_time", sanitizedFilters.dateTo + "T23:59:59");
+      }
+      
+      if (sanitizedFilters.search) {
+        // Enhanced search with length limits
+        const searchTerm = sanitizedFilters.search.substring(0, 50);
+        query = query.or(
+          [
+            `action.ilike.%${searchTerm}%`,
+            `entity_type.ilike.%${searchTerm}%`,
+            `message.ilike.%${searchTerm}%`,
+            `category.ilike.%${searchTerm}%`,
+            `user_name.ilike.%${searchTerm}%`
+          ].join(",")
+        );
+      }
+
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error('Error fetching audit logs:', error);
+        throw error;
+      }
+
+      // PRODUCTION SECURITY: Process logs with security utilities
+      const secureEnrichedLogs = (data as AuditLogRow[]).map(log => {
+        const enrichedLog: SecureAuditLogRow = {
+          ...log,
+          admin_profile: log.user_id ? adminProfilesMap.get(log.user_id) : undefined,
+        };
+        
+        // Apply comprehensive security processing
+        return secureAuditLogData(enrichedLog);
+      });
+
+      setLogs(secureEnrichedLogs);
+      setHasMore(secureEnrichedLogs.length === PAGE_SIZE);
+      
+      // Log audit log access for monitoring
+      await logAuditLogAccess(user.user?.id || null, sanitizedFilters, secureEnrichedLogs.length);
+        
+    } catch (error) {
+      console.error('Error in fetchLogs:', error);
+      setLogs([]);
+      setHasMore(false);
+      toast({
+        title: "Error Loading Audit Logs",
+        description: "Failed to load audit logs. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  }, [rateLimited, page, sanitizedFilters, toast]);
 
   useEffect(() => {
-    const fetchLogs = async () => {
-      setLoading(true);
-
-      try {
-        // PRODUCTION SECURITY: Query admin activities with optimized approach
-        let query = supabase
-          .from("audit_logs")
-          .select(`
-            id,
-            event_time,
-            user_id,
-            user_name,
-            action,
-            category,
-            entity_type,
-            entity_id,
-            message,
-            old_values,
-            new_values,
-            ip_address,
-            user_agent
-          `)
-          .order("event_time", { ascending: false })
-          .range((page - 1) * PAGE_SIZE, page * PAGE_SIZE - 1);
-
-        // PRODUCTION FILTER: Show all admin activities and system operations
-        // First get all profiles with admin role for enhanced display
-        const { data: adminProfiles, error: adminError } = await supabase
-          .from('profiles')
-          .select('id, email, role, is_active')
-          .eq('role', 'admin')
-          .eq('is_active', true);
-
-        if (adminError) {
-          console.error('Error fetching admin profiles:', adminError);
-          throw adminError;
-        }
-
-        const adminIds = adminProfiles?.map(p => p.id) || [];
-        const adminProfilesMap = new Map(
-          adminProfiles?.map(profile => [profile.id, profile]) || []
-        );
-        
-        // Filter for admin users OR system operations (null user_id)
-        if (adminIds.length > 0) {
-          query = query.or(`user_id.is.null,user_id.in.(${adminIds.join(',')})`);
-        } else {
-          // If no admins found, only show system operations
-          query = query.is('user_id', null);
-        }
-
-        // Additional production filters
-        if (filters.category) {
-          query = query.eq("category", filters.category);
-        }
-        
-        if (filters.user) {
-          query = query.ilike("user_name", `%${filters.user}%`);
-        }
-        
-        if (filters.dateFrom) {
-          query = query.gte("event_time", filters.dateFrom);
-        }
-        
-        if (filters.dateTo) {
-          query = query.lte("event_time", filters.dateTo + "T23:59:59");
-        }
-        
-        if (filters.search) {
-          // Enhanced search across multiple fields
-          query = query.or(
-            [
-              `action.ilike.%${filters.search}%`,
-              `entity_type.ilike.%${filters.search}%`,
-              `message.ilike.%${filters.search}%`,
-              `category.ilike.%${filters.search}%`,
-              `user_name.ilike.%${filters.search}%`
-            ].join(",")
-          );
-        }
-
-        const { data, error } = await query;
-        
-        if (error) {
-          console.error('Error fetching audit logs:', error);
-          throw error;
-        }
-
-        // PRODUCTION ENHANCEMENT: Enrich logs with admin profile information
-        const enrichedLogs = (data as AuditLogRow[]).map(log => ({
-          ...log,
-          // Add admin profile information for enhanced display
-          admin_profile: log.user_id ? adminProfilesMap.get(log.user_id) : undefined,
-          // Mask sensitive IP addresses partially for privacy
-          ip_address: log.ip_address ? 
-            log.ip_address.replace(/(\d+)\.(\d+)\.(\d+)\.(\d+)/, '$1.$2.xxx.xxx') : 
-            null,
-          // Ensure user_agent doesn't contain sensitive info
-          user_agent: log.user_agent ? 
-            log.user_agent.substring(0, 100) + (log.user_agent.length > 100 ? '...' : '') : 
-            null
-        }));
-
-        setLogs(enrichedLogs);
-        setHasMore(enrichedLogs.length === PAGE_SIZE);
-        
-      } catch (error) {
-        console.error('Error in fetchLogs:', error);
-        setLogs([]);
-        setHasMore(false);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchLogs();
-  }, [filters, page]);
+  }, [fetchLogs]);
 
+  // Enhanced secure mobile component
   const mobileComponent = (
     <div className="space-y-3">
+      {rateLimited && (
+        <Alert>
+          <AlertTriangle className="h-4 w-4" />
+          <AlertDescription>
+            Rate limit exceeded. Please wait {retryAfter} seconds before requesting more data.
+          </AlertDescription>
+        </Alert>
+      )}
+      
       {loading ? (
         <div className="flex justify-center py-7">
           <Loader2 className="animate-spin h-5 w-5 text-gray-400" />
@@ -318,14 +384,16 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
             <MobileCardHeader>
               <div>
                 <p className="font-medium text-gray-800">
-                  <span className="capitalize font-semibold text-blue-700">{log.action}</span>
+                  <SafeHtml className="capitalize font-semibold text-blue-700">
+                    {log.action}
+                  </SafeHtml>
                 </p>
                 <p className="text-sm text-gray-600">{new Date(log.event_time).toLocaleString()}</p>
               </div>
               <div className="text-right">
                 {log.category && (
                   <span className="inline-block px-2 py-1 text-xs font-medium rounded-full bg-gray-100 text-gray-700">
-                    {log.category}
+                    <SafeHtml>{log.category}</SafeHtml>
                   </span>
                 )}
               </div>
@@ -334,19 +402,19 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
             <MobileCardContent>
               <MobileCardRow 
                 label="Admin User" 
-                value={<MobileAdminUserDisplay log={log} />} 
+                value={<MobileAdminUserDisplay log={log as AuditLogRow} />} 
               />
               {log.entity_type && (
                 <MobileCardRow 
                   label="Entity" 
-                  value={log.entity_type} 
+                  value={<SafeHtml>{log.entity_type}</SafeHtml>} 
                 />
               )}
               {log.message && (
                 <div className="mt-2">
                   <span className="text-sm font-medium text-gray-600">Message:</span>
                   <div className="text-sm text-gray-900 mt-1 whitespace-pre-line break-words">
-                    {log.message}
+                    <SafeHtml>{log.message}</SafeHtml>
                   </div>
                 </div>
               )}
@@ -365,7 +433,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
       <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
         <button
           className="px-4 py-2 bg-gray-100 rounded text-sm w-full sm:w-auto disabled:opacity-50"
-          disabled={page === 1 || loading}
+          disabled={page === 1 || loading || rateLimited}
           onClick={() => setPage(page - 1)}
         >
           Previous
@@ -375,7 +443,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
         </span>
         <button
           className="px-4 py-2 bg-gray-100 rounded text-sm w-full sm:w-auto disabled:opacity-50"
-          disabled={!hasMore || loading}
+          disabled={!hasMore || loading || rateLimited}
           onClick={() => setPage(page + 1)}
         >
           Next
@@ -386,20 +454,34 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
 
   return (
     <div>
+      {/* Enhanced Production Security Status */}
       <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
         <div className="flex items-center gap-2 mb-2">
-          <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-          <h3 className="text-sm font-semibold text-blue-800">Production Security Monitor</h3>
+          <Shield className="w-4 h-4 text-blue-600" />
+          <h3 className="text-sm font-semibold text-blue-800">Production Security Monitor - LIVE</h3>
         </div>
         <p className="text-sm text-blue-700">
-          Tracking all administrative activities and system operations. IP addresses are partially masked for privacy compliance.
+          Comprehensive audit trail with enhanced security measures: XSS protection, rate limiting, 
+          IP masking, and data sanitization enabled.
           {logs.length > 0 && (
             <span className="block mt-1 font-medium">
-              Currently showing {logs.length} recent admin activities.
+              Showing {logs.length} secure admin activities with privacy compliance.
             </span>
           )}
         </p>
       </div>
+
+      {/* Rate Limit Warning */}
+      {rateLimited && (
+        <Alert className="mb-4">
+          <Clock className="h-4 w-4" />
+          <AlertDescription>
+            Rate limit active. Next request available in {retryAfter} seconds. 
+            This protects system resources and prevents abuse.
+          </AlertDescription>
+        </Alert>
+      )}
+
       <ResponsiveTable
         className="relative border rounded-xl overflow-x-auto bg-white"
         mobileComponent={mobileComponent}
@@ -413,7 +495,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
             <TableHead>Category</TableHead>
             <TableHead>Entity</TableHead>
             <TableHead>Message</TableHead>
-            <TableHead>IP</TableHead>
+            <TableHead>IP (Masked)</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -428,7 +510,7 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
           ) : logs.length === 0 ? (
             <TableRow>
               <TableCell colSpan={7} className="text-gray-400 py-7 text-center">
-                No logs found for these filters.
+                {rateLimited ? "Rate limited - please wait" : "No logs found for these filters."}
               </TableCell>
             </TableRow>
           ) : (
@@ -438,47 +520,58 @@ const AuditLogTable: React.FC<Props> = ({ filters }) => {
                   {new Date(log.event_time).toLocaleString()}
                 </TableCell>
                 <TableCell>
-                  <span className="font-medium text-gray-900">
-                    {extractUsername(log)}
-                  </span>
+                  <AdminUserDisplay log={log as AuditLogRow} />
                 </TableCell>
                 <TableCell>
-                  <span className="capitalize font-semibold text-blue-700">{log.action}</span>
+                  <SafeHtml className="capitalize font-semibold text-blue-700">
+                    {log.action}
+                  </SafeHtml>
                 </TableCell>
-                <TableCell>{log.category}</TableCell>
-                <TableCell>{log.entity_type}</TableCell>
+                <TableCell>
+                  <SafeHtml>{log.category || '-'}</SafeHtml>
+                </TableCell>
+                <TableCell>
+                  <SafeHtml>{log.entity_type || '-'}</SafeHtml>
+                </TableCell>
                 <TableCell>
                   <div className="whitespace-pre-line break-all max-w-[260px]">
-                    {log.message}
+                    <SafeHtml>{log.message || '-'}</SafeHtml>
                   </div>
                 </TableCell>
                 <TableCell>
-                  <span className="text-xs">{log.ip_address || "-"}</span>
+                  <span className="text-xs font-mono">{log.ip_address || "-"}</span>
                 </TableCell>
               </TableRow>
             ))
           )}
         </TableBody>
       </Table>
-      {/* Pagination */}
-      <div className="p-3 flex items-center justify-end gap-2">
-        <button
-          className="px-3 py-1 bg-gray-100 rounded text-sm disabled:opacity-50"
-          disabled={page === 1 || loading}
-          onClick={() => setPage(page - 1)}
-        >
-          Previous
-        </button>
-        <span className="text-sm text-gray-500">
-          Page {page}
-        </span>
-        <button
-          className="px-3 py-1 bg-gray-100 rounded text-sm disabled:opacity-50"
-          disabled={!hasMore || loading}
-          onClick={() => setPage(page + 1)}
-        >
-          Next
-        </button>
+      {/* Enhanced Pagination with Rate Limiting */}
+      <div className="p-3 flex items-center justify-between">
+        <div className="text-xs text-gray-500">
+          {rateLimited && (
+            <span className="text-orange-600">⏱ Rate limited: {retryAfter}s</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            className="px-3 py-1 bg-gray-100 rounded text-sm disabled:opacity-50"
+            disabled={page === 1 || loading || rateLimited}
+            onClick={() => setPage(page - 1)}
+          >
+            Previous
+          </button>
+          <span className="text-sm text-gray-500">
+            Page {page}
+          </span>
+          <button
+            className="px-3 py-1 bg-gray-100 rounded text-sm disabled:opacity-50"
+            disabled={!hasMore || loading || rateLimited}
+            onClick={() => setPage(page + 1)}
+          >
+            Next
+          </button>
+        </div>
       </div>
       </ResponsiveTable>
     </div>

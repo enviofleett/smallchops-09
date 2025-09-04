@@ -56,10 +56,14 @@ export const CommunicationsTab = () => {
     isLoading: isLoadingSettings
   } = useSMTPSettings();
 
-  // Check production credentials status
+  // Check production credentials status with proper error handling
   React.useEffect(() => {
     const checkProductionStatus = async () => {
       try {
+        // Production-safe health check with timeout
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+        
         const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
           body: {
             healthcheck: true,
@@ -67,26 +71,50 @@ export const CommunicationsTab = () => {
           }
         });
 
+        clearTimeout(timeoutId);
+
+        if (error) {
+          throw new Error(error.message || 'Health check failed');
+        }
+
         if (data?.smtpCheck) {
           setProductionStatus({
-            configured: data.smtpCheck.configured,
+            configured: data.smtpCheck.configured || false,
             source: data.smtpCheck.source || 'unknown',
             message: data.smtpCheck.configured 
               ? `Production ready! Using ${data.smtpCheck.source === 'function_secrets' ? 'Edge Function Secrets' : 'Database Configuration'}`
               : 'SMTP credentials not configured properly'
           });
+        } else {
+          // Fallback for malformed response
+          setProductionStatus({
+            configured: false,
+            source: 'unknown',
+            message: 'SMTP health check returned invalid response'
+          });
         }
-      } catch (error) {
+      } catch (error: any) {
         console.warn('Failed to check production status:', error);
+        
+        // Production-safe error categorization
+        let message = 'Unable to verify production configuration';
+        if (error.name === 'AbortError') {
+          message = 'Health check timed out - SMTP service may be unavailable';
+        } else if (error.message?.includes('SMTP_PASSWORD')) {
+          message = 'SMTP credentials missing - please configure Function Secrets';
+        }
+        
         setProductionStatus({
           configured: false,
           source: 'error',
-          message: 'Unable to verify production configuration'
+          message
         });
       }
     };
 
-    checkProductionStatus();
+    // Debounce health check to prevent spam
+    const timeoutId = setTimeout(checkProductionStatus, 1000);
+    return () => clearTimeout(timeoutId);
   }, []);
 
   // Calculate email statistics
@@ -113,28 +141,41 @@ export const CommunicationsTab = () => {
     }
   }, [deliveryLogs]);
   const testEmailConnection = async () => {
-    if (!testEmail) {
-      toast.error('Please enter an email address');
+    // Production-ready input validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!testEmail || !emailRegex.test(testEmail.trim())) {
+      toast.error('Please enter a valid email address');
       return;
     }
     
+    const sanitizedEmail = testEmail.trim().toLowerCase();
     setTestingConnection(true);
     setConnectionStatus(null);
     
     try {
-      // Use production-safe template-based email sending
+      // Production-safe edge function call with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      
       const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
-          to: testEmail,
+          to: sanitizedEmail,
           templateKey: 'smtp_connection_test',
           variables: {
-            timestamp: new Date().toLocaleString()
+            timestamp: new Date().toLocaleString(),
+            businessName: 'Starters Small Chops'
           }
         }
       });
       
+      clearTimeout(timeoutId);
+      
       if (error) {
-        throw error;
+        throw new Error(`SMTP Function Error: ${error.message || 'Unknown error'}`);
+      }
+      
+      if (!data || !data.success) {
+        throw new Error(data?.error || 'Email send failed - check SMTP configuration');
       }
       
       setConnectionStatus('success');
@@ -142,7 +183,22 @@ export const CommunicationsTab = () => {
     } catch (error: any) {
       console.error('Test email error:', error);
       setConnectionStatus('error');
-      toast.error(`❌ Test failed: ${error.message}`);
+      
+      // Production-ready error categorization
+      let errorMessage = 'Test failed - ';
+      if (error.name === 'AbortError') {
+        errorMessage += 'Request timed out. Check your SMTP configuration.';
+      } else if (error.message?.includes('SMTP_PASSWORD')) {
+        errorMessage += 'SMTP credentials not configured. Please add Function Secrets.';
+      } else if (error.message?.includes('535')) {
+        errorMessage += 'SMTP authentication failed. Verify your email credentials.';
+      } else if (error.message?.includes('Edge Function')) {
+        errorMessage += 'SMTP service unavailable. Please try again later.';
+      } else {
+        errorMessage += error.message || 'Unknown error occurred';
+      }
+      
+      toast.error(`❌ ${errorMessage}`);
     } finally {
       setTestingConnection(false);
     }
@@ -151,28 +207,46 @@ export const CommunicationsTab = () => {
     setProcessingQueue(true);
     
     try {
-      // Use the unified email queue processor for production consistency
+      // Production-safe queue processing with timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 60000); // 60s timeout
+      
       const { data, error } = await supabase.functions.invoke('unified-email-queue-processor', {
         body: { 
-          batchSize: 50,
+          batchSize: Math.min(50, 100), // Limit batch size for safety
           priority: 'all'
         }
       });
       
+      clearTimeout(timeoutId);
+      
       if (error) {
-        throw error;
+        throw new Error(`Queue Processor Error: ${error.message || 'Unknown error'}`);
       }
       
-      const result = data as { processed?: number; failed?: number; success?: boolean };
+      const result = data as { processed?: number; failed?: number; success?: boolean; message?: string };
       
-      if (result.success) {
-        toast.success(`✅ Processed ${result.processed || 0} emails, ${result.failed || 0} failed`);
+      if (result.success !== false) {
+        const processed = result.processed || 0;
+        const failed = result.failed || 0;
+        toast.success(`✅ Queue processed: ${processed} emails sent, ${failed} failed`);
       } else {
-        throw new Error('Queue processing returned failure status');
+        throw new Error(result.message || 'Queue processing returned failure status');
       }
     } catch (error: any) {
       console.error('Queue processing error:', error);
-      toast.error(`❌ Queue processing failed: ${error.message}`);
+      
+      // Production-ready error handling
+      let errorMessage = 'Queue processing failed - ';
+      if (error.name === 'AbortError') {
+        errorMessage += 'Processing timed out. Large queue detected.';
+      } else if (error.message?.includes('SMTP_PASSWORD')) {
+        errorMessage += 'SMTP not configured. Please add Function Secrets.';
+      } else {
+        errorMessage += error.message || 'Unknown error occurred';
+      }
+      
+      toast.error(`❌ ${errorMessage}`);
     } finally {
       setProcessingQueue(false);
     }
@@ -404,12 +478,31 @@ export const CommunicationsTab = () => {
                   {testingConnection ? 'Sending Test Email...' : 'Send Test Email'}
                 </Button>
 
-                {connectionStatus && <Alert className={connectionStatus === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
-                    {connectionStatus === 'success' ? <CheckCircle className="h-4 w-4 text-green-600" /> : <AlertCircle className="h-4 w-4 text-red-600" />}
+                {connectionStatus && (
+                  <Alert className={connectionStatus === 'success' ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50'}>
+                    {connectionStatus === 'success' ? (
+                      <CheckCircle className="h-4 w-4 text-green-600" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-600" />
+                    )}
                     <AlertDescription className={connectionStatus === 'success' ? 'text-green-800' : 'text-red-800'}>
-                      {connectionStatus === 'success' ? 'Test email sent successfully! Check your inbox.' : 'Test email failed. Please check your SMTP settings.'}
+                      {connectionStatus === 'success' 
+                        ? 'Test email sent successfully! Check your inbox and spam folder.'
+                        : 'Test email failed. Please verify your SMTP credentials and configuration.'
+                      }
+                      {connectionStatus === 'error' && (
+                        <div className="mt-2 text-sm">
+                          <p className="font-medium">Troubleshooting:</p>
+                          <ul className="list-disc list-inside space-y-1 mt-1">
+                            <li>Check that SMTP Function Secrets are configured correctly</li>
+                            <li>Verify your email provider credentials and app passwords</li>
+                            <li>Ensure your email provider allows SMTP connections</li>
+                          </ul>
+                        </div>
+                      )}
                     </AlertDescription>
-                  </Alert>}
+                  </Alert>
+                )}
               </CardContent>
             </Card>
 

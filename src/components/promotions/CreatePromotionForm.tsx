@@ -36,8 +36,15 @@ import { Switch } from "@/components/ui/switch";
 import { DaysSelector } from "./DaysSelector";
 
 const PromotionFormSchema = z.object({
-  name: z.string().min(2, "Name is required").transform(val => val.trim()),
-  description: z.string().max(256).optional().transform(val => val?.trim()),
+  name: z.string()
+    .min(2, "Name must be at least 2 characters")
+    .max(100, "Name must be less than 100 characters")
+    .transform(val => val.trim())
+    .refine(val => val.length > 0, "Name is required"),
+  description: z.string()
+    .max(500, "Description must be less than 500 characters")
+    .optional()
+    .transform(val => val?.trim()),
   type: z.enum([
     "percentage",
     "fixed_amount", 
@@ -50,7 +57,7 @@ const PromotionFormSchema = z.object({
       const num = Number(val);
       return isNaN(num) ? undefined : num;
     },
-    z.number().min(0).optional()
+    z.number().min(0, "Value must be positive").optional()
   ),
   min_order_amount: z.preprocess(
     (val) => {
@@ -58,7 +65,7 @@ const PromotionFormSchema = z.object({
       const num = Number(val);
       return isNaN(num) ? undefined : num;
     },
-    z.number().min(0).optional()
+    z.number().min(0, "Minimum order amount must be positive").optional()
   ),
   max_discount_amount: z.preprocess(
     (val) => {
@@ -66,7 +73,7 @@ const PromotionFormSchema = z.object({
       const num = Number(val);
       return isNaN(num) ? undefined : num;
     },
-    z.number().min(0).optional()
+    z.number().min(0, "Maximum discount amount must be positive").optional()
   ),
   usage_limit: z.preprocess(
     (val) => {
@@ -74,21 +81,27 @@ const PromotionFormSchema = z.object({
       const num = Number(val);
       return isNaN(num) ? undefined : num;
     },
-    z.number().min(1).optional()
+    z.number().min(1, "Usage limit must be at least 1").max(1000000, "Usage limit too high").optional()
   ),
-  code: z.string().optional().transform(val => val?.trim().toUpperCase()),
+  code: z.string()
+    .optional()
+    .transform(val => val?.trim().toUpperCase())
+    .refine(val => !val || /^[A-Z0-9]{3,20}$/.test(val), "Code must be 3-20 characters, letters and numbers only"),
   applicable_categories: z.array(z.string()).optional(),
   applicable_products: z.array(z.string()).optional(),
   applicable_days: z.array(z.string()).optional(),
   valid_from: z.date().optional(),
   valid_until: z.date().optional(),
 }).refine((data) => {
-  // Business logic validation
+  // PRODUCTION: Enhanced business logic validation
   if (data.type === "percentage" && data.value !== undefined) {
     return data.value >= 1 && data.value <= 100;
   }
   if (data.type === "fixed_amount" && data.value !== undefined) {
-    return data.value > 0;
+    return data.value > 0 && data.value <= 1000000;
+  }
+  if (data.type === "buy_one_get_one" && data.value !== undefined) {
+    return data.value >= 0 && data.value <= 100;
   }
   if (data.type === "free_delivery" && data.min_order_amount === undefined) {
     return false;
@@ -98,14 +111,26 @@ const PromotionFormSchema = z.object({
   message: "Invalid configuration for selected promotion type",
   path: ["value"]
 }).refine((data) => {
-  // Date range validation
+  // PRODUCTION: Enhanced date range validation
   if (data.valid_from && data.valid_until) {
-    return data.valid_until >= data.valid_from;
+    const daysDifference = Math.ceil((data.valid_until.getTime() - data.valid_from.getTime()) / (1000 * 60 * 60 * 24));
+    if (daysDifference < 0) return false;
+    if (daysDifference > 365) return false; // Max 1 year promotion
+    return true;
   }
   return true;
 }, {
-  message: "End date must be the same or after start date",
+  message: "End date must be after start date and within 1 year",
   path: ["valid_until"]
+}).refine((data) => {
+  // PRODUCTION: Max discount validation for percentage
+  if (data.type === "percentage" && data.max_discount_amount && data.min_order_amount) {
+    return data.max_discount_amount <= data.min_order_amount;
+  }
+  return true;
+}, {
+  message: "Maximum discount cannot exceed minimum order amount",
+  path: ["max_discount_amount"]
 });
 
 type PromotionFormData = z.infer<typeof PromotionFormSchema>;
@@ -118,6 +143,7 @@ export default function CreatePromotionForm({
   disabled?: boolean;
 }) {
   const [generateCode, setGenerateCode] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const createMutation = useCreatePromotion();
   const form = useForm<PromotionFormData>({
@@ -137,6 +163,7 @@ export default function CreatePromotionForm({
       valid_from: undefined,
       valid_until: undefined,
     },
+    mode: "onChange", // PRODUCTION: Real-time validation
   });
 
   const watchType = form.watch("type");
@@ -152,12 +179,30 @@ export default function CreatePromotionForm({
     return result;
   };
 
-  // Auto-generate code when enabled
+  // PRODUCTION: Enhanced auto-generate code with cleanup
   React.useEffect(() => {
+    let timeoutId: NodeJS.Timeout;
+    
     if (generateCode && !form.getValues('code')) {
-      form.setValue('code', generatePromotionCode());
+      // Add small delay to prevent rapid regeneration
+      timeoutId = setTimeout(() => {
+        form.setValue('code', generatePromotionCode());
+      }, 100);
     }
+    
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+      }
+    };
   }, [generateCode, form]);
+
+  // PRODUCTION: Cleanup on unmount
+  React.useEffect(() => {
+    return () => {
+      setIsSubmitting(false);
+    };
+  }, []);
 
   // Safe type guard to check for a Date object
   function isDate(val: unknown): val is Date {
@@ -168,44 +213,111 @@ export default function CreatePromotionForm({
     );
   }
 
-  function handleSubmit(values: PromotionFormData) {
-    const cleaned: Omit<
-      import("@/api/promotions").Promotion,
-      "status" | "id" | "created_at" | "updated_at"
-    > = { ...values } as any;
-
-    // Safely convert dates to ISO string if they are valid Date objects
-    if (isDate(cleaned.valid_from)) {
-      cleaned.valid_from = cleaned.valid_from.toISOString();
-    }
-    if (isDate(cleaned.valid_until)) {
-      cleaned.valid_until = cleaned.valid_until.toISOString();
-    }
-    Object.keys(cleaned).forEach(
-      key =>
-        (cleaned[key] === "" ||
-          typeof cleaned[key] === "undefined" ||
-          (typeof cleaned[key] === "number" && isNaN(cleaned[key])))
-          && delete cleaned[key]
-    );
-    createMutation.mutate(cleaned, {
-      onSuccess: () => {
+  // PRODUCTION: Enhanced submit handler with comprehensive error handling
+  const handleSubmit = React.useCallback(async (values: PromotionFormData) => {
+    if (isSubmitting || disabled) return;
+    
+    setIsSubmitting(true);
+    
+    try {
+      // PRODUCTION: Comprehensive validation
+      const validation = PromotionFormSchema.safeParse(values);
+      if (!validation.success) {
+        console.error('Form validation failed:', validation.error);
         toast({
-          title: "Success",
-          description: "Promotion created successfully!",
-        });
-        form.reset();
-        onSuccess?.();
-      },
-      onError: (error) => {
-        toast({
-          title: "Error",
-          description: error?.message || "Failed to create promotion. Please try again.",
+          title: "Validation Error",
+          description: "Please check all required fields and try again.",
           variant: "destructive",
         });
-      },
-    });
-  }
+        return;
+      }
+
+      // PRODUCTION: Clean and prepare data
+      const cleaned: Omit<
+        import("@/api/promotions").Promotion,
+        "status" | "id" | "created_at" | "updated_at"
+      > = { ...validation.data } as any;
+
+      // PRODUCTION: Enhanced date handling with proper validation
+      if (isDate(cleaned.valid_from)) {
+        // Ensure date is not in the past
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
+        if (cleaned.valid_from < now) {
+          toast({
+            title: "Invalid Date",
+            description: "Start date cannot be in the past.",
+            variant: "destructive",
+          });
+          return;
+        }
+        cleaned.valid_from = cleaned.valid_from.toISOString();
+      }
+
+      if (isDate(cleaned.valid_until)) {
+        cleaned.valid_until = cleaned.valid_until.toISOString();
+      }
+
+      // PRODUCTION: Remove empty values and sanitize
+      Object.keys(cleaned).forEach(key => {
+        const value = cleaned[key as keyof typeof cleaned];
+        if (
+          value === "" || 
+          value === null || 
+          value === undefined ||
+          (typeof value === "number" && isNaN(value)) ||
+          (Array.isArray(value) && value.length === 0)
+        ) {
+          delete cleaned[key as keyof typeof cleaned];
+        }
+      });
+
+      // PRODUCTION: Business logic validation
+      if (cleaned.type === 'free_delivery' && !cleaned.min_order_amount) {
+        toast({
+          title: "Configuration Error",
+          description: "Free delivery promotions require a minimum order amount.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      if (cleaned.type !== 'free_delivery' && !cleaned.value) {
+        toast({
+          title: "Configuration Error",
+          description: "Please specify a discount value for this promotion type.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // PRODUCTION: Attempt to create promotion
+      await createMutation.mutateAsync(cleaned);
+      
+      toast({
+        title: "Success",
+        description: "Promotion created successfully!",
+      });
+      
+      // PRODUCTION: Safe form reset
+      form.reset();
+      setGenerateCode(false);
+      onSuccess?.();
+
+    } catch (error: any) {
+      console.error('Promotion creation failed:', error);
+      
+      const errorMessage = error?.message || error?.toString() || "Failed to create promotion. Please try again.";
+      
+      toast({
+        title: "Creation Failed",
+        description: errorMessage,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  }, [isSubmitting, disabled, form, createMutation, onSuccess]);
 
   return (
     <div className="space-y-4 max-h-[85vh] overflow-y-auto">
@@ -607,15 +719,15 @@ export default function CreatePromotionForm({
         <div className="hidden md:flex items-center gap-3 justify-end">
           <Button
             type="submit"
-            disabled={disabled || createMutation.isPending}
+            disabled={disabled || isSubmitting || createMutation.isPending}
             className="w-auto"
           >
-            {createMutation.isPending ? (
+            {isSubmitting || createMutation.isPending ? (
               <span className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
             ) : (
               <Plus className="w-4 h-4 mr-2" />
             )}
-            Create Promotion
+            {isSubmitting ? "Creating..." : "Create Promotion"}
           </Button>
         </div>
 
@@ -623,16 +735,16 @@ export default function CreatePromotionForm({
         <div className="md:hidden fixed bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg z-50">
           <Button
             type="submit"
-            disabled={disabled || createMutation.isPending}
+            disabled={disabled || isSubmitting || createMutation.isPending}
             className="w-full min-h-[44px]"
             size="lg"
           >
-            {createMutation.isPending ? (
+            {isSubmitting || createMutation.isPending ? (
               <span className="animate-spin mr-2 w-4 h-4 border-2 border-white border-t-transparent rounded-full" />
             ) : (
               <Plus className="w-4 h-4 mr-2" />
             )}
-            Create Promotion
+            {isSubmitting ? "Creating..." : "Create Promotion"}
           </Button>
         </div>
         </form>

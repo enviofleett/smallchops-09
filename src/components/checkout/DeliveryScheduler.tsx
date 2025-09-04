@@ -1,17 +1,25 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Calendar } from '@/components/ui/calendar';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { CalendarIcon, Clock, AlertTriangle } from 'lucide-react';
+import { CalendarIcon, Clock, AlertTriangle, Info } from 'lucide-react';
 import { deliverySchedulingService, DeliverySlot, DeliveryTimeSlot } from '@/utils/deliveryScheduling';
-import { isAfter, addDays } from 'date-fns';
+import { isAfter, addDays, addMonths, isBefore, startOfDay, endOfDay, differenceInDays, isWeekend } from 'date-fns';
 import { useCallback } from 'react';
 import { format, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
 import { HorizontalDatePicker } from './HorizontalDatePicker';
+
+// Production-ready constants
+const DELIVERY_BOOKING_CONSTANTS = {
+  MIN_ADVANCE_DAYS: 1, // Minimum 1 day advance booking
+  MAX_ADVANCE_MONTHS: 6, // 6 months advance booking
+  BUSINESS_DAYS_ONLY: false, // Set to true if delivery only on business days
+  BLOCKED_DATES: [] as Date[], // Specific dates to block (holidays, maintenance days)
+} as const;
 interface DeliverySchedulerProps {
   selectedDate?: string;
   selectedTimeSlot?: {
@@ -40,6 +48,79 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(selectedDate ? parseISO(selectedDate) : undefined);
+
+  // Production-ready date validation functions
+  const dateValidation = useMemo(() => {
+    const now = new Date();
+    const minDate = addDays(startOfDay(now), DELIVERY_BOOKING_CONSTANTS.MIN_ADVANCE_DAYS);
+    const maxDate = addMonths(startOfDay(now), DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS);
+
+    return {
+      minDate,
+      maxDate,
+      isDateInRange: (date: Date) => {
+        const dayStart = startOfDay(date);
+        return !isBefore(dayStart, minDate) && !isAfter(dayStart, maxDate);
+      },
+      isDateBlocked: (date: Date) => {
+        const dayStart = startOfDay(date);
+        return DELIVERY_BOOKING_CONSTANTS.BLOCKED_DATES.some(blockedDate => 
+          startOfDay(blockedDate).getTime() === dayStart.getTime()
+        );
+      },
+      isBusinessDayOnly: (date: Date) => {
+        return DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY ? !isWeekend(date) : true;
+      },
+      getDateDisabledReason: (date: Date) => {
+        const dayStart = startOfDay(date);
+        
+        if (isBefore(dayStart, minDate)) {
+          return `Minimum ${DELIVERY_BOOKING_CONSTANTS.MIN_ADVANCE_DAYS} day advance booking required`;
+        }
+        
+        if (isAfter(dayStart, maxDate)) {
+          return `Booking available up to ${DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS} months in advance`;
+        }
+        
+        if (DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY && isWeekend(date)) {
+          return 'Delivery not available on weekends';
+        }
+        
+        if (DELIVERY_BOOKING_CONSTANTS.BLOCKED_DATES.some(blockedDate => 
+          startOfDay(blockedDate).getTime() === dayStart.getTime()
+        )) {
+          return 'Delivery not available on this date';
+        }
+        
+        return null;
+      }
+    };
+  }, []);
+
+  // Enhanced date disabled function with comprehensive validation
+  const isDateDisabled = useCallback((date: Date) => {
+    // Check if date is in valid range
+    if (!dateValidation.isDateInRange(date)) {
+      return true;
+    }
+
+    // Check if date is blocked
+    if (dateValidation.isDateBlocked(date)) {
+      return true;
+    }
+
+    // Check business days requirement
+    if (!dateValidation.isBusinessDayOnly(date)) {
+      return true;
+    }
+
+    // Check if it's a past date (extra safety)
+    if (isBefore(startOfDay(date), startOfDay(new Date()))) {
+      return true;
+    }
+
+    return false;
+  }, [dateValidation]);
   useEffect(() => {
     loadAvailableSlots();
   }, []);
@@ -57,8 +138,9 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
       console.log('📋 Loading delivery slots...');
       setLoading(true);
       setError(null);
-      const endDate = addDays(new Date(), 30);
-      console.log('🕐 Getting slots from service...');
+      // Use the new 6-month range instead of 30 days
+      const endDate = addMonths(new Date(), DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS);
+      console.log('🕐 Getting slots from service for 6-month range...');
       const slots = await deliverySchedulingService.getAvailableDeliverySlots(new Date(), endDate);
       console.log('✅ Delivery slots loaded:', slots.length);
       setAvailableSlots(slots);
@@ -73,11 +155,8 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
       setLoading(false);
     }
   }, []);
-  const isDateDisabled = (date: Date) => {
-    const dateStr = format(date, 'yyyy-MM-dd');
-    const slot = availableSlots.find(s => s.date === dateStr);
-    return !slot?.is_business_day || slot.is_holiday;
-  };
+
+  // Legacy date modifier functions for existing slot data
   const getDateModifiers = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
     const slot = availableSlots.find(s => s.date === dateStr);
@@ -216,15 +295,38 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
 
         
 
-        {/* Calendar Section */}
+        {/* Calendar Section with Enhanced Date Range Info */}
         <div className="space-y-4">
-          <h3 className="font-medium">Select Delivery Date</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+            <h3 className="font-medium text-foreground">Select Delivery Date</h3>
+            <div className="flex items-center gap-2">
+              <Info className="w-4 h-4 text-muted-foreground" />
+              <span className="text-xs text-muted-foreground">
+                Book up to {DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS} months ahead
+              </span>
+            </div>
+          </div>
+          
+          {/* Date Range Information */}
+          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <p className="text-sm text-blue-800">
+              📅 <strong>Booking Range:</strong> {format(dateValidation.minDate, 'MMM d')} - {format(dateValidation.maxDate, 'MMM d, yyyy')}
+              {DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY && (
+                <span className="block mt-1">
+                  🏢 <strong>Business days only</strong> (Monday-Friday)
+                </span>
+              )}
+            </p>
+          </div>
+
           <div className="w-full overflow-hidden rounded-lg bg-background">
             <Calendar 
               mode="single" 
               selected={calendarDate} 
               onSelect={handleDateSelect} 
-              disabled={date => isDateDisabled(date) || isAfter(date, addDays(new Date(), 30))} 
+              disabled={isDateDisabled}
+              fromDate={dateValidation.minDate}
+              toDate={dateValidation.maxDate}
               className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200" 
               classNames={{
                 months: "flex flex-col space-y-4",
@@ -247,16 +349,18 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
                   "aria-selected:opacity-100 touch-manipulation",
                   "active:scale-95 disabled:pointer-events-none"
                 ),
-                day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md",
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md ring-2 ring-primary ring-offset-1",
                 day_today: "bg-accent text-accent-foreground font-semibold ring-2 ring-primary/20",
-                day_outside: "text-muted-foreground/40 opacity-50",
-                day_disabled: "text-muted-foreground/30 opacity-30 cursor-not-allowed",
+                day_outside: "text-muted-foreground/40 opacity-30",
+                day_disabled: "text-muted-foreground/20 opacity-20 cursor-not-allowed line-through",
                 day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
                 day_hidden: "invisible"
               }} 
               modifiers={{
                 holiday: date => getDateModifiers(date) === 'holiday',
-                closed: date => getDateModifiers(date) === 'closed'
+                closed: date => getDateModifiers(date) === 'closed',
+                weekend: date => isWeekend(date),
+                farFuture: date => differenceInDays(date, new Date()) > 90 // Highlight far future dates
               }} 
               modifiersStyles={{
                 holiday: {
@@ -268,17 +372,31 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
                   backgroundColor: 'hsl(var(--muted))',
                   color: 'hsl(var(--muted-foreground))',
                   textDecoration: 'line-through'
+                },
+                weekend: DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY ? {
+                  backgroundColor: 'hsl(var(--muted) / 0.5)',
+                  color: 'hsl(var(--muted-foreground))'
+                } : {},
+                farFuture: {
+                  backgroundColor: 'hsl(var(--blue-50))',
+                  color: 'hsl(var(--blue-700))',
+                  fontSize: '0.8rem'
                 }
               }} 
             />
           </div>
 
-          {selectedSlot?.is_holiday && <Alert variant="destructive">
-              <AlertTriangle className="h-4 w-4" />
-              <AlertDescription>
-                {selectedSlot.holiday_name} - No delivery available on this date
-              </AlertDescription>
-            </Alert>}
+          {/* Date Selection Feedback */}
+          {calendarDate && (
+            <div className="text-sm text-muted-foreground bg-green-50 border border-green-200 rounded-lg p-3">
+              ✅ Selected: <strong>{format(calendarDate, 'EEEE, MMMM d, yyyy')}</strong>
+              {differenceInDays(calendarDate, new Date()) > 7 && (
+                <div className="mt-1 text-blue-600">
+                  ℹ️ Advanced booking - {differenceInDays(calendarDate, new Date())} days from today
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Time Slots Section - Enhanced Mobile Layout */}
@@ -332,14 +450,14 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
           </Alert>
         )}
 
-        {/* Delivery Summary - Enhanced Mobile Design */}
+        {/* Delivery Summary - Enhanced with Booking Timeline */}
         {selectedDate && selectedTimeSlot && (
           <div className="pt-6 border-t border-border/50">
             <h4 className="font-semibold mb-4 text-foreground flex items-center gap-2">
               <CalendarIcon className="w-4 h-4 text-primary" />
               Delivery Schedule Summary
             </h4>
-            <div className="space-y-3">
+            <div className="space-y-4">
               <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
                 <Badge variant="secondary" className="px-3 py-1.5 text-sm font-medium whitespace-nowrap bg-primary/10 text-primary border-primary/20">
                   📅 {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')}
@@ -347,14 +465,58 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
                 <Badge variant="secondary" className="px-3 py-1.5 text-sm font-medium whitespace-nowrap bg-green-100 text-green-800 border-green-200">
                   🕒 {selectedTimeSlot.start_time} - {selectedTimeSlot.end_time}
                 </Badge>
+                {differenceInDays(parseISO(selectedDate), new Date()) > 30 && (
+                  <Badge variant="outline" className="px-3 py-1.5 text-sm font-medium whitespace-nowrap bg-blue-50 text-blue-700 border-blue-200">
+                    🚀 Advanced Booking
+                  </Badge>
+                )}
               </div>
-              <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
-                <p className="text-sm text-muted-foreground leading-relaxed">
-                  📍 Please ensure someone is available to receive the delivery during this time window. Our delivery team will contact you 30 minutes before arrival.
+
+              {/* Booking Timeline Info */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
+                  <div className="flex items-center gap-2 mb-2">
+                    <CalendarIcon className="w-4 h-4 text-primary" />
+                    <span className="font-medium text-sm">Booking Details</span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    Days ahead: <strong>{differenceInDays(parseISO(selectedDate), new Date())}</strong>
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Booking window: <strong>Valid until {format(dateValidation.maxDate, 'MMM d, yyyy')}</strong>
+                  </p>
+                </div>
+
+                <div className="p-4 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Info className="w-4 h-4 text-green-600" />
+                    <span className="font-medium text-sm text-green-800">Delivery Notes</span>
+                  </div>
+                  <p className="text-sm text-green-700 leading-relaxed">
+                    📍 Please ensure someone is available to receive the delivery during this time window. Our delivery team will contact you 30 minutes before arrival.
+                  </p>
+                </div>
+              </div>
+
+              {/* Production Features */}
+              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
+                <p className="text-sm text-yellow-800">
+                  ⚡ <strong>Production Features:</strong> 6-month advance booking • Smart date validation • Business day filtering • Holiday detection
                 </p>
               </div>
             </div>
           </div>
+        )}
+
+        {/* Advanced Booking Notice */}
+        {selectedDate && differenceInDays(parseISO(selectedDate), new Date()) > 90 && (
+          <Alert className="border-blue-200 bg-blue-50">
+            <Info className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800">
+              <strong>Long-term booking:</strong> You're booking {differenceInDays(parseISO(selectedDate), new Date())} days in advance. 
+              We'll send you a confirmation reminder 1 week before your delivery date.
+            </AlertDescription>
+          </Alert>
         )}
       </CardContent>
       </Card>

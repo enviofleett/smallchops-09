@@ -219,41 +219,58 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         {/* Calendar Section */}
         <div className="space-y-4">
           <h3 className="font-medium">Select Delivery Date</h3>
-          <div className="w-full overflow-hidden">
-            <Calendar mode="single" selected={calendarDate} onSelect={handleDateSelect} disabled={date => isDateDisabled(date) || isAfter(date, addDays(new Date(), 30))} className="w-full mx-auto rounded-md border pointer-events-auto scale-90 sm:scale-100 origin-top" classNames={{
-              months: "flex flex-col sm:flex-row space-y-4 sm:space-x-4 sm:space-y-0",
-              month: "space-y-4",
-              caption: "flex justify-center pt-1 relative items-center text-sm sm:text-base",
-              caption_label: "text-sm sm:text-base font-medium",
-              nav: "space-x-1 flex items-center",
-              nav_button: "h-7 w-7 bg-transparent p-0 hover:bg-accent hover:text-accent-foreground border rounded-md",
-              nav_button_previous: "absolute left-1",
-              nav_button_next: "absolute right-1",
-              table: "w-full border-collapse space-y-1",
-              head_row: "flex",
-              head_cell: "text-muted-foreground rounded-md w-8 sm:w-9 font-normal text-xs sm:text-sm",
-              row: "flex w-full mt-2",
-              cell: "text-center text-xs sm:text-sm p-0 relative [&:has([aria-selected])]:bg-accent first:[&:has([aria-selected])]:rounded-l-md last:[&:has([aria-selected])]:rounded-r-md focus-within:relative focus-within:z-20",
-              day: "h-8 w-8 sm:h-9 sm:w-9 p-0 font-normal aria-selected:opacity-100 hover:bg-accent hover:text-accent-foreground rounded-md transition-colors text-xs sm:text-sm touch-manipulation",
-              day_selected: "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground",
-              day_today: "bg-accent text-accent-foreground",
-              day_outside: "text-muted-foreground opacity-50",
-              day_disabled: "text-muted-foreground opacity-50",
-              day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
-              day_hidden: "invisible"
-            }} modifiers={{
-              holiday: date => getDateModifiers(date) === 'holiday',
-              closed: date => getDateModifiers(date) === 'closed'
-            }} modifiersStyles={{
-              holiday: {
-                backgroundColor: 'hsl(var(--destructive))',
-                color: 'hsl(var(--destructive-foreground))'
-              },
-              closed: {
-                backgroundColor: 'hsl(var(--muted))',
-                color: 'hsl(var(--muted-foreground))'
-              }
-            }} />
+          <div className="w-full overflow-hidden rounded-lg bg-background">
+            <Calendar 
+              mode="single" 
+              selected={calendarDate} 
+              onSelect={handleDateSelect} 
+              disabled={date => isDateDisabled(date) || isAfter(date, addDays(new Date(), 30))} 
+              className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200" 
+              classNames={{
+                months: "flex flex-col space-y-4",
+                month: "space-y-4 w-full",
+                caption: "flex justify-center pt-3 pb-2 relative items-center",
+                caption_label: "text-base md:text-lg font-semibold text-foreground",
+                nav: "space-x-1 flex items-center",
+                nav_button: "h-9 w-9 bg-background hover:bg-accent hover:text-accent-foreground border border-border rounded-lg transition-colors duration-200 touch-manipulation",
+                nav_button_previous: "absolute left-3",
+                nav_button_next: "absolute right-3",
+                table: "w-full border-collapse",
+                head_row: "flex mb-2",
+                head_cell: "text-muted-foreground rounded-md w-full max-w-10 font-medium text-xs uppercase tracking-wide py-2 text-center",
+                row: "flex w-full mt-1",
+                cell: "relative p-0 text-center focus-within:relative focus-within:z-20 w-full max-w-10",
+                day: cn(
+                  "h-10 w-10 mx-auto font-normal transition-all duration-200",
+                  "hover:bg-accent hover:text-accent-foreground rounded-lg",
+                  "focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                  "aria-selected:opacity-100 touch-manipulation",
+                  "active:scale-95 disabled:pointer-events-none"
+                ),
+                day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md",
+                day_today: "bg-accent text-accent-foreground font-semibold ring-2 ring-primary/20",
+                day_outside: "text-muted-foreground/40 opacity-50",
+                day_disabled: "text-muted-foreground/30 opacity-30 cursor-not-allowed",
+                day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
+                day_hidden: "invisible"
+              }} 
+              modifiers={{
+                holiday: date => getDateModifiers(date) === 'holiday',
+                closed: date => getDateModifiers(date) === 'closed'
+              }} 
+              modifiersStyles={{
+                holiday: {
+                  backgroundColor: 'hsl(var(--destructive) / 0.1)',
+                  color: 'hsl(var(--destructive))',
+                  border: '1px solid hsl(var(--destructive) / 0.3)'
+                },
+                closed: {
+                  backgroundColor: 'hsl(var(--muted))',
+                  color: 'hsl(var(--muted-foreground))',
+                  textDecoration: 'line-through'
+                }
+              }} 
+            />
           </div>
 
           {selectedSlot?.is_holiday && <Alert variant="destructive">
@@ -264,47 +281,81 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
             </Alert>}
         </div>
 
-        {/* Time Slots Section */}
-        {calendarDate && selectedDateSlots.length > 0 && <div className="space-y-4">
-            <h3 className="font-medium text-sm sm:text-base flex items-center gap-2">
-              <Clock className="w-4 h-4" />
+        {/* Time Slots Section - Enhanced Mobile Layout */}
+        {calendarDate && selectedDateSlots.length > 0 && (
+          <div className="space-y-4">
+            <h3 className="font-medium text-base flex items-center gap-2 text-foreground">
+              <Clock className="w-4 h-4 text-primary" />
               Select Delivery Time for {format(calendarDate, 'EEEE, MMMM d')}
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
-              {selectedDateSlots.map((timeSlot, index) => <Button key={index} variant={selectedTimeSlot?.start_time === timeSlot.start_time && selectedTimeSlot?.end_time === timeSlot.end_time ? "default" : "outline"} disabled={!timeSlot.available} onClick={() => handleTimeSlotSelect(timeSlot)} className={cn("h-auto min-h-[64px] p-3 sm:p-4 flex flex-col items-center justify-center gap-1 text-center touch-manipulation", "hover:scale-105 transition-all duration-200 active:scale-95", !timeSlot.available && "opacity-50 cursor-not-allowed", "sm:min-h-[72px] rounded-lg border-2")}>
-                  <span className="font-medium text-sm sm:text-base">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+              {selectedDateSlots.map((timeSlot, index) => (
+                <Button 
+                  key={index} 
+                  variant={selectedTimeSlot?.start_time === timeSlot.start_time && selectedTimeSlot?.end_time === timeSlot.end_time ? "default" : "outline"} 
+                  disabled={!timeSlot.available} 
+                  onClick={() => handleTimeSlotSelect(timeSlot)} 
+                  className={cn(
+                    "h-auto min-h-[72px] p-4 flex flex-col items-center justify-center gap-2 text-center",
+                    "transition-all duration-200 touch-manipulation rounded-xl border-2",
+                    "hover:scale-[1.02] active:scale-[0.98] focus:scale-[1.02]",
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                    !timeSlot.available && "opacity-50 cursor-not-allowed hover:scale-100",
+                    timeSlot.available && "hover:shadow-md",
+                    selectedTimeSlot?.start_time === timeSlot.start_time && selectedTimeSlot?.end_time === timeSlot.end_time && "ring-2 ring-primary ring-offset-2 shadow-lg"
+                  )}
+                >
+                  <span className="font-semibold text-sm leading-tight">
                     {timeSlot.start_time} - {timeSlot.end_time}
                   </span>
-                  {!timeSlot.available && timeSlot.reason && <span className="text-xs text-red-500 text-center leading-tight">
+                  {!timeSlot.available && timeSlot.reason && (
+                    <span className="text-xs text-destructive text-center leading-tight max-w-full">
                       {timeSlot.reason}
-                    </span>}
-                  {timeSlot.available && <span className="text-xs text-green-600">Available</span>}
-                </Button>)}
+                    </span>
+                  )}
+                  {timeSlot.available && (
+                    <span className="text-xs text-green-600 font-medium">Available</span>
+                  )}
+                </Button>
+              ))}
             </div>
-          </div>}
+          </div>
+        )}
 
-        {calendarDate && selectedDateSlots.length === 0 && !selectedSlot?.is_holiday && <Alert>
-            <AlertTriangle className="h-4 w-4" />
-            <AlertDescription>
-              No delivery slots available for the selected date.
+        {/* No Slots Available Alert - Enhanced */}
+        {calendarDate && selectedDateSlots.length === 0 && !selectedSlot?.is_holiday && (
+          <Alert className="border-orange-200 bg-orange-50">
+            <AlertTriangle className="h-4 w-4 text-orange-600" />
+            <AlertDescription className="text-orange-800">
+              No delivery slots available for the selected date. Please choose a different date or contact support for assistance.
             </AlertDescription>
-          </Alert>}
+          </Alert>
+        )}
 
-        {/* Summary */}
-        {selectedDate && selectedTimeSlot && <div className="pt-4 border-t">
-            <h4 className="font-medium mb-2">Delivery Schedule Summary</h4>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-              <Badge variant="secondary" className="whitespace-nowrap">
-                {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')}
-              </Badge>
-              <Badge variant="secondary" className="whitespace-nowrap">
-                {selectedTimeSlot.start_time} - {selectedTimeSlot.end_time}
-              </Badge>
+        {/* Delivery Summary - Enhanced Mobile Design */}
+        {selectedDate && selectedTimeSlot && (
+          <div className="pt-6 border-t border-border/50">
+            <h4 className="font-semibold mb-4 text-foreground flex items-center gap-2">
+              <CalendarIcon className="w-4 h-4 text-primary" />
+              Delivery Schedule Summary
+            </h4>
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                <Badge variant="secondary" className="px-3 py-1.5 text-sm font-medium whitespace-nowrap bg-primary/10 text-primary border-primary/20">
+                  📅 {format(parseISO(selectedDate), 'EEEE, MMMM d, yyyy')}
+                </Badge>
+                <Badge variant="secondary" className="px-3 py-1.5 text-sm font-medium whitespace-nowrap bg-green-100 text-green-800 border-green-200">
+                  🕒 {selectedTimeSlot.start_time} - {selectedTimeSlot.end_time}
+                </Badge>
+              </div>
+              <div className="p-4 bg-muted/30 rounded-lg border border-border/50">
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  📍 Please ensure someone is available to receive the delivery during this time window. Our delivery team will contact you 30 minutes before arrival.
+                </p>
+              </div>
             </div>
-            <p className="text-sm text-muted-foreground mt-2">
-              Please ensure someone is available to receive the delivery during this time window.
-            </p>
-          </div>}
+          </div>
+        )}
       </CardContent>
       </Card>
     </DeliverySchedulingErrorBoundary>;

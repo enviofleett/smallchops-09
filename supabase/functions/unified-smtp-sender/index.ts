@@ -301,36 +301,38 @@ async function processTemplate(
 
   if (templateKey) {
     try {
-      // First try the email_templates view (preferred)
-      const { data: viewTemplate } = await supabase
-        .from('email_templates')
-        .select('*')
+      // CRITICAL FIX 1: Prioritize enhanced_email_templates from Settings Page
+      const { data: enhancedTemplate } = await supabase
+        .from('enhanced_email_templates')
+        .select('template_type, subject, subject_template, html_content, html_template, text_content, text_template')
         .eq('template_key', templateKey)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (viewTemplate) {
-        template = viewTemplate;
-        templateType = viewTemplate.template_type || 'standard';
+      if (enhancedTemplate) {
+        template = {
+          subject: enhancedTemplate.subject || enhancedTemplate.subject_template,
+          html_content: enhancedTemplate.html_content || enhancedTemplate.html_template,
+          text_content: enhancedTemplate.text_content || enhancedTemplate.text_template,
+          template_type: enhancedTemplate.template_type || 'standard'
+        };
+        templateType = template.template_type;
         templateFound = true;
+        console.log(`✅ Using template from Email Template Manager: ${templateKey}`);
       } else {
-        // Fallback to enhanced_email_templates with field mapping
-        const { data: enhancedTemplate } = await supabase
-          .from('enhanced_email_templates')
-          .select('template_type, subject, subject_template, html_content, html_template, text_content, text_template')
+        // Fallback to legacy email_templates view (for backwards compatibility)
+        const { data: viewTemplate } = await supabase
+          .from('email_templates')
+          .select('*')
           .eq('template_key', templateKey)
           .eq('is_active', true)
           .maybeSingle();
 
-        if (enhancedTemplate) {
-          template = {
-            subject: enhancedTemplate.subject || enhancedTemplate.subject_template,
-            html_content: enhancedTemplate.html_content || enhancedTemplate.html_template,
-            text_content: enhancedTemplate.text_content || enhancedTemplate.text_template,
-            template_type: enhancedTemplate.template_type || 'standard'
-          };
-          templateType = template.template_type;
+        if (viewTemplate) {
+          template = viewTemplate;
+          templateType = viewTemplate.template_type || 'standard';
           templateFound = true;
+          console.warn(`⚠️ Using legacy template (consider migrating to Email Template Manager): ${templateKey}`);
         }
       }
     } catch (error) {
@@ -338,17 +340,17 @@ async function processTemplate(
     }
   }
 
-  // PRODUCTION MODE: Strict template enforcement
+  // CRITICAL FIX 2: Enhanced Production Mode Template Validation
   if (isProductionMode) {
     if (!templateKey) {
       throw new Error('PRODUCTION_MODE: All emails must specify a valid templateKey. Direct content emails are not allowed in production.');
     }
     
     if (!templateFound) {
-      throw new Error(`PRODUCTION_MODE: Template '${templateKey}' not found in database. Only active templates from enhanced_email_templates are allowed in production.`);
+      throw new Error(`PRODUCTION_MODE: Template '${templateKey}' not found in enhanced_email_templates. Only active templates from Email Template Manager are allowed in production.`);
     }
     
-    console.log(`✅ PRODUCTION_MODE: Using verified template '${templateKey}' from database`);
+    console.log(`✅ PRODUCTION_MODE: Using verified template '${templateKey}' from Email Template Manager`);
   }
 
   // DEVELOPMENT MODE: Log when fallback templates are used

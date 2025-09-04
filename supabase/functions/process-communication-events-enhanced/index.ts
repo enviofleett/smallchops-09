@@ -21,6 +21,38 @@ interface CommunicationEvent {
   error_message?: string
 }
 
+// CRITICAL FIX 3: Template Key Mapping for Production
+const TEMPLATE_KEY_MAPPING = {
+  'order_status_update': {
+    'confirmed': 'order_confirmed',
+    'preparing': 'order_preparing', 
+    'ready': 'order_ready',
+    'out_for_delivery': 'out_for_delivery',
+    'delivered': 'order_delivered',
+    'completed': 'order_completed'
+  },
+  'customer_welcome': 'customer_welcome',
+  'payment_confirmation': 'payment_confirmation',
+  'order_confirmation': 'order_confirmation',
+  'admin_notification': 'admin_new_order',
+  'password_reset': 'password_reset'
+};
+
+// Helper function to get correct template key
+function getTemplateKey(eventType: string, existingTemplateKey?: string, status?: string): string {
+  // If template_key is already provided, use it
+  if (existingTemplateKey) {
+    return existingTemplateKey;
+  }
+
+  // Map event types to template keys
+  if (eventType === 'order_status_update' && status) {
+    return TEMPLATE_KEY_MAPPING[eventType][status] || 'order_confirmed';
+  }
+
+  return TEMPLATE_KEY_MAPPING[eventType] || eventType;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -246,7 +278,7 @@ async function processOrderEmail(supabase: any, event: CommunicationEvent): Prom
     const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       headers: { 'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` },
       body: {
-        templateId: event.template_id || event.template_key || 'order_confirmation',
+        templateId: getTemplateKey(event.event_type, event.template_key, event.variables?.status),
         recipient: {
           email: event.recipient_email,
           name: enhancedVariables?.customerName || 'Valued Customer'
@@ -327,7 +359,7 @@ async function processPasswordResetEmail(supabase: any, event: CommunicationEven
 
     const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
-        templateId: event.template_id || event.template_key || 'password_reset',
+        templateId: getTemplateKey('password_reset', event.template_key),
         recipient: {
           email: event.recipient_email,
           name: enhancedVariables?.customerName || 'User'
@@ -356,7 +388,7 @@ async function processAdminNotification(supabase: any, event: CommunicationEvent
   try {
     const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
       body: {
-        templateId: event.template_id || event.template_key || 'admin_notification',
+        templateId: getTemplateKey('admin_notification', event.template_key),
         recipient: {
           email: event.recipient_email,
           name: 'Admin'

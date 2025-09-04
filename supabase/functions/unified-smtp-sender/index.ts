@@ -22,6 +22,17 @@ const RETRY_CONFIG = {
   jitterFactor: 0.1
 };
 
+// Utility function to mask SMTP config for logging
+function maskSMTPConfig(config: any) {
+  return {
+    ...config,
+    user: config.user ? config.user.replace(/.(?=.{2})/g, '*') : undefined,
+    username: config.username ? config.username.replace(/.(?=.{2})/g, '*') : undefined,
+    pass: config.pass ? '***MASKED***' : undefined,
+    password: config.password ? '***MASKED***' : undefined
+  };
+}
+
 // Helper function for timeouts
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, operation: string): Promise<T> {
   return Promise.race([
@@ -196,6 +207,27 @@ Never use placeholder, test, or hashed values in production.
         console.warn(`⚠️ Invalid SMTP_PORT value: "${secretPort}", using default 587`);
       }
     }
+    
+    // Gmail-specific validation for Function Secrets
+    if (secretHost?.includes('gmail.com') && port === 587) {
+      if (!secretUsername.includes('@')) {
+        throw new Error('Gmail SMTP requires full email address as username. Please set SMTP_USERNAME to your full Gmail address.');
+      }
+      const cleanPassword = secretPassword.replace(/\s+/g, '');
+      if (cleanPassword.length !== 16) {
+        throw new Error(`Gmail requires a 16-character App Password. Current password length: ${cleanPassword.length}. Generate one at https://myaccount.google.com/apppasswords`);
+      }
+    }
+
+    console.log('🔍 Production SMTP Configuration:', maskSMTPConfig({
+      source: 'function_secrets',
+      host: secretHost,
+      port: port,
+      username: secretUsername,
+      senderEmail: (secretFromEmail || secretUsername),
+      senderName: (secretFromName || 'System'),
+      encryption: secretEncryption || 'TLS'
+    }));
     
     return {
       host: secretHost.trim(),
@@ -863,10 +895,17 @@ function categorizeError(error: Error): { category: string; isTransient: boolean
   }
   
   if (message.includes('authentication failed') || message.includes('535')) {
+    let suggestion = 'Verify SMTP username and password credentials';
+    
+    // Enhanced guidance for Gmail 535 errors
+    if (message.includes('535') && message.includes('username and password not accepted')) {
+      suggestion = 'Gmail authentication failed. Common fixes: 1) Enable 2-Step Verification on your Google account, 2) Generate a 16-character App Password at https://myaccount.google.com/apppasswords (not your regular password), 3) Use your full Gmail address as SMTP_USERNAME, 4) Remove spaces from App Password';
+    }
+    
     return {
       category: 'auth',
       isTransient: false,
-      suggestion: 'Verify SMTP username and password credentials'
+      suggestion: suggestion
     };
   }
   

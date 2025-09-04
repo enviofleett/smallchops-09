@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { useCartTracking } from '@/hooks/useCartTracking';
 import { calculateAdvancedOrderDiscount, CartPromotion } from '@/lib/discountCalculations';
 import { calculateCartVATSummary } from '@/lib/vatCalculations';
@@ -114,23 +114,23 @@ export const useCart = () => {
     setIsInitialized(true);
   }, []); // Remove isInitialized dependency to prevent loops
 
-  // Save cart to localStorage with debouncing for production stability
+  // Save cart to localStorage with optimized debouncing
   useEffect(() => {
-    if (!isInitialized) return; // Don't save during initialization
+    if (!isInitialized) return;
     
     const timeoutId = setTimeout(() => {
       try {
-        console.log('🛒 useCart - Saving cart to localStorage:', cart);
         localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cart));
       } catch (error) {
         console.error('🛒 useCart - Error saving cart:', error);
       }
-    }, 100); // Debounce saves for performance
+    }, 50); // Reduced debounce for faster persistence
 
     return () => clearTimeout(timeoutId);
   }, [cart, isInitialized]);
 
-  const calculateCartSummary = (
+  // Memoized cart calculations for performance
+  const calculateCartSummary = useCallback((
     items: CartItem[], 
     deliveryFee = 0, 
     promotionCode?: string
@@ -170,12 +170,12 @@ export const useCart = () => {
     const total_amount = subtotal + finalDeliveryFee - promotionResult.total_discount;
 
     return {
-      items: items, // Use original items, don't replace with promotion result items
+      items: items,
       summary: {
         subtotal: Math.round(subtotal * 100) / 100,
         subtotal_cost: Math.round(vatSummary.subtotal_cost * 100) / 100,
         total_vat: Math.round(vatSummary.total_vat * 100) / 100,
-        tax_amount: 0, // Deprecated - VAT replaces this
+        tax_amount: 0,
         delivery_fee: Math.round(deliveryFee * 100) / 100,
         discount_amount: Math.round(promotionResult.total_discount * 100) / 100,
         delivery_discount: Math.round(promotionResult.delivery_discount * 100) / 100,
@@ -185,7 +185,7 @@ export const useCart = () => {
       itemCount,
       promotion_code: promotionCode
     };
-  };
+  }, [promotions]);
 
   const addItem = (product: {
     id: string;
@@ -274,28 +274,35 @@ export const useCart = () => {
     }
   };
 
-  const removeItem = (cartItemId: string) => {
+  const removeItem = useCallback((cartItemId: string) => {
+    // Optimistic update: immediately filter out the item
     const updatedItems = cart.items.filter(item => item.id !== cartItemId);
-    setCart(calculateCartSummary(updatedItems, 0, cart.promotion_code)); // No delivery fee in cart
-  };
+    
+    // Immediate calculation and state update
+    const newCart = calculateCartSummary(updatedItems, 0, cart.promotion_code);
+    setCart(newCart);
+  }, [cart.items, cart.promotion_code, calculateCartSummary]);
 
-  const updateQuantity = (cartItemId: string, quantity: number) => {
+  const updateQuantity = useCallback((cartItemId: string, quantity: number) => {
     if (quantity <= 0) {
       removeItem(cartItemId);
       return;
     }
 
+    // Optimistic update: immediately update the quantity
     const updatedItems = cart.items.map(item => {
       if (item.id === cartItemId) {
         const moq = item.minimum_order_quantity || 1;
-        // Ensure quantity meets MOQ
         const validQuantity = Math.max(quantity, moq);
         return { ...item, quantity: validQuantity };
       }
       return item;
     });
-    setCart(calculateCartSummary(updatedItems, 0, cart.promotion_code)); // No delivery fee in cart
-  };
+    
+    // Immediate calculation and state update
+    const newCart = calculateCartSummary(updatedItems, 0, cart.promotion_code);
+    setCart(newCart);
+  }, [cart.items, cart.promotion_code, calculateCartSummary, removeItem]);
 
   const clearCart = () => {
     console.log('🛒 Clearing cart and all related data...');

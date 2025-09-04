@@ -17,7 +17,7 @@ import { useEmailService } from '@/hooks/useEmailService';
 import { useSMTPSettings } from '@/hooks/useSMTPSettings';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { Mail, Settings, FileText, TestTube, Activity, BarChart3, AlertCircle, CheckCircle, Clock, Send, TrendingUp, User, Zap } from 'lucide-react';
+import { Mail, Settings, FileText, TestTube, Activity, BarChart3, AlertCircle, CheckCircle, Clock, Send, TrendingUp, User, Zap, Shield, Key } from 'lucide-react';
 import { DeliverySchedulingTab } from './DeliverySchedulingTab';
 import { LegalTermsManager } from './LegalTermsManager';
 import { SMTPIntegrationDiagnostics } from './SMTPIntegrationDiagnostics';
@@ -41,6 +41,12 @@ export const CommunicationsTab = () => {
   const [connectionStatus, setConnectionStatus] = useState<'success' | 'error' | null>(null);
   const [processingQueue, setProcessingQueue] = useState(false);
   const [emailStats, setEmailStats] = useState<EmailStats | null>(null);
+  const [productionStatus, setProductionStatus] = useState<{
+    configured: boolean;
+    source: string;
+    message: string;
+  } | null>(null);
+  
   const {
     deliveryLogs,
     isLoadingLogs
@@ -49,6 +55,39 @@ export const CommunicationsTab = () => {
     settings: smtpSettings,
     isLoading: isLoadingSettings
   } = useSMTPSettings();
+
+  // Check production credentials status
+  React.useEffect(() => {
+    const checkProductionStatus = async () => {
+      try {
+        const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+          body: {
+            healthcheck: true,
+            check: 'smtp'
+          }
+        });
+
+        if (data?.smtpCheck) {
+          setProductionStatus({
+            configured: data.smtpCheck.configured,
+            source: data.smtpCheck.source || 'unknown',
+            message: data.smtpCheck.configured 
+              ? `Production ready! Using ${data.smtpCheck.source === 'function_secrets' ? 'Edge Function Secrets' : 'Database Configuration'}`
+              : 'SMTP credentials not configured properly'
+          });
+        }
+      } catch (error) {
+        console.warn('Failed to check production status:', error);
+        setProductionStatus({
+          configured: false,
+          source: 'error',
+          message: 'Unable to verify production configuration'
+        });
+      }
+    };
+
+    checkProductionStatus();
+  }, []);
 
   // Calculate email statistics
   React.useEffect(() => {
@@ -78,46 +117,45 @@ export const CommunicationsTab = () => {
       toast.error('Please enter an email address');
       return;
     }
+    
     setTestingConnection(true);
     setConnectionStatus(null);
+    
     try {
-      const {
-        data,
-        error
-      } = await supabase.functions.invoke('unified-smtp-sender', {
+      // Use production-safe template-based email sending
+      const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: testEmail,
-          subject: 'SMTP Connection Test - ' + new Date().toISOString(),
-          html: `
-            <h2>SMTP Connection Test</h2>
-            <p>This is a test email to verify your SMTP configuration is working correctly.</p>
-            <p><strong>Sent at:</strong> ${new Date().toLocaleString()}</p>
-            <p>If you received this email, your SMTP settings are configured properly.</p>
-          `,
-          text: `SMTP Connection Test - Sent at ${new Date().toLocaleString()}`
+          templateKey: 'smtp_connection_test',
+          variables: {
+            timestamp: new Date().toLocaleString()
+          }
         }
       });
+      
       if (error) {
         throw error;
       }
+      
       setConnectionStatus('success');
-      toast.success('Test email sent successfully!');
+      toast.success('✅ Test email sent successfully! Check your inbox.');
     } catch (error: any) {
       console.error('Test email error:', error);
       setConnectionStatus('error');
-      toast.error(`Test failed: ${error.message}`);
+      toast.error(`❌ Test failed: ${error.message}`);
     } finally {
       setTestingConnection(false);
     }
   };
   const processEmailQueue = async () => {
     setProcessingQueue(true);
+    
     try {
-      const { data, error } = await supabase.functions.invoke('email-core', {
+      // Use the unified email queue processor for production consistency
+      const { data, error } = await supabase.functions.invoke('unified-email-queue-processor', {
         body: { 
-          action: 'process_queue',
-          batch_size: 50,
-          priority_filter: 'all'
+          batchSize: 50,
+          priority: 'all'
         }
       });
       
@@ -125,11 +163,16 @@ export const CommunicationsTab = () => {
         throw error;
       }
       
-      const result = data as { processed?: number; failed?: number };
-      toast.success(`Processed ${result.processed || 0} emails, ${result.failed || 0} failed`);
+      const result = data as { processed?: number; failed?: number; success?: boolean };
+      
+      if (result.success) {
+        toast.success(`✅ Processed ${result.processed || 0} emails, ${result.failed || 0} failed`);
+      } else {
+        throw new Error('Queue processing returned failure status');
+      }
     } catch (error: any) {
       console.error('Queue processing error:', error);
-      toast.error(`Queue processing failed: ${error.message}`);
+      toast.error(`❌ Queue processing failed: ${error.message}`);
     } finally {
       setProcessingQueue(false);
     }
@@ -174,13 +217,57 @@ export const CommunicationsTab = () => {
             Complete email system management - SMTP settings, templates, analytics, and testing
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-center">
+          {/* Production Status Indicator */}
+          {productionStatus && (
+            <Badge 
+              variant={productionStatus.configured ? "default" : "destructive"}
+              className="flex items-center gap-1"
+            >
+              {productionStatus.configured ? (
+                <Shield className="h-3 w-3" />
+              ) : (
+                <Key className="h-3 w-3" />
+              )}
+              {productionStatus.source === 'function_secrets' ? 'Production Ready' : 
+               productionStatus.configured ? 'Database Config' : 'Setup Required'}
+            </Badge>
+          )}
           <Button onClick={processEmailQueue} disabled={processingQueue} variant="outline">
             <Send className="mr-2 h-4 w-4" />
             {processingQueue ? 'Processing...' : 'Process Queue'}
           </Button>
         </div>
       </div>
+
+      {/* Production Configuration Alert */}
+      {productionStatus && !productionStatus.configured && (
+        <Alert className="border-yellow-200 bg-yellow-50">
+          <AlertCircle className="h-4 w-4 text-yellow-600" />
+          <AlertDescription className="text-yellow-800">
+            <strong>Production Setup Required:</strong> Configure SMTP credentials in Edge Function Secrets for production use. 
+            {' '}
+            <a 
+              href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/settings/functions" 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="underline font-medium"
+            >
+              Add Function Secrets →
+            </a>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Production Success Status */}
+      {productionStatus?.configured && productionStatus.source === 'function_secrets' && (
+        <Alert className="border-green-200 bg-green-50">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">
+            <strong>Production Ready:</strong> SMTP credentials configured in Edge Function Secrets. Your email system is ready for production deployment.
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Email Statistics */}
       {emailStats && <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">

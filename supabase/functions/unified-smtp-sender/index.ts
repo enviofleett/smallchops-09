@@ -65,7 +65,7 @@ function parseResponse(response: string): SMTPResponse {
 }
 
 // Validate SMTP configuration values to detect invalid hashed secrets
-function isValidSMTPConfig(host: string, port: string, username: string, password: string): { 
+function isValidSMTPConfig(host: string, port: string, user: string, pass: string): { 
   isValid: boolean; 
   errors: string[];
   suggestions: string[];
@@ -86,14 +86,14 @@ function isValidSMTPConfig(host: string, port: string, username: string, passwor
     suggestions.push('Set SMTP_PORT to your email provider port (usually 587 or 465)');
   }
   
-  if (hashPattern.test(username)) {
-    errors.push(`SMTP_USERNAME appears to be a hashed value (${username.substring(0,8)}...), needs actual email/username`);
-    suggestions.push('Set SMTP_USERNAME to your email address or API username');
+  if (hashPattern.test(user)) {
+    errors.push(`SMTP_USER appears to be a hashed value (${user.substring(0,8)}...), needs actual email/username`);
+    suggestions.push('Set SMTP_USER to your email address or API username');
   }
   
-  if (hashPattern.test(password)) {
-    errors.push(`SMTP_PASSWORD appears to be a hashed value (${password.substring(0,8)}...), needs actual password`);
-    suggestions.push('Set SMTP_PASSWORD to your email password or API key');
+  if (hashPattern.test(pass)) {
+    errors.push(`SMTP_PASS appears to be a hashed value (${pass.substring(0,8)}...), needs actual password`);
+    suggestions.push('Set SMTP_PASS to your email password or API key');
   }
   
   // Validate hostname format
@@ -109,20 +109,20 @@ function isValidSMTPConfig(host: string, port: string, username: string, passwor
     suggestions.push('Use port 587 for most providers, or 465 for SSL connections');
   }
   
-  // Basic email validation for username
-  if (username && !username.includes('@') && !username.includes('apikey') && username.length < 10) {
-    errors.push(`SMTP_USERNAME "${username}" should typically be an email address or API key`);
+  // Basic email validation for user
+  if (user && !user.includes('@') && !user.includes('apikey') && user.length < 10) {
+    errors.push(`SMTP_USER "${user}" should typically be an email address or API key`);
     suggestions.push('Use your full email address for Gmail/Outlook, or "apikey" for SendGrid');
   }
   
   // Check for obvious placeholder/test values
-  if (username.toLowerCase().includes('test') || username.toLowerCase().includes('example') || username.toLowerCase() === 'starters') {
-    errors.push(`SMTP_USERNAME "${username}" appears to be a placeholder or test value`);
+  if (user.toLowerCase().includes('test') || user.toLowerCase().includes('example') || user.toLowerCase() === 'starters') {
+    errors.push(`SMTP_USER "${user}" appears to be a placeholder or test value`);
     suggestions.push('Replace with your actual SMTP username/email address');
   }
   
-  if (password.toLowerCase().includes('test') || password.toLowerCase().includes('example') || password.length < 8) {
-    errors.push(`SMTP_PASSWORD appears to be a placeholder or test value`);
+  if (pass.toLowerCase().includes('test') || pass.toLowerCase().includes('example') || pass.length < 8) {
+    errors.push(`SMTP_PASS appears to be a placeholder or test value`);
     suggestions.push('Use your actual email password or API key (at least 8 characters)');
   }
   
@@ -146,14 +146,11 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
 }> {
   console.log('🔍 Loading SMTP configuration...');
   
-// Priority 1: Function Secrets (Production)
+// Priority 1: Function Secrets (Production) - Using standardized variable names
   const secretHost = Deno.env.get('SMTP_HOST');
   const secretPort = Deno.env.get('SMTP_PORT');
-  const secretUsername = Deno.env.get('SMTP_USERNAME');
-  const secretPassword = Deno.env.get('SMTP_PASSWORD');
-  const secretEncryption = Deno.env.get('SMTP_ENCRYPTION');
-  const secretFromName = Deno.env.get('SMTP_FROM_NAME');
-  const secretFromEmail = Deno.env.get('SMTP_FROM_EMAIL');
+  const secretUser = Deno.env.get('SMTP_USER');
+  const secretPass = Deno.env.get('SMTP_PASS');
 
   // CRITICAL: In production, REQUIRE complete Function Secrets
   const isProduction = Deno.env.get('DENO_ENV') === 'production' || 
@@ -163,9 +160,9 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
   if (isProduction) {
     const missingSecrets = [];
     if (!secretHost) missingSecrets.push('SMTP_HOST');
-    if (!secretUsername) missingSecrets.push('SMTP_USERNAME'); 
-    if (!secretPassword) missingSecrets.push('SMTP_PASSWORD');
-    if (!secretFromEmail) missingSecrets.push('SMTP_FROM_EMAIL');
+    if (!secretPort) missingSecrets.push('SMTP_PORT');
+    if (!secretUser) missingSecrets.push('SMTP_USER'); 
+    if (!secretPass) missingSecrets.push('SMTP_PASS');
 
     if (missingSecrets.length > 0) {
       const errorMsg = `
@@ -176,11 +173,8 @@ SETUP REQUIRED:
 2. Add the missing Function Secrets with your actual SMTP credentials:
    - SMTP_HOST: Your email provider hostname (e.g., smtp.gmail.com)
    - SMTP_PORT: Usually 587 or 465  
-   - SMTP_USERNAME: Your email address or API username
-   - SMTP_PASSWORD: Your email password or API key
-   - SMTP_FROM_EMAIL: The email address to send from
-   - SMTP_FROM_NAME: The display name for outgoing emails
-   - SMTP_ENCRYPTION: Usually STARTTLS or TLS
+   - SMTP_USER: Your email address or API username
+   - SMTP_PASS: Your email password or API key
 
 SECURITY: Never use placeholder, test, or hashed values in production.
       `.trim();
@@ -190,15 +184,15 @@ SECURITY: Never use placeholder, test, or hashed values in production.
     }
   }
 
-  if (secretHost && secretUsername && secretPassword) {
+  if (secretHost && secretUser && secretPass) {
     console.log('✅ Using production SMTP configuration from Function Secrets');
     
     // CRITICAL: Validate that secrets contain actual values, not hashes
     const validation = isValidSMTPConfig(
       secretHost, 
       secretPort || '587', 
-      secretUsername, 
-      secretPassword
+      secretUser, 
+      secretPass
     );
     
     if (!validation.isValid) {
@@ -245,10 +239,10 @@ Never use placeholder, test, or hashed values in production.
     
     // Gmail-specific validation for Function Secrets
     if (secretHost?.includes('gmail.com') && port === 587) {
-      if (!secretUsername.includes('@')) {
-        throw new Error('Gmail SMTP requires full email address as username. Please set SMTP_USERNAME to your full Gmail address.');
+      if (!secretUser.includes('@')) {
+        throw new Error('Gmail SMTP requires full email address as username. Please set SMTP_USER to your full Gmail address.');
       }
-      const cleanPassword = secretPassword.replace(/\s+/g, '');
+      const cleanPassword = secretPass.replace(/\s+/g, '');
       if (cleanPassword.length !== 16) {
         throw new Error(`Gmail requires a 16-character App Password. Current password length: ${cleanPassword.length}. Generate one at https://myaccount.google.com/apppasswords`);
       }
@@ -258,21 +252,21 @@ Never use placeholder, test, or hashed values in production.
       source: 'function_secrets',
       host: secretHost,
       port: port,
-      username: secretUsername,
-      senderEmail: (secretFromEmail || secretUsername),
-      senderName: (secretFromName || 'System'),
-      encryption: secretEncryption || 'TLS'
+      username: secretUser,
+      senderEmail: secretUser,
+      senderName: 'System',
+      encryption: 'TLS'
     }));
     
     return {
       host: secretHost.trim(),
       port: port,
-      username: secretUsername.trim(),
+      username: secretUser.trim(),
       // Normalize password: remove spaces that are sometimes copied from UI (e.g., Gmail App Passwords)
-      password: secretPassword.replace(/\s+/g, '').trim(),
-      senderEmail: (secretFromEmail || secretUsername).trim(),
-      senderName: (secretFromName || 'System').trim(),
-      encryption: secretEncryption?.trim() || 'TLS',
+      password: secretPass.replace(/\s+/g, '').trim(),
+      senderEmail: secretUser.trim(),
+      senderName: 'System',
+      encryption: 'TLS',
       source: 'function_secrets'
     };
   }

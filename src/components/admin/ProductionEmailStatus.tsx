@@ -66,9 +66,9 @@ export const ProductionEmailStatus: React.FC = () => {
 
       setTemplateStatuses(templateResults);
 
-      // Check email system health
-      const { data: healthData, error: healthError } = await supabase.functions.invoke('unified-smtp-sender', {
-        method: 'GET'
+      // Check email system health using the standardized healthcheck
+      const { data: healthData, error: healthError } = await supabase.functions.invoke('smtp-auth-healthcheck', {
+        method: 'POST'
       });
 
       if (!healthError && healthData) {

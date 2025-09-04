@@ -16,6 +16,7 @@ interface EmailRequest {
   subject: string;
   html?: string;
   text?: string;
+  healthcheck?: boolean; // Add healthcheck flag
 }
 
 // Response interface
@@ -27,40 +28,94 @@ interface EmailResponse {
   messageId?: string;
 }
 
-// Validate and load SMTP configuration from environment variables
+// Configuration loading and validation with standardized variable names
 function loadSMTPConfig(): SMTPConfig {
   const host = Deno.env.get('SMTP_HOST');
   const port = Deno.env.get('SMTP_PORT');
-  const username = Deno.env.get('SMTP_USER');
-  const password = Deno.env.get('SMTP_PASS');
+  const user = Deno.env.get('SMTP_USER');
+  const pass = Deno.env.get('SMTP_PASS');
 
-  const missingVars: string[] = [];
-  if (!host) missingVars.push('SMTP_HOST');
-  if (!port) missingVars.push('SMTP_PORT');
-  if (!username) missingVars.push('SMTP_USER');
-  if (!password) missingVars.push('SMTP_PASS');
-
-  if (missingVars.length > 0) {
-    throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  if (!host || !user || !pass) {
+    throw new Error('Missing required SMTP configuration. Set SMTP_HOST, SMTP_USER, and SMTP_PASS environment variables.');
   }
 
-  const portNumber = parseInt(port!, 10);
-  if (isNaN(portNumber) || portNumber <= 0 || portNumber > 65535) {
-    throw new Error(`Invalid SMTP_PORT: ${port}. Must be a valid port number (1-65535)`);
-  }
-
-  // Validate host format (basic hostname validation)
-  if (!host!.includes('.') || host!.includes('://')) {
-    throw new Error(`Invalid SMTP_HOST: ${host}. Must be a valid hostname (e.g., smtp.gmail.com)`);
-  }
-
-  return {
-    host: host!,
-    port: portNumber,
-    username: username!,
-    password: password!,
-    secure: portNumber === 465 // Use SSL for port 465, STARTTLS for others
+  const config: SMTPConfig = {
+    host: host.trim(),
+    port: port ? parseInt(port.trim(), 10) : 587,
+    username: user.trim(),
+    password: pass.trim(),
+    secure: false // Use STARTTLS
   };
+
+  // Validate port range
+  if (isNaN(config.port) || config.port < 1 || config.port > 65535) {
+    throw new Error(`Invalid SMTP_PORT: ${port}. Must be a number between 1-65535.`);
+  }
+
+  console.log(`SMTP Config loaded: ${config.host}:${config.port} for ${config.username.replace(/.(?=.{2})/g, '*')}`);
+  return config;
+}
+
+// SMTP healthcheck function
+async function performHealthCheck(config: SMTPConfig): Promise<{ success: boolean; details: string }> {
+  console.log('🔍 Performing SMTP health check...');
+  
+  let connection: Deno.TcpConn | null = null;
+  
+  try {
+    // Test TCP connection with timeout
+    const connectPromise = Deno.connect({
+      hostname: config.host,
+      port: config.port,
+      transport: "tcp"
+    });
+    
+    connection = await Promise.race([
+      connectPromise,
+      new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Connection timeout')), 10000)
+      )
+    ]);
+
+    console.log(`✅ Successfully connected to ${config.host}:${config.port}`);
+
+    // Send EHLO and check response
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
+    
+    await connection.write(encoder.encode(`EHLO test\r\n`));
+    
+    const buffer = new Uint8Array(1024);
+    const n = await connection.read(buffer);
+    const response = decoder.decode(buffer.subarray(0, n || 0));
+    
+    if (response.startsWith('220') || response.startsWith('250')) {
+      console.log('✅ SMTP server responded successfully to EHLO');
+      await connection.write(encoder.encode(`QUIT\r\n`));
+      
+      return {
+        success: true,
+        details: `Connected to ${config.host}:${config.port}, EHLO successful`
+      };
+    } else {
+      throw new Error(`Unexpected SMTP response: ${response.substring(0, 100)}`);
+    }
+    
+  } catch (error) {
+    console.error('❌ SMTP health check failed:', error.message);
+    return {
+      success: false,
+      details: `Health check failed: ${error.message}`
+    };
+  } finally {
+    if (connection) {
+      try {
+        connection.close();
+      } catch (e) {
+        console.warn('Warning: Error closing SMTP connection:', e.message);
+      }
+    }
+  }
 }
 
 // Basic SMTP connection and email sending
@@ -242,6 +297,32 @@ const handler = async (req: Request): Promise<Response> => {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
+    }
+
+    // Handle healthcheck requests
+    if (emailRequest.healthcheck) {
+      console.log('🔍 Healthcheck request received');
+      const healthResult = await performHealthCheck(smtpConfig);
+      
+      return new Response(
+        JSON.stringify({
+          status: healthResult.success ? 'success' : 'error',
+          to: '',
+          subject: '',
+          error: healthResult.success ? undefined : healthResult.details,
+          smtpCheck: {
+            configured: true,
+            source: 'function_secrets',
+            host: smtpConfig.host,
+            port: smtpConfig.port,
+            details: healthResult.details
+          }
+        }),
+        {
+          status: healthResult.success ? 200 : 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
 
     // Validate email request

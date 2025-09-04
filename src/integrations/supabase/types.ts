@@ -6663,6 +6663,89 @@ export type Database = {
           },
         ]
       }
+      promotion_code_rate_limits: {
+        Row: {
+          attempt_count: number
+          blocked_until: string | null
+          created_at: string | null
+          id: string
+          identifier: string
+          updated_at: string | null
+          window_hour: string
+        }
+        Insert: {
+          attempt_count?: number
+          blocked_until?: string | null
+          created_at?: string | null
+          id?: string
+          identifier: string
+          updated_at?: string | null
+          window_hour?: string
+        }
+        Update: {
+          attempt_count?: number
+          blocked_until?: string | null
+          created_at?: string | null
+          id?: string
+          identifier?: string
+          updated_at?: string | null
+          window_hour?: string
+        }
+        Relationships: []
+      }
+      promotion_security_audit: {
+        Row: {
+          action_type: string
+          created_at: string | null
+          customer_email: string | null
+          customer_id: string | null
+          discount_calculated: number | null
+          failure_reason: string | null
+          id: string
+          ip_address: unknown | null
+          metadata: Json | null
+          order_amount: number | null
+          promotion_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string | null
+          customer_email?: string | null
+          customer_id?: string | null
+          discount_calculated?: number | null
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          order_amount?: number | null
+          promotion_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string | null
+          customer_email?: string | null
+          customer_id?: string | null
+          discount_calculated?: number | null
+          failure_reason?: string | null
+          id?: string
+          ip_address?: unknown | null
+          metadata?: Json | null
+          order_amount?: number | null
+          promotion_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "promotion_security_audit_promotion_id_fkey"
+            columns: ["promotion_id"]
+            isOneToOne: false
+            referencedRelation: "promotions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       promotion_usage: {
         Row: {
           customer_email: string
@@ -8385,6 +8468,15 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      check_promotion_code_rate_limit: {
+        Args: {
+          p_block_minutes?: number
+          p_identifier: string
+          p_max_attempts?: number
+          p_window_hours?: number
+        }
+        Returns: Json
+      }
       check_rate_limit: {
         Args: {
           p_identifier: string
@@ -8465,6 +8557,10 @@ export type Database = {
       cleanup_old_health_checks: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      cleanup_promotion_rate_limits: {
+        Args: Record<PropertyKey, never>
+        Returns: number
       }
       clear_production_data: {
         Args: Record<PropertyKey, never>
@@ -9606,6 +9702,17 @@ export type Database = {
       validate_phone_number: {
         Args: { phone_text: string }
         Returns: boolean
+      }
+      validate_promotion_code_secure: {
+        Args: {
+          p_code: string
+          p_customer_email?: string
+          p_customer_id?: string
+          p_ip_address?: unknown
+          p_order_amount: number
+          p_user_agent?: string
+        }
+        Returns: Json
       }
       validate_promotion_usage: {
         Args: {

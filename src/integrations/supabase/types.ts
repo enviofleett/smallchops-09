@@ -8573,6 +8573,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Json
       }
+      execute_go_live: {
+        Args: Record<PropertyKey, never>
+        Returns: string
+      }
       execute_go_live_cleanup: {
         Args: Record<PropertyKey, never>
         Returns: Json

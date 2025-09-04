@@ -9370,6 +9370,14 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      reset_for_go_live: {
+        Args: {
+          p_dry_run?: boolean
+          p_include_audit_logs?: boolean
+          p_reset_sequences?: boolean
+        }
+        Returns: Json
+      }
       safe_delete_product: {
         Args: { product_id: string }
         Returns: Json

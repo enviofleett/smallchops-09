@@ -21,6 +21,7 @@ import { ErrorTrackerComponent } from "./components/monitoring/ErrorTracker";
 import { NetworkProvider } from "./components/network/NetworkProvider";
 import { OnlineStatusBanner } from "./components/network/OnlineStatusBanner";
 import { DeploymentInfo } from "./components/common/DeploymentInfo";
+import { NotificationIntegration } from "@/components/notifications/NotificationIntegration";
 import AdminLayout from "./components/layout/AdminLayout";
 
 // Initialize payment monitoring and cache busting
@@ -192,8 +193,9 @@ const App = () => {
           <Sonner />
           <DynamicFavicon />
           <OnlineStatusBanner />
-          <NotificationProvider>
-            <AuthProvider>
+           <NotificationProvider>
+             <NotificationIntegration />
+             <AuthProvider>
             <BrowserRouter>
             <Routes>
               {/* Customer store at root */}

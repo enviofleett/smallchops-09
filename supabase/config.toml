@@ -24,7 +24,7 @@ enable_phone_autoconfirm = false
 verify_jwt = true
 
 [functions.unified-smtp-sender]
-verify_jwt = false
+verify_jwt = true
 
 [functions.unified-email-queue-processor]
 verify_jwt = false
@@ -130,4 +130,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.recover-order-schedule]
+verify_jwt = true
+
+[functions.email-queue-cleanup]
 verify_jwt = true

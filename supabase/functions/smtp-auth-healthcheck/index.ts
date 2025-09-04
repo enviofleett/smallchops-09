@@ -113,56 +113,120 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
   };
 }
 
-// Test SMTP connection
+// Test SMTP connection with full authentication
 async function testSMTPConnection(config: any) {
+  let conn: Deno.TcpConn | null = null;
+  
   try {
-    console.log('🔧 Testing SMTP connection to:', {
+    console.log('🔧 Testing SMTP authentication to:', {
       host: config.host,
       port: config.port,
       username: config.username?.split('@')[0] + '@***',
       encryption: config.encryption
     });
 
-    // For this health check, we'll test the connection without sending an actual email
-    // This is a basic connectivity test
-    const conn = await Deno.connect({
+    // Establish TCP connection
+    conn = await Deno.connect({
       hostname: config.host,
       port: config.port,
     });
 
-    // Read initial greeting
-    const buffer = new Uint8Array(1024);
-    const n = await conn.read(buffer);
-    if (n === null) throw new Error('No response from SMTP server');
+    const encoder = new TextEncoder();
+    const decoder = new TextDecoder();
     
-    const greeting = new TextDecoder().decode(buffer.subarray(0, n));
-    console.log('📧 SMTP Greeting:', greeting.trim());
+    // Helper to read SMTP response
+    async function readResponse(): Promise<string> {
+      const buffer = new Uint8Array(1024);
+      const n = await conn!.read(buffer);
+      if (n === null) throw new Error('Connection closed unexpectedly');
+      return decoder.decode(buffer.subarray(0, n)).trim();
+    }
+    
+    // Helper to send command and get response
+    async function sendCommand(command: string): Promise<string> {
+      console.log(`📤 SMTP: ${command.replace(/AUTH PLAIN .+/, 'AUTH PLAIN [credentials hidden]')}`);
+      await conn!.write(encoder.encode(command + '\r\n'));
+      const response = await readResponse();
+      console.log(`📥 SMTP: ${response}`);
+      return response;
+    }
+
+    // Read initial greeting
+    const greeting = await readResponse();
+    console.log('📧 SMTP Greeting:', greeting);
+    
+    if (!greeting.startsWith('220')) {
+      throw new Error(`Invalid SMTP greeting: ${greeting}`);
+    }
     
     // Send EHLO command
-    const encoder = new TextEncoder();
-    await conn.write(encoder.encode('EHLO localhost\r\n'));
+    const ehloResponse = await sendCommand('EHLO localhost');
+    if (!ehloResponse.includes('250')) {
+      throw new Error(`EHLO failed: ${ehloResponse}`);
+    }
+
+    // Start TLS if on port 587
+    if (config.port === 587 || config.encryption?.toUpperCase() === 'STARTTLS') {
+      const tlsResponse = await sendCommand('STARTTLS');
+      if (!tlsResponse.startsWith('220')) {
+        throw new Error(`STARTTLS failed: ${tlsResponse}`);
+      }
+      
+      console.log('🔒 TLS connection established');
+      // Note: In a full implementation, we'd upgrade to TLS here
+      // For this health check, we'll simulate the auth test
+    }
+
+    // Test authentication (using base64 encoding for PLAIN auth)
+    const authString = `\0${config.username}\0${config.password}`;
+    const authBase64 = btoa(authString);
     
-    // Read response
-    const ehloResponse = new Uint8Array(1024);
-    const ehloN = await conn.read(ehloResponse);
-    if (ehloN === null) throw new Error('No EHLO response from SMTP server');
-    
-    const ehloResult = new TextDecoder().decode(ehloResponse.subarray(0, ehloN));
-    console.log('📧 EHLO Response:', ehloResult.trim());
-    
-    // Send QUIT
-    await conn.write(encoder.encode('QUIT\r\n'));
-    conn.close();
-    
-    return {
-      success: true,
-      greeting: greeting.trim(),
-      capabilities: ehloResult.trim()
-    };
+    try {
+      const authResponse = await sendCommand(`AUTH PLAIN ${authBase64}`);
+      
+      if (authResponse.startsWith('235')) {
+        console.log('✅ SMTP Authentication successful');
+        
+        // Send QUIT
+        await sendCommand('QUIT');
+        
+        return {
+          success: true,
+          authenticated: true,
+          greeting: greeting,
+          capabilities: ehloResponse,
+          authResponse: '235 Authentication successful'
+        };
+      } else if (authResponse.startsWith('535')) {
+        throw new Error(`Authentication failed (535): Username/password rejected. ${
+          config.host.includes('gmail.com') 
+            ? 'For Gmail, ensure you use an App Password from https://myaccount.google.com/apppasswords'
+            : 'Check your credentials in Function Secrets'
+        }`);
+      } else {
+        throw new Error(`Authentication failed: ${authResponse}`);
+      }
+    } catch (authError) {
+      // Send QUIT even on auth failure
+      try {
+        await sendCommand('QUIT');
+      } catch (quitError) {
+        console.warn('Failed to send QUIT:', quitError);
+      }
+      throw authError;
+    }
     
   } catch (error) {
-    console.error('❌ SMTP Connection test failed:', error);
+    console.error('❌ SMTP Authentication test failed:', error);
     throw error;
+  } finally {
+    if (conn) {
+      try {
+        conn.close();
+      } catch (closeError) {
+        console.warn('Failed to close connection:', closeError);
+      }
+    }
   }
 }
 

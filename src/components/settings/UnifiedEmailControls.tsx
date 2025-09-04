@@ -58,30 +58,30 @@ export const UnifiedEmailControls = () => {
       console.log('📊 Health check result:', data);
       setHealthCheckResult(data);
 
-      if (data.success && data.connection_healthy) {
+      if (data.success && data.authenticated) {
         setConnectionStatus({
           isConnected: true,
-          provider: data.provider,
-          source: data.source,
+          provider: data.provider?.host,
+          source: data.provider?.source,
           message: data.message,
           lastChecked: new Date()
         });
         
-        const sourceLabel = data.source === 'function_secrets' ? 'Function Secrets (Production)' : 'Database (Development)';
-        toast.success('SMTP Connection Verified', {
-          description: `Successfully connected to ${data.provider} via ${sourceLabel}`,
+        const sourceLabel = data.provider?.source === 'function_secrets' ? 'Function Secrets (Production)' : 'Database (Development)';
+        toast.success('SMTP Authentication Verified', {
+          description: `Successfully authenticated with ${data.provider?.host} via ${sourceLabel}`,
         });
       } else {
         setConnectionStatus({
           isConnected: false,
-          provider: data.provider,
-          source: data.source,
+          provider: data.provider?.host,
+          source: data.provider?.source,
           message: data.error || data.message,
           lastChecked: new Date()
         });
         
-        toast.error('SMTP Connection Failed', {
-          description: data.troubleshooting || data.error || "Failed to establish SMTP connection"
+        toast.error('SMTP Authentication Failed', {
+          description: data.error || "Authentication failed. Check SMTP credentials."
         });
       }
     } catch (error: any) {

@@ -901,6 +901,28 @@ const initializeDiagnostics = () => {
     runDiagnostics();
   }, []);
 
+  const cleanEmailQueue = async () => {
+    try {
+      const { data, error } = await supabase.functions.invoke('email-queue-cleanup', {
+        body: {}
+      });
+
+      if (error) throw error;
+
+      toast.success('Email queue cleanup completed', {
+        description: `Cleaned ${data.stats.invalidEmails} invalid emails, reset ${data.stats.stuckProcessing} stuck emails`
+      });
+
+      // Re-run queue health check
+      await testQueueHealth();
+      
+    } catch (error: any) {
+      toast.error('Queue cleanup failed', {
+        description: error.message
+      });
+    }
+  };
+
   return (
     <Card className="mb-6">
       <CardHeader>

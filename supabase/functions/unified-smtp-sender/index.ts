@@ -146,7 +146,7 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
 }> {
   console.log('🔍 Loading SMTP configuration...');
   
-  // Priority 1: Function Secrets (Production)
+// Priority 1: Function Secrets (Production)
   const secretHost = Deno.env.get('SMTP_HOST');
   const secretPort = Deno.env.get('SMTP_PORT');
   const secretUsername = Deno.env.get('SMTP_USERNAME');
@@ -154,6 +154,41 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
   const secretEncryption = Deno.env.get('SMTP_ENCRYPTION');
   const secretFromName = Deno.env.get('SMTP_FROM_NAME');
   const secretFromEmail = Deno.env.get('SMTP_FROM_EMAIL');
+
+  // CRITICAL: In production, REQUIRE complete Function Secrets
+  const isProduction = Deno.env.get('DENO_ENV') === 'production' || 
+                       Deno.env.get('SUPABASE_URL')?.includes('supabase.co') ||
+                       isProductionMode;
+
+  if (isProduction) {
+    const missingSecrets = [];
+    if (!secretHost) missingSecrets.push('SMTP_HOST');
+    if (!secretUsername) missingSecrets.push('SMTP_USERNAME'); 
+    if (!secretPassword) missingSecrets.push('SMTP_PASSWORD');
+    if (!secretFromEmail) missingSecrets.push('SMTP_FROM_EMAIL');
+
+    if (missingSecrets.length > 0) {
+      const errorMsg = `
+❌ PRODUCTION MODE: Missing required Function Secrets: ${missingSecrets.join(', ')}
+
+SETUP REQUIRED:
+1. Go to Supabase Dashboard → Settings → Edge Functions
+2. Add the missing Function Secrets with your actual SMTP credentials:
+   - SMTP_HOST: Your email provider hostname (e.g., smtp.gmail.com)
+   - SMTP_PORT: Usually 587 or 465  
+   - SMTP_USERNAME: Your email address or API username
+   - SMTP_PASSWORD: Your email password or API key
+   - SMTP_FROM_EMAIL: The email address to send from
+   - SMTP_FROM_NAME: The display name for outgoing emails
+   - SMTP_ENCRYPTION: Usually STARTTLS or TLS
+
+SECURITY: Never use placeholder, test, or hashed values in production.
+      `.trim();
+      
+      console.error(errorMsg);
+      throw new Error(errorMsg);
+    }
+  }
 
   if (secretHost && secretUsername && secretPassword) {
     console.log('✅ Using production SMTP configuration from Function Secrets');
@@ -242,7 +277,11 @@ Never use placeholder, test, or hashed values in production.
     };
   }
 
-  // Database Configuration (Development Fallback Only)
+  // Database Configuration (Development Fallback Only)  
+  if (isProduction) {
+    throw new Error('PRODUCTION MODE: Database fallback not allowed. Configure Function Secrets for production use.');
+  }
+  
   console.log('📧 Falling back to database SMTP configuration (development mode)');
   
   const { data: config } = await supabase
@@ -1040,60 +1079,53 @@ serve(async (req: Request) => {
 
     requestBody = await req.json();
     
-    // CRITICAL FIX: Handle health check requests in POST method
+    // SECURITY FIX: Enhanced health check with actual SMTP authentication test
     if (requestBody.healthcheck === true || requestBody.check === 'smtp') {
       console.log('🔍 Health check request detected in POST body');
       
-      const healthData: any = {
-        status: 'healthy',
-        service: 'unified-smtp-sender',
-        implementation: 'production-native-deno',
-        timestamp: new Date().toISOString()
-      };
-
       try {
         const smtpConfig = await getProductionSMTPConfig(supabase);
         
-        // Enhanced health check with connection test
-        let connectionHealthy = false;
-        try {
-          // Quick connection test without sending emails
-          const conn = await Deno.connect({
-            hostname: smtpConfig.host,
-            port: smtpConfig.port
-          });
-          conn.close();
-          connectionHealthy = true;
-        } catch (connError) {
-          console.warn('Connection test failed:', connError.message);
-        }
-
-        healthData.smtpCheck = {
-          configured: true,
-          source: smtpConfig.source,
-          host: smtpConfig.host,
-          port: smtpConfig.port,
-          username: smtpConfig.username?.split('@')[0] + '@***',
-          senderEmail: smtpConfig.senderEmail?.split('@')[0] + '@***',
-          senderName: smtpConfig.senderName,
-          encryption: smtpConfig.encryption,
-          connection_healthy: connectionHealthy
-        };
-
-        console.log('✅ SMTP health check passed');
+        // SECURITY FIX: Test actual SMTP AUTH instead of just config loading
+        console.log('🔐 Testing SMTP authentication...');
+        const client = new ProductionSMTPClient(smtpConfig);
+        await client.connect();
+        await client.close();
+        
+        console.log('✅ SMTP health check passed - authentication verified');
         
         return new Response(JSON.stringify({
           success: true,
-          message: 'SMTP health check completed successfully',
-          smtp_configured: true,
-          connection_healthy: connectionHealthy,
-          provider: smtpConfig.host,
-          source: smtpConfig.source,
-          ...healthData
+          message: 'SMTP sender health check passed - authentication verified',
+          provider: {
+            host: smtpConfig.host,
+            port: smtpConfig.port,
+            username: smtpConfig.username?.split('@')[0] + '@***',
+            senderEmail: smtpConfig.senderEmail?.split('@')[0] + '@***', 
+            senderName: smtpConfig.senderName,
+            encryption: smtpConfig.encryption,
+            source: smtpConfig.source
+          },
+          timestamp: new Date().toISOString()
         }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200
+          status: 200,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
         });
+      } catch (error) {
+        console.error('❌ SMTP health check failed:', error);
+        return new Response(JSON.stringify({
+          success: false,
+          error: 'SMTP authentication failed',
+          message: error.message.includes('535') ? 
+            'SMTP Authentication Error: Check username/password in Function Secrets. For Gmail, use App Passwords.' : 
+            error.message,
+          timestamp: new Date().toISOString()
+        }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders }
+        });
+      }
+    }
       } catch (error) {
         console.error('❌ SMTP health check failed:', error.message);
         

@@ -141,64 +141,131 @@ export const CommunicationsTab = () => {
     }
   }, [deliveryLogs]);
   const testEmailConnection = async () => {
-    // Production-ready input validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    // PRODUCTION-READY: Comprehensive input validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
     if (!testEmail || !emailRegex.test(testEmail.trim())) {
       toast.error('Please enter a valid email address');
       return;
     }
     
+    // PRODUCTION-READY: Security checks
     const sanitizedEmail = testEmail.trim().toLowerCase();
+    
+    // Check for potentially malicious inputs
+    if (sanitizedEmail.includes('<') || sanitizedEmail.includes('>') || sanitizedEmail.includes('script')) {
+      toast.error('Invalid characters detected in email address');
+      return;
+    }
+    
+    // PRODUCTION-READY: Rate limiting check
+    const lastTestKey = 'last_smtp_test_time';
+    const lastTest = localStorage.getItem(lastTestKey);
+    const now = Date.now();
+    
+    if (lastTest && now - parseInt(lastTest) < 60000) { // 1 minute cooldown
+      const remainingTime = Math.ceil((60000 - (now - parseInt(lastTest))) / 1000);
+      toast.error(`Please wait ${remainingTime} seconds before testing again`);
+      return;
+    }
+    
+    // PRODUCTION-READY: Pre-flight production status check
+    if (productionStatus && !productionStatus.configured) {
+      toast.error('🔒 Production SMTP not configured. Please add Function Secrets first.');
+      return;
+    }
+    
     setTestingConnection(true);
     setConnectionStatus(null);
     
     try {
-      // Production-safe edge function call with timeout
+      // PRODUCTION-READY: Store rate limit timestamp
+      localStorage.setItem(lastTestKey, now.toString());
+      
+      // PRODUCTION-READY: Enhanced timeout and abort controller
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30s timeout
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+        console.warn('SMTP test timeout after 25s');
+      }, 25000);
+      
+      console.log('🧪 Testing SMTP connection to:', sanitizedEmail.replace(/(.{3}).*(@.*)/, '$1***$2'));
       
       const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: sanitizedEmail,
-          templateKey: 'smtp_connection_test',
+          template_key: 'smtp_connection_test',
           variables: {
             timestamp: new Date().toLocaleString(),
-            businessName: 'Starters Small Chops'
-          }
+            test_environment: window.location.hostname.includes('lovable') ? 'preview' : 'production',
+            business_name: 'Starters Small Chops',
+            test_id: `test_${now}`
+          },
+          email_type: 'system_test'
         }
       });
       
       clearTimeout(timeoutId);
       
       if (error) {
-        throw new Error(`SMTP Function Error: ${error.message || 'Unknown error'}`);
+        throw new Error(`SMTP Service Error: ${error.message || 'Service unavailable'}`);
       }
       
       if (!data || !data.success) {
-        throw new Error(data?.error || 'Email send failed - check SMTP configuration');
+        throw new Error(data?.error || data?.message || 'Email delivery failed');
       }
       
       setConnectionStatus('success');
-      toast.success('✅ Test email sent successfully! Check your inbox.');
+      toast.success('✅ Production SMTP test successful! Check your inbox.', {
+        description: `Message ID: ${data.messageId || 'N/A'}`,
+        duration: 10000
+      });
+      
+      // PRODUCTION-READY: Log successful test for monitoring
+      console.log('✅ SMTP test successful:', {
+        recipient: sanitizedEmail.replace(/(.{3}).*(@.*)/, '$1***$2'),
+        messageId: data.messageId,
+        timestamp: new Date().toISOString()
+      });
+      
     } catch (error: any) {
-      console.error('Test email error:', error);
+      console.error('💥 SMTP test error:', error);
       setConnectionStatus('error');
       
-      // Production-ready error categorization
-      let errorMessage = 'Test failed - ';
+      // PRODUCTION-READY: Enhanced error categorization and user guidance
+      let errorMessage = '';
+      let actionGuidance = '';
+      
       if (error.name === 'AbortError') {
-        errorMessage += 'Request timed out. Check your SMTP configuration.';
-      } else if (error.message?.includes('SMTP_PASSWORD')) {
-        errorMessage += 'SMTP credentials not configured. Please add Function Secrets.';
-      } else if (error.message?.includes('535')) {
-        errorMessage += 'SMTP authentication failed. Verify your email credentials.';
-      } else if (error.message?.includes('Edge Function')) {
-        errorMessage += 'SMTP service unavailable. Please try again later.';
+        errorMessage = 'Connection timeout (25s exceeded)';
+        actionGuidance = 'Check your SMTP server configuration and network connectivity.';
+      } else if (error.message?.includes('SMTP_HOST') || error.message?.includes('SMTP_USER') || error.message?.includes('SMTP_PASS')) {
+        errorMessage = 'Missing SMTP credentials';
+        actionGuidance = 'Please configure Function Secrets in Supabase Dashboard.';
+      } else if (error.message?.includes('535') || error.message?.includes('authentication')) {
+        errorMessage = 'SMTP authentication failed';
+        actionGuidance = 'Verify your email provider credentials are correct.';
+      } else if (error.message?.includes('550') || error.message?.includes('blocked')) {
+        errorMessage = 'Email blocked by provider';
+        actionGuidance = 'Check sender reputation and email provider policies.';
+      } else if (error.message?.includes('Edge Function') || error.message?.includes('non-2xx')) {
+        errorMessage = 'SMTP service temporarily unavailable';
+        actionGuidance = 'Please try again in a few moments.';
+      } else if (error.message?.includes('rate') || error.message?.includes('limit')) {
+        errorMessage = 'Rate limit exceeded';
+        actionGuidance = 'Wait a few minutes before testing again.';
       } else {
-        errorMessage += error.message || 'Unknown error occurred';
+        errorMessage = error.message || 'Unknown error occurred';
+        actionGuidance = 'Check console logs for technical details.';
       }
       
-      toast.error(`❌ ${errorMessage}`);
+      toast.error(`❌ ${errorMessage}`, {
+        description: actionGuidance,
+        duration: 8000
+      });
+      
+      // PRODUCTION-READY: Remove rate limit on failure to allow retry
+      localStorage.removeItem(lastTestKey);
+      
     } finally {
       setTestingConnection(false);
     }
@@ -486,9 +553,31 @@ export const CommunicationsTab = () => {
                   <Label htmlFor="test-email">Test Email Address</Label>
                   <Input id="test-email" type="email" placeholder="your-email@example.com" value={testEmail} onChange={e => setTestEmail(e.target.value)} />
                 </div>
-                <Button onClick={testEmailConnection} disabled={testingConnection || (productionStatus && !productionStatus.configured)} className="w-full">
-                  <TestTube className="mr-2 h-4 w-4" />
-                  {testingConnection ? 'Sending Test Email...' : 'Send Test Email'}
+                <Button 
+                  onClick={testEmailConnection} 
+                  disabled={
+                    testingConnection || 
+                    !testEmail || 
+                    (productionStatus && !productionStatus.configured)
+                  } 
+                  className="w-full"
+                  variant={productionStatus?.configured ? "default" : "secondary"}
+                >
+                  {testingConnection ? (
+                    <>
+                      <Clock className="mr-2 h-4 w-4 animate-spin" />
+                      Sending Test Email...
+                    </>
+                  ) : (
+                    <>
+                      {productionStatus?.configured ? (
+                        <TestTube className="mr-2 h-4 w-4" />
+                      ) : (
+                        <Shield className="mr-2 h-4 w-4" />
+                      )}
+                      {productionStatus?.configured ? 'Send Production Test' : 'Configure SMTP First'}
+                    </>
+                  )}
                 </Button>
 
                 {connectionStatus && (

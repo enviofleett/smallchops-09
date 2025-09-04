@@ -19,21 +19,28 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
 }> {
   console.log('🔍 Loading SMTP configuration...');
   
-  // Priority 1: Function Secrets (Production)
+  // Priority 1: Function Secrets (Production) - Updated to use generic names
   const secretHost = Deno.env.get('SMTP_HOST');
   const secretPort = Deno.env.get('SMTP_PORT');
-  const secretUsername = Deno.env.get('SMTP_USERNAME');
-  const secretPassword = Deno.env.get('SMTP_PASSWORD');
+  const secretUser = Deno.env.get('SMTP_USER');
+  const secretPass = Deno.env.get('SMTP_PASS');
+  
+  // Legacy fallback names (backwards compatibility)
+  const legacyUsername = Deno.env.get('SMTP_USERNAME');
+  const legacyPassword = Deno.env.get('SMTP_PASSWORD');
   const secretEncryption = Deno.env.get('SMTP_ENCRYPTION');
   const secretFromName = Deno.env.get('SMTP_FROM_NAME');
   const secretFromEmail = Deno.env.get('SMTP_FROM_EMAIL');
 
-  if (secretHost && secretUsername && secretPassword) {
+  const username = secretUser || legacyUsername;
+  const password = secretPass || legacyPassword;
+
+  if (secretHost && username && password) {
     console.log('📧 Using Function Secrets configuration (Production)');
     
     const port = secretPort ? parseInt(secretPort.trim(), 10) : 587;
-    const normalizedPassword = secretPassword.replace(/\s+/g, '').trim();
-    const normalizedUsername = secretUsername.trim();
+    const normalizedPassword = password.replace(/\s+/g, '').trim();
+    const normalizedUsername = username.trim();
     
     // Gmail-specific validation
     if (secretHost.includes('gmail.com') && port === 587) {
@@ -53,7 +60,7 @@ async function getProductionSMTPConfig(supabase: any): Promise<{
       senderEmail: (secretFromEmail || normalizedUsername).trim(),
       senderName: (secretFromName || 'System').trim(),
       encryption: secretEncryption?.trim() || 'TLS',
-      source: 'function_secrets'
+      source: secretUser ? 'function_secrets' : 'legacy_vars'
     };
   }
 
@@ -283,9 +290,18 @@ serve(async (req: Request) => {
         senderEmail: smtpConfig.senderEmail?.split('@')[0] + '@***',
         senderName: smtpConfig.senderName,
         encryption: smtpConfig.encryption,
-        source: smtpConfig.source
+        source: smtpConfig.source,
+        configured: true
       },
       connection: connectionResult,
+      smtpCheck: {
+        configured: true,
+        source: smtpConfig.source,
+        host: smtpConfig.host,
+        port: smtpConfig.port,
+        encryption: smtpConfig.encryption,
+        details: connectionResult.authMethod ? `Authentication successful using ${connectionResult.authMethod}` : 'Connected successfully'
+      },
       timestamp: new Date().toISOString()
     };
 

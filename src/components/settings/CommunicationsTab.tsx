@@ -307,10 +307,23 @@ export const CommunicationsTab = () => {
                productionStatus.configured ? 'Database Config' : 'Setup Required'}
             </Badge>
           )}
-          <Button onClick={processEmailQueue} disabled={processingQueue} variant="outline">
-            <Send className="mr-2 h-4 w-4" />
-            {processingQueue ? 'Processing...' : 'Process Queue'}
-          </Button>
+          {productionStatus && !productionStatus.configured && (
+            <Button 
+              onClick={processEmailQueue} 
+              disabled={processingQueue || (productionStatus && !productionStatus.configured)} 
+              variant="outline"
+              title={productionStatus && !productionStatus.configured ? 'Configure Function Secrets to enable queue processing in production' : ''}
+            >
+              <Send className="mr-2 h-4 w-4" />
+              {processingQueue ? 'Processing...' : 'Process Queue'}
+            </Button>
+          )}
+          {productionStatus?.configured && (
+            <Button onClick={processEmailQueue} disabled={processingQueue} variant="outline">
+              <Send className="mr-2 h-4 w-4" />
+              {processingQueue ? 'Processing...' : 'Process Queue'}
+            </Button>
+          )}
         </div>
       </div>
 
@@ -473,7 +486,7 @@ export const CommunicationsTab = () => {
                   <Label htmlFor="test-email">Test Email Address</Label>
                   <Input id="test-email" type="email" placeholder="your-email@example.com" value={testEmail} onChange={e => setTestEmail(e.target.value)} />
                 </div>
-                <Button onClick={testEmailConnection} disabled={testingConnection || !testEmail} className="w-full">
+                <Button onClick={testEmailConnection} disabled={testingConnection || (productionStatus && !productionStatus.configured)} className="w-full">
                   <TestTube className="mr-2 h-4 w-4" />
                   {testingConnection ? 'Sending Test Email...' : 'Send Test Email'}
                 </Button>
@@ -521,7 +534,7 @@ export const CommunicationsTab = () => {
                   Process queued email events immediately. For production use, 
                   go to the "Email Processing" tab for advanced controls.
                 </div>
-                <Button onClick={processEmailQueue} disabled={processingQueue} className="w-full" variant="outline">
+                <Button onClick={processEmailQueue} disabled={processingQueue || (productionStatus && !productionStatus.configured)} className="w-full" variant="outline">
                   <Send className="mr-2 h-4 w-4" />
                   {processingQueue ? 'Processing Queue...' : 'Quick Process Queue'}
                 </Button>

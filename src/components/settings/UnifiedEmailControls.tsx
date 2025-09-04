@@ -7,8 +7,9 @@ import { Badge } from '@/components/ui/badge';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { useEnvironmentConfig } from '@/hooks/useEnvironmentConfig';
 import { EmailSystemStatus } from './EmailSystemStatus';
-import { Mail, Send, TestTube, Activity, CheckCircle, AlertTriangle, Zap } from 'lucide-react';
+import { Mail, Send, TestTube, Activity, CheckCircle, AlertTriangle, Zap, Lock, ExternalLink } from 'lucide-react';
 
 export const UnifiedEmailControls = () => {
   const [testEmail, setTestEmail] = useState('');
@@ -25,6 +26,12 @@ export const UnifiedEmailControls = () => {
   });
 
   const [healthCheckResult, setHealthCheckResult] = useState<any>(null);
+  const { config: envConfig, loading: envLoading } = useEnvironmentConfig();
+
+  // Production readiness check
+  const isLiveMode = envConfig?.isLiveMode || false;
+  const isProductionReady = connectionStatus.isConnected && connectionStatus.source === 'function_secrets';
+  const isButtonsDisabled = isLiveMode && !isProductionReady;
 
   const testSMTPAuthentication = async () => {
     setIsTestingConnection(true);
@@ -58,7 +65,7 @@ export const UnifiedEmailControls = () => {
       console.log('📊 Health check result:', data);
       setHealthCheckResult(data);
 
-      if (data.success && data.authenticated) {
+      if (data.success && data.connection) {
         setConnectionStatus({
           isConnected: true,
           provider: data.provider?.host,
@@ -68,7 +75,9 @@ export const UnifiedEmailControls = () => {
         });
         
         const sourceLabel = data.provider?.source === 'function_secrets' ? 'Function Secrets (Production)' : 'Database (Development)';
-        toast.success('SMTP Authentication Verified', {
+        const isProduction = data.provider?.source === 'function_secrets';
+        
+        toast.success(isProduction ? 'Production SMTP Ready!' : 'SMTP Connected', {
           description: `Successfully authenticated with ${data.provider?.host} via ${sourceLabel}`,
         });
       } else {
@@ -106,6 +115,11 @@ export const UnifiedEmailControls = () => {
       return;
     }
 
+    if (isButtonsDisabled) {
+      toast.error('Production mode requires Function Secrets configuration');
+      return;
+    }
+
     try {
       const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
@@ -127,6 +141,11 @@ export const UnifiedEmailControls = () => {
   };
 
   const processEmailQueue = async () => {
+    if (isButtonsDisabled) {
+      toast.error('Production mode requires Function Secrets configuration');
+      return;
+    }
+
     setIsProcessingQueue(true);
 
     try {
@@ -174,9 +193,32 @@ export const UnifiedEmailControls = () => {
         </div>
         <Badge variant="default" className="bg-green-100 text-green-800 border-green-200">
           <Activity className="h-3 w-3 mr-1" />
-          Production Ready
+          {isProductionReady ? 'Production Ready' : 'Configuration Required'}
         </Badge>
       </div>
+
+      {/* Production Mode Alert */}
+      {isLiveMode && !isProductionReady && (
+        <Alert className="border-red-200 bg-red-50">
+          <Lock className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">
+            <strong>Production Mode Active:</strong> Email functions are locked until SMTP credentials are configured via Edge Function Secrets.
+            <div className="mt-2">
+              <Button variant="outline" size="sm" asChild className="h-8">
+                <a 
+                  href="https://supabase.com/dashboard/project/oknnklksdiqaifhxaccs/settings/functions" 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1"
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  Configure Function Secrets
+                </a>
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      )}
 
       {/* Key Features Alert */}
       <Alert className="border-green-200 bg-green-50">
@@ -242,8 +284,7 @@ export const UnifiedEmailControls = () => {
                 <div className="text-sm text-green-800 space-y-1">
                   <p><strong>Host:</strong> {healthCheckResult.provider?.host}:{healthCheckResult.provider?.port}</p>
                   <p><strong>Source:</strong> {healthCheckResult.provider?.source === 'function_secrets' ? 'Function Secrets (Production)' : 'Database (Fallback)'}</p>
-                  <p><strong>Authentication:</strong> {healthCheckResult.auth?.method} with {healthCheckResult.auth?.tlsMode} encryption</p>
-                  <p><strong>Connection Time:</strong> {healthCheckResult.timing?.totalMs}ms</p>
+                  <p><strong>Authentication:</strong> {healthCheckResult.connection?.authMethod} encryption</p>
                 </div>
               </div>
             )}
@@ -263,13 +304,19 @@ export const UnifiedEmailControls = () => {
                 </div>
                 <Button 
                   onClick={sendActualTestEmail} 
-                  disabled={!testEmail}
+                  disabled={!testEmail || isButtonsDisabled}
                   variant="outline"
                   className="w-full mt-2"
+                  title={isButtonsDisabled ? 'Configure Function Secrets to enable test emails in production' : ''}
                 >
                   <Mail className="mr-2 h-4 w-4" />
                   Send Test Email
                 </Button>
+                {isButtonsDisabled && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    🔒 Configure Function Secrets to enable test emails in production
+                  </p>
+                )}
               </div>
             )}
           </CardContent>
@@ -298,13 +345,19 @@ export const UnifiedEmailControls = () => {
             </div>
             <Button 
               onClick={processEmailQueue} 
-              disabled={isProcessingQueue}
+              disabled={isProcessingQueue || isButtonsDisabled}
               className="w-full"
               variant="default"
+              title={isButtonsDisabled ? 'Configure Function Secrets to enable queue processing in production' : ''}
             >
               <Send className="mr-2 h-4 w-4" />
               {isProcessingQueue ? 'Processing Queue...' : 'Process Email Queue'}
             </Button>
+            {isButtonsDisabled && (
+              <p className="text-xs text-muted-foreground">
+                🔒 Configure Function Secrets to enable queue processing in production
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -330,7 +383,7 @@ export const UnifiedEmailControls = () => {
               <Activity className="h-5 w-5 text-blue-600" />
               <div>
                 <p className="font-medium text-blue-900">Queue Processing</p>
-                <p className="text-sm text-blue-700">Automated processing active</p>
+                <p className="text-sm text-blue-700">{isButtonsDisabled ? 'Locked in production' : 'Automated processing active'}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 p-3 bg-purple-50 rounded-lg border border-purple-200">

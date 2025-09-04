@@ -304,21 +304,21 @@ async function processTemplate(
       // CRITICAL FIX 1: Prioritize enhanced_email_templates from Settings Page
       const { data: enhancedTemplate } = await supabase
         .from('enhanced_email_templates')
-        .select('template_type, subject, subject_template, html_content, html_template, text_content, text_template')
+        .select('template_type, subject_template, html_template, text_template')
         .eq('template_key', templateKey)
         .eq('is_active', true)
         .maybeSingle();
 
       if (enhancedTemplate) {
         template = {
-          subject: enhancedTemplate.subject || enhancedTemplate.subject_template,
-          html_content: enhancedTemplate.html_content || enhancedTemplate.html_template,
-          text_content: enhancedTemplate.text_content || enhancedTemplate.text_template,
+          subject: enhancedTemplate.subject_template,
+          html_content: enhancedTemplate.html_template,
+          text_content: enhancedTemplate.text_template,
           template_type: enhancedTemplate.template_type || 'standard'
         };
         templateType = template.template_type;
         templateFound = true;
-        console.log(`✅ Using template from Email Template Manager: ${templateKey}`);
+        console.log(`✅ PRODUCTION_MODE: Using verified template '${templateKey}' from Email Template Manager`);
       } else {
         // Fallback to legacy email_templates view (for backwards compatibility)
         const { data: viewTemplate } = await supabase

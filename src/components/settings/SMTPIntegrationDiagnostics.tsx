@@ -115,6 +115,13 @@ const initializeDiagnostics = () => {
         criticalBlocker: false
       },
       {
+        id: 'queue-health',
+        title: 'Email Queue Health',
+        status: 'testing',
+        message: 'Checking email queue status...',
+        criticalBlocker: true
+      },
+      {
         id: 'delivery-tracking',
         title: 'Email Delivery Tracking',
         status: 'testing',
@@ -152,6 +159,7 @@ const initializeDiagnostics = () => {
       await testTemplateSystem();
       await testRateLimiting();
       await testMonitoringSetup();
+      await testQueueHealth();
       await testDeliveryTracking();
       await testCircuitBreakerStatus();
       
@@ -676,6 +684,80 @@ const initializeDiagnostics = () => {
     }
   };
 
+  const testQueueHealth = async () => {
+    try {
+      // Get queue statistics
+      const { data: queueStats, error } = await supabase
+        .from('communication_events')
+        .select('status')
+        .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
+        
+      if (error) {
+        updateDiagnostic('queue-health', {
+          status: 'fail',
+          message: 'Cannot access email queue',
+          recommendation: 'Check database connectivity and table permissions'
+        });
+        return;
+      }
+
+      const stats = queueStats?.reduce((acc, event) => {
+        acc[event.status] = (acc[event.status] || 0) + 1;
+        return acc;
+      }, {} as Record<string, number>) || {};
+
+      const queued = stats['queued'] || 0;
+      const processing = stats['processing'] || 0;
+      const failed = stats['failed'] || 0;
+      const sent = stats['sent'] || 0;
+
+      console.log('Queue Stats:', { queued, processing, failed, sent });
+
+      // Critical issues
+      if (queued > 100) {
+        updateDiagnostic('queue-health', {
+          status: 'fail',
+          message: `${queued} emails queued - processing backlog detected`,
+          recommendation: 'Run email queue cleanup to process backlog',
+          criticalBlocker: true
+        });
+        return;
+      }
+
+      // Warnings
+      if (processing > 20) {
+        updateDiagnostic('queue-health', {
+          status: 'warning',
+          message: `${processing} emails stuck in processing state`,
+          recommendation: 'Reset stuck processing emails back to queued'
+        });
+        return;
+      }
+
+      if (failed > 50) {
+        updateDiagnostic('queue-health', {
+          status: 'warning', 
+          message: `${failed} failed emails in last 24h - high failure rate`,
+          recommendation: 'Investigate SMTP connection issues or invalid email addresses'
+        });
+        return;
+      }
+
+      // Healthy
+      updateDiagnostic('queue-health', {
+        status: 'pass',
+        message: `Queue healthy: ${sent} sent, ${queued} queued, ${failed} failed`
+      });
+      
+    } catch (error) {
+      updateDiagnostic('queue-health', {
+        status: 'fail',
+        message: 'Queue health check failed',
+        recommendation: 'Check email system status and database connectivity'
+      });
+    }
+  };
+
   const testMonitoringSetup = async () => {
     try {
       // Check for email delivery logs table
@@ -921,13 +1003,40 @@ const initializeDiagnostics = () => {
                 <p className="ml-4 text-xs">→ Check Supabase Functions dashboard for deployment status</p>
               </div>
               <div>
-                <strong>3. Secure Credential Storage</strong>
+                <strong>3. Clean Email Queue Backlog</strong>
+                <p className="ml-4 text-xs">→ Run email queue cleanup to process stuck emails</p>
+              </div>
+              <div>
+                <strong>4. Secure Credential Storage</strong>
                 <p className="ml-4 text-xs">→ Move SMTP password to Supabase Function Secrets (production requirement)</p>
               </div>
               <div>
-                <strong>4. Enable HTTPS</strong>
+                <strong>5. Enable HTTPS</strong>
                 <p className="ml-4 text-xs">→ Ensure production site uses HTTPS for secure email transmission</p>
               </div>
+            </div>
+            <div className="mt-3 pt-3 border-t border-red-200">
+              <Button
+                onClick={async () => {
+                  try {
+                    toast.loading('Cleaning email queue...');
+                    const { data, error } = await supabase.functions.invoke('email-queue-cleanup');
+                    if (error) throw error;
+                    toast.success(`Queue cleanup completed: ${data.stats?.processed || 0} processed`);
+                    // Re-run diagnostics after cleanup
+                    setTimeout(() => runDiagnostics(), 1000);
+                  } catch (error: any) {
+                    console.error('Cleanup failed:', error);
+                    toast.error('Queue cleanup failed: ' + error.message);
+                  }
+                }}
+                size="sm"
+                variant="outline"
+                className="text-red-700 border-red-300 hover:bg-red-100"
+              >
+                <Zap className="h-3 w-3 mr-1" />
+                Clean Email Queue
+              </Button>
             </div>
           </div>
         )}

@@ -398,8 +398,6 @@ const ProductDetail = () => {
                 price={product.discounted_price || product.price}
                 stockQuantity={product.stock_quantity}
                 currentCartQuantity={getCurrentCartQuantity()}
-                variant="detailed"
-                showDetailedInfo={true}
               />
             )}
 

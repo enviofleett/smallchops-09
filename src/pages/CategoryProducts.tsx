@@ -230,15 +230,11 @@ const CategoryProductsContent = () => {
 
             {/* Products Grid */}
             {isLoadingProducts ? (
-              <div className={`grid gap-3 sm:gap-4 lg:gap-6 ${
-                isCustomizationCategory 
-                  ? 'grid-cols-2 sm:grid-cols-2' 
-                  : 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3'
-              }`}>
+              <div className="grid gap-3 sm:gap-4 lg:gap-6 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Card key={i} className="animate-pulse">
                     <CardContent className="p-0">
-                      <div className={`${isCustomizationCategory ? 'aspect-[4/3]' : 'aspect-square'} bg-muted rounded-t-lg`}></div>
+                      <div className="aspect-square bg-muted rounded-t-lg"></div>
                       <div className="p-3 sm:p-4 space-y-2">
                         <div className="h-4 bg-muted rounded"></div>
                         <div className="h-3 bg-muted rounded w-2/3"></div>
@@ -260,32 +256,30 @@ const CategoryProductsContent = () => {
               </div>
             ) : (
               <>
-                <div className={`grid gap-3 sm:gap-4 lg:gap-6 mb-8 ${
-                  isCustomizationCategory 
-                    ? 'grid-cols-2 lg:grid-cols-2' 
-                    : 'grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3'
-                }`}>
+                <div className="grid gap-3 sm:gap-4 lg:gap-6 mb-8 grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-3">
                   {currentProducts.map((product) => (
                     <Card 
                       key={product.id} 
-                      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer"
+                      className="overflow-hidden hover:shadow-lg transition-shadow cursor-pointer group"
                       onClick={() => navigate(`/product/${product.id}`)}
                     >
-                      <div className={`${isCustomizationCategory ? 'aspect-[3/2]' : 'aspect-square'} relative`}>
+                      <div className="aspect-square relative overflow-hidden">
                          <ProductImageGallery
                            images={toImagesArray(product)}
                            alt={product.name}
-                           containerClassName={`${isCustomizationCategory ? 'aspect-[3/2]' : 'aspect-square'}`}
-                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 33vw"
+                           containerClassName="aspect-square"
+                           sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 25vw"
                          />
                          {(product.discount_percentage || 0) > 0 && (
-                           <div className="absolute top-1 sm:top-2 left-1 sm:left-2">
+                           <div className="absolute top-1 sm:top-2 left-1 sm:left-2 z-10">
                              <DiscountBadge 
                                discountPercentage={product.discount_percentage || 0}
                                size="sm"
                              />
                            </div>
                          )}
+                         {/* Hover overlay for better UX */}
+                         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-all duration-200 z-5" />
                        </div>
                       <CardContent className="p-2 sm:p-3 lg:p-4">
                         <h3 className="font-semibold mb-1 sm:mb-2 line-clamp-2 text-sm sm:text-base">{product.name}</h3>

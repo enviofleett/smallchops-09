@@ -83,24 +83,11 @@ export const UnifiedEmailControls = () => {
       const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
         body: {
           to: testEmail,
-          subject: 'Production SMTP Test - ' + new Date().toLocaleString(),
-          html: `
-            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-              <h2 style="color: #10b981;">✅ Production SMTP Test Email</h2>
-              <p>Congratulations! Your production SMTP system is working correctly.</p>
-              <div style="background: #f0fdf4; padding: 15px; border-radius: 8px; margin: 20px 0; border: 1px solid #bbf7d0;">
-                <p><strong>Production Test Details:</strong></p>
-                <ul>
-                  <li>Sent at: ${new Date().toLocaleString()}</li>
-                  <li>System: YourNotify Production SMTP</li>
-                  <li>Configuration: Function Secrets</li>
-                  <li>Status: Live Production Ready ✅</li>
-                </ul>
-              </div>
-              <p>Your email system is now fully configured and ready for live production use!</p>
-            </div>
-          `,
-          text: `Production SMTP Test - Sent at ${new Date().toLocaleString()}. Live production system ready!`
+          templateKey: 'smtp_connection_test',
+          variables: {
+            timestamp: new Date().toLocaleString(),
+            test_message: 'Production SMTP Test'
+          }
         }
       });
 

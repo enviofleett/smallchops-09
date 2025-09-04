@@ -239,13 +239,19 @@ export const SMTPSettingsTab = () => {
     return null;
   };
 
-  // Enhanced testSMTPConnection function:
+// Enhanced testSMTPConnection function:
 const testSMTPConnection = async () => {
   setTestingConnection(true);
   setConnectionStatus('idle');
   
   try {
-    const formData = form.getValues();
+    // Use health check instead of sending actual emails
+    const { data, error } = await supabase.functions.invoke('unified-smtp-sender', {
+      body: {
+        healthcheck: true,
+        check: 'smtp'
+      }
+    });
     
     // Enhanced validation
     const validationError = validateSMTPCredentials(formData);

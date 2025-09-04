@@ -1126,40 +1126,6 @@ serve(async (req: Request) => {
         });
       }
     }
-      } catch (error) {
-        console.error('❌ SMTP health check failed:', error.message);
-        
-        // Enhanced error handling with actionable guidance
-        let errorMessage = 'SMTP configuration failed';
-        let troubleshooting = '';
-        
-        if (error.message.includes('Gmail requires a 16-character App Password')) {
-          troubleshooting = 'Gmail requires an App Password (not your regular password). Enable 2-Step Verification and generate an App Password at https://myaccount.google.com/apppasswords';
-        } else if (error.message.includes('Function Secrets')) {
-          troubleshooting = 'Configure SMTP credentials in Supabase Function Secrets for production use';
-        } else {
-          troubleshooting = 'Check your SMTP configuration and credentials';
-        }
-        
-        return new Response(JSON.stringify({
-          success: false,
-          error: errorMessage,
-          details: error.message,
-          troubleshooting: troubleshooting,
-          smtp_configured: false,
-          connection_healthy: false,
-          ...healthData
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 500
-        });
-      }
-
-      return new Response(JSON.stringify(healthData), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200
-      });
-    }
     
     // P0 HOTFIX: Validate required "to" field immediately (only for regular emails)
     if (!requestBody.to || typeof requestBody.to !== 'string' || !requestBody.to.includes('@')) {

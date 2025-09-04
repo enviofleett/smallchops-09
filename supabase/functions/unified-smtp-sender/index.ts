@@ -980,7 +980,63 @@ serve(async (req: Request) => {
 
     requestBody = await req.json();
     
-    // P0 HOTFIX: Validate required "to" field immediately
+    // CRITICAL FIX: Handle health check requests in POST method
+    if (requestBody.healthcheck === true || requestBody.check === 'smtp') {
+      console.log('🔍 Health check request detected in POST body');
+      
+      const healthData: any = {
+        status: 'healthy',
+        service: 'unified-smtp-sender',
+        implementation: 'production-native-deno',
+        timestamp: new Date().toISOString()
+      };
+
+      try {
+        const smtpConfig = await getProductionSMTPConfig(supabase);
+        
+        // Enhanced health check with connection test
+        let connectionHealthy = false;
+        try {
+          // Quick connection test without sending emails
+          const conn = await Deno.connect({
+            hostname: smtpConfig.host,
+            port: smtpConfig.port
+          });
+          conn.close();
+          connectionHealthy = true;
+        } catch (connError) {
+          console.warn('Connection test failed:', connError.message);
+        }
+
+        healthData.smtpCheck = {
+          configured: true,
+          source: smtpConfig.source,
+          host: smtpConfig.host,
+          port: smtpConfig.port,
+          username: smtpConfig.username?.split('@')[0] + '@***',
+          senderEmail: smtpConfig.senderEmail?.split('@')[0] + '@***',
+          senderName: smtpConfig.senderName,
+          encryption: smtpConfig.encryption,
+          connection_healthy: connectionHealthy
+        };
+
+        console.log('✅ SMTP health check passed');
+      } catch (error) {
+        console.error('❌ SMTP health check failed:', error.message);
+        healthData.smtpCheck = { 
+          configured: false, 
+          error: error.message,
+          connection_healthy: false
+        };
+      }
+
+      return new Response(JSON.stringify(healthData), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200
+      });
+    }
+    
+    // P0 HOTFIX: Validate required "to" field immediately (only for regular emails)
     if (!requestBody.to || typeof requestBody.to !== 'string' || !requestBody.to.includes('@')) {
       console.error('❌ Invalid or missing recipient email:', {
         to: requestBody.to,

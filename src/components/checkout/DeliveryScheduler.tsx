@@ -335,7 +335,8 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
 
         {/* Calendar Section with Enhanced Date Range Info */}
         <div className="space-y-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+          {/* Enhanced date selection info - production ready */}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
             <h3 className="font-medium text-foreground">Select Delivery Date</h3>
             <div className="flex items-center gap-2">
               <Info className="w-4 h-4 text-muted-foreground" />
@@ -343,18 +344,6 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                 Book up to {DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS} months ahead
               </span>
             </div>
-          </div>
-          
-          {/* Date Range Information */}
-          <div className="p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <p className="text-sm text-blue-800">
-              📅 <strong>Booking Range:</strong> {format(dateValidation.minDate, 'MMM d')} - {format(dateValidation.maxDate, 'MMM d, yyyy')}
-              {DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY && (
-                <span className="block mt-1">
-                  🏢 <strong>Business days only</strong> (Monday-Friday)
-                </span>
-              )}
-            </p>
           </div>
 
           <LazyCalendar
@@ -512,10 +501,10 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                 </div>
               </div>
 
-              {/* Production Features */}
-              <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-                <p className="text-sm text-yellow-800">
-                  ⚡ <strong>Production Features:</strong> 6-month advance booking • Smart date validation • Business day filtering • Holiday detection
+              {/* Production Features - Simplified */}
+              <div className="p-3 bg-accent/30 border border-border rounded-lg">
+                <p className="text-sm text-muted-foreground">
+                  ⚡ <strong>Fast Calendar:</strong> Lazy loading • Smart caching • Month-by-month data fetching
                 </p>
               </div>
             </div>

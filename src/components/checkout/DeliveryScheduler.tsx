@@ -94,29 +94,30 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
     };
   }, []);
 
-  // Enhanced date disabled function with comprehensive validation
+  // Enhanced date disabled function - only disable past dates, show all future dates
   const isDateDisabled = useCallback((date: Date) => {
-    // Check if date is in valid range
+    // Only disable past dates for production - show all future dates
+    return isBefore(startOfDay(date), startOfDay(new Date()));
+  }, []);
+
+  // Check if date is available for booking
+  const isDateAvailable = useCallback((date: Date) => {
+    // Check if date is in valid booking range
     if (!dateValidation.isDateInRange(date)) {
-      return true;
+      return false;
     }
 
     // Check if date is blocked
     if (dateValidation.isDateBlocked(date)) {
-      return true;
+      return false;
     }
 
     // Check business days requirement
     if (!dateValidation.isBusinessDayOnly(date)) {
-      return true;
+      return false;
     }
 
-    // Check if it's a past date (extra safety)
-    if (isBefore(startOfDay(date), startOfDay(new Date()))) {
-      return true;
-    }
-
-    return false;
+    return true;
   }, [dateValidation]);
   // Optimized query with caching
   const { data: availableSlots = [], isLoading: loading, error: queryError, refetch } = useQuery({
@@ -173,8 +174,15 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
     return undefined;
   };
   const handleDateSelect = (date: Date | undefined) => {
+    if (!date) {
+      setCalendarDate(undefined);
+      return;
+    }
+
+    // Allow selection of any future date, but provide feedback for unavailable dates
     setCalendarDate(date);
-    if (date && selectedTimeSlot) {
+    
+    if (selectedTimeSlot && isDateAvailable(date)) {
       const dateStr = format(date, 'yyyy-MM-dd');
       onScheduleChange(dateStr, selectedTimeSlot);
     }
@@ -344,32 +352,30 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
               selected={calendarDate} 
               onSelect={handleDateSelect} 
               disabled={isDateDisabled}
-              fromDate={dateValidation.minDate}
-              toDate={dateValidation.maxDate}
               className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200" 
               classNames={{
-                months: "flex flex-col space-y-4",
-                month: "space-y-4 w-full",
-                caption: "flex justify-center pt-3 pb-2 relative items-center",
-                caption_label: "text-base md:text-lg font-semibold text-foreground",
+                months: "flex flex-col space-y-2 sm:space-y-4",
+                month: "space-y-2 sm:space-y-4 w-full",
+                caption: "flex justify-center pt-2 sm:pt-3 pb-1 sm:pb-2 relative items-center",
+                caption_label: "text-sm sm:text-base md:text-lg font-semibold text-foreground",
                 nav: "space-x-1 flex items-center",
-                nav_button: "h-9 w-9 bg-background hover:bg-accent hover:text-accent-foreground border border-border rounded-lg transition-colors duration-200 touch-manipulation",
-                nav_button_previous: "absolute left-3",
-                nav_button_next: "absolute right-3",
+                nav_button: "h-8 w-8 sm:h-9 sm:w-9 bg-background hover:bg-accent hover:text-accent-foreground border border-border rounded-lg transition-colors duration-200 touch-manipulation",
+                nav_button_previous: "absolute left-2 sm:left-3",
+                nav_button_next: "absolute right-2 sm:right-3",
                 table: "w-full border-collapse",
-                head_row: "flex mb-2",
-                head_cell: "text-muted-foreground rounded-md w-full max-w-10 font-medium text-xs uppercase tracking-wide py-2 text-center",
-                row: "flex w-full mt-1",
-                cell: "relative p-0 text-center focus-within:relative focus-within:z-20 w-full max-w-10",
+                head_row: "flex mb-1 sm:mb-2",
+                head_cell: "text-muted-foreground rounded-md w-full font-medium text-xs uppercase tracking-wide py-1 sm:py-2 text-center flex-1",
+                row: "flex w-full mt-0.5 sm:mt-1",
+                cell: "relative p-0 text-center focus-within:relative focus-within:z-20 flex-1 aspect-square",
                 day: cn(
-                  "h-10 w-10 mx-auto font-normal transition-all duration-200",
+                  "h-8 w-8 sm:h-10 sm:w-10 mx-auto font-normal transition-all duration-200",
                   "hover:bg-accent hover:text-accent-foreground rounded-lg",
-                  "focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
-                  "aria-selected:opacity-100 touch-manipulation",
+                  "focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
+                  "aria-selected:opacity-100 touch-manipulation text-xs sm:text-sm",
                   "active:scale-95 disabled:pointer-events-none"
                 ),
                 day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md ring-2 ring-primary ring-offset-1",
-                day_today: "bg-accent text-accent-foreground font-semibold ring-2 ring-primary/20",
+                day_today: "bg-accent text-accent-foreground font-semibold ring-1 sm:ring-2 ring-primary/20",
                 day_outside: "text-muted-foreground/40 opacity-30",
                 day_disabled: "text-muted-foreground/20 opacity-20 cursor-not-allowed line-through",
                 day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
@@ -379,7 +385,9 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                 holiday: date => getDateModifiers(date) === 'holiday',
                 closed: date => getDateModifiers(date) === 'closed',
                 weekend: date => isWeekend(date),
-                farFuture: date => differenceInDays(date, new Date()) > 90 // Highlight far future dates
+                unavailable: date => !isDateAvailable(date) && !isBefore(startOfDay(date), startOfDay(new Date())),
+                farFuture: date => differenceInDays(date, new Date()) > 90,
+                available: date => isDateAvailable(date)
               }} 
               modifiersStyles={{
                 holiday: {
@@ -392,30 +400,76 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                   color: 'hsl(var(--muted-foreground))',
                   textDecoration: 'line-through'
                 },
+                unavailable: {
+                  backgroundColor: 'hsl(var(--muted) / 0.3)',
+                  color: 'hsl(var(--muted-foreground))',
+                  opacity: '0.6'
+                },
+                available: {
+                  backgroundColor: 'hsl(var(--success) / 0.1)',
+                  color: 'hsl(var(--success))',
+                  border: '1px solid hsl(var(--success) / 0.2)'
+                },
                 weekend: DELIVERY_BOOKING_CONSTANTS.BUSINESS_DAYS_ONLY ? {
                   backgroundColor: 'hsl(var(--muted) / 0.5)',
                   color: 'hsl(var(--muted-foreground))'
                 } : {},
                 farFuture: {
-                  backgroundColor: 'hsl(var(--blue-50))',
-                  color: 'hsl(var(--blue-700))',
-                  fontSize: '0.8rem'
+                  backgroundColor: 'transparent',
+                  color: 'hsl(var(--muted-foreground))',
+                  fontSize: '0.75rem'
                 }
               }} 
             />
           </div>
 
-          {/* Date Selection Feedback */}
+          {/* Date Selection Feedback - Enhanced */}
           {calendarDate && (
-            <div className="text-sm text-muted-foreground bg-green-50 border border-green-200 rounded-lg p-3">
-              ✅ Selected: <strong>{format(calendarDate, 'EEEE, MMMM d, yyyy')}</strong>
-              {differenceInDays(calendarDate, new Date()) > 7 && (
-                <div className="mt-1 text-blue-600">
-                  ℹ️ Advanced booking - {differenceInDays(calendarDate, new Date())} days from today
-                </div>
+            <div className={cn(
+              "text-sm rounded-lg p-3 border transition-colors duration-200",
+              isDateAvailable(calendarDate) 
+                ? "bg-success/10 border-success/20 text-success" 
+                : "bg-warning/10 border-warning/20 text-warning"
+            )}>
+              {isDateAvailable(calendarDate) ? (
+                <>
+                  ✅ <strong>Available:</strong> {format(calendarDate, 'EEEE, MMMM d, yyyy')}
+                  {differenceInDays(calendarDate, new Date()) > 7 && (
+                    <div className="mt-1 text-blue-600">
+                      📅 Advanced booking - {differenceInDays(calendarDate, new Date())} days from today
+                    </div>
+                  )}
+                </>
+              ) : (
+                <>
+                  ⚠️ <strong>Selected:</strong> {format(calendarDate, 'EEEE, MMMM d, yyyy')}
+                  <div className="mt-1">
+                    {dateValidation.getDateDisabledReason(calendarDate) || "Date may have limited availability"}
+                  </div>
+                </>
               )}
             </div>
           )}
+
+          {/* Legend for calendar dates */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-success/20 border border-success/40"></div>
+              <span className="text-muted-foreground">Available</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-muted/50"></div>
+              <span className="text-muted-foreground">Unavailable</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-destructive/20 border border-destructive/40"></div>
+              <span className="text-muted-foreground">Holiday</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-3 h-3 rounded bg-primary text-primary-foreground"></div>
+              <span className="text-muted-foreground">Selected</span>
+            </div>
+          </div>
         </div>
 
         {/* Time Slots Section - Enhanced Mobile Layout */}

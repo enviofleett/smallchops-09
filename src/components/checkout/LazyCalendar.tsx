@@ -30,8 +30,9 @@ export const LazyCalendar: React.FC<LazyCalendarProps> = ({
     prefetchNextMonth();
   }, [prefetchNextMonth]);
 
-  // Enhanced date disabled function - only disable past dates
+  // Production-ready date disabled function - only disable past dates to show all available dates
   const isDateDisabled = useCallback((date: Date) => {
+    // Only disable past dates - show all future dates for better UX
     return isBefore(startOfDay(date), startOfDay(new Date()));
   }, []);
 
@@ -79,7 +80,7 @@ export const LazyCalendar: React.FC<LazyCalendarProps> = ({
 
   return (
     <div 
-      className={cn("w-full overflow-hidden rounded-lg bg-background", className)}
+      className={cn("w-full overflow-visible rounded-lg bg-background", className)}
       onMouseEnter={handleCalendarInteraction}
       onFocus={handleCalendarInteraction}
     >
@@ -96,6 +97,8 @@ export const LazyCalendar: React.FC<LazyCalendarProps> = ({
         month={currentMonth}
         onMonthChange={handleMonthChange}
         disabled={isDateDisabled}
+        showOutsideDays={true}
+        fixedWeeks={true}
         className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200" 
         classNames={{
           months: "flex flex-col space-y-2 sm:space-y-4",
@@ -116,21 +119,20 @@ export const LazyCalendar: React.FC<LazyCalendarProps> = ({
             "hover:bg-accent hover:text-accent-foreground rounded-lg",
             "focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
             "aria-selected:opacity-100 touch-manipulation text-xs sm:text-sm",
-            "active:scale-95 disabled:pointer-events-none"
+            "active:scale-95"
           ),
           day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md ring-2 ring-primary ring-offset-1",
           day_today: "bg-accent text-accent-foreground font-semibold ring-1 sm:ring-2 ring-primary/20",
-          day_outside: "text-muted-foreground/40 opacity-30",
-          day_disabled: "text-muted-foreground/20 opacity-20 cursor-not-allowed line-through",
+          day_outside: "text-muted-foreground/60 opacity-60 hover:opacity-100 transition-opacity",
+          day_disabled: "text-muted-foreground/30 opacity-30 cursor-not-allowed line-through pointer-events-none",
           day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
-          day_hidden: "invisible"
+          day_hidden: "opacity-0"
         }} 
         modifiers={{
           holiday: date => getDateModifiers(date) === 'holiday',
           closed: date => getDateModifiers(date) === 'closed',
           weekend: date => isWeekend(date),
           unavailable: date => getDateModifiers(date) === 'unavailable',
-          farFuture: date => differenceInDays(date, new Date()) > 90,
           available: date => getDateModifiers(date) === 'available',
           loading: date => {
             const dateStr = format(date, 'yyyy-MM-dd');
@@ -144,14 +146,14 @@ export const LazyCalendar: React.FC<LazyCalendarProps> = ({
             border: '1px solid hsl(var(--destructive) / 0.3)'
           },
           closed: {
-            backgroundColor: 'hsl(var(--muted))',
+            backgroundColor: 'hsl(var(--muted) / 0.5)',
             color: 'hsl(var(--muted-foreground))',
             textDecoration: 'line-through'
           },
           unavailable: {
-            backgroundColor: 'hsl(var(--muted) / 0.3)',
+            backgroundColor: 'hsl(var(--muted) / 0.2)',
             color: 'hsl(var(--muted-foreground))',
-            opacity: '0.6'
+            opacity: '0.7'
           },
           available: {
             backgroundColor: 'hsl(var(--success) / 0.15)',
@@ -162,13 +164,12 @@ export const LazyCalendar: React.FC<LazyCalendarProps> = ({
           loading: {
             backgroundColor: 'hsl(var(--muted) / 0.1)',
             color: 'hsl(var(--muted-foreground))',
-            opacity: '0.7',
+            opacity: '0.8',
             animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
           },
-          farFuture: {
+          weekend: {
             backgroundColor: 'transparent',
-            color: 'hsl(var(--muted-foreground))',
-            fontSize: '0.75rem'
+            color: 'hsl(var(--muted-foreground))'
           }
         }} 
       />

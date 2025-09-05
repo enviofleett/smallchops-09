@@ -28,10 +28,11 @@ serve(async (req) => {
         console.log('Admin function: Listing orders', { page, pageSize, status, searchQuery, startDate, endDate })
 
         let query = supabaseClient
-          .from('orders_view')
+          .from('orders')
           .select(`*, 
             order_items (*),
-            order_delivery_schedule (*)
+            order_delivery_schedule (*),
+            delivery_zones (id, name, base_fee, is_active)
           `, { count: 'exact' })
         // Sort by delivery date (today's orders first for confirmed status)
         if (status === 'confirmed') {
@@ -67,6 +68,72 @@ serve(async (req) => {
 
         if (error) {
           console.error('Error fetching orders:', error)
+          
+          // Defensive fallback: try without embeds if embedding fails
+          if (error.code === 'PGRST200' || error.message.includes('relationship')) {
+            console.log('Retrying without embeds due to relationship error')
+            
+            let fallbackQuery = supabaseClient
+              .from('orders')
+              .select('*', { count: 'exact' })
+              
+            // Apply same filters
+            if (status === 'confirmed') {
+              fallbackQuery = fallbackQuery.eq('status', status).eq('payment_status', 'paid')
+            } else if (status !== 'all') {
+              fallbackQuery = fallbackQuery.eq('status', status)
+            }
+
+            if (searchQuery) {
+              const searchString = `%${searchQuery}%`
+              fallbackQuery = fallbackQuery.or(
+                `order_number.ilike.${searchString},customer_name.ilike.${searchString},customer_phone.ilike.${searchString}`
+              )
+            }
+
+            if (startDate && endDate) {
+              fallbackQuery = fallbackQuery.gte('order_time', startDate).lte('order_time', endDate)
+            }
+
+            fallbackQuery = fallbackQuery.order('order_time', { ascending: false })
+            const { data: fallbackData, error: fallbackError, count: fallbackCount } = await fallbackQuery.range(from, to)
+            
+            if (fallbackError) {
+              return new Response(JSON.stringify({
+                success: false,
+                error: fallbackError.message
+              }), {
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+                status: 500
+              })
+            }
+
+            // Fetch related data separately
+            const orderIds = fallbackData?.map(order => order.id) || []
+            
+            const [itemsResult, schedulesResult, zonesResult] = await Promise.all([
+              supabaseClient.from('order_items').select('*').in('order_id', orderIds),
+              supabaseClient.from('order_delivery_schedule').select('*').in('order_id', orderIds),
+              supabaseClient.from('delivery_zones').select('id, name, base_fee, is_active')
+            ])
+
+            // Merge the data
+            const enrichedOrders = fallbackData?.map(order => ({
+              ...order,
+              order_items: itemsResult.data?.filter(item => item.order_id === order.id) || [],
+              order_delivery_schedule: schedulesResult.data?.filter(schedule => schedule.order_id === order.id) || [],
+              delivery_zones: zonesResult.data?.find(zone => zone.id === order.delivery_zone_id) || null
+            }))
+
+            return new Response(JSON.stringify({
+              success: true,
+              orders: enrichedOrders,
+              count: fallbackCount || 0
+            }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+            })
+          }
+          
           return new Response(JSON.stringify({
             success: false,
             error: error.message
@@ -133,10 +200,11 @@ serve(async (req) => {
           
           // Fetch updated order with relations
           const { data: updatedOrder, error: fetchError } = await supabaseClient
-            .from('orders_view')
+            .from('orders')
             .select(`*, 
               order_items (*),
-              order_delivery_schedule (*)
+              order_delivery_schedule (*),
+              delivery_zones (id, name, base_fee, is_active)
             `)
             .eq('id', orderId)
             .single()
@@ -175,10 +243,11 @@ serve(async (req) => {
           
           // Fetch updated order with relations
           const { data: updatedOrder, error: fetchError } = await supabaseClient
-            .from('orders_view')
+            .from('orders')
             .select(`*, 
               order_items (*),
-              order_delivery_schedule (*)
+              order_delivery_schedule (*),
+              delivery_zones (id, name, base_fee, is_active)
             `)
             .eq('id', orderId)
             .single()

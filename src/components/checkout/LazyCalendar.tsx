@@ -90,6 +90,9 @@ export const LazyCalendar: React.FC<LazyCalendarProps> = ({
         </div>
       )}
       
+      {/* Production-ready calendar with all dates visible */}
+      <div className="relative w-full min-w-0 max-w-full calendar-container">
+      
       <Calendar 
         mode="single" 
         selected={selectedDate} 
@@ -99,51 +102,60 @@ export const LazyCalendar: React.FC<LazyCalendarProps> = ({
         disabled={isDateDisabled}
         showOutsideDays={true}
         fixedWeeks={true}
+        numberOfMonths={1}
         className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200" 
         classNames={{
-          months: "flex flex-col space-y-1 sm:space-y-2",
-          month: "space-y-1 sm:space-y-2 w-full",
-          caption: "flex justify-center pt-1 sm:pt-2 pb-1 relative items-center",
-          caption_label: "text-sm sm:text-base font-semibold text-foreground",
+          months: "flex flex-col space-y-1 sm:space-y-2 w-full",
+          month: "space-y-1 sm:space-y-2 w-full overflow-hidden",
+          caption: "flex justify-center pt-1 sm:pt-2 pb-1 relative items-center w-full",
+          caption_label: "text-sm sm:text-base font-semibold text-foreground min-w-0 truncate",
           nav: "space-x-1 flex items-center",
-          nav_button: "h-7 w-7 sm:h-8 sm:w-8 bg-background hover:bg-accent hover:text-accent-foreground border border-border rounded-md sm:rounded-lg transition-colors duration-200 touch-manipulation",
+          nav_button: "h-7 w-7 sm:h-8 sm:w-8 bg-background hover:bg-accent hover:text-accent-foreground border border-border rounded-md sm:rounded-lg transition-colors duration-200 touch-manipulation flex-shrink-0",
           nav_button_previous: "absolute left-1 sm:left-2",
           nav_button_next: "absolute right-1 sm:right-2",
-          table: "w-full border-collapse",
-          head_row: "flex mb-1",
-          head_cell: "text-muted-foreground rounded-md w-full font-medium text-xs uppercase tracking-wide py-1 text-center flex-1",
-          row: "flex w-full mt-0.5",
-          cell: "relative p-0 text-center focus-within:relative focus-within:z-20 flex-1 aspect-square min-w-0",
+          table: "w-full border-collapse table-fixed",
+          head_row: "flex mb-1 w-full",
+          head_cell: "text-muted-foreground rounded-md font-medium text-xs uppercase tracking-wide py-1 text-center flex-1 min-w-0",
+          row: "flex w-full",
+          cell: "relative p-0.5 sm:p-1 text-center focus-within:relative focus-within:z-20 flex-1 min-w-0",
           day: cn(
             "h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9 mx-auto font-normal transition-all duration-200",
             "hover:bg-accent hover:text-accent-foreground rounded-md sm:rounded-lg",
             "focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-1 focus:ring-primary",
             "aria-selected:opacity-100 touch-manipulation text-xs sm:text-sm",
-            "active:scale-95 flex items-center justify-center"
+            "active:scale-95 flex items-center justify-center min-w-0 shrink-0",
+            "border border-transparent hover:border-border/20"
           ),
-          day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md ring-1 sm:ring-2 ring-primary ring-offset-1",
-          day_today: "bg-accent text-accent-foreground font-semibold ring-1 ring-primary/30",
-          day_outside: "text-muted-foreground/50 opacity-50 hover:opacity-80 transition-opacity",
+          day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md ring-1 sm:ring-2 ring-primary ring-offset-1 border-primary",
+          day_today: "bg-accent text-accent-foreground font-semibold ring-1 ring-primary/30 border-primary/30",
+          day_outside: "text-muted-foreground/60 opacity-70 hover:opacity-100 transition-opacity hover:bg-muted/20",
           day_disabled: "text-muted-foreground/20 opacity-20 cursor-not-allowed line-through pointer-events-none",
           day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
-          day_hidden: "opacity-0"
-        }}
+          day_hidden: "invisible"
+        }} 
         modifiers={{
           holiday: date => getDateModifiers(date) === 'holiday',
           closed: date => getDateModifiers(date) === 'closed',
-          weekend: date => isWeekend(date),
+          weekend: date => isWeekend(date) && !isBefore(startOfDay(date), startOfDay(new Date())),
           unavailable: date => getDateModifiers(date) === 'unavailable',
           available: date => getDateModifiers(date) === 'available',
           loading: date => {
             const dateStr = format(date, 'yyyy-MM-dd');
             return !slots.some(s => s.date === dateStr) && !isBefore(startOfDay(date), startOfDay(new Date()));
+          },
+          future: date => !isBefore(startOfDay(date), startOfDay(new Date())),
+          outsideMonth: date => {
+            const dateMonth = date.getMonth();
+            const currentMonthNum = currentMonth.getMonth();
+            return dateMonth !== currentMonthNum;
           }
         }} 
         modifiersStyles={{
           holiday: {
             backgroundColor: 'hsl(var(--destructive) / 0.1)',
             color: 'hsl(var(--destructive))',
-            border: '1px solid hsl(var(--destructive) / 0.3)'
+            border: '1px solid hsl(var(--destructive) / 0.3)',
+            fontWeight: '500'
           },
           closed: {
             backgroundColor: 'hsl(var(--muted) / 0.5)',
@@ -168,16 +180,34 @@ export const LazyCalendar: React.FC<LazyCalendarProps> = ({
             animation: 'pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite'
           },
           weekend: {
-            backgroundColor: 'transparent',
-            color: 'hsl(var(--muted-foreground))'
+            backgroundColor: 'hsl(var(--accent) / 0.3)',
+            color: 'hsl(var(--accent-foreground))',
+            fontWeight: '400'
+          },
+          future: {
+            cursor: 'pointer'
+          },
+          outsideMonth: {
+            opacity: '0.4',
+            fontSize: '0.8rem'
           }
         }} 
       />
+      </div>
       
+      {/* Mobile-optimized loading indicator */}
       {loading && slots.length > 0 && (
         <div className="text-xs text-muted-foreground text-center py-2 flex items-center justify-center gap-2">
           <div className="w-3 h-3 border border-primary border-t-transparent rounded-full animate-spin"></div>
-          Loading month data...
+          <span className="hidden sm:inline">Loading month data...</span>
+          <span className="sm:hidden">Loading...</span>
+        </div>
+      )}
+      
+      {/* Production info for debugging */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="text-xs text-muted-foreground text-center py-1 opacity-50">
+          📊 {slots.length} slots loaded • Fixed weeks: ON • Outside days: ON
         </div>
       )}
     </div>

@@ -161,21 +161,21 @@ export class DeliveryBookingAPI {
   }
 
   /**
-   * Validate date range for 6-month booking window
+   * Validate date range for 2-month booking window
    */
   validateDateRange(startDate: Date, endDate: Date): { valid: boolean; error?: string } {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
     const maxDate = new Date();
-    maxDate.setMonth(maxDate.getMonth() + 6);
+    maxDate.setMonth(maxDate.getMonth() + 2);
     
     if (startDate < today) {
       return { valid: false, error: 'Start date cannot be in the past' };
     }
     
     if (endDate > maxDate) {
-      return { valid: false, error: 'End date cannot be more than 6 months in advance' };
+      return { valid: false, error: 'End date cannot be more than 2 months in advance' };
     }
     
     if (startDate > endDate) {
@@ -193,11 +193,11 @@ export class DeliveryBookingAPI {
   }
 
   /**
-   * Get the maximum booking date (6 months from now)
+   * Get the maximum booking date (2 months from now)
    */
   getMaxBookingDate(): Date {
     const maxDate = new Date();
-    maxDate.setMonth(maxDate.getMonth() + 6);
+    maxDate.setMonth(maxDate.getMonth() + 2);
     return maxDate;
   }
 

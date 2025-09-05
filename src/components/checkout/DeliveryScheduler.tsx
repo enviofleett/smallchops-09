@@ -17,7 +17,7 @@ import { CacheOptimizer } from '@/utils/optimizedQuery';
 // Production-ready constants
 const DELIVERY_BOOKING_CONSTANTS = {
   MIN_ADVANCE_DAYS: 1, // Minimum 1 day advance booking
-  MAX_ADVANCE_MONTHS: 6, // 6 months advance booking
+  MAX_ADVANCE_MONTHS: 2, // 2 months advance booking for faster loading
   BUSINESS_DAYS_ONLY: false, // Set to true if delivery only on business days
   BLOCKED_DATES: [] as Date[], // Specific dates to block (holidays, maintenance days)
 } as const;

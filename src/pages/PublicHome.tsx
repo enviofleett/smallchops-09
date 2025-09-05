@@ -330,8 +330,7 @@ const PublicHome = () => {
             <div className="text-center lg:text-left order-2 lg:order-1">
               <div className="space-y-4 sm:space-y-6">
                 <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-gray-900 leading-tight">
-                  Delicious Bites,<br />
-                  Big Smiles
+                  LIVE . LOVE . SHARE
                 </h1>
                 <p className="text-base sm:text-lg lg:text-xl text-gray-600 px-4 sm:px-0">
                   Crispy, savory small chops, freshly made and delivered fast.

@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { DeliverySchedulingErrorBoundary } from './DeliverySchedulingErrorBoundary';
 import { HorizontalDatePicker } from './HorizontalDatePicker';
 import { ProgressiveLoader } from '@/components/ui/progressive-loader';
+import { LoadingProgress } from '@/components/ui/loading-progress';
 import { deliveryBookingAPI } from '@/api/deliveryBookingApi';
 
 // Production-ready constants
@@ -49,6 +50,8 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
   const [selectedDateSlots, setSelectedDateSlots] = useState<DeliveryTimeSlot[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasInitialLoad, setHasInitialLoad] = useState(false); // Track if initial load is complete
+  const [loadingProgress, setLoadingProgress] = useState(0); // Track loading progress
   const [calendarDate, setCalendarDate] = useState<Date | undefined>(selectedDate ? parseISO(selectedDate) : undefined);
 
   // Production-ready date validation functions
@@ -121,25 +124,15 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
       return true;
     }
 
-    return false;
+   return false;
   }, [dateValidation]);
-  useEffect(() => {
-    loadAvailableSlots();
-  }, []);
-  useEffect(() => {
-    if (calendarDate) {
-      const dateStr = format(calendarDate, 'yyyy-MM-dd');
-      const daySlots = availableSlots.find(slot => slot.date === dateStr);
-      setSelectedDateSlots(daySlots?.time_slots || []);
-    } else {
-      setSelectedDateSlots([]);
-    }
-  }, [calendarDate, availableSlots]);
+  
   const loadAvailableSlots = useCallback(async () => {
     try {
       console.log('📋 Loading delivery slots with production API...');
       setLoading(true);
       setError(null);
+      setLoadingProgress(10); // Start progress
       
       // Use optimized date range
       const startDate = dateValidation.minDate;
@@ -150,10 +143,14 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         end: format(endDate, 'yyyy-MM-dd')
       });
       
+      setLoadingProgress(30); // API call starting
+      
       const response = await deliveryBookingAPI.getAvailableSlots({
         start_date: deliveryBookingAPI.formatDateForAPI(startDate),
         end_date: deliveryBookingAPI.formatDateForAPI(endDate)
       });
+      
+      setLoadingProgress(70); // Data received
       
       console.log('✅ Slots loaded:', response.slots.length, 'business days:', response.business_days);
       
@@ -171,19 +168,53 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
         }))
       }));
       
+      setLoadingProgress(90); // Processing complete
+      
       setAvailableSlots(convertedSlots);
+      setHasInitialLoad(true);
       
       if (convertedSlots.length === 0) {
         setError('No delivery slots available for the next 6 months. Please contact support.');
       }
+      
+      setLoadingProgress(100); // Complete
     } catch (err) {
       console.error('❌ Failed to load delivery slots:', err);
       const errorMessage = err instanceof Error ? err.message : 'Failed to load available delivery slots';
-      setError(errorMessage);
+      
+      // Only show error if we've completed initial load attempt
+      if (hasInitialLoad) {
+        setError(errorMessage);
+      } else {
+        // For initial load, show user-friendly message
+        setError('Having trouble connecting to delivery services. Please check your connection and try again.');
+      }
+      setLoadingProgress(0);
     } finally {
       setLoading(false);
+      // Complete progress after a short delay
+      setTimeout(() => setLoadingProgress(0), 500);
     }
-  }, [dateValidation]);
+  }, [dateValidation, hasInitialLoad]);
+
+  useEffect(() => {
+    // Only load slots on mount, prevent error flash on initial render
+    const timer = setTimeout(() => {
+      loadAvailableSlots();
+    }, 100); // Small delay to prevent error flash
+    
+    return () => clearTimeout(timer);
+  }, [loadAvailableSlots]);
+
+  useEffect(() => {
+    if (calendarDate) {
+      const dateStr = format(calendarDate, 'yyyy-MM-dd');
+      const daySlots = availableSlots.find(slot => slot.date === dateStr);
+      setSelectedDateSlots(daySlots?.time_slots || []);
+    } else {
+      setSelectedDateSlots([]);
+    }
+  }, [calendarDate, availableSlots]);
 
   // Legacy date modifier functions for existing slot data
   const getDateModifiers = (date: Date) => {
@@ -490,18 +521,25 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = ({
     );
   };
 
-  // Use ProgressiveLoader for optimized loading experience
+  // Use ProgressiveLoader with custom loading indicator
   return (
     <DeliverySchedulingErrorBoundary>
       <ProgressiveLoader
         isLoading={loading}
-        error={error ? new Error(error) : null}
+        error={error && hasInitialLoad ? new Error(error) : null} // Only show errors after initial load
         data={availableSlots}
         skeletonType="card"
         retryFn={loadAvailableSlots}
-        timeout={15000}
+        timeout={20000} // Increased timeout for production
       >
-        {renderContent()}
+        {loading && loadingProgress > 0 ? (
+          <LoadingProgress 
+            progress={loadingProgress} 
+            message="Loading delivery availability..." 
+          />
+        ) : (
+          renderContent()
+        )}
       </ProgressiveLoader>
     </DeliverySchedulingErrorBoundary>
   );

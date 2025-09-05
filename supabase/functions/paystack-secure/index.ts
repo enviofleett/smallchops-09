@@ -141,6 +141,14 @@ async function initializePayment({
 
     console.log('🔍 Fetching authoritative order data:', orderId)
 
+    // Get business settings for website URL
+    const { data: businessSettings } = await supabaseAdmin
+      .from('business_settings')
+      .select('website_url')
+      .single()
+
+    const frontendUrl = businessSettings?.website_url || 'https://7d0e93f8-fb9a-4fff-bcf3-b56f4a3f8c37.sandbox.lovable.dev'
+
     // Get order details for authoritative amount
     const { data: order, error: orderError } = await supabaseAdmin
       .from('orders')
@@ -254,13 +262,14 @@ async function initializePayment({
       order_found: true
     })
 
-    // Prepare Paystack payload
+    // Prepare Paystack payload with frontend callback URL
+    const frontendCallbackUrl = `${frontendUrl}/payment/callback?order_id=${orderId}`
     const paystackPayload: PaystackInitializePayload = {
       email: email,
       amount: amountInKobo.toString(),
       currency: 'NGN',
       reference: finalReference,
-      callback_url: callback_url || `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?order_id=${orderId}`,
+      callback_url: callback_url || frontendCallbackUrl,
       channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
       metadata: {
         order_id: orderId,
@@ -331,7 +340,7 @@ async function initializePayment({
             .eq('id', orderId)
           
           paystackPayload.reference = newReference
-          paystackPayload.callback_url = callback_url || `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-callback?order_id=${orderId}`
+          paystackPayload.callback_url = callback_url || frontendCallbackUrl
           
           retryAttempt++
           continue

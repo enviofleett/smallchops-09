@@ -320,7 +320,7 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
   return <DeliverySchedulingErrorBoundary>
       <Card className={`border-primary/20 ${className}`}>
         {showHeader}
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-4 sm:space-y-6 p-3 sm:p-6">
         {error && <Alert variant="destructive">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
@@ -333,83 +333,86 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
 
         
 
-        {/* Calendar Section with Enhanced Date Range Info */}
-        <div className="space-y-4">
+        {/* Calendar Section with Enhanced Mobile Responsiveness */}
+        <div className="space-y-3 sm:space-y-4">
           {/* Enhanced date selection info - production ready */}
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
-            <h3 className="font-medium text-foreground">Select Delivery Date</h3>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-3 sm:mb-4">
+            <h3 className="font-medium text-foreground text-sm sm:text-base">Select Delivery Date</h3>
             <div className="flex items-center gap-2">
-              <Info className="w-4 h-4 text-muted-foreground" />
+              <Info className="w-3 h-3 sm:w-4 sm:h-4 text-muted-foreground" />
               <span className="text-xs text-muted-foreground">
                 Book up to {DELIVERY_BOOKING_CONSTANTS.MAX_ADVANCE_MONTHS} months ahead
               </span>
             </div>
           </div>
 
-          <LazyCalendar
-            selectedDate={calendarDate}
-            onDateSelect={handleDateSelect}
-            isDateAvailable={isDateAvailable}
-            className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200"
-          />
+          {/* Mobile-optimized calendar container */}
+          <div className="w-full bg-background rounded-lg border border-border/50 p-2 sm:p-4">
+            <LazyCalendar
+              selectedDate={calendarDate}
+              onDateSelect={handleDateSelect}
+              isDateAvailable={isDateAvailable}
+              className="w-full"
+            />
+          </div>
 
-          {/* Date Selection Feedback - Enhanced */}
+          {/* Date Selection Feedback - Mobile Enhanced */}
           {calendarDate && (
             <div className={cn(
-              "text-sm rounded-lg p-3 border transition-colors duration-200",
+              "text-xs sm:text-sm rounded-lg p-2 sm:p-3 border transition-colors duration-200",
               isDateAvailable(calendarDate) 
                 ? "bg-success/10 border-success/20 text-success" 
                 : "bg-warning/10 border-warning/20 text-warning"
             )}>
               {isDateAvailable(calendarDate) ? (
                 <>
-                  ✅ <strong>Available:</strong> {format(calendarDate, 'EEEE, MMMM d, yyyy')}
+                  ✅ <strong>Available:</strong> <span className="text-xs sm:text-sm">{format(calendarDate, 'EEE, MMM d, yyyy')}</span>
                   {differenceInDays(calendarDate, new Date()) > 7 && (
-                    <div className="mt-1 text-blue-600">
-                      📅 Advanced booking - {differenceInDays(calendarDate, new Date())} days from today
+                    <div className="mt-1 text-blue-600 text-xs">
+                      📅 {differenceInDays(calendarDate, new Date())} days ahead
                     </div>
                   )}
                 </>
               ) : (
                 <>
-                  ⚠️ <strong>Selected:</strong> {format(calendarDate, 'EEEE, MMMM d, yyyy')}
-                  <div className="mt-1">
-                    {dateValidation.getDateDisabledReason(calendarDate) || "Date may have limited availability"}
+                  ⚠️ <strong>Selected:</strong> <span className="text-xs sm:text-sm">{format(calendarDate, 'EEE, MMM d, yyyy')}</span>
+                  <div className="mt-1 text-xs">
+                    {dateValidation.getDateDisabledReason(calendarDate) || "Limited availability"}
                   </div>
                 </>
               )}
             </div>
           )}
 
-          {/* Legend for calendar dates */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-success/20 border border-success/40"></div>
-              <span className="text-muted-foreground">Available</span>
+          {/* Mobile-optimized legend */}
+          <div className="grid grid-cols-2 gap-2 text-xs px-1">
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-success/20 border border-success/40"></div>
+              <span className="text-muted-foreground text-xs">Available</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-muted/50"></div>
-              <span className="text-muted-foreground">Unavailable</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-muted/50"></div>
+              <span className="text-muted-foreground text-xs">Unavailable</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-destructive/20 border border-destructive/40"></div>
-              <span className="text-muted-foreground">Holiday</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-destructive/20 border border-destructive/40"></div>
+              <span className="text-muted-foreground text-xs">Holiday</span>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 rounded bg-primary text-primary-foreground"></div>
-              <span className="text-muted-foreground">Selected</span>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 sm:w-3 sm:h-3 rounded bg-primary"></div>
+              <span className="text-muted-foreground text-xs">Selected</span>
             </div>
           </div>
         </div>
 
-        {/* Time Slots Section - Enhanced Mobile Layout */}
+        {/* Time Slots Section - Mobile Enhanced */}
         {calendarDate && selectedDateSlots.length > 0 && (
-          <div className="space-y-4">
-            <h3 className="font-medium text-base flex items-center gap-2 text-foreground">
-              <Clock className="w-4 h-4 text-primary" />
-              Select Delivery Time for {format(calendarDate, 'EEEE, MMMM d')}
+          <div className="space-y-3 sm:space-y-4">
+            <h3 className="font-medium text-sm sm:text-base flex items-center gap-2 text-foreground px-1">
+              <Clock className="w-3 h-3 sm:w-4 sm:h-4 text-primary" />
+              <span className="truncate">Select Time - {format(calendarDate, 'MMM d')}</span>
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 sm:gap-3">
               {selectedDateSlots.map((timeSlot, index) => (
                 <Button 
                   key={index} 
@@ -417,16 +420,16 @@ export const DeliveryScheduler: React.FC<DeliverySchedulerProps> = memo(({
                   disabled={!timeSlot.available} 
                   onClick={() => handleTimeSlotSelect(timeSlot)} 
                   className={cn(
-                    "h-auto min-h-[72px] p-4 flex flex-col items-center justify-center gap-2 text-center",
-                    "transition-all duration-200 touch-manipulation rounded-xl border-2",
+                    "h-auto min-h-[60px] sm:min-h-[72px] p-2 sm:p-4 flex flex-col items-center justify-center gap-1 sm:gap-2 text-center",
+                    "transition-all duration-200 touch-manipulation rounded-lg sm:rounded-xl border-2",
                     "hover:scale-[1.02] active:scale-[0.98] focus:scale-[1.02]",
-                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2",
+                    "focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1 sm:focus:ring-offset-2",
                     !timeSlot.available && "opacity-50 cursor-not-allowed hover:scale-100",
                     timeSlot.available && "hover:shadow-md",
-                    selectedTimeSlot?.start_time === timeSlot.start_time && selectedTimeSlot?.end_time === timeSlot.end_time && "ring-2 ring-primary ring-offset-2 shadow-lg"
+                    selectedTimeSlot?.start_time === timeSlot.start_time && selectedTimeSlot?.end_time === timeSlot.end_time && "ring-2 ring-primary ring-offset-1 sm:ring-offset-2 shadow-lg"
                   )}
                 >
-                  <span className="font-semibold text-sm leading-tight">
+                  <span className="font-semibold text-xs sm:text-sm leading-tight">
                     {timeSlot.start_time} - {timeSlot.end_time}
                   </span>
                   {!timeSlot.available && timeSlot.reason && (

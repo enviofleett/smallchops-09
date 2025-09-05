@@ -101,33 +101,33 @@ export const LazyCalendar: React.FC<LazyCalendarProps> = ({
         fixedWeeks={true}
         className="w-full mx-auto rounded-lg border border-border/50 pointer-events-auto shadow-sm hover:shadow-md transition-shadow duration-200" 
         classNames={{
-          months: "flex flex-col space-y-2 sm:space-y-4",
-          month: "space-y-2 sm:space-y-4 w-full",
-          caption: "flex justify-center pt-2 sm:pt-3 pb-1 sm:pb-2 relative items-center",
-          caption_label: "text-sm sm:text-base md:text-lg font-semibold text-foreground",
+          months: "flex flex-col space-y-1 sm:space-y-2",
+          month: "space-y-1 sm:space-y-2 w-full",
+          caption: "flex justify-center pt-1 sm:pt-2 pb-1 relative items-center",
+          caption_label: "text-sm sm:text-base font-semibold text-foreground",
           nav: "space-x-1 flex items-center",
-          nav_button: "h-8 w-8 sm:h-9 sm:w-9 bg-background hover:bg-accent hover:text-accent-foreground border border-border rounded-lg transition-colors duration-200 touch-manipulation",
-          nav_button_previous: "absolute left-2 sm:left-3",
-          nav_button_next: "absolute right-2 sm:right-3",
+          nav_button: "h-7 w-7 sm:h-8 sm:w-8 bg-background hover:bg-accent hover:text-accent-foreground border border-border rounded-md sm:rounded-lg transition-colors duration-200 touch-manipulation",
+          nav_button_previous: "absolute left-1 sm:left-2",
+          nav_button_next: "absolute right-1 sm:right-2",
           table: "w-full border-collapse",
-          head_row: "flex mb-1 sm:mb-2",
-          head_cell: "text-muted-foreground rounded-md w-full font-medium text-xs uppercase tracking-wide py-1 sm:py-2 text-center flex-1",
-          row: "flex w-full mt-0.5 sm:mt-1",
-          cell: "relative p-0 text-center focus-within:relative focus-within:z-20 flex-1 aspect-square",
+          head_row: "flex mb-1",
+          head_cell: "text-muted-foreground rounded-md w-full font-medium text-xs uppercase tracking-wide py-1 text-center flex-1",
+          row: "flex w-full mt-0.5",
+          cell: "relative p-0 text-center focus-within:relative focus-within:z-20 flex-1 aspect-square min-w-0",
           day: cn(
-            "h-8 w-8 sm:h-10 sm:w-10 mx-auto font-normal transition-all duration-200",
-            "hover:bg-accent hover:text-accent-foreground rounded-lg",
-            "focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-1",
+            "h-7 w-7 sm:h-8 sm:w-8 md:h-9 md:w-9 mx-auto font-normal transition-all duration-200",
+            "hover:bg-accent hover:text-accent-foreground rounded-md sm:rounded-lg",
+            "focus:bg-accent focus:text-accent-foreground focus:outline-none focus:ring-1 focus:ring-primary",
             "aria-selected:opacity-100 touch-manipulation text-xs sm:text-sm",
-            "active:scale-95"
+            "active:scale-95 flex items-center justify-center"
           ),
-          day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md ring-2 ring-primary ring-offset-1",
-          day_today: "bg-accent text-accent-foreground font-semibold ring-1 sm:ring-2 ring-primary/20",
-          day_outside: "text-muted-foreground/60 opacity-60 hover:opacity-100 transition-opacity",
-          day_disabled: "text-muted-foreground/30 opacity-30 cursor-not-allowed line-through pointer-events-none",
+          day_selected: "bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground focus:bg-primary focus:text-primary-foreground shadow-md ring-1 sm:ring-2 ring-primary ring-offset-1",
+          day_today: "bg-accent text-accent-foreground font-semibold ring-1 ring-primary/30",
+          day_outside: "text-muted-foreground/50 opacity-50 hover:opacity-80 transition-opacity",
+          day_disabled: "text-muted-foreground/20 opacity-20 cursor-not-allowed line-through pointer-events-none",
           day_range_middle: "aria-selected:bg-accent aria-selected:text-accent-foreground",
           day_hidden: "opacity-0"
-        }} 
+        }}
         modifiers={{
           holiday: date => getDateModifiers(date) === 'holiday',
           closed: date => getDateModifiers(date) === 'closed',
